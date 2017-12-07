@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Root>
+    <A />
+    <Region>
+        <B />
+        <C />
+        <Region>
+            <D />
+        </Region>
+        <E />
+        <F />
+    </Region>
+    <G />
+</Root>

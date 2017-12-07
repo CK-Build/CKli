@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <LangVersion>7.1</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CK.Env.FileSystem\CK.Env.FileSystem.csproj" />
+    <ProjectReference Include="..\CK.Env.XTyping\CK.Env.XTyping.csproj" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Physical" Version="2.0.0" />
+    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="9.0.0" />
+    <PackageReference Include="LibGit2Sharp" Version="0.25.0-preview-0033" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Folder Include="Referential\" />
+  </ItemGroup>
+
+</Project>

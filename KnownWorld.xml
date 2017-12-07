@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<KnownWorld>
+
+    <ReferentialFolder Path="CK-Env/CKli/Referential" />
+
+    <Reusable Name="StandardCodeCake">
+        
+    </Reusable>
+    
+    <Folder Name="CK-Core-Projects">
+        <GitFolder Name="CK-Text">
+            <Branch Name="master">
+                <Reuse Name="StandardCodeCake" />
+                <Folder Name="Common">
+                    <MustExist />
+                </Folder>
+            </Branch>
+        </GitFolder>
+        <GitFolder Name="CK-Core">
+        </GitFolder>
+        <GitFolder Name="CK-ActivityMonitor">
+        </GitFolder>
+    </Folder>
+    <File Name="CK-World">
+        <MustExist Content="SimpleFiles/CK-World"/>
+    </File>
+</KnownWorld>
