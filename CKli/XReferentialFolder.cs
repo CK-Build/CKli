@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using Microsoft.Extensions.FileProviders;
+using CK.Text;
 
 namespace CKli
 {
@@ -24,6 +25,10 @@ namespace CKli
             initializer.Services.Add( this );
         }
 
+
+        /// <summary>
+        /// Gets the file provider of this referential folder.
+        /// </summary>
         public IFileProvider FileProvider { get; }
 
 
@@ -62,13 +67,6 @@ namespace CKli
                 }
             }
             return default( T );
-        }
-
-        public void Copy( IFileInfo refSource, NormalizedPath itemPathDestination, bool overwrite )
-        {
-            using( var s = refSource.CreateReadStream() )
-            {
-            }
         }
     }
 }

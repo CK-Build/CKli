@@ -6,6 +6,7 @@ using System.IO;
 using System.Text;
 using CK.Env;
 using Microsoft.Extensions.FileProviders;
+using CK.Text;
 
 namespace CKli
 {
@@ -15,58 +16,84 @@ namespace CKli
     {
         IFileInfo _fileInfo;
         IDirectoryContents _contents;
+        FileProviderContentInfo _contentInfo;
 
         public XPathItem(
             Initializer initializer,
             FileSystem fs,
             XPathItem parent = null )
+            : this( initializer, fs, parent?.FullPath ?? new NormalizedPath() )
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new <see cref="XPathItem"/> where <see cref="IsFolder"/> is true
+        /// unless the Xml element name is File. The element must have a "Name" attribute
+        /// that will be used as the <see cref="Name"/> and appended to the <paramref name="parentPath"/>
+        /// to build this <see cref="FullPath"/>.
+        /// </summary>
+        /// <param name="initializer">Initializer object.</param>
+        /// <param name="fs">Root file system object.</param>
+        /// <param name="parentPath">Parent path.</param>
+        public XPathItem(
+            Initializer initializer,
+            FileSystem fs,
+            NormalizedPath parentPath )
             : base( initializer )
         {
             FileSystem = fs;
-            IsFolder = initializer.Element.Name == "Folder";
-            FullPath = (parent?.FullPath ?? new NormalizedPath()).AppendPart( (string)initializer.Element.AttributeRequired( "Name" ) );
+            Kind = initializer.Element.Name == "File" ? FileSystemItemKind.File : FileSystemItemKind.Directory;
+            FullPath = parentPath.AppendPart( (string)initializer.Element.AttributeRequired( "Name" ) );
             initializer.ChildServices.Add( this );
         }
 
+        /// <summary>
+        /// Gets the <see cref="FileSystem"/> to which this item belongs.
+        /// </summary>
         public FileSystem FileSystem { get; }
 
+        /// <summary>
+        /// Gets this item name (the <see cref="NormalizedPath.LastPart"/> of the <see cref="<see cref="FullPath"/>"/>).
+        /// </summary>
         public string Name => FullPath.LastPart;
 
+        /// <summary>
+        /// Gets the path of this item relative to the <see cref="FileSystem"/> object.
+        /// </summary>
         public NormalizedPath FullPath { get; }
 
-        public bool IsFolder { get; }
+        /// <summary>
+        /// Gets whether this item is a folder.
+        /// </summary>
+        public bool IsFolder => Kind == FileSystemItemKind.Directory;
 
-        public string KindName => IsFolder ? "Folder" : "Item";
+        /// <summary>
+        /// Gets this item kind (<see cref="FileSystemItemKind.File"/> or <see cref="FileSystemItemKind.Directory"/>).
+        /// </summary>
+        public FileSystemItemKind Kind { get; }
 
+        /// <summary>
+        /// Gets the <see cref="IFileInfo"/> in the <see cref="FileSystem"/>.
+        /// </summary>
         public IFileInfo FileInfo => _fileInfo ?? (_fileInfo = FileSystem.GetFileInfo( FullPath ));
 
+        /// <summary>
+        /// Gets the <see cref="IDirectoryContents"/> or null if <see cref="IsFolder"/> is false.
+        /// </summary>
         public IDirectoryContents DirectoryContents => _contents ?? (_contents = FileInfo.IsDirectory ? FileSystem.GetDirectoryContents( FullPath ) : null);
+
+        /// <summary>
+        /// Gets the full <see cref="FileProviderContentInfo"/> of this item in <see cref="FileSystem"/>.
+        /// </summary>
+        public FileProviderContentInfo ContentInfo => _contentInfo ?? (_contentInfo = new FileProviderContentInfo( FileSystem, FullPath ));
 
         protected override void Reset( IRunContext ctx )
         {
             _fileInfo = null;
             _contents = null;
+            _contentInfo = null;
         }
 
-        public bool CopyFrom( IActivityMonitor m, XReferentialFolder referential, NormalizedPath source )
-        {
-            if( IsFolder )
-            {
-                var refDir = referential.ObtainContentReference<IDirectoryContents>( m, source );
-                if( refDir != null )
-                {
-                    return FileSystem.CopyTo( m, refDir, source );
-                }
-            }
-            else
-            {
-                var refFile = referential.ObtainContentReference<IFileInfo>( m, source );
-                if( refFile != null )
-                {
-                    return FileSystem.CopyTo( m, refFile, source );
-                }
-            }
-            return false;
-        }
+        public override string ToString() => FullPath;
     }
 }

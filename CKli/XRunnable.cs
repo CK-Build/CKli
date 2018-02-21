@@ -39,12 +39,9 @@ namespace CKli
         {
             var p = (XRunnable)initializer.Parent;
             Ignore |= p?.Ignore ?? false;
-            XElementName = initializer.Element.Name.ToString();
         }
 
         public bool Ignore { get; private set; }
-
-        string XElementName { get; }
 
         public new IEnumerable<XRunnable> Children => base.Children.Cast<XRunnable>();
 
@@ -55,10 +52,10 @@ namespace CKli
         /// <returns>True on success, false if a severe error occurred.</returns>
         public bool Run( IRunContext ctx )
         {
-            if( Ignore ) ctx.Monitor.Trace( $"Skipping {XElementName}." );
+            if( Ignore ) ctx.Monitor.Trace( $"Skipping {ToString()}." );
             else
             {
-                using( ctx.Monitor.OpenInfo( $"Running {XElementName}." ) )
+                using( ctx.Monitor.OpenInfo( $"Running {ToString()}." ) )
                 {
                     Reset( ctx );
                     return DoRun( ctx );

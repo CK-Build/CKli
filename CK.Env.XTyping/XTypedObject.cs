@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -59,25 +60,60 @@ namespace CK.Env
 
         protected XTypedObject( Initializer initializer )
         {
+            Parent = initializer.Parent;
+            XElement = initializer.Element;
             var a = initializer.Element.FirstAttribute;
             while( a != null )
             {
                 var p = GetType().GetProperty( a.Name.LocalName );
                 if( p != null && p.CanWrite )
                 {
-                    var v = Convert.ChangeType( a.Value, p.PropertyType );
+                    object v;
+                    if( p.PropertyType == typeof(NormalizedPath))
+                    {
+                        v = new NormalizedPath( a.Value );
+                    }
+                    else v = Convert.ChangeType( a.Value, p.PropertyType );
                     p.SetValue( this, v );
                 }
                 a = a.NextAttribute;
             }
         }
 
+        /// <summary>
+        /// Gets the parent typed object.
+        /// </summary>
+        public XTypedObject Parent { get; }
+
+        /// <summary>
+        /// Gets the children typed objects.
+        /// This is available right before <see cref="OnCreated(Initializer)"/> is called. 
+        /// </summary>
         public IReadOnlyList<XTypedObject> Children { get; private set; }
 
-        protected virtual void OnCreated( Initializer initializer )
+        /// <summary>
+        /// Gets the raw <see cref="XElement"/>.
+        /// Unfortunaltely, there is no read-only view of XElement, this should not be mutated
+        /// otherwise an InvalidOperationException is thrown.
+        /// </summary>
+        public XElement XElement { get; }
+
+        /// <summary>
+        /// Called once the <see cref="Children"/> are available.
+        /// Does nothing at this level (returns true).
+        /// </summary>
+        /// <param name="initializer">The object intializer.</param>
+        /// <returns>True on success, false on error (errors must be logged into <see cref="Initializer.Monitor"/>).</returns>
+        protected virtual bool OnCreated( Initializer initializer )
         {
+            return true;
         }
 
+        /// <summary>
+        /// Gets all the descendants of a given type.
+        /// </summary>
+        /// <typeparam name="T">Type of the descendants that must be enumerated.</typeparam>
+        /// <returns>The set of typed descendants.</returns>
         public IEnumerable<T> Descendants<T>()
         {
             foreach( var c in Children )
@@ -90,11 +126,16 @@ namespace CK.Env
             }
         }
 
-        internal void OnChildrenCreated( Initializer initializer, IReadOnlyList<XTypedObject> children )
+        internal bool OnChildrenCreated( Initializer initializer, IReadOnlyList<XTypedObject> children )
         {
             Children = children;
-            OnCreated( initializer );
+            return OnCreated( initializer );
         }
 
+        /// <summary>
+        /// Overridden to return the XElement name.
+        /// </summary>
+        /// <returns>The XElement name.</returns>
+        public override string ToString() => XElement.Name.LocalName;
     }
 }

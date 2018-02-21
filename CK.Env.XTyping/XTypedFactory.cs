@@ -97,13 +97,23 @@ namespace CK.Env
 
         public XTypedObject CreateInstance( IActivityMonitor monitor, XElement e, IServiceProvider baseProvider = null, Type type = null )
         {
-            if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
-            if( _typeRegister.Count == 0 ) AutoRegisterFromLoadedAssemblies();
+            using( monitor.OpenDebug( "Creating XTypedObject from XElement." ) )
+            {
+                if( e == null ) throw new ArgumentNullException( nameof( e ) );
+                if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
+                if( _typeRegister.Count == 0 ) AutoRegisterFromLoadedAssemblies();
 
-            var typedRoot = TypedXml.Create( e, GetMappping, type );
-            var rootConfig = new XTypedObject.Initializer( monitor, typedRoot, baseProvider );
-            var root = (XTypedObject)baseProvider.SimpleObjectCreate( monitor, typedRoot.Type, rootConfig );
-            return root != null && CreateChildren( root, rootConfig ) ? root : null;
+                e.Changing += PreventAnyChangesToXElement;
+                var typedRoot = TypedXml.Create( e, GetMappping, type );
+                var rootConfig = new XTypedObject.Initializer( monitor, typedRoot, baseProvider );
+                var root = (XTypedObject)baseProvider.SimpleObjectCreate( monitor, typedRoot.Type, rootConfig );
+                return root != null && CreateChildren( root, rootConfig ) ? root : null;
+            }
+        }
+
+        private void PreventAnyChangesToXElement( object sender, XObjectChangeEventArgs e )
+        {
+            throw new InvalidOperationException( "An XElement that is bound to a TypedObject must not be changed." );
         }
 
         static bool CreateChildren( XTypedObject parent, XTypedObject.Initializer parentConfig )
@@ -118,8 +128,7 @@ namespace CK.Env
                 var o = created[i] = (XTypedObject)cChild.SimpleObjectCreate( parentConfig.Monitor, c.Type, config );
                 if( o == null || !CreateChildren( o, config ) ) return false;
             }
-            parent.OnChildrenCreated( parentConfig, created );
-            return true;
+            return parent.OnChildrenCreated( parentConfig, created );
         }
 
 

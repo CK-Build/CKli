@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Xml.Linq;
 using System.Linq;
 using CK.Env;
+using System.Text.RegularExpressions;
 
 namespace CKli
 {
@@ -45,64 +46,75 @@ namespace CKli
             var rootPath = GetRootPath( args );
             using( var global = new GlobalContext( monitor, xFactory, rootPath ) )
             {
-                if( global.Open() )
+                if( !InteractiveRun( monitor, global ) ) Console.ReadLine();
+            }
+        }
+
+        static bool InteractiveRun( ActivityMonitor monitor, GlobalContext global )
+        {
+            if( !global.Open() ) return false;
+            for(; ; )
+            {
+                global.DisplayIssues( Console.Out, true );
+                global.DisplayActions( Console.Out );
+                Console.WriteLine( $"exit | r[estart] | d[esc] #issue | f[ix] #issue | a[ction] #action" );
+                Console.Write( $">" );
+                string rep = Console.ReadLine().Trim();
+                if( rep.Length == 0 )
                 {
-                    for(; ; )
+                    if( !global.Run() ) return false;
+                    continue;
+                }
+                if( rep[0] == 'e' ) return true;
+                if( rep[0] == 'r' )
+                {
+                    if( !global.Open() ) return false;
+                    continue;
+                }
+                if( rep[0] == 'a' )
+                {
+                    int act = ReadNumber( rep );
+                    if( act < 0 || act >= global.Actions.Count )
                     {
-                        global.DisplayIssues( Console.Out );
-                        Console.WriteLine( $"exit | r[estart] | d[esc] #issue | f[ix] #issue" );
-                        Console.Write( $">" );
-                        string rep;
-                        while( (rep = Console.ReadLine().Trim()).Length == 0 );
-                        if( rep[0] == 'e' ) break;
-                        if( rep[0] == 'r' )
-                        {
-                            if( !global.Open() ) break;
-                            continue;
-                        }
+                        Console.WriteLine( $"Invalid action number." );
+                    }
+                    else
+                    {
+                        global.Actions[act].Run( monitor );
+                    }
+                    continue;
+                }
+                if( rep[0] == 'd' || rep[0] == 'f' )
+                {
+                    int iss = ReadNumber( rep );
+                    if( iss < 0 || iss >= global.Issues.Count )
+                    {
+                        Console.WriteLine( $"Invalid issue number." );
+                    }
+                    else
+                    {
                         if( rep[0] == 'd' )
                         {
-                            int iss = GetIssueNumber( rep );
-                            if( iss < 0 || iss > global.I)
+                            Console.WriteLine( global.Issues[iss].ToString() );
+                            Console.WriteLine( global.Issues[iss].Description );
+                        }
+                        else
+                        {
+                            global.Issues[iss].AutoFix( monitor );
+                            Console.WriteLine( "<<Hit a key>>" );
+                            Console.ReadKey();
+                            if( !global.Run() ) return false;
                         }
                     }
                 }
             }
+        }
 
-            var fs = new FileSystem( rootPath );
-            var issues = new IssueCollector();
-            var baseProvider = new SimpleServiceContainer();
-            baseProvider.Add<ISimpleObjectActivator>( new SimpleObjectActivator() );
-            baseProvider.Add( fs );
-            baseProvider.Add( issues );
-
-            var knownWorldPath = Path.Combine( rootPath, "CK-Env", "KnownWorld.xml" );
-            var w = xFactory.CreateInstance<XRunnable>( monitor, XDocument.Load( knownWorldPath ).Root, baseProvider );
-            if( w != null )
-            {
-                var runContext = new XRunnable.DefaultContext( monitor );
-                if( !w.Run( runContext ) )
-                {
-                    monitor.Error( "Failed Run." );
-                }
-                else
-                {
-                    int fixCount = 0;
-                    foreach( var i in issues.Issues )
-                    {
-                        if( i.HasAutoFix ) ++fixCount;
-                        Console.WriteLine( $"{i.Number} {(i.HasAutoFix ? "*" : " ")} - {i.MaxLevel} - {i.Title}" );
-                    }
-                    if( fixCount > 0 )
-                    {
-                        Console.WriteLine( $"{fixCount} automatic fixes available." );
-                    }
-                    Console.WriteLine( $"exit | r[un] | d[esc] #issue | f[ix] #issue" );
-                    Console.Write( $">" );
-                }
-            }
-
-            Console.ReadLine();
+        static int ReadNumber( string rep )
+        {
+            Match m = Regex.Match( rep, @"\d+" );
+            if( !m.Success ) return -1;
+            return Int32.TryParse( m.Value, out int iss ) ? iss : -2;
         }
     }
 }

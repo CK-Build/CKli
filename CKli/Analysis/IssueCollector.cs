@@ -44,6 +44,12 @@ namespace CK.Env.Analysis
                 return _fix?.Invoke( monitor ) ?? true;
             }
 
+            public string ToString( bool withDescription )
+            {
+                var s = ToString();
+                if( withDescription ) s += Environment.NewLine + Description;
+                return s;
+            }
             public override string ToString() => $"{Number} {(HasAutoFix ? "*" : " ")} - {MaxLevel} - {Title}";
 
         }
@@ -55,15 +61,15 @@ namespace CK.Env.Analysis
 
         public void Clear() => _issues.Clear();
 
-        public IReadOnlyList<IIssue> Issues { get; }
+        public IReadOnlyList<IIssue> Issues => _issues;
 
-        public void DisplayIssues( TextWriter w )
+        public void DisplayIssues( TextWriter w, bool withDescription )
         {
             int fixCount = 0;
             foreach( var i in _issues )
             {
                 if( i.HasAutoFix ) ++fixCount;
-                Console.WriteLine( i.ToString() );
+                Console.WriteLine( i.ToString( withDescription ) );
             }
             if( fixCount > 0 )
             {

@@ -9,47 +9,16 @@ using NUnit.Framework;
 using System.Runtime.CompilerServices;
 using CK.Core;
 using System.Xml.Linq;
+using static CK.Testing.MonitorTestHelper;
+using CK.Text;
 
 namespace CK.Env.Tests
 {
-    static class TestHelper
+    static class LocalTestHelper
     {
-        static string _solutionFolder;
-        static string _worldFolder;
+        static NormalizedPath _worldFolder;
 
-        static IActivityMonitor _monitor;
-        static ActivityMonitorConsoleClient _console;
-
-        static TestHelper()
-        {
-            _monitor = new ActivityMonitor();
-            // Do not pollute the console by default... LogsToConsole does the job.
-            _console = new ActivityMonitorConsoleClient();
-            LogsToConsole = true;
-        }
-
-        public static IActivityMonitor Monitor => _monitor;
-
-        public static bool LogsToConsole
-        {
-            get { return _monitor.Output.Clients.Contains( _console ); }
-            set
-            {
-                if( value ) _monitor.Output.RegisterUniqueClient( c => c == _console, () => _console );
-                else _monitor.Output.UnregisterClient( _console );
-            }
-        }
-
-        public static string SolutionFolder
-        {
-            get
-            {
-                if( _solutionFolder == null ) InitalizePaths();
-                return _solutionFolder;
-            }
-        }
-
-        public static string XmlInputFolder => Path.Combine( SolutionFolder, "Tests", "CK.Env.Tests", "XmlInput" );
+        public static NormalizedPath XmlInputFolder => TestHelper.SolutionFolder.Combine( "Tests/CK.Env.Tests/XmlInput" );
 
         public static XElement LoadXmlInput( string name )
         {
@@ -57,15 +26,20 @@ namespace CK.Env.Tests
             return XDocument.Load( p ).Root;
         }
 
-        public static string WorldFolder
+        /// <summary>
+        /// Gets a small world: that contains one Git repository (), a copy of the
+        /// solution KnownWorld.xml a directory with a compy of this file int it and
+        /// an empty directory.
+        /// </summary>
+        public static NormalizedPath WorldFolder
         {
             get
             {
                 if( _worldFolder == null )
                 {
-                    _worldFolder = Path.Combine( SolutionFolder, "Tests", "World" );
-                    var gitRepo = Path.Combine( _worldFolder, "TestGitRepository" );
-                    string gitPath = gitRepo + @"\.git";
+                    _worldFolder = TestHelper.SolutionFolder.Combine( "Tests/World" );
+                    var gitRepo = _worldFolder.Combine( "TestGitRepository" );
+                    var gitPath = gitRepo.AppendPart( ".git" );
                     if( !Directory.Exists( gitPath ) )
                     {
                         // Let any exceptions be thrown here: if we can't have a copy of the test repository, it 
@@ -85,24 +59,13 @@ namespace CK.Env.Tests
                         // Fetch fails. We don't care.
                         Console.WriteLine( "Warning: Fetching the TestGitRepository (https://github.com/SimpleGitVersion/TestGitRepository.git) failed. Check the internet connection. Error: {0}.", ex.Message );
                     }
-                    File.Copy( SolutionFolder + "/KnownWorld.xml", WorldFolder + "/KnownWorld.xml", true );
+                    File.Copy( TestHelper.SolutionFolder.AppendPart( "KnownWorld.xml" ), WorldFolder.AppendPart( "KnownWorld.xml" ), true );
                     Directory.CreateDirectory( _worldFolder + "/SubDir" );
                     File.Copy( ThisFile(), _worldFolder + "/SubDir/Text.txt", true );
                     Directory.CreateDirectory( _worldFolder + "/EmptyDir" );
                 }
                 return _worldFolder;
             }
-        }
-
-        static void InitalizePaths()
-        {
-            string p = ThisFile();
-            do
-            {
-                p = Path.GetDirectoryName( p );
-            }
-            while( !Directory.Exists( Path.Combine( p, ".git" ) ) );
-            _solutionFolder = p;
         }
 
         static string ThisFile( [CallerFilePath]string p = null ) => p;

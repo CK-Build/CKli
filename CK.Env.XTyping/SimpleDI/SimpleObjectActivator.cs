@@ -71,7 +71,7 @@ namespace CK.Core
                 }
                 if( failCount > 0 )
                 {
-                    monitor.OpenError( $"Unable to resolve parameters for '{t.FullName}'. Considered longest constructor: {longestCtor.Ctor.ToString()}." );
+                    monitor.Error( $"Unable to resolve parameters for '{t.FullName}'. Considered longest constructor: {longestCtor.Ctor.ToString()}." );
                     return null;
                 }
                 return longestCtor.Ctor.Invoke( longestCtor.Mapped );

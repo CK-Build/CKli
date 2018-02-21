@@ -1,14 +1,14 @@
 {
   "profiles": {
-    "GUI Debug": {
+    "GUI-Debug": {
       "commandName": "Executable",
-      "executablePath": "C:\\Dev\\NUnit-Gui\\NUnit-Gui-0.6.0\\nunit-gui.exe",
-      "commandLineArgs": "bin\\Debug\\netstandard2.0\\CK.Env.Tests.dll"
+      "executablePath": "%USERPROFILE%\\.nuget\\packages\\nunit.runners.net4\\2.6.4\\tools\\nunit.exe",
+      "commandLineArgs": "bin\\Debug\\net461\\CK.Env.Tests.dll"
     },
-    "GUI Release": {
+    "GUI-Release": {
       "commandName": "Executable",
-      "executablePath": "C:\\Dev\\NUnit-Gui\\NUnit-Gui-0.6.0\\nunit-gui.exe",
-      "commandLineArgs": "bin\\Release\\netstandard2.0\\CK.Env.Tests.dll"
+      "executablePath": "%USERPROFILE%\\.nuget\\packages\\nunit.runners.net4\\2.6.4\\tools\\nunit.exe",
+      "commandLineArgs": "bin\\Release\\net461\\CK.Env.Tests.dll"
     }
   }
 }

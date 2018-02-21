@@ -15,6 +15,7 @@ namespace CKli
         readonly XTypedFactory _factory;
         readonly string _rootPath;
         readonly IssueCollector _issues;
+        readonly List<XEnvAction> _actions;
         FileSystem _fs;
         XRunnable _root;
 
@@ -24,6 +25,7 @@ namespace CKli
             _factory = factory;
             _rootPath = rootPath;
             _issues = new IssueCollector();
+            _actions = new List<XEnvAction>();
         }
 
         public bool Open()
@@ -34,8 +36,11 @@ namespace CKli
             baseProvider.Add<ISimpleObjectActivator>( new SimpleObjectActivator() );
             baseProvider.Add( _fs );
             baseProvider.Add( _issues );
+            baseProvider.Add( _actions );
             var knownWorldPath = Path.Combine( _rootPath, "CK-Env", "KnownWorld.xml" );
-            _root = _factory.CreateInstance<XRunnable>( _monitor, XDocument.Load( knownWorldPath ).Root, baseProvider );
+            var original = XDocument.Load( knownWorldPath ).Root;
+            var expanded = XTypedFactory.PreProcess( _monitor, original );
+            _root = _factory.CreateInstance<XRunnable>( _monitor, expanded, baseProvider );
             return _root != null;
         }
 
@@ -51,9 +56,21 @@ namespace CKli
             return true;
         }
 
-        public void DisplayIssues( TextWriter w ) => _issues.DisplayIssues( w );
+        public void DisplayIssues( TextWriter w, bool withDescription ) => _issues.DisplayIssues( w, withDescription );
 
-        public void FixIssue( int issueNumber ) => _issues.FixIssue( _monitor, issueNumber );
+        public void DisplayActions( TextWriter w )
+        {
+            w.WriteLine( $"{_actions.Count} Actions:" );
+            foreach( var a in _actions )
+            {
+                w.Write( " > " );
+                w.WriteLine( a.ToString() );
+            }
+        }
+
+        public IReadOnlyList<IIssue> Issues => _issues.Issues;
+
+        public IReadOnlyList<XEnvAction> Actions => _actions;
 
         public void Close()
         {
@@ -63,6 +80,7 @@ namespace CKli
                 _fs = null;
                 _root = null;
                 _issues.Clear();
+                _actions.Clear();
             }
         }
 

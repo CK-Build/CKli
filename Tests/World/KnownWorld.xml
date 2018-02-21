@@ -1,23 +1,79 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <KnownWorld>
-    <Reusable Name="StandardCodeCake">
-        
+
+    <ReferentialFolder Path="CK-Env/CKli/Referential" />
+
+    <Reusable Name="StandardFiles">
+        <File Name="NuGet.config">
+            <MustExist Content="SimpleFiles/NuGet.config"/>
+        </File>
+        <Folder Name="Common">
+            <MustExist />
+            <MustExist Content="SimpleFiles/SharedKey.snk"/>
+        </Folder>
     </Reusable>
+    
     <Folder Name="CK-Core-Projects">
-        <GitFolder Name="CK-Text">
-            <Branch Name="master">
-                <Reuse Name="StandardCodeCake" />
-                <Folder Name="Common">
-                    <MustExist />
-                </Folder>
+
+        <GitFolder Name="CK-ActivityMonitor">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
             </Branch>
         </GitFolder>
+
+        <GitFolder Name="CK-Auth-Abstractions">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
         <GitFolder Name="CK-Core">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
         </GitFolder>
-        <GitFolder Name="CK-ActivityMonitor">
+
+        <GitFolder Name="CK-Monitoring">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
         </GitFolder>
+
+        <GitFolder Name="CK-Reflection">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-Testing">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-Text">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-WeakAssemblyNameResolver">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
     </Folder>
+    
     <File Name="CK-World">
-        <MustExist />
+        <MustExist Content="SimpleFiles/CK-World"/>
     </File>
 </KnownWorld>

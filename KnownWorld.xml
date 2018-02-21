@@ -3,24 +3,174 @@
 
     <ReferentialFolder Path="CK-Env/CKli/Referential" />
 
-    <Reusable Name="StandardCodeCake">
-        
+    <Reusable Name="StandardFiles">
+        <File Name="NuGet.config">
+            <MustExist Content="SimpleFiles/NuGet.config"/>
+        </File>
+        <Folder Name="Common">
+            <MustExist />
+            <File Name="SharedKey.snk">
+                <MustExist Content="SimpleFiles/SharedKey.snk"/>
+            </File>
+        </Folder>
     </Reusable>
-    
-    <Folder Name="CK-Core-Projects">
-        <GitFolder Name="CK-Text">
-            <Branch Name="master">
-                <Reuse Name="StandardCodeCake" />
-                <Folder Name="Common">
-                    <MustExist />
-                </Folder>
+
+    <Folder Name="CK-AspNet-Projects">
+
+        <GitFolder Name="CK-AspNet">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
             </Branch>
         </GitFolder>
-        <GitFolder Name="CK-Core">
+
+        <GitFolder Name="CK-AspNet-Auth">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
         </GitFolder>
-        <GitFolder Name="CK-ActivityMonitor">
+
+        <GitFolder Name="CK-AspNet-Tester">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
         </GitFolder>
+
     </Folder>
+
+    <Folder Name="CK-Core-Projects">
+
+        <GitFolder Name="CK-ActivityMonitor">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-Auth-Abstractions">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-Core">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-Monitoring">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-Reflection">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-Testing">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-Text">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-WeakAssemblyNameResolver">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+    </Folder>
+
+    <Folder Name="CK-Database-Projects" >
+
+        <GitFolder Name="CK-CodeGen">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-Database">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-DB">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-Setup">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-Setup-Dependency">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CKSetupRemoteStore">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-SqlServer-Parser">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-SqlServer-Parser-Model">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+    </Folder>
+
+    <Folder Name="Yodii-Projects">
+
+        <GitFolder Name="Yodii-Script">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+        
+    </Folder>
+
     <File Name="CK-World">
         <MustExist Content="SimpleFiles/CK-World"/>
     </File>

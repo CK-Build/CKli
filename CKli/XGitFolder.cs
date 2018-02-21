@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using CK.Core;
 
 namespace CKli
 {
@@ -13,7 +14,8 @@ namespace CKli
             XPathItem parent)
             : base(initializer, parent.FileSystem, parent)
         {
-            IsFolder = true;
+            initializer.ChildServices.Add( this );
+            FileSystem.EnsureGitFolder( FullPath );
         }
 
     }

@@ -20,29 +20,144 @@ namespace CK.Env
         readonly HeadFolder _headFolder;
         readonly BranchesFolder _branchesFolder;
         readonly RemotesFolder _remoteBranchesFolder;
+        readonly string[] _onlyBranches;
+        string _dirtyDescription;
         bool _branchRefreshed;
 
-        internal GitFolder( FileSystem fs, string gitFolder )
+        internal GitFolder( FileSystem fs, string gitFolder, IEnumerable<string> onlyBranches = null )
         {
             Debug.Assert( gitFolder.StartsWith( fs.Root.Path ) && gitFolder.EndsWith( ".git" ) );
+            _onlyBranches = onlyBranches?.ToArray();
             FullPath = new NormalizedPath( gitFolder.Remove( gitFolder.Length - 4 ) );
             SubPath = FullPath.RemovePrefix( fs.Root );
             if( SubPath.IsEmpty ) throw new InvalidOperationException( "Root path can not be a Git folder." );
             FileSystem = fs;
             _git = new Repository( gitFolder );
             _headFolder = new HeadFolder( this );
-            _branchesFolder = new BranchesFolder( this, "branches", false );
+            _branchesFolder = new BranchesFolder( this, "branches", isRemote:false );
             _remoteBranchesFolder = new RemotesFolder( this );
             _thisDir = new RootDir( this, SubPath.LastPart );
         }
 
+        /// <summary>
+        /// Gets the full path that starts with the <see cref="FileSystem"/>' root path.
+        /// </summary>
         public NormalizedPath FullPath { get; }
 
+        /// <summary>
+        /// Get the path relative to the <see cref="FileSystem"/>.
+        /// </summary>
         public NormalizedPath SubPath { get; }
         
         public string Name => _thisDir.Name;
 
         public FileSystem FileSystem { get; }
+
+        public string CurrentBranchName
+        {
+            get
+            {
+                return _git.Head.FriendlyName;
+            }
+        }
+
+        /// <summary>
+        /// Gets a string that describes local modifications that are not committed or a null string
+        /// if the working folder is clean.
+        /// </summary>
+        /// <param name="refresh">True to recompute this description.</param>
+        /// <returns>The dirty description or null.</returns>
+        public string GetDirtyDescription( bool refresh = false )
+        {
+            if( _dirtyDescription == null || refresh ) _dirtyDescription = ComputeDirtyString();
+            return _dirtyDescription;
+        }
+
+        /// <summary>
+        /// Attempts to check out a branch.
+        /// There must not be any uncommitted changes, the branch must exist and, if branch names
+        /// are restricted, it must belong to the authorized ones.
+        /// If the branch exists only in the "origin" remote, a local branch is automatically
+        /// created that tracks the remote one.
+        /// </summary>
+        /// <param name="m">The monitor.</param>
+        /// <param name="branchName">The name of the branch.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool Checkout( IActivityMonitor m, string branchName )
+        {
+            try
+            {
+                if( GetDirtyDescription() != null )
+                {
+                    using( m.OpenError( $"Current working folder '{SubPath}' has uncommited changes." ) )
+                    {
+                        m.Info( _dirtyDescription );
+                    }
+                    return false;
+                }
+                if( _onlyBranches != null && !_onlyBranches.Contains( branchName ) )
+                {
+                    m.Error( $"Branch {branchName} is not explcitly allowed to be modified." );
+                    return false;
+                }
+                Branch b = _git.Branches[branchName];
+                if( b == null )
+                {
+                    var remote = _git.Branches["origin/" + branchName];
+                    if( remote == null )
+                    {
+                        m.Error( $"Branch {branchName} not found." );
+                        return false;
+                    }
+                    b = _git.Branches.Add( branchName, remote.Tip );
+                    b = _git.Branches.Update( b, u => u.TrackedBranch = remote.CanonicalName );
+                }
+                Commands.Checkout( _git, b );
+                return true;
+            }
+            catch( Exception ex )
+            {
+                m.Error( ex );
+                return false;
+            }
+        }
+
+        string ComputeDirtyString()
+        {
+            RepositoryStatus repositoryStatus = _git.RetrieveStatus();
+            int addedCount = repositoryStatus.Added.Count();
+            int missingCount = repositoryStatus.Missing.Count();
+            int removedCount = repositoryStatus.Removed.Count();
+            int stagedCount = repositoryStatus.Staged.Count();
+            StringBuilder b = null;
+            if( addedCount > 0 || missingCount > 0 || removedCount > 0 || stagedCount > 0 )
+            {
+                b = new StringBuilder( "Found: " );
+                if( addedCount > 0 ) b.AppendFormat( "{0} file(s) added", addedCount );
+                if( missingCount > 0 ) b.AppendFormat( "{0}{1} file(s) missing", b.Length > 10 ? ", " : null, missingCount );
+                if( removedCount > 0 ) b.AppendFormat( "{0}{1} file(s) removed", b.Length > 10 ? ", " : null, removedCount );
+                if( stagedCount > 0 ) b.AppendFormat( "{0}{1} file(s) staged", b.Length > 10 ? ", " : null, removedCount );
+            }
+            else
+            {
+                int fileCount = 0;
+                foreach( StatusEntry m in repositoryStatus.Modified )
+                {
+                    string path = m.FilePath;
+                    if( b == null )
+                    {
+                        b = new StringBuilder( "Modified file(s) found: " );
+                        b.Append( path );
+                    }
+                    else if( fileCount <= 10 ) b.Append( ", " ).Append( path );
+                }
+                if( fileCount > 10 ) b.AppendFormat( ", and {0} other file(s)", fileCount - 10 );
+            }
+            if( b == null ) return null;
+            b.Append( '.' );
+            return b.ToString();
+        }
+
 
         internal void Dispose()
         {
@@ -112,7 +227,7 @@ namespace CK.Env
 
             public IEnumerator<IFileInfo> GetEnumerator()
             {
-                if( _physical == null ) _physical = _f.FileSystem.DoGetDirectoryContents( _f.SubPath );
+                if( _physical == null ) _physical = _f.FileSystem.PhysicalGetDirectoryContents( _f.SubPath );
                 return _physical.GetEnumerator();
             }
 
@@ -120,7 +235,7 @@ namespace CK.Env
 
         }
 
-        class CommitFolder : BaseDirFileInfo
+        class CommitFolder : BaseDirFileInfo, IDirectoryContents
         {
             public readonly Commit Commit;
 
@@ -144,13 +259,21 @@ namespace CK.Env
 
             public IDirectoryContents GetDirectoryContents( NormalizedPath sub )
             {
-                var e = Commit.Tree[sub.ToString( '/' )];
+                if( sub.IsEmpty ) return this;
+                TreeEntry e = Commit.Tree[sub.ToString( '/' )];
                 if( e != null && e.TargetType != TreeEntryTargetType.GitLink )
                 {
                     return new TreeEntryWrapper( e, this );
                 }
                 return NotFoundDirectoryContents.Singleton;
             }
+
+            public IEnumerator<IFileInfo> GetEnumerator()
+            {
+                return Commit.Tree.Select( t => new TreeEntryWrapper( t, this ) ).GetEnumerator();
+            }
+
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         }
 
         class RemotesFolder : BaseDirFileInfo, IDirectoryContents
@@ -222,18 +345,23 @@ namespace CK.Env
 
             public override DateTimeOffset LastModified => _f._git.Head.Tip.Committer.When;
 
-            internal void Add( Branch b )
+            internal bool Add( Branch b )
             {
                 Debug.Assert( b.IsRemote == _isRemote && (!_isRemote || b.RemoteName == Name ) );
                 string name = _isRemote ? b.FriendlyName.Remove( 0, Name.Length + 1 ) : b.FriendlyName;
-                if( _branches.TryGetValue( name, out var exists ) )
+                if( _f._onlyBranches == null || _f._onlyBranches.Contains( name ) )
                 {
-                    if( exists.Commit != b.Tip )
+                    if( _branches.TryGetValue( name, out var exists ) )
                     {
-                        _branches[name] = new CommitFolder( name, b.Tip );
+                        if( exists.Commit != b.Tip )
+                        {
+                            _branches[name] = new CommitFolder( name, b.Tip );
+                        }
                     }
+                    else _branches.Add( name, new CommitFolder( name, b.Tip ) );
+                    return true;
                 }
-                else _branches.Add( name, new CommitFolder( name, b.Tip ) );
+                return false;
             }
 
             public IEnumerator<IFileInfo> GetEnumerator()
@@ -247,6 +375,7 @@ namespace CK.Env
                 if( sub.Parts.Count == 1 ) return this;
                 if( _branches.TryGetValue( sub.Parts[1], out var b ) )
                 {
+                    if( sub.Parts.Count == 2 ) return b;
                     return b.GetFileInfo( sub.RemoveParts( 0, 2 ) );
                 }
                 return null;
@@ -322,10 +451,10 @@ namespace CK.Env
         internal IFileInfo GetFileInfo( NormalizedPath sub )
         {
             if( sub.IsEmpty ) return _thisDir;
-            if( sub.FirstPart == _headFolder.Name )
+            if( IsInWorkingFolder( ref sub ) )
             {
-                if( sub.Parts.Count == 1 ) return _headFolder;
-                return FileSystem.DoGetFileInfo( SubPath.Combine( sub.RemovePart(0) ) );
+                if( sub.IsEmpty ) return _headFolder;
+                return FileSystem.PhysicalGetFileInfo( SubPath.Combine( sub ) );
             }
             RefreshBranches();
             if( sub.FirstPart == _branchesFolder.Name )
@@ -342,10 +471,10 @@ namespace CK.Env
         internal IDirectoryContents GetDirectoryContents( NormalizedPath sub )
         {
             if( sub.IsEmpty ) return _thisDir;
-            if( sub.FirstPart == _headFolder.Name )
+            if( IsInWorkingFolder( ref sub ) )
             {
-                if( sub.Parts.Count == 1 ) return _headFolder;
-                return FileSystem.DoGetDirectoryContents( SubPath.Combine( sub.RemovePart(0) ) );
+                if( sub.IsEmpty ) return _headFolder;
+                return FileSystem.PhysicalGetDirectoryContents( SubPath.Combine( sub ) );
             }
             RefreshBranches();
             if( sub.FirstPart == _branchesFolder.Name )
@@ -356,7 +485,22 @@ namespace CK.Env
             {
                 return _remoteBranchesFolder.GetDirectoryContents( sub );
             }
-            throw new NotImplementedException();
+            return NotFoundDirectoryContents.Singleton;
+        }
+
+        bool IsInWorkingFolder( ref NormalizedPath sub )
+        {
+            if( sub.FirstPart == _headFolder.Name )
+            {
+                sub = sub.RemoveFirstPart();
+                return true;
+            }
+            if( sub.Parts.Count > 1 && _git.Head.FriendlyName == sub.Parts[1] )
+            {
+                sub = sub.RemoveParts( 0, 2 );
+                return true;
+            }
+            return false;
         }
 
     }

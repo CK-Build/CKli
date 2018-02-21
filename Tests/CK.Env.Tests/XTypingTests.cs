@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Xml.Linq;
+using static CK.Testing.MonitorTestHelper;
 
 namespace CK.Env.Tests
 {
@@ -15,7 +16,7 @@ namespace CK.Env.Tests
         [Test]
         public void removing_regions()
         {
-            var original = TestHelper.LoadXmlInput( "SimpleRegions" );
+            var original = LocalTestHelper.LoadXmlInput( "SimpleRegions" );
             var originals = new HashSet<XElement>( original.DescendantsAndSelf() );
 
             var p = XTypedFactory.PreProcess( TestHelper.Monitor, original );
@@ -28,7 +29,7 @@ namespace CK.Env.Tests
         [Test]
         public void defining_reusables()
         {
-            var original = TestHelper.LoadXmlInput( "ReusableDefinitions" );
+            var original = LocalTestHelper.LoadXmlInput( "ReusableDefinitions" );
             var originals = new HashSet<XElement>( original.DescendantsAndSelf() );
 
             var p = XTypedFactory.PreProcess( TestHelper.Monitor, original );

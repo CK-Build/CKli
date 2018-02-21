@@ -20,7 +20,7 @@ namespace CK.Env.Analysis
 
         public interface IRunContextIssue : IRunContext
         {
-            void CreateFix( string title, Func<IActivityMonitor, bool> fix = null );
+            void CreateFix( string title, Func<IActivityMonitor, bool> autoFix = null );
         }
 
         class RunContextIssue : IRunContextIssue
@@ -29,7 +29,7 @@ namespace CK.Env.Analysis
             readonly XIssue _issue;
             readonly ActivityMonitorSimpleCollector _sc;
             internal string _fixTitle;
-            internal Func<IActivityMonitor, bool> _fixAction;
+            internal Func<IActivityMonitor, bool> _autoFixAction;
 
             public RunContextIssue( IRunContext c, XIssue issue, ActivityMonitorSimpleCollector sc )
             {
@@ -42,12 +42,12 @@ namespace CK.Env.Analysis
 
             public Dictionary<object, object> Items => _base.Items;
 
-            public void CreateFix( string title, Func<IActivityMonitor, bool> fix = null )
+            public void CreateFix( string title, Func<IActivityMonitor, bool> autoFix = null )
             {
-                if( title != null ) throw new ArgumentNullException( nameof( title ) );
+                if( title == null ) throw new ArgumentNullException( nameof( title ) );
                 if( _fixTitle != null ) throw new InvalidOperationException( $"Fix has already been created." );
                 _fixTitle = title;
-                _fixAction = fix;
+                _autoFixAction = autoFix;
             }
 
             internal ActivityMonitorSimpleCollector ActivityMonitorSimpleCollector => _sc;
@@ -64,7 +64,7 @@ namespace CK.Env.Analysis
                 if( !success ) return false;
                 if( ctxIssue._fixTitle != null )
                 {
-                    _collector.Add( logCollector.Entries, ctxIssue._fixTitle, ctxIssue._fixAction );
+                    _collector.Add( logCollector.Entries, ctxIssue._fixTitle, ctxIssue._autoFixAction );
                 }
                 return true;
             }
