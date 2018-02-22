@@ -53,13 +53,7 @@ namespace CK.Env
 
         public FileSystem FileSystem { get; }
 
-        public string CurrentBranchName
-        {
-            get
-            {
-                return _git.Head.FriendlyName;
-            }
-        }
+        public string CurrentBranchName => _git.Head.FriendlyName;
 
         /// <summary>
         /// Gets a string that describes local modifications that are not committed or a null string
@@ -69,7 +63,7 @@ namespace CK.Env
         /// <returns>The dirty description or null.</returns>
         public string GetDirtyDescription( bool refresh = false )
         {
-            if( _dirtyDescription == null || refresh ) _dirtyDescription = ComputeDirtyString();
+            if( _dirtyDescription == null || refresh ) _dirtyDescription = ComputeDirtyString( _git.RetrieveStatus() );
             return _dirtyDescription;
         }
 
@@ -85,46 +79,83 @@ namespace CK.Env
         /// <returns>True on success, false on error.</returns>
         public bool Checkout( IActivityMonitor m, string branchName )
         {
-            try
+            using( m.OpenInfo( $"Checking out branch '{branchName}' in '{SubPath}'." ) )
             {
-                if( GetDirtyDescription() != null )
+                try
                 {
-                    using( m.OpenError( $"Current working folder '{SubPath}' has uncommited changes." ) )
+                    if( _onlyBranches != null && !_onlyBranches.Contains( branchName ) )
                     {
-                        m.Info( _dirtyDescription );
-                    }
-                    return false;
-                }
-                if( _onlyBranches != null && !_onlyBranches.Contains( branchName ) )
-                {
-                    m.Error( $"Branch {branchName} is not explcitly allowed to be modified." );
-                    return false;
-                }
-                Branch b = _git.Branches[branchName];
-                if( b == null )
-                {
-                    var remote = _git.Branches["origin/" + branchName];
-                    if( remote == null )
-                    {
-                        m.Error( $"Branch {branchName} not found." );
+                        m.Error( $"Branch {branchName} in {SubPath} is not explicitly allowed to be modified." );
                         return false;
                     }
-                    b = _git.Branches.Add( branchName, remote.Tip );
-                    b = _git.Branches.Update( b, u => u.TrackedBranch = remote.CanonicalName );
+                    Branch b = _git.Branches[branchName];
+                    if( b != null && b.IsCurrentRepositoryHead )
+                    {
+                        m.CloseGroup( $"Already on {branchName}." );
+                        return true;
+                    }
+                    if( GetDirtyDescription() != null )
+                    {
+                        using( m.OpenError( $"Repository '{SubPath}' has uncommited changes." ) )
+                        {
+                            m.Info( _dirtyDescription );
+                        }
+                        return false;
+                    }
+                    if( b == null )
+                    {
+                        string remoteName = "origin/" + branchName;
+                        var remote = _git.Branches[remoteName];
+                        if( remote == null )
+                        {
+                            m.Error( $"Repository '{SubPath}': Local branch '{branchName}' and remote '{remoteName}' not found." );
+                            return false;
+                        }
+                        m.Info( $"Creating local branch on remote '{remoteName}'." );
+                        b = _git.Branches.Add( branchName, remote.Tip );
+                        b = _git.Branches.Update( b, u => u.TrackedBranch = remote.CanonicalName );
+                    }
+                    Commands.Checkout( _git, b );
+                    m.CloseGroup( "Done." );
+                    return true;
                 }
-                Commands.Checkout( _git, b );
-                return true;
-            }
-            catch( Exception ex )
-            {
-                m.Error( ex );
-                return false;
+                catch( Exception ex )
+                {
+                    m.Error( ex );
+                    return false;
+                }
             }
         }
 
-        string ComputeDirtyString()
+
+        public bool Commit( IActivityMonitor m, string commitMessage )
         {
-            RepositoryStatus repositoryStatus = _git.RetrieveStatus();
+            if( String.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
+            using( m.OpenInfo( $"Committing changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
+            {
+                try
+                {
+                    Commands.Stage( _git, "*" );
+                    var s = _git.RetrieveStatus();
+                    if( s.IsDirty )
+                    {
+                        m.Info( ComputeDirtyString( s ) );
+                        var author = _git.Config.BuildSignature( DateTimeOffset.Now );
+                        _git.Commit( commitMessage, author, new Signature( "CKli", "none", DateTimeOffset.Now ) );
+                    }
+                    else m.CloseGroup( "Working folder is up-to-date." );
+                    return true;
+                }
+                catch( Exception ex )
+                {
+                    m.Error( ex );
+                    return false;
+                }
+            }
+        }
+
+        static string ComputeDirtyString( RepositoryStatus repositoryStatus )
+        {
             int addedCount = repositoryStatus.Added.Count();
             int missingCount = repositoryStatus.Missing.Count();
             int removedCount = repositoryStatus.Removed.Count();
@@ -157,7 +188,6 @@ namespace CK.Env
             b.Append( '.' );
             return b.ToString();
         }
-
 
         internal void Dispose()
         {

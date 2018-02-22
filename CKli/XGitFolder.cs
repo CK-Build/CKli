@@ -15,8 +15,10 @@ namespace CKli
             : base(initializer, parent.FileSystem, parent)
         {
             initializer.ChildServices.Add( this );
-            FileSystem.EnsureGitFolder( FullPath );
+            GitFolder = FileSystem.EnsureGitFolder( FullPath );
         }
+
+        public GitFolder GitFolder { get; }
 
     }
 }

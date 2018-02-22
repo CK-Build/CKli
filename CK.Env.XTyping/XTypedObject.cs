@@ -92,6 +92,28 @@ namespace CK.Env
         public IReadOnlyList<XTypedObject> Children { get; private set; }
 
         /// <summary>
+        /// Gets the next sibling.
+        /// Null if this is the last children of the <see cref="Parent"/>.
+        /// </summary>
+        public XTypedObject NextSibling { get; private set; }
+
+        /// <summary>
+        /// Gets the next siblings.
+        /// </summary>
+        public IEnumerable<XTypedObject> NextSiblings
+        {
+            get
+            {
+                var s = NextSibling;
+                while( s != null )
+                {
+                    yield return s;
+                    s = s.NextSibling;
+                }
+            }
+        }
+
+        /// <summary>
         /// Gets the raw <see cref="XElement"/>.
         /// Unfortunaltely, there is no read-only view of XElement, this should not be mutated
         /// otherwise an InvalidOperationException is thrown.
@@ -128,8 +150,27 @@ namespace CK.Env
 
         internal bool OnChildrenCreated( Initializer initializer, IReadOnlyList<XTypedObject> children )
         {
+            XTypedObject sibling = null;
+            for( int i = children.Count-1; i >= 0; --i )
+            {
+                var c = children[i];
+                c.NextSibling = sibling;
+                c.OnSiblingsCreated( initializer.Monitor );
+                sibling = c;
+            }
             Children = children;
             return OnCreated( initializer );
+        }
+
+        /// <summary>
+        /// Called once <see cref="NextSibling"/> is available (and all the siblings up to the last child
+        /// of the <see cref="Parent"/>.
+        /// </summary>
+        /// <param name="monitor">Monitor that must be used to log any information.</param>
+        /// <returns>Must return true on success, false if an error occured.</returns>
+        protected virtual bool OnSiblingsCreated( IActivityMonitor monitor )
+        {
+            return true;
         }
 
         /// <summary>

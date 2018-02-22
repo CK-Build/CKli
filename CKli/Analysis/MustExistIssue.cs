@@ -45,24 +45,24 @@ namespace CK.Env.Analysis
             return true;
         }
 
-        protected override bool DoRun( IRunContextIssue ctx )
+        protected override bool CreateIssue( IRunContextIssue builder )
         {
             if( Item.FileInfo.Exists )
             {
                 if( Item.FileInfo.IsDirectory != Item.IsFolder )
                 {
-                    ctx.Monitor.Fatal( $"File/Directory mismatch for '{Item.FullPath}' (expected {Item.Kind})." );
+                    builder.Monitor.Fatal( $"File/Directory mismatch for '{Item.FullPath}' (expected {Item.Kind})." );
                 }
                 else
                 {
-                    using( ctx.Monitor.OpenTrace( $"{Item.Kind} '{Item.FullPath}' exists." ) )
+                    using( builder.Monitor.OpenTrace( $"{Item.Kind} '{Item.FullPath}' exists." ) )
                     {
                         FileProviderContentInfo exist = Item.ContentInfo;
                         if( exist.CaseConflicts.Count > 0 )
                         {
-                            using( ctx.Monitor.OpenFatal( $"{exist.CaseConflicts.Count} case sensitive paths detected. They must be manually eliminated." ) )
+                            using( builder.Monitor.OpenFatal( $"{exist.CaseConflicts.Count} case sensitive paths detected. They must be manually eliminated." ) )
                             {
-                                foreach( var p in exist.CaseConflicts ) ctx.Monitor.Trace( p );
+                                foreach( var p in exist.CaseConflicts ) builder.Monitor.Trace( p );
                             }
                         }
                         else
@@ -73,23 +73,23 @@ namespace CK.Env.Analysis
                                 var diffResult = exist.ComputeDiff( referential );
                                 if( diffResult.FixCasePaths.Count > 0 )
                                 {
-                                    using( ctx.Monitor.OpenFatal( $"In these {diffResult.FixCasePaths.Count} paths, casing must be strictly the same. This must be manually corrected." ) )
+                                    using( builder.Monitor.OpenFatal( $"In these {diffResult.FixCasePaths.Count} paths, casing must be strictly the same. This must be manually corrected." ) )
                                     {
-                                        foreach( var p in diffResult.FixCasePaths ) ctx.Monitor.Trace( p );
+                                        foreach( var p in diffResult.FixCasePaths ) builder.Monitor.Trace( p );
                                     }
                                 }
                                 else
                                 {
                                     if( diffResult.Differences.Count > 0 )
                                     {
-                                        using( ctx.Monitor.OpenInfo( $"{diffResult.Differences.Count} differences found." ) )
+                                        using( builder.Monitor.OpenInfo( $"{diffResult.Differences.Count} differences found." ) )
                                         {
-                                            foreach( var diff in diffResult.Differences) ctx.Monitor.Info( diff.ToString() );
+                                            foreach( var diff in diffResult.Differences) builder.Monitor.Info( diff.ToString() );
                                         }
                                         Func<IActivityMonitor, bool> fix = m => Item.FileSystem.ApplyDiff( m, diffResult );
-                                        ctx.CreateFix( "Correcting content", fix );
+                                        builder.CreateIssue( "Correcting content", fix );
                                     }
-                                    else ctx.Monitor.CloseGroup( $"Content is up to date." );
+                                    else builder.Monitor.CloseGroup( $"Content is up to date." );
                                 }
                             }
                         }
@@ -98,11 +98,11 @@ namespace CK.Env.Analysis
             }
             else
             {
-                ctx.Monitor.Error( $"Missing {Item.Kind} '{Item.FullPath}'." );
+                builder.Monitor.Error( $"Missing {Item.Kind} '{Item.FullPath}'." );
                 if( !InitialContent.IsEmpty )
                 {
                     FileProviderContentInfo referential = RefFolder.FileProvider.GetContentInfo( InitialContent );
-                    ctx.CreateFix( "Creating initial content", m => Item.FileSystem.ApplyDiff( m, Item.ContentInfo.ComputeDiff( referential ) ) );
+                    builder.CreateIssue( "Creating initial content", m => Item.FileSystem.ApplyDiff( m, Item.ContentInfo.ComputeDiff( referential ) ) );
                 }
             }
             return true;

@@ -3,6 +3,10 @@
 
     <ReferentialFolder Path="CK-Env/CKli/Referential" />
 
+    <GitStatusAction Title="Displays statuses of all the repositories." />
+    <GitCheckoutAction Title="Checkout all repositories on a specific branch name." />
+    <GitCommitAction Title="Commits all pending changes to the current branch of all the repositories." />
+
     <Reusable Name="StandardFiles">
         <File Name="NuGet.config">
             <MustExist Content="SimpleFiles/NuGet.config"/>

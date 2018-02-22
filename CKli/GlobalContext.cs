@@ -15,7 +15,7 @@ namespace CKli
         readonly XTypedFactory _factory;
         readonly string _rootPath;
         readonly IssueCollector _issues;
-        readonly List<XEnvAction> _actions;
+        readonly ActionCollector _actions;
         FileSystem _fs;
         XRunnable _root;
 
@@ -25,7 +25,7 @@ namespace CKli
             _factory = factory;
             _rootPath = rootPath;
             _issues = new IssueCollector();
-            _actions = new List<XEnvAction>();
+            _actions = new ActionCollector();
         }
 
         public bool Open()
@@ -60,8 +60,8 @@ namespace CKli
 
         public void DisplayActions( TextWriter w )
         {
-            w.WriteLine( $"{_actions.Count} Actions:" );
-            foreach( var a in _actions )
+            w.WriteLine( $"{_actions.Actions.Count} Actions:" );
+            foreach( var a in _actions.Actions )
             {
                 w.Write( " > " );
                 w.WriteLine( a.ToString() );
@@ -70,7 +70,38 @@ namespace CKli
 
         public IReadOnlyList<IIssue> Issues => _issues.Issues;
 
-        public IReadOnlyList<XEnvAction> Actions => _actions;
+        public IReadOnlyList<XAction> Actions => _actions.Actions;
+
+        public void RunAction( IActivityMonitor monitor, int idxAction )
+        {
+            var a = _actions.Actions[idxAction];
+            using( monitor.OpenInfo( $"Executing action: {a.ToString()}" ) )
+            {
+                if( a.Parameters.Count > 0 )
+                {
+                    Console.WriteLine( $"{a.Parameters.Count} parameters required (type '!cancel' to cancel):" );
+                    foreach( var p in a.Parameters )
+                    {
+                        Console.Write( $"    > {p.Name} =>" );
+                        string s;
+                        do
+                        {
+                            s = Console.ReadLine();
+                            if( s == "!cancel" )
+                            {
+                                monitor.CloseGroup( "Cancelled" );
+                                return;
+                            }
+                        }
+                        while( !p.ParseAndSet( monitor, s ) );
+                    }
+                }
+                if( !a.Run( monitor ) )
+                {
+                    monitor.CloseGroup( "Failed." );
+                }
+            }
+        }
 
         public void Close()
         {

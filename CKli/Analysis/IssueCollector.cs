@@ -87,7 +87,7 @@ namespace CK.Env.Analysis
             }
         }
 
-        internal void Add( IReadOnlyList<ActivityMonitorSimpleCollector.Entry> entries, string title, Func<IActivityMonitor, bool> fix )
+        void Add( IReadOnlyList<ActivityMonitorSimpleCollector.Entry> entries, string title, Func<IActivityMonitor, bool> fix )
         {
             var maxLevel = LogLevel.None;
             StringBuilder b = new StringBuilder();
@@ -101,5 +101,87 @@ namespace CK.Env.Analysis
             var desc = b.ToString();
             _issues.Add( new Issue( _issues.Count, maxLevel, title, desc, fix ) );
         }
+
+        /// <summary>
+        /// Implementation of <see cref="IIssueBuilder"/>.
+        /// </summary>
+        public class IssueBuilder : IIssueBuilder
+        {
+            readonly ActivityMonitorSimpleCollector _logCollector;
+            readonly IActivityMonitor _monitor;
+            internal string _fixTitle;
+            internal Func<IActivityMonitor, bool> _autoFixAction;
+
+            internal protected IssueBuilder( IActivityMonitor monitor )
+            {
+                _logCollector = new ActivityMonitorSimpleCollector() { MinimalFilter = LogLevelFilter.Debug };
+                _monitor = monitor;
+            }
+
+            public IActivityMonitor Monitor => _monitor;
+
+            internal void StartLogCollect()
+            {
+                Monitor.Output.RegisterClient( _logCollector );
+            }
+
+            public void CreateIssue( string title, Func<IActivityMonitor, bool> autoFix = null )
+            {
+                if( title == null ) throw new ArgumentNullException( nameof( title ) );
+                if( _fixTitle != null ) throw new InvalidOperationException( $"Fix has already been created." );
+                _fixTitle = title;
+                _autoFixAction = autoFix;
+            }
+
+            internal IReadOnlyList<ActivityMonitorSimpleCollector.Entry> StopLogCollect()
+            {
+                Monitor.Output.RegisterClient( _logCollector );
+                return _logCollector.Entries;
+            }
+        }
+
+        /// <summary>
+        /// Actual run of an issue factory function.
+        /// To be used only to support specialized builders.
+        /// </summary>
+        /// <typeparam name="T">Type of the builder. Must be a <see cref="IssueBuilder"/>.</typeparam>
+        /// <typeparam name="TI">Type of the builder contract provided to the factory function.</typeparam>
+        /// <param name="builder">The builder object.</param>
+        /// <param name="factory">The factory for issue. Must return false if an error occured.</param>
+        /// <returns>True on success, false if an error occured.</returns>
+        public bool RunIssueBuilder<T,TI>( T builder, Func<TI, bool> factory )
+            where T : IssueBuilder, TI
+            where TI : IIssueBuilder
+        {
+            try
+            {
+                builder.StartLogCollect();
+                bool success = factory( builder );
+                var entries = builder.StopLogCollect();
+                if( !success ) return false;
+                if( builder._fixTitle != null )
+                {
+                    Add( entries, builder._fixTitle, builder._autoFixAction );
+                }
+                return true;
+            }
+            catch( Exception ex )
+            {
+                builder.Monitor.Fatal( $"Internal error.", ex );
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Runs a factory function that can emit one issue with an optional automatic fix.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="factory">The factory for issue. Must return false if an error occured.</param>
+        /// <returns>True on success, false if an error occured.</returns>
+        public bool RunIssueFactory( IActivityMonitor m, Func<IIssueBuilder, bool> factory )
+        {
+            return RunIssueBuilder( new IssueBuilder( m ), factory );
+        }
+
     }
 }

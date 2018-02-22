@@ -43,8 +43,6 @@ namespace CKli
 
         public bool Ignore { get; private set; }
 
-        public new IEnumerable<XRunnable> Children => base.Children.Cast<XRunnable>();
-
         /// <summary>
         /// Runs this object only if <see cref="Ignore"/> is false.
         /// </summary>
@@ -79,13 +77,13 @@ namespace CKli
         protected virtual bool DoRun( IRunContext ctx ) => RunChildren( ctx );
 
         /// <summary>
-        /// Calls <see cref="Run"/> on <see cref="Children"/>.
+        /// Calls <see cref="Run"/> on <see cref="Children"/> that are <see cref="XRunnable"/> objects.
         /// </summary>
         /// <param name="ctx">The run context.</param>
         /// <returns>True on success, false if a severe error occurred.</returns>
         protected virtual bool RunChildren( IRunContext ctx )
         {
-            foreach( var c in Children )
+            foreach( var c in Children.OfType<XRunnable>() )
             {
                 if( !c.Run( ctx ) ) return false;
             }

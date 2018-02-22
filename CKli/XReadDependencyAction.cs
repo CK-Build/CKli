@@ -6,9 +6,9 @@ using System.Text;
 
 namespace CKli
 {
-    public class XReadDependency : XEnvAction
+    public class XReadDependencyAction : XAction
     {
-        public XReadDependency( Initializer intializer, List<XEnvAction> collector )
+        public XReadDependencyAction( Initializer intializer, ActionCollector collector )
             : base( intializer, collector )
         {
         }

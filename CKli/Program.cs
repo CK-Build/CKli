@@ -9,6 +9,7 @@ using System.Xml.Linq;
 using System.Linq;
 using CK.Env;
 using System.Text.RegularExpressions;
+using System.Collections.Generic;
 
 namespace CKli
 {
@@ -55,16 +56,13 @@ namespace CKli
             if( !global.Open() ) return false;
             for(; ; )
             {
+                if( !global.Run() ) return false;
                 global.DisplayIssues( Console.Out, true );
                 global.DisplayActions( Console.Out );
-                Console.WriteLine( $"exit | r[estart] | d[esc] #issue | f[ix] #issue | a[ction] #action" );
+                Console.WriteLine( $"e[xit] | r[estart] | f[ix] #issue | a[ction] #action" );
                 Console.Write( $">" );
                 string rep = Console.ReadLine().Trim();
-                if( rep.Length == 0 )
-                {
-                    if( !global.Run() ) return false;
-                    continue;
-                }
+                if( rep.Length == 0 ) continue;
                 if( rep[0] == 'e' ) return true;
                 if( rep[0] == 'r' )
                 {
@@ -80,32 +78,25 @@ namespace CKli
                     }
                     else
                     {
-                        global.Actions[act].Run( monitor );
+                        global.RunAction( monitor, act );
                     }
+                    Console.WriteLine( "<<Hit a key>>" );
+                    Console.ReadKey();
                     continue;
                 }
-                if( rep[0] == 'd' || rep[0] == 'f' )
+                if( rep[0] == 'f' )
                 {
-                    int iss = ReadNumber( rep );
-                    if( iss < 0 || iss >= global.Issues.Count )
+                    var issues = ReadNumbers( monitor, rep, 0, global.Issues.Count - 1 );
+                    if( issues.Count > 0 )
                     {
-                        Console.WriteLine( $"Invalid issue number." );
-                    }
-                    else
-                    {
-                        if( rep[0] == 'd' )
+                        foreach( int iss in issues )
                         {
-                            Console.WriteLine( global.Issues[iss].ToString() );
-                            Console.WriteLine( global.Issues[iss].Description );
-                        }
-                        else
-                        {
-                            global.Issues[iss].AutoFix( monitor );
-                            Console.WriteLine( "<<Hit a key>>" );
-                            Console.ReadKey();
-                            if( !global.Run() ) return false;
+                            if( !global.Issues[iss].AutoFix( monitor ) ) break;
                         }
                     }
+                    Console.WriteLine( "<<Hit a key>>" );
+                    Console.ReadKey();
+                    continue;
                 }
             }
         }
@@ -115,6 +106,22 @@ namespace CKli
             Match m = Regex.Match( rep, @"\d+" );
             if( !m.Success ) return -1;
             return Int32.TryParse( m.Value, out int iss ) ? iss : -2;
+        }
+
+        static IReadOnlyList<int> ReadNumbers( IActivityMonitor monitor, string rep, int min, int max )
+        {
+            try
+            {
+                return Regex.Matches( rep, @"\d+" )
+                            .Select( m => Int32.Parse( m.Value ) )
+                            .Where( v => v >= min && v <= max )
+                            .ToList();
+            }
+            catch( Exception ex )
+            {
+                monitor.Error( ex );
+                return Array.Empty<int>();
+            }
         }
     }
 }
