@@ -7,7 +7,28 @@
     <GitCheckoutAction Title="Checkout all repositories on a specific branch name." />
     <GitCommitAction Title="Commits all pending changes to the current branch of all the repositories." />
 
+    
+    <Reusable Name="CodeCakeBuilder">
+        <Folder Name="CodeCakeBuilder">
+            <MustExist InitialContent="InitialCodeCakeBuilder">
+                <File Name="Bootstrap.ps1">
+                    <MustExist Content="InitialCodeCakeBuilder/Bootstrap.ps1" />
+                </File>
+                <File Name="BootstrapAndBuild.ps1">
+                    <MustExist Content="InitialCodeCakeBuilder/BootstrapAndBuild.ps1" />
+                </File>
+                <File Name="RepositoryInfo.xsd">
+                    <MustExist Content="InitialCodeCakeBuilder/RepositoryInfo.xsd" />
+                </File>
+                <File Name="Program.cs">
+                    <MustExist Content="InitialCodeCakeBuilder/Program.cs" />
+                </File>
+            </MustExist>
+        </Folder>
+    </Reusable>
+
     <Reusable Name="StandardFiles">
+        <Reuse Name="CodeCakeBuilder" />
         <File Name="NuGet.config">
             <MustExist Content="SimpleFiles/NuGet.config"/>
         </File>
@@ -21,7 +42,7 @@
             </File>
         </Folder>
     </Reusable>
-
+        
     <Folder Name="CK-AspNet-Projects">
 
         <GitFolder Name="CK-AspNet">

@@ -33,7 +33,6 @@ namespace CodeCake
 
             const string solutionName = "CK-Env";
             const string solutionFileName = solutionName + ".sln";
-            const string coreBuildProj = "CodeCakeBuilder/CoreBuild.proj";
 
             var projects = Cake.ParseSolution( solutionFileName )
                                        .Projects
@@ -45,8 +44,12 @@ namespace CodeCake
             Task( "Build" )
                 .Does( () =>
                 {
-                    Cake.DotNetCoreBuild( coreBuildProj,
-                        new DotNetCoreBuildSettings(){ Configuration = configuration } );
+                    using( var tempSln = Cake.CreateTemporarySolutionFile( solutionFileName ) )
+                    {
+                        tempSln.ExcludeProjectsFromBuild( "CodeCakeBuilder" );
+                        Cake.DotNetCoreBuild( tempSln.FullPath.FullPath,
+                            new DotNetCoreBuildSettings() { Configuration = configuration } );
+                    }
                 } );
 
             Task( "Unit-Testing" )
