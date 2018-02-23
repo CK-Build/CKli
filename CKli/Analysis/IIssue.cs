@@ -11,6 +11,8 @@ namespace CK.Env.Analysis
 
         LogLevel MaxLevel { get; }
 
+        string Identifier { get; }
+
         string Title { get; }
 
         string Description { get; }

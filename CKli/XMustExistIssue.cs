@@ -8,13 +8,15 @@ using CKli;
 using Microsoft.Extensions.FileProviders;
 using System.Diagnostics;
 using CK.Text;
+using CK.Env.Analysis;
+using CK.Env;
 
-namespace CK.Env.Analysis
+namespace CKli
 {
-    [XName("MustExist")]
-    public class MustExistIssue : XIssue
+    [CK.Env.XName( "MustExist")]
+    public class XMustExistIssue : XIssue
     {
-        public MustExistIssue(
+        public XMustExistIssue(
             XPathItem path,
             XReferentialFolder refFolder,
             IssueCollector issueCollector,
@@ -87,7 +89,7 @@ namespace CK.Env.Analysis
                                             foreach( var diff in diffResult.Differences) builder.Monitor.Info( diff.ToString() );
                                         }
                                         Func<IActivityMonitor, bool> fix = m => Item.FileSystem.ApplyDiff( m, diffResult );
-                                        builder.CreateIssue( "Correcting content", fix );
+                                        builder.CreateIssue( $"Update:{Item.FullPath}:With:{Content}", "File content update required", fix );
                                     }
                                     else builder.Monitor.CloseGroup( $"Content is up to date." );
                                 }
@@ -102,7 +104,21 @@ namespace CK.Env.Analysis
                 if( !InitialContent.IsEmpty )
                 {
                     FileProviderContentInfo referential = RefFolder.FileProvider.GetContentInfo( InitialContent );
-                    builder.CreateIssue( "Creating initial content", m => Item.FileSystem.ApplyDiff( m, Item.ContentInfo.ComputeDiff( referential ) ) );
+                    builder.CreateIssue( $"Create:{Item.FullPath}:With:{Content}", "Initial content must be created.", m => Item.FileSystem.ApplyDiff( m, Item.ContentInfo.ComputeDiff( referential ) ) );
+                }
+                else if( Item.IsFolder )
+                {
+                    builder.CreateIssue( $"CreateFolder:{Item.FullPath}", "Folder must be created.", m =>
+                    {
+                        if( Item.FileInfo.PhysicalPath != null )
+                        {
+                            Directory.CreateDirectory( Item.FileInfo.PhysicalPath );
+                            m.Info( $"Folder {Item.FullPath} has been created." );
+                        }
+                        else m.Error( $"Folder {Item.FullPath} can not be created." );
+                        return true;
+                    } );
+                    builder.SkipRunChildren = true;
                 }
             }
             return true;

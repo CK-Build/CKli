@@ -21,7 +21,7 @@ namespace CKli
         {
             _fs = fs;
             _path = (string)initializer.Element.AttributeRequired( "Path" );
-            FileProvider = new PhysicalFileProvider( Path.Combine( fs.Root.Path, _path) );
+            FileProvider = new FileSystem( Path.Combine( fs.Root.Path, _path) );
             initializer.Services.Add( this );
         }
 

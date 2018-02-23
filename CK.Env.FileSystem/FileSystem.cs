@@ -157,12 +157,12 @@ namespace CK.Env
                 m.Error( $"Cannot replace a file '{destination}' by a folder." );
                 return false;
             }
-            if( fDest.PhysicalPath == null )
+            if( fDest.Exists && fDest.PhysicalPath == null )
             {
                 m.Error( $"Destination file '{destination}' is not writable." );
                 return false;
             }
-            using( m.OpenInfo( $"Replacing {destination}." ) )
+            using( m.OpenInfo( $"{(fDest.Exists ? "Replacing" : "Creating")} {destination}." ) )
                 try
                 {
                     using( var s = source.CreateReadStream() )
@@ -315,14 +315,13 @@ namespace CK.Env
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         }
    
-
         internal IFileInfo PhysicalGetFileInfo( NormalizedPath sub )
         {
             Debug.Assert( sub == sub.ResolveDots() );
             var path = Root.Combine( sub );
             if( File.Exists( path ) ) return new FileSystemInfoWrapper( new FileInfo( path ) );
             if( Directory.Exists( path ) ) return new FileSystemInfoWrapper( new DirectoryInfo( path ) );
-            return new NotFoundFileInfo( path );
+            return new PhysicalNotFoundFileInfo( path );
         }
 
         internal IDirectoryContents PhysicalGetDirectoryContents( NormalizedPath sub )

@@ -11,6 +11,9 @@
         <File Name="NuGet.config">
             <MustExist Content="SimpleFiles/NuGet.config"/>
         </File>
+        <File Name=".editorconfig">
+            <MustExist Content="SimpleFiles/.editorconfig"/>
+        </File>
         <Folder Name="Common">
             <MustExist />
             <File Name="SharedKey.snk">

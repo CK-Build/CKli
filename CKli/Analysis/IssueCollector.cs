@@ -18,6 +18,7 @@ namespace CK.Env.Analysis
             public Issue(
                 int n,
                 LogLevel max,
+                string identifier,
                 string title,
                 string description,
                 Func<IActivityMonitor,bool> fix )
@@ -32,6 +33,8 @@ namespace CK.Env.Analysis
             public int Number { get; }
 
             public LogLevel MaxLevel { get; }
+
+            public string Identifier { get; }
 
             public string Title { get; }
 
@@ -87,19 +90,24 @@ namespace CK.Env.Analysis
             }
         }
 
-        void Add( IReadOnlyList<ActivityMonitorSimpleCollector.Entry> entries, string title, Func<IActivityMonitor, bool> fix )
+        void Add( IReadOnlyList<ActivityMonitorSimpleCollector.Entry> entries,
+                  string identifier,
+                  string title,
+                  Func<IActivityMonitor, bool> fix )
         {
             var maxLevel = LogLevel.None;
             StringBuilder b = new StringBuilder();
+            const string exPrefix = "    ";
             foreach( var e in entries )
             {
-                string level = e.MaskedLevel.ToString();
+                char level = e.MaskedLevel.ToString()[0];
                 b.Append( level ).Append( " - " ).AppendLine( e.Text );
-                if( e.Exception != null ) b.AppendMultiLine( new string( ' ', level.Length + 3 ), e.Exception.Message, true );
+                if( e.Exception != null ) b.AppendMultiLine( exPrefix, e.Exception.Message, true ).AppendLine();
                 if( maxLevel < e.MaskedLevel ) maxLevel = e.MaskedLevel;
             }
+            b.Append( "Identifier: " ).AppendLine( identifier );
             var desc = b.ToString();
-            _issues.Add( new Issue( _issues.Count, maxLevel, title, desc, fix ) );
+            _issues.Add( new Issue( _issues.Count, maxLevel, identifier, title, desc, fix ) );
         }
 
         /// <summary>
@@ -109,6 +117,7 @@ namespace CK.Env.Analysis
         {
             readonly ActivityMonitorSimpleCollector _logCollector;
             readonly IActivityMonitor _monitor;
+            internal string _fixIdentifier;
             internal string _fixTitle;
             internal Func<IActivityMonitor, bool> _autoFixAction;
 
@@ -125,10 +134,11 @@ namespace CK.Env.Analysis
                 Monitor.Output.RegisterClient( _logCollector );
             }
 
-            public void CreateIssue( string title, Func<IActivityMonitor, bool> autoFix = null )
+            public void CreateIssue( string identifier, string title = null, Func<IActivityMonitor, bool> autoFix = null )
             {
-                if( title == null ) throw new ArgumentNullException( nameof( title ) );
-                if( _fixTitle != null ) throw new InvalidOperationException( $"Fix has already been created." );
+                if( identifier == null ) throw new ArgumentNullException( nameof( identifier ) );
+                if( _fixIdentifier != null ) throw new InvalidOperationException( $"Fix has already been created." );
+                _fixIdentifier = identifier;
                 _fixTitle = title;
                 _autoFixAction = autoFix;
             }
@@ -161,7 +171,7 @@ namespace CK.Env.Analysis
                 if( !success ) return false;
                 if( builder._fixTitle != null )
                 {
-                    Add( entries, builder._fixTitle, builder._autoFixAction );
+                    Add( entries, builder._fixIdentifier, builder._fixTitle, builder._autoFixAction );
                 }
                 return true;
             }

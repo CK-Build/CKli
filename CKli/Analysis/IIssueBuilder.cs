@@ -7,6 +7,6 @@ namespace CK.Env.Analysis
     {
         IActivityMonitor Monitor { get; }
 
-        void CreateIssue( string title, Func<IActivityMonitor, bool> autoFix = null );
+        void CreateIssue( string identifier, string title = null, Func<IActivityMonitor, bool> autoFix = null );
     }
 }
