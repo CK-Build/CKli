@@ -23,6 +23,28 @@
                 <File Name="Program.cs">
                     <MustExist Content="InitialCodeCakeBuilder/Program.cs" />
                 </File>
+                <File Name="Build.cs">
+                    <MustExist InitialContent="InitialCodeCakeBuilder/Build.cs" >
+                        <FileTransform>
+                            <Replace Text="" Script="Solution."
+                        </FileTransform>
+                    </MustExist>
+                </File>
+                <File Name="Build.cs">
+                    <MustExist Content="InitialCodeCakeBuilder/Build.StandardCheckRepository.cs" />
+                </File>
+                <File Name="Build.cs">
+                    <MustExist Content="InitialCodeCakeBuilder/Build.StandardSolutionBuild.cs" />
+                </File>
+                <File Name="Build.cs">
+                    <MustExist Content="InitialCodeCakeBuilder/Build.StandardUnitTests.cs" />
+                </File>
+                <File Name="Build.cs">
+                    <MustExist Content="InitialCodeCakeBuilder/Build.StandardCreateNuGetPackages.cs" />
+                </File>
+                <File Name="Build.cs">
+                    <MustExist Content="InitialCodeCakeBuilder/Build.StandardPushNuGetPackages.cs" />
+                </File>
             </MustExist>
         </Folder>
     </Reusable>

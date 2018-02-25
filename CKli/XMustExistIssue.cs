@@ -10,12 +10,15 @@ using System.Diagnostics;
 using CK.Text;
 using CK.Env.Analysis;
 using CK.Env;
+using System.Linq;
 
 namespace CKli
 {
     [CK.Env.XName( "MustExist")]
-    public class XMustExistIssue : XIssue
+    public class XMustExistIssue : XIssue, IFileInfoHandler
     {
+        readonly List<Func<IActivityMonitor, IFileInfo, IFileInfo>> _fileProcessors;
+
         public XMustExistIssue(
             XPathItem path,
             XReferentialFolder refFolder,
@@ -25,6 +28,7 @@ namespace CKli
         {
             Item = path;
             RefFolder = refFolder;
+            _fileProcessors = new List<Func<IActivityMonitor, IFileInfo, IFileInfo>>();
         }
 
         public XPathItem Item { get; }
@@ -122,6 +126,21 @@ namespace CKli
                 }
             }
             return true;
+        }
+
+        void IFileInfoHandler.AddProcessor( Func<IActivityMonitor, IFileInfo, IFileInfo> processor )
+        {
+            if( processor == null ) throw new ArgumentNullException( nameof( processor ) );
+            _fileProcessors.Add( processor );
+        }
+
+        Func<IFileInfo,IFileInfo> CreateFileTransformer( IActivityMonitor m )
+        {
+            return f =>
+            {
+                foreach( var t in _fileProcessors ) f = t( m, f );
+                return f;
+            };
         }
     }
 }

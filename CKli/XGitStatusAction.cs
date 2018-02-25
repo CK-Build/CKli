@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using CK.Core;
 using CK.Env.Analysis;
+using CK.Text;
 
 namespace CKli
 {
@@ -21,6 +22,7 @@ namespace CKli
             {
                 try
                 {
+                    List<string> dirty = new List<string>();
                     var gitFolders = NextSiblings.SelectMany( s => s.Descendants<XGitFolder>() ).Select( g => g.GitFolder );
                     foreach( var git in gitFolders )
                     {
@@ -31,10 +33,13 @@ namespace CKli
                             else
                             {
                                 m.Info( s );
+                                dirty.Add( git.SubPath );
                                 m.CloseGroup( "Dirty." );
                             }
                         }
                     }
+                    m.CloseGroup( $"{dirty.Count} dirty." );
+                    if( dirty.Count > 0 ) m.Info( $"Dirty: {dirty.Concatenate()}" );
                     return true;
                 }
                 catch( Exception ex )
