@@ -18,6 +18,7 @@ namespace CKli
             IFileInfoHandler target )
             : base( initializer )
         {
+            _gitFolder = gitFolder;
             target.AddProcessor( Process );
         }
 
@@ -29,10 +30,9 @@ namespace CKli
                 var replaced = t.TextContent.Replace( Text, _gitFolder.Name );
                 if( !ReferenceEquals( replaced, t.TextContent ) )
                 {
-                    return t.WithText();
+                    f = t.WithText( replaced );
                 }
             }
-
             return f;
         }
 

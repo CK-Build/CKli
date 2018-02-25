@@ -26,7 +26,7 @@
                 <File Name="Build.cs">
                     <MustExist InitialContent="InitialCodeCakeBuilder/Build.cs" >
                         <FileTransform>
-                            <Replace Text="" Script="Solution."
+                            <ReplaceBySolutionName Text="$Solution Name$" />
                         </FileTransform>
                     </MustExist>
                 </File>

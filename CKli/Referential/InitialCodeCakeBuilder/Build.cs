@@ -38,8 +38,8 @@ namespace CodeCake
         {
             Cake.Log.Verbosity = Verbosity.Diagnostic;
 
-            // solutionName is the name of default solution (same as the folder name).
-            const string solutionName = "solution name";
+            // solutionName is the name of default solution (same as the git folder name).
+            const string solutionName = "$Solution Name$";
             const string solutionFileName = solutionName + ".sln";
 
             var releasesDir = Cake.Directory( "CodeCakeBuilder/Releases" );

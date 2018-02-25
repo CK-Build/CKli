@@ -18,7 +18,7 @@ namespace CK.Env
         /// <returns>The text content.</returns>
         public static string ReadAsText( this IFileInfo @this )
         {
-            if( @this is TextFileInfo txt ) return txt.Text;
+            if( @this is ITextFileInfo txt ) return txt.TextContent;
             using( var s = @this.CreateReadStream() )
             using( var t = new StreamReader( s ) )
             {
