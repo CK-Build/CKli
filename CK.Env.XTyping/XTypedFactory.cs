@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Xml.Linq;
+using System.Xml.XPath;
 
 namespace CK.Env
 {
@@ -131,11 +132,28 @@ namespace CK.Env
             return parent.OnChildrenCreated( parentConfig, created );
         }
 
-
-        static public XElement PreProcess( IActivityMonitor monitor, XElement e )
+        public struct PreProcessResult
         {
-            var clone = RemoveRegionsAndResolveReusables( new Reusables( monitor, e ) ).Single();
-            return clone;
+            public PreProcessResult( IReadOnlyList<ActivityMonitorSimpleCollector.Entry> errors, XElement result )
+            {
+                Errors = errors ?? Array.Empty<ActivityMonitorSimpleCollector.Entry>();
+                Result = errors != null ? null : result;
+            }
+
+            public XElement Result { get; }
+
+            public IReadOnlyList<ActivityMonitorSimpleCollector.Entry> Errors { get; }
+        }
+
+        static public PreProcessResult PreProcess( IActivityMonitor monitor, XElement e )
+        {
+            IReadOnlyList<ActivityMonitorSimpleCollector.Entry> errors = null;
+            XElement result;
+            using( monitor.CollectEntries( err => errors = err ) )
+            {
+                result = RemoveRegionsAndResolveReusables( new Reusables( monitor, e ) ).Single();
+            }
+            return new PreProcessResult( errors, result );
         }
 
         class Reusables
@@ -196,9 +214,9 @@ namespace CK.Env
                 {
                     if( e.Name == "Reuse" )
                     {
-                        if( e.Elements().Any() )
+                        if( e.Elements().Any( c => c.Name != "Remove" ) )
                         {
-                            Monitor.Error( $"Reuse element {e.ToStringPath()} can not have children." );
+                            Monitor.Error( $"Reuse element {e.ToStringPath()} can not have children other than Remove." );
                             return Array.Empty<XElement>();
                         }
                         string reusableName = (string)e.AttributeRequired( "Name" );
@@ -210,7 +228,20 @@ namespace CK.Env
                         }
                         Debug.Assert( reusable.DescendantsAndSelf().Any( c => c.Name == "Reuse" ) == false );
                         Monitor.Debug( $"Expanded reusable named '{reusableName}'." );
-                        return reusable.Select( c => new XElement( c ) );
+
+                        var reusedRoot = new XElement( e.Name, reusable.Select( c => new XElement( c ) ) );
+                        var removeExpr = e.Elements().Select( r => (string)r.AttributeRequired( "Target" ) ).ToList();
+                        foreach( var toRemove in removeExpr )
+                        {
+                            var removes = reusedRoot.XPathSelectElements( toRemove ).ToList();
+                            if( removes.Count == 0 )
+                            {
+                                Monitor.Error( $"No match found for Remove Target {toRemove} in Reuse {e.ToStringPath()}." );
+                                return Array.Empty<XElement>();
+                            }
+                            foreach( var r in removes ) r.Remove();
+                        }
+                        return reusedRoot.Elements();
                     }
                     var children = e.Elements().SelectMany( c => Apply( c ) );
                     return e.Name == "Reusable"

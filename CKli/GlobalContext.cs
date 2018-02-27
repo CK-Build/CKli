@@ -40,7 +40,11 @@ namespace CKli
             var knownWorldPath = Path.Combine( _rootPath, "CK-Env", "KnownWorld.xml" );
             var original = XDocument.Load( knownWorldPath ).Root;
             var expanded = XTypedFactory.PreProcess( _monitor, original );
-            _root = _factory.CreateInstance<XRunnable>( _monitor, expanded, baseProvider );
+            if( expanded.Errors.Count > 0 )
+            {
+                return false;
+            }
+            _root = _factory.CreateInstance<XRunnable>( _monitor, expanded.Result, baseProvider );
             return _root != null;
         }
 

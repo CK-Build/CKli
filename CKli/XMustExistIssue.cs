@@ -29,6 +29,7 @@ namespace CKli
             Item = path;
             RefFolder = refFolder;
             _fileProcessors = new List<Func<IActivityMonitor, IFileInfo, IFileInfo>>();
+            initializer.ChildServices.Add<IFileInfoHandler>( this );
         }
 
         public XPathItem Item { get; }

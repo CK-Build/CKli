@@ -10,42 +10,44 @@
     
     <Reusable Name="CodeCakeBuilder">
         <Folder Name="CodeCakeBuilder">
-            <MustExist InitialContent="InitialCodeCakeBuilder">
-                <File Name="Bootstrap.ps1">
-                    <MustExist Content="InitialCodeCakeBuilder/Bootstrap.ps1" />
-                </File>
-                <File Name="BootstrapAndBuild.ps1">
-                    <MustExist Content="InitialCodeCakeBuilder/BootstrapAndBuild.ps1" />
-                </File>
-                <File Name="RepositoryInfo.xsd">
-                    <MustExist Content="InitialCodeCakeBuilder/RepositoryInfo.xsd" />
-                </File>
-                <File Name="Program.cs">
-                    <MustExist Content="InitialCodeCakeBuilder/Program.cs" />
-                </File>
-                <File Name="Build.cs">
-                    <MustExist InitialContent="InitialCodeCakeBuilder/Build.cs" >
-                        <FileTransform>
-                            <ReplaceBySolutionName Text="$Solution Name$" />
-                        </FileTransform>
-                    </MustExist>
-                </File>
-                <File Name="Build.cs">
-                    <MustExist Content="InitialCodeCakeBuilder/Build.StandardCheckRepository.cs" />
-                </File>
-                <File Name="Build.cs">
-                    <MustExist Content="InitialCodeCakeBuilder/Build.StandardSolutionBuild.cs" />
-                </File>
-                <File Name="Build.cs">
-                    <MustExist Content="InitialCodeCakeBuilder/Build.StandardUnitTests.cs" />
-                </File>
-                <File Name="Build.cs">
-                    <MustExist Content="InitialCodeCakeBuilder/Build.StandardCreateNuGetPackages.cs" />
-                </File>
-                <File Name="Build.cs">
-                    <MustExist Content="InitialCodeCakeBuilder/Build.StandardPushNuGetPackages.cs" />
-                </File>
-            </MustExist>
+            <MustExist InitialContent="InitialCodeCakeBuilder" />
+            <File Name="App.config">
+                <MustNotExist />
+            </File>
+            <File Name="packages.config">
+                <MustNotExist />
+            </File>
+            <File Name="CodeCakeBuilder.csproj">
+                <MustExist Content="InitialCodeCakeBuilder/CodeCakeBuilder.csproj" />
+            </File>
+            <File Name="RepositoryInfo.xsd">
+                <MustExist Content="InitialCodeCakeBuilder/RepositoryInfo.xsd" />
+            </File>
+            <File Name="Program.cs">
+                <MustExist Content="InitialCodeCakeBuilder/Program.cs" />
+            </File>
+            <File Name="Build.cs">
+                <MustExist InitialContent="InitialCodeCakeBuilder/Build.cs" >
+                    <FileTransform>
+                        <ReplaceBySolutionName Text="$Solution Name$" />
+                    </FileTransform>
+                </MustExist>
+            </File>
+            <File Name="Build.StandardCheckRepository.cs">
+                <MustExist Content="InitialCodeCakeBuilder/Build.StandardCheckRepository.cs" />
+            </File>
+            <File Name="Build.StandardSolutionBuild.cs">
+                <MustExist Content="InitialCodeCakeBuilder/Build.StandardSolutionBuild.cs" />
+            </File>
+            <File Name="Build.StandardUnitTests.cs">
+                <MustExist Content="InitialCodeCakeBuilder/Build.StandardUnitTests.cs" />
+            </File>
+            <File Name="Build.StandardCreateNuGetPackages.cs">
+                <MustExist Content="InitialCodeCakeBuilder/Build.StandardCreateNuGetPackages.cs" />
+            </File>
+            <File Name="Build.StandardPushNuGetPackages.cs">
+                <MustExist Content="InitialCodeCakeBuilder/Build.StandardPushNuGetPackages.cs" />
+            </File>
         </Folder>
     </Reusable>
 
@@ -65,7 +67,7 @@
         </Folder>
     </Reusable>
         
-    <Folder Name="CK-AspNet-Projects">
+    <!--<Folder Name="CK-AspNet-Projects">
 
         <GitFolder Name="CK-AspNet">
             <Branch Name="develop">
@@ -88,7 +90,7 @@
             </Branch>
         </GitFolder>
 
-    </Folder>
+    </Folder>-->
 
     <Folder Name="CK-Core-Projects">
 
@@ -144,13 +146,15 @@
         <GitFolder Name="CK-WeakAssemblyNameResolver">
             <Branch Name="develop">
                 <MustExist />
-                <Reuse Name="StandardFiles" />
+                <Reuse Name="StandardFiles">
+                    <Remove Target="Folder[@Name='CodeCakeBuilder']/File[@Name='Build.StandardUnitTests.cs']" />
+                </Reuse>
             </Branch>
         </GitFolder>
 
     </Folder>
 
-    <Folder Name="CK-Database-Projects" >
+    <!--<Folder Name="CK-Database-Projects" >
 
         <GitFolder Name="CK-CodeGen">
             <Branch Name="develop">
@@ -219,7 +223,7 @@
             </Branch>
         </GitFolder>
         
-    </Folder>
+    </Folder>-->
 
     <File Name="CK-World">
         <MustExist Content="SimpleFiles/CK-World"/>

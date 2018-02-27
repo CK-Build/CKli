@@ -3,19 +3,93 @@
 
     <ReferentialFolder Path="CK-Env/CKli/Referential" />
 
+    <GitStatusAction Title="Displays statuses of all the repositories." />
+    <GitCheckoutAction Title="Checkout all repositories on a specific branch name." />
+    <GitCommitAction Title="Commits all pending changes to the current branch of all the repositories." />
+
+    
+    <Reusable Name="CodeCakeBuilder">
+        <Folder Name="CodeCakeBuilder">
+            <MustExist InitialContent="InitialCodeCakeBuilder">
+                <File Name="CodeCakeBuilder.csproj">
+                    <MustExist Content="InitialCodeCakeBuilder/CodeCakeBuilder.csproj" />
+                </File>
+                <File Name="RepositoryInfo.xsd">
+                    <MustExist Content="InitialCodeCakeBuilder/RepositoryInfo.xsd" />
+                </File>
+                <File Name="Program.cs">
+                    <MustExist Content="InitialCodeCakeBuilder/Program.cs" />
+                </File>
+                <File Name="Build.cs">
+                    <MustExist InitialContent="InitialCodeCakeBuilder/Build.cs" >
+                        <FileTransform>
+                            <ReplaceBySolutionName Text="$Solution Name$" />
+                        </FileTransform>
+                    </MustExist>
+                </File>
+                <File Name="Build.StandardCheckRepository.cs">
+                    <MustExist Content="InitialCodeCakeBuilder/Build.StandardCheckRepository.cs" />
+                </File>
+                <File Name="Build.StandardSolutionBuild.cs">
+                    <MustExist Content="InitialCodeCakeBuilder/Build.StandardSolutionBuild.cs" />
+                </File>
+                <File Name="Build.StandardUnitTests.cs">
+                    <MustExist Content="InitialCodeCakeBuilder/Build.StandardUnitTests.cs" />
+                </File>
+                <File Name="Build.StandardCreateNuGetPackages.cs">
+                    <MustExist Content="InitialCodeCakeBuilder/Build.StandardCreateNuGetPackages.cs" />
+                </File>
+                <File Name="Build.StandardPushNuGetPackages.cs">
+                    <MustExist Content="InitialCodeCakeBuilder/Build.StandardPushNuGetPackages.cs" />
+                </File>
+            </MustExist>
+        </Folder>
+    </Reusable>
+
     <Reusable Name="StandardFiles">
+        <Reuse Name="CodeCakeBuilder" />
         <File Name="NuGet.config">
             <MustExist Content="SimpleFiles/NuGet.config"/>
         </File>
+        <File Name=".editorconfig">
+            <MustExist Content="SimpleFiles/.editorconfig"/>
+        </File>
         <Folder Name="Common">
             <MustExist />
-            <MustExist Content="SimpleFiles/SharedKey.snk"/>
+            <File Name="SharedKey.snk">
+                <MustExist Content="SimpleFiles/SharedKey.snk"/>
+            </File>
         </Folder>
     </Reusable>
-    
+        
+    <!--<Folder Name="CK-AspNet-Projects">
+
+        <GitFolder Name="CK-AspNet">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-AspNet-Auth">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-AspNet-Tester">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+    </Folder>-->
+
     <Folder Name="CK-Core-Projects">
 
-        <GitFolder Name="CK-ActivityMonitor">
+        <!--<GitFolder Name="CK-ActivityMonitor">
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
@@ -55,7 +129,7 @@
                 <MustExist />
                 <Reuse Name="StandardFiles" />
             </Branch>
-        </GitFolder>
+        </GitFolder>-->
 
         <GitFolder Name="CK-Text">
             <Branch Name="develop">
@@ -67,12 +141,85 @@
         <GitFolder Name="CK-WeakAssemblyNameResolver">
             <Branch Name="develop">
                 <MustExist />
+                <Reuse Name="StandardFiles">
+                    <Remove Target="Folder[@Name='CodeCakeBuilder']/File[@Name='Build.StandardUnitTests.cs']" />
+                </Reuse>
+            </Branch>
+        </GitFolder>
+
+    </Folder>
+
+    <!--<Folder Name="CK-Database-Projects" >
+
+        <GitFolder Name="CK-CodeGen">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-Database">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-DB">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-Setup">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-Setup-Dependency">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CKSetupRemoteStore">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-SqlServer-Parser">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+
+        <GitFolder Name="CK-SqlServer-Parser-Model">
+            <Branch Name="develop">
+                <MustExist />
                 <Reuse Name="StandardFiles" />
             </Branch>
         </GitFolder>
 
     </Folder>
-    
+
+    <Folder Name="Yodii-Projects">
+
+        <GitFolder Name="Yodii-Script">
+            <Branch Name="develop">
+                <MustExist />
+                <Reuse Name="StandardFiles" />
+            </Branch>
+        </GitFolder>
+        
+    </Folder>-->
+
     <File Name="CK-World">
         <MustExist Content="SimpleFiles/CK-World"/>
     </File>

@@ -31,9 +31,8 @@ namespace CodeCake
 {
 
     [AddPath("%UserProfile%/.nuget/packages/**/tools*")]
-    public class Build : CodeCakeHost
+    public partial class Build : CodeCakeHost
     {
-
         public Build()
         {
             Cake.Log.Verbosity = Verbosity.Diagnostic;
