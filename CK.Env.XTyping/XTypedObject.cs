@@ -65,7 +65,8 @@ namespace CK.Env
             var a = initializer.Element.FirstAttribute;
             while( a != null )
             {
-                var p = GetType().GetProperty( a.Name.LocalName );
+                var pInh = GetType().GetProperty( a.Name.LocalName );
+                var p = pInh?.DeclaringType.GetProperty( pInh.Name );
                 if( p != null && p.CanWrite )
                 {
                     object v;
@@ -78,6 +79,7 @@ namespace CK.Env
                 }
                 a = a.NextAttribute;
             }
+            XElement.AddAnnotation( this );
         }
 
         /// <summary>
@@ -86,10 +88,58 @@ namespace CK.Env
         public XTypedObject Parent { get; }
 
         /// <summary>
+        /// Gets the first child.
+        /// </summary>
+        public XTypedObject FirstChild => Children?.Count == 0 ? null : Children[0];
+
+        /// <summary>
         /// Gets the children typed objects.
         /// This is available right before <see cref="OnCreated(Initializer)"/> is called. 
         /// </summary>
         public IReadOnlyList<XTypedObject> Children { get; private set; }
+
+        /// <summary>
+        /// Enumerates through all descendants of the given element, returning the topmost
+        /// elements that match the given predicate
+        /// </summary>
+        /// <param name="predicate">Filter condition. When successful, children nodes are skipped.</param>
+        /// <returns>The set of descendants that match the predicate in document order regardless of their depth.</returns>
+        /// <param name="withSelf">True to consider <paramref name="this"/> element. Defaults to consider only the element children.</param>
+        public IEnumerable<XTypedObject> TopDescendants( Func<XTypedObject, bool> predicate, bool withSelf = false )
+        {
+            if( predicate == null ) throw new ArgumentNullException( nameof( predicate ) );
+            if( withSelf && predicate( this ) )
+            {
+                yield return this;
+                yield break;
+            }
+            var current = FirstChild;
+            while( current != null )
+            {
+                XTypedObject next = null;
+                if( predicate( current ) ) yield return current;
+                else
+                {
+                    // Dive into the children (if any).
+                    next = current.FirstChild;
+                }
+                // If current matched or has no children, next is the next sibling.
+                if( next == null ) next = current.NextSibling;
+
+                // No more siblings: walk up the parents until one has as sibling or is the root.
+                if( next == null )
+                {
+                    var parent = current.Parent;
+                    while( parent != null && parent != this )
+                    {
+                        if( (next = parent.NextSibling) != null ) break;
+                        parent = parent.Parent;
+                    }
+                }
+                current = next;
+            }
+        }
+
 
         /// <summary>
         /// Gets the next sibling.

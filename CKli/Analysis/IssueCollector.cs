@@ -62,6 +62,11 @@ namespace CK.Env.Analysis
             _issues = new List<Issue>();
         }
 
+        /// <summary>
+        /// Gets or sets whether collecting issue is disabled.
+        /// </summary>
+        public bool Disabled { get; set; }
+
         public void Clear() => _issues.Clear();
 
         public IReadOnlyList<IIssue> Issues => _issues;

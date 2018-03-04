@@ -6,10 +6,11 @@ using System.IO;
 using System.Text;
 using Microsoft.Extensions.FileProviders;
 using CK.Text;
+using CK.Env.Analysis;
 
 namespace CKli
 {
-    public class XReferentialFolder : XRunnable
+    public class XReferentialFolder : XTypedObject
     {
         readonly string _path;
         readonly FileSystem _fs;

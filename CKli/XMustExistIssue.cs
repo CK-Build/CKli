@@ -76,7 +76,7 @@ namespace CKli
                         {
                             if( !Content.IsEmpty )
                             {
-                                FileProviderContentInfo referential = RefFolder.FileProvider.GetContentInfo( Content );
+                                FileProviderContentInfo referential = GetReferentialFileProvider( builder.Monitor ).GetContentInfo( Content );
                                 var diffResult = exist.ComputeDiff( referential );
                                 if( diffResult.FixCasePaths.Count > 0 )
                                 {
@@ -108,8 +108,8 @@ namespace CKli
                 builder.Monitor.Error( $"Missing {Item.Kind} '{Item.FullPath}'." );
                 if( !InitialContent.IsEmpty )
                 {
-                    FileProviderContentInfo referential = RefFolder.FileProvider.GetContentInfo( InitialContent );
-                    builder.CreateIssue( $"Create:{Item.FullPath}:With:{Content}", "Initial content must be created.", m => Item.FileSystem.ApplyDiff( m, Item.ContentInfo.ComputeDiff( referential ) ) );
+                    builder.CreateIssue( $"Create:{Item.FullPath}:With:{InitialContent}", "Initial content must be created.",
+                                         m => Item.FileSystem.ApplyDiff( m, Item.ContentInfo.ComputeDiff( GetReferentialFileProvider( m ).GetContentInfo( InitialContent ) ) ) );
                 }
                 else if( Item.IsFolder )
                 {
@@ -129,17 +129,33 @@ namespace CKli
             return true;
         }
 
+        XPathItem IFileInfoHandler.TargetItem => Item;
+
+        NormalizedPath IFileInfoHandler.ContentPath => InitialContent;
+
         void IFileInfoHandler.AddProcessor( Func<IActivityMonitor, IFileInfo, IFileInfo> processor )
         {
             if( processor == null ) throw new ArgumentNullException( nameof( processor ) );
             _fileProcessors.Add( processor );
         }
 
-        Func<IFileInfo,IFileInfo> CreateFileTransformer( IActivityMonitor m )
+        IFileProvider GetReferentialFileProvider( IActivityMonitor m )
         {
-            return f =>
+            if( _fileProcessors.Count == 0 ) return RefFolder.FileProvider;
+            return new TransformedFileProvider( RefFolder.FileProvider, CreateFileTransformer( m ) );
+        }
+
+        Func<string,IFileInfo,IFileInfo> CreateFileTransformer( IActivityMonitor m )
+        {
+            return (path, f) =>
             {
-                foreach( var t in _fileProcessors ) f = t( m, f );
+                if( InitialContent.Path.Equals( path, StringComparison.OrdinalIgnoreCase ) )
+                {
+                    foreach( var t in _fileProcessors )
+                    {
+                        f = t( m, f );
+                    }
+                }
                 return f;
             };
         }

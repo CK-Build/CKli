@@ -26,6 +26,28 @@ namespace CK.Env
             }
         }
 
+        public static IEnumerable<string> ReadAsTextLines( this IFileInfo @this )
+        {
+            using( var t = @this is ITextFileInfo txt
+                                ? (TextReader)new StringReader( txt.TextContent )
+                                : new StreamReader( @this.CreateReadStream() ) )
+            {
+                string line;
+                while( (line = t.ReadLine()) != null ) yield return line;
+            }
+        }
+
+        public static byte[] ReadAllBytes( this IFileInfo @this )
+        {
+            if( @this is Transformed t ) return t.BinContent;
+            using( var s = @this.CreateReadStream() )
+            {
+                var b = new byte[@this.Length];
+                s.Read( b, 0, b.Length );
+                return b;
+            }
+        }
+
         /// <summary>
         /// Checks content equality. This <see cref="IFileInfo"/> and <paramref name="file"/>
         /// must both be actual files, not directories.
@@ -42,26 +64,37 @@ namespace CK.Env
             using( var s = @this.CreateReadStream() )
             using( var d = file.CreateReadStream() )
             {
-                int read;
-                for(; ; )
-                {
-                    if( s.ReadByte() != (read = d.ReadByte()) ) return false;
-                    if( read == -1 ) return true;
-                }
+                return ContentEquals( s, d );
             }
         }
 
-        static string[] _textExtensions = new string[] { ".txt", ".cs", ".xml", ".sql" };
-
-        class Origin : ITextFileInfo
+        public static bool ContentEquals( Stream s1, Stream s2 )
         {
-            IFileInfo _source;
+            int read;
+            for(; ; )
+            {
+                if( s1.ReadByte() != (read = s2.ReadByte()) ) return false;
+                if( read == -1 ) return true;
+            }
+        }
+
+        static string[] _textExtensions = new string[]
+        {
+            ".txt",
+            ".cs", ".js", ".sql",
+            ".sln", ".csproj", ".proj",
+            ".yml", ".json", ".xml"
+        };
+
+    class Origin : ITextFileInfo
+        {
+            readonly IFileInfo _source;
+            string _text;
 
             public Origin( IFileInfo source )
             {
                 Debug.Assert( source.Exists && !source.IsDirectory );
                 _source = source;
-                TextContent = source.ReadAsText();
             }
 
             public bool Exists => true;
@@ -76,28 +109,30 @@ namespace CK.Env
 
             public bool IsDirectory => false;
 
-            public string TextContent { get; }
+            public string TextContent => _text ?? (_text = _source.ReadAsText());
 
             public Stream CreateReadStream() => _source.CreateReadStream();
         }
 
         class Transformed : ITextFileInfo
         {
-            IFileInfo _source;
+            readonly ITextFileInfo _source;
+            readonly Func<string, string> _trans;
+
+            string _text;
             byte[] _bin;
 
-            public Transformed( IFileInfo source, string t )
+            public Transformed( ITextFileInfo source, Func<string,string> trans )
             {
                 Debug.Assert( source.Exists && !source.IsDirectory );
-                Debug.Assert( t != null );
+                Debug.Assert( trans != null );
                 _source = source;
-                TextContent = t;
-                _bin = Encoding.UTF8.GetBytes( t );
+                _trans = trans;
             }
 
             public bool Exists => true;
 
-            public long Length => _bin.Length;
+            public long Length => BinContent.Length;
 
             public string PhysicalPath => _source.PhysicalPath;
 
@@ -107,9 +142,11 @@ namespace CK.Env
 
             public bool IsDirectory => false;
 
-            public string TextContent { get; }
+            public string TextContent => _text ?? (_text = _trans( _source.TextContent ) );
 
-            public Stream CreateReadStream() => new MemoryStream( _bin );
+            public byte[] BinContent => _bin ?? (_bin = Encoding.UTF8.GetBytes( TextContent ));
+
+            public Stream CreateReadStream() => new MemoryStream( BinContent );
         }
 
 
@@ -122,9 +159,9 @@ namespace CK.Env
             return new Origin( f );
         }
 
-        public static ITextFileInfo WithText( this ITextFileInfo f, string text )
+        public static ITextFileInfo WithTransformedText( this ITextFileInfo f, Func<string,string> trans )
         {
-            return new Transformed( f, text );
+            return new Transformed( f, trans );
         }
 
 

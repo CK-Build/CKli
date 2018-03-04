@@ -98,7 +98,7 @@ namespace CK.Env
 
         public XTypedObject CreateInstance( IActivityMonitor monitor, XElement e, IServiceProvider baseProvider = null, Type type = null )
         {
-            using( monitor.OpenDebug( "Creating XTypedObject from XElement." ) )
+            using( monitor.OpenDebug( $"Creating XTypedObject from root {e.ToStringPath()}." ) )
             {
                 if( e == null ) throw new ArgumentNullException( nameof( e ) );
                 if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );

@@ -48,9 +48,13 @@ namespace CKli
             return _root != null;
         }
 
-        public bool Run()
+        public bool Run( bool withIssues )
         {
-            _issues.Clear();
+            if( withIssues )
+            {
+                _issues.Clear();
+            }
+            _issues.Disabled = !withIssues;
             var runContext = new XRunnable.DefaultContext( _monitor );
             if( !_root.Run( runContext ) )
             {

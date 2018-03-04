@@ -6,19 +6,33 @@
     <GitStatusAction Title="Displays statuses of all the repositories." />
     <GitCheckoutAction Title="Checkout all repositories on a specific branch name." />
     <GitCommitAction Title="Commits all pending changes to the current branch of all the repositories." />
-
-    
+    <LaunchSettingsUpdateNugetExePathAction Title="Update nuget.exe path in launchSettings.json files." />
+   
     <Reusable Name="CodeCakeBuilder">
         <Folder Name="CodeCakeBuilder">
             <MustExist InitialContent="InitialCodeCakeBuilder" />
-            <File Name="App.config">
-                <MustNotExist />
-            </File>
-            <File Name="packages.config">
-                <MustNotExist />
-            </File>
+            <Region Title="Removing files and folders that should not more exist.">
+                <Folder Name="Properties">
+                    <MustNotExist />
+                </Folder>
+                <File Name="App.config">
+                    <MustNotExist />
+                </File>
+                <File Name="CoreBuild.proj">
+                    <MustNotExist />
+                </File>
+                <File Name="Bootstrap.ps1">
+                    <MustNotExist />
+                </File>
+                <File Name="BootstrapAndBuild.ps1">
+                    <MustNotExist />
+                </File>
+                <File Name="packages.config">
+                    <MustNotExist />
+                </File>
+            </Region>
             <File Name="CodeCakeBuilder.csproj">
-                <MustExist Content="InitialCodeCakeBuilder/CodeCakeBuilder.csproj" />
+                <MustExist InitialContent="InitialCodeCakeBuilder/CodeCakeBuilder.csproj" />
             </File>
             <File Name="RepositoryInfo.xsd">
                 <MustExist Content="InitialCodeCakeBuilder/RepositoryInfo.xsd" />
@@ -29,7 +43,7 @@
             <File Name="Build.cs">
                 <MustExist InitialContent="InitialCodeCakeBuilder/Build.cs" >
                     <FileTransform>
-                        <ReplaceBySolutionName Text="$Solution Name$" />
+                        <TextReplace Text="$Solution Name$" SourceXPath="ancestor::Folder[1]" SourcePropertyName="Name" />
                     </FileTransform>
                 </MustExist>
             </File>
@@ -56,6 +70,9 @@
         <File Name="NuGet.config">
             <MustExist Content="SimpleFiles/NuGet.config"/>
         </File>
+        <File Name="CoreBuild.proj">
+            <MustNotExist/>
+        </File>
         <File Name=".editorconfig">
             <MustExist Content="SimpleFiles/.editorconfig"/>
         </File>
@@ -66,13 +83,15 @@
             </File>
         </Folder>
     </Reusable>
-        
-    <!--<Folder Name="CK-AspNet-Projects">
+
+    <!-- Use attribute SkipRun="True" to skip running runnable items. -->    
+    <Folder Name="CK-AspNet-Projects">
 
         <GitFolder Name="CK-AspNet">
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
+                <AppVeyorFile />
             </Branch>
         </GitFolder>
 
@@ -80,6 +99,7 @@
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
+                <AppVeyorFile SqlServer="2016" />
             </Branch>
         </GitFolder>
 
@@ -87,17 +107,19 @@
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
+                <AppVeyorFile />
             </Branch>
         </GitFolder>
 
-    </Folder>-->
-
+    </Folder>
+    
     <Folder Name="CK-Core-Projects">
 
         <GitFolder Name="CK-ActivityMonitor">
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
+                <AppVeyorFile />
             </Branch>
         </GitFolder>
 
@@ -105,6 +127,7 @@
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
+                <AppVeyorFile />
             </Branch>
         </GitFolder>
 
@@ -112,6 +135,7 @@
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
+                <AppVeyorFile />
             </Branch>
         </GitFolder>
 
@@ -119,6 +143,7 @@
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
+                <AppVeyorFile />
             </Branch>
         </GitFolder>
 
@@ -126,6 +151,7 @@
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
+                <AppVeyorFile />
             </Branch>
         </GitFolder>
 
@@ -133,6 +159,7 @@
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
+                <AppVeyorFile SqlServer="2016" />
             </Branch>
         </GitFolder>
 
@@ -140,6 +167,7 @@
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
+                <AppVeyorFile />
             </Branch>
         </GitFolder>
 
@@ -149,24 +177,27 @@
                 <Reuse Name="StandardFiles">
                     <Remove Target="Folder[@Name='CodeCakeBuilder']/File[@Name='Build.StandardUnitTests.cs']" />
                 </Reuse>
+                <AppVeyorFile />
             </Branch>
         </GitFolder>
 
     </Folder>
 
-    <!--<Folder Name="CK-Database-Projects" >
+    <Folder Name="CK-Database-Projects">
 
         <GitFolder Name="CK-CodeGen">
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
+                <AppVeyorFile />
             </Branch>
         </GitFolder>
 
-        <GitFolder Name="CK-Database">
+     <GitFolder Name="CK-Database">
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
+                <AppVeyorFile SqlServer="2016" PushToRemoteStore="True" />
             </Branch>
         </GitFolder>
 
@@ -174,13 +205,15 @@
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
+                <AppVeyorFile SqlServer="2016" PushToRemoteStore="True" />
             </Branch>
         </GitFolder>
-
+        
         <GitFolder Name="CK-Setup">
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
+                <AppVeyorFile PushToRemoteStore="True" />
             </Branch>
         </GitFolder>
 
@@ -188,6 +221,7 @@
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
+                <AppVeyorFile />
             </Branch>
         </GitFolder>
 
@@ -195,20 +229,25 @@
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
+                <AppVeyorFile />
             </Branch>
         </GitFolder>
-
+        
         <GitFolder Name="CK-SqlServer-Parser">
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
+                <AppVeyorFile />
             </Branch>
         </GitFolder>
 
         <GitFolder Name="CK-SqlServer-Parser-Model">
             <Branch Name="develop">
                 <MustExist />
-                <Reuse Name="StandardFiles" />
+                <Reuse Name="StandardFiles">
+                    <Remove Target="Folder[@Name='CodeCakeBuilder']/File[@Name='Build.StandardUnitTests.cs']" />
+                </Reuse>
+                <AppVeyorFile />
             </Branch>
         </GitFolder>
 
@@ -220,10 +259,11 @@
             <Branch Name="develop">
                 <MustExist />
                 <Reuse Name="StandardFiles" />
+                <AppVeyorFile />
             </Branch>
         </GitFolder>
         
-    </Folder>-->
+    </Folder>
 
     <File Name="CK-World">
         <MustExist Content="SimpleFiles/CK-World"/>

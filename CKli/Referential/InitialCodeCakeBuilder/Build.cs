@@ -59,7 +59,7 @@ namespace CodeCake
             Task( "Check-Repository" )
                 .Does( () =>
                  {
-                     configuration = StandardCheckRepository(projectsToPublish, gitInfo);
+                     configuration = StandardCheckRepository( projectsToPublish, gitInfo );
                  });
 
             Task( "Clean" )
@@ -76,7 +76,7 @@ namespace CodeCake
                 .IsDependentOn( "Clean" )
                 .Does( () =>
                  {
-                     StandardSolutionBuild(solutionFileName, gitInfo, configuration);
+                     StandardSolutionBuild( solutionFileName, gitInfo, configuration );
                  });
 
             Task( "Unit-Testing" )
@@ -85,8 +85,8 @@ namespace CodeCake
                                      || Cake.ReadInteractiveOption( "Run Unit Tests?", 'Y', 'N' ) == 'Y' )
                 .Does( () =>
                  {
-                     var testProjects = projects.Where(p => p.Name.EndsWith(".Tests"));
-                     StandardUnitTests(configuration, testProjects);
+                     var testProjects = projects.Where( p => p.Name.EndsWith(".Tests") );
+                     StandardUnitTests( configuration, testProjects );
                  });
 
 
@@ -95,7 +95,7 @@ namespace CodeCake
                 .IsDependentOn("Unit-Testing")
                 .Does(() =>
                 {
-                    StandardCreateNuGetPackages(releasesDir, projectsToPublish, gitInfo, configuration);
+                    StandardCreateNuGetPackages( releasesDir, projectsToPublish, gitInfo, configuration );
                 });
 
             Task("Push-NuGet-Packages")

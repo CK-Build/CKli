@@ -41,14 +41,22 @@ namespace CK.Env.Analysis
                 _base = c;
             }
 
+            /// <summary>
+            /// Gets the <see cref="XRunnable.IRunContext.Items"/> shared global dictionary.
+            /// </summary>
             public Dictionary<object, object> Items => _base.Items;
 
+            /// <summary>
+            /// Gets or sets whether children issues should be ignored.
+            /// Defaults to false.
+            /// </summary>
             public bool SkipRunChildren { get; set; }
 
         }
 
         protected sealed override bool DoRun( IRunContext ctx )
         {
+            if( _collector.Disabled ) return RunChildren( ctx );
             var c = new RunContextIssue( ctx );
             if( !_collector.RunIssueBuilder<RunContextIssue, IRunContextIssue>( c, CreateIssue ) ) return false;
             return c.SkipRunChildren ? true : RunChildren( ctx ); 

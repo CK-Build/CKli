@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using CK.Core;
 
 namespace CKli
 {
@@ -13,6 +14,7 @@ namespace CKli
             XGitFolder parent )
             : base( initializer, parent.FileSystem, parent.FullPath.AppendPart( "branches" ) )
         {
+            initializer.ChildServices.Add( this );
         }
 
         public new XGitFolder Parent => (XGitFolder)base.Parent;

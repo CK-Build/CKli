@@ -149,34 +149,62 @@ namespace CK.Env
         public bool CopyTo( IActivityMonitor m, IFileInfo source, NormalizedPath destination )
         {
             if( source == null || !source.Exists ) throw new ArgumentNullException( nameof( source ) );
-            destination = destination.ResolveDots();
-            if( destination.IsEmpty ) throw new ArgumentNullException( nameof( destination ) );
-            var fDest = GetFileInfo( destination );
-            if( fDest.Exists && fDest.IsDirectory )
+            using( var content = source.CreateReadStream() )
             {
-                m.Error( $"Cannot replace a file '{destination}' by a folder." );
-                return false;
+                return CopyTo( m, content, destination );
             }
-            if( fDest.Exists && fDest.PhysicalPath == null )
-            {
-                m.Error( $"Destination file '{destination}' is not writable." );
-                return false;
-            }
+        }
+
+        /// <summary>
+        /// Copy a text content to a <paramref name="destination"/> path in this
+        /// file system.
+        /// The destination must not be an existing folder and must be physically accessible
+        /// (<see cref="IFileInfo.PhysicalPath"/> must not be null): if inside a <see cref="GitFolder"/>, it must
+        /// be a in the current head (ie. corresponds to a file in the current working directory).
+        /// </summary>
+        /// <param name="m">The activity monitor.</param>
+        /// <param name="content">The content text.</param>
+        /// <param name="destination">The target path in this file system.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool CopyTo( IActivityMonitor m, string content, NormalizedPath destination )
+        {
+            if( content == null ) throw new ArgumentNullException( nameof( content ) );
+            var fDest = GetWritableDestination( m, ref destination );
+            if( fDest == null ) return false;
             using( m.OpenInfo( $"{(fDest.Exists ? "Replacing" : "Creating")} {destination}." ) )
                 try
                 {
-                    using( var s = source.CreateReadStream() )
+                    File.WriteAllText( fDest.PhysicalPath, content );
+                    return true;
+                }
+                catch( Exception ex )
+                {
+                    m.Error( ex );
+                    return false;
+                }
+        }
+
+        /// <summary>
+        /// Copy a content to a <paramref name="destination"/> path in this
+        /// file system.
+        /// The destination must not be an existing folder and must be physically accessible
+        /// (<see cref="IFileInfo.PhysicalPath"/> must not be null): if inside a <see cref="GitFolder"/>, it must
+        /// be a in the current head (ie. corresponds to a file in the current working directory).
+        /// </summary>
+        /// <param name="m">The activity monitor.</param>
+        /// <param name="content">The content source.</param>
+        /// <param name="destination">The target path in this file system.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool CopyTo( IActivityMonitor m, Stream content, NormalizedPath destination )
+        {
+            IFileInfo fDest = GetWritableDestination( m, ref destination );
+            if( fDest == null ) return false;
+            using( m.OpenInfo( $"{(fDest.Exists ? "Replacing" : "Creating")} {destination}." ) )
+                try
+                {
+                    using( var d = new FileStream( fDest.PhysicalPath, FileMode.Create, FileAccess.Write, FileShare.Read ) )
                     {
-                        string dir = Path.GetDirectoryName( fDest.PhysicalPath );
-                        if( !Directory.Exists( dir ) )
-                        {
-                            m.Trace( $"Creating directory '{dir}'." );
-                            Directory.CreateDirectory( dir );
-                        }
-                        using( var d = new FileStream( fDest.PhysicalPath, FileMode.Create, FileAccess.Write, FileShare.Read ) )
-                        {
-                            s.CopyTo( d );
-                        }
+                        content.CopyTo( d );
                     }
                     return true;
                 }
@@ -185,6 +213,33 @@ namespace CK.Env
                     m.Fatal( ex );
                     return false;
                 }
+        }
+
+        private IFileInfo GetWritableDestination( IActivityMonitor m, ref NormalizedPath destination )
+        {
+            destination = destination.ResolveDots();
+            if( destination.IsEmpty ) throw new ArgumentNullException( nameof( destination ) );
+            var fDest = GetFileInfo( destination );
+            if( fDest.Exists && fDest.IsDirectory )
+            {
+                m.Error( $"Cannot replace a folder '{destination}' by a file content." );
+                fDest = null;
+            }
+            if( fDest.Exists && fDest.PhysicalPath == null )
+            {
+                m.Error( $"Destination file '{destination}' is not writable." );
+                fDest = null;
+            }
+            if( fDest != null )
+            {
+                string dir = Path.GetDirectoryName( fDest.PhysicalPath );
+                if( !Directory.Exists( dir ) )
+                {
+                    m.Trace( $"Creating directory '{dir}'." );
+                    Directory.CreateDirectory( dir );
+                }
+            }
+            return fDest;
         }
 
         /// <summary>
@@ -209,10 +264,12 @@ namespace CK.Env
                 {
                     if( info.IsDirectory )
                     {
+                        m.Info( $"Deleting folder '{subPath}'." );
                         Directory.Delete( info.PhysicalPath, true );
                     }
                     else
                     {
+                        m.Info( $"Deleting file '{subPath}'." );
                         File.Delete( info.PhysicalPath );
                     }
                 }

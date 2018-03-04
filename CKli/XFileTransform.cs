@@ -8,18 +8,12 @@ using Microsoft.Extensions.FileProviders;
 
 namespace CKli
 {
-    public class XFileTransform : XTypedObject, IFileInfoHandler
+    public class XFileTransform : XTypedObject
     {
-        readonly IFileInfoHandler _target;
-
-        public XFileTransform(
-            Initializer initializer,
-            IFileInfoHandler target )
+        
+        public XFileTransform( Initializer initializer )
             : base( initializer )
         {
-            _target = target;
         }
-
-        void IFileInfoHandler.AddProcessor( Func<IActivityMonitor, IFileInfo, IFileInfo> p ) => _target.AddProcessor( p );
     }
 }

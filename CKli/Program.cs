@@ -56,13 +56,22 @@ namespace CKli
             if( !global.Open() ) return false;
             for(; ; )
             {
-                if( !global.Run() ) return false;
-                global.DisplayIssues( Console.Out, true );
                 global.DisplayActions( Console.Out );
-                Console.WriteLine( $"e[xit] | r[estart] | f[ix] #issue | a[ction] #action" );
+                Console.WriteLine( $"r[estart] || i[ssues] || f[ix] all|#issue+ || a[ction] #action || e[xit]" );
                 Console.Write( $">" );
                 string rep = Console.ReadLine().Trim();
-                if( rep.Length == 0 ) continue;
+                if( rep.Length == 0 )
+                {
+                    if( !global.Run( false ) ) return false;
+                    global.DisplayIssues( Console.Out, true );
+                    continue;
+                }
+                if( rep[0] == 'i' )
+                {
+                    if( !global.Run( true ) ) return false;
+                    global.DisplayIssues( Console.Out, true );
+                    continue;
+                }
                 if( rep[0] == 'e' ) return true;
                 if( rep[0] == 'r' )
                 {
@@ -80,8 +89,6 @@ namespace CKli
                     {
                         global.RunAction( monitor, act );
                     }
-                    Console.WriteLine( "<<Hit a key>>" );
-                    Console.ReadKey();
                     continue;
                 }
                 if( rep[0] == 'f' )
@@ -94,8 +101,6 @@ namespace CKli
                             if( !global.Issues[iss].AutoFix( monitor ) ) break;
                         }
                     }
-                    Console.WriteLine( "<<Hit a key>>" );
-                    Console.ReadKey();
                     continue;
                 }
             }
@@ -112,6 +117,7 @@ namespace CKli
         {
             try
             {
+                if( rep.Contains( " all" ) ) return Enumerable.Range( min, max - min + 1 ).ToArray();
                 return Regex.Matches( rep, @"\d+" )
                             .Select( m => Int32.Parse( m.Value ) )
                             .Where( v => v >= min && v <= max )

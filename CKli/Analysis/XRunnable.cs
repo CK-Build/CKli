@@ -6,17 +6,26 @@ using System.IO;
 using System.Linq;
 using System.Text;
 
-namespace CKli
+namespace CK.Env.Analysis
 {
     public class XRunnable : XTypedObject
     {
         public interface IRunContext
         {
+            /// <summary>
+            /// Gets the monitor to use.
+            /// </summary>
             IActivityMonitor Monitor { get; }
 
+            /// <summary>
+            /// Gets a shared global dictionary for the run.
+            /// </summary>
             Dictionary<object, object> Items { get; }
         }
 
+        /// <summary>
+        /// Default implementation of the <see cref="IRunContext"/>.
+        /// </summary>
         public class DefaultContext : IRunContext
         {
             readonly IActivityMonitor _monitor;
@@ -34,23 +43,23 @@ namespace CKli
         }
 
         public XRunnable(
-            Initializer initializer )
+            Initializer initializer,
+            XRunnable parent = null )
             : base( initializer )
         {
-            var p = (XRunnable)initializer.Parent;
-            Ignore |= p?.Ignore ?? false;
+            SkipRun |= parent?.SkipRun ?? false;
         }
 
-        public bool Ignore { get; private set; }
+        public bool SkipRun { get; private set; }
 
         /// <summary>
-        /// Runs this object only if <see cref="Ignore"/> is false.
+        /// Runs this object only if <see cref="SkipRun"/> is false.
         /// </summary>
         /// <param name="ctx">The run context.</param>
         /// <returns>True on success, false if a severe error occurred.</returns>
         public bool Run( IRunContext ctx )
         {
-            if( Ignore ) ctx.Monitor.Trace( $"Skipping {ToString()}." );
+            if( SkipRun ) ctx.Monitor.Trace( $"Skipping {ToString()}." );
             else
             {
                 using( ctx.Monitor.OpenInfo( $"Running {ToString()}." ) )
@@ -77,13 +86,14 @@ namespace CKli
         protected virtual bool DoRun( IRunContext ctx ) => RunChildren( ctx );
 
         /// <summary>
-        /// Calls <see cref="Run"/> on <see cref="Children"/> that are <see cref="XRunnable"/> objects.
+        /// Calls <see cref="Run"/> on <see cref="XTypedObject.TopDescendants"/> that
+        /// are <see cref="XRunnable"/> objects.
         /// </summary>
         /// <param name="ctx">The run context.</param>
         /// <returns>True on success, false if a severe error occurred.</returns>
         protected virtual bool RunChildren( IRunContext ctx )
         {
-            foreach( var c in Children.OfType<XRunnable>() )
+            foreach( var c in TopDescendants( d => d is XRunnable ).Cast<XRunnable>() )
             {
                 if( !c.Run( ctx ) ) return false;
             }

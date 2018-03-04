@@ -22,21 +22,16 @@ namespace CK.Env
         /// <param name="predicate">Filter condition. When successful, children nodes are skipped.</param>
         /// <returns>The set of descendants that match the predicate in document order regardless of their depth.</returns>
         /// <param name="withSelf">True to consider <paramref name="this"/> element. Defaults to consider only the element children.</param>
-        public static IEnumerable<XElement> TopDescendantsWhere( this XElement @this, Func<XElement, bool> predicate, bool withSelf = false )
+        public static IEnumerable<XElement> TopDescendants( this XElement @this, Func<XElement, bool> predicate, bool withSelf = false )
         {
             if( predicate == null ) throw new ArgumentNullException( nameof(predicate) );
-            return GetDescendantsUntil( @this, predicate, withSelf );
-        }
-
-        static IEnumerable<XElement> GetDescendantsUntil( XElement root, Func<XElement, bool> predicate, bool includeSelf )
-        {
-            if( root == null ) yield break;
-            if( includeSelf && predicate( root ) )
+            if( @this == null ) yield break;
+            if( withSelf && predicate( @this ) )
             {
-                yield return root;
+                yield return @this;
                 yield break;
             }
-            var current = root.FirstChild<XElement>();
+            var current = @this.FirstChild<XElement>();
             while( current != null )
             {
                 XElement next = null;
@@ -52,11 +47,11 @@ namespace CK.Env
                 // No more siblings: walk up the parents until one has as sibling or is the root.
                 if( next == null )
                 {
-                    var parent = current.Parent as XElement;
-                    while( parent != null && parent != root )
+                    var parent = current.Parent;
+                    while( parent != null && parent != @this )
                     {
                         if( (next = parent.NextSibling<XElement>()) != null ) break;
-                        parent = parent.Parent as XElement;
+                        parent = parent.Parent;
                     }
                 }
                 current = next;
