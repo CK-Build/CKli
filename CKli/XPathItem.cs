@@ -40,11 +40,23 @@ namespace CKli
             Initializer initializer,
             FileSystem fs,
             NormalizedPath parentPath )
+            : this( initializer,
+                    fs,
+                    initializer.Element.Name == "File" ? FileSystemItemKind.File : FileSystemItemKind.Directory,
+                    parentPath.AppendPart( (string)initializer.Element.AttributeRequired( "Name" ) ) )
+        {
+        }
+
+        protected XPathItem(
+            Initializer initializer,
+            FileSystem fs,
+            FileSystemItemKind kind,
+            NormalizedPath fullPath )
             : base( initializer )
         {
             FileSystem = fs;
-            Kind = initializer.Element.Name == "File" ? FileSystemItemKind.File : FileSystemItemKind.Directory;
-            FullPath = parentPath.AppendPart( (string)initializer.Element.AttributeRequired( "Name" ) );
+            Kind = kind;
+            FullPath = fullPath;
             initializer.ChildServices.Add( this );
         }
 

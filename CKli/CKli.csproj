@@ -21,9 +21,5 @@
   <ItemGroup>
     <Compile Remove="Referential/**/*.cs" />
   </ItemGroup>
-  
-  <ItemGroup>
-    <Folder Include="Referential\Appveyor\" />
-  </ItemGroup>
 
 </Project>

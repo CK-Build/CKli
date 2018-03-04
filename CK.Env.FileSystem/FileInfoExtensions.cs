@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Xml.Linq;
 
 namespace CK.Env
 {
@@ -34,6 +35,14 @@ namespace CK.Env
             {
                 string line;
                 while( (line = t.ReadLine()) != null ) yield return line;
+            }
+        }
+
+        public static XDocument ReadAsXDocument( this IFileInfo @this )
+        {
+            using( var s = @this.CreateReadStream() )
+            {
+                return XDocument.Load( s );
             }
         }
 
@@ -86,7 +95,7 @@ namespace CK.Env
             ".yml", ".json", ".xml"
         };
 
-    class Origin : ITextFileInfo
+        class Origin : ITextFileInfo
         {
             readonly IFileInfo _source;
             string _text;

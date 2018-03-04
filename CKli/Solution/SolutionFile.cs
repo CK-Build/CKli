@@ -4,6 +4,9 @@ using System;
 using System.Text;
 using System.Collections.Generic;
 using System.Linq;
+using CK.Core;
+using System.IO;
+using System.Xml.Linq;
 
 namespace CK.Env.Solution
 {
@@ -30,7 +33,7 @@ namespace CK.Env.Solution
         /// <summary>
         /// Gets all solution projects.
         /// </summary>
-        public IReadOnlyCollection<SolutionProject> Projects { get; }
+        public IReadOnlyCollection<ProjectBase> Projects { get; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SolutionFile"/> class.
@@ -43,7 +46,7 @@ namespace CK.Env.Solution
             string version,
             string visualStudioVersion,
             string minimumVisualStudioVersion,
-            IReadOnlyCollection<SolutionProject> projects )
+            IReadOnlyCollection<ProjectBase> projects )
         {
             Version = version;
             VisualStudioVersion = visualStudioVersion;
@@ -56,62 +59,69 @@ namespace CK.Env.Solution
         /// </summary>
         /// <param name="solutionPath">The solution path.</param>
         /// <returns>A parsed solution.</returns>
-        static public SolutionFile Parse( IFileProvider fileSystem, NormalizedPath solutionPath )
+        static public SolutionFile Create( IActivityMonitor m, IFileProvider fileSystem, NormalizedPath solutionPath )
         {
             if( fileSystem == null ) throw new ArgumentNullException( nameof( fileSystem ) );
             var file = fileSystem.GetFileInfo( solutionPath ).AsTextFileInfo();
-            string version = null;
-            string visualStudioVersion = null;
-            string minimumVisualStudioVersion = null;
-            var projects = new List<SolutionProject>();
-            bool inNestedProjectsSection = false;
-            foreach( var line in file.ReadAsTextLines() )
+            if( file == null )
             {
-                var trimmed = line.Trim();
-                if( line.StartsWith( "Project(\"{" ) )
-                {
-                    var project = ParseSolutionProjectLine( solutionPath, line );
-                    if( StringComparer.OrdinalIgnoreCase.Equals( project.Type, SolutionFolder.TypeIdentifier ) )
-                    {
-                        projects.Add( new SolutionFolder( project.Id, project.Name, project.Path ) );
-                        continue;
-                    }
-                    projects.Add( project );
-                }
-                else if( line.StartsWith( "Microsoft Visual Studio Solution File, " ) )
-                {
-                    version = string.Concat( line.Skip( 39 ) );
-                }
-                else if( line.StartsWith( "VisualStudioVersion = " ) )
-                {
-                    visualStudioVersion = string.Concat( line.Skip( 22 ) );
-                }
-                else if( line.StartsWith( "MinimumVisualStudioVersion = " ) )
-                {
-                    minimumVisualStudioVersion = string.Concat( line.Skip( 29 ) );
-                }
-                else if( trimmed.StartsWith( "GlobalSection(NestedProjects)" ) )
-                {
-                    inNestedProjectsSection = true;
-                }
-                else if( inNestedProjectsSection && trimmed.StartsWith( "EndGlobalSection" ) )
-                {
-                    inNestedProjectsSection = false;
-                }
-                else if( inNestedProjectsSection )
-                {
-                    ParseNestedProjectLine( projects, trimmed );
-                }
+                m.Error( $"Unable to read solution file '{solutionPath}'." );
+                return null;
             }
-            var solutionParserResult = new SolutionFile(
-                version,
-                visualStudioVersion,
-                minimumVisualStudioVersion,
-                projects.AsReadOnly() );
-            return solutionParserResult;
+            try
+            {
+                string version = null;
+                string visualStudioVersion = null;
+                string minimumVisualStudioVersion = null;
+                var projects = new List<ProjectBase>();
+                bool inNestedProjectsSection = false;
+                foreach( var line in file.ReadAsTextLines() )
+                {
+                    var trimmed = line.Trim();
+                    if( line.StartsWith( "Project(\"{" ) )
+                    {
+                        projects.Add( ParseSolutionProjectLine( solutionPath, line ) );
+                    }
+                    else if( line.StartsWith( "Microsoft Visual Studio Solution File, " ) )
+                    {
+                        version = string.Concat( line.Skip( 39 ) );
+                    }
+                    else if( line.StartsWith( "VisualStudioVersion = " ) )
+                    {
+                        visualStudioVersion = string.Concat( line.Skip( 22 ) );
+                    }
+                    else if( line.StartsWith( "MinimumVisualStudioVersion = " ) )
+                    {
+                        minimumVisualStudioVersion = string.Concat( line.Skip( 29 ) );
+                    }
+                    else if( trimmed.StartsWith( "GlobalSection(NestedProjects)" ) )
+                    {
+                        inNestedProjectsSection = true;
+                    }
+                    else if( inNestedProjectsSection && trimmed.StartsWith( "EndGlobalSection" ) )
+                    {
+                        inNestedProjectsSection = false;
+                    }
+                    else if( inNestedProjectsSection )
+                    {
+                        ParseNestedProjectLine( projects, trimmed );
+                    }
+                }
+                var solutionParserResult = new SolutionFile(
+                    version,
+                    visualStudioVersion,
+                    minimumVisualStudioVersion,
+                    projects.AsReadOnly() );
+                return solutionParserResult;
+            }
+            catch( Exception ex )
+            {
+                m.Error( $"Error while parsing solution file '{solutionPath}'.", ex );
+                return null;
+            }
         }
 
-        static SolutionProject ParseSolutionProjectLine( NormalizedPath solutionPath, string line )
+        static ProjectBase ParseSolutionProjectLine( NormalizedPath solutionPath, string line )
         {
             var withinQuotes = false;
             var projectTypeBuilder = new StringBuilder();
@@ -146,26 +156,32 @@ namespace CK.Env.Solution
                 }
                 result[position].Append( c );
             }
-            return new SolutionProject(
-                idBuilder.ToString(),
-                nameBuilder.ToString(),
-                solutionPath.RemoveLastPart().Combine( pathBuilder.ToString() ),
-                projectTypeBuilder.ToString() );
+            string projectGuid = idBuilder.ToString();
+            string projectName = nameBuilder.ToString();
+            NormalizedPath path = solutionPath.RemoveLastPart().Combine( pathBuilder.ToString() );
+            string type = projectTypeBuilder.ToString();
+            if( type.Equals( SolutionFolder.TypeIdentifier, StringComparison.OrdinalIgnoreCase ) )
+            {
+                return new SolutionFolder( idBuilder.ToString(), nameBuilder.ToString(), path );
+            }
+            return new Project( projectGuid, projectName, path, type );
         }
 
-        static void ParseNestedProjectLine( List<SolutionProject> projects, string line )
+        static void ParseNestedProjectLine( List<ProjectBase> projects, string line )
         {
             // pattern: {Child} = {Parent}
             var projectIds = line.Split( new[] { " = " }, StringSplitOptions.RemoveEmptyEntries );
-            var child = projects.FirstOrDefault( x => StringComparer.OrdinalIgnoreCase.Equals( x.Id, projectIds[0].Trim() ) );
-            if( child == null ) return;
-
-            // Parent should be a folder
-            var parent = projects.FirstOrDefault( x => StringComparer.OrdinalIgnoreCase.Equals( x.Id, projectIds[1].Trim() ) ) as SolutionFolder;
-            if( parent == null ) return;
-
-            parent.Items.Add( child );
-            child.Parent = parent;
+            var child = projects.FirstOrDefault( x => StringComparer.OrdinalIgnoreCase.Equals( x.ProjectGuid, projectIds[0].Trim() ) );
+            if( child != null )
+            {
+                // Parent should be a folder
+                SolutionFolder parent = projects.FirstOrDefault( x => StringComparer.OrdinalIgnoreCase.Equals( x.ProjectGuid, projectIds[1].Trim() ) ) as SolutionFolder;
+                if( parent != null )
+                {
+                    parent.Items.Add( child );
+                    child.Parent = parent;
+                }
+            }
         }
 
     }

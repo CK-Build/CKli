@@ -66,6 +66,7 @@
     </Reusable>
 
     <Reusable Name="StandardFiles">
+        <StandardSolution />
         <Reuse Name="CodeCakeBuilder" />
         <File Name="NuGet.config">
             <MustExist Content="SimpleFiles/NuGet.config"/>

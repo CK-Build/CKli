@@ -6,7 +6,7 @@ namespace CK.Env.Solution
     /// <summary>
     /// Represents a folder in a MSBuild solution.
     /// </summary>
-    public sealed class SolutionFolder : SolutionProject
+    public sealed class SolutionFolder : ProjectBase
     {
         /// <summary>
         /// Visual Studio project type guid for solution folder
@@ -16,7 +16,7 @@ namespace CK.Env.Solution
         /// <summary>
         /// Gets the projects.
         /// </summary>
-        public List<SolutionProject> Items { get; }
+        public List<ProjectBase> Items { get; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SolutionFolder"/> class.
@@ -27,7 +27,7 @@ namespace CK.Env.Solution
         public SolutionFolder( string id, string name, NormalizedPath path )
             : base( id, name, path, TypeIdentifier )
         {
-            Items = new List<SolutionProject>();
+            Items = new List<ProjectBase>();
         }
     }
 }
