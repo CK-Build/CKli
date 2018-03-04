@@ -6,7 +6,13 @@
     <GitStatusAction Title="Displays statuses of all the repositories." />
     <GitCheckoutAction Title="Checkout all repositories on a specific branch name." />
     <GitCommitAction Title="Commits all pending changes to the current branch of all the repositories." />
+
+<!-- Unsafe brutal tools.
+    
     <LaunchSettingsUpdateNugetExePathAction Title="Update nuget.exe path in launchSettings.json files." />
+    <RemoveXmlHeaderFromCSProjAction Title="Removes xml namespace from .csproj and .proj files." />
+
+-->
    
     <Reusable Name="CodeCakeBuilder">
         <Folder Name="CodeCakeBuilder">
