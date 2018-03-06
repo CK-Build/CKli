@@ -26,6 +26,7 @@ namespace CKli
         {
             var files = System.IO.Directory.EnumerateFiles( _fs.Root, "*.csproj", System.IO.SearchOption.AllDirectories )
                         .Concat( System.IO.Directory.EnumerateFiles( _fs.Root, "*.proj", System.IO.SearchOption.AllDirectories ) )
+                        .Concat( System.IO.Directory.EnumerateFiles( _fs.Root, "*.props", System.IO.SearchOption.AllDirectories ) )
                             .Select( f => (Content: System.IO.File.ReadAllText( f ), Path: f) );
             foreach( var f in files )
             {

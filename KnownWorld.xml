@@ -2,7 +2,8 @@
 <KnownWorld>
 
     <ReferentialFolder Path="CK-Env/CKli/Referential" />
-
+    <SolutionCentral />
+    
     <GitStatusAction Title="Displays statuses of all the repositories." />
     <GitCheckoutAction Title="Checkout all repositories on a specific branch name." />
     <GitCommitAction Title="Commits all pending changes to the current branch of all the repositories." />
@@ -10,7 +11,7 @@
 <!-- Unsafe brutal tools.
     
     <LaunchSettingsUpdateNugetExePathAction Title="Update nuget.exe path in launchSettings.json files." />
-    <RemoveXmlHeaderFromCSProjAction Title="Removes xml namespace from .csproj and .proj files." />
+    <RemoveXmlHeaderFromCSProjAction Title="Removes xml namespace from .csproj, .props and .proj files." />
 
 -->
    
@@ -76,9 +77,6 @@
         <Reuse Name="CodeCakeBuilder" />
         <File Name="NuGet.config">
             <MustExist Content="SimpleFiles/NuGet.config"/>
-        </File>
-        <File Name="CoreBuild.proj">
-            <MustNotExist/>
         </File>
         <File Name=".editorconfig">
             <MustExist Content="SimpleFiles/.editorconfig"/>

@@ -42,7 +42,9 @@ namespace CKli
             NormalizedPath parentPath )
             : this( initializer,
                     fs,
-                    initializer.Element.Name == "File" ? FileSystemItemKind.File : FileSystemItemKind.Directory,
+                    initializer.Element.Name == "File"
+                            ? FileSystemItemKind.File
+                            : FileSystemItemKind.Directory,
                     parentPath.AppendPart( (string)initializer.Element.AttributeRequired( "Name" ) ) )
         {
         }

@@ -16,6 +16,21 @@ namespace CK.Env.Solution
     public sealed class SolutionFile
     {
         /// <summary>
+        /// Gets the .sln path (relative to the <see cref="FileSystem"/>).
+        /// </summary>
+        public NormalizedPath FilePath { get; }
+
+        /// <summary>
+        /// Gets the folder path (relative to the <see cref="FileSystem"/>).
+        /// </summary>
+        public NormalizedPath SolutionFolderPath { get; }
+
+        /// <summary>
+        /// Gets the file system from which this solution has been loaded.
+        /// </summary>
+        public IFileProvider FileSystem { get; }
+
+        /// <summary>
         /// Gets the file format version.
         /// </summary>
         public string Version { get; }
@@ -35,19 +50,16 @@ namespace CK.Env.Solution
         /// </summary>
         public IReadOnlyCollection<ProjectBase> Projects { get; }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="SolutionFile"/> class.
-        /// </summary>
-        /// <param name="version">The file format version.</param>
-        /// <param name="visualStudioVersion">The version of Visual Studio that created the file.</param>
-        /// <param name="minimumVisualStudioVersion">The minimum supported version of Visual Studio.</param>
-        /// <param name="projects">The solution projects.</param>
-        public SolutionFile(
+        SolutionFile(
+            NormalizedPath filePath,
+            NormalizedPath folderPath,
             string version,
             string visualStudioVersion,
             string minimumVisualStudioVersion,
             IReadOnlyCollection<ProjectBase> projects )
         {
+            FilePath = filePath;
+            SolutionFolderPath = folderPath;
             Version = version;
             VisualStudioVersion = visualStudioVersion;
             MinimumVisualStudioVersion = minimumVisualStudioVersion;
@@ -57,19 +69,20 @@ namespace CK.Env.Solution
         /// <summary>
         /// Parses a MSBuild solution.
         /// </summary>
-        /// <param name="solutionPath">The solution path.</param>
+        /// <param name="filePath">The solution path.</param>
         /// <returns>A parsed solution.</returns>
-        static public SolutionFile Create( IActivityMonitor m, IFileProvider fileSystem, NormalizedPath solutionPath )
+        static public SolutionFile Create( IActivityMonitor m, ProjectFileContext ctx, NormalizedPath filePath )
         {
-            if( fileSystem == null ) throw new ArgumentNullException( nameof( fileSystem ) );
-            var file = fileSystem.GetFileInfo( solutionPath ).AsTextFileInfo();
+            if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
+            var file = ctx.FileSystem.GetFileInfo( filePath ).AsTextFileInfo();
             if( file == null )
             {
-                m.Error( $"Unable to read solution file '{solutionPath}'." );
+                m.Error( $"Unable to read solution file '{filePath}'." );
                 return null;
             }
             try
             {
+                NormalizedPath folderPath = filePath.RemoveLastPart();
                 string version = null;
                 string visualStudioVersion = null;
                 string minimumVisualStudioVersion = null;
@@ -80,7 +93,7 @@ namespace CK.Env.Solution
                     var trimmed = line.Trim();
                     if( line.StartsWith( "Project(\"{" ) )
                     {
-                        projects.Add( ParseSolutionProjectLine( solutionPath, line ) );
+                        projects.Add( ParseSolutionProjectLine( m, ctx, folderPath, line ) );
                     }
                     else if( line.StartsWith( "Microsoft Visual Studio Solution File, " ) )
                     {
@@ -108,6 +121,8 @@ namespace CK.Env.Solution
                     }
                 }
                 var solutionParserResult = new SolutionFile(
+                    filePath,
+                    folderPath,
                     version,
                     visualStudioVersion,
                     minimumVisualStudioVersion,
@@ -116,12 +131,12 @@ namespace CK.Env.Solution
             }
             catch( Exception ex )
             {
-                m.Error( $"Error while parsing solution file '{solutionPath}'.", ex );
+                m.Error( $"Error while parsing solution file '{filePath}'.", ex );
                 return null;
             }
         }
 
-        static ProjectBase ParseSolutionProjectLine( NormalizedPath solutionPath, string line )
+        static ProjectBase ParseSolutionProjectLine( IActivityMonitor m, ProjectFileContext ctx, NormalizedPath folderPath, string line )
         {
             var withinQuotes = false;
             var projectTypeBuilder = new StringBuilder();
@@ -158,13 +173,15 @@ namespace CK.Env.Solution
             }
             string projectGuid = idBuilder.ToString();
             string projectName = nameBuilder.ToString();
-            NormalizedPath path = solutionPath.RemoveLastPart().Combine( pathBuilder.ToString() );
+            NormalizedPath path = folderPath.Combine( pathBuilder.ToString() );
             string type = projectTypeBuilder.ToString();
             if( type.Equals( SolutionFolder.TypeIdentifier, StringComparison.OrdinalIgnoreCase ) )
             {
                 return new SolutionFolder( idBuilder.ToString(), nameBuilder.ToString(), path );
             }
-            return new Project( projectGuid, projectName, path, type );
+            var p = new Project( projectGuid, projectName, path, type, ctx );
+            p.LoadProjectFile( m );
+            return p;
         }
 
         static void ParseNestedProjectLine( List<ProjectBase> projects, string line )
