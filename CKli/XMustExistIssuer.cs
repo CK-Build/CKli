@@ -15,11 +15,11 @@ using System.Linq;
 namespace CKli
 {
     [CK.Env.XName( "MustExist")]
-    public class XMustExistIssue : XIssue, IFileInfoHandler
+    public class XMustExistIssuer : XIssuer, IFileInfoHandler
     {
         readonly List<Func<IActivityMonitor, IFileInfo, IFileInfo>> _fileProcessors;
 
-        public XMustExistIssue(
+        public XMustExistIssuer(
             XPathItem path,
             XReferentialFolder refFolder,
             IssueCollector issueCollector,

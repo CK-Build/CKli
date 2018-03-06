@@ -1,7 +1,10 @@
 using CK.Core;
 using CK.Text;
 using Microsoft.Extensions.FileProviders;
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Xml.Linq;
 
 namespace CK.Env.Solution
 {
@@ -38,8 +41,42 @@ namespace CK.Env.Solution
         {
             if( !force && _file != null ) return _file;
             _file = _ctx.FindOrLoad( m, Path, force );
+            if( _file != null )
+            {
+                Sdk = (string)_file.Content.Root.Attribute( "Sdk" );
+                if( Sdk == null )
+                {
+                    m.Error( $"There must be one and only one TargetFramework or TargetFrameworks element in {Path}." );
+                    _file = null;
+                }
+                else
+                {
+                    XElement f = _file.Content.Root
+                                    .Elements( "PropertyGroup" )
+                                    .Elements()
+                                    .Where( x => x.Name.LocalName == "TargetFramework" || x.Name.LocalName == "TargetFrameworks" )
+                                    .SingleOrDefault();
+                    if( f == null )
+                    {
+                        m.Error( $"There must be one and only one TargetFramework or TargetFrameworks element in {Path}." );
+                        _file = null;
+                    }
+                    else
+                    {
+                        TargetFrameworks = f.Value.Split( ';', StringSplitOptions.RemoveEmptyEntries );
+                        m.Debug( $"TargetFrameworks = {TargetFrameworks.Concatenate()}" );
+                    }
+                }
+            }
+            if( _file == null )
+            {
+                Sdk = null;
+                TargetFrameworks = Array.Empty<string>();
+            }
             return _file;
         }
+
+        public string Sdk { get; private set; }
 
         public IReadOnlyList<string> TargetFrameworks { get; private set; }
 

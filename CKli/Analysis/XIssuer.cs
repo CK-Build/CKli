@@ -7,14 +7,14 @@ using System.Text;
 namespace CK.Env.Analysis
 {
     /// <summary>
-    /// Standard implementation for an issue description that can
+    /// Standard implementation for an issuer that can
     /// create one issue thanks to <see cref="CreateIssue"/>.
     /// </summary>
-    public abstract class XIssue : XRunnable
+    public abstract class XIssuer : XRunnable
     {
         readonly IssueCollector _collector;
 
-        public XIssue(
+        public XIssuer(
             IssueCollector collector,
             Initializer intializer )
             : base( intializer )

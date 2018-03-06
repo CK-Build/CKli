@@ -101,6 +101,7 @@ namespace CKli
                             if( !global.Issues[iss].AutoFix( monitor ) ) break;
                         }
                     }
+                    else global.DisplayIssues( Console.Out, true );
                     continue;
                 }
             }

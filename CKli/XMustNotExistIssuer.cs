@@ -15,9 +15,9 @@ using System.Linq;
 namespace CKli
 {
     [CK.Env.XName( "MustNotExist")]
-    public class XMustNotExistIssue : XIssue
+    public class XMustNotExistIssuer : XIssuer
     {
-        public XMustNotExistIssue(
+        public XMustNotExistIssuer(
             XPathItem path,
             IssueCollector issueCollector,
             Initializer initializer )

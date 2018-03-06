@@ -13,11 +13,11 @@ using System.Text;
 namespace CKli
 {
     [CK.Env.XName( "AppVeyorFile" )]
-    public class XAppVeyorFileIssue : XIssue
+    public class XAppVeyorFileIssuer : XIssuer
     {
         readonly XBranch _gitBranch;
 
-        public XAppVeyorFileIssue(
+        public XAppVeyorFileIssuer(
             XBranch gitBranch,
             IssueCollector issueCollector,
             Initializer initializer )
