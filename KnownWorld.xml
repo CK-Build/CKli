@@ -22,6 +22,9 @@
                 <Folder Name="Properties">
                     <MustNotExist />
                 </Folder>
+                <Folder Name="Tools">
+                    <MustNotExist />
+                </Folder>
                 <File Name="App.config">
                     <MustNotExist />
                 </File>
