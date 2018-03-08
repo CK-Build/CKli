@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
 
-namespace CK.Env.Solution
+namespace CK.Env.MSBuild
 {
     /// <summary>
     /// Represents an actual project in a solution.
@@ -63,7 +63,7 @@ namespace CK.Env.Solution
                     }
                     else
                     {
-                        TargetFrameworks = f.Value.Split( ';', StringSplitOptions.RemoveEmptyEntries );
+                        TargetFrameworks = f.Value.Split( new[] { ';' }, StringSplitOptions.RemoveEmptyEntries );
                         m.Debug( $"TargetFrameworks = {TargetFrameworks.Concatenate()}" );
                     }
                 }

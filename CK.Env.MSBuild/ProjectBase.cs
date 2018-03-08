@@ -4,7 +4,7 @@
 
 using CK.Text;
 
-namespace CK.Env.Solution
+namespace CK.Env.MSBuild
 {
     /// <summary>
     /// Represents a base project that can be a <see cref="SolutionFolder"/> or an actual <see cref="Project"/>.

@@ -10,7 +10,7 @@
 
 <!-- Unsafe brutal tools.
     
-    <LaunchSettingsUpdateNugetExePathAction Title="Update nuget.exe path in launchSettings.json files." />
+    <LaunchSettingsUpdateNugetExePathAction Title="Update nunit.exe path in launchSettings.json files." />
     <RemoveXmlHeaderFromCSProjAction Title="Removes xml namespace from .csproj, .props and .proj files." />
 
 -->

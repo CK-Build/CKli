@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Xml.Linq;
 
-namespace CK.Env.Solution
+namespace CK.Env.MSBuild
 {
     public class ProjectFileContext
     {

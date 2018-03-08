@@ -1,7 +1,7 @@
 using CK.Text;
 using System.Collections.Generic;
 
-namespace CK.Env.Solution
+namespace CK.Env.MSBuild
 {
     /// <summary>
     /// Represents a folder in a MSBuild solution.

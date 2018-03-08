@@ -8,7 +8,7 @@ using CK.Core;
 using System.IO;
 using System.Xml.Linq;
 
-namespace CK.Env.Solution
+namespace CK.Env.MSBuild
 {
     /// <summary>
     /// Represents the content in an MSBuild solution file.

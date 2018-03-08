@@ -10,7 +10,6 @@ namespace CKli
 {
     public class XGitStatusAction : XAction
     {
-
         public XGitStatusAction( Initializer initializer, ActionCollector collector )
             : base( initializer, collector )
         {
