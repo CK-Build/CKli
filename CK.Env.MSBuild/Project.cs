@@ -46,7 +46,7 @@ namespace CK.Env.MSBuild
                 Sdk = (string)_file.Content.Root.Attribute( "Sdk" );
                 if( Sdk == null )
                 {
-                    m.Error( $"There must be one and only one TargetFramework or TargetFrameworks element in {Path}." );
+                    m.Error( $"There must a Sdk element on root {Path}." );
                     _file = null;
                 }
                 else

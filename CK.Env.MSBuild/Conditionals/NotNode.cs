@@ -16,7 +16,7 @@ namespace CK.Env.MSBuild
 
         public BaseNode Left { get; }
 
-        public override string ToString() => $"!({Left})";
+        public override string ToString() => $"Not ({Left})";
 
     }
 }

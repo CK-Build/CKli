@@ -13,8 +13,8 @@ namespace CK.Env.MSBuild
         // Start of Comparison operators.
         LessThan,
         GreaterThan,
-        LessThanOrEqualTo,
-        GreaterThanOrEqualTo,
+        LessOrEqualTo,
+        GreaterOrEqualTo,
         EqualTo,
         NotEqualTo,
         // End of Comparison operators.
@@ -29,9 +29,14 @@ namespace CK.Env.MSBuild
 
     public static class TokenTypeExtension
     {
-        public static bool IsComparison( this TokenType @this )
+        public static bool IsComparisonOperator( this TokenType @this )
         {
             return @this >= TokenType.LessThan && @this <= TokenType.NotEqualTo;
+        }
+
+        public static bool IsOrderingOperator( this TokenType @this )
+        {
+            return @this >= TokenType.LessThan && @this <= TokenType.GreaterOrEqualTo;
         }
     }
 }

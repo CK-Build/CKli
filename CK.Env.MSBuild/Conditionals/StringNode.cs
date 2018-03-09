@@ -5,6 +5,8 @@ using System.Collections;
 using System.Globalization;
 using System.IO;
 using System;
+using System.Collections.Generic;
+using CK.Text;
 
 namespace CK.Env.MSBuild
 {
@@ -13,15 +15,45 @@ namespace CK.Env.MSBuild
         public StringNode( string value )
         {
             if( value == null ) throw new ArgumentNullException( nameof( value ) );
-            Value = value;
+            StringValue = value;
             RequiresExpansion = value.IndexOf("$(", StringComparison.Ordinal ) >= 0;
         }
 
-        public string Value { get; }
+        public override string StringValue { get; }
 
-        public bool RequiresExpansion { get; }
+        public override bool RequiresExpansion { get; }
 
-        public override string ToString() => $"'{Value}'{(RequiresExpansion ? "*" : "")}";
+        public IEnumerable<string> EmbeddedProperties
+        {
+            get
+            {
+                int idx = 0;
+                while( (idx = StringValue.IndexOf( "$(", idx )) >= 0 )
+                {
+                    int end = StringValue.IndexOf( ')', idx + 2 );
+                    yield return StringValue.Substring( idx, end - idx + 1 );
+                    idx = end;
+                }
+            }
+        }
+
+        public override bool? AsBoolean => StringValue.Equals( "true", StringComparison.OrdinalIgnoreCase )
+                                              ? true
+                                              : StringValue.Equals( "false", StringComparison.OrdinalIgnoreCase )
+                                                  ? (bool?)false
+                                                  : null;
+
+        public override NumericNode AsNumeric
+        {
+            get
+            {
+                if( StringValue.Length == 0 || RequiresExpansion || AsBoolean.HasValue ) return null;
+                var t = Tokenizer.TryParseNumeric( new StringMatcher( StringValue ) );
+                return t != null ? new NumericNode( t ) : null;
+            }
+        }
+
+        public override string ToString() => $"'{StringValue}'{(RequiresExpansion ? "*" : "")}";
 
     }
 }

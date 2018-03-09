@@ -1,6 +1,6 @@
 using CK.Core;
 using CK.Env;
-using CK.Env.Solution;
+using CK.Env.MSBuild;
 using CK.Text;
 using System;
 using System.Collections.Generic;

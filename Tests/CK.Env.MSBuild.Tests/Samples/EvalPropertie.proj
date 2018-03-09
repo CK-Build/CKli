@@ -1,0 +1,49 @@
+<Project>
+
+    <PropertyGroup>
+        <Value>Val</Value>
+        <!-- Simple quote around properties are not required. -->
+        <ValueWithDefault Condition=" $(ValueWithDefault) == '' ">Val2</ValueWithDefault>
+        <ValueNotDefined Condition=" $(ValueWithDefault) == '' ">NO WAY</ValueNotDefined>
+        <NumericTest Condition=" 0xFF == '255' ">This works.</NumericTest>
+        <NumericTest2 Condition=" 0xFF == 255 ">This works too.</NumericTest2>
+        <BooleanTest Condition=" (0xFF == 255) == True ">True (case insensitive) evaluates to true.</BooleanTest>
+        <BooleanTestProof Condition=" (0xFF == 255) == False">NO WAY</BooleanTestProof>
+        <BooleanTestProof2 Condition=" (0xFF > 255) == false">Works.</BooleanTestProof2>
+        <BooleanTestProof3 Condition=" true ">Works.</BooleanTestProof3>
+        <BooleanTestProof4 Condition=" false ">NO WAY</BooleanTestProof4>
+        <!-- These are invalid: <, >, <= and >= require a valid numeric coertion.
+        <InvalidCompare Condition=" false &lt; true ">NO WAY</InvalidCompare>
+        <InvalidCompare Condition=" 100 &lt; 'kilo' ">NO WAY</InvalidCompare>
+        <InvalidCompare Condition=" 'mm' &lt; 'kilo' ">NO WAY</InvalidCompare>
+        -->
+        <BooleanAreOnlyEquatableToBoolean Condition=" true == 'kilo' ">NO WAY</BooleanAreOnlyEquatableToBoolean>
+        <BooleanAreOnlyEquatableToBoolean2 Condition=" false != 'kilo' ">Yes, it is different</BooleanAreOnlyEquatableToBoolean2>
+        <Coercion Condition=" '0xFF' > '34' ">Yes</Coercion>
+        <EmptyProperty Condition=" $() == '' ">The empty property is always valid!</EmptyProperty>
+        <N>Numeric</N>
+        <T>Test</T>
+        <!-- This does not work.
+            <CompositeProperty Condition=" '$(N$(T))' == 'This works.' ">Property evaluation @work.</CompositeProperty>
+        -->
+    </PropertyGroup>
+
+    <Target Name="Build">
+        <Message Text="Value:$(Value)" Importance="high" />
+        <Message Text="ValueWithDefault:$(ValueWithDefault)" Importance="high" />
+        <Message Text="ValueNotDefined:$(ValueNotDefined)" Importance="high" />
+        <Message Text="NumericTest:$(NumericTest)" Importance="high" />
+        <Message Text="NumericTest2:$(NumericTest2)" Importance="high" />
+        <Message Text="BooleanTest:$(BooleanTest)" Importance="high" />
+        <Message Text="BooleanTestProof:$(BooleanTestProof)" Importance="high" />
+        <Message Text="BooleanTestProof2:$(BooleanTestProof2)" Importance="high" />
+        <Message Text="BooleanTestProof3:$(BooleanTestProof3)" Importance="high" />
+        <Message Text="BooleanTestProof4:$(BooleanTestProof4)" Importance="high" />
+        <Message Text="BooleanAreOnlyEquatableToBoolean:$(BooleanAreOnlyEquatableToBoolean)" Importance="high" />
+        <Message Text="BooleanAreOnlyEquatableToBoolean2:$(BooleanAreOnlyEquatableToBoolean2)" Importance="high" />
+        <Message Text="Coercion:$(Coercion)" Importance="high" />
+        <Message Text="EmptyProperty:$(EmptyProperty)" Importance="high" />
+        <Message Text="DumpEmpty:|$()|" Importance="high" />
+    </Target>
+    
+</Project>

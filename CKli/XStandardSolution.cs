@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using CK.Core;
-using CK.Env.Solution;
+using CK.Env.MSBuild;
 using CK.Env.Analysis;
 
 namespace CKli

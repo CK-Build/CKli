@@ -28,7 +28,7 @@ namespace CK.Env.Tests
 
         /// <summary>
         /// Gets a small world: that contains one Git repository (), a copy of the
-        /// solution KnownWorld.xml a directory with a compy of this file int it and
+        /// solution KnownWorld.xml a directory with a copy of this file int it and
         /// an empty directory.
         /// </summary>
         public static NormalizedPath WorldFolder

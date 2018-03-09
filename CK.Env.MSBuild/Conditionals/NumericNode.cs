@@ -13,11 +13,15 @@ namespace CK.Env.MSBuild
             _t = t;
         }
 
-        public TokenType TokenType => _t.TokenType;
+        public override string StringValue => _t.Value;
 
-        public string Value => _t.Value;
+        public double DoubleValue => _t.DoubleValue;
 
-        public override string ToString() => $"[{_t.TokenType}]{Value}";
+        public long LongValue => _t.LongValue;
+
+        public override NumericNode AsNumeric => this;
+
+        public override string ToString() => $"[Numeric]{StringValue}";
 
     }
 }

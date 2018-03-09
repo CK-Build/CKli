@@ -14,14 +14,14 @@ namespace CK.Env.MSBuild
 {
     public static class MSBuildConditionParser
     {
-        public static bool TryParse( IActivityMonitor m, string c, out BaseNode b )
+        public static bool TryParse( IActivityMonitor m, string text, out BaseNode b )
         {
-            if( c == null ) throw new ArgumentNullException( nameof( c ) );
-            var matcher = new StringMatcher( c );
+            if( text == null ) throw new ArgumentNullException( nameof( text ) );
+            var matcher = new StringMatcher( text );
             b = Parse( matcher );
             if( matcher.IsError )
             {
-                m.Error( $"Error while parsing condition '{c}': {matcher.ErrorMessage}." );
+                m.Error( $"Error while parsing condition @{matcher.StartIndex} '{text}': {matcher.ErrorMessage}." );
                 return false;
             }
             return true;
@@ -32,13 +32,14 @@ namespace CK.Env.MSBuild
             var t = new Tokenizer( m );
             if( !t.Forward() )
             {
-                m.SetError( "Invalid token.", "Parser" );
+                m.SetError( "Valid token.", "Parser" );
                 return null;
             }
+            if( t.CurrentToken.TokenType == TokenType.EndOfInput ) return null;
             BaseNode node = Expr( t );
             if( t.CurrentToken.TokenType != TokenType.EndOfInput )
             {
-               m.SetError( "Unexpected token.", "Parser" );
+               m.SetError( "EndOfInput.", "Parser" );
             }
             return node;
         }
@@ -51,9 +52,10 @@ namespace CK.Env.MSBuild
         static BaseNode Expr( Tokenizer t )
         {
             BaseNode node = HandleTerm( t );
-            while( t.CurrentToken.TokenType == TokenType.Or )
+            while( t.Match( TokenType.Or ) )
             {
                 BaseNode right = HandleTerm( t );
+                if( right == null ) return null;
                 node = new BinaryOperatorNode( node, TokenType.Or, right );
             }
             return node;
@@ -87,7 +89,7 @@ namespace CK.Env.MSBuild
             BaseNode left = HandleTerminal( t );
             if( left == null ) return null;
             TokenType op = t.CurrentToken.TokenType;
-            if( op.IsComparison() )
+            if( op.IsComparisonOperator() )
             {
                 t.Forward();
                 BaseNode right = HandleTerminal( t );
