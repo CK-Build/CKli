@@ -10,6 +10,7 @@ using LibGit2Sharp;
 using System.Collections;
 using System.Linq;
 using CK.Text;
+using LibGit2Sharp.Handlers;
 
 namespace CK.Env
 {
@@ -127,6 +128,31 @@ namespace CK.Env
             }
         }
 
+        public bool FetchAll( IActivityMonitor m )
+        {
+            using( m.OpenInfo( $"Fetching all remotes in repository '{FullPath}'" ) )
+            {
+                try
+                {
+                    foreach( Remote remote in _git.Network.Remotes )
+                    {
+                        m.Info( $"Fetching remote {remote.Name}" );
+                        IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification );
+                        Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
+                        {
+                            CredentialsProvider = GitFolder.ObtainGitCredentialsHandler( m ),
+                        }, $"Fetching remote {remote.Name}" );
+                    }
+                }
+                catch( Exception ex )
+                {
+                    m.Error( ex );
+                    return false;
+                }
+            }
+
+            return true;
+        }
 
         public bool Commit( IActivityMonitor m, string commitMessage )
         {
