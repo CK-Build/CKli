@@ -11,14 +11,26 @@ namespace CK.Env.MSBuild
 {
     public class DeclaredPackageDependency
     {
+        public DeclaredPackageDependency(
+            string packageId,
+            SVersion version,
+            XElement originElement,
+            XElement finalDeclaration )
+        {
+            PackageId = packageId;
+            Version = version;
+            OriginElement = originElement;
+            VersionPropertyTargetElement = finalDeclaration;
+        }
+
         public string PackageId { get; }
 
         public SVersion Version { get; }
 
         public CKTrait Frameworks { get; }
 
-        public XElement InitialDeclaration { get; }
+        public XElement OriginElement { get; }
 
-        public XElement FinalDeclaration { get; }
+        public XElement VersionPropertyTargetElement { get; }
     }
 }

@@ -27,18 +27,33 @@ namespace CK.Env.MSBuild
         {
             public NormalizedPath Path { get; }
 
-            public XDocument Content { get; }
+            public XDocument Document { get; }
+
+            /// <summary>
+            /// Gets all the root elements, starting with the primary <see cref="Document"/> one
+            /// and followed by <see cref="AllImportedFiles"/>' ones.
+            /// </summary>
+            public IReadOnlyList<XElement> AllRoots { get; }
 
             public IReadOnlyList<Import> Imports { get; }
+
+            /// <summary>
+            /// Gets a list of all the imported files without duplicate.
+            /// </summary>
+            public IReadOnlyCollection<File> AllImportedFiles { get; }
 
             internal int Version { get; }
 
             internal File( NormalizedPath p, XDocument d, List<Import> imports, int v )
             {
                 Path = p;
-                Content = d;
+                Document = d;
                 Imports = imports;
                 Version = v;
+                AllImportedFiles = imports.SelectMany( i => i.ImportedFile.AllImportedFiles )
+                                        .Distinct().ToList();
+                var start = new XElement[] { Document.Root };
+                AllRoots = start.Concat( AllImportedFiles.Select( f => f.Document.Root ) ).ToArray();
             }
         }
 
