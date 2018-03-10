@@ -76,7 +76,7 @@
     </Reusable>
 
     <Reusable Name="StandardFiles">
-        <StandardSolution />
+        <MustExist />
         <Reuse Name="CodeCakeBuilder" />
         <File Name="NuGet.config">
             <MustExist Content="SimpleFiles/NuGet.config"/>
@@ -97,7 +97,7 @@
 
         <GitFolder Name="CK-AspNet">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -105,7 +105,7 @@
 
         <GitFolder Name="CK-AspNet-Auth">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile SqlServer="2016" />
             </Branch>
@@ -113,7 +113,7 @@
 
         <GitFolder Name="CK-AspNet-Tester">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -125,7 +125,7 @@
 
         <GitFolder Name="CK-ActivityMonitor">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -133,7 +133,7 @@
 
         <GitFolder Name="CK-Auth-Abstractions">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -141,7 +141,7 @@
 
         <GitFolder Name="CK-Core">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -149,7 +149,7 @@
 
         <GitFolder Name="CK-Monitoring">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -157,7 +157,7 @@
 
         <GitFolder Name="CK-Reflection">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -165,7 +165,7 @@
 
         <GitFolder Name="CK-Testing">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile SqlServer="2016" />
             </Branch>
@@ -173,7 +173,7 @@
 
         <GitFolder Name="CK-Text">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -181,7 +181,7 @@
 
         <GitFolder Name="CK-WeakAssemblyNameResolver">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles">
                     <Remove Target="Folder[@Name='CodeCakeBuilder']/File[@Name='Build.StandardUnitTests.cs']" />
                 </Reuse>
@@ -195,15 +195,15 @@
 
         <GitFolder Name="CK-CodeGen">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
         </GitFolder>
 
-     <GitFolder Name="CK-Database">
+        <GitFolder Name="CK-Database">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile SqlServer="2016" PushToRemoteStore="True" />
             </Branch>
@@ -211,7 +211,7 @@
 
         <GitFolder Name="CK-DB">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile SqlServer="2016" PushToRemoteStore="True" />
             </Branch>
@@ -219,7 +219,7 @@
         
         <GitFolder Name="CK-Setup">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile PushToRemoteStore="True" />
             </Branch>
@@ -227,7 +227,7 @@
 
         <GitFolder Name="CK-Setup-Dependency">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -235,7 +235,7 @@
 
         <GitFolder Name="CKSetupRemoteStore">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -243,7 +243,7 @@
         
         <GitFolder Name="CK-SqlServer-Parser">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -251,7 +251,7 @@
 
         <GitFolder Name="CK-SqlServer-Parser-Model">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles">
                     <Remove Target="Folder[@Name='CodeCakeBuilder']/File[@Name='Build.StandardUnitTests.cs']" />
                 </Reuse>
@@ -265,7 +265,7 @@
 
         <GitFolder Name="Yodii-Script">
             <Branch Name="develop">
-                <MustExist />
+                <PrimarySolution />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>

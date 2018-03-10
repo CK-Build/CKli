@@ -6,23 +6,25 @@ using System.Text;
 using CK.Core;
 using CK.Env.MSBuild;
 using CK.Env.Analysis;
+using CK.Text;
 
 namespace CKli
 {
-    public class XStandardSolution : XPathItem
+    public abstract class XSolutionBase : XPathItem
     {
         readonly XSolutionCentral _central;
         readonly XBranch _branch;
-        SolutionFile _file;
+        SolutionFile _solution;
 
-        public XStandardSolution(
+        public XSolutionBase(
             Initializer initializer,
             XBranch branch,
-            XSolutionCentral central )
+            XSolutionCentral central,
+            NormalizedPath branchBasedSolutionFilePath )
             : base( initializer,
                     branch.FileSystem,
                     FileSystemItemKind.File,
-                    branch.FullPath.AppendPart( branch.Parent.Name + ".sln" ) )
+                    branch.FullPath.Combine( branchBasedSolutionFilePath ) )
         {
             _central = central;
             _branch = branch;
@@ -33,16 +35,16 @@ namespace CKli
 
         public SolutionFile ReadSolutionFile( IActivityMonitor m, bool force = false )
         {
-            if( _file == null || force )
+            if( _solution == null || force )
             {
-                _file = _central.GetSolution( m, FullPath, force );
+                _solution = _central.GetSolution( m, FullPath, force );
             }
-            return _file;
+            return _solution;
         }
 
         protected override void Reset( IRunContext ctx )
         {
-            _file = null;
+            _solution = null;
             base.Reset( ctx );
         }
 

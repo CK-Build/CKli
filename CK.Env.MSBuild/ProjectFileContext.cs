@@ -11,6 +11,15 @@ namespace CK.Env.MSBuild
 {
     public class ProjectFileContext
     {
+        /// <summary>
+        /// Traits are used to manage framework names.
+        /// </summary>
+        static readonly public CKTraitContext Traits = new CKTraitContext( "ProjectFileContext" );
+
+
+        /// <summary>
+        /// Defines import of a <see cref="File"/> from another File.
+        /// </summary>
         public struct Import
         {
             public readonly XElement ImportElement;
@@ -23,6 +32,9 @@ namespace CK.Env.MSBuild
             }
         }
 
+        /// <summary>
+        /// Project Xml file.
+        /// </summary>
         public class File
         {
             public NormalizedPath Path { get; }

@@ -66,37 +66,41 @@ namespace CK.Env.MSBuild
                     }
                     else
                     {
-                        TargetFrameworks = f.Value.Split( new[] { ';' }, StringSplitOptions.RemoveEmptyEntries );
-                        m.Debug( $"TargetFrameworks = {TargetFrameworks.Concatenate()}" );
+                        TargetFrameworks = ProjectFileContext.Traits.EmptyTrait;
+                        foreach( var t in f.Value.Split( new[] { ';' }, StringSplitOptions.RemoveEmptyEntries ) )
+                        {
+                            TargetFrameworks = TargetFrameworks.Union( ProjectFileContext.Traits.FindOrCreate( t ) );
+                        }
+                        m.Debug( $"TargetFrameworks = {TargetFrameworks}" );
                     }
                 }
             }
             if( _file == null )
             {
                 Sdk = null;
-                TargetFrameworks = Array.Empty<string>();
+                TargetFrameworks = ProjectFileContext.Traits.EmptyTrait;
             }
             return _file;
         }
 
         public string Sdk { get; private set; }
 
-        public IReadOnlyList<string> TargetFrameworks { get; private set; }
+        public CKTrait TargetFrameworks { get; private set; }
 
-        public IReadOnlyList<DeclaredPackageDependency> GetPackageDependencies( IActivityMonitor m, bool force )
+        public IReadOnlyList<DeclaredPackageDependency> GetPackageDependencies( IActivityMonitor m, bool forceReload )
         {
-            LoadProjectFile( m, force );
+            LoadProjectFile( m, forceReload );
             if( _file == null ) return null;
-            if( _packageDependencies == null || force )
+            if( _packageDependencies == null || forceReload )
             {
                 _packageDependencies = null;
-                var inital = _file.AllRoots
+                var packageRefs = _file.AllRoots
                                  .SelectMany( root => root.Elements( "ItemGroup" ).Elements( "PackageReference" ) )
-                                 .Select( e => (InitialDeclaration: e,
+                                 .Select( e => (Origin: e,
                                                 PackageId: (string)e.Attribute( "Include" ),
                                                 RawVersion: (string)e.Attribute( "Version" ) ) );
                 var deps = new List<DeclaredPackageDependency>();
-                foreach( var p in inital )
+                foreach( var p in packageRefs )
                 {
                     bool isPropVersion;
                     SVersion version = null;
@@ -107,52 +111,78 @@ namespace CK.Env.MSBuild
                     {
                         if( version != null )
                         {
-                            m.Error( $"Unable to parse Version attribute on element {p.InitialDeclaration}: {version.ParseErrorMessage}" );
+                            m.Error( $"Unable to parse Version attribute on element {p.Origin}: {version.ParseErrorMessage}" );
                         }
                         else
                         {
-                            m.Error( $"Invalid Include or Version attribute on element {p.InitialDeclaration}." );
+                            m.Error( $"Invalid Include or Version attribute on element {p.Origin}." );
                         }
                         return null;
                     }
                     XElement propertyDef = null;
                     if( isPropVersion )
                     {
-                        if( !p.RawVersion.EndsWith( "Version)" ) )
+                        propertyDef = FollowRefPropertyVersion( m, p, ref version );
+                        if( propertyDef == null ) return null;
+                    }
+                    var evaluator = new PartialEvaluator();
+                    CKTrait frameworks = ProjectFileContext.Traits.EmptyTrait;
+                    foreach( var framework in TargetFrameworks.AtomicTraits )
+                    {
+                        foreach( var condition in p.Origin.AncestorsAndSelf()
+                                               .Select( x => (E:x, C:(string)x.Attribute( "Condition" )) )
+                                               .Where( x => x.C != null ) )
                         {
-                            m.Error( $"Invalid $(PropertyVersion) on element {p.InitialDeclaration}. Its name must end with Version." );
-                            return null;
-                        }
-                        // Lookup for the property.
-                        string propName = p.RawVersion.Substring( 2, p.RawVersion.Length - 3 );
-                        var candidates = _file.AllRoots
-                                             .SelectMany( root => root.Elements( "PropertyGroup" ) )
-                                             .Where( e => e.Name.LocalName == propName )
-                                             .ToList();
-                        if( candidates.Count == 0 )
-                        {
-                            m.Error( $"Unable to find $({propName}) version definition for element {p.InitialDeclaration}." );
-                            return null;
-                        }
-                        if( candidates.Count > 1 )
-                        {
-                            m.Error( $"Found more than one $({propName}) version definition for element {p.InitialDeclaration}." );
-                            return null;
-                        }
-                        propertyDef = candidates[0];
-                        version = SVersion.TryParse( propertyDef.Value );
-                        if( !version.IsValidSyntax )
-                        {
-                            m.Error( $"Invalid $({propName}) version definition {p.InitialDeclaration} in {propertyDef}: {version.ParseErrorMessage}." );
-                            return null;
+                            bool? include = evaluator.EvalFinalResult( m, condition.C, f => f == "$(TargetFramework)" ? framework.ToString() : null );
+                            if( include == null )
+                            {
+                                m.Error( $"Unable to evaluate condition of {condition.E}." );
+                                return null;
+                            }
+                            if( include == true )
+                            {
+                                frameworks = frameworks.Union( framework );
+                            }
                         }
                     }
-                    deps.Add( new DeclaredPackageDependency( p.PackageId, version, p.InitialDeclaration, propertyDef ) );
+                    deps.Add( new DeclaredPackageDependency( p.PackageId, version, p.Origin, propertyDef, frameworks ) );
                 }
                 _packageDependencies = deps;
             }
             return _packageDependencies;
         }
 
+        XElement FollowRefPropertyVersion( IActivityMonitor m, (XElement Origin, string PackageId, string RawVersion) p, ref SVersion version )
+        {
+            if( !p.RawVersion.EndsWith( "Version)" ) )
+            {
+                m.Error( $"Invalid $(PropertyVersion) on element {p.Origin}. Its name must end with Version." );
+                return null;
+            }
+            // Lookup for the property.
+            string propName = p.RawVersion.Substring( 2, p.RawVersion.Length - 3 );
+            var candidates = _file.AllRoots
+                                 .SelectMany( root => root.Elements( "PropertyGroup" ) )
+                                 .Where( e => e.Name.LocalName == propName )
+                                 .ToList();
+            if( candidates.Count == 0 )
+            {
+                m.Error( $"Unable to find $({propName}) version definition for element {p.Origin}." );
+                return null;
+            }
+            if( candidates.Count > 1 )
+            {
+                m.Error( $"Found more than one $({propName}) version definition for element {p.Origin}." );
+                return null;
+            }
+            XElement propertyDef = candidates[0];
+            version = SVersion.TryParse( propertyDef.Value );
+            if( !version.IsValidSyntax )
+            {
+                m.Error( $"Invalid $({propName}) version definition {p.Origin} in {propertyDef}: {version.ParseErrorMessage}." );
+                return null;
+            }
+            return propertyDef;
+        }
     }
 }

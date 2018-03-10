@@ -7,6 +7,7 @@ using System.Linq;
 using CK.Core;
 using System.IO;
 using System.Xml.Linq;
+using CK.Setup;
 
 namespace CK.Env.MSBuild
 {
@@ -46,9 +47,34 @@ namespace CK.Env.MSBuild
         public string MinimumVisualStudioVersion { get; }
 
         /// <summary>
-        /// Gets all solution projects.
+        /// Gets all solution projects, including any <see cref="SolutionFolder"/>.
         /// </summary>
-        public IReadOnlyCollection<ProjectBase> Projects { get; }
+        public IReadOnlyCollection<ProjectBase> AllProjects { get; }
+
+        /// <summary>
+        /// Gets the published projects (the ones that will be packaged). These projetcs are by default
+        /// all projects at the root of the solution.
+        /// </summary>
+        public IList<Project> PublishedProjects { get; }
+
+        /// <summary>
+        /// Gets the test projects. These projetcs are by default
+        /// all projects whose name ends with ".Tests".
+        /// They sould be located in a "Tests" directory.
+        /// </summary>
+        public IList<Project> TestProjects { get; }
+
+        /// <summary>
+        /// Gets the build projects. By default, this contains the "CodeCakeBuilder" project
+        /// if it exists.
+        /// </summary>
+        public IList<Project> BuildProjects { get; }
+
+        /// <summary>
+        /// Gets the projects that are not in <see cref="PublishedProjects"/>, <see cref="TestProjects"/>,
+        /// and <see cref="BuildProjects"/>.
+        /// </summary>
+        public IEnumerable<Project> MiscProjects { get; }
 
         SolutionFile(
             NormalizedPath filePath,
@@ -63,7 +89,13 @@ namespace CK.Env.MSBuild
             Version = version;
             VisualStudioVersion = visualStudioVersion;
             MinimumVisualStudioVersion = minimumVisualStudioVersion;
-            Projects = projects;
+            AllProjects = projects;
+            BuildProjects = projects.OfType<Project>().Where( p => p.Name == "CodeCakeBuilder" ).ToList();
+            TestProjects = projects.OfType<Project>().Where( p => p.Name.EndsWith( ".Tests" ) ).ToList();
+            PublishedProjects = projects.OfType<Project>().Where( p => p.Name != "CodeCakeBuilder"
+                                                                       && !p.Name.EndsWith( ".Tests" )
+                                                                       && p.Path.Parts.Count == FilePath.Parts.Count + 1 )
+                                                          .ToList();
         }
 
         /// <summary>

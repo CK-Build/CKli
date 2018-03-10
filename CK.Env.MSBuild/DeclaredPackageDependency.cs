@@ -15,12 +15,14 @@ namespace CK.Env.MSBuild
             string packageId,
             SVersion version,
             XElement originElement,
-            XElement finalDeclaration )
+            XElement finalDeclaration,
+            CKTrait frameworks )
         {
             PackageId = packageId;
             Version = version;
             OriginElement = originElement;
-            VersionPropertyTargetElement = finalDeclaration;
+            PropertyVersionElement = finalDeclaration;
+            Frameworks = frameworks;
         }
 
         public string PackageId { get; }
@@ -31,6 +33,8 @@ namespace CK.Env.MSBuild
 
         public XElement OriginElement { get; }
 
-        public XElement VersionPropertyTargetElement { get; }
+        public XElement PropertyVersionElement { get; }
+
+        public bool UsePropertyVersion => PropertyVersionElement != null;
     }
 }
