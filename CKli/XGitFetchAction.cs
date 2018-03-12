@@ -20,7 +20,7 @@ namespace CKli
             var xGitFolders = NextSiblings.SelectMany( s => s.Descendants<XGitFolder>() );
             foreach( var xgit in xGitFolders )
             {
-                if( !xgit.GitFolder.FetchAll( m ) ) { return false; }
+                if( !xgit.GitFolder.FetchAll( m, xgit.ObtainGitCredentialsProvider(m) ) ) { return false; }
             }
             return true;
         }

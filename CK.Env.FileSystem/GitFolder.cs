@@ -35,7 +35,7 @@ namespace CK.Env
             FileSystem = fs;
             _git = new Repository( gitFolder );
             _headFolder = new HeadFolder( this );
-            _branchesFolder = new BranchesFolder( this, "branches", isRemote:false );
+            _branchesFolder = new BranchesFolder( this, "branches", isRemote: false );
             _remoteBranchesFolder = new RemotesFolder( this );
             _thisDir = new RootDir( this, SubPath.LastPart );
         }
@@ -49,7 +49,7 @@ namespace CK.Env
         /// Get the path relative to the <see cref="FileSystem"/>.
         /// </summary>
         public NormalizedPath SubPath { get; }
-        
+
         public string Name => _thisDir.Name;
 
         public FileSystem FileSystem { get; }
@@ -128,7 +128,7 @@ namespace CK.Env
             }
         }
 
-        public bool FetchAll( IActivityMonitor m )
+        public bool FetchAll( IActivityMonitor m, CredentialsHandler credentialsProvider = null )
         {
             using( m.OpenInfo( $"Fetching all remotes in repository '{FullPath}'" ) )
             {
@@ -138,9 +138,10 @@ namespace CK.Env
                     {
                         m.Info( $"Fetching remote {remote.Name}" );
                         IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification );
+
                         Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
                         {
-                            CredentialsProvider = GitFolder.ObtainGitCredentialsHandler( m ),
+                            CredentialsProvider = credentialsProvider
                         }, $"Fetching remote {remote.Name}" );
                     }
                 }
@@ -403,7 +404,7 @@ namespace CK.Env
 
             internal bool Add( Branch b )
             {
-                Debug.Assert( b.IsRemote == _isRemote && (!_isRemote || b.RemoteName == Name ) );
+                Debug.Assert( b.IsRemote == _isRemote && (!_isRemote || b.RemoteName == Name) );
                 string name = _isRemote ? b.FriendlyName.Remove( 0, Name.Length + 1 ) : b.FriendlyName;
                 if( _f._onlyBranches == null || _f._onlyBranches.Contains( name ) )
                 {
@@ -557,56 +558,6 @@ namespace CK.Env
                 return true;
             }
             return false;
-        }
-
-        public static CredentialsHandler ObtainGitCredentialsHandler( IActivityMonitor m )
-        {
-            return ( url, usernameFromUrl, types ) =>
-            {
-                string domain = new Uri( url ).Host;
-                string usernameEnvironmentVariableKey = $"GIT_USER_{domain}";
-                string passwordEnvironmentVariableKey = $"GIT_PWD_{domain}";
-
-                m.Info( $"Looking for credentials for domain {domain} in environment: {usernameEnvironmentVariableKey}, {passwordEnvironmentVariableKey}, and URL" );
-
-                // Guess username: use URL, fallback on env. var
-                string username = usernameFromUrl;
-                if( string.IsNullOrEmpty( username ) )
-                {
-                    username = Environment.GetEnvironmentVariable( usernameEnvironmentVariableKey );
-
-                    if( string.IsNullOrEmpty( username ) )
-                    {
-                        m.Warn( $"Git username was not found at environment variable {usernameEnvironmentVariableKey}. Git might fail if the repository requires authentication." );
-                    }
-                    else
-                    {
-                        m.Info( $"Using Git username from environment variable ({usernameEnvironmentVariableKey}): {username}" );
-                    }
-                }
-                else
-                {
-                    m.Info( $"Using Git username from URL: {username}" );
-                }
-
-                // Read password from env. var
-
-                if( !string.IsNullOrEmpty( username ) )
-                {
-                    string password = Environment.GetEnvironmentVariable( passwordEnvironmentVariableKey );
-
-                    if( string.IsNullOrEmpty( password ) )
-                    {
-                        m.Warn( $"Git password was not found at environment variable {passwordEnvironmentVariableKey}. Git might fail if the repository requires authentication." );
-                    }
-                    else
-                    {
-                        m.Info( $"Using Git password from environment variable ({passwordEnvironmentVariableKey})" );
-                        return new UsernamePasswordCredentials() { Username = username, Password = password };
-                    }
-                }
-                return new DefaultCredentials();
-            };
         }
     }
 }

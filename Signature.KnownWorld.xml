@@ -9,6 +9,10 @@
     <GitCommitAction Title="Commits all pending changes to the current branch of all the repositories." />
     <GitFetchAction Title="Fetches all remotes in all repositories." />
 
+    <GitCredentials
+        UsernameEnvironmentVariable="GIT_USERNAME"
+        PasswordEnvironmentVariable="GIT_PASSWORD" />
+
     <Folder Name="Clients">
 
         <GitFolder Name="Dominos" Url="https://invenietis.visualstudio.com/DefaultCollection/Signature/_git/Dominos">
