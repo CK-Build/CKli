@@ -10,6 +10,7 @@ using LibGit2Sharp;
 using System.Collections;
 using System.Linq;
 using CK.Text;
+using LibGit2Sharp.Handlers;
 
 namespace CK.Env
 {
@@ -127,6 +128,31 @@ namespace CK.Env
             }
         }
 
+        public bool FetchAll( IActivityMonitor m )
+        {
+            using( m.OpenInfo( $"Fetching all remotes in repository '{FullPath}'" ) )
+            {
+                try
+                {
+                    foreach( Remote remote in _git.Network.Remotes )
+                    {
+                        m.Info( $"Fetching remote {remote.Name}" );
+                        IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification );
+                        Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
+                        {
+                            CredentialsProvider = GitFolder.ObtainGitCredentialsHandler( m ),
+                        }, $"Fetching remote {remote.Name}" );
+                    }
+                }
+                catch( Exception ex )
+                {
+                    m.Error( ex );
+                    return false;
+                }
+            }
+
+            return true;
+        }
 
         public bool Commit( IActivityMonitor m, string commitMessage )
         {
@@ -533,5 +559,54 @@ namespace CK.Env
             return false;
         }
 
+        public static CredentialsHandler ObtainGitCredentialsHandler( IActivityMonitor m )
+        {
+            return ( url, usernameFromUrl, types ) =>
+            {
+                string domain = new Uri( url ).Host;
+                string usernameEnvironmentVariableKey = $"GIT_USER_{domain}";
+                string passwordEnvironmentVariableKey = $"GIT_PWD_{domain}";
+
+                m.Info( $"Looking for credentials for domain {domain} in environment: {usernameEnvironmentVariableKey}, {passwordEnvironmentVariableKey}, and URL" );
+
+                // Guess username: use URL, fallback on env. var
+                string username = usernameFromUrl;
+                if( string.IsNullOrEmpty( username ) )
+                {
+                    username = Environment.GetEnvironmentVariable( usernameEnvironmentVariableKey );
+
+                    if( string.IsNullOrEmpty( username ) )
+                    {
+                        m.Warn( $"Git username was not found at environment variable {usernameEnvironmentVariableKey}. Git might fail if the repository requires authentication." );
+                    }
+                    else
+                    {
+                        m.Info( $"Using Git username from environment variable ({usernameEnvironmentVariableKey}): {username}" );
+                    }
+                }
+                else
+                {
+                    m.Info( $"Using Git username from URL: {username}" );
+                }
+
+                // Read password from env. var
+
+                if( !string.IsNullOrEmpty( username ) )
+                {
+                    string password = Environment.GetEnvironmentVariable( passwordEnvironmentVariableKey );
+
+                    if( string.IsNullOrEmpty( password ) )
+                    {
+                        m.Warn( $"Git password was not found at environment variable {passwordEnvironmentVariableKey}. Git might fail if the repository requires authentication." );
+                    }
+                    else
+                    {
+                        m.Info( $"Using Git password from environment variable ({passwordEnvironmentVariableKey})" );
+                        return new UsernamePasswordCredentials() { Username = username, Password = password };
+                    }
+                }
+                return new DefaultCredentials();
+            };
+        }
     }
 }
