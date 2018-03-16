@@ -14,7 +14,7 @@ namespace CK.Env.MSBuild
     /// <summary>
     /// Represents the content in an MSBuild solution file.
     /// </summary>
-    public sealed class SolutionFile
+    public sealed class SolutionFile : IDependentItemContainerRef
     {
         /// <summary>
         /// Gets the .sln path (relative to the <see cref="FileSystem"/>).
@@ -25,6 +25,13 @@ namespace CK.Env.MSBuild
         /// Gets the folder path (relative to the <see cref="FileSystem"/>).
         /// </summary>
         public NormalizedPath SolutionFolderPath { get; }
+
+        /// <summary>
+        /// Gets the solution name. This should be unique accross any possible world.
+        /// However, since this solution name does not contain the branch name, duplicates
+        /// may occur if the same solution is loaded from different branches.
+        /// </summary>
+        public string UniqueSolutionName => SolutionFolderPath.Parts[SolutionFolderPath.Parts.Count - 3];
 
         /// <summary>
         /// Gets the file system from which this solution has been loaded.
@@ -47,13 +54,27 @@ namespace CK.Env.MSBuild
         public string MinimumVisualStudioVersion { get; }
 
         /// <summary>
+        /// Gets or sets the primary solution if this is a secondary solution (null if this is a
+        /// primary solution).
+        /// When set, this acts as a Container in terms of dependencies when <see cref="SolutionSortStrategy.EverythingExceptBuildProjects"/>
+        /// is used.
+        /// </summary>
+        public SolutionFile PrimarySolution { get; set; }
+
+        /// <summary>
         /// Gets all solution projects, including any <see cref="SolutionFolder"/>.
         /// </summary>
-        public IReadOnlyCollection<ProjectBase> AllProjects { get; }
+        public IReadOnlyCollection<ProjectBase> AllBaseProjects { get; }
+
+        /// <summary>
+        /// Gets all projects.
+        /// </summary>
+        public IEnumerable<Project> AllProjects => AllBaseProjects.OfType<Project>();
 
         /// <summary>
         /// Gets the published projects (the ones that will be packaged). These projetcs are by default
-        /// all projects at the root of the solution.
+        /// all projects at the root of the solution for primary solutions. For secondary solutions
+        /// this is empty by default.
         /// </summary>
         public IList<Project> PublishedProjects { get; }
 
@@ -74,9 +95,33 @@ namespace CK.Env.MSBuild
         /// Gets the projects that are not in <see cref="PublishedProjects"/>, <see cref="TestProjects"/>,
         /// and <see cref="BuildProjects"/>.
         /// </summary>
-        public IEnumerable<Project> MiscProjects { get; }
+        public IEnumerable<Project> MiscProjects => AllProjects
+                                                        .Except( PublishedProjects )
+                                                        .Except( TestProjects )
+                                                        .Except( BuildProjects );
+
+        /// <summary>
+        /// Initializes all <see cref="Project.Deps"/>.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>False if an error occurred. True on success.</returns>
+        public bool InitializeProjectsDeps( IActivityMonitor m )
+        {
+            foreach( var p in AllProjects )
+            {
+                if( !p.InitializeDeps( m, false ).IsInitialized ) return false;
+            }
+            return true;
+        }
+
+        public override string ToString() => $"Solution '{SolutionFolderPath}'.";
+
+        string IDependentItemRef.FullName => UniqueSolutionName;
+
+        bool IDependentItemRef.Optional => false;
 
         SolutionFile(
+            SolutionFile primarySolution,
             NormalizedPath filePath,
             NormalizedPath folderPath,
             string version,
@@ -84,26 +129,33 @@ namespace CK.Env.MSBuild
             string minimumVisualStudioVersion,
             IReadOnlyCollection<ProjectBase> projects )
         {
+            PrimarySolution = primarySolution;
             FilePath = filePath;
             SolutionFolderPath = folderPath;
             Version = version;
             VisualStudioVersion = visualStudioVersion;
             MinimumVisualStudioVersion = minimumVisualStudioVersion;
-            AllProjects = projects;
+            AllBaseProjects = projects;
+            foreach( var p in projects ) p.Solution = this;
             BuildProjects = projects.OfType<Project>().Where( p => p.Name == "CodeCakeBuilder" ).ToList();
             TestProjects = projects.OfType<Project>().Where( p => p.Name.EndsWith( ".Tests" ) ).ToList();
-            PublishedProjects = projects.OfType<Project>().Where( p => p.Name != "CodeCakeBuilder"
-                                                                       && !p.Name.EndsWith( ".Tests" )
-                                                                       && p.Path.Parts.Count == FilePath.Parts.Count + 1 )
-                                                          .ToList();
+            if( primarySolution == null )
+            {
+                PublishedProjects = projects.OfType<Project>().Where( p => p.Name != "CodeCakeBuilder"
+                                                                           && !p.Name.EndsWith( ".Tests" )
+                                                                           && p.Path.Parts.Count == FilePath.Parts.Count + 1 )
+                                                              .ToList();
+            }
+            else PublishedProjects = new List<Project>();
         }
 
         /// <summary>
         /// Parses a MSBuild solution.
         /// </summary>
         /// <param name="filePath">The solution path.</param>
+        /// <param name="primarySolution">The primary solution if this is a secondary solution.</param>
         /// <returns>A parsed solution.</returns>
-        static public SolutionFile Create( IActivityMonitor m, ProjectFileContext ctx, NormalizedPath filePath )
+        static public SolutionFile Create( IActivityMonitor m, ProjectFileContext ctx, SolutionFile primarySolution, NormalizedPath filePath )
         {
             if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
             var file = ctx.FileSystem.GetFileInfo( filePath ).AsTextFileInfo();
@@ -153,12 +205,13 @@ namespace CK.Env.MSBuild
                     }
                 }
                 var solutionParserResult = new SolutionFile(
+                    primarySolution,
                     filePath,
                     folderPath,
                     version,
                     visualStudioVersion,
                     minimumVisualStudioVersion,
-                    projects.AsReadOnly() );
+                    projects.ToArray() );
                 return solutionParserResult;
             }
             catch( Exception ex )

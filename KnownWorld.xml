@@ -7,8 +7,9 @@
     <GitStatusAction Title="Displays statuses of all the repositories." />
     <GitCheckoutAction Title="Checkout all repositories on a specific branch name." />
     <GitCommitAction Title="Commits all pending changes to the current branch of all the repositories." />
+    <ReadDependencyAction Title="WIP: reading dependencies." />
 
-<!-- Unsafe brutal tools.
+    <!-- Unsafe brutal tools.
     
     <LaunchSettingsUpdateNugetExePathAction Title="Update nunit.exe path in launchSettings.json files." />
     <RemoveXmlHeaderFromCSProjAction Title="Removes xml namespace from .csproj, .props and .proj files." />
@@ -191,6 +192,7 @@
 
     </Folder>
 
+
     <Folder Name="CK-Database-Projects">
 
         <GitFolder Name="CK-CodeGen">
@@ -260,6 +262,7 @@
         </GitFolder>
 
     </Folder>
+
 
     <Folder Name="Yodii-Projects">
 

@@ -37,22 +37,26 @@ namespace CK.Env.MSBuild
         /// </summary>
         public class File
         {
+            IReadOnlyList<File> _allFiles;
+
             public NormalizedPath Path { get; }
 
             public XDocument Document { get; }
 
             /// <summary>
-            /// Gets all the root elements, starting with the primary <see cref="Document"/> one
-            /// and followed by <see cref="AllImportedFiles"/>' ones.
+            /// Gets all the imports in this file.
             /// </summary>
-            public IReadOnlyList<XElement> AllRoots { get; }
-
             public IReadOnlyList<Import> Imports { get; }
 
             /// <summary>
-            /// Gets a list of all the imported files without duplicate.
+            /// Gets a list of all the imported files without duplicate, starting with this one.
             /// </summary>
-            public IReadOnlyCollection<File> AllImportedFiles { get; }
+            public IReadOnlyList<File> AllFiles => _allFiles;
+
+            /// <summary>
+            /// Gets all the root elements from <see cref="AllFiles"/>.
+            /// </summary>
+            public IEnumerable<XElement> AllRoots => _allFiles.Select( f => f.Document.Root );
 
             internal int Version { get; }
 
@@ -62,10 +66,13 @@ namespace CK.Env.MSBuild
                 Document = d;
                 Imports = imports;
                 Version = v;
-                AllImportedFiles = imports.SelectMany( i => i.ImportedFile.AllImportedFiles )
-                                        .Distinct().ToList();
-                var start = new XElement[] { Document.Root };
-                AllRoots = start.Concat( AllImportedFiles.Select( f => f.Document.Root ) ).ToArray();
+            }
+
+            internal void Initialize()
+            {
+                var start = new File[] { this };
+                _allFiles = start.Concat( Imports.SelectMany( i => i.ImportedFile.AllFiles ) )
+                                        .Distinct().ToArray();
             }
         }
 
@@ -113,6 +120,7 @@ namespace CK.Env.MSBuild
                                         .Select( i => (E: i, P: (string)i.Attribute( "Project" )) )
                                         .Where( i => i.P != null )
                                         .Select( i => new Import( i.E, FindOrLoad( m, folder.Combine( i.P ).ResolveDots(), version ) ) ) );
+                    f.Initialize();
                     return f;
                 }
                 catch( Exception ex )

@@ -40,5 +40,16 @@ namespace CKli
         /// </summary>
         public IEnumerable<XSecondarySolution> SecondarySolutions => Parent.Descendants<XSecondarySolution>();
 
+        public override SolutionFile ReadSolutionFile( IActivityMonitor m, bool force = false )
+        {
+            var prev = _solution;
+            var newS = DoReadSolutionFile( m, null, force );
+            if( prev != newS )
+            {
+                foreach( var s in SecondarySolutions ) s.OnPrimarySolutionFileChanged( newS );
+            }
+            return newS;
+        }
+
     }
 }

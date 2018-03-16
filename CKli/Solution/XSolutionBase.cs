@@ -14,7 +14,7 @@ namespace CKli
     {
         readonly XSolutionCentral _central;
         readonly XBranch _branch;
-        SolutionFile _solution;
+        private protected SolutionFile _solution;
 
         public XSolutionBase(
             Initializer initializer,
@@ -33,11 +33,23 @@ namespace CKli
 
         public XBranch GitBranch => _branch;
 
-        public SolutionFile ReadSolutionFile( IActivityMonitor m, bool force = false )
+        public abstract SolutionFile ReadSolutionFile( IActivityMonitor m, bool force = false );
+
+        protected SolutionFile DoReadSolutionFile( IActivityMonitor m, XPrimarySolution primary, bool force )
         {
             if( _solution == null || force )
             {
-                _solution = _central.GetSolution( m, FullPath, force );
+                _solution = null;
+                SolutionFile p = null;
+                if( primary != null )
+                {
+                    using( m.OpenTrace( $"Ensuring primary solution {primary.FullPath} is loaded." ) )
+                    {
+                        p = primary.ReadSolutionFile( m );
+                        if( p == null ) return null;
+                    }
+                }
+                _solution = _central.FindOrCreateSolutionFile( m, FullPath, p, force );
             }
             return _solution;
         }

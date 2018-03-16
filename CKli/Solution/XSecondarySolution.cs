@@ -13,41 +13,38 @@ namespace CKli
 {
     public class XSecondarySolution : XSolutionBase
     {
-        XPrimarySolution _primarySolution;
-
         public XSecondarySolution(
             Initializer initializer,
-            XBranch branch,
+            XPrimarySolution primary,
             XPathItem parentFolder,
             XSolutionCentral central )
             : base( initializer,
-                    branch,
+                    primary.GitBranch,
                     central,
                     parentFolder.FullPath.Combine( (string)initializer.Element.Attribute( "Name" )
                                                     ?? (string)initializer.Element.AttributeRequired( "Path" ) ) )
         {
+            PrimarySolution = primary;
             initializer.ChildServices.Add( this );
         }
 
         /// <summary>
-        /// Gets the <see cref="XPrimarySolution"/>. This should not be null.
+        /// Gets the required <see cref="XPrimarySolution"/>.
         /// </summary>
-        public XPrimarySolution PrimarySolution
+        public XPrimarySolution PrimarySolution { get; }
+
+        public override SolutionFile ReadSolutionFile( IActivityMonitor m, bool force = false )
         {
-            get
+            return DoReadSolutionFile( m, PrimarySolution, force );
+        }
+
+        internal void OnPrimarySolutionFileChanged( SolutionFile newPrimary )
+        {
+            if( _solution != null )
             {
-                if( _primarySolution == null )
-                {
-                    _primarySolution = GitBranch.Children.OfType<XPrimarySolution>().FirstOrDefault();
-                }
-                return _primarySolution;
+                _solution.PrimarySolution = newPrimary;
             }
         }
 
-        protected override void Reset( IRunContext ctx )
-        {
-            _primarySolution = null;
-            base.Reset( ctx );
-        }
     }
 }
