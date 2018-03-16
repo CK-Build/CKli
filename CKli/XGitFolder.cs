@@ -10,22 +10,28 @@ namespace CKli
     public class XGitFolder : XPathItem
     {
         private readonly IssueCollector _issueCollector;
+        private readonly XGitCredentials _gitCredentials;
 
         public XGitFolder(
             Initializer initializer,
             XPathItem parent,
-            IssueCollector issueCollector
+            IssueCollector issueCollector,
+            XGitCredentials gitCredentials = null
             )
             : base( initializer, parent.FileSystem, parent )
         {
             initializer.ChildServices.Add( this );
             GitFolder = FileSystem.EnsureGitFolder( FullPath );
             _issueCollector = issueCollector;
+            _gitCredentials = gitCredentials;
         }
 
         public GitFolder GitFolder { get; private set; }
 
         public string Url { get; private set; }
+
+        public CredentialsHandler ObtainGitCredentialsProvider( IActivityMonitor m )
+            => _gitCredentials?.ObtainGitCredentialsHandler( m );
 
         protected override bool DoRun( IRunContext ctx )
         {
@@ -55,7 +61,7 @@ namespace CKli
                      {
                          Repository.Clone( Url, FileInfo.PhysicalPath, new CloneOptions()
                          {
-                             CredentialsProvider = GitFolder.ObtainGitCredentialsHandler( m ),
+                             CredentialsProvider = ObtainGitCredentialsProvider( m ),
                          } );
                      }
                      return true;

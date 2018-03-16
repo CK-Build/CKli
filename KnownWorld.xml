@@ -16,6 +16,12 @@
     <RemoveXmlHeaderFromCSProjAction Title="Removes xml namespace from .csproj, .props and .proj files." />
 
 -->
+
+    <!--
+    <GitCredentials
+        UsernameEnvironmentVariable="GIT_USERNAME"
+        PasswordEnvironmentVariable="GIT_PASSWORD" />
+    -->
    
     <Reusable Name="CodeCakeBuilder">
         <Folder Name="CodeCakeBuilder">
