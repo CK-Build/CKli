@@ -78,6 +78,10 @@ namespace CK.Env.MSBuild
 
         }
 
+        /// <summary>
+        /// This internal class is the IDepentItem that represents a Project
+        /// in a SortableSolutionFile graph.
+        /// </summary>
         internal class ProjectItem : IDependentItem, IDependentItemRef
         {
             readonly Project _p;
@@ -98,11 +102,23 @@ namespace CK.Env.MSBuild
 
             public Project Project => _p;
 
-            public string FullName => _p.Path.LastPart;
+            /// <summary>
+            /// Whether this project belongs to the Published ones.
+            /// When a project is published its name is the one of the associated DependencyContext.Package
+            /// and is necessarily unique: we can use its file name as the item's FullName (with the .csproj
+            /// extension: the naked project name is its Package's FullName).
+            /// But when a project is not published, we scope its name to its solution name to compute the
+            /// FullName so that utility projects can have the same name in different solutions.
+            /// </summary>
+            public bool IsPublished { get; set; }
+
+            public string FullName => IsPublished
+                                        ? _p.Path.LastPart
+                                        : _p.Solution.UniqueSolutionName + '/' + _p.Path.LastPart;
 
             internal void AddRequires( Package p ) => _requires.Add( p );
 
-            public IDependentItemContainerRef Container => _p?.Solution;
+            public IDependentItemContainerRef Container => _p.Solution;
 
             public IDependentItemRef Generalization => null;
 
@@ -194,6 +210,7 @@ namespace CK.Env.MSBuild
             var packages = new Dictionary<string, Package>();
             var solutions = solutionFiles.ToArray();
             var projectItems = new Dictionary<Project, ProjectItem>();
+            // 1 - Create all the ProjectItem for all projects in all solutions.
             foreach( var s in solutions )
             {
                 if( !s.InitializeProjectsDeps( m ) ) return null;
@@ -202,6 +219,7 @@ namespace CK.Env.MSBuild
                     ProjectItem.Create( project, projectItems );
                 }
             }
+            // 2 - Create a Package for each Published project.
             foreach( var s in solutions )
             {
                 foreach( var p in s.PublishedProjects )
@@ -211,9 +229,14 @@ namespace CK.Env.MSBuild
                         m.Error( $"{p} is already published: {alreadyPublished}." );
                         return null;
                     }
-                    packages.Add( p.Name, new Package( projectItems[p] ) );
+                    ProjectItem projectItem = projectItems[p];
+                    projectItem.IsPublished = true;
+                    packages.Add( p.Name, new Package( projectItem ) );
                 }
             }
+            // 3 - Create the requirements between each project and either
+            //     a Package that is bound to a Published project or to an
+            //     external Package.
             foreach( var project in projectItems.Values )
             {
                 foreach( var dep in project.Project.Deps.Packages )

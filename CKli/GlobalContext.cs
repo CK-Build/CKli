@@ -37,7 +37,9 @@ namespace CKli
             baseProvider.Add( _fs );
             baseProvider.Add( _issues );
             baseProvider.Add( _actions );
-            var knownWorldPath = Path.Combine( _rootPath, "CK-Env", "KnownWorld.xml" );
+
+            var knownWorldPath = ChooseWorld();
+            if( knownWorldPath == null ) return false;
             var original = XDocument.Load( knownWorldPath ).Root;
             var expanded = XTypedFactory.PreProcess( _monitor, original );
             if( expanded.Errors.Count > 0 )
@@ -46,6 +48,23 @@ namespace CKli
             }
             _root = _factory.CreateInstance<XRunnable>( _monitor, expanded.Result, baseProvider );
             return _root != null;
+        }
+
+        string ChooseWorld()
+        {
+            var files = Directory.GetFiles( Path.Combine( _rootPath, "CK-Env" ), "*-World.xml" );
+            for(; ;)
+            {
+                int i = 0;
+                foreach( var f in files )
+                {
+                    Console.WriteLine( $"{++i} - {Path.GetFileName( f )}" );
+                }
+                Console.WriteLine( "x - Exit" );
+                string r = Console.ReadLine();
+                if( Int32.TryParse( r, out int result ) && result >= 1 && result <= i ) return files[result - 1];
+                if( r == "x" ) return null;
+            }
         }
 
         public bool Run( bool withIssues )

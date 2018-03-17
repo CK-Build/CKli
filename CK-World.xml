@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<KnownWorld>
+<CK-World>
 
     <ReferentialFolder Path="CK-Env/CKli/Referential" />
     <SolutionCentral />
@@ -16,12 +16,6 @@
     <RemoveXmlHeaderFromCSProjAction Title="Removes xml namespace from .csproj, .props and .proj files." />
 
 -->
-
-    <!--
-    <GitCredentials
-        UsernameEnvironmentVariable="GIT_USERNAME"
-        PasswordEnvironmentVariable="GIT_PASSWORD" />
-    -->
    
     <Reusable Name="CodeCakeBuilder">
         <Folder Name="CodeCakeBuilder">
@@ -103,7 +97,7 @@
     <!-- Use attribute SkipRun="True" to skip running runnable items. -->    
     <Folder Name="CK-AspNet-Projects">
 
-        <GitFolder Name="CK-AspNet">
+        <GitFolder Name="CK-AspNet" Url="https://github.com/Invenietis/CK-AspNet.git" >
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles" />
@@ -111,7 +105,7 @@
             </Branch>
         </GitFolder>
 
-        <GitFolder Name="CK-AspNet-Auth">
+        <GitFolder Name="CK-AspNet-Auth" Url="https://github.com/Invenietis/CK-AspNet-Auth.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles" />
@@ -119,7 +113,7 @@
             </Branch>
         </GitFolder>
 
-        <GitFolder Name="CK-AspNet-Tester">
+        <GitFolder Name="CK-AspNet-Tester" Url="https://github.com/Invenietis/CK-AspNet-Tester.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles" />
@@ -131,7 +125,7 @@
     
     <Folder Name="CK-Core-Projects">
 
-        <GitFolder Name="CK-ActivityMonitor">
+        <GitFolder Name="CK-ActivityMonitor" Url="https://github.com/Invenietis/CK-ActivityMonitor.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles" />
@@ -139,7 +133,7 @@
             </Branch>
         </GitFolder>
 
-        <GitFolder Name="CK-Auth-Abstractions">
+        <GitFolder Name="CK-Auth-Abstractions" Url="https://github.com/Invenietis/CK-Auth-Abstractions.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles" />
@@ -147,7 +141,7 @@
             </Branch>
         </GitFolder>
 
-        <GitFolder Name="CK-Core">
+        <GitFolder Name="CK-Core" Url="https://github.com/Invenietis/CK-Core.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles" />
@@ -155,7 +149,7 @@
             </Branch>
         </GitFolder>
 
-        <GitFolder Name="CK-Monitoring">
+        <GitFolder Name="CK-Monitoring" Url="https://github.com/Invenietis/CK-Monitoring.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles" />
@@ -163,7 +157,7 @@
             </Branch>
         </GitFolder>
 
-        <GitFolder Name="CK-Reflection">
+        <GitFolder Name="CK-Reflection" Url="https://github.com/Invenietis/CK-Reflection.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles" />
@@ -171,7 +165,7 @@
             </Branch>
         </GitFolder>
 
-        <GitFolder Name="CK-Testing">
+        <GitFolder Name="CK-Testing" Url="https://github.com/Invenietis/CK-Testing.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles" />
@@ -179,7 +173,7 @@
             </Branch>
         </GitFolder>
 
-        <GitFolder Name="CK-Text">
+        <GitFolder Name="CK-Text" Url="https://github.com/Invenietis/CK-Text.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles" />
@@ -187,7 +181,7 @@
             </Branch>
         </GitFolder>
 
-        <GitFolder Name="CK-WeakAssemblyNameResolver">
+        <GitFolder Name="CK-WeakAssemblyNameResolver" Url="https://github.com/Invenietis/CK-WeakAssemblyNameResolver.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles">
@@ -202,7 +196,7 @@
 
     <Folder Name="CK-Database-Projects">
 
-        <GitFolder Name="CK-CodeGen">
+        <GitFolder Name="CK-CodeGen" Url="https://github.com/Invenietis/CK-CodeGen.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles" />
@@ -210,7 +204,7 @@
             </Branch>
         </GitFolder>
 
-        <GitFolder Name="CK-Database">
+        <GitFolder Name="CK-Database" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-database.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles" />
@@ -218,7 +212,7 @@
             </Branch>
         </GitFolder>
 
-        <GitFolder Name="CK-DB">
+        <GitFolder Name="CK-DB" Url="https://github.com/Invenietis/CK-DB.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles" />
@@ -226,7 +220,7 @@
             </Branch>
         </GitFolder>
         
-        <GitFolder Name="CK-Setup">
+        <GitFolder Name="CK-Setup" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-setup.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles" />
@@ -234,7 +228,7 @@
             </Branch>
         </GitFolder>
 
-        <GitFolder Name="CK-Setup-Dependency">
+        <GitFolder Name="CK-Setup-Dependency" Url="https://github.com/Invenietis/CK-Setup-Dependency.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles" />
@@ -242,7 +236,7 @@
             </Branch>
         </GitFolder>
 
-        <GitFolder Name="CKSetupRemoteStore">
+        <GitFolder Name="CKSetupRemoteStore" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/cksetupremotestore.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles" />
@@ -250,7 +244,7 @@
             </Branch>
         </GitFolder>
         
-        <GitFolder Name="CK-SqlServer-Parser">
+        <GitFolder Name="CK-SqlServer-Parser" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-sqlserver-parser.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles" />
@@ -258,7 +252,7 @@
             </Branch>
         </GitFolder>
 
-        <GitFolder Name="CK-SqlServer-Parser-Model">
+        <GitFolder Name="CK-SqlServer-Parser-Model" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-sqlserver-parser-model.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles">
@@ -273,7 +267,7 @@
 
     <Folder Name="Yodii-Projects">
 
-        <GitFolder Name="Yodii-Script">
+        <GitFolder Name="Yodii-Script" Url="https://github.com/Invenietis/yodii-script.git">
             <Branch Name="develop">
                 <PrimarySolution />
                 <Reuse Name="StandardFiles" />
@@ -286,4 +280,4 @@
     <File Name="CK-World">
         <MustExist Content="SimpleFiles/CK-World"/>
     </File>
-</KnownWorld>
+</CK-World>

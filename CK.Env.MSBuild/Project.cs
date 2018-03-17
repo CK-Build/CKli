@@ -47,11 +47,17 @@ namespace CK.Env.MSBuild
 
         /// <summary>
         /// Gets the project file. This is loaded when the <see cref="SolutionFile"/>
-        /// is created but may be reloaded.
+        /// is created but may be reloaded if needed.
         /// This is null if an error occurred while loading.
         /// </summary>
         public ProjectFileContext.File ProjectFile => _file;
 
+        /// <summary>
+        /// Enables the <see cref="ProjectFile"/> to be reloaded.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="force">True to force the reload.</param>
+        /// <returns>The project file and all its imports.</returns>
         public ProjectFileContext.File LoadProjectFile( IActivityMonitor m, bool force = false )
         {
             if( !force && _file != null ) return _file;
@@ -97,7 +103,7 @@ namespace CK.Env.MSBuild
         }
 
         /// <summary>
-        /// Gets the Sdk arrtibute of the primary project file.
+        /// Gets the Sdk attribute of the primary project file.
         /// Null if the project can not be read.
         /// </summary>
         public string Sdk { get; private set; }

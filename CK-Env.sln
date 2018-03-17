@@ -7,8 +7,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CKli", "CKli\CKli.csproj", 
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{ED8B158D-9126-4936-89A0-CF887F5AB966}"
 	ProjectSection(SolutionItems) = preProject
-		KnownWorld.xml = KnownWorld.xml
+		CK-World.xml = CK-World.xml
 		nuget.config = nuget.config
+		Signature-World.xml = Signature-World.xml
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.FileSystem", "CK.Env.FileSystem\CK.Env.FileSystem.csproj", "{3B5B07A0-8847-4087-AEF6-D068640E0EE3}"
@@ -25,9 +26,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Referential", "Referential"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Feeds", "CK.Env.Feeds\CK.Env.Feeds.csproj", "{49897755-1470-44CE-B463-056F3BAC1280}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CK.Env.MSBuild", "CK.Env.MSBuild\CK.Env.MSBuild.csproj", "{AC05468B-369F-4D66-AD22-59B22BD16E49}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.MSBuild", "CK.Env.MSBuild\CK.Env.MSBuild.csproj", "{AC05468B-369F-4D66-AD22-59B22BD16E49}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CK.Env.MSBuild.Tests", "Tests\CK.Env.MSBuild.Tests\CK.Env.MSBuild.Tests.csproj", "{49349794-CE5E-468D-BAA1-726D59F21F64}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.MSBuild.Tests", "Tests\CK.Env.MSBuild.Tests\CK.Env.MSBuild.Tests.csproj", "{49349794-CE5E-468D-BAA1-726D59F21F64}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

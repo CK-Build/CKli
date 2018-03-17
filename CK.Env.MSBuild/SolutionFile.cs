@@ -28,10 +28,23 @@ namespace CK.Env.MSBuild
 
         /// <summary>
         /// Gets the solution name. This should be unique accross any possible world.
+        /// For primary solution, this is the folder name (the .sln file name without the .sln extension).
+        /// For secondary solutions, this is the "name of the primary solution"/"solution file name" (including
+        /// the .sln extension) in order for the secondary solution to be scoped by the primary name and, with
+        /// the traling .sln to easily be spotted as a secondary solution.
         /// However, since this solution name does not contain the branch name, duplicates
         /// may occur if the same solution is loaded from different branches.
         /// </summary>
-        public string UniqueSolutionName => SolutionFolderPath.Parts[SolutionFolderPath.Parts.Count - 3];
+        public string UniqueSolutionName
+        {
+            get
+            {
+                return PrimarySolution == null
+                        ? SolutionFolderPath.Parts[SolutionFolderPath.Parts.Count - 3]
+                        : PrimarySolution.UniqueSolutionName + '/' + FilePath.LastPart;
+                
+            }
+        }
 
         /// <summary>
         /// Gets the file system from which this solution has been loaded.
@@ -68,6 +81,8 @@ namespace CK.Env.MSBuild
 
         /// <summary>
         /// Gets all projects.
+        /// This includes <see cref="PublishedProjects"/>, <see cref="TestProjects"/>,
+        /// <see cref="BuildProjects"/> and <see cref="MiscProjects"/>.
         /// </summary>
         public IEnumerable<Project> AllProjects => AllBaseProjects.OfType<Project>();
 
@@ -114,7 +129,7 @@ namespace CK.Env.MSBuild
             return true;
         }
 
-        public override string ToString() => $"Solution '{SolutionFolderPath}'.";
+        public override string ToString() => $"Solution '{UniqueSolutionName}'.";
 
         string IDependentItemRef.FullName => UniqueSolutionName;
 

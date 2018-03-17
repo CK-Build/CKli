@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<KnownWorld>
+<Signature-World>
 
     <ReferentialFolder Path="CK-Env/Referential" />
     <SolutionCentral />
@@ -137,4 +137,4 @@
 
     </Folder>
     
-</KnownWorld>
+</Signature-World>

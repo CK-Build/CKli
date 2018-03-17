@@ -38,6 +38,7 @@ namespace CKli
 
         static void Main( string[] args )
         {
+            Console.OutputEncoding = System.Text.Encoding.Unicode;
             ActivityMonitor.DefaultFilter = LogFilter.Debug;
             var monitor = new ActivityMonitor();
             monitor.Output.RegisterClient( new ActivityMonitorConsoleClient() );
