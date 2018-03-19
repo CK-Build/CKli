@@ -61,6 +61,7 @@ namespace CK.Env.MSBuild
         public ProjectFileContext.File LoadProjectFile( IActivityMonitor m, bool force = false )
         {
             if( !force && _file != null ) return _file;
+            IsTestProject = false;
             _dependencies = new Dependencies();
             _file = _ctx.FindOrLoad( m, Path, force );
             if( _file != null )
@@ -91,6 +92,17 @@ namespace CK.Env.MSBuild
                             TargetFrameworks = TargetFrameworks.Union( ProjectFileContext.Traits.FindOrCreate( t ) );
                         }
                         m.Debug( $"TargetFrameworks = {TargetFrameworks}" );
+                        bool? isTestProject = (bool?)_file.Document.Root.Elements( "PropertyGroup" )
+                                                          .Elements( "IsTestProject" )
+                                                          .FirstOrDefault();
+                        if( !isTestProject.HasValue )
+                        {
+                            var testMarker = _file.Document.Root.Elements( "ItemGroup" )
+                                                  .Elements( "Service" )
+                                                  .FirstOrDefault( e => (string)e.Attribute( "Include" ) == "{82a7f48d-3b50-4b1e-b82e-3ada8210c358}" );
+                            isTestProject = testMarker != null;
+                        }
+                        IsTestProject = isTestProject.Value;
                     }
                 }
             }
@@ -113,6 +125,12 @@ namespace CK.Env.MSBuild
         /// Null if the project can not be read.
         /// </summary>
         public CKTrait TargetFrameworks { get; private set; }
+
+        /// <summary>
+        /// Gets whether this is a test project. Since VS 15.6.1 update the
+        /// csproj contains a Service Include="{82a7f48d-3b50-4b1e-b82e-3ada8210c358}" item.
+        /// </summary>
+        public bool IsTestProject { get; private set; }
 
         /// <summary>
         /// Gets the dependencies.

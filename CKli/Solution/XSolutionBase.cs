@@ -62,7 +62,7 @@ namespace CKli
 
         protected override bool DoRun( IRunContext ctx )
         {
-            ReadSolutionFile( ctx.Monitor );
+            ReadSolutionFile( ctx.Monitor, force: true );
             return base.DoRun( ctx );
         }
     }

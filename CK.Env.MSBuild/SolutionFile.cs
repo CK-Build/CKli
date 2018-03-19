@@ -16,6 +16,8 @@ namespace CK.Env.MSBuild
     /// </summary>
     public sealed class SolutionFile : IDependentItemContainerRef
     {
+        SolutionFileSpecialType _specialType;
+
         /// <summary>
         /// Gets the .sln path (relative to the <see cref="FileSystem"/>).
         /// </summary>
@@ -42,7 +44,7 @@ namespace CK.Env.MSBuild
                 return PrimarySolution == null
                         ? SolutionFolderPath.Parts[SolutionFolderPath.Parts.Count - 3]
                         : PrimarySolution.UniqueSolutionName + '/' + FilePath.LastPart;
-                
+
             }
         }
 
@@ -73,6 +75,22 @@ namespace CK.Env.MSBuild
         /// is used.
         /// </summary>
         public SolutionFile PrimarySolution { get; set; }
+
+        /// <summary>
+        /// Gets or sets a special type for this solution.
+        /// </summary>
+        public SolutionFileSpecialType SpecialType
+        {
+            get => _specialType;
+            set
+            {
+                if( value != SolutionFileSpecialType.None && PrimarySolution == null )
+                {
+                    throw new ArgumentException( "Invalid SpecialType for a Primary solution." );
+                }
+                _specialType = value;
+            }
+        }
 
         /// <summary>
         /// Gets all solution projects, including any <see cref="SolutionFolder"/>.

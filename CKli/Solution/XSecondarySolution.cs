@@ -11,6 +11,7 @@ using System.Linq;
 
 namespace CKli
 {
+
     public class XSecondarySolution : XSolutionBase
     {
         public XSecondarySolution(
@@ -21,8 +22,7 @@ namespace CKli
             : base( initializer,
                     primary.GitBranch,
                     central,
-                    parentFolder.FullPath.Combine( (string)initializer.Element.Attribute( "Name" )
-                                                    ?? (string)initializer.Element.AttributeRequired( "Path" ) ) )
+                    (string)initializer.Element.Attribute( "Name" ) ?? (string)initializer.Element.AttributeRequired( "Path" ) )
         {
             PrimarySolution = primary;
             initializer.ChildServices.Add( this );
@@ -33,9 +33,16 @@ namespace CKli
         /// </summary>
         public XPrimarySolution PrimarySolution { get; }
 
+        /// <summary>
+        /// Gets the optional <see cref="SpecialType"/> indicator.
+        /// </summary>
+        public SolutionFileSpecialType SpecialType { get; private set; }
+
         public override SolutionFile ReadSolutionFile( IActivityMonitor m, bool force = false )
         {
-            return DoReadSolutionFile( m, PrimarySolution, force );
+            var s = DoReadSolutionFile( m, PrimarySolution, force );
+            s.SpecialType = SpecialType;
+            return s;
         }
 
         internal void OnPrimarySolutionFileChanged( SolutionFile newPrimary )

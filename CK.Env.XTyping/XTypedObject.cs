@@ -74,6 +74,10 @@ namespace CK.Env
                     {
                         v = new NormalizedPath( a.Value );
                     }
+                    else if( p.PropertyType.IsEnum )
+                    {
+                        v = Enum.Parse( p.PropertyType, a.Value );
+                    }
                     else v = Convert.ChangeType( a.Value, p.PropertyType );
                     p.SetValue( this, v );
                 }

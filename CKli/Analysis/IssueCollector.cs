@@ -122,14 +122,13 @@ namespace CK.Env.Analysis
         {
             readonly ActivityMonitorSimpleCollector _logCollector;
             readonly IActivityMonitor _monitor;
-            internal string _fixIdentifier;
-            internal string _fixTitle;
-            internal Func<IActivityMonitor, bool> _autoFixAction;
+            internal readonly List<(string Id, string Title, Func<IActivityMonitor, bool> Act)> _issues;
 
             internal protected IssueBuilder( IActivityMonitor monitor )
             {
                 _logCollector = new ActivityMonitorSimpleCollector() { MinimalFilter = LogLevelFilter.Debug };
                 _monitor = monitor;
+                _issues = new List<(string Id, string Title, Func<IActivityMonitor, bool> Act)>();
             }
 
             public IActivityMonitor Monitor => _monitor;
@@ -139,13 +138,17 @@ namespace CK.Env.Analysis
                 Monitor.Output.RegisterClient( _logCollector );
             }
 
-            public void CreateIssue( string identifier, string title = null, Func<IActivityMonitor, bool> autoFix = null )
+            /// <summary>
+            /// Creates an issue. Its description will be the captured log entries of the <see cref="Monitor"/>.
+            /// If more than one issue is created they will all share the same description.
+            /// </summary>
+            /// <param name="identifier">Unique identifier of the issue.</param>
+            /// <param name="title">Required title of the issue.</param>
+            /// <param name="autoFix">Optional autmatix fix for the issue.</param>
+            public void CreateIssue( string identifier, string title, Func<IActivityMonitor, bool> autoFix = null )
             {
                 if( identifier == null ) throw new ArgumentNullException( nameof( identifier ) );
-                if( _fixIdentifier != null ) throw new InvalidOperationException( $"Fix has already been created." );
-                _fixIdentifier = identifier;
-                _fixTitle = title;
-                _autoFixAction = autoFix;
+                _issues.Add( (identifier, title, autoFix) );
             }
 
             internal IReadOnlyList<ActivityMonitorSimpleCollector.Entry> StopLogCollect()
@@ -174,9 +177,9 @@ namespace CK.Env.Analysis
                 bool success = factory( builder );
                 var entries = builder.StopLogCollect();
                 if( !success ) return false;
-                if( builder._fixTitle != null )
+                foreach( var i in builder._issues )
                 {
-                    Add( entries, builder._fixIdentifier, builder._fixTitle, builder._autoFixAction );
+                    Add( entries, i.Id, i.Title, i.Act );
                 }
                 return true;
             }

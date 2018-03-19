@@ -8,7 +8,7 @@
     <GitCheckoutAction Title="Checkout all repositories on a specific branch name." />
     <GitCommitAction Title="Commits all pending changes to the current branch of all the repositories." />
     <GitFetchAction Title="Fetches all remotes in all repositories." />
-    <ReadDependencyAction Title="WIP: reading dependencies." />
+    <ReadDependencyAction Title="Analysing Solution dependencies and Solution ordering." />
 
     <!-- Unsafe brutal tools.
     
@@ -94,12 +94,18 @@
         </Folder>
     </Reusable>
 
+    <Reusable Name="StandardPrimarySolution" >
+        <PrimarySolution>
+            <TestProjectsStandardConventions />
+        </PrimarySolution>
+    </Reusable>
+    
     <!-- Use attribute SkipRun="True" to skip running runnable items. -->    
     <Folder Name="CK-AspNet-Projects">
 
         <GitFolder Name="CK-AspNet" Url="https://github.com/Invenietis/CK-AspNet.git" >
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -107,7 +113,7 @@
 
         <GitFolder Name="CK-AspNet-Auth" Url="https://github.com/Invenietis/CK-AspNet-Auth.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile SqlServer="2016" />
             </Branch>
@@ -115,7 +121,7 @@
 
         <GitFolder Name="CK-AspNet-Tester" Url="https://github.com/Invenietis/CK-AspNet-Tester.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -127,7 +133,7 @@
 
         <GitFolder Name="CK-ActivityMonitor" Url="https://github.com/Invenietis/CK-ActivityMonitor.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -135,7 +141,7 @@
 
         <GitFolder Name="CK-Auth-Abstractions" Url="https://github.com/Invenietis/CK-Auth-Abstractions.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -143,7 +149,7 @@
 
         <GitFolder Name="CK-Core" Url="https://github.com/Invenietis/CK-Core.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -151,7 +157,7 @@
 
         <GitFolder Name="CK-Monitoring" Url="https://github.com/Invenietis/CK-Monitoring.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -159,7 +165,7 @@
 
         <GitFolder Name="CK-Reflection" Url="https://github.com/Invenietis/CK-Reflection.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -167,7 +173,7 @@
 
         <GitFolder Name="CK-Testing" Url="https://github.com/Invenietis/CK-Testing.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile SqlServer="2016" />
             </Branch>
@@ -175,7 +181,7 @@
 
         <GitFolder Name="CK-Text" Url="https://github.com/Invenietis/CK-Text.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -183,7 +189,7 @@
 
         <GitFolder Name="CK-WeakAssemblyNameResolver" Url="https://github.com/Invenietis/CK-WeakAssemblyNameResolver.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles">
                     <Remove Target="Folder[@Name='CodeCakeBuilder']/File[@Name='Build.StandardUnitTests.cs']" />
                 </Reuse>
@@ -198,7 +204,7 @@
 
         <GitFolder Name="CK-CodeGen" Url="https://github.com/Invenietis/CK-CodeGen.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -206,7 +212,7 @@
 
         <GitFolder Name="CK-Database" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-database.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile SqlServer="2016" PushToRemoteStore="True" />
             </Branch>
@@ -214,7 +220,12 @@
 
         <GitFolder Name="CK-DB" Url="https://github.com/Invenietis/CK-DB.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <PrimarySolution TestProjectsArePublished="True">
+                    <TestProjectsStandardConventions />
+                </PrimarySolution>
+                <SecondarySolution Path="IntegrationTests/IntegrationTests.sln" SpecialType="IncludedSecondarySolution">
+                    <TestProjectsStandardConventions />
+                </SecondarySolution>
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile SqlServer="2016" PushToRemoteStore="True" />
             </Branch>
@@ -222,7 +233,7 @@
         
         <GitFolder Name="CK-Setup" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-setup.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile PushToRemoteStore="True" />
             </Branch>
@@ -230,7 +241,7 @@
 
         <GitFolder Name="CK-Setup-Dependency" Url="https://github.com/Invenietis/CK-Setup-Dependency.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -238,7 +249,7 @@
 
         <GitFolder Name="CKSetupRemoteStore" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/cksetupremotestore.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -246,7 +257,7 @@
         
         <GitFolder Name="CK-SqlServer-Parser" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-sqlserver-parser.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>
@@ -254,7 +265,7 @@
 
         <GitFolder Name="CK-SqlServer-Parser-Model" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-sqlserver-parser-model.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles">
                     <Remove Target="Folder[@Name='CodeCakeBuilder']/File[@Name='Build.StandardUnitTests.cs']" />
                 </Reuse>
@@ -269,7 +280,7 @@
 
         <GitFolder Name="Yodii-Script" Url="https://github.com/Invenietis/yodii-script.git">
             <Branch Name="develop">
-                <PrimarySolution />
+                <Reuse Name="StandardPrimarySolution" />
                 <Reuse Name="StandardFiles" />
                 <AppVeyorFile />
             </Branch>

@@ -158,13 +158,25 @@ namespace CK.Env
             public Stream CreateReadStream() => new MemoryStream( BinContent );
         }
 
-
-        public static ITextFileInfo AsTextFileInfo( this IFileInfo f )
+        /// <summary>
+        /// Creates a <see cref="ITextFileInfo"/> for this file info if it is possible:
+        /// the file exists, is not a directory ans its extension denotes a text format.
+        /// </summary>
+        /// <param name="f">This file info.</param>
+        /// <param name="ignoreExtension">
+        /// True to ignore the extension.
+        /// By default only extensions that are known to contain text are considered.
+        /// </param>
+        /// <returns>A ITextFileInfo or null.</returns>
+        public static ITextFileInfo AsTextFileInfo( this IFileInfo f, bool ignoreExtension = false )
         {
             if( f is ITextFileInfo t ) return t;
             if( f == null || !f.Exists || f.IsDirectory ) return null;
-            string ext = System.IO.Path.GetExtension( f.Name );
-            if( Array.IndexOf( _textExtensions, ext ) < 0 ) return null;
+            if( !ignoreExtension )
+            {
+                string ext = System.IO.Path.GetExtension( f.Name );
+                if( Array.IndexOf( _textExtensions, ext ) < 0 ) return null;
+            }
             return new Origin( f );
         }
 

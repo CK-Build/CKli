@@ -36,6 +36,11 @@ namespace CKli
         public new XBranch Parent => (XBranch)base.Parent;
 
         /// <summary>
+        /// Gets whether <see cref="SolutionFile.TestProjects"/> must be added to <see cref="SolutionFile.PublishedProjects"/>.
+        /// </summary>
+        public bool TestProjectsArePublished { get; private set; }
+
+        /// <summary>
         /// Gets all the secondary solutions of the <see cref="Parent"/> branch.
         /// </summary>
         public IEnumerable<XSecondarySolution> SecondarySolutions => Parent.Descendants<XSecondarySolution>();
@@ -46,6 +51,10 @@ namespace CKli
             var newS = DoReadSolutionFile( m, null, force );
             if( prev != newS )
             {
+                if( newS != null && TestProjectsArePublished )
+                {
+                    newS.PublishedProjects.AddRange( newS.TestProjects );
+                }
                 foreach( var s in SecondarySolutions ) s.OnPrimarySolutionFileChanged( newS );
             }
             return newS;
