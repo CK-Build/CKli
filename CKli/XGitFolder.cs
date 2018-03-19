@@ -57,14 +57,7 @@ namespace CKli
              {
                  bool DoFix( IActivityMonitor m )
                  {
-                     using( m.OpenInfo( $"Checking out {FullPath} from {Url}" ) )
-                     {
-                         Repository.Clone( Url, FileInfo.PhysicalPath, new CloneOptions()
-                         {
-                             CredentialsProvider = ObtainGitCredentialsProvider( m ),
-                         } );
-                     }
-                     return true;
+                     return EnsureOrCloneGitDirectory( m );
                  }
 
                  using( ib.Monitor.OpenInfo( $"Missing Git working directory: {FullPath}" ) )
@@ -81,6 +74,35 @@ namespace CKli
              } );
 
             return true;
+        }
+
+        internal bool EnsureOrCloneGitDirectory( IActivityMonitor m )
+        {
+            if( GitFolder == null )
+            {
+                m.Info( "Git directory does not exist." );
+                if( Url == null )
+                {
+                    m.Warn( "Url repository is not specified. Skipping Autmatic clone." );
+                    return false;
+                }
+                else
+                {
+                    using( m.OpenInfo( $"Checking out {FullPath} from {Url}" ) )
+                    {
+                        Repository.Clone( Url, FileInfo.PhysicalPath, new CloneOptions()
+                        {
+                            CredentialsProvider = ObtainGitCredentialsProvider( m ),
+                        } );
+                        GitFolder = FileSystem.EnsureGitFolder( FullPath );
+                    }
+                    return true;
+                }
+            }
+            else
+            {
+                return true;
+            }
         }
     }
 }
