@@ -20,7 +20,19 @@ namespace CKli
             var xGitFolders = NextSiblings.SelectMany( s => s.Descendants<XGitFolder>() );
             foreach( var xgit in xGitFolders )
             {
-                if( !xgit.GitFolder.FetchAll( m, xgit.ObtainGitCredentialsProvider(m) ) ) { return false; }
+                using( m.OpenInfo( $"Fetching {xgit.Name}" ) )
+                {
+                    if( xgit.GitFolder == null )
+                    {
+                        // No git folder: Clone it (single remote, default branch)
+                        xgit.EnsureOrCloneGitDirectory( m );
+                    }
+                    else
+                    {
+                        // With git folder: Fetch all remotes
+                        if( !xgit.GitFolder.FetchAll( m, xgit.ObtainGitCredentialsProvider( m ) ) ) { return false; }
+                    }
+                }
             }
             return true;
         }
