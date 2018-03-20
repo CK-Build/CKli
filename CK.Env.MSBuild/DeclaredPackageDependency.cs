@@ -11,7 +11,7 @@ namespace CK.Env.MSBuild
 {
     public class DeclaredPackageDependency
     {
-        public DeclaredPackageDependency(
+        internal DeclaredPackageDependency(
             Project owner,
             string packageId,
             SVersion version,
@@ -58,8 +58,10 @@ namespace CK.Env.MSBuild
         public XElement PropertyVersionElement { get; }
 
         /// <summary>
-        /// Gets whether the version uese a $(Version) property.
+        /// Gets whether the version use a $(Version) property.
         /// </summary>
         public bool UsePropertyVersion => PropertyVersionElement != null;
+
+        public override string ToString() => $"{Owner} => {PackageId}/{Version}";
     }
 }

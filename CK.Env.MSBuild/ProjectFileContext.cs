@@ -38,7 +38,11 @@ namespace CK.Env.MSBuild
         public class File
         {
             IReadOnlyList<File> _allFiles;
+            bool _hasChanged;
 
+            /// <summary>
+            /// Gets the file path.
+            /// </summary>
             public NormalizedPath Path { get; }
 
             public XDocument Document { get; }
@@ -66,13 +70,45 @@ namespace CK.Env.MSBuild
                 Document = d;
                 Imports = imports;
                 Version = v;
+                Document.Changed += OnDocumentChanged;
+            }
+
+            void OnDocumentChanged( object sender, XObjectChangeEventArgs e )
+            {
+                _hasChanged = true;
+            }
+
+            /// <summary>
+            /// Gets whether the Xml document has changed and should
+            /// be saved.
+            /// </summary>
+            public bool IsModified => _hasChanged;
+
+            /// <summary>
+            /// Saves this file if it has been modified as well as all modified imported files.
+            /// </summary>
+            /// <param name="m">The monitor.</param>
+            /// <param name="fs">The file system.</param>
+            /// <returns>True on success, false on success.</returns>
+            public bool SaveModifiedFile( IActivityMonitor m, FileSystem fs )
+            {
+                if( _hasChanged )
+                {
+                    if( !fs.CopyTo( m, Document.ToString(), Path ) ) return false;
+                    _hasChanged = false;
+                }
+                foreach( var i in Imports )
+                {
+                    if( !i.ImportedFile.SaveModifiedFile( m, fs ) ) return false;
+                }
+                return true;
             }
 
             internal void Initialize()
             {
                 var start = new File[] { this };
                 _allFiles = start.Concat( Imports.SelectMany( i => i.ImportedFile.AllFiles ) )
-                                        .Distinct().ToArray();
+                                 .Distinct().ToArray();
             }
         }
 
@@ -80,12 +116,19 @@ namespace CK.Env.MSBuild
         readonly Dictionary<NormalizedPath, File> _files;
         int _version;
 
+        /// <summary>
+        /// Initializes a new project file context.
+        /// </summary>
+        /// <param name="fileSystem">The file system provider.</param>
         public ProjectFileContext( IFileProvider fileSystem )
         {
             _fileSystem = fileSystem;
             _files = new Dictionary<NormalizedPath, File>();
         }
 
+        /// <summary>
+        /// Gets the file system.
+        /// </summary>
         public IFileProvider FileSystem => _fileSystem;
 
         /// <summary>

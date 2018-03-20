@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Env;
 using CK.Env.Analysis;
+using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -109,7 +110,15 @@ namespace CKli
                     Console.WriteLine( $"{a.Parameters.Count} parameters required (type '!cancel' to cancel):" );
                     foreach( var p in a.Parameters )
                     {
-                        Console.Write( $"    > {p.Name} =>" );
+                        const string prefix = "     ";
+                        StringBuilder b = new StringBuilder();
+                        if( !String.IsNullOrWhiteSpace( p.Description ) )
+                        {
+                            b.AppendMultiLine( prefix, p.Description, true, true );
+                        }
+                        else b.Append( prefix );
+                        b.Append( "> " ).Append( p.Name ).Append( " => " );
+                        Console.Write( b.ToString() );
                         string s;
                         do
                         {

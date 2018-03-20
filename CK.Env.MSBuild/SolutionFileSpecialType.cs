@@ -24,6 +24,8 @@ namespace CK.Env.MSBuild
         /// <summary>
         /// Consider this secondary solution as "transparent": its projects must be logically attached
         /// to the primary solution and this secondary solution itself does not appear at all.
+        /// Dependencies from projects from this secondary solution to any Package published by its
+        /// primary solutions are considered as requirements to the origin Project itself.
         /// </summary>
         IncludedSecondarySolution
     }

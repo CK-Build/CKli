@@ -26,22 +26,58 @@ namespace CK.Env.Analysis
 
         public interface IParameter
         {
+            /// <summary>
+            /// Gets an optional description that can contain multiple lines of text.
+            /// Defaults to null (<see cref="Name"/> is enough).
+            /// </summary>
+            string Description { get; }
+
+            /// <summary>
+            /// Gets the required parameter name.
+            /// </summary>
             string Name { get; }
 
+            /// <summary>
+            /// Gets whether this parameter has a defaut value.
+            /// </summary>
             bool HasDefaultValue { get; }
 
+            /// <summary>
+            /// Gets the default value. <see cref="HasDefaultValue"/> must be true
+            /// for this value to make sense.
+            /// </summary>
             object DefaultValue { get; }
 
+            /// <summary>
+            /// Gets the type of the parameter.
+            /// </summary>
             Type ParameterType { get; }
 
+            /// <summary>
+            /// Gets whether a <see cref="Value"/> has been set.
+            /// </summary>
             bool HasValue { get; }
 
+            /// <summary>
+            /// Gets the value. <see cref="HasValue"/> must be true
+            /// for this value to make sense.
+            /// </summary>
             object Value { get; }
 
+            /// <summary>
+            /// Parses an input string an sets the <see cref="Value"/> accordingly.
+            /// </summary>
+            /// <param name="m">The monitor that will be used for errors.</param>
+            /// <param name="input">Input string.</param>
+            /// <returns>True on succes, false on error.</returns>
             bool ParseAndSet( IActivityMonitor m, string input );
 
         }
 
+        /// <summary>
+        /// Stronglt typed <see cref="IParameter"/>.
+        /// </summary>
+        /// <typeparam name="T">Type of the value.</typeparam>
         public interface IParameter<T> : IParameter
         {
             new T DefaultValue { get; }
@@ -67,6 +103,8 @@ namespace CK.Env.Analysis
                 _defaultValue = defaultValue;
                 _validator = validator;
             }
+
+            public string Description { get; set; }
 
             public string Name => _name;
 
@@ -126,6 +164,20 @@ namespace CK.Env.Analysis
             }
         }
 
+        public class IntParameter : Parameter<int>
+        {
+            internal IntParameter( string name, string description, Func<IActivityMonitor, int, bool> validator )
+                : base( name, false, 0, validator )
+            {
+                Description = description;
+            }
+
+            protected override bool TryParse( IActivityMonitor m, string input, out int value )
+            {
+                return int.TryParse( input, out value );
+            }
+        }
+
         protected StringParameter AddStringParameter( string name, Func<IActivityMonitor, string, bool> validator )
         {
             return AddStringParameter( name, null, validator );
@@ -134,6 +186,13 @@ namespace CK.Env.Analysis
         protected StringParameter AddStringParameter( string name, string defaultValue = null, Func<IActivityMonitor, string, bool> validator = null )
         {
             var p = new StringParameter( name, defaultValue, validator );
+            _parameters.Add( p );
+            return p;
+        }
+
+        protected IntParameter AddIntParameter( string name, string description, Func<IActivityMonitor, int, bool> validator = null )
+        {
+            var p = new IntParameter( name, description, validator );
             _parameters.Add( p );
             return p;
         }

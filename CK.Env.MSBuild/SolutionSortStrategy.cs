@@ -7,7 +7,7 @@ namespace CK.Env.MSBuild
     public enum SolutionSortStrategy
     {
         /// <summary>
-        /// Consider only published projectsof primary solutions
+        /// Consider only published projects of primary solutions
         /// (secondary solutions are ignored).
         /// </summary>
         PublishedProjects = 1,

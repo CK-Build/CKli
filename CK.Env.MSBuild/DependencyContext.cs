@@ -14,8 +14,14 @@ namespace CK.Env.MSBuild
         readonly SolutionFile[] _solutions;
         readonly Dictionary<string, Package> _packages;
         readonly Dictionary<Project, ProjectItem> _projects;
-        public class Package : IDependentItem, IDependentItemRef
+        readonly CKTrait _frameworks;
+        ProjectDependencyResult _projectDependencies;
+
+        public class Package : IDependentPackage, IDependentItem, IDependentItemRef
         {
+            // This contains only the Solution of the Project for local projects:
+            // The Package (published) requires its Solution.
+            // This is null otherwise.
             readonly IDependentItemRef[] _requires;
 
             internal Package( ProjectItem localProject )
@@ -54,7 +60,7 @@ namespace CK.Env.MSBuild
 
             /// <summary>
             /// Gets <see cref="PackageId"/>/<see cref="Version"/> for external packages
-            /// and the versionless package identifier if the project is available.
+            /// and the versionless package identifier if the project is locally published.
             /// </summary>
             public string FullName { get; }
 
@@ -82,7 +88,7 @@ namespace CK.Env.MSBuild
         /// This internal class is the IDepentItem that represents a Project
         /// in a SortableSolutionFile graph.
         /// </summary>
-        internal class ProjectItem : IDependentItem, IDependentItemRef
+        internal class ProjectItem : IDependentProject, IDependentItem, IDependentItemRef
         {
             readonly Project _p;
             readonly List<IDependentItemRef> _requires;
@@ -100,69 +106,67 @@ namespace CK.Env.MSBuild
                 return new ProjectItem( p, cache );
             }
 
+            /// <summary>
+            /// Gets the project itself.
+            /// </summary>
             public Project Project => _p;
 
             /// <summary>
             /// Whether this project belongs to the Published ones.
             /// When a project is published, its name is the one of the associated DependencyContext.Package
             /// and is necessarily unique: we can use its file name as the item's FullName (with the .csproj
-            /// extension: the naked project name is its Package's FullName).
+            /// extension: the naked project name is used for its Package's FullName).
             /// But when a project is not published, we scope its name to its solution name to compute the
             /// FullName so that utility projects can have the same name in different solutions.
             /// </summary>
             public bool IsPublished { get; set; }
 
+            /// <summary>
+            /// Gets the full name of this project item (see <see cref="IsPublished"/>).
+            /// </summary>
             public string FullName => IsPublished
                                         ? _p.Path.LastPart
                                         : _p.Solution.UniqueSolutionName + '/' + _p.Path.LastPart;
 
             internal void AddRequires( IDependentItemRef p ) => _requires.Add( p );
 
-            public IDependentItemContainerRef Container => _p.Solution.SpecialType == SolutionFileSpecialType.IncludedSecondarySolution
+            IDependentItemContainerRef IDependentItem.Container => _p.Solution.SpecialType == SolutionFileSpecialType.IncludedSecondarySolution
                                                             ? _p.Solution.PrimarySolution
                                                             : _p.Solution;
 
-            public IDependentItemRef Generalization => null;
+            IDependentItemRef IDependentItem.Generalization => null;
 
-            public IEnumerable<IDependentItemRef> Requires => _requires;
+            IEnumerable<IDependentItemRef> IDependentItem.Requires => _requires;
 
-            public IEnumerable<IDependentItemRef> RequiredBy => null;
+            IEnumerable<IDependentItemRef> IDependentItem.RequiredBy => null;
 
-            public IEnumerable<IDependentItemGroupRef> Groups => null;
+            IEnumerable<IDependentItemGroupRef> IDependentItem.Groups => null;
 
             bool IDependentItemRef.Optional => false;
 
-            public object StartDependencySort( IActivityMonitor m ) => _p;
+            object IDependentItem.StartDependencySort( IActivityMonitor m ) => _p;
         }
 
-        DependencyContext( SolutionFile[] solutions, Dictionary<string, Package> packages, Dictionary<Project, ProjectItem> projects )
+        DependencyContext(
+            SolutionFile[] solutions,
+            Dictionary<string, Package> packages,
+            Dictionary<Project, ProjectItem> projects,
+            CKTrait frameworks )
         {
             _solutions = solutions;
             _packages = packages;
             _projects = projects;
+            _frameworks = frameworks;
         }
 
         public SolutionDependencyResult AnalyzeDependencies( IActivityMonitor m, SolutionSortStrategy content )
         {
-            IEnumerable<ProjectItem> GetProjects( SolutionFile s )
-            {
-                switch( content )
-                {
-                    case SolutionSortStrategy.PublishedProjects:
-                        return s.PublishedProjects.Select( p => _projects[p] );
-                    case SolutionSortStrategy.PublishedAndTestsProjects:
-                        return s.PublishedProjects.Concat( s.TestProjects ).Distinct().Select( p => _projects[p] );
-                    default:
-                        return s.AllProjects.Except( s.BuildProjects ).Select( p => _projects[p] );
-                }
-            }
-
             var sortables = new Dictionary<SolutionFile, SortableSolutionFile>();
             // Handles Primary solutions first.
             foreach( var s in _solutions )
             {
                 if( s.PrimarySolution != null ) continue;
-                sortables.Add( s, new SortableSolutionFile( s, GetProjects( s ) ) );
+                sortables.Add( s, new SortableSolutionFile( s, GetProjects( s, content ) ) );
             }
             if( content == SolutionSortStrategy.EverythingExceptBuildProjects )
             {
@@ -173,9 +177,9 @@ namespace CK.Env.MSBuild
                     if( s.SpecialType == SolutionFileSpecialType.IncludedSecondarySolution )
                     {
                         var primary = sortables[s.PrimarySolution];
-                        primary.AddSecondaryProjects( GetProjects( s ) );
+                        primary.AddSecondaryProjects( GetProjects( s, content ) );
                     }
-                    else sortables.Add( s, new SortableSolutionFile( s, GetProjects( s ) ) );
+                    else sortables.Add( s, new SortableSolutionFile( s, GetProjects( s, content ) ) );
                 }
             }
 
@@ -184,6 +188,7 @@ namespace CK.Env.MSBuild
             {
                 return new SolutionDependencyResult( content, result );
             }
+            // Building the list of SolutionDependencyResult.DependencyRow.
             var table = result.SortedItems
                           // 1 - Selects solutions along with their ordered index.
                           .Where( sorted => sorted.GroupForHead == null && sorted.Item is SortableSolutionFile )
@@ -219,11 +224,74 @@ namespace CK.Env.MSBuild
 
         }
 
+
+        public ProjectDependencyResult ProjectDependencies
+        {
+            get
+            {
+                Package FindPackage( DeclaredPackageDependency  d, bool isIncludedSolutionProject )
+                {
+                    // Check for a published Package.
+                    if( _packages.TryGetValue( d.PackageId, out Package p ) )
+                    {
+                        // If this published Package is from the primary solution of
+                        // the project's solution that has SpecialType=IncludedSecondarySolution, we ignore
+                        // the dependency as if the dependency was a ProjectReference instead of a PackageReference.
+                        if( isIncludedSolutionProject
+                            && p.Project.Solution == d.Owner.Solution.PrimarySolution )
+                        {
+                             p = null;
+                        }
+                    }
+                    else
+                    {
+                        // If it is not a published package, then we must find it as an external package.
+                        p = _packages[d.PackageId + '/' + d.Version];
+                    }
+                    return p;
+                }
+
+                if( _projectDependencies == null )
+                {
+                    var result = new List<ProjectDependencyResult.FrameworkDependencies>();
+                    foreach( var f in _frameworks.AtomicTraits )
+                    {
+                        var allDeps = _projects.Keys.SelectMany( p => p.Deps.Packages.Where( d => d.Frameworks.Intersect( f ) == f ) )
+                                            .Select( d => (Dep: d, Target: FindPackage( d, d.Owner.Solution.SpecialType == SolutionFileSpecialType.IncludedSecondarySolution )) )
+                                            .Where( t => t.Target != null )
+                                            .Select( t => new ProjectDependencyResult.ProjectDepencyRow(
+                                                            t.Dep,
+                                                            _projects[t.Dep.Owner],
+                                                            t.Target
+                                                             ) )
+                                            .ToList();
+                        result.Add( new ProjectDependencyResult.FrameworkDependencies( f, allDeps ) );
+                    }
+                    _projectDependencies = new ProjectDependencyResult( result );
+                }
+                return _projectDependencies;
+            }
+        }
+
+        IEnumerable<ProjectItem> GetProjects( SolutionFile s, SolutionSortStrategy content )
+        {
+            switch( content )
+            {
+                case SolutionSortStrategy.PublishedProjects:
+                    return s.PublishedProjects.Select( p => _projects[p] );
+                case SolutionSortStrategy.PublishedAndTestsProjects:
+                    return s.PublishedProjects.Concat( s.TestProjects ).Distinct().Select( p => _projects[p] );
+                default:
+                    return s.AllProjects.Except( s.BuildProjects ).Select( p => _projects[p] );
+            }
+        }
+
         static public DependencyContext Create( IActivityMonitor m, IEnumerable<SolutionFile> solutionFiles )
         {
             var packages = new Dictionary<string, Package>();
             var solutions = solutionFiles.ToArray();
             var projectItems = new Dictionary<Project, ProjectItem>();
+            var frameworks = ProjectFileContext.Traits.EmptyTrait;
             using( m.OpenInfo( "Creating all the ProjectItem for all projects in all solutions." ) )
             {
                 foreach( var s in solutions )
@@ -233,6 +301,7 @@ namespace CK.Env.MSBuild
                         if( !s.InitializeProjectsDeps( m ) ) return null;
                         foreach( var project in s.AllProjects )
                         {
+                            frameworks = frameworks.Union( project.TargetFrameworks );
                             ProjectItem.Create( project, projectItems );
                         }
                     }
@@ -271,9 +340,11 @@ namespace CK.Env.MSBuild
                     IDependentItemRef refTarget;
                     if( packages.TryGetValue( dep.PackageId, out Package target ) )
                     {
-                        // Dependency to one of our Published projects.
+                        // Dependency to a Published projects from the primary solution are
+                        // transfomed into requirements to the Project itself.
                         refTarget = target;
-                        if( project.Project.Solution.SpecialType == SolutionFileSpecialType.IncludedSecondarySolution )
+                        if( project.Project.Solution.SpecialType == SolutionFileSpecialType.IncludedSecondarySolution
+                            && target.Project.Solution == project.Project.Solution.PrimarySolution )
                         {
                             refTarget = projectItems[target.Project];
                         }
@@ -286,7 +357,7 @@ namespace CK.Env.MSBuild
                     project.AddRequires( refTarget );
                 }
             }
-            return new DependencyContext( solutions, packages, projectItems );
+            return new DependencyContext( solutions, packages, projectItems, frameworks );
         }
 
         static Package RegisterExternal( Dictionary<string, Package> externals, DeclaredPackageDependency dep )

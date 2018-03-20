@@ -11,7 +11,7 @@ namespace CK.Env.MSBuild
         public class DependencyRow
         {
             /// <summary>
-            /// Gets the biuild order for the <see cref="Solution"/>.
+            /// Gets the build order for the <see cref="Solution"/>.
             /// </summary>
             public int Index { get; }
 
@@ -80,6 +80,8 @@ namespace CK.Env.MSBuild
         /// Gets whether solutions and their projects have been successfully ordered.
         /// </summary>
         public bool HasError => !RawSorterResult.IsComplete;
+
+
     }
 
 }

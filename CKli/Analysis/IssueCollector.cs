@@ -3,6 +3,7 @@ using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace CK.Env.Analysis
@@ -30,7 +31,7 @@ namespace CK.Env.Analysis
                 _fix = fix;
             }
 
-            public int Number { get; }
+            public int Number { get; internal set; }
 
             public LogLevel MaxLevel { get; }
 
@@ -70,6 +71,17 @@ namespace CK.Env.Analysis
         public void Clear() => _issues.Clear();
 
         public IReadOnlyList<IIssue> Issues => _issues;
+
+        public int ClearIssues( IActivityMonitor m, Func<IIssue,bool> deleteSelector )
+        {
+            int c = _issues.RemoveWhereAndReturnsRemoved( deleteSelector ).Count();
+            if( c != 0 )
+            {
+                m.Info( $"{c} issues removed." );
+                for( int i = 0; i < _issues.Count; ++i ) _issues[i].Number = i;
+            }
+            return c;
+        }
 
         public void DisplayIssues( TextWriter w, bool withDescription )
         {
