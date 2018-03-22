@@ -12,11 +12,11 @@ using CK.Setup;
 namespace CK.Env.MSBuild
 {
     /// <summary>
-    /// Represents the content in an MSBuild solution file.
+    /// A MSBuild solution file.
     /// </summary>
-    public sealed class SolutionFile : IDependentItemContainerRef
+    public sealed class Solution : IDependentItemContainerRef
     {
-        SolutionFileSpecialType _specialType;
+        SolutionSpecialType _specialType;
 
         /// <summary>
         /// Gets the .sln path (relative to the <see cref="FileSystem"/>).
@@ -69,27 +69,30 @@ namespace CK.Env.MSBuild
         public string MinimumVisualStudioVersion { get; }
 
         /// <summary>
-        /// Gets or sets the primary solution if this is a secondary solution (null if this is a
+        /// Gets the primary solution if this is a secondary solution (null if this is a
         /// primary solution).
-        /// When set, this acts as a Container in terms of dependencies when <see cref="SolutionSortStrategy.EverythingExceptBuildProjects"/>
-        /// is used.
         /// </summary>
-        public SolutionFile PrimarySolution { get; set; }
+        public Solution PrimarySolution { get; private set; }
 
         /// <summary>
-        /// Gets or sets a special type for this solution.
+        /// Gets the special type for this secondary solution.
         /// </summary>
-        public SolutionFileSpecialType SpecialType
+        public SolutionSpecialType SpecialType => _specialType;
+
+
+        /// <summary>
+        /// Declares this solution as a secondary solution of an existing one.
+        /// <see cref="PublishedProjects"/> is cleared when this method is called since a secondary solution
+        /// is not aimed at producing packages.
+        /// </summary>
+        /// <param name="primarySolution">The required primary solution.</param>
+        /// <param name="type">The solution type.</param>
+        public void SetAsSecondarySolution( Solution primarySolution, SolutionSpecialType type )
         {
-            get => _specialType;
-            set
-            {
-                if( value != SolutionFileSpecialType.None && PrimarySolution == null )
-                {
-                    throw new ArgumentException( "Invalid SpecialType for a Primary solution." );
-                }
-                _specialType = value;
-            }
+            if( primarySolution == null ) throw new ArgumentNullException( nameof( primarySolution ) );
+            PrimarySolution = primarySolution;
+            _specialType = type;
+            PublishedProjects.Clear();
         }
 
         /// <summary>
@@ -133,28 +136,13 @@ namespace CK.Env.MSBuild
                                                         .Except( TestProjects )
                                                         .Except( BuildProjects );
 
-        /// <summary>
-        /// Initializes all <see cref="Project.Deps"/>.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <returns>False if an error occurred. True on success.</returns>
-        public bool InitializeProjectsDeps( IActivityMonitor m )
-        {
-            foreach( var p in AllProjects )
-            {
-                if( !p.InitializeDeps( m, false ).IsInitialized ) return false;
-            }
-            return true;
-        }
-
         public override string ToString() => $"Solution '{UniqueSolutionName}'.";
 
         string IDependentItemRef.FullName => UniqueSolutionName;
 
         bool IDependentItemRef.Optional => false;
 
-        SolutionFile(
-            SolutionFile primarySolution,
+        Solution(
             NormalizedPath filePath,
             NormalizedPath folderPath,
             string version,
@@ -162,7 +150,6 @@ namespace CK.Env.MSBuild
             string minimumVisualStudioVersion,
             IReadOnlyCollection<ProjectBase> projects )
         {
-            PrimarySolution = primarySolution;
             FilePath = filePath;
             SolutionFolderPath = folderPath;
             Version = version;
@@ -172,23 +159,13 @@ namespace CK.Env.MSBuild
             foreach( var p in projects ) p.Solution = this;
             BuildProjects = projects.OfType<Project>().Where( p => p.Name == "CodeCakeBuilder" ).ToList();
             TestProjects = projects.OfType<Project>().Where( p => p.Name.EndsWith( ".Tests" ) ).ToList();
-            if( primarySolution == null )
-            {
-                PublishedProjects = projects.OfType<Project>().Where( p => p.Name != "CodeCakeBuilder"
-                                                                           && !p.Name.EndsWith( ".Tests" )
-                                                                           && p.Path.Parts.Count == FilePath.Parts.Count + 1 )
-                                                              .ToList();
-            }
-            else PublishedProjects = new List<Project>();
+            PublishedProjects = projects.OfType<Project>().Where( p => p.Name != "CodeCakeBuilder"
+                                                                        && !p.Name.EndsWith( ".Tests" )
+                                                                        && p.Path.Parts.Count == FilePath.Parts.Count + 1 )
+                                                          .ToList();
         }
 
-        /// <summary>
-        /// Parses a MSBuild solution.
-        /// </summary>
-        /// <param name="filePath">The solution path.</param>
-        /// <param name="primarySolution">The primary solution if this is a secondary solution.</param>
-        /// <returns>A parsed solution.</returns>
-        static public SolutionFile Create( IActivityMonitor m, ProjectFileContext ctx, SolutionFile primarySolution, NormalizedPath filePath )
+        static internal Solution Load( IActivityMonitor m, MSBuildContext ctx, NormalizedPath filePath )
         {
             if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
             var file = ctx.FileSystem.GetFileInfo( filePath ).AsTextFileInfo();
@@ -237,15 +214,14 @@ namespace CK.Env.MSBuild
                         ParseNestedProjectLine( projects, trimmed );
                     }
                 }
-                var solutionParserResult = new SolutionFile(
-                    primarySolution,
+                var s = new Solution(
                     filePath,
                     folderPath,
                     version,
                     visualStudioVersion,
                     minimumVisualStudioVersion,
                     projects.ToArray() );
-                return solutionParserResult;
+                return s;
             }
             catch( Exception ex )
             {
@@ -254,7 +230,7 @@ namespace CK.Env.MSBuild
             }
         }
 
-        static ProjectBase ParseSolutionProjectLine( IActivityMonitor m, ProjectFileContext ctx, NormalizedPath folderPath, string line )
+        static ProjectBase ParseSolutionProjectLine( IActivityMonitor m, MSBuildContext ctx, NormalizedPath folderPath, string line )
         {
             var withinQuotes = false;
             var projectTypeBuilder = new StringBuilder();
@@ -297,8 +273,8 @@ namespace CK.Env.MSBuild
             {
                 return new SolutionFolder( idBuilder.ToString(), nameBuilder.ToString(), path );
             }
-            var p = new Project( projectGuid, projectName, path, type, ctx );
-            p.LoadProjectFile( m );
+            var p = new Project( ctx, projectGuid, projectName, path, type );
+            p.ReloadProjectFile( m );
             return p;
         }
 

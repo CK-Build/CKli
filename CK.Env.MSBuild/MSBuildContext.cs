@@ -9,13 +9,30 @@ using System.Xml.Linq;
 
 namespace CK.Env.MSBuild
 {
-    public class ProjectFileContext
+    public class MSBuildContext
     {
         /// <summary>
         /// Traits are used to manage framework names.
         /// </summary>
         static readonly public CKTraitContext Traits = new CKTraitContext( "ProjectFileContext" );
 
+        /// <summary>
+        /// Parses a semi colon separated framework string that can be null or empty (the empty trait is returned).
+        /// </summary>
+        /// <param name="frameworks">Semi colon separated traits.</param>
+        /// <returns>The traits from <see cref="Traits"/> context.</returns>
+        public static CKTrait ParseSemiColonFrameworks( string frameworks )
+        {
+            CKTrait f = Traits.EmptyTrait;
+            if( frameworks != null )
+            {
+                foreach( var t in frameworks.Split( new[] { ';' }, StringSplitOptions.RemoveEmptyEntries ) )
+                {
+                    f = f.Union( Traits.FindOrCreate( t ) );
+                }
+            }
+            return f;
+        }
 
         /// <summary>
         /// Defines import of a <see cref="File"/> from another File.
@@ -53,23 +70,15 @@ namespace CK.Env.MSBuild
             public IReadOnlyList<Import> Imports { get; }
 
             /// <summary>
-            /// Gets a list of all the imported files without duplicate, starting with this one.
+            /// Gets a list starting with this one and all the imported files without duplicate.
             /// </summary>
             public IReadOnlyList<File> AllFiles => _allFiles;
 
-            /// <summary>
-            /// Gets all the root elements from <see cref="AllFiles"/>.
-            /// </summary>
-            public IEnumerable<XElement> AllRoots => _allFiles.Select( f => f.Document.Root );
-
-            internal int Version { get; }
-
-            internal File( NormalizedPath p, XDocument d, List<Import> imports, int v )
+            internal File( NormalizedPath p, XDocument d, List<Import> imports )
             {
                 Path = p;
                 Document = d;
                 Imports = imports;
-                Version = v;
                 Document.Changed += OnDocumentChanged;
             }
 
@@ -79,18 +88,17 @@ namespace CK.Env.MSBuild
             }
 
             /// <summary>
-            /// Gets whether the Xml document has changed and should
-            /// be saved.
+            /// Gets whether any <see cref="AllFiles"/>' <see cref="Document"/> has changed.
             /// </summary>
-            public bool IsModified => _hasChanged;
+            public bool IsDirty => _allFiles.Any( f => f._hasChanged );
 
             /// <summary>
             /// Saves this file if it has been modified as well as all modified imported files.
             /// </summary>
             /// <param name="m">The monitor.</param>
             /// <param name="fs">The file system.</param>
-            /// <returns>True on success, false on success.</returns>
-            public bool SaveModifiedFile( IActivityMonitor m, FileSystem fs )
+            /// <returns>True on success, false on error.</returns>
+            internal bool Save( IActivityMonitor m, FileSystem fs )
             {
                 if( _hasChanged )
                 {
@@ -99,7 +107,7 @@ namespace CK.Env.MSBuild
                 }
                 foreach( var i in Imports )
                 {
-                    if( !i.ImportedFile.SaveModifiedFile( m, fs ) ) return false;
+                    if( !i.ImportedFile.Save( m, fs ) ) return false;
                 }
                 return true;
             }
@@ -112,57 +120,66 @@ namespace CK.Env.MSBuild
             }
         }
 
-        readonly IFileProvider _fileSystem;
+        readonly FileSystem _fileSystem;
         readonly Dictionary<NormalizedPath, File> _files;
-        int _version;
+        readonly Dictionary<NormalizedPath, Solution> _solutions;
 
         /// <summary>
         /// Initializes a new project file context.
         /// </summary>
         /// <param name="fileSystem">The file system provider.</param>
-        public ProjectFileContext( IFileProvider fileSystem )
+        public MSBuildContext( FileSystem fileSystem )
         {
             _fileSystem = fileSystem;
             _files = new Dictionary<NormalizedPath, File>();
+            _solutions = new Dictionary<NormalizedPath, Solution>();
         }
 
         /// <summary>
         /// Gets the file system.
         /// </summary>
-        public IFileProvider FileSystem => _fileSystem;
+        public FileSystem FileSystem => _fileSystem;
 
-        /// <summary>
-        /// Loads the project file and all its imported parts if not already loaded.
-        /// Returns null on error.
-        /// </summary>
-        /// <param name="m">The monitor.</param>
-        /// <param name="path">The project file path.</param>
-        /// <param name="forceLoad">True to ignore any already loaded file content.</param>
-        /// <returns>The file on success, null on error.</returns>
-        public File FindOrLoad( IActivityMonitor m, NormalizedPath path, bool forceLoad )
+        public Solution GetSolution( IActivityMonitor m, NormalizedPath path )
         {
-            return FindOrLoad( m, path, forceLoad ? ++_version : -1 );
+            if( _solutions.TryGetValue( path, out Solution s ) )
+            {
+                return s;
+            }
+            using( m.OpenTrace( $"Loading solution {path}." ) )
+            {
+                try
+                {
+                    s = Solution.Load( m, this, path );
+                    if( s != null ) _solutions.Add( path, s );
+                }
+                catch( Exception ex )
+                {
+                    m.Error( ex );
+                }
+            }
+            return s;
         }
 
-        File FindOrLoad( IActivityMonitor m, NormalizedPath path, int version )
+        internal File FindOrLoad( IActivityMonitor m, NormalizedPath path )
         {
-            if( _files.TryGetValue( path, out File f ) && f.Version >= version )
+            if( _files.TryGetValue( path, out File f )  )
             {
                 return f;
             }
-            using( m.OpenDebug( $"Loading project file {path}." ) )
+            using( m.OpenTrace( $"Loading project file {path}." ) )
             {
                 try
                 {
                     XDocument content = _fileSystem.GetFileInfo( path ).ReadAsXDocument();
                     var imports = new List<Import>();
-                    f = new File( path, content, imports, _version );
+                    f = new File( path, content, imports );
                     _files[path] = f;
                     var folder = path.RemoveLastPart();
                     imports.AddRange( content.Root.Descendants( "Import" )
                                         .Select( i => (E: i, P: (string)i.Attribute( "Project" )) )
                                         .Where( i => i.P != null )
-                                        .Select( i => new Import( i.E, FindOrLoad( m, folder.Combine( i.P ).ResolveDots(), version ) ) ) );
+                                        .Select( i => new Import( i.E, FindOrLoad( m, folder.Combine( i.P ).ResolveDots() ) ) ) );
                     f.Initialize();
                     return f;
                 }

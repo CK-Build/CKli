@@ -11,9 +11,9 @@ namespace CK.Env.MSBuild
     public abstract class ProjectBase
     {
         /// <summary>
-        /// Gets the owning <see cref="SolutionFile"/>.
+        /// Gets the owning <see cref="MSBuild.Solution"/>.
         /// </summary>
-        public SolutionFile Solution { get; internal set; }
+        public Solution Solution { get; internal set; }
 
         /// <summary>
         /// Gets the project identity.

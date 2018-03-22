@@ -22,8 +22,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CodeCakeBuilder", "CodeCake
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.XTyping", "CK.Env.XTyping\CK.Env.XTyping.csproj", "{06A5A730-C435-45AB-999C-CDC382445739}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Referential", "Referential", "{2C2C0FD2-F8B5-44D3-89BB-04301834FF42}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Feeds", "CK.Env.Feeds\CK.Env.Feeds.csproj", "{49897755-1470-44CE-B463-056F3BAC1280}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.MSBuild", "CK.Env.MSBuild\CK.Env.MSBuild.csproj", "{AC05468B-369F-4D66-AD22-59B22BD16E49}"

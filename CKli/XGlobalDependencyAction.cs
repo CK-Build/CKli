@@ -3,6 +3,7 @@ using CK.Env;
 using CK.Env.Analysis;
 using CK.Env.MSBuild;
 using CK.Text;
+using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,37 +11,40 @@ using System.Text;
 
 namespace CKli
 {
-    public class XReadDependencyAction : XAction
+    public class XGlobalDependencyAction : XAction
     {
         readonly XSolutionCentral _solutions;
         readonly IntParameter _choice;
         readonly IssueCollector _issueCollector;
         readonly FileSystem _fileSystem;
+        readonly XKnownPackageVersionsIssuer _knownPackageVersions;
 
-        public XReadDependencyAction(
+        public XGlobalDependencyAction(
             Initializer intializer,
             FileSystem fileSystem,
             ActionCollector collector,
             IssueCollector issueCollector,
-            XSolutionCentral solutions )
+            XSolutionCentral solutions,
+            XKnownPackageVersionsIssuer knownPackageVersions = null )
             : base( intializer, collector )
         {
             _fileSystem = fileSystem;
             _issueCollector = issueCollector;
+            _knownPackageVersions = knownPackageVersions;
+            _solutions = solutions;
             const string menu =
 @"--- Solution Dependencies
-1 - PublishedProjects - Consider only published projects of primary solutions
-    (secondary solutions are ignored).
-2 - PublishedAndTestsProjects - Consider published and tests projects of primary solutions
-    (secondary solutions are ignored).
-3 - EverythingExceptBuildProjects - Consider all projects and the secondary solutions if any.
-    Build projects are ignored.
+   1 - PublishedProjects - Consider only published projects of primary solutions
+                           (secondary solutions are ignored).
+   2 - PublishedAndTestsProjects - Consider published and tests projects of primary solutions
+                                   (secondary solutions are ignored).
+   3 - EverythingExceptBuildProjects - Consider all projects and the secondary solutions if any.
+                                       Build projects are ignored.
 --- Project Dependencies
-4 - Dumps all projects dependencies across all solutions.
-5 - Dumps version dependency discrepancies across all solutions.
-6 - Generate issues to fix version dependency discrepancies across all solutions.
+   4 - Dumps all projects dependencies across all solutions.
+   5 - Dumps version dependency discrepancies across all solutions.
+   6 - Generate issues to fix version dependency discrepancies across all solutions.
 ";
-            _solutions = solutions;
             _choice = AddIntParameter( "choice", menu, ( m, i ) =>
             {
                 if( i < 1 || i > 6 )
@@ -85,17 +89,20 @@ namespace CKli
         void CreateIssues( IActivityMonitor m, DependencyContext deps )
         {
             _issueCollector.ClearIssues( m, i => i.Identifier.StartsWith( "ProjectVersionDeps:" ) );
+
             var toFix = deps.ProjectDependencies.VersionDiscrepancies
                             .SelectMany( d =>
-                                    d.DependencyTable.GroupBy( r => r.PackageId )
-                                    .Select( g => (PackageName: g.Key,
-                                                    MaxVer: g.Select( x => x.Version ).Max(),
-                                                    Rows: g) )
-                                    .Select( t => (d.Framework,
-                                                    t.PackageName,
-                                                    t.MaxVer,
-                                                    Rows: t.Rows.Where( x => x.Version != t.MaxVer ).ToList()) ) )
+                                    d.DependencyTable
+                                        .GroupBy( r => r.PackageId )
+                                        .Select( g => (PackageName: g.Key,
+                                                        MaxVer: g.Select( x => x.Version ).Max(),
+                                                        Rows: g) )
+                                        .Select( t => (d.Framework,
+                                                        t.PackageName,
+                                                        t.MaxVer,
+                                                        Rows: t.Rows.Where( x => x.Version != t.MaxVer ).ToList()) ) )
                             .ToList();
+
             foreach( var fix in toFix )
             {
                 _issueCollector.RunIssueFactory( m, builder =>
@@ -106,17 +113,7 @@ namespace CKli
                     {
                         foreach( var f in fix.Rows )
                         {
-                            var e = f.RawPackageDependency.PropertyVersionElement;
-                            if( e != null )
-                            {
-                                e.Value = fix.MaxVer.ToString();
-                            }
-                            else
-                            {
-                                e = f.RawPackageDependency.PropertyVersionElement ?? f.RawPackageDependency.OriginElement;
-                                e.Attribute( "Version" ).SetValue( fix.MaxVer.ToString() );
-                            }
-                            f.RawPackageDependency.Owner.ProjectFile.SaveModifiedFile( monitor, _fileSystem );
+                            f.RawPackageDependency.Owner.SetPackageReferenceVersion( m, fix.Framework, fix.PackageName, fix.MaxVer );
                         }
                         return true;
                     } );

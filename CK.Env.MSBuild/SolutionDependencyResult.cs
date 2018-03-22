@@ -18,7 +18,7 @@ namespace CK.Env.MSBuild
             /// <summary>
             /// Gets the solution file.
             /// </summary>
-            public SolutionFile Solution { get; }
+            public Solution Solution { get; }
 
             /// <summary>
             /// Gets one of the projects that references the package produced by the <see cref="Target"/> project.
@@ -32,7 +32,7 @@ namespace CK.Env.MSBuild
             /// </summary>
             public Project Target { get; }
 
-            internal DependencyRow( int idx, SolutionFile s, Project o, Project t )
+            internal DependencyRow( int idx, Solution s, Project o, Project t )
             {
                 Index = idx;
                 Solution = s;

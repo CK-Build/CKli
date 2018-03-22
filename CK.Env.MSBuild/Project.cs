@@ -24,52 +24,48 @@ namespace CK.Env.MSBuild
         {
             public readonly IReadOnlyList<DeclaredPackageDependency> Packages;
             public readonly IReadOnlyList<ProjectToProjectDependency> Projects;
+            public readonly IReadOnlyList<XElement> UselessDependencies;
             public bool IsInitialized => Packages != null;
 
-            internal Dependencies( IReadOnlyList<DeclaredPackageDependency> packages, IReadOnlyList<ProjectToProjectDependency> projects )
+            internal Dependencies(
+                IReadOnlyList<DeclaredPackageDependency> packages,
+                IReadOnlyList<ProjectToProjectDependency> projects,
+                IReadOnlyList<XElement> uselessDeps )
             {
                 Packages = packages;
                 Projects = projects;
+                UselessDependencies = uselessDeps;
             }
         }
 
-        readonly ProjectFileContext _ctx;
-        ProjectFileContext.File _file;
+        readonly MSBuildContext _ctx;
+        MSBuildContext.File _file;
         Dependencies _dependencies;
 
-        internal Project( string id, string name, NormalizedPath projectFilePath, string typeIdentifier, ProjectFileContext ctx )
+        internal Project( MSBuildContext ctx, string id, string name, NormalizedPath projectFilePath, string typeIdentifier )
             : base( id, name, projectFilePath, typeIdentifier )
         {
             _ctx = ctx;
         }
 
-        public bool IsCSProj => Path.LastPart.EndsWith( ".csproj" );
-
         /// <summary>
-        /// Gets the project file. This is loaded when the <see cref="SolutionFile"/>
-        /// is created but may be reloaded if needed.
+        /// Gets the project file. This is loaded when the <see cref="Solution"/>
+        /// is created.
         /// This is null if an error occurred while loading.
         /// </summary>
-        public ProjectFileContext.File ProjectFile => _file;
+        public MSBuildContext.File ProjectFile => _file;
 
-        /// <summary>
-        /// Enables the <see cref="ProjectFile"/> to be reloaded.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="force">True to force the reload.</param>
-        /// <returns>The project file and all its imports.</returns>
-        public ProjectFileContext.File LoadProjectFile( IActivityMonitor m, bool force = false )
+        internal MSBuildContext.File ReloadProjectFile( IActivityMonitor m )
         {
-            if( !force && _file != null ) return _file;
             IsTestProject = false;
             _dependencies = new Dependencies();
-            _file = _ctx.FindOrLoad( m, Path, force );
+            _file = _ctx.FindOrLoad( m, Path );
             if( _file != null )
             {
                 Sdk = (string)_file.Document.Root.Attribute( "Sdk" );
                 if( Sdk == null )
                 {
-                    m.Error( $"There must a Sdk element on root {Path}." );
+                    m.Error( $"There must be a Sdk element on root {Path}." );
                     _file = null;
                 }
                 else
@@ -86,11 +82,7 @@ namespace CK.Env.MSBuild
                     }
                     else
                     {
-                        TargetFrameworks = ProjectFileContext.Traits.EmptyTrait;
-                        foreach( var t in f.Value.Split( new[] { ';' }, StringSplitOptions.RemoveEmptyEntries ) )
-                        {
-                            TargetFrameworks = TargetFrameworks.Union( ProjectFileContext.Traits.FindOrCreate( t ) );
-                        }
+                        TargetFrameworks = MSBuildContext.ParseSemiColonFrameworks( f.Value );
                         m.Debug( $"TargetFrameworks = {TargetFrameworks}" );
                         bool? isTestProject = (bool?)_file.Document.Root.Elements( "PropertyGroup" )
                                                           .Elements( "IsTestProject" )
@@ -103,13 +95,14 @@ namespace CK.Env.MSBuild
                             isTestProject = testMarker != null;
                         }
                         IsTestProject = isTestProject.Value;
+                        DoInitializeDependencies( m );
                     }
                 }
             }
             if( _file == null )
             {
                 Sdk = null;
-                TargetFrameworks = ProjectFileContext.Traits.EmptyTrait;
+                TargetFrameworks = MSBuildContext.Traits.EmptyTrait;
             }
             return _file;
         }
@@ -129,31 +122,48 @@ namespace CK.Env.MSBuild
         /// <summary>
         /// Gets whether this is a test project. Since VS 15.6.1 update the
         /// csproj contains a Service Include="{82a7f48d-3b50-4b1e-b82e-3ada8210c358}" item.
+        /// However sometimes it is not updated or it appears in a non test project (in a
+        /// helper assembly for example): to fix this, projects can define a IsTestProject
+        /// property (sets to True or False) that is checked first. Only if IsTestProject
+        /// is not defined, Service Include is used.
         /// </summary>
         public bool IsTestProject { get; private set; }
 
         /// <summary>
         /// Gets the dependencies.
-        /// They must have been <see cref="InitializeDeps"/> first.
         /// </summary>
         public Dependencies Deps => _dependencies;
 
-        public Dependencies InitializeDeps( IActivityMonitor m, bool forceReload )
+        /// <summary>
+        /// Sets a package reference and returns the number of changes.
+        /// </summary>
+        /// <param name="m">The monitor.</param>
+        /// <param name="frameworks">Frameworks that applies to the reference.</param>
+        /// <param name="packageId">The package identifier.</param>
+        /// <param name="version">The new version to set.</param>
+        public int SetPackageReferenceVersion( IActivityMonitor m, CKTrait frameworks, string packageId, SVersion version )
         {
-            using( m.OpenTrace( $"Reading dependencies of {ToString()}." ) )
+            if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
+            int changeCount = 0;
+            foreach( var r in _dependencies.Packages.Where( p => p.PackageId == packageId
+                                                                 && p.Version != version
+                                                                 && p.Frameworks.Intersect( frameworks ).IsEmpty == false ) )
             {
-                LoadProjectFile( m, forceReload );
-                if( _file == null )
+                var e = r.PropertyVersionElement;
+                if( e != null )
                 {
-                    Debug.Assert( !_dependencies.IsInitialized );
-                    return _dependencies;
+                    e.Value = version.ToString();
                 }
-                if( !_dependencies.IsInitialized || forceReload )
+                else
                 {
-                    DoInitializeDependencies( m );
+                    e = r.OriginElement;
+                    e.Attribute( "Version" ).SetValue( version.ToString() );
                 }
-                return _dependencies;
+                ++changeCount;
             }
+            m.Trace( $"{changeCount} version update in {ToString()} for package reference {packageId}." );
+            if( changeCount > 0 ) DoInitializeDependencies( m );
+            return changeCount;
         }
 
         public override string ToString() => $"Project '{Name}' in '{Solution}'.";
@@ -161,7 +171,7 @@ namespace CK.Env.MSBuild
         void DoInitializeDependencies( IActivityMonitor m )
         {
             _dependencies = new Dependencies();
-            var packageRefs = _file.AllRoots
+            var packageRefs = _file.AllFiles.Select( f => f.Document.Root )
                              .SelectMany( root => root.Elements( "ItemGroup" )
                                                         .Elements()
                                                         .Where( e => e.Name.LocalName == "PackageReference"
@@ -172,6 +182,7 @@ namespace CK.Env.MSBuild
 
             var conditionEvaluator = new PartialEvaluator();
             var deps = new List<DeclaredPackageDependency>();
+            var uselessDeps = new List<XElement>();
             var projs = new List<ProjectToProjectDependency>();
             foreach( var p in packageRefs )
             {
@@ -204,7 +215,12 @@ namespace CK.Env.MSBuild
                     }
                     CKTrait frameworks = ComputeFrameworks( m, p.Origin, conditionEvaluator );
                     if( frameworks == null ) return;
-                    deps.Add( new DeclaredPackageDependency( this, p.PackageId, version, p.Origin, propertyDef, frameworks ) );
+                    if( frameworks.IsEmpty )
+                    {
+                        m.Warn( $"Useless PackageReference (applies to undeclared frameworks): {p.Origin}." );
+                        uselessDeps.Add( p.Origin );
+                    }
+                    else deps.Add( new DeclaredPackageDependency( this, p.PackageId, version, p.Origin, propertyDef, frameworks ) );
                 }
                 else
                 {
@@ -223,10 +239,15 @@ namespace CK.Env.MSBuild
                     }
                     CKTrait frameworks = ComputeFrameworks( m, p.Origin, conditionEvaluator );
                     if( frameworks == null ) return;
-                    projs.Add( new ProjectToProjectDependency( this, target, frameworks ) );
+                    if( frameworks.IsEmpty )
+                    {
+                        m.Warn( $"Useless ProjectReference (applies to undeclared frameworks): {p.Origin}." );
+                        uselessDeps.Add( p.Origin );
+                    }
+                    else projs.Add( new ProjectToProjectDependency( this, target, frameworks ) );
                 }
             }
-            _dependencies = new Dependencies( deps, projs );
+            _dependencies = new Dependencies( deps, projs, uselessDeps );
         }
 
         CKTrait ComputeFrameworks( IActivityMonitor m, XElement e, PartialEvaluator evaluator )
@@ -262,7 +283,7 @@ namespace CK.Env.MSBuild
             }
             // Lookup for the property.
             string propName = p.RawVersion.Substring( 2, p.RawVersion.Length - 3 );
-            var candidates = _file.AllRoots
+            var candidates = _file.AllFiles.Select( f => f.Document.Root )
                                  .SelectMany( root => root.Elements( "PropertyGroup" ) )
                                  .Elements()
                                  .Where( e => e.Name.LocalName == propName ).ToList();

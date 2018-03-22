@@ -9,16 +9,16 @@ namespace CK.Env.MSBuild
 {
     public class SortableSolutionFile : IDependentItemContainer
     {
-        readonly SolutionFile _solution;
+        readonly Solution _solution;
         IEnumerable<DependencyContext.ProjectItem> _projects;
 
-        internal SortableSolutionFile( SolutionFile f, IEnumerable<DependencyContext.ProjectItem> projects )
+        internal SortableSolutionFile( Solution f, IEnumerable<DependencyContext.ProjectItem> projects )
         {
             _solution = f;
             _projects = projects;
         }
 
-        public SolutionFile Solution => _solution;
+        public Solution Solution => _solution;
 
         public IEnumerable<Project> Projects => _projects.Select( p => p.Project );
 
@@ -29,7 +29,7 @@ namespace CK.Env.MSBuild
 
         string IDependentItem.FullName => _solution.UniqueSolutionName;
 
-        IDependentItemContainerRef IDependentItem.Container => _solution.SpecialType == SolutionFileSpecialType.IndependantSecondarySolution
+        IDependentItemContainerRef IDependentItem.Container => _solution.SpecialType == SolutionSpecialType.IndependantSecondarySolution
                                                                 ? null
                                                                 : _solution.PrimarySolution;
 

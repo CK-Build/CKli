@@ -23,9 +23,8 @@ namespace CodeCake
     /// <summary>
     /// Standard build "script".
     /// </summary>
-    [AddPath( "CodeCakeBuilder/Tools" )]
-    [AddPath( "packages/**/tools*" )]
-    public class Build : CodeCakeHost
+    [AddPath( "%UserProfile%/.nuget/packages/**/tools*" )]
+    public partial class Build : CodeCakeHost
     {
         public Build()
         {

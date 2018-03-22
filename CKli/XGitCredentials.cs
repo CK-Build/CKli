@@ -9,9 +9,7 @@ namespace CKli
 {
     public class XGitCredentials : XTypedObject
     {
-        public XGitCredentials(
-            Initializer initializer
-            )
+        public XGitCredentials( Initializer initializer )
             : base( initializer )
         {
             // Add to DI
@@ -19,6 +17,7 @@ namespace CKli
         }
 
         public string UsernameEnvironmentVariable { get; set; }
+
         public string PasswordEnvironmentVariable { get; set; }
 
         internal string GetUsername( IActivityMonitor m )
@@ -53,7 +52,6 @@ namespace CKli
         {
             return (GetUsername( m ), GetPassword( m ));
         }
-
 
         internal CredentialsHandler ObtainGitCredentialsHandler( IActivityMonitor m )
         {

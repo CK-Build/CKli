@@ -17,6 +17,8 @@ namespace CKli
     /// </summary>
     public class XPrimarySolution : XSolutionBase
     {
+        readonly Solution _solution;
+
         public XPrimarySolution(
             Initializer initializer,
             XBranch branch,
@@ -28,6 +30,11 @@ namespace CKli
         {
             if( !(initializer.Parent is XBranch) ) throw new Exception( "A primary solution must be a direct child of a Git branch." );
             initializer.Services.Add( this );
+            _solution = central.MSBuildContext.GetSolution( initializer.Monitor, FullPath );
+            if( TestProjectsArePublished )
+            {
+                _solution.PublishedProjects.AddRange( _solution.TestProjects );
+            }
         }
 
         /// <summary>
@@ -36,29 +43,11 @@ namespace CKli
         public new XBranch Parent => (XBranch)base.Parent;
 
         /// <summary>
-        /// Gets whether <see cref="SolutionFile.TestProjects"/> must be added to <see cref="SolutionFile.PublishedProjects"/>.
+        /// Gets whether <see cref="CK.Env.MSBuild.Solution.TestProjects"/> must be added to <see cref="CK.Env.MSBuild.Solution.PublishedProjects"/>.
         /// </summary>
         public bool TestProjectsArePublished { get; private set; }
 
-        /// <summary>
-        /// Gets all the secondary solutions of the <see cref="Parent"/> branch.
-        /// </summary>
-        public IEnumerable<XSecondarySolution> SecondarySolutions => Parent.Descendants<XSecondarySolution>();
-
-        public override SolutionFile ReadSolutionFile( IActivityMonitor m, bool force = false )
-        {
-            var prev = _solution;
-            var newS = DoReadSolutionFile( m, null, force );
-            if( prev != newS )
-            {
-                if( newS != null && TestProjectsArePublished )
-                {
-                    newS.PublishedProjects.AddRange( newS.TestProjects );
-                }
-                foreach( var s in SecondarySolutions ) s.OnPrimarySolutionFileChanged( newS );
-            }
-            return newS;
-        }
+        public override Solution Solution => _solution;
 
     }
 }

@@ -14,6 +14,8 @@ namespace CKli
 
     public class XSecondarySolution : XSolutionBase
     {
+        readonly Solution _solution;
+
         public XSecondarySolution(
             Initializer initializer,
             XPrimarySolution primary,
@@ -26,6 +28,8 @@ namespace CKli
         {
             PrimarySolution = primary;
             initializer.ChildServices.Add( this );
+            _solution = central.MSBuildContext.GetSolution( initializer.Monitor, FullPath );
+            _solution.SetAsSecondarySolution( PrimarySolution.Solution, SpecialType );
         }
 
         /// <summary>
@@ -36,22 +40,9 @@ namespace CKli
         /// <summary>
         /// Gets the optional <see cref="SpecialType"/> indicator.
         /// </summary>
-        public SolutionFileSpecialType SpecialType { get; private set; }
+        public SolutionSpecialType SpecialType { get; private set; }
 
-        public override SolutionFile ReadSolutionFile( IActivityMonitor m, bool force = false )
-        {
-            var s = DoReadSolutionFile( m, PrimarySolution, force );
-            s.SpecialType = SpecialType;
-            return s;
-        }
-
-        internal void OnPrimarySolutionFileChanged( SolutionFile newPrimary )
-        {
-            if( _solution != null )
-            {
-                _solution.PrimarySolution = newPrimary;
-            }
-        }
+        public override Solution Solution => _solution;
 
     }
 }

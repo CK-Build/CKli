@@ -9,7 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Xml.Linq;
 
-namespace CKli.Solution.Issues
+namespace CKli.MSBuild.Issues
 {
     [CK.Env.XName( "TestProjectsStandardConventions" )]
     public class XTestProjectsStandardConventionsIssuer : XIssuer
@@ -27,7 +27,7 @@ namespace CKli.Solution.Issues
 
         protected override bool CreateIssue( IRunContextIssue builder )
         {
-            var s = _solution.ReadSolutionFile( builder.Monitor );
+            var s = _solution.Solution;
             using( builder.Monitor.OpenInfo( $"Analysing Tests in solution '{s.UniqueSolutionName}'." ) )
             {
                 var testsPath = s.SolutionFolderPath.AppendPart( "Tests" );

@@ -11,7 +11,7 @@ namespace CK.Env.MSBuild
 {
     public class DependencyContext
     {
-        readonly SolutionFile[] _solutions;
+        readonly Solution[] _solutions;
         readonly Dictionary<string, Package> _packages;
         readonly Dictionary<Project, ProjectItem> _projects;
         readonly CKTrait _frameworks;
@@ -130,7 +130,7 @@ namespace CK.Env.MSBuild
 
             internal void AddRequires( IDependentItemRef p ) => _requires.Add( p );
 
-            IDependentItemContainerRef IDependentItem.Container => _p.Solution.SpecialType == SolutionFileSpecialType.IncludedSecondarySolution
+            IDependentItemContainerRef IDependentItem.Container => _p.Solution.SpecialType == SolutionSpecialType.IncludedSecondarySolution
                                                             ? _p.Solution.PrimarySolution
                                                             : _p.Solution;
 
@@ -148,7 +148,7 @@ namespace CK.Env.MSBuild
         }
 
         DependencyContext(
-            SolutionFile[] solutions,
+            Solution[] solutions,
             Dictionary<string, Package> packages,
             Dictionary<Project, ProjectItem> projects,
             CKTrait frameworks )
@@ -161,7 +161,7 @@ namespace CK.Env.MSBuild
 
         public SolutionDependencyResult AnalyzeDependencies( IActivityMonitor m, SolutionSortStrategy content )
         {
-            var sortables = new Dictionary<SolutionFile, SortableSolutionFile>();
+            var sortables = new Dictionary<Solution, SortableSolutionFile>();
             // Handles Primary solutions first.
             foreach( var s in _solutions )
             {
@@ -174,7 +174,7 @@ namespace CK.Env.MSBuild
                 foreach( var s in _solutions )
                 {
                     if( s.PrimarySolution == null ) continue;
-                    if( s.SpecialType == SolutionFileSpecialType.IncludedSecondarySolution )
+                    if( s.SpecialType == SolutionSpecialType.IncludedSecondarySolution )
                     {
                         var primary = sortables[s.PrimarySolution];
                         primary.AddSecondaryProjects( GetProjects( s, content ) );
@@ -195,7 +195,7 @@ namespace CK.Env.MSBuild
                           .Select( ( sorted, idx ) =>
                                         (
                                             Index: idx,
-                                            Solution: (SolutionFile)sorted.StartValue,
+                                            Solution: (Solution)sorted.StartValue,
                                             // The projects from this solution that reference packages that are
                                             // produced by local solutions have a direct requires to a Package
                                             // that has a local Project.
@@ -257,7 +257,7 @@ namespace CK.Env.MSBuild
                     foreach( var f in _frameworks.AtomicTraits )
                     {
                         var allDeps = _projects.Keys.SelectMany( p => p.Deps.Packages.Where( d => d.Frameworks.Intersect( f ) == f ) )
-                                            .Select( d => (Dep: d, Target: FindPackage( d, d.Owner.Solution.SpecialType == SolutionFileSpecialType.IncludedSecondarySolution )) )
+                                            .Select( d => (Dep: d, Target: FindPackage( d, d.Owner.Solution.SpecialType == SolutionSpecialType.IncludedSecondarySolution )) )
                                             .Where( t => t.Target != null )
                                             .Select( t => new ProjectDependencyResult.ProjectDepencyRow(
                                                             t.Dep,
@@ -273,7 +273,7 @@ namespace CK.Env.MSBuild
             }
         }
 
-        IEnumerable<ProjectItem> GetProjects( SolutionFile s, SolutionSortStrategy content )
+        IEnumerable<ProjectItem> GetProjects( Solution s, SolutionSortStrategy content )
         {
             switch( content )
             {
@@ -286,19 +286,18 @@ namespace CK.Env.MSBuild
             }
         }
 
-        static public DependencyContext Create( IActivityMonitor m, IEnumerable<SolutionFile> solutionFiles )
+        static public DependencyContext Create( IActivityMonitor m, IEnumerable<Solution> solutionFiles )
         {
             var packages = new Dictionary<string, Package>();
             var solutions = solutionFiles.ToArray();
             var projectItems = new Dictionary<Project, ProjectItem>();
-            var frameworks = ProjectFileContext.Traits.EmptyTrait;
+            var frameworks = MSBuildContext.Traits.EmptyTrait;
             using( m.OpenInfo( "Creating all the ProjectItem for all projects in all solutions." ) )
             {
                 foreach( var s in solutions )
                 {
                     using( m.OpenTrace( $"Solution {s.UniqueSolutionName}." ) )
                     {
-                        if( !s.InitializeProjectsDeps( m ) ) return null;
                         foreach( var project in s.AllProjects )
                         {
                             frameworks = frameworks.Union( project.TargetFrameworks );
@@ -343,7 +342,7 @@ namespace CK.Env.MSBuild
                         // Dependency to a Published projects from the primary solution are
                         // transfomed into requirements to the Project itself.
                         refTarget = target;
-                        if( project.Project.Solution.SpecialType == SolutionFileSpecialType.IncludedSecondarySolution
+                        if( project.Project.Solution.SpecialType == SolutionSpecialType.IncludedSecondarySolution
                             && target.Project.Solution == project.Project.Solution.PrimarySolution )
                         {
                             refTarget = projectItems[target.Project];

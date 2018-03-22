@@ -5,9 +5,9 @@ using System.Text;
 namespace CK.Env.MSBuild
 {
     /// <summary>
-    /// Defines special type for a <see cref="SolutionFile"/>.
+    /// Defines special type for a <see cref="Solution"/>.
     /// </summary>
-    public enum SolutionFileSpecialType
+    public enum SolutionSpecialType
     {
         /// <summary>
         /// No special type.
