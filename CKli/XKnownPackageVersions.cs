@@ -97,7 +97,7 @@ namespace CKli
 
         protected override bool CreateIssue( IRunContextIssue builder )
         {
-            var toFix = _solutions.LoadAllSolutions( builder.Monitor, false )
+            var toFix = _solutions.AllSolutions.Select( s => s.Solution )
                               .SelectMany( s => s.AllProjects )
                               .SelectMany( p => p.Deps.Packages )
                               .Select( d => (D: d, C: FindConstraint( d.PackageId, d.Version, d.Frameworks )) )
@@ -120,7 +120,7 @@ namespace CKli
                         {
                             f.Key.SetPackageReferenceVersion( m, fix.D.Frameworks, fix.D.PackageId, fix.C.Version );
                         }
-                        return true;
+                        return f.Key.Save( m, _solutions.MSBuildContext.FileSystem );
                     } );
                 }
 

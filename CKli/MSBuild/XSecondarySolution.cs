@@ -28,7 +28,7 @@ namespace CKli
         {
             PrimarySolution = primary;
             initializer.ChildServices.Add( this );
-            _solution = central.MSBuildContext.GetSolution( initializer.Monitor, FullPath );
+            _solution = central.MSBuildContext.GetSolution( initializer.Monitor, primary.GitBranch.Name, FullPath );
             _solution.SetAsSecondarySolution( PrimarySolution.Solution, SpecialType );
         }
 

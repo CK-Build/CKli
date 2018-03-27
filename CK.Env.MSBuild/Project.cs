@@ -22,10 +22,37 @@ namespace CK.Env.MSBuild
         /// </summary>
         public struct Dependencies
         {
+            /// <summary>
+            /// Gets all the PackageReference.
+            /// </summary>
             public readonly IReadOnlyList<DeclaredPackageDependency> Packages;
+
+            /// <summary>
+            /// Gets all ProjectReference.
+            /// </summary>
             public readonly IReadOnlyList<ProjectToProjectDependency> Projects;
+
+            /// <summary>
+            /// Gets the useless dependencies.
+            /// </summary>
             public readonly IReadOnlyList<XElement> UselessDependencies;
+
+            /// <summary>
+            /// Gets whether this structure hass been initialized.
+            /// </summary>
             public bool IsInitialized => Packages != null;
+
+            /// <summary>
+            /// Gets the <see cref="DeclaredPackageDependency"/> that applies to frameworks.
+            /// </summary>
+            /// <param name="frameworks">Frameworks to consider. When empty, all dependencies apply.</param>
+            /// <returns>The filtered set of dependencies.</returns>
+            public IEnumerable<DeclaredPackageDependency> Filter( CKTrait frameworks )
+            {
+                return frameworks.IsEmpty
+                        ? Packages
+                        : Packages.Where( p => p.Frameworks.Intersect( frameworks ) == frameworks );
+            }
 
             internal Dependencies(
                 IReadOnlyList<DeclaredPackageDependency> packages,
@@ -36,6 +63,7 @@ namespace CK.Env.MSBuild
                 Projects = projects;
                 UselessDependencies = uselessDeps;
             }
+
         }
 
         readonly MSBuildContext _ctx;
@@ -59,7 +87,7 @@ namespace CK.Env.MSBuild
         {
             IsTestProject = false;
             _dependencies = new Dependencies();
-            _file = _ctx.FindOrLoad( m, Path );
+            _file = _ctx.FindOrLoadProjectFile( m, Path );
             if( _file != null )
             {
                 Sdk = (string)_file.Document.Root.Attribute( "Sdk" );
@@ -96,11 +124,13 @@ namespace CK.Env.MSBuild
                         }
                         IsTestProject = isTestProject.Value;
                         DoInitializeDependencies( m );
+                        if( !_dependencies.IsInitialized ) _file = null;
                     }
                 }
             }
             if( _file == null )
             {
+                _ctx.Unload( Path );
                 Sdk = null;
                 TargetFrameworks = MSBuildContext.Traits.EmptyTrait;
             }
@@ -135,12 +165,25 @@ namespace CK.Env.MSBuild
         public Dependencies Deps => _dependencies;
 
         /// <summary>
+        /// Saves all files that have been modified.
+        /// </summary>
+        /// <param name="m">The monitor.</param>
+        /// <param name="fs">The file system.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool Save( IActivityMonitor m, FileSystem fs )
+        {
+            if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
+            return _file.Save( m, fs );
+        }
+
+        /// <summary>
         /// Sets a package reference and returns the number of changes.
         /// </summary>
         /// <param name="m">The monitor.</param>
         /// <param name="frameworks">Frameworks that applies to the reference.</param>
         /// <param name="packageId">The package identifier.</param>
         /// <param name="version">The new version to set.</param>
+        /// <returns>The number of changes.</returns>
         public int SetPackageReferenceVersion( IActivityMonitor m, CKTrait frameworks, string packageId, SVersion version )
         {
             if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
@@ -162,11 +205,62 @@ namespace CK.Env.MSBuild
                 ++changeCount;
             }
             m.Trace( $"{changeCount} version update in {ToString()} for package reference {packageId}." );
-            if( changeCount > 0 ) DoInitializeDependencies( m );
+            if( changeCount > 0 ) OnChange( m );
             return changeCount;
         }
 
-        public override string ToString() => $"Project '{Name}' in '{Solution}'.";
+        /// <summary>
+        /// Removes the <see cref="Dependencies.UselessDependencies"/> and returns the number of changes.
+        /// </summary>
+        /// <param name="m">The monitor.</param>
+        /// <returns>The number of changes.</returns>
+        public int RemoveUselessDependencies( IActivityMonitor m )
+        {
+            if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
+            int changeCount = _dependencies.UselessDependencies.Count;
+            if( changeCount > 0 )
+            {
+                var parents = _dependencies.UselessDependencies.Select( p => p.Parent ).Distinct().ToList();
+                _dependencies.UselessDependencies.Remove();
+                if( parents.Count > 0 )
+                {
+                    changeCount += parents.Where( e => !e.HasElements ).Count();
+                    parents.Where( e => !e.HasElements ).Remove();
+                }
+                OnChange( m );
+            }
+            return changeCount;
+        }
+
+        /// <summary>
+        /// Removes a set of dependencies.
+        /// </summary>
+        /// <param name="toRemove">Set of dependenies to remove.</param>
+        public int RemoveDependencies( IActivityMonitor m, IReadOnlyList<DeclaredPackageDependency> toRemove )
+        {
+            if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
+            if( toRemove == null || toRemove.Count == 0 ) throw new ArgumentException( "Empty dependency to remove.", nameof(toRemove) );
+            var extra = toRemove.FirstOrDefault( r => !_dependencies.Packages.Contains( r ) );
+            if( extra != null ) throw new ArgumentException( $"Dependency not contained: {extra}.", nameof(toRemove) );
+            int changeCount = toRemove.Count;
+            var parents = toRemove.Select( p => p.OriginElement.Parent ).Distinct().ToList();
+            changeCount += parents.Count;
+            toRemove.Select( r => r.OriginElement ).Remove();
+            OnChange( m );
+            return changeCount;
+        }
+
+        void OnChange( IActivityMonitor m )
+        {
+            DoInitializeDependencies( m );
+            if( !_dependencies.IsInitialized )
+            {
+                throw new Exception( "Altering project files must produce valid dependencies." );
+            }
+            Solution.CheckDirty( true );
+        }
+
+        public override string ToString() => $"{Solution}/{Name}";
 
         void DoInitializeDependencies( IActivityMonitor m )
         {

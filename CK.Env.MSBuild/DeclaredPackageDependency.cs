@@ -62,6 +62,10 @@ namespace CK.Env.MSBuild
         /// </summary>
         public bool UsePropertyVersion => PropertyVersionElement != null;
 
-        public override string ToString() => $"{Owner} => {PackageId}/{Version}";
+        /// <summary>
+        /// Overridden to return the <see cref="Owner"/> => <see cref="PackageId"/>/<see cref="Version"/> (<see cref="Frameworks"/>).
+        /// </summary>
+        /// <returns>A readable string.</returns>
+        public override string ToString() => $"{Owner} => {PackageId}/{Version} ({Frameworks})";
     }
 }

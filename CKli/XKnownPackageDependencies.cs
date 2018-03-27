@@ -39,8 +39,8 @@ namespace CKli
                 if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
                 Name = name;
                 Frameworks = MSBuildContext.ParseSemiColonFrameworks( frameworks );
-                var t = requires?.Split( new[] { ';' }, StringSplitOptions.RemoveEmptyEntries );
-                if( t == null || t.Length == 0 ) throw new ArgumentException( "Must specify at leas one package name.", nameof( requires ) );
+                Requires = requires?.Split( new[] { ';' }, StringSplitOptions.RemoveEmptyEntries );
+                if( Requires == null || Requires.Count == 0 ) throw new ArgumentException( "Must specify at leas one package name.", nameof( requires ) );
             }
 
             public override string ToString()
@@ -67,10 +67,46 @@ namespace CKli
 
         readonly TransitiveDependency[] _knownDeps;
 
-        public IEnumerable<TransitiveDependency> TransitiveDependencies => _knownDeps;
+        public IReadOnlyCollection<TransitiveDependency> TransitiveDependencies => _knownDeps;
 
         protected override bool CreateIssue( IRunContextIssue builder )
         {
+            var toRemove = _solutions.AllSolutions.Select( s => s.Solution )
+                        .SelectMany( s => s.AllProjects )
+                        .Select( p => (Project: p,
+                                       Applicable: _knownDeps.Where( dep => p.Deps.Filter( dep.Frameworks )
+                                                                                  .Where( d => dep.Name == d.PackageId ).Any() )) )
+                        .Select( t => (t.Project,
+                                       ToRemove: t.Project.Deps.Packages
+                                                    .Where( d => t.Applicable.Any( a =>
+                                                                    d.Frameworks.Intersect( a.Frameworks ) == a.Frameworks
+                                                                    && a.Requires.Contains( d.PackageId ) ) )
+                                                    .ToList()) )
+                        .Where( t => t.ToRemove.Count > 0 )
+                        .ToList();
+            if( toRemove.Count > 0 )
+            {
+                foreach( var t in toRemove )
+                {
+                    using( builder.Monitor.OpenInfo( $"{t.ToRemove.Count} transitive dependencies in {t.Project} can be removed." ) )
+                    {
+                        foreach( var dep in t.ToRemove )
+                        {
+                            builder.Monitor.Info( dep.ToString() );
+                        }
+                    }
+                }
+                builder.CreateIssue( "RemovingTransitiveDependencies", $"{toRemove.Count} projects contain transitive dependencis.", m =>
+                {
+                    foreach( var r in toRemove )
+                    {
+                        r.Project.RemoveDependencies( m, r.ToRemove );
+                        if( !r.Project.Save( m, _solutions.MSBuildContext.FileSystem ) ) return false;
+                    }
+                    return true;
+                } );
+            }
+
             return true;
         }
     }

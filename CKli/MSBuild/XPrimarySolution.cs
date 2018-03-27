@@ -30,7 +30,7 @@ namespace CKli
         {
             if( !(initializer.Parent is XBranch) ) throw new Exception( "A primary solution must be a direct child of a Git branch." );
             initializer.Services.Add( this );
-            _solution = central.MSBuildContext.GetSolution( initializer.Monitor, FullPath );
+            _solution = central.MSBuildContext.GetSolution( initializer.Monitor, branch.Name, FullPath );
             if( TestProjectsArePublished )
             {
                 _solution.PublishedProjects.AddRange( _solution.TestProjects );

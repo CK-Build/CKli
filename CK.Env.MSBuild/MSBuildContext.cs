@@ -140,7 +140,7 @@ namespace CK.Env.MSBuild
         /// </summary>
         public FileSystem FileSystem => _fileSystem;
 
-        public Solution GetSolution( IActivityMonitor m, NormalizedPath path )
+        public Solution GetSolution( IActivityMonitor m, string branchName, NormalizedPath path )
         {
             if( _solutions.TryGetValue( path, out Solution s ) )
             {
@@ -150,7 +150,7 @@ namespace CK.Env.MSBuild
             {
                 try
                 {
-                    s = Solution.Load( m, this, path );
+                    s = Solution.Load( m, this, branchName, path );
                     if( s != null ) _solutions.Add( path, s );
                 }
                 catch( Exception ex )
@@ -161,7 +161,7 @@ namespace CK.Env.MSBuild
             return s;
         }
 
-        internal File FindOrLoad( IActivityMonitor m, NormalizedPath path )
+        internal File FindOrLoadProjectFile( IActivityMonitor m, NormalizedPath path )
         {
             if( _files.TryGetValue( path, out File f )  )
             {
@@ -179,16 +179,19 @@ namespace CK.Env.MSBuild
                     imports.AddRange( content.Root.Descendants( "Import" )
                                         .Select( i => (E: i, P: (string)i.Attribute( "Project" )) )
                                         .Where( i => i.P != null )
-                                        .Select( i => new Import( i.E, FindOrLoad( m, folder.Combine( i.P ).ResolveDots() ) ) ) );
+                                        .Select( i => new Import( i.E, FindOrLoadProjectFile( m, folder.Combine( i.P ).ResolveDots() ) ) ) );
                     f.Initialize();
                     return f;
                 }
                 catch( Exception ex )
                 {
                     m.Error( ex );
+                    _files.Remove( path );
                     return null;
                 }
             }
         }
+
+        internal bool Unload( NormalizedPath path ) => _files.Remove( path );
     }
 }

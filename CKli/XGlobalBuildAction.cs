@@ -29,8 +29,7 @@ namespace CKli
 
         public override bool Run( IActivityMonitor m )
         {
-            var all = _solutions.LoadAllSolutions( m, false );
-            if( all == null ) return false;
+            var all = _solutions.AllSolutions.Select( s => s.Solution );
             var deps = DependencyContext.Create( m, all );
             if( deps == null ) return false;
             SolutionDependencyResult r = deps.AnalyzeDependencies( m, SolutionSortStrategy.EverythingExceptBuildProjects );

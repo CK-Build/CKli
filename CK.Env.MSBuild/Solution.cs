@@ -17,6 +17,7 @@ namespace CK.Env.MSBuild
     public sealed class Solution : IDependentItemContainerRef
     {
         SolutionSpecialType _specialType;
+        bool _isDirty;
 
         /// <summary>
         /// Gets the .sln path (relative to the <see cref="FileSystem"/>).
@@ -27,6 +28,53 @@ namespace CK.Env.MSBuild
         /// Gets the folder path (relative to the <see cref="FileSystem"/>).
         /// </summary>
         public NormalizedPath SolutionFolderPath { get; }
+
+        /// <summary>
+        /// Gets the branch name.
+        /// </summary>
+        public string BranchName { get; }
+
+        /// <summary>
+        /// Gets whether any of the the projects this solution contains need to be saved.
+        /// </summary>
+        public bool IsDirty => _isDirty;
+
+        /// <summary>
+        /// Raised whenever 
+        /// </summary>
+        public event EventHandler IsDirtyChanged;
+
+        /// <summary>
+        /// Saves all files that have been modified.
+        /// </summary>
+        /// <param name="m">The monitor.</param>
+        /// <param name="fs">The file system.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool Save( IActivityMonitor m, FileSystem fs )
+        {
+            if( _isDirty )
+            {
+                foreach( var p in AllProjects )
+                {
+                    if( !p.ProjectFile.Save( m, fs ) ) return false;
+                }
+                CheckDirty( false );
+            }
+            return true;
+        }
+
+        internal void CheckDirty( bool shouldBeDirty )
+        {
+            if( _isDirty != shouldBeDirty )
+            {
+                bool now = AllProjects.Any( p => p.ProjectFile.IsDirty );
+                if( _isDirty != now )
+                {
+                    _isDirty = now;
+                    IsDirtyChanged?.Invoke( this, EventArgs.Empty );
+                }
+            }
+        }
 
         /// <summary>
         /// Gets the solution name. This should be unique accross any possible world.
@@ -136,13 +184,14 @@ namespace CK.Env.MSBuild
                                                         .Except( TestProjects )
                                                         .Except( BuildProjects );
 
-        public override string ToString() => $"Solution '{UniqueSolutionName}'.";
+        public override string ToString() => $"{BranchName}/{UniqueSolutionName}";
 
         string IDependentItemRef.FullName => UniqueSolutionName;
 
         bool IDependentItemRef.Optional => false;
 
         Solution(
+            string branchName,
             NormalizedPath filePath,
             NormalizedPath folderPath,
             string version,
@@ -150,6 +199,7 @@ namespace CK.Env.MSBuild
             string minimumVisualStudioVersion,
             IReadOnlyCollection<ProjectBase> projects )
         {
+            BranchName = branchName;
             FilePath = filePath;
             SolutionFolderPath = folderPath;
             Version = version;
@@ -165,7 +215,7 @@ namespace CK.Env.MSBuild
                                                           .ToList();
         }
 
-        static internal Solution Load( IActivityMonitor m, MSBuildContext ctx, NormalizedPath filePath )
+        static internal Solution Load( IActivityMonitor m, MSBuildContext ctx, string branchName, NormalizedPath filePath )
         {
             if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
             var file = ctx.FileSystem.GetFileInfo( filePath ).AsTextFileInfo();
@@ -215,12 +265,21 @@ namespace CK.Env.MSBuild
                     }
                 }
                 var s = new Solution(
+                    branchName,
                     filePath,
                     folderPath,
                     version,
                     visualStudioVersion,
                     minimumVisualStudioVersion,
                     projects.ToArray() );
+                foreach( var p in s.AllProjects )
+                {
+                    if( p.ReloadProjectFile( m ) == null )
+                    {
+                        m.Error( $"Error while loading project '{p}'." );
+                        return null;
+                    }
+                }
                 return s;
             }
             catch( Exception ex )
@@ -273,9 +332,7 @@ namespace CK.Env.MSBuild
             {
                 return new SolutionFolder( idBuilder.ToString(), nameBuilder.ToString(), path );
             }
-            var p = new Project( ctx, projectGuid, projectName, path, type );
-            p.ReloadProjectFile( m );
-            return p;
+            return new Project( ctx, projectGuid, projectName, path, type );
         }
 
         static void ParseNestedProjectLine( List<ProjectBase> projects, string line )
