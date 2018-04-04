@@ -155,13 +155,26 @@ namespace CK.Env
             return true;
         }
 
-        public bool Commit( IActivityMonitor m, string commitMessage )
+        public struct CommitResult
+        {
+            public readonly bool Success;
+            public readonly bool CommitCreated;
+
+            public CommitResult(bool success, bool commit)
+            {
+                Success = success;
+                CommitCreated = commit;
+            }
+        }
+
+        public CommitResult Commit( IActivityMonitor m, string commitMessage )
         {
             if( String.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
             using( m.OpenInfo( $"Committing changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
             {
                 try
                 {
+                    bool createdCommit = false;
                     Commands.Stage( _git, "*" );
                     var s = _git.RetrieveStatus();
                     if( s.IsDirty )
@@ -169,8 +182,32 @@ namespace CK.Env
                         m.Info( ComputeDirtyString( s ) );
                         var author = _git.Config.BuildSignature( DateTimeOffset.Now );
                         _git.Commit( commitMessage, author, new Signature( "CKli", "none", DateTimeOffset.Now ) );
+                        createdCommit = true;
                     }
                     else m.CloseGroup( "Working folder is up-to-date." );
+                    return new CommitResult( true, createdCommit );
+                }
+                catch( Exception ex )
+                {
+                    m.Error( ex );
+                    return new CommitResult( false, false );
+                }
+            }
+        }
+
+        /// <summary>
+        /// Resets the index to the tree recorded by the commit and updates the working directory to
+        /// match the content of the index.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool ResetHard( IActivityMonitor m )
+        {
+            using( m.OpenInfo( $" changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
+            {
+                try
+                {
+                    _git.Reset( ResetMode.Hard );
                     return true;
                 }
                 catch( Exception ex )

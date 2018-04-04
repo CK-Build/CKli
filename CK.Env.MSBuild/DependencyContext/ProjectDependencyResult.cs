@@ -8,6 +8,9 @@ using System.Text;
 
 namespace CK.Env.MSBuild
 {
+    /// <summary>
+    /// Encapsulates the set of dependencies that exist in a <see cref="DependencyContext"/>.
+    /// </summary>
     public class ProjectDependencyResult
     {
         /// <summary>

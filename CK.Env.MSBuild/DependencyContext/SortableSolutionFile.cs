@@ -7,7 +7,7 @@ using System.Text;
 
 namespace CK.Env.MSBuild
 {
-    public class SortableSolutionFile : IDependentItemContainer
+    internal class SortableSolutionFile : IDependentItemContainer
     {
         readonly Solution _solution;
         IEnumerable<DependencyContext.ProjectItem> _projects;

@@ -147,7 +147,7 @@ namespace CKli
             }
         }
 
-        static void DisplayResult( IActivityMonitor m, SolutionDependencyResult result )
+        internal static void DisplayResult( IActivityMonitor m, SolutionDependencyResult result )
         {
             using( m.OpenInfo( $"Solutions sorted ({result.Content}): " ) )
             {

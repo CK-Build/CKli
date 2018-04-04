@@ -67,7 +67,7 @@ namespace CKli
             EnsureDoubleKeyValue( env, "MYGET_CI_API_KEY", "secure", "z3ZFnSM3FPCaJYkLhqjZmFTCw1Wf1hmRznQ0/UfxY/5haxctmymvFhh+PTz+/eHw" );
             if( PushToRemoteStore )
             {
-                EnsureDoubleKeyValue( env, "CKSETUPREMOTESTORE_PUSH_API_KEY", "secure", "ffSyq7zhajO1GUXQraZnZiZGtrPjUMGXXhlS71JUDouxx43VgzbtRfqmZM6zKTmS" );
+                EnsureDoubleKeyValue( env, "CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL", "secure", "ffSyq7zhajO1GUXQraZnZiZGtrPjUMGXXhlS71JUDos5aibfGQQ0zf4BWRjM02dn3zrvVnGZBp6bZwULB/ffASa7PO3mcKcqvppnG6eLYDU=" );
             }
             if( SqlServer != null )
             {

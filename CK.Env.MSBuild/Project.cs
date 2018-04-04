@@ -180,13 +180,17 @@ namespace CK.Env.MSBuild
         /// Sets a package reference and returns the number of changes.
         /// </summary>
         /// <param name="m">The monitor.</param>
-        /// <param name="frameworks">Frameworks that applies to the reference.</param>
+        /// <param name="frameworks">
+        /// Frameworks that applies to the reference. Must not be empty.
+        /// Can be this project's <see cref="TargetFrameworks"/> to update the package reference regrdless of the framework.
+        /// </param>
         /// <param name="packageId">The package identifier.</param>
         /// <param name="version">The new version to set.</param>
         /// <returns>The number of changes.</returns>
         public int SetPackageReferenceVersion( IActivityMonitor m, CKTrait frameworks, string packageId, SVersion version )
         {
             if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
+            if( frameworks.IsEmpty ) throw new ArgumentException( "Must not be empty.", nameof(frameworks) );
             int changeCount = 0;
             foreach( var r in _dependencies.Packages.Where( p => p.PackageId == packageId
                                                                  && p.Version != version

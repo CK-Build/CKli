@@ -36,9 +36,24 @@ namespace CKli
             if( r.HasError ) r.RawSorterResult.LogError( m );
             else
             {
+                XGlobalDependencyAction.DisplayResult( m, r );
+                int startAt = 0;
+                using( m.OpenInfo( "Solutions to build:" ) )
+                {
+                    foreach( var build in r.DependencyTable.Select( d => (d.Index, d.Solution) )
+                                             .Distinct()
+                                             .OrderBy( t => t.Index ) )
+                    {
+                        m.Info( $"{build.Index} - {build.Solution}" );
+                    }
+                    Console.Write( "Start at:" );
+                    while( !int.TryParse( Console.ReadLine(), out startAt ) ) ;
+                }
+
                 foreach( var build in r.DependencyTable.Select( d => (d.Index, d.Solution) )
                                                          .Distinct()
-                                                         .OrderBy( t => t.Index ) )
+                                                         .OrderBy( t => t.Index )
+                                                         .Skip( startAt ) )
                 {
                     using( m.OpenInfo( $"Building {build.Solution}" ) )
                     {
@@ -78,16 +93,14 @@ namespace CKli
             using( m.OpenTrace( $"{fileName} {cmdStartInfo.Arguments}" ) )
             using( Process cmdProcess = new Process() )
             {
-                StringBuilder conOut = new StringBuilder();
                 cmdProcess.StartInfo = cmdStartInfo;
-                cmdProcess.ErrorDataReceived += ( o, e ) => { if( !string.IsNullOrEmpty( e.Data ) ) conOut.Append( "<StdErr> " ).AppendLine( e.Data ); };
-                cmdProcess.OutputDataReceived += ( o, e ) => { if( e.Data != null ) conOut.Append( "<StdOut> " ).AppendLine( e.Data ); };
+                cmdProcess.ErrorDataReceived += ( o, e ) => { if( !string.IsNullOrEmpty( e.Data ) ) m.Info( "<StdErr> " + e.Data ); };
+                cmdProcess.OutputDataReceived += ( o, e ) => { if( e.Data != null ) m.Info( "<StdOut> " + e.Data ); };
                 cmdProcess.Start();
                 cmdProcess.BeginErrorReadLine();
                 cmdProcess.BeginOutputReadLine();
                 cmdProcess.WaitForExit();
 
-                if( conOut.Length > 0 ) m.Info( conOut.ToString() );
                 if( cmdProcess.ExitCode != 0 )
                 {
                     m.Error( $"Process returned ExitCode {cmdProcess.ExitCode}." );

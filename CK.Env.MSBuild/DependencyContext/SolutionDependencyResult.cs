@@ -6,8 +6,16 @@ using System.Text;
 
 namespace CK.Env.MSBuild
 {
+    /// <summary>
+    /// Encapsulates the result of the dependencies analysis at the solution level.
+    /// This is produced by <see cref="DependencyContext.AnalyzeDependencies(Core.IActivityMonitor, SolutionSortStrategy)"/>.
+    /// </summary>
     public class SolutionDependencyResult
     {
+        /// <summary>
+        /// Expanded data that captures for each solution, all referenced projects (<see cref="Target"/>) to
+        /// other soutions from its own projects (<see cref="Origin)"/>.
+        /// </summary>
         public class DependencyRow
         {
             /// <summary>
@@ -21,13 +29,13 @@ namespace CK.Env.MSBuild
             public Solution Solution { get; }
 
             /// <summary>
-            /// Gets one of the projects that references the package produced by the <see cref="Target"/> project.
+            /// Gets the project that references the package produced by the <see cref="Target"/> project.
             /// Null if <see cref="Solution"/> does not require any other solution.
             /// </summary>
             public Project Origin { get; }
 
             /// <summary>
-            /// Gets the target project.
+            /// Gets the targeted project by <see cref="Origin"/>.
             /// Null if <see cref="Solution"/> does not require any other solution.
             /// </summary>
             public Project Target { get; }
@@ -42,7 +50,7 @@ namespace CK.Env.MSBuild
 
             public override string ToString()
             {
-                return $"{Index}|{Solution.UniqueSolutionName}|{Origin.Name}|{Target.Name}";
+                return $"{Index}|{Solution.UniqueSolutionName}|{Origin?.Name}|{Target?.Name}";
             }
         }
 
@@ -67,12 +75,12 @@ namespace CK.Env.MSBuild
         public SolutionSortStrategy Content { get; }
 
         /// <summary>
-        /// Gets the details of the depedencies between solutions.
+        /// Gets the details of the dependencies between solutions.
         /// </summary>
         public IReadOnlyList<DependencyRow> DependencyTable { get; }
 
         /// <summary>
-        /// Gets the <see cref="IDependencySorterResult"/>.
+        /// Gets the <see cref="IDependencySorterResult"/> of the Solution/Project graph.
         /// </summary>
         public IDependencySorterResult RawSorterResult { get; }
 
@@ -80,7 +88,6 @@ namespace CK.Env.MSBuild
         /// Gets whether solutions and their projects have been successfully ordered.
         /// </summary>
         public bool HasError => !RawSorterResult.IsComplete;
-
 
     }
 

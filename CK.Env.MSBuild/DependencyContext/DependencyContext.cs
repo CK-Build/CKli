@@ -17,7 +17,7 @@ namespace CK.Env.MSBuild
         readonly CKTrait _frameworks;
         ProjectDependencyResult _projectDependencies;
 
-        public class Package : IDependentPackage, IDependentItem, IDependentItemRef
+        internal class Package : IDependentPackage, IDependentItem, IDependentItemRef
         {
             // This contains only the Solution of the Project for local projects:
             // The Package (published) requires its Solution.
@@ -286,6 +286,12 @@ namespace CK.Env.MSBuild
             }
         }
 
+        /// <summary>
+        /// Factory method for a <see cref="DependencyContext"/>.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="solutionFiles">The set of <see cref="Solution"/> to consider.</param>
+        /// <returns>A new depednency context.</returns>
         static public DependencyContext Create( IActivityMonitor m, IEnumerable<Solution> solutionFiles )
         {
             var packages = new Dictionary<string, Package>();

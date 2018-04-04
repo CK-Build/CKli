@@ -31,7 +31,7 @@ namespace CKli
             var gitFolders = NextSiblings.SelectMany( s => s.Descendants<XGitFolder>() ).Select( g => g.GitFolder );
             foreach( var git in gitFolders )
             {
-                if( !git.Commit( m, _commitMessage.Value ) ) return false;
+                if( !git.Commit( m, _commitMessage.Value ).Success ) return false;
             }
             return true;
         }

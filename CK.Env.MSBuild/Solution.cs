@@ -127,7 +127,6 @@ namespace CK.Env.MSBuild
         /// </summary>
         public SolutionSpecialType SpecialType => _specialType;
 
-
         /// <summary>
         /// Declares this solution as a secondary solution of an existing one.
         /// <see cref="PublishedProjects"/> is cleared when this method is called since a secondary solution
