@@ -24,30 +24,16 @@ namespace CK.Env
         /// Initializes a new <see cref="FileSystem"/> on a physical root path.
         /// </summary>
         /// <param name="rootPath">Physical root path.</param>
-        /// <param name="autoDiscoverAllGitFolders">
-        /// True to discover all Git folders below: calling <see cref="EnsureGitFolder(NormalizedPath)"/> is no
-        /// more required but this can be a lengthy operation if there is a lot og Git folders to discover.
-        /// </param>
-        public FileSystem( string rootPath, bool autoDiscoverAllGitFolders = false )
+        public FileSystem( string rootPath )
         {
             Root = new NormalizedPath( Path.GetFullPath( rootPath ) );
             _gits = new List<GitFolder>();
-            if( autoDiscoverAllGitFolders ) DiscoverGitFolders( Root );
-
-            void DiscoverGitFolders( string parent )
-            {
-                foreach( var d in Directory.EnumerateDirectories( parent ) )
-                {
-                    var gitFolder = Path.Combine( d, ".git" );
-                    if( Directory.Exists( gitFolder ) )
-                    {
-                        _gits.Add( new GitFolder( this, gitFolder ) );
-                        return;
-                    }
-                    DiscoverGitFolders( d );
-                }
-            }
         }
+
+        /// <summary>
+        /// Gets or sets the provider for blank feed local folder.
+        /// </summary>
+        public ILocalBlankFeedProvider LocalBlankFeedProvider { get; set; }
 
         /// <summary>
         /// Gets the <see cref="GitFolder"/> loaded so far (<see cref="EnsureGitFolder(NormalizedPath)"/>).
@@ -75,7 +61,7 @@ namespace CK.Env
                 var gitFolder = Path.Combine( folderPath, ".git" );
                 if( Directory.Exists( gitFolder ) )
                 {
-                    g = new GitFolder( this, gitFolder );
+                    g = new GitFolder( this, gitFolder, LocalBlankFeedProvider );
                     _gits.Add( g );
                 }
             }

@@ -11,27 +11,35 @@ using System.Collections;
 using System.Linq;
 using CK.Text;
 using LibGit2Sharp.Handlers;
+using System.Xml.Linq;
 
 namespace CK.Env
 {
     public class GitFolder
     {
+        static readonly XNamespace SVGNS = XNamespace.Get( "http://csemver.org/schemas/2015" );
+
+        public const string BlanckDevBranchName = "blank-dev";
+
         readonly Repository _git;
         readonly RootDir _thisDir;
         readonly HeadFolder _headFolder;
         readonly BranchesFolder _branchesFolder;
         readonly RemotesFolder _remoteBranchesFolder;
         readonly string[] _onlyBranches;
+        readonly ILocalBlankFeedProvider _blankFeedProvider;
         string _dirtyDescription;
         bool _branchRefreshed;
 
-        internal GitFolder( FileSystem fs, string gitFolder, IEnumerable<string> onlyBranches = null )
+        internal GitFolder( FileSystem fs, string gitFolder, ILocalBlankFeedProvider blankFeedProvider, IEnumerable<string> onlyBranches = null )
         {
             Debug.Assert( gitFolder.StartsWith( fs.Root.Path ) && gitFolder.EndsWith( ".git" ) );
+            _blankFeedProvider = blankFeedProvider;
             _onlyBranches = onlyBranches?.ToArray();
             FullPath = new NormalizedPath( gitFolder.Remove( gitFolder.Length - 4 ) );
             SubPath = FullPath.RemovePrefix( fs.Root );
             if( SubPath.IsEmpty ) throw new InvalidOperationException( "Root path can not be a Git folder." );
+
             FileSystem = fs;
             _git = new Repository( gitFolder );
             _headFolder = new HeadFolder( this );
@@ -50,10 +58,14 @@ namespace CK.Env
         /// </summary>
         public NormalizedPath SubPath { get; }
 
-        public string Name => _thisDir.Name;
-
+        /// <summary>
+        /// Gets the file ssytem.
+        /// </summary>
         public FileSystem FileSystem { get; }
 
+        /// <summary>
+        /// Gets the current branch name (name of the repository's HEAD).
+        /// </summary>
         public string CurrentBranchName => _git.Head.FriendlyName;
 
         /// <summary>
@@ -128,6 +140,12 @@ namespace CK.Env
             }
         }
 
+        /// <summary>
+        /// Fetches all remotes changes into this repository.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="credentialsProvider">Optional credential provider.</param>
+        /// <returns>True on success, false on error.</returns>
         public bool FetchAll( IActivityMonitor m, CredentialsHandler credentialsProvider = null )
         {
             using( m.OpenInfo( $"Fetching all remotes in repository '{FullPath}'" ) )
@@ -155,18 +173,34 @@ namespace CK.Env
             return true;
         }
 
+        /// <summary>
+        /// Captures <see cref="GitFolder.Commit(IActivityMonitor, string)"/> result.
+        /// </summary>
         public struct CommitResult
         {
+            /// <summary>
+            /// True on success.
+            /// </summary>
             public readonly bool Success;
+
+            /// <summary>
+            /// True if an actual commit has been created.
+            /// </summary>
             public readonly bool CommitCreated;
 
-            public CommitResult(bool success, bool commit)
+            internal CommitResult(bool success, bool commit)
             {
                 Success = success;
                 CommitCreated = commit;
             }
         }
 
+        /// <summary>
+        /// Commits any pending changes.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="commitMessage">Required commit message.</param>
+        /// <returns>A commit result with success/error and whether a commit has actually been created..</returns>
         public CommitResult Commit( IActivityMonitor m, string commitMessage )
         {
             if( String.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
@@ -180,8 +214,9 @@ namespace CK.Env
                     if( s.IsDirty )
                     {
                         m.Info( ComputeDirtyString( s ) );
-                        var author = _git.Config.BuildSignature( DateTimeOffset.Now );
-                        _git.Commit( commitMessage, author, new Signature( "CKli", "none", DateTimeOffset.Now ) );
+                        var now = DateTimeOffset.Now;
+                        var author = _git.Config.BuildSignature( now );
+                        _git.Commit( commitMessage, author, new Signature( "CKli", "none", now ) );
                         createdCommit = true;
                     }
                     else m.CloseGroup( "Working folder is up-to-date." );
@@ -203,7 +238,7 @@ namespace CK.Env
         /// <returns>True on success, false on error.</returns>
         public bool ResetHard( IActivityMonitor m )
         {
-            using( m.OpenInfo( $" changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
+            using( m.OpenInfo( $"Reset --hard changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
             {
                 try
                 {
@@ -217,6 +252,203 @@ namespace CK.Env
                 }
             }
         }
+
+        /// <summary>
+        /// Checkouts the <see cref="BlanckDevBranchName"/>. If the repository is already
+        /// on the blank dev branch, 'develop' is merged into it. Otherwise, the <see cref="CurrentBranchName"/> must
+        /// be 'develop', a <see cref="Commit"/> is done to save any current work, the blank dev branch is created
+        /// if needed, checked out and 'develop' is merged into it.
+        /// If the the merge fails, repository is cleaned up and a manual operation  is required.
+        /// On success, RepositoryInfo.xml and nuget.config are modified to work on LocalFeed/Blank.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool SwitchFromDevelopToBlankDev( IActivityMonitor m )
+        {
+            using( m.OpenInfo( $"Switching '{SubPath}' to branch '{BlanckDevBranchName}')." ) )
+            {
+                try
+                {
+                    Branch bBranch = _git.Branches[BlanckDevBranchName];
+                    Branch bDevelop = _git.Branches["develop"];
+                    if( bBranch == null || !bBranch.IsCurrentRepositoryHead )
+                    {
+                        if( bDevelop == null || !bDevelop.IsCurrentRepositoryHead )
+                        {
+                            m.Error( $"Expected current branch to be 'develop'. Only 'develop' can be switched to '{BlanckDevBranchName}'." );
+                            return false;
+                        }
+                        if( !Commit( m, $"Switching to {BlanckDevBranchName} branch." ).Success ) return false;
+                        if( bBranch == null )
+                        {
+                            m.Info( $"Creating the {BlanckDevBranchName}." );
+                            bBranch = _git.CreateBranch( BlanckDevBranchName );
+                        }
+                        Commands.Checkout( _git, bBranch );
+                    }
+                    else m.Trace( $"Already on {BlanckDevBranchName}." );
+
+                    var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
+                    var r = _git.Merge( bDevelop, merger, new MergeOptions { FastForwardStrategy = FastForwardStrategy.NoFastForward } );
+                    if( r.Status == MergeStatus.Conflicts )
+                    {
+                        m.Error( $"Merge failed from 'develop' to '{BlanckDevBranchName}': conflicts must be manually resolved." );
+                        _git.Reset( ResetMode.Hard );
+                        return false;
+                    }
+                    if( !EnsureRepositoryXmlBlankDevBranch( m ) ) return false;
+                    if( !EnsureLocalFeedBlankNuGetSource( m ) ) return false;
+                    if( !Commit( m, "Updated Repository.xml and nuget.config for blank dev branch." ).Success ) return false;
+                    if( r.Status != MergeStatus.UpToDate )
+                    {
+                        m.CloseGroup( "Success (with merge from 'develop')." );
+                    }
+                    return true;
+                }
+                catch( Exception ex )
+                {
+                    m.Error( ex );
+                    return false;
+                }
+            }
+        }
+        /// <summary>
+        /// Checkouts the 'develop' branch. Must be on <see cref="BlanckDevBranchName"/>.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool SwitchFromBlankDevToDevelop( IActivityMonitor m )
+        {
+            using( m.OpenInfo( $"Switching '{SubPath}' to branch 'develop'." ) )
+            {
+                try
+                {
+                    Branch bBranch = _git.Branches[BlanckDevBranchName];
+                    if( bBranch == null || !bBranch.IsCurrentRepositoryHead )
+                    {
+                        m.Error( $"Expected current branch to be '{BlanckDevBranchName}'." );
+                        return false;
+                    }
+                    Branch bDevelop = _git.Branches["develop"];
+                    if( bDevelop == null )
+                    {
+                        m.Error( $"Unable to find 'develop' branch." );
+                        return false;
+                    }
+
+                    if( !RemoveRepositoryXmlBlankDevBranch( m ) ) return false;
+                    if( !RemoveLocalFeedBlankNuGetSource( m ) ) return false;
+                    if( !Commit( m, $"Switching to 'develop' branch." ).Success ) return false;
+                    Commands.Checkout( _git, bDevelop );
+
+                    var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
+                    var r = _git.Merge( bBranch, merger, new MergeOptions { FastForwardStrategy = FastForwardStrategy.NoFastForward } );
+                    if( r.Status == MergeStatus.Conflicts )
+                    {
+                        m.Error( $"Merge failed from '{BlanckDevBranchName}' to 'develop': conflicts must be manually resolved." );
+                        _git.Reset( ResetMode.Hard );
+                        return false;
+                    }
+                    if( r.Status != MergeStatus.UpToDate )
+                    {
+                        m.CloseGroup( $"Success (with merge from '{BlanckDevBranchName}')." );
+                    }
+                    return true;
+                }
+                catch( Exception ex )
+                {
+                    m.Error( ex );
+                    return false;
+                }
+            }
+        }
+
+        (XDocument Doc, string Path) GetXmlDocument( IActivityMonitor m, string fileName )
+        {
+            var pathXml = SubPath.AppendPart( "branches" ).AppendPart( GitFolder.BlanckDevBranchName ).AppendPart( fileName );
+            var rXml = FileSystem.GetFileInfo( pathXml );
+            if( !rXml.Exists || rXml.IsDirectory || rXml.PhysicalPath == null )
+            {
+                m.Fatal( $"{pathXml} must exist." );
+                return (null,null);
+            }
+            return (rXml.ReadAsXDocument(), pathXml);
+        }
+
+        bool EnsureRepositoryXmlBlankDevBranch( IActivityMonitor m )
+        {
+            var (xDoc, pathXml) = GetXmlDocument( m, "RepositoryInfo.xml" );
+            if( xDoc == null ) return false;
+            var e = xDoc.Root;
+            var branches = e.Element( SVGNS + "Branches" );
+            if( branches == null ) e.Add( branches = new XElement( SVGNS + "Branches" ) );
+
+            var branch = branches.Elements( SVGNS + "Branch" )
+                                 .Where( b => (string)b.Attribute( "Name" ) == GitFolder.BlanckDevBranchName );
+            if( !branch.Any() )
+            {
+                branches.Add( new XElement( SVGNS + "Branch",
+                                   new XAttribute( "Name", GitFolder.BlanckDevBranchName ),
+                                   new XAttribute( "VersionName", "blank" ),
+                                   new XAttribute( "CIVersionMode", "LastReleaseBased" ) ) );
+            }
+            else
+            {
+                var b = branch.First();
+                b.SetAttributeValue( "VersionName", "blank" );
+                b.SetAttributeValue( "CIVersionMode", "LastReleaseBased" );
+            }
+            return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );
+        }
+
+        bool EnsureLocalFeedBlankNuGetSource( IActivityMonitor m )
+        {
+            var (xDoc, pathXml) = GetXmlDocument( m, "nuget.config" );
+            if( xDoc == null ) return false;
+
+            var e = xDoc.Root;
+            var packageSources = e.Element( "packageSources" );
+            if( packageSources == null )
+            {
+                m.Fatal( $"nuget.config must contain at least one <packageSources> element." );
+                return false;
+            }
+            var localFeedBlank = _blankFeedProvider.EnsureLocalFeedBlankFolder( m ).PhysicalPath;
+            if( !packageSources.Elements( "add" ).Any( x => (string)x.Attribute( "value" ) == localFeedBlank ) )
+            {
+                packageSources.Add( new XElement( "add",
+                                                new XAttribute( "key", "Blank Feed" ),
+                                                new XAttribute( "value", localFeedBlank ) ) );
+            }
+            return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );
+        }
+
+        bool RemoveRepositoryXmlBlankDevBranch( IActivityMonitor m )
+        {
+            var (xDoc, pathXml) = GetXmlDocument( m, "RepositoryInfo.xml" );
+            if( xDoc == null ) return false;
+            xDoc.Root.Element( SVGNS + "Branches" )
+                     .Elements( SVGNS + "Branch" )
+                     .Where( b => (string)b.Attribute( "Name" ) == GitFolder.BlanckDevBranchName )
+                     .Remove();
+            return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );
+        }
+
+        bool RemoveLocalFeedBlankNuGetSource( IActivityMonitor m )
+        {
+            var (xDoc, pathXml) = GetXmlDocument( m, "nuget.config" );
+            if( xDoc == null ) return false;
+            var localFeedBlank = _blankFeedProvider.EnsureLocalFeedBlankFolder( m ).PhysicalPath;
+
+            xDoc.Root.Element( "packageSources" )
+                     .Elements( "add" )
+                     .Where( b => (string)b.Attribute( "value" ) == localFeedBlank )
+                     .Remove();
+            return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );
+        }
+
+
+
 
         static string ComputeDirtyString( RepositoryStatus repositoryStatus )
         {

@@ -70,9 +70,13 @@ namespace CK.Env
                 if( p != null && p.CanWrite )
                 {
                     object v;
-                    if( p.PropertyType == typeof(NormalizedPath))
+                    if( p.PropertyType == typeof( NormalizedPath ) )
                     {
                         v = new NormalizedPath( a.Value );
+                    }
+                    else if( p.PropertyType == typeof( Uri ) )
+                    {
+                        v = new Uri( a.Value );
                     }
                     else if( p.PropertyType.IsEnum )
                     {

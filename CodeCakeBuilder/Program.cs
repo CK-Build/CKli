@@ -14,7 +14,7 @@ namespace CodeCake
         {
             var app = new CodeCakeApplication();
             RunResult result = app.Run( args );
-            if( result.IsInteractiveMode )
+            if( result.InteractiveMode == InteractiveMode.Interactive )
             {
                 Console.WriteLine();
                 Console.WriteLine( $"Hit any key to exit." );

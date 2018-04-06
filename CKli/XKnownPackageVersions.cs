@@ -119,6 +119,7 @@ namespace CKli
                         foreach( var fix in f )
                         {
                             f.Key.SetPackageReferenceVersion( m, fix.D.Frameworks, fix.D.PackageId, fix.C.Version );
+                            f.Key.Save( m, _solutions.MSBuildContext.FileSystem );
                         }
                         return f.Key.Save( m, _solutions.MSBuildContext.FileSystem );
                     } );

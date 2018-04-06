@@ -44,5 +44,10 @@ namespace CKli
 
         public override Solution Solution => _solution;
 
+        protected override void ConfigureSolution( IActivityMonitor m, Solution solution )
+        {
+            var primary = PrimarySolution.GetSolutionInBranch( m, solution.BranchName );
+            solution.SetAsSecondarySolution( primary, SpecialType );
+        }
     }
 }

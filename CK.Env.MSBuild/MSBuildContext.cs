@@ -142,9 +142,14 @@ namespace CK.Env.MSBuild
 
         public Solution GetSolution( IActivityMonitor m, string branchName, NormalizedPath path )
         {
+            return FindOrLoadSolution( m, branchName, path ).Solution;
+        }
+
+        public (Solution Solution, bool Loaded) FindOrLoadSolution( IActivityMonitor m, string branchName, NormalizedPath path )
+        {
             if( _solutions.TryGetValue( path, out Solution s ) )
             {
-                return s;
+                return (s,false);
             }
             using( m.OpenTrace( $"Loading solution {path}." ) )
             {
@@ -158,7 +163,7 @@ namespace CK.Env.MSBuild
                     m.Error( ex );
                 }
             }
-            return s;
+            return (s,true);
         }
 
         internal File FindOrLoadProjectFile( IActivityMonitor m, NormalizedPath path )

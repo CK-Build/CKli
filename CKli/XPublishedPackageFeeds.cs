@@ -11,7 +11,7 @@ using System.Text;
 
 namespace CKli
 {
-    public class XPublishedPackageFeeds : XTypedObject
+    public class XPublishedPackageFeeds : XTypedObject, ILocalBlankFeedProvider
     {
         static readonly NormalizedPath _localCache = Path.GetFullPath( "%UserProfile%/.nuget/packages/" );
 
@@ -25,6 +25,7 @@ namespace CKli
             : base( initializer )
         {
             _fs = fs;
+            _fs.LocalBlankFeedProvider = this;
             initializer.Services.Add( this );
         }
 

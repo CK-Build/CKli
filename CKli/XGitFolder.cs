@@ -26,12 +26,17 @@ namespace CKli
             _gitCredentials = gitCredentials;
         }
 
+        /// <summary>
+        /// Gets the <see cref="GitFolder"/> object that encapsulates the Git repoistory.
+        /// </summary>
         public GitFolder GitFolder { get; private set; }
 
+        /// <summary>
+        /// Gets the rul of the remote repository.
+        /// </summary>
         public string Url { get; private set; }
 
-        public CredentialsHandler ObtainGitCredentialsProvider( IActivityMonitor m )
-            => _gitCredentials?.ObtainGitCredentialsHandler( m );
+        public CredentialsHandler ObtainGitCredentialsProvider( IActivityMonitor m ) => _gitCredentials?.ObtainGitCredentialsHandler( m );
 
         protected override bool DoRun( IRunContext ctx )
         {
@@ -83,7 +88,7 @@ namespace CKli
                 m.Info( "Git directory does not exist." );
                 if( Url == null )
                 {
-                    m.Warn( "Url repository is not specified. Skipping Autmatic clone." );
+                    m.Warn( "Url repository is not specified. Skipping Automatic clone." );
                     return false;
                 }
                 else
@@ -96,13 +101,9 @@ namespace CKli
                         } );
                         GitFolder = FileSystem.EnsureGitFolder( FullPath );
                     }
-                    return true;
                 }
             }
-            else
-            {
-                return true;
-            }
+            return true;
         }
     }
 }

@@ -31,9 +31,27 @@ namespace CKli
             central.Register( this );
         }
 
+        public XSolutionCentral SolutionCentral => _central;
+
         public XBranch GitBranch => _branch;
 
         public abstract Solution Solution { get; }
 
+        public Solution GetSolutionInBranch( IActivityMonitor m, string branchName )
+        {
+            if( branchName == _branch.Name ) return Solution;
+            var path = GitBranch.FullPath
+                                 .RemoveLastPart()
+                                 .AppendPart( branchName )
+                                 .Combine( Solution.FilePath.RemovePrefix( GitBranch.FullPath ) );
+            var s = SolutionCentral.MSBuildContext.FindOrLoadSolution( m, branchName, path );
+            if( s.Solution != null && s.Loaded )
+            {
+                ConfigureSolution( m, s.Solution );
+            }
+            return s.Solution;
+        }
+
+        protected abstract void ConfigureSolution( IActivityMonitor m, Solution solution );
     }
 }
