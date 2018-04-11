@@ -21,10 +21,12 @@ namespace CKli
             {
                 try
                 {
+                    int gitFoldersCount = 0;
                     List<string> dirty = new List<string>();
                     var gitFolders = NextSiblings.SelectMany( s => s.Descendants<XGitFolder>() ).Select( g => g.GitFolder );
                     foreach( var git in gitFolders )
                     {
+                        ++gitFoldersCount;
                         using( m.OpenInfo( $"{git.SubPath} - branch: {git.CurrentBranchName}." ) )
                         {
                             var s = git.GetDirtyDescription( true );
@@ -37,8 +39,21 @@ namespace CKli
                             }
                         }
                     }
-                    m.CloseGroup( $"{dirty.Count} dirty." );
+                    m.CloseGroup( $"{dirty.Count} dirty (out of {gitFoldersCount})." );
                     if( dirty.Count > 0 ) m.Info( $"Dirty: {dirty.Concatenate()}" );
+                    var byActiveBranch = gitFolders.GroupBy( g => g.CurrentBranchName );
+                    if( byActiveBranch.Count() > 1 )
+                    {
+                        using( m.OpenInfo( $"{byActiveBranch.Count()} different branches:" ) )
+                        {
+                            foreach( var b in byActiveBranch )
+                            {
+                                m.Info( $"Branch '{b.Key}': {b.Select( g => g.SubPath.Path ).Concatenate()}" );
+                            }
+                        }
+                    }
+                    else m.Info( $"All {gitFoldersCount} git folders are on '{byActiveBranch.First().Key}' branch." );
+
                     return true;
                 }
                 catch( Exception ex )

@@ -25,8 +25,9 @@
   <GitCommitAction Title="Commits all pending changes to the current branch of all the repositories." />
   <GitFetchAction Title="Fetches all remotes in all repositories." />
   <GlobalDependencyAction Title="Solutions &amp; Projects management." />
-  <GlobalBuildAction Title="Build all Solutions." />
-  <GlobalBlankBuildAction Title="Blank build." />
+  <GlobalSwitchBranchAction Title="Switch between 'develop-blank' &lt;=&gt; 'develop' branches." />
+  <GlobalCIBuildAction Title="CI Build: Build all Solutions in develop to CI packages, optionally pushing them to MyGet invenietis-ci feed." />
+  <GlobalBlankBuildAction Title="Blank build: Build all Solutions locally in 'develop-local' branch." />
   
   <!-- Unsafe brutal tools.
     

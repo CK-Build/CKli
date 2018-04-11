@@ -51,19 +51,23 @@ namespace CodeCake
             var projectsToPublish = projects
                                         .Where( p => !p.Path.Segments.Contains( "Tests" ) );
 
+            // The SimpleRepositoryInfo should be computed once and only once.
             SimpleRepositoryInfo gitInfo = Cake.GetSimpleRepositoryInfo();
-
-            // Configuration is either "Debug" or "Release".
-            string configuration = "Debug";
+            // This default global info will be replaced by Check-Repository task.
+            // It is allocated here to ease debugging and/or manual work on complex build script.
+            CheckRepositoryInfo globalInfo = new CheckRepositoryInfo { Version = gitInfo.SafeNuGetVersion };
 
             Task( "Check-Repository" )
                 .Does( () =>
-                 {
-                     configuration = StandardCheckRepository( projectsToPublish, gitInfo );
-                 });
+                {
+                    globalInfo = StandardCheckRepository( projectsToPublish, gitInfo );
+                    if( globalInfo.ShouldStop )
+                    {
+                        Cake.TerminateWithSuccess( "All packages from this commit are already available. Build skipped." );
+                    }
+                } );
 
             Task( "Clean" )
-                .IsDependentOn( "Check-Repository" )
                 .Does( () =>
                  {
                      Cake.CleanDirectories( projects.Select( p => p.Path.GetDirectory().Combine( "bin" ) ) );
@@ -76,7 +80,7 @@ namespace CodeCake
                 .IsDependentOn( "Clean" )
                 .Does( () =>
                  {
-                     StandardSolutionBuild( solutionFileName, gitInfo, configuration );
+                     StandardSolutionBuild( solutionFileName, gitInfo, globalInfo.BuildConfiguration );
                  });
 
             Task( "Unit-Testing" )
@@ -86,25 +90,24 @@ namespace CodeCake
                 .Does( () =>
                  {
                      var testProjects = projects.Where( p => p.Name.EndsWith(".Tests") );
-                     StandardUnitTests( configuration, testProjects );
+                     StandardUnitTests( globalInfo.BuildConfiguration, testProjects );
                  });
-
 
             Task("Create-NuGet-Packages")
                 .WithCriteria(() => gitInfo.IsValid)
                 .IsDependentOn("Unit-Testing")
                 .Does(() =>
                 {
-                    StandardCreateNuGetPackages( releasesDir, projectsToPublish, gitInfo, configuration );
+                    StandardCreateNuGetPackages( releasesDir, projectsToPublish, gitInfo, globalInfo.BuildConfiguration );
                 });
 
-            Task("Push-NuGet-Packages")
-                .IsDependentOn("Create-NuGet-Packages")
-                .WithCriteria(() => gitInfo.IsValid)
-                .Does(() =>
-                {
-                    StandardPushNuGetPackages(Cake.GetFiles(releasesDir.Path + "/*.nupkg"), gitInfo);
-                });
+            Task( "Push-NuGet-Packages" )
+                .IsDependentOn( "Create-NuGet-Packages" )
+                .WithCriteria( () => gitInfo.IsValid )
+                .Does( () =>
+                 {
+                     StandardPushNuGetPackages( globalInfo, releasesDir );
+                 } );
 
 
             // The Default task for this script can be set here.

@@ -18,8 +18,9 @@ namespace CK.Env.Tests
         [Test]
         public void FileSystem_sees_physical_files()
         {
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, autoDiscoverAllGitFolders: true ) )
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder ) )
             {
+                fs.DiscoverGitFolders();
                 fs.GetDirectoryContents( "" ).Select( f => $"{f.Name} - {f.IsDirectory}" )
                 .Should().Contain( "KnownWorld.xml - False" )
                         .And.Contain( "TestGitRepository - True" )
@@ -31,8 +32,9 @@ namespace CK.Env.Tests
         [Test]
         public void FileSystem_sees_Git_repo_with_a_null_PhysicalPath()
         {
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, autoDiscoverAllGitFolders: true ) )
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder ) )
             {
+                fs.DiscoverGitFolders();
                 CheckRoot( fs.GetFileInfo( "TestGitRepository" ) );
                 CheckRoot( fs.GetFileInfo( "/TestGitRepository" ) );
                 CheckRoot( fs.GetFileInfo( "TestGitRepository/" ) );
@@ -53,8 +55,9 @@ namespace CK.Env.Tests
         [Test]
         public void FileSystem_sees_Git_repo_with_head_and_branches_subfolder()
         {
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, autoDiscoverAllGitFolders: true ) )
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder ) )
             {
+                fs.DiscoverGitFolders();
                 CheckRootContent( fs.GetDirectoryContents( "TestGitRepository" ) );
                 CheckRootContent( fs.GetDirectoryContents( "/TestGitRepository" ) );
                 CheckRootContent( fs.GetDirectoryContents( "TestGitRepository/" ) );
@@ -75,8 +78,9 @@ namespace CK.Env.Tests
         [Test]
         public void FileSystem_sees_Git_head_as_the_PhysicalDirectory()
         {
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, autoDiscoverAllGitFolders: true ) )
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder ) )
             {
+                fs.DiscoverGitFolders();
                 CheckHead( fs.GetFileInfo( "TestGitRepository/head" ) );
                 CheckHead( fs.GetFileInfo( "/TestGitRepository/head" ) );
                 CheckHead( fs.GetFileInfo( "TestGitRepository/head/" ) );
@@ -116,8 +120,9 @@ namespace CK.Env.Tests
         [Test]
         public void FileSystem_sees_the_branches_as_directories()
         {
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, autoDiscoverAllGitFolders: true ) )
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder ) )
             {
+                fs.DiscoverGitFolders();
                 var f = fs.GetFileInfo( "TestGitRepository/branches" );
                 f.IsDirectory.Should().BeTrue();
                 f.Name.Should().Be( "branches" );
@@ -134,8 +139,9 @@ namespace CK.Env.Tests
         [Test]
         public void FileSystem_remotes_contains_the_remote_branches()
         {
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, autoDiscoverAllGitFolders: true ) )
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder ) )
             {
+                fs.DiscoverGitFolders();
                 var f = fs.GetFileInfo( "TestGitRepository/remotes/" );
                 f.IsDirectory.Should().BeTrue();
                 f.Name.Should().Be( "remotes" );
@@ -179,8 +185,9 @@ namespace CK.Env.Tests
         [Test]
         public void when_the_branch_is_thecurrent_one_we_have_access_to_the_physical_files()
         {
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, autoDiscoverAllGitFolders: true ) )
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder ) )
             {
+                fs.DiscoverGitFolders();
                 fs.GitFolders[0].CurrentBranchName.Should().Be( "master", "The TestRepository must be on 'master'." );
 
                 var fA = fs.GetFileInfo( "TestGitRepository/branches/master/a" );
@@ -206,9 +213,9 @@ namespace CK.Env.Tests
         [Test]
         public void once_in_a_branch_we_have_access_to_directory_content_in_read_only_or_writable_if_in_current_head()
         {
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, autoDiscoverAllGitFolders: true ) )
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder ) )
             {
-
+                fs.DiscoverGitFolders();
                 fs.GitFolders[0].Checkout( TestHelper.Monitor, "alpha" ).Should().BeTrue( "Go to 'alpha' branch." ); ;
 
                 var cA = fs.GetDirectoryContents( "TestGitRepository/branches/master/a" );

@@ -22,7 +22,6 @@ namespace CodeCake
                 Console.ReadKey();
             }
             return result.ReturnCode;
-
         }
     }
 }

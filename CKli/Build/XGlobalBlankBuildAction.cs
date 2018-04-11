@@ -72,10 +72,9 @@ namespace CKli
                         while( !int.TryParse( Console.ReadLine(), out startAt ) ) ;
 
                         string blankStore = EnsureBlankStore( m );
-                        var envVariables = new KeyValuePair<string, string>[]
-                        {
-                            new KeyValuePair<string, string>("CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL", blankStore)
-                        };
+
+                        var environmentVariables = new List<(string, string)>();
+                        environmentVariables.Add( ("CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL", blankStore) );
 
                         foreach( var build in list.Skip( startAt ) )
                         {
@@ -103,12 +102,11 @@ namespace CKli
                                 }
 
                                 var gitFolder = all[build.Solution].GitFolder;
-                                var commitResult = gitFolder.Commit( m, "Blank Build from CK-Env." );
-                                if( !commitResult.Success ) return false;
+                                if( !gitFolder.Commit( m, "Blank Build from CK-Env." ).Success ) return false;
 
                                 var path = _fileSystem.GetFileInfo( build.Solution.SolutionFolderPath ).PhysicalPath;
-                                if( !Run( m, path, "dotnet", "run --project CodeCakeBuilder -autointeraction", envVariables ) ) return false;
-                                if( !CopyReleasesPackagesToLocalFolder( m, build.Solution, true ) ) return false;
+                                if( !XGlobalCIBuildAction.Run( m, path, "dotnet", "run --project CodeCakeBuilder -autointeraction", environmentVariables ) ) return false;
+                                if( !XGlobalCIBuildAction.CopyReleasesPackagesToLocalFolder( m, _localPackages, build.Solution, true ) ) return false;
                             }
                         }
                     }
@@ -128,72 +126,6 @@ namespace CKli
             return path;
         }
 
-        bool CopyReleasesPackagesToLocalFolder( IActivityMonitor m, Solution solution, bool toBlankFolder )
-        {
-            using( m.OpenInfo( $"Copying released Packages to LocalFeed{(toBlankFolder ? "/Blanck" : "")}." ) )
-            {
-                try
-                {
-                    var targetFolder = toBlankFolder
-                                        ? _localPackages.EnsureLocalFeedBlankFolder( m ).PhysicalPath
-                                        : _localPackages.EnsureLocalFeedFolder( m ).PhysicalPath;
-                    var releasesFolder = solution.SolutionFolderPath.Combine( "CodeCakeBuilder/Releases" );
-                    var packages = Directory.GetFiles( _fileSystem.GetFileInfo( releasesFolder ).PhysicalPath, "*.nupkg" );
-                    foreach( var p in packages )
-                    {
-                        var target = Path.Combine( targetFolder, Path.GetFileName( p ) );
-                        File.Copy( p, target, true );
-                    }
-                    return true;
-                }
-                catch( Exception ex )
-                {
-                    m.Fatal( ex );
-                    return false;
-                }
-            }
-        }
-
-        static bool Run( IActivityMonitor m,
-                         string workingDir,
-                         string fileName,
-                         string arguments,
-                         IEnumerable<KeyValuePair<string,string>> environmentVariables )
-        {
-            ProcessStartInfo cmdStartInfo = new ProcessStartInfo
-            {
-                WorkingDirectory = workingDir,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                FileName = fileName,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                RedirectStandardInput = true,
-            };
-            if( environmentVariables != null )
-            {
-                foreach( var kv in environmentVariables ) cmdStartInfo.EnvironmentVariables.Add( kv.Key, kv.Value );
-            }
-            cmdStartInfo.Arguments = arguments;
-            using( m.OpenTrace( $"{fileName} {cmdStartInfo.Arguments}" ) )
-            using( Process cmdProcess = new Process() )
-            {
-                cmdProcess.StartInfo = cmdStartInfo;
-                cmdProcess.ErrorDataReceived += ( o, e ) => { if( !string.IsNullOrEmpty( e.Data ) ) m.Info( "<StdErr> " + e.Data ); };
-                cmdProcess.OutputDataReceived += ( o, e ) => { if( e.Data != null ) m.Info( "<StdOut> " + e.Data ); };
-                cmdProcess.Start();
-                cmdProcess.BeginErrorReadLine();
-                cmdProcess.BeginOutputReadLine();
-                cmdProcess.WaitForExit();
-
-                if( cmdProcess.ExitCode != 0 )
-                {
-                    m.Error( $"Process returned ExitCode {cmdProcess.ExitCode}." );
-                    return false;
-                }
-                return true;
-            }
-        }
     }
 
 

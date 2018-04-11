@@ -19,7 +19,7 @@ namespace CK.Env
     {
         static readonly XNamespace SVGNS = XNamespace.Get( "http://csemver.org/schemas/2015" );
 
-        public const string BlanckDevBranchName = "blank-dev";
+        public const string BlanckDevBranchName = "develop-local";
 
         readonly Repository _git;
         readonly RootDir _thisDir;
@@ -27,14 +27,14 @@ namespace CK.Env
         readonly BranchesFolder _branchesFolder;
         readonly RemotesFolder _remoteBranchesFolder;
         readonly string[] _onlyBranches;
-        readonly ILocalBlankFeedProvider _blankFeedProvider;
+        readonly ILocalFeedProvider _feedProvider;
         string _dirtyDescription;
         bool _branchRefreshed;
 
-        internal GitFolder( FileSystem fs, string gitFolder, ILocalBlankFeedProvider blankFeedProvider, IEnumerable<string> onlyBranches = null )
+        internal GitFolder( FileSystem fs, string gitFolder, ILocalFeedProvider blankFeedProvider, IEnumerable<string> onlyBranches = null )
         {
             Debug.Assert( gitFolder.StartsWith( fs.Root.Path ) && gitFolder.EndsWith( ".git" ) );
-            _blankFeedProvider = blankFeedProvider;
+            _feedProvider = blankFeedProvider;
             _onlyBranches = onlyBranches?.ToArray();
             FullPath = new NormalizedPath( gitFolder.Remove( gitFolder.Length - 4 ) );
             SubPath = FullPath.RemovePrefix( fs.Root );
@@ -257,8 +257,8 @@ namespace CK.Env
         /// Checkouts the <see cref="BlanckDevBranchName"/>. If the repository is already
         /// on the blank dev branch, 'develop' is merged into it. Otherwise, the <see cref="CurrentBranchName"/> must
         /// be 'develop', a <see cref="Commit"/> is done to save any current work, the blank dev branch is created
-        /// if needed, checked out and 'develop' is merged into it.
-        /// If the the merge fails, repository is cleaned up and a manual operation  is required.
+        /// if needed, checked out. 'develop' branch is always merged into it.
+        /// If the the merge fails, repository is cleaned up and a manual operation is required.
         /// On success, RepositoryInfo.xml and nuget.config are modified to work on LocalFeed/Blank.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -297,7 +297,7 @@ namespace CK.Env
                         return false;
                     }
                     if( !EnsureRepositoryXmlBlankDevBranch( m ) ) return false;
-                    if( !EnsureLocalFeedBlankNuGetSource( m ) ) return false;
+                    if( !EnsureLocalFeedNuGetSource( m, blankFeed: true ) ) return false;
                     if( !Commit( m, "Updated Repository.xml and nuget.config for blank dev branch." ).Success ) return false;
                     if( r.Status != MergeStatus.UpToDate )
                     {
@@ -337,7 +337,7 @@ namespace CK.Env
                     }
 
                     if( !RemoveRepositoryXmlBlankDevBranch( m ) ) return false;
-                    if( !RemoveLocalFeedBlankNuGetSource( m ) ) return false;
+                    if( !RemoveLocalFeedNuGetSource( m ) ) return false;
                     if( !Commit( m, $"Switching to 'develop' branch." ).Success ) return false;
                     Commands.Checkout( _git, bDevelop );
 
@@ -365,7 +365,7 @@ namespace CK.Env
 
         (XDocument Doc, string Path) GetXmlDocument( IActivityMonitor m, string fileName )
         {
-            var pathXml = SubPath.AppendPart( "branches" ).AppendPart( GitFolder.BlanckDevBranchName ).AppendPart( fileName );
+            var pathXml = SubPath.AppendPart( "branches" ).AppendPart( CurrentBranchName ).AppendPart( fileName );
             var rXml = FileSystem.GetFileInfo( pathXml );
             if( !rXml.Exists || rXml.IsDirectory || rXml.PhysicalPath == null )
             {
@@ -373,6 +373,55 @@ namespace CK.Env
                 return (null,null);
             }
             return (rXml.ReadAsXDocument(), pathXml);
+        }
+
+        public bool EnsureLocalFeedNuGetSource( IActivityMonitor m, bool blankFeed = false )
+        {
+            var (xDoc, pathXml) = GetXmlDocument( m, "nuget.config" );
+            if( xDoc == null ) return false;
+
+            var e = xDoc.Root;
+            var packageSources = e.Element( "packageSources" );
+            if( packageSources == null )
+            {
+                m.Fatal( $"nuget.config must contain at least one <packageSources> element." );
+                return false;
+            }
+            if( !packageSources.Elements( "add" ).Any( x => (string)x.Attribute( "key" ) == "Local Feed" ) )
+            {
+                var localFeed = blankFeed
+                                ? _feedProvider.EnsureLocalFeedBlankFolder( m ).PhysicalPath
+                                : _feedProvider.EnsureLocalFeedFolder( m ).PhysicalPath;
+                packageSources.Add( new XElement( "add",
+                                                new XAttribute( "key", "Local Feed" ),
+                                                new XAttribute( "value", localFeed ) ) );
+            }
+            return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );
+        }
+
+        public bool RemoveLocalFeedNuGetSource( IActivityMonitor m )
+        {
+            var (xDoc, pathXml) = GetXmlDocument( m, "nuget.config" );
+            if( xDoc == null ) return false;
+            xDoc.Root.Element( "packageSources" )
+                     .Elements( "add" )
+                     .Where( b => (string)b.Attribute( "key" ) == "Local Feed" )
+                     .Remove();
+            return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );
+        }
+
+        public bool SetRepositoryXmlIgnoreDirtyFolders( IActivityMonitor m )
+        {
+            var (xDoc, pathXml) = GetXmlDocument( m, "RepositoryInfo.xml" );
+            if( xDoc == null ) return false;
+            var e = xDoc.Root;
+            var debug = e.Element( SVGNS + "Debug" );
+            if( debug == null ) e.Add( debug = new XElement( SVGNS + "Debug" ) );
+            if( (string)debug.Attribute( "IgnoreDirtyWorkingFolder" ) != "true" )
+            {
+                debug.SetAttributeValue( "IgnoreDirtyWorkingFolder", "true" );
+            }
+            return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );
         }
 
         bool EnsureRepositoryXmlBlankDevBranch( IActivityMonitor m )
@@ -401,28 +450,6 @@ namespace CK.Env
             return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );
         }
 
-        bool EnsureLocalFeedBlankNuGetSource( IActivityMonitor m )
-        {
-            var (xDoc, pathXml) = GetXmlDocument( m, "nuget.config" );
-            if( xDoc == null ) return false;
-
-            var e = xDoc.Root;
-            var packageSources = e.Element( "packageSources" );
-            if( packageSources == null )
-            {
-                m.Fatal( $"nuget.config must contain at least one <packageSources> element." );
-                return false;
-            }
-            var localFeedBlank = _blankFeedProvider.EnsureLocalFeedBlankFolder( m ).PhysicalPath;
-            if( !packageSources.Elements( "add" ).Any( x => (string)x.Attribute( "value" ) == localFeedBlank ) )
-            {
-                packageSources.Add( new XElement( "add",
-                                                new XAttribute( "key", "Blank Feed" ),
-                                                new XAttribute( "value", localFeedBlank ) ) );
-            }
-            return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );
-        }
-
         bool RemoveRepositoryXmlBlankDevBranch( IActivityMonitor m )
         {
             var (xDoc, pathXml) = GetXmlDocument( m, "RepositoryInfo.xml" );
@@ -433,22 +460,6 @@ namespace CK.Env
                      .Remove();
             return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );
         }
-
-        bool RemoveLocalFeedBlankNuGetSource( IActivityMonitor m )
-        {
-            var (xDoc, pathXml) = GetXmlDocument( m, "nuget.config" );
-            if( xDoc == null ) return false;
-            var localFeedBlank = _blankFeedProvider.EnsureLocalFeedBlankFolder( m ).PhysicalPath;
-
-            xDoc.Root.Element( "packageSources" )
-                     .Elements( "add" )
-                     .Where( b => (string)b.Attribute( "value" ) == localFeedBlank )
-                     .Remove();
-            return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );
-        }
-
-
-
 
         static string ComputeDirtyString( RepositoryStatus repositoryStatus )
         {
