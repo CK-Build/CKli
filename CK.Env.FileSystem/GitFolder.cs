@@ -12,12 +12,14 @@ using System.Linq;
 using CK.Text;
 using LibGit2Sharp.Handlers;
 using System.Xml.Linq;
+using Microsoft.Alm.Authentication;
 
 namespace CK.Env
 {
     public class GitFolder
     {
         static readonly XNamespace SVGNS = XNamespace.Get( "http://csemver.org/schemas/2015" );
+        static readonly CredentialsHandler _defaultCredentialHandler;
 
         public const string BlanckDevBranchName = "develop-local";
 
@@ -30,6 +32,20 @@ namespace CK.Env
         readonly ILocalFeedProvider _feedProvider;
         string _dirtyDescription;
         bool _branchRefreshed;
+
+        static GitFolder()
+        {
+            var secrets = new SecretStore( "git" );
+            var auth = new BasicAuthentication( secrets );
+            _defaultCredentialHandler = ( url, user, cred ) =>
+            {
+                var uri = new Uri( url ).GetLeftPart( UriPartial.Authority );
+                var creds = auth.GetCredentials( new TargetUri( uri ) );
+                return creds != null
+                        ? new UsernamePasswordCredentials { Username = creds.Username, Password = creds.Password }
+                        : null;
+            };
+        }
 
         internal GitFolder( FileSystem fs, string gitFolder, ILocalFeedProvider blankFeedProvider, IEnumerable<string> onlyBranches = null )
         {
@@ -156,10 +172,9 @@ namespace CK.Env
                     {
                         m.Info( $"Fetching remote {remote.Name}" );
                         IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification );
-
                         Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
                         {
-                            CredentialsProvider = credentialsProvider
+                            CredentialsProvider = credentialsProvider ?? _defaultCredentialHandler
                         }, $"Fetching remote {remote.Name}" );
                     }
                 }
@@ -226,6 +241,42 @@ namespace CK.Env
                 {
                     m.Error( ex );
                     return new CommitResult( false, false );
+                }
+            }
+        }
+
+        /// <summary>
+        /// Pushes changes from the current branch to the origin.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="credentialsProvider">Optional credential provider..</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool Push( IActivityMonitor m, CredentialsHandler credentialsProvider = null )
+        {
+            using( m.OpenInfo( $"Pushing '{SubPath}' (branch '{CurrentBranchName}') to origin." ) )
+            {
+                try
+                {
+                    var s = _git.RetrieveStatus();
+                    if( s.IsDirty )
+                    {
+                        m.Warn( ComputeDirtyString( s ) );
+                        m.CloseGroup( "Working folder is dirty." );
+                    }
+                    else
+                    {
+                        var options = new PushOptions()
+                        {
+                            CredentialsProvider = credentialsProvider ?? _defaultCredentialHandler
+                        };
+                        _git.Network.Push( _git.Head, options );
+                    }
+                    return true;
+                }
+                catch( Exception ex )
+                {
+                    m.Error( ex );
+                    return false;
                 }
             }
         }
@@ -312,6 +363,7 @@ namespace CK.Env
                 }
             }
         }
+
         /// <summary>
         /// Checkouts the 'develop' branch. Must be on <see cref="BlanckDevBranchName"/>.
         /// </summary>

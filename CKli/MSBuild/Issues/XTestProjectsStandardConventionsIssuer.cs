@@ -66,8 +66,8 @@ namespace CKli.MSBuild.Issues
                                    {
                                        foreach( var prop in c )
                                        {
-                                           prop.Value = ((string)prop.Value).Replace( "bin\\Debug\\net461\\", "", StringComparison.OrdinalIgnoreCase )
-                                                                            .Replace( "bin\\Release\\net461\\", "", StringComparison.OrdinalIgnoreCase );
+                                           prop.Value = ((string)prop.Value).Replace( "bin\\Debug\\net461\\", "" )
+                                                                            .Replace( "bin\\Release\\net461\\", "" );
                                        }
                                        _solution.FileSystem.CopyTo( m, o.ToString(), settings );
                                        return true;

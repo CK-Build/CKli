@@ -30,7 +30,7 @@ namespace CKli
                     else
                     {
                         // With git folder: Fetch all remotes
-                        if( !xgit.GitFolder.FetchAll( m, xgit.ObtainGitCredentialsProvider( m ) ) ) { return false; }
+                        if( !xgit.GitFolder.FetchAll( m, xgit.ObtainGitCredentialsProvider( m ) ) ) return false;
                     }
                 }
             }

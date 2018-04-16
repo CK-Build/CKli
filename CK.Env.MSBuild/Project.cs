@@ -208,7 +208,7 @@ namespace CK.Env.MSBuild
                 }
                 ++changeCount;
             }
-            m.Trace( $"{changeCount} version update in {ToString()} for package reference {packageId}." );
+            m.Trace( $"{changeCount} version update in {ToString()} for package reference {packageId} -> {version}." );
             if( changeCount > 0 ) OnChange( m );
             return changeCount;
         }

@@ -69,6 +69,11 @@ namespace CK.Env.MSBuild
         }
 
         /// <summary>
+        /// Gets all dependencies.
+        /// </summary>
+        public IReadOnlyList<ProjectDepencyRow> DependencyTable { get; }
+
+        /// <summary>
         /// Captures <see cref="DeclaredPackageDependency"/> filtered by applicable target framework.
         /// </summary>
         public class FrameworkDependencies
@@ -94,7 +99,7 @@ namespace CK.Env.MSBuild
         /// <summary>
         /// Gets the dependencies per target frameworks.
         /// </summary>
-        public IReadOnlyList<FrameworkDependencies> Dependencies { get; }
+        public IReadOnlyList<FrameworkDependencies> PerFrameworkDependencies { get; }
 
         /// <summary>
         /// Gets the dependencies per target frameworks that references more than one version
@@ -102,10 +107,11 @@ namespace CK.Env.MSBuild
         /// </summary>
         public IReadOnlyList<FrameworkDependencies> VersionDiscrepancies { get; }
 
-        internal ProjectDependencyResult( IReadOnlyList<FrameworkDependencies> deps )
+        internal ProjectDependencyResult( IReadOnlyList<ProjectDepencyRow> all, IReadOnlyList<FrameworkDependencies> perFramework )
         {
-            Dependencies = deps;
-            VersionDiscrepancies = deps.Select( r => new FrameworkDependencies
+            DependencyTable = all;
+            PerFrameworkDependencies = perFramework;
+            VersionDiscrepancies = perFramework.Select( r => new FrameworkDependencies
                                              (
                                                r.Framework,
                                                r.DependencyTable

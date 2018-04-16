@@ -16,6 +16,11 @@ namespace CK.Env.MSBuild
         public Solution Solution { get; internal set; }
 
         /// <summary>
+        /// Gets the primary solution of this project.
+        /// </summary>
+        public Solution PrimarySolution => Solution.PrimarySolution ?? Solution;
+
+        /// <summary>
         /// Gets the project identity.
         /// </summary>
         public string ProjectGuid { get; }

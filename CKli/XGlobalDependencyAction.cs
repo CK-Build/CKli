@@ -73,7 +73,7 @@ namespace CKli
                     DisplayResult( m, deps.AnalyzeDependencies( m, SolutionSortStrategy.EverythingExceptBuildProjects ) );
                     break;
                 case 4:
-                    DisplayProjectDependencies( m, "Dumping all project dependencies.", deps.ProjectDependencies.Dependencies );
+                    DisplayProjectDependencies( m, "Dumping all project dependencies.", deps.ProjectDependencies.PerFrameworkDependencies );
                     break;
                 case 5:
                     DisplayProjectDependencies( m, "Project version dependency discrepancies.", deps.ProjectDependencies.VersionDiscrepancies );

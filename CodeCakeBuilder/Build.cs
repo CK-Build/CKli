@@ -85,7 +85,7 @@ namespace CodeCake
 
             Task( "Unit-Testing" )
                 .IsDependentOn( "Build" )
-                .WithCriteria( () => Cake.InteractiveMode() != InteractiveMode.NoInteraction
+                .WithCriteria( () => Cake.InteractiveMode() == InteractiveMode.NoInteraction
                                      || Cake.ReadInteractiveOption( "Run Unit Tests?", 'Y', 'N' ) == 'Y' )
                 .Does( () =>
                  {

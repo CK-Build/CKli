@@ -121,6 +121,7 @@ namespace CKli
             {
                 if( rep.Contains( " all" ) ) return Enumerable.Range( min, max - min + 1 ).ToArray();
                 return Regex.Matches( rep, @"\d+" )
+                            .Cast<Match>()
                             .Select( m => Int32.Parse( m.Value ) )
                             .Where( v => v >= min && v <= max )
                             .ToList();

@@ -24,6 +24,7 @@
   <GitCheckoutAction Title="Checkout all repositories on a specific branch name." />
   <GitCommitAction Title="Commits all pending changes to the current branch of all the repositories." />
   <GitFetchAction Title="Fetches all remotes in all repositories." />
+  <GitPushAction Title="Pushes all current branches to their tracked remote." />
   <GlobalDependencyAction Title="Solutions &amp; Projects management." />
   <GlobalSwitchBranchAction Title="Switch between 'develop-blank' &lt;=&gt; 'develop' branches." />
   <GlobalCIBuildAction Title="CI Build: Build all Solutions in develop to CI packages, optionally pushing them to MyGet invenietis-ci feed." />
@@ -270,6 +271,14 @@
         <Reuse Name="StandardPrimarySolution" />
         <Reuse Name="StandardFiles" />
         <AppVeyorFile />
+      </Branch>
+    </GitFolder>
+
+    <GitFolder Name="CK-Sqlite" Url="https://github.com/Invenietis/CK-Sqlite.git">
+      <Branch Name="develop">
+        <Reuse Name="StandardPrimarySolution" />
+        <Reuse Name="StandardFiles" />
+        <AppVeyorFile PushToRemoteStore="True" />
       </Branch>
     </GitFolder>
 

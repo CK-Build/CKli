@@ -159,6 +159,56 @@ namespace CK.Env.MSBuild
             _frameworks = frameworks;
         }
 
+        public ProjectDependencyResult ProjectDependencies
+        {
+            get
+            {
+                Package FindPackage( DeclaredPackageDependency  d, bool isIncludedSolutionProject )
+                {
+                    // Check for a published Package.
+                    if( _packages.TryGetValue( d.PackageId, out Package p ) )
+                    {
+                        // If this published Package is from the primary solution of
+                        // the project's solution that has SpecialType=IncludedSecondarySolution, we ignore
+                        // the dependency as if the dependency was a ProjectReference instead of a PackageReference.
+                        if( isIncludedSolutionProject
+                            && p.Project.Solution == d.Owner.Solution.PrimarySolution )
+                        {
+                             p = null;
+                        }
+                    }
+                    else
+                    {
+                        // If it is not a published package, then we must find it as an external package.
+                        p = _packages[d.PackageId + '/' + d.Version];
+                    }
+                    return p;
+                }
+
+                if( _projectDependencies == null )
+                {
+                    var allDeps = _projects.Keys.SelectMany( p => p.Deps.Packages )
+                                        .Select( d => (Dep: d, Target: FindPackage( d, d.Owner.Solution.SpecialType == SolutionSpecialType.IncludedSecondarySolution )) )
+                                        .Where( t => t.Target != null )
+                                        .Select( t => new ProjectDependencyResult.ProjectDepencyRow(
+                                                        t.Dep,
+                                                        _projects[t.Dep.Owner],
+                                                        t.Target
+                                                         ) )
+                                        .ToList();
+
+                    var result = new List<ProjectDependencyResult.FrameworkDependencies>();
+                    foreach( var f in _frameworks.AtomicTraits )
+                    {
+                        var fDeps = allDeps.Where( d => d.RawPackageDependency.Frameworks.Intersect( f ) == f ).ToList();
+                        result.Add( new ProjectDependencyResult.FrameworkDependencies( f, fDeps ) );
+                    }
+                    _projectDependencies = new ProjectDependencyResult( allDeps, result );
+                }
+                return _projectDependencies;
+            }
+        }
+
         public SolutionDependencyResult AnalyzeDependencies( IActivityMonitor m, SolutionSortStrategy content )
         {
             var sortables = new Dictionary<Solution, SortableSolutionFile>();
@@ -166,7 +216,7 @@ namespace CK.Env.MSBuild
             foreach( var s in _solutions )
             {
                 if( s.PrimarySolution != null ) continue;
-                sortables.Add( s, new SortableSolutionFile( s, GetProjects( s, content ) ) );
+                sortables.Add( s, new SortableSolutionFile( s, GetProjectItems( s, content ) ) );
             }
             if( content == SolutionSortStrategy.EverythingExceptBuildProjects )
             {
@@ -177,9 +227,9 @@ namespace CK.Env.MSBuild
                     if( s.SpecialType == SolutionSpecialType.IncludedSecondarySolution )
                     {
                         var primary = sortables[s.PrimarySolution];
-                        primary.AddSecondaryProjects( GetProjects( s, content ) );
+                        primary.AddSecondaryProjects( GetProjectItems( s, content ) );
                     }
-                    else sortables.Add( s, new SortableSolutionFile( s, GetProjects( s, content ) ) );
+                    else sortables.Add( s, new SortableSolutionFile( s, GetProjectItems( s, content ) ) );
                 }
             }
 
@@ -225,55 +275,7 @@ namespace CK.Env.MSBuild
         }
 
 
-        public ProjectDependencyResult ProjectDependencies
-        {
-            get
-            {
-                Package FindPackage( DeclaredPackageDependency  d, bool isIncludedSolutionProject )
-                {
-                    // Check for a published Package.
-                    if( _packages.TryGetValue( d.PackageId, out Package p ) )
-                    {
-                        // If this published Package is from the primary solution of
-                        // the project's solution that has SpecialType=IncludedSecondarySolution, we ignore
-                        // the dependency as if the dependency was a ProjectReference instead of a PackageReference.
-                        if( isIncludedSolutionProject
-                            && p.Project.Solution == d.Owner.Solution.PrimarySolution )
-                        {
-                             p = null;
-                        }
-                    }
-                    else
-                    {
-                        // If it is not a published package, then we must find it as an external package.
-                        p = _packages[d.PackageId + '/' + d.Version];
-                    }
-                    return p;
-                }
-
-                if( _projectDependencies == null )
-                {
-                    var result = new List<ProjectDependencyResult.FrameworkDependencies>();
-                    foreach( var f in _frameworks.AtomicTraits )
-                    {
-                        var allDeps = _projects.Keys.SelectMany( p => p.Deps.Packages.Where( d => d.Frameworks.Intersect( f ) == f ) )
-                                            .Select( d => (Dep: d, Target: FindPackage( d, d.Owner.Solution.SpecialType == SolutionSpecialType.IncludedSecondarySolution )) )
-                                            .Where( t => t.Target != null )
-                                            .Select( t => new ProjectDependencyResult.ProjectDepencyRow(
-                                                            t.Dep,
-                                                            _projects[t.Dep.Owner],
-                                                            t.Target
-                                                             ) )
-                                            .ToList();
-                        result.Add( new ProjectDependencyResult.FrameworkDependencies( f, allDeps ) );
-                    }
-                    _projectDependencies = new ProjectDependencyResult( result );
-                }
-                return _projectDependencies;
-            }
-        }
-
-        IEnumerable<ProjectItem> GetProjects( Solution s, SolutionSortStrategy content )
+        IEnumerable<ProjectItem> GetProjectItems( Solution s, SolutionSortStrategy content )
         {
             switch( content )
             {
@@ -298,11 +300,11 @@ namespace CK.Env.MSBuild
             var solutions = solutionFiles.ToArray();
             var projectItems = new Dictionary<Project, ProjectItem>();
             var frameworks = MSBuildContext.Traits.EmptyTrait;
-            using( m.OpenInfo( "Creating all the ProjectItem for all projects in all solutions." ) )
+            using( m.OpenDebug( "Creating all the ProjectItem for all projects in all solutions." ) )
             {
                 foreach( var s in solutions )
                 {
-                    using( m.OpenTrace( $"Solution {s.UniqueSolutionName}." ) )
+                    using( m.OpenDebug( $"Solution {s.UniqueSolutionName}." ) )
                     {
                         foreach( var project in s.AllProjects )
                         {
