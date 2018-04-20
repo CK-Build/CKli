@@ -15,18 +15,22 @@ namespace CKli
     {
         static readonly NormalizedPath _localCache = Path.GetFullPath( "%UserProfile%/.nuget/packages/" );
 
+        readonly XSharedHttpClient _http;
         readonly FileSystem _fs;
         IFileInfo _localFeed;
         IFileInfo _blankFeed;
 
+
         public XPublishedPackageFeeds(
             Initializer initializer,
-            FileSystem fs )
+            FileSystem fs,
+            XSharedHttpClient http )
             : base( initializer )
         {
             _fs = fs;
             _fs.LocalBlankFeedProvider = this;
             initializer.Services.Add( this );
+            _http = http;
         }
 
         /// <summary>
@@ -82,6 +86,24 @@ namespace CKli
                 Directory.CreateDirectory( _blankFeed.PhysicalPath );
             }
             return _blankFeed;
+        }
+
+        public SVersion GetMyGetLastVersion( IActivityMonitor m, string feedName, string packageId )
+        {
+            var url = $"https://www.myget.org/feed/{feedName}/package/nuget/{packageId}";
+            try
+            {
+                using( var res = _http.Shared.GetAsync( url ).GetAwaiter().GetResult() )
+                {
+                    var body = res.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                    return SVersion.Parse( body.Substring( body.IndexOf( packageId ) + 1 ) );
+                }
+            }
+            catch( Exception ex )
+            {
+                m.Error( $"Unable to extract last version from: " + url, ex );
+                return null;
+            }
         }
 
         /// <summary>

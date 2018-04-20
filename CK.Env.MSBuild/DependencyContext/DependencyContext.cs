@@ -269,9 +269,23 @@ namespace CK.Env.MSBuild
                                                                     r.Target.Project
                                                                 ) )
                                                 : new[] { new SolutionDependencyResult.DependencyRow( s.Index, s.Solution, null, null ) }
-                                      );
-            return new SolutionDependencyResult( content, result, table.ToList() );
+                                      )
+                            .ToList();
+            Debug.Assert( table.Select( r => r.Index ).IsSortedLarge() );
 
+            // Now that the table of SolutionDependencyResult.DependencyRow is built, use it to compute the
+            // pure solution dependency graph.
+            Solution current = null;
+            var depSolutions = new SolutionDependencyResult.DependentSolution[sortables.Count];
+            foreach( var r in table )
+            {
+                if( current != r.Solution )
+                {
+                    current = r.Solution;
+                    depSolutions[r.Index] = new SolutionDependencyResult.DependentSolution( current, r.Index, table, s => depSolutions.First( x => x.Solution == s ) );
+                }
+            }
+            return new SolutionDependencyResult( content, result, table, depSolutions );
         }
 
 

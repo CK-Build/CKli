@@ -29,11 +29,9 @@ namespace CKli
                         ++gitFoldersCount;
                         using( m.OpenInfo( $"{git.SubPath} - branch: {git.CurrentBranchName}." ) )
                         {
-                            var s = git.GetDirtyDescription( true );
-                            if( s == null ) m.CloseGroup( "Up-to-date." );
+                            if( git.CheckCleanCommit( m ) ) m.CloseGroup( "Up-to-date." );
                             else
                             {
-                                m.Info( s );
                                 dirty.Add( git.SubPath );
                                 m.CloseGroup( "Dirty." );
                             }

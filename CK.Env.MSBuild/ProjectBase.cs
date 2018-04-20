@@ -17,6 +17,7 @@ namespace CK.Env.MSBuild
 
         /// <summary>
         /// Gets the primary solution of this project.
+        /// It is never null.
         /// </summary>
         public Solution PrimarySolution => Solution.PrimarySolution ?? Solution;
 

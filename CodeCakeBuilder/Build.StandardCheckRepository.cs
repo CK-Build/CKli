@@ -160,16 +160,16 @@ namespace CodeCake
 
                 if( missingCount == 0 )
                 {
-                    Cake.Information( $"All {existCount} packages are already in '{feedId}'." );
+                    Cake.Information( $"{feedId}: No packages must be pushed ({existCount} packages already available)." );
                 }
                 else if( existCount == 0 )
                 {
-                    Cake.Information( $"All {missingCount} packages must be pushed to '{feedId}'." );
+                    Cake.Information( $": All {missingCount} packages must be pushed." );
                 }
                 else
                 {
-                    Cake.Information( $"{missingCount} packages are missing on '{feedId}': {missingPackages.Select( p => p.Name ).Concatenate()}." );
-                    Cake.Information( $"{existCount} packages are already pushed on '{feedId}': {projectsToPublish.Except( missingPackages ).Select( p => p.Name ).Concatenate()}." );
+                    Cake.Information( $"{feedId}: {missingCount} packages must be pushed: {missingPackages.Select( p => p.Name ).Concatenate()}." );
+                    Cake.Information( $"    => {existCount} packages already pushed: {projectsToPublish.Except( missingPackages ).Select( p => p.Name ).Concatenate()}." );
                 }
             }
 
@@ -187,6 +187,7 @@ namespace CodeCake
                     && Cake.ReadInteractiveOption( "PublishDirtyRepo", "Repository is not ready to be published. Proceed anyway?", 'Y', 'N' ) == 'Y' )
                 {
                     Cake.Warning( "GitInfo is not valid, but you choose to continue..." );
+                    result.IgnoreNoPackagesToProduce = true;
                 }
                 else
                 {
@@ -197,7 +198,7 @@ namespace CodeCake
                     }
                     else Cake.TerminateWithError( "Repository is not ready to be published." );
                 }
-                // When the gitInfo is not valid, we do not ty to push any packages, even if the build continues
+                // When the gitInfo is not valid, we do not try to push any packages, even if the build continues
                 // (either because the user choose to continue or if we are on the CI server).
                 // We don't need to worry about feeds here.
             }
@@ -286,8 +287,15 @@ namespace CodeCake
                 result.LocalFeedPackagesToCopy.AddRange( notOk );
                 DispalyFeedPackageResult( result.LocalFeedPath, result.LocalFeedPackagesToCopy, lookup.Count );
             }
-            Cake.Information( $"Should actually publish {result.ActualPackagesToPublish.Count()} out of {projectsToPublish.Count()} projects with version={gitInfo.SafeNuGetVersion} and configuration={result.BuildConfiguration}: {result.ActualPackagesToPublish.Select( p => p.Name ).Concatenate()}" );
-
+            int nbPackagesToPublish = result.ActualPackagesToPublish.Count();
+            if( nbPackagesToPublish == 0 )
+            {
+                Cake.Information( $"No packages out of {projectsToPublish.Count()} projects to publish." );
+            }
+            else
+            {
+                Cake.Information( $"Should actually publish {nbPackagesToPublish} out of {projectsToPublish.Count()} projects with version={gitInfo.SafeNuGetVersion} and configuration={result.BuildConfiguration}: {result.ActualPackagesToPublish.Select( p => p.Name ).Concatenate()}" );
+            }
             var appVeyor = Cake.AppVeyor();
             if( appVeyor.IsRunningOnAppVeyor )
             {
@@ -307,7 +315,6 @@ namespace CodeCake
                     }
                 }
             }
-
             return result;
         }
 

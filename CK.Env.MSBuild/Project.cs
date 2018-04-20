@@ -182,7 +182,7 @@ namespace CK.Env.MSBuild
         /// <param name="m">The monitor.</param>
         /// <param name="frameworks">
         /// Frameworks that applies to the reference. Must not be empty.
-        /// Can be this project's <see cref="TargetFrameworks"/> to update the package reference regrdless of the framework.
+        /// Can be this project's <see cref="TargetFrameworks"/> to update the package reference regardless of the framework.
         /// </param>
         /// <param name="packageId">The package identifier.</param>
         /// <param name="version">The new version to set.</param>

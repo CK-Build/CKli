@@ -4,13 +4,15 @@ using CK.Env.Analysis;
 using CK.Text;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Xml.Linq;
 
 namespace CKli
 {
-    class GlobalContext : IDisposable
+    public class GlobalContext : IDisposable
     {
         readonly IActivityMonitor _monitor;
         readonly XTypedFactory _factory;
@@ -19,6 +21,59 @@ namespace CKli
         readonly ActionCollector _actions;
         FileSystem _fs;
         XRunnable _root;
+        World _currentWorld;
+
+        public class World
+        {
+            public string FilePath { get; }
+
+            public string WorldName { get; }
+
+            /// <summary>
+            /// Gets the LTS key. Normalized to null for current.
+            /// </summary>
+            public string LTSKey { get; }
+
+            public string DevelopBranchName { get; }
+
+            public string MasterBranchName { get; }
+
+            public string DevelopLocalBranchName { get; }
+
+            public World( string path, string worldName, string ltsKey )
+            {
+                if( String.IsNullOrWhiteSpace( path ) ) throw new ArgumentNullException( nameof( path ) );
+                if( String.IsNullOrWhiteSpace( worldName ) ) throw new ArgumentNullException( nameof( worldName ) );
+                FilePath = path;
+                WorldName = worldName;
+                if( !String.IsNullOrWhiteSpace( ltsKey ) )
+                {
+                    LTSKey = ltsKey;
+                    MasterBranchName = "master-" + ltsKey;
+                    DevelopBranchName = "develop-" + ltsKey;
+                    DevelopLocalBranchName = $"develop-{ltsKey}-local";
+                }
+                else
+                {
+                    MasterBranchName = "master";
+                    DevelopBranchName = "develop";
+                    DevelopLocalBranchName = $"develop-local";
+                }
+            }
+
+            public static World Parse( string filePath )
+            {
+                Debug.Assert( filePath.EndsWith( "-World.xml" ) );
+                var fName = Path.GetFileName( filePath );
+                fName = fName.Substring( 0, fName.Length - 10 );
+                int idx = fName.IndexOf( '-' );
+                if( idx < 0 )
+                {
+                    return new World(filePath, fName, null);
+                }
+                return new World( filePath, fName.Substring( 0, idx ), fName.Substring( idx + 1 ) );
+            }
+        }
 
         public GlobalContext( IActivityMonitor monitor, XTypedFactory factory, string rootPath )
         {
@@ -29,41 +84,60 @@ namespace CKli
             _actions = new ActionCollector();
         }
 
+        public World CurrentWorld => _currentWorld;
+
+        public event EventHandler CurrentWorldChanged;
+
+
         public bool Open()
         {
             Close();
+            var w = ChooseWorld();
+            if( w == null ) return false;
+
+            _currentWorld = null;
             _fs = new FileSystem( _rootPath );
             var baseProvider = new SimpleServiceContainer();
             baseProvider.Add<ISimpleObjectActivator>( new SimpleObjectActivator() );
             baseProvider.Add( _fs );
+            baseProvider.Add( w );
             baseProvider.Add( _issues );
             baseProvider.Add( _actions );
 
-            var knownWorldPath = ChooseWorld();
-            if( knownWorldPath == null ) return false;
-            var original = XDocument.Load( knownWorldPath ).Root;
+            var original = XDocument.Load( w.FilePath ).Root;
             var expanded = XTypedFactory.PreProcess( _monitor, original );
             if( expanded.Errors.Count > 0 )
             {
                 return false;
             }
             _root = _factory.CreateInstance<XRunnable>( _monitor, expanded.Result, baseProvider );
-            return _root != null;
+            if( _root == null ) return false;
+            _currentWorld = w;
+            CurrentWorldChanged?.Invoke( this, EventArgs.Empty );
+            return true;
         }
 
-        string ChooseWorld()
+        World ChooseWorld()
         {
-            var files = Directory.GetFiles( Path.Combine( _rootPath, "CK-Env" ), "*-World.xml" );
+            var files = Directory.GetFiles( Path.Combine( _rootPath, "CK-Env" ), "*-World.xml" )
+                                .Select( ( p, idx ) => (Idx: idx, File: World.Parse( p )) );
             for(; ;)
             {
                 int i = 0;
-                foreach( var f in files )
+                foreach( var g in files.GroupBy( f => f.File.WorldName ) )
                 {
-                    Console.WriteLine( $"{++i} - {Path.GetFileName( f )}" );
+                    Console.WriteLine( $"- {g.Key}" );
+                    foreach( var lts in g )
+                    {
+                        Console.WriteLine( $"- {lts.Idx} - {lts.File.LTSKey ?? "<Current>"}" );
+                    }
                 }
                 Console.WriteLine( "x - Exit" );
                 string r = Console.ReadLine();
-                if( Int32.TryParse( r, out int result ) && result >= 1 && result <= i ) return files[result - 1];
+                if( Int32.TryParse( r, out int result ) && result >= 1 && result <= i )
+                {
+                    return files.First( f => f.Idx == result ).File;
+                }
                 if( r == "x" ) return null;
             }
         }
@@ -143,9 +217,16 @@ namespace CKli
         {
             if( _fs != null )
             {
+                if( _root != null )
+                {
+                    foreach( var e in _root.Descendants<IDisposable>().Reverse() )
+                    {
+                        e.Dispose();
+                    }
+                    _root = null;
+                }
                 _fs.Dispose();
                 _fs = null;
-                _root = null;
                 _issues.Clear();
                 _actions.Clear();
             }

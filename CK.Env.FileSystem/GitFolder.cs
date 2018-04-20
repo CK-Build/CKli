@@ -13,6 +13,7 @@ using CK.Text;
 using LibGit2Sharp.Handlers;
 using System.Xml.Linq;
 using Microsoft.Alm.Authentication;
+using SimpleGitVersion;
 
 namespace CK.Env
 {
@@ -28,9 +29,7 @@ namespace CK.Env
         readonly HeadFolder _headFolder;
         readonly BranchesFolder _branchesFolder;
         readonly RemotesFolder _remoteBranchesFolder;
-        readonly string[] _onlyBranches;
         readonly ILocalFeedProvider _feedProvider;
-        string _dirtyDescription;
         bool _branchRefreshed;
 
         static GitFolder()
@@ -47,11 +46,10 @@ namespace CK.Env
             };
         }
 
-        internal GitFolder( FileSystem fs, string gitFolder, ILocalFeedProvider blankFeedProvider, IEnumerable<string> onlyBranches = null )
+        internal GitFolder( FileSystem fs, string gitFolder, ILocalFeedProvider blankFeedProvider )
         {
             Debug.Assert( gitFolder.StartsWith( fs.Root.Path ) && gitFolder.EndsWith( ".git" ) );
             _feedProvider = blankFeedProvider;
-            _onlyBranches = onlyBranches?.ToArray();
             FullPath = new NormalizedPath( gitFolder.Remove( gitFolder.Length - 4 ) );
             SubPath = FullPath.RemovePrefix( fs.Root );
             if( SubPath.IsEmpty ) throw new InvalidOperationException( "Root path can not be a Git folder." );
@@ -85,67 +83,90 @@ namespace CK.Env
         public string CurrentBranchName => _git.Head.FriendlyName;
 
         /// <summary>
-        /// Gets a string that describes local modifications that are not committed or a null string
-        /// if the working folder is clean.
+        /// Checks that the current head is a clean commit (working directory is clean and no staging files exists).
         /// </summary>
-        /// <param name="refresh">True to recompute this description.</param>
-        /// <returns>The dirty description or null.</returns>
-        public string GetDirtyDescription( bool refresh = false )
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>True if the current head is clean, false otherwise.</returns>
+        public bool CheckCleanCommit( IActivityMonitor m )
         {
-            if( _dirtyDescription == null || refresh ) _dirtyDescription = ComputeDirtyString( _git.RetrieveStatus() );
-            return _dirtyDescription;
+            if( _git.RetrieveStatus().IsDirty )
+            {
+                m.Error( $"Repository '{SubPath}' has uncommited changes ({CurrentBranchName})." );
+                return false;
+            }
+            return true;
         }
 
         /// <summary>
-        /// Attempts to check out a branch.
-        /// There must not be any uncommitted changes, the branch must exist and, if branch names
-        /// are restricted, it must belong to the authorized ones.
+        /// Attempts to check out a branch and pull any 'origin' changes.
+        /// There must not be any uncommitted changes on the current head.
+        /// The branch must exist locally or on the 'origin' remote.
         /// If the branch exists only in the "origin" remote, a local branch is automatically
         /// created that tracks the remote one.
         /// </summary>
         /// <param name="m">The monitor.</param>
-        /// <param name="branchName">The name of the branch.</param>
-        /// <returns>True on success, false on error.</returns>
-        public bool Checkout( IActivityMonitor m, string branchName )
+        /// <param name="branchName">The local name of the branch.</param>
+        /// <param name="alwaysFetchAll">True to always call <see cref="FetchAll"/>.</param>
+        /// <returns>True on success, false on error (such as merge conflicts).</returns>
+        public bool CheckoutAndPull( IActivityMonitor m, string branchName, bool alwaysFetchAll = false )
         {
             using( m.OpenInfo( $"Checking out branch '{branchName}' in '{SubPath}'." ) )
             {
                 try
                 {
-                    if( _onlyBranches != null && !_onlyBranches.Contains( branchName ) )
-                    {
-                        m.Error( $"Branch {branchName} in {SubPath} is not explicitly allowed to be modified." );
-                        return false;
-                    }
+                    if( alwaysFetchAll && !FetchAll( m ) ) return false;
                     Branch b = _git.Branches[branchName];
-                    if( b != null && b.IsCurrentRepositoryHead )
-                    {
-                        m.CloseGroup( $"Already on {branchName}." );
-                        return true;
-                    }
-                    if( GetDirtyDescription() != null )
-                    {
-                        using( m.OpenError( $"Repository '{SubPath}' has uncommited changes." ) )
-                        {
-                            m.Info( _dirtyDescription );
-                        }
-                        return false;
-                    }
                     if( b == null )
                     {
+                        m.Info( $"No local branch '{branchName}' in '{SubPath}'." );
+                        if( !alwaysFetchAll )
+                        {
+                            if( !FetchAll( m ) ) return false;
+                        }
                         string remoteName = "origin/" + branchName;
                         var remote = _git.Branches[remoteName];
                         if( remote == null )
                         {
-                            m.Error( $"Repository '{SubPath}': Local branch '{branchName}' and remote '{remoteName}' not found." );
+                            m.Error( $"Repository '{SubPath}': Both local '{branchName}' and remote '{remoteName}' not found." );
                             return false;
                         }
+                        if( !CheckCleanCommit( m ) ) return false;
                         m.Info( $"Creating local branch on remote '{remoteName}'." );
                         b = _git.Branches.Add( branchName, remote.Tip );
                         b = _git.Branches.Update( b, u => u.TrackedBranch = remote.CanonicalName );
+                        Commands.Checkout( _git, b );
+                        return true;
                     }
-                    Commands.Checkout( _git, b );
-                    m.CloseGroup( "Done." );
+                    if( b.IsCurrentRepositoryHead )
+                    {
+                        m.Trace( $"Already on {branchName}." );
+                    }
+                    else
+                    {
+                        if( !CheckCleanCommit( m ) ) return false;
+                        m.Info( $"Checking out {branchName} (leaving {CurrentBranchName})." );
+                        Commands.Checkout( _git, b );
+                    }
+                    var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
+                    var result = Commands.Pull( _git, merger, new PullOptions
+                    {
+                        FetchOptions = new FetchOptions
+                        {
+                            TagFetchMode = TagFetchMode.All,
+                            CredentialsProvider = _defaultCredentialHandler
+                        },
+                        MergeOptions = new MergeOptions
+                        {
+                            CommitOnSuccess = true,
+                            FailOnConflict = true,
+                            FastForwardStrategy = FastForwardStrategy.Default,
+                            SkipReuc = true
+                        }
+                    } );
+                    if( result.Status == MergeStatus.Conflicts )
+                    {
+                        m.Error( "Merge conflicts occurred. Unable to Pull changes from the remote." );
+                    }
                     return true;
                 }
                 catch( Exception ex )
@@ -157,24 +178,23 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Fetches all remotes changes into this repository.
+        /// Fetches 'origin' or all remotes changes into this repository.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="credentialsProvider">Optional credential provider.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool FetchAll( IActivityMonitor m, CredentialsHandler credentialsProvider = null )
+        public bool FetchAll( IActivityMonitor m, bool originOnly = true )
         {
-            using( m.OpenInfo( $"Fetching all remotes in repository '{FullPath}'" ) )
+            using( m.OpenInfo( $"Fetching {(originOnly ? "origin" : "all remotes")} in repository '{FullPath}'" ) )
             {
                 try
                 {
-                    foreach( Remote remote in _git.Network.Remotes )
+                    foreach( Remote remote in _git.Network.Remotes.Where( r => !originOnly || r.Name == "origin" ) )
                     {
                         m.Info( $"Fetching remote {remote.Name}" );
                         IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification );
                         Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
                         {
-                            CredentialsProvider = credentialsProvider ?? _defaultCredentialHandler
+                            CredentialsProvider = _defaultCredentialHandler
                         }, $"Fetching remote {remote.Name}" );
                     }
                 }
@@ -184,8 +204,65 @@ namespace CK.Env
                     return false;
                 }
             }
-
             return true;
+        }
+
+        /// <summary>
+        /// Gets the simple git version <see cref="RepositoryInfo"/> from develop branch.
+        /// This prepares a release and triggers a <see cref="FetchAll"/> and a <see cref="CheckoutAndPull"/>
+        /// on develop.
+        /// A RepositoryInfo.xml file must exist.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>The version info. Can be invalid if master or develop RepositoryInfo.xml has not been read.</returns>
+        public RepositoryInfo GetVersionRepositoryInfo( IActivityMonitor m )
+        {
+            if( !CheckoutAndPull( m, "develop", true ) ) return null;
+            return ReadVersionInfo( m, "develop" );
+        }
+
+        RepositoryInfo ReadVersionInfo( IActivityMonitor m, string branchName )
+        {
+            Debug.Assert( branchName != null );
+            try
+            {
+                Branch b = _git.Branches[branchName];
+                if( b == null )
+                {
+                    m.Error( $"Unknown local branch {branchName}." );
+                    return null;
+                }
+                var pathOpt = b.IsRemote
+                                ? SubPath.AppendPart( "remotes" ).Combine( b.FriendlyName )
+                                : SubPath.AppendPart( "branches" ).AppendPart( branchName );
+
+                pathOpt = pathOpt.AppendPart( "RepositoryInfo.xml" );
+                var fOpt = FileSystem.GetFileInfo( pathOpt );
+                if( !fOpt.Exists )
+                {
+                    m.Error( $"Missing required {pathOpt} file." );
+                    return null;
+                }
+                var opt = RepositoryInfoOptions.Read( fOpt.ReadAsXDocument().Root );
+                opt.StartingBranchName = branchName;
+                var result = new RepositoryInfo( _git, opt );
+                if( result.RepositoryError != null )
+                {
+                    m.Error( $"Unable to read RepositoryInfo. RepositoryError: {result.RepositoryError}." );
+                    return null;
+                }
+                if( result.HasError )
+                {
+                    m.Error( result.ReleaseTagErrorText );
+                    return null;
+                }
+                return result;
+            }
+            catch( Exception ex )
+            {
+                m.Fatal( $"While reading version info for branch '{branchName}'.", ex );
+                return null;
+            }
         }
 
         /// <summary>
@@ -228,7 +305,7 @@ namespace CK.Env
                     var s = _git.RetrieveStatus();
                     if( s.IsDirty )
                     {
-                        m.Info( ComputeDirtyString( s ) );
+                        m.Info( "Working Folder is dirty. Committing changes." );
                         var now = DateTimeOffset.Now;
                         var author = _git.Config.BuildSignature( now );
                         _git.Commit( commitMessage, author, new Signature( "CKli", "none", now ) );
@@ -249,28 +326,19 @@ namespace CK.Env
         /// Pushes changes from the current branch to the origin.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="credentialsProvider">Optional credential provider..</param>
         /// <returns>True on success, false on error.</returns>
-        public bool Push( IActivityMonitor m, CredentialsHandler credentialsProvider = null )
+        public bool Push( IActivityMonitor m )
         {
             using( m.OpenInfo( $"Pushing '{SubPath}' (branch '{CurrentBranchName}') to origin." ) )
             {
                 try
                 {
-                    var s = _git.RetrieveStatus();
-                    if( s.IsDirty )
+                    if( !CheckCleanCommit( m ) ) return false;
+                    var options = new PushOptions()
                     {
-                        m.Warn( ComputeDirtyString( s ) );
-                        m.CloseGroup( "Working folder is dirty." );
-                    }
-                    else
-                    {
-                        var options = new PushOptions()
-                        {
-                            CredentialsProvider = credentialsProvider ?? _defaultCredentialHandler
-                        };
-                        _git.Network.Push( _git.Head, options );
-                    }
+                        CredentialsProvider = _defaultCredentialHandler
+                    };
+                    _git.Network.Push( _git.Head, options );
                     return true;
                 }
                 catch( Exception ex )
@@ -340,7 +408,12 @@ namespace CK.Env
                     else m.Trace( $"Already on {BlanckDevBranchName}." );
 
                     var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
-                    var r = _git.Merge( bDevelop, merger, new MergeOptions { FastForwardStrategy = FastForwardStrategy.NoFastForward } );
+                    var r = _git.Merge( bDevelop, merger, new MergeOptions
+                    {
+                        FastForwardStrategy = FastForwardStrategy.NoFastForward,
+                        MergeFileFavor = MergeFileFavor.Theirs,
+                        FileConflictStrategy = CheckoutFileConflictStrategy.Theirs
+                    } );
                     if( r.Status == MergeStatus.Conflicts )
                     {
                         m.Error( $"Merge failed from 'develop' to '{BlanckDevBranchName}': conflicts must be manually resolved." );
@@ -511,41 +584,6 @@ namespace CK.Env
                      .Where( b => (string)b.Attribute( "Name" ) == GitFolder.BlanckDevBranchName )
                      .Remove();
             return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );
-        }
-
-        static string ComputeDirtyString( RepositoryStatus repositoryStatus )
-        {
-            int addedCount = repositoryStatus.Added.Count();
-            int missingCount = repositoryStatus.Missing.Count();
-            int removedCount = repositoryStatus.Removed.Count();
-            int stagedCount = repositoryStatus.Staged.Count();
-            StringBuilder b = null;
-            if( addedCount > 0 || missingCount > 0 || removedCount > 0 || stagedCount > 0 )
-            {
-                b = new StringBuilder( "Found: " );
-                if( addedCount > 0 ) b.AppendFormat( "{0} file(s) added", addedCount );
-                if( missingCount > 0 ) b.AppendFormat( "{0}{1} file(s) missing", b.Length > 10 ? ", " : null, missingCount );
-                if( removedCount > 0 ) b.AppendFormat( "{0}{1} file(s) removed", b.Length > 10 ? ", " : null, removedCount );
-                if( stagedCount > 0 ) b.AppendFormat( "{0}{1} file(s) staged", b.Length > 10 ? ", " : null, removedCount );
-            }
-            else
-            {
-                int fileCount = 0;
-                foreach( StatusEntry m in repositoryStatus.Modified )
-                {
-                    string path = m.FilePath;
-                    if( b == null )
-                    {
-                        b = new StringBuilder( "Modified file(s) found: " );
-                        b.Append( path );
-                    }
-                    else if( fileCount <= 10 ) b.Append( ", " ).Append( path );
-                }
-                if( fileCount > 10 ) b.AppendFormat( ", and {0} other file(s)", fileCount - 10 );
-            }
-            if( b == null ) return null;
-            b.Append( '.' );
-            return b.ToString();
         }
 
         internal void Dispose()
@@ -738,19 +776,15 @@ namespace CK.Env
             {
                 Debug.Assert( b.IsRemote == _isRemote && (!_isRemote || b.RemoteName == Name) );
                 string name = _isRemote ? b.FriendlyName.Remove( 0, Name.Length + 1 ) : b.FriendlyName;
-                if( _f._onlyBranches == null || _f._onlyBranches.Contains( name ) )
+                if( _branches.TryGetValue( name, out var exists ) )
                 {
-                    if( _branches.TryGetValue( name, out var exists ) )
+                    if( exists.Commit != b.Tip )
                     {
-                        if( exists.Commit != b.Tip )
-                        {
-                            _branches[name] = new CommitFolder( name, b.Tip );
-                        }
+                        _branches[name] = new CommitFolder( name, b.Tip );
                     }
-                    else _branches.Add( name, new CommitFolder( name, b.Tip ) );
-                    return true;
                 }
-                return false;
+                else _branches.Add( name, new CommitFolder( name, b.Tip ) );
+                return true;
             }
 
             public IEnumerator<IFileInfo> GetEnumerator()

@@ -37,11 +37,11 @@ namespace CKli
             // Consider all GitFolders that contains at least a solution definition in 'develop' branch.
             var gitFolders = _solutions.AllDevelopSolutions.Select( s => s.GitBranch.Parent.GitFolder )
                                 .Distinct()
-                                .Where( g => g.CurrentBranchName != "develop" );
-            if( gitFolders.Any() )
+                                .ToList();
+
+            foreach( var g in gitFolders )
             {
-                m.Warn( $"Git folders must be on 'develop' branch: {gitFolders.Select( g => $"{g.SubPath} ({g.CurrentBranchName})" ).Concatenate()}" );
-                return true;
+                if( !g.CheckoutAndPull( m, "develop" ) ) return false;
             }
 
             var environmentVariables = new List<(string, string)>();

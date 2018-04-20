@@ -34,6 +34,7 @@ namespace CKli
             _solutions = solutions;
             const string menu =
 @"--- Solution Dependencies
+   0 - Solution Dependencies - No project detail (in EverythingExceptBuildProjects mode).
    1 - PublishedProjects - Consider only published projects of primary solutions
                            (secondary solutions are ignored).
    2 - PublishedAndTestsProjects - Consider published and tests projects of primary solutions
@@ -47,9 +48,9 @@ namespace CKli
 ";
             _choice = AddIntParameter( "choice", menu, ( m, i ) =>
             {
-                if( i < 1 || i > 6 )
+                if( i < 0 || i > 6 )
                 {
-                    m.Error( "Must be between 1 and 6." );
+                    m.Error( "Must be between 0 and 6." );
                     return false;
                 }
                 return true;
@@ -58,19 +59,22 @@ namespace CKli
 
         public override bool Run( IActivityMonitor m )
         {
-            var all = _solutions.AllSolutions.Select( s => s.Solution );
+            var all = _solutions.AllDevelopSolutions.Select( s => s.Solution );
             var deps = DependencyContext.Create( m, all );
             if( deps == null ) return false;
             switch( _choice.Value )
             {
-                case 1: 
-                    DisplayResult( m, deps.AnalyzeDependencies( m, SolutionSortStrategy.PublishedProjects ) );
+                case 0:
+                    DisplaySolutionsResult( m, deps.AnalyzeDependencies( m, SolutionSortStrategy.EverythingExceptBuildProjects ) );
+                    break;
+                case 1:
+                    DisplayDetailedResult( m, deps.AnalyzeDependencies( m, SolutionSortStrategy.PublishedProjects ) );
                     break;
                 case 2:
-                    DisplayResult( m, deps.AnalyzeDependencies( m, SolutionSortStrategy.PublishedAndTestsProjects ) );
+                    DisplayDetailedResult( m, deps.AnalyzeDependencies( m, SolutionSortStrategy.PublishedAndTestsProjects ) );
                     break;
                 case 3:
-                    DisplayResult( m, deps.AnalyzeDependencies( m, SolutionSortStrategy.EverythingExceptBuildProjects ) );
+                    DisplayDetailedResult( m, deps.AnalyzeDependencies( m, SolutionSortStrategy.EverythingExceptBuildProjects ) );
                     break;
                 case 4:
                     DisplayProjectDependencies( m, "Dumping all project dependencies.", deps.ProjectDependencies.PerFrameworkDependencies );
@@ -148,7 +152,33 @@ namespace CKli
             }
         }
 
-        internal static void DisplayResult( IActivityMonitor m, SolutionDependencyResult result )
+        void DisplaySolutionsResult( IActivityMonitor m, SolutionDependencyResult result )
+        {
+            using( m.OpenInfo( $"Solutions sorted ({result.Content}): " ) )
+            {
+                if( result.HasError ) result.RawSorterResult.LogError( m );
+                else
+                {
+                    StringBuilder b = new StringBuilder();
+                    foreach( var r in result.Solutions.GroupBy( s => s.Rank ) )
+                    {
+                        b.Append( "Rank: " ).Append( r.Key ).AppendLine();
+                        foreach( var s in r )
+                        {
+                            b.Append( "  " ).Append( s.Index ).Append( " - " ).Append( s.Solution.UniqueSolutionName );
+                            if( s.MinimalImpacts.Count > 0 )
+                            {
+                                b.Append( "  => " ).AppendStrings( s.MinimalImpacts.Select( i => i.Solution.UniqueSolutionName ) ).AppendLine();
+                            }
+                            else b.AppendLine();
+                        }
+                    }
+                    m.Info( b.ToString() );
+                }
+            }
+        }
+
+        internal static void DisplayDetailedResult( IActivityMonitor m, SolutionDependencyResult result )
         {
             using( m.OpenInfo( $"Solutions sorted ({result.Content}): " ) )
             {

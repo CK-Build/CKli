@@ -216,7 +216,7 @@ namespace CK.Env.Tests
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder ) )
             {
                 fs.DiscoverGitFolders();
-                fs.GitFolders[0].Checkout( TestHelper.Monitor, "alpha" ).Should().BeTrue( "Go to 'alpha' branch." ); ;
+                fs.GitFolders[0].CheckoutAndPull( TestHelper.Monitor, "alpha" ).Should().BeTrue( "Go to 'alpha' branch." ); ;
 
                 var cA = fs.GetDirectoryContents( "TestGitRepository/branches/master/a" );
                 cA.Exists.Should().BeTrue();
@@ -235,7 +235,7 @@ namespace CK.Env.Tests
                     }
                 }
 
-                fs.GitFolders[0].Checkout( TestHelper.Monitor, "master" ).Should().BeTrue( "Back to master." );
+                fs.GitFolders[0].CheckoutAndPull( TestHelper.Monitor, "master" ).Should().BeTrue( "Back to master." );
 
                 var cAW = fs.GetDirectoryContents( "TestGitRepository/branches/master/a" );
                 cAW.Exists.Should().BeTrue();

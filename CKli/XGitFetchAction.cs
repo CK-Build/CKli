@@ -20,7 +20,7 @@ namespace CKli
             var xGitFolders = NextSiblings.SelectMany( s => s.Descendants<XGitFolder>() );
             foreach( var xgit in xGitFolders )
             {
-                using( m.OpenInfo( $"Fetching {xgit.Name}" ) )
+                using( m.OpenInfo( $"Fetching {xgit.Name} 'origin' remote" ) )
                 {
                     if( xgit.GitFolder == null )
                     {
@@ -29,8 +29,8 @@ namespace CKli
                     }
                     else
                     {
-                        // With git folder: Fetch all remotes
-                        if( !xgit.GitFolder.FetchAll( m, xgit.ObtainGitCredentialsProvider( m ) ) ) return false;
+                        // With git folder: Fetch 'origin'.
+                        if( !xgit.GitFolder.FetchAll( m ) ) return false;
                     }
                 }
             }

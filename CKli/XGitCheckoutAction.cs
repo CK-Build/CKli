@@ -22,7 +22,7 @@ namespace CKli
             var gitFolders = NextSiblings.SelectMany( s => s.Descendants<XGitFolder>() ).Select( g => g.GitFolder );
             foreach( var git in gitFolders )
             {
-                if( !git.Checkout( m, _branchName.Value ) ) return false;
+                if( !git.CheckoutAndPull( m, _branchName.Value ) ) return false;
             }
             return true;
         }
