@@ -23,10 +23,16 @@ namespace CKli
         XRunnable _root;
         World _currentWorld;
 
-        public class World
+        public class World : IWorldName
         {
+            /// <summary>
+            /// 
+            /// </summary>
             public string FilePath { get; }
 
+            /// <summary>
+            /// Gets tne name of this world.
+            /// </summary>
             public string WorldName { get; }
 
             /// <summary>
@@ -34,13 +40,22 @@ namespace CKli
             /// </summary>
             public string LTSKey { get; }
 
+            /// <summary>
+            /// Gets the develop branch name.
+            /// </summary>
             public string DevelopBranchName { get; }
 
+            /// <summary>
+            /// Gets the master branch name.
+            /// </summary>
             public string MasterBranchName { get; }
 
+            /// <summary>
+            /// Gets the develop local branch name.
+            /// </summary>
             public string DevelopLocalBranchName { get; }
 
-            public World( string path, string worldName, string ltsKey )
+            internal World( string path, string worldName, string ltsKey )
             {
                 if( String.IsNullOrWhiteSpace( path ) ) throw new ArgumentNullException( nameof( path ) );
                 if( String.IsNullOrWhiteSpace( worldName ) ) throw new ArgumentNullException( nameof( worldName ) );
@@ -69,7 +84,7 @@ namespace CKli
                 int idx = fName.IndexOf( '-' );
                 if( idx < 0 )
                 {
-                    return new World(filePath, fName, null);
+                    return new World( filePath, fName, null );
                 }
                 return new World( filePath, fName.Substring( 0, idx ), fName.Substring( idx + 1 ) );
             }
@@ -120,21 +135,21 @@ namespace CKli
         World ChooseWorld()
         {
             var files = Directory.GetFiles( Path.Combine( _rootPath, "CK-Env" ), "*-World.xml" )
-                                .Select( ( p, idx ) => (Idx: idx, File: World.Parse( p )) );
+                                .Select( ( p, idx ) => (Idx: idx+1, File: World.Parse( p )) )
+                                .ToList();
             for(; ;)
             {
-                int i = 0;
                 foreach( var g in files.GroupBy( f => f.File.WorldName ) )
                 {
                     Console.WriteLine( $"- {g.Key}" );
                     foreach( var lts in g )
                     {
-                        Console.WriteLine( $"- {lts.Idx} - {lts.File.LTSKey ?? "<Current>"}" );
+                        Console.WriteLine( $"   > {lts.Idx} - {lts.File.LTSKey ?? "<Current>"}" );
                     }
                 }
-                Console.WriteLine( "x - Exit" );
+                Console.WriteLine( "   > x - Exit" );
                 string r = Console.ReadLine();
-                if( Int32.TryParse( r, out int result ) && result >= 1 && result <= i )
+                if( Int32.TryParse( r, out int result ) && result >= 1 && result <= files.Count )
                 {
                     return files.First( f => f.Idx == result ).File;
                 }

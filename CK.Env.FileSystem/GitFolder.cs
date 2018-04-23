@@ -20,7 +20,7 @@ namespace CK.Env
     public class GitFolder
     {
         static readonly XNamespace SVGNS = XNamespace.Get( "http://csemver.org/schemas/2015" );
-        static readonly CredentialsHandler _defaultCredentialHandler;
+        static internal readonly CredentialsHandler DefaultCredentialHandler;
 
         public const string BlanckDevBranchName = "develop-local";
 
@@ -36,7 +36,7 @@ namespace CK.Env
         {
             var secrets = new SecretStore( "git" );
             var auth = new BasicAuthentication( secrets );
-            _defaultCredentialHandler = ( url, user, cred ) =>
+            DefaultCredentialHandler = ( url, user, cred ) =>
             {
                 var uri = new Uri( url ).GetLeftPart( UriPartial.Authority );
                 var creds = auth.GetCredentials( new TargetUri( uri ) );
@@ -46,7 +46,7 @@ namespace CK.Env
             };
         }
 
-        internal GitFolder( FileSystem fs, string gitFolder, ILocalFeedProvider blankFeedProvider )
+        internal GitFolder( FileSystem fs, string gitFolder, ILocalFeedProvider blankFeedProvider, IWorldName world )
         {
             Debug.Assert( gitFolder.StartsWith( fs.Root.Path ) && gitFolder.EndsWith( ".git" ) );
             _feedProvider = blankFeedProvider;
@@ -55,12 +55,19 @@ namespace CK.Env
             if( SubPath.IsEmpty ) throw new InvalidOperationException( "Root path can not be a Git folder." );
 
             FileSystem = fs;
+            World = world;
             _git = new Repository( gitFolder );
             _headFolder = new HeadFolder( this );
             _branchesFolder = new BranchesFolder( this, "branches", isRemote: false );
             _remoteBranchesFolder = new RemotesFolder( this );
             _thisDir = new RootDir( this, SubPath.LastPart );
         }
+
+
+        /// <summary>
+        /// Gets the current <see cref="World"/>.
+        /// </summary>
+        public IWorldName World { get; }
 
         /// <summary>
         /// Gets the full path that starts with the <see cref="FileSystem"/>' root path.
@@ -107,45 +114,47 @@ namespace CK.Env
         /// <param name="m">The monitor.</param>
         /// <param name="branchName">The local name of the branch.</param>
         /// <param name="alwaysFetchAll">True to always call <see cref="FetchAll"/>.</param>
-        /// <returns>True on success, false on error (such as merge conflicts).</returns>
-        public bool CheckoutAndPull( IActivityMonitor m, string branchName, bool alwaysFetchAll = false )
+        /// <returns>
+        /// Success is true on success, false on error (such as merge conflicts) and in case of success,
+        /// the result states whether a reload should be required or if nothing changed.
+        /// </returns>
+        public (bool Success, bool ReloadNeeded) CheckoutAndPull( IActivityMonitor m, string branchName, bool alwaysFetchAll = false )
         {
             using( m.OpenInfo( $"Checking out branch '{branchName}' in '{SubPath}'." ) )
             {
                 try
                 {
-                    if( alwaysFetchAll && !FetchAll( m ) ) return false;
+                    if( alwaysFetchAll && !FetchAll( m ) ) return (false,false);
                     Branch b = _git.Branches[branchName];
                     if( b == null )
                     {
                         m.Info( $"No local branch '{branchName}' in '{SubPath}'." );
-                        if( !alwaysFetchAll )
-                        {
-                            if( !FetchAll( m ) ) return false;
-                        }
+                        if( !alwaysFetchAll && !FetchAll( m ) ) return (false,false);
                         string remoteName = "origin/" + branchName;
                         var remote = _git.Branches[remoteName];
                         if( remote == null )
                         {
                             m.Error( $"Repository '{SubPath}': Both local '{branchName}' and remote '{remoteName}' not found." );
-                            return false;
+                            return (false,false);
                         }
-                        if( !CheckCleanCommit( m ) ) return false;
+                        if( !CheckCleanCommit( m ) ) return (false,false);
                         m.Info( $"Creating local branch on remote '{remoteName}'." );
                         b = _git.Branches.Add( branchName, remote.Tip );
                         b = _git.Branches.Update( b, u => u.TrackedBranch = remote.CanonicalName );
                         Commands.Checkout( _git, b );
-                        return true;
+                        return (true,true);
                     }
+                    bool reloadNeeded = false;
                     if( b.IsCurrentRepositoryHead )
                     {
                         m.Trace( $"Already on {branchName}." );
                     }
                     else
                     {
-                        if( !CheckCleanCommit( m ) ) return false;
+                        if( !CheckCleanCommit( m ) ) return (false,false);
                         m.Info( $"Checking out {branchName} (leaving {CurrentBranchName})." );
                         Commands.Checkout( _git, b );
+                        reloadNeeded = true;
                     }
                     var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
                     var result = Commands.Pull( _git, merger, new PullOptions
@@ -153,7 +162,7 @@ namespace CK.Env
                         FetchOptions = new FetchOptions
                         {
                             TagFetchMode = TagFetchMode.All,
-                            CredentialsProvider = _defaultCredentialHandler
+                            CredentialsProvider = DefaultCredentialHandler
                         },
                         MergeOptions = new MergeOptions
                         {
@@ -166,13 +175,14 @@ namespace CK.Env
                     if( result.Status == MergeStatus.Conflicts )
                     {
                         m.Error( "Merge conflicts occurred. Unable to Pull changes from the remote." );
+                        return (false,false);
                     }
-                    return true;
+                    return (true, reloadNeeded || result.Status != MergeStatus.UpToDate);
                 }
                 catch( Exception ex )
                 {
                     m.Error( ex );
-                    return false;
+                    return (false, false);
                 }
             }
         }
@@ -194,7 +204,8 @@ namespace CK.Env
                         IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification );
                         Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
                         {
-                            CredentialsProvider = _defaultCredentialHandler
+                            CredentialsProvider = DefaultCredentialHandler,
+                            TagFetchMode = TagFetchMode.All
                         }, $"Fetching remote {remote.Name}" );
                     }
                 }
@@ -208,20 +219,13 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the simple git version <see cref="RepositoryInfo"/> from develop branch.
-        /// This prepares a release and triggers a <see cref="FetchAll"/> and a <see cref="CheckoutAndPull"/>
-        /// on develop.
-        /// A RepositoryInfo.xml file must exist.
+        /// Gets the simple git version <see cref="RepositoryInfo"/> from a branch.
+        /// Returns null if an error occurred or if RepositoryInfo.xml has not been successfully read.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <returns>The version info. Can be invalid if master or develop RepositoryInfo.xml has not been read.</returns>
-        public RepositoryInfo GetVersionRepositoryInfo( IActivityMonitor m )
-        {
-            if( !CheckoutAndPull( m, "develop", true ) ) return null;
-            return ReadVersionInfo( m, "develop" );
-        }
-
-        RepositoryInfo ReadVersionInfo( IActivityMonitor m, string branchName )
+        /// <param name="m"></param>
+        /// <param name="branchName"></param>
+        /// <returns></returns>
+        public RepositoryInfo ReadVersionInfo( IActivityMonitor m, string branchName )
         {
             Debug.Assert( branchName != null );
             try
@@ -336,7 +340,7 @@ namespace CK.Env
                     if( !CheckCleanCommit( m ) ) return false;
                     var options = new PushOptions()
                     {
-                        CredentialsProvider = _defaultCredentialHandler
+                        CredentialsProvider = DefaultCredentialHandler
                     };
                     _git.Network.Push( _git.Head, options );
                     return true;

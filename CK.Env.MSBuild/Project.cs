@@ -130,7 +130,7 @@ namespace CK.Env.MSBuild
             }
             if( _file == null )
             {
-                _ctx.Unload( Path );
+                _ctx.UnloadFile( Path );
                 Sdk = null;
                 TargetFrameworks = MSBuildContext.Traits.EmptyTrait;
             }

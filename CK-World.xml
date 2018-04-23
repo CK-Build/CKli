@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <CK-World>
 
-  <XSharedHttpClient />
+  <SharedHttpClient />
   <ReferentialFolder Path="CK-Env/CKli/Referential" />
   <SolutionCentral />
   <PublishedPackageFeeds />
@@ -30,6 +30,7 @@
   <GlobalSwitchBranchAction Title="Switch between 'develop-blank' &lt;=&gt; 'develop' branches." />
   <GlobalCIBuildAction Title="CI Build: Build all Solutions in develop to CI packages, optionally pushing them to MyGet invenietis-ci feed." />
   <GlobalBlankBuildAction Title="Blank build: Build all Solutions locally in 'develop-local' branch." />
+  <GlobalReleaserAction Title="Global Release." />
   
   <!-- Unsafe brutal tools.
     

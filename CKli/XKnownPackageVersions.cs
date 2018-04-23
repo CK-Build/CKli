@@ -97,7 +97,7 @@ namespace CKli
 
         protected override bool CreateIssue( IRunContextIssue builder )
         {
-            var toFix = _solutions.AllSolutions.Select( s => s.Solution )
+            var toFix = _solutions.AllSolutions.Select( s => s.GetSolution( builder.Monitor, false ) )
                               .SelectMany( s => s.AllProjects )
                               .SelectMany( p => p.Deps.Packages )
                               .Select( d => (D: d, C: FindConstraint( d.PackageId, d.Version, d.Frameworks )) )

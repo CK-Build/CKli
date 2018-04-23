@@ -77,7 +77,7 @@ namespace CK.Env.MSBuild
                                 .Distinct()
                                 .Select( others )
                                 .ToList();
-                MinimalRequirements = Requirements.Except( Requirements.SelectMany( r => r.TransitiveRequirements ) ).ToList();
+                MinimalRequirements = Requirements.Except( Requirements.SelectMany( r => r.MinimalRequirements ) ).ToList();
                 Rank = MinimalRequirements.Count == 0 ? 0 : MinimalRequirements.Max( r => r.Rank ) + 1;
                 TransitiveRequirements = Requirements.SelectMany( r => r.TransitiveRequirements ).Distinct().ToList();
             }
@@ -225,7 +225,7 @@ namespace CK.Env.MSBuild
         public IReadOnlyList<DependencyRow> DependencyTable { get; }
 
         /// <summary>
-        /// Gets the global dependencies informations between solutions.
+        /// Gets the global, sorted, dependencies informations between solutions.
         /// </summary>
         public IReadOnlyList<DependentSolution> Solutions { get; }
 

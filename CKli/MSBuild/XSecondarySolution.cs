@@ -28,8 +28,7 @@ namespace CKli
         {
             PrimarySolution = primary;
             initializer.ChildServices.Add( this );
-            _solution = central.MSBuildContext.GetSolution( initializer.Monitor, primary.GitBranch.Name, FullPath );
-            _solution.SetAsSecondarySolution( PrimarySolution.Solution, SpecialType );
+            if( SpecialType == SolutionSpecialType.None ) SpecialType = SolutionSpecialType.IncludedSecondarySolution;
         }
 
         /// <summary>
@@ -42,12 +41,10 @@ namespace CKli
         /// </summary>
         public SolutionSpecialType SpecialType { get; private set; }
 
-        public override Solution Solution => _solution;
-
-        protected override void ConfigureSolution( IActivityMonitor m, Solution solution )
+        protected override Solution GetSolution( IActivityMonitor m, NormalizedPath path, bool reload )
         {
-            var primary = PrimarySolution.GetSolutionInBranch( m, solution.BranchName );
-            solution.SetAsSecondarySolution( primary, SpecialType );
+            var primary = PrimarySolution.GetSolution( m, false );
+            return SolutionCentral.MSBuildContext.FindOrLoadSolution( m, path, primary, SpecialType, reload ).Solution;
         }
     }
 }

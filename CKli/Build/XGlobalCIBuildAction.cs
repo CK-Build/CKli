@@ -34,15 +34,8 @@ namespace CKli
 
         public override bool Run( IActivityMonitor m )
         {
-            // Consider all GitFolders that contains at least a solution definition in 'develop' branch.
-            var gitFolders = _solutions.AllDevelopSolutions.Select( s => s.GitBranch.Parent.GitFolder )
-                                .Distinct()
-                                .ToList();
-
-            foreach( var g in gitFolders )
-            {
-                if( !g.CheckoutAndPull( m, "develop" ) ) return false;
-            }
+            var ctx = _solutions.GetGlobalReleaseContext( m, false );
+            if( ctx == null ) return false;
 
             var environmentVariables = new List<(string, string)>();
             Console.Write( "Enter MYGET_CI_API_KEY to push packages to remote feed: " );
@@ -59,8 +52,7 @@ namespace CKli
                 environmentVariables.Add( ("CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL", storePushKey+"|https://cksetup.invenietis.net") );
             }
 
-            var all = _solutions.AllDevelopSolutions.ToDictionary( s => s.Solution, s => s.GitBranch.Parent );
-            var deps = DependencyContext.Create( m, all.Keys );
+            var deps = DependencyContext.Create( m, ctx.AllSolutions );
             if( deps == null ) return false;
             SolutionDependencyResult r = deps.AnalyzeDependencies( m, SolutionSortStrategy.EverythingExceptBuildProjects );
             if( r.HasError ) r.RawSorterResult.LogError( m );
@@ -126,7 +118,7 @@ namespace CKli
                                 if( !build.Solution.Save( m, _fileSystem ) ) return false;
                             }
 
-                            var gitFolder = all[build.Solution].GitFolder;
+                            var gitFolder = build.Solution.GitFolder;
                             if( !gitFolder.Commit( m, "Global Build from CK-Env." ).Success ) return false;
 
                             bool resetSuccess = false;

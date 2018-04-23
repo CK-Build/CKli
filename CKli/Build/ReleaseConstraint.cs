@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace CKli
 {
     /// <summary>
-    /// Defines constraints on versions.
+    /// Defines composable constraints on versions.
     /// </summary>
     [Flags]
     public enum ReleaseConstraint
@@ -27,7 +27,6 @@ namespace CKli
         /// This does not apply if <see cref="MustBePreRelease"/> is set.
         /// </summary>
         HasBreakingChanges = 2,
-
 
         /// <summary>
         /// The version must indicate new features.

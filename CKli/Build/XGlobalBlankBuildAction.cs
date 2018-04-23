@@ -42,7 +42,7 @@ namespace CKli
                 {
                     if( !g.SwitchFromDevelopToBlankDev( m ) ) return false;
                 }
-                var blankSolutions = _solutions.AllDevelopSolutions.Select( x => (XSolution: x, Solution: x.GetSolutionInBranch( m, GitFolder.BlanckDevBranchName ) ) );
+                var blankSolutions = _solutions.AllDevelopSolutions.Select( x => (XSolution: x, Solution: x.GetSolutionInBranch( m, GitFolder.BlanckDevBranchName, true ) ) );
                 if( blankSolutions.Any( s => s.Solution == null ) ) return false;
 
                 var all = blankSolutions.ToDictionary( s => s.Solution, s => s.XSolution.GitBranch.Parent );

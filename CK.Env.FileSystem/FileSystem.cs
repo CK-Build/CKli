@@ -9,6 +9,7 @@ using System.Collections;
 using System.Linq;
 using CK.Text;
 using System.Diagnostics;
+using LibGit2Sharp;
 
 namespace CK.Env
 {
@@ -33,19 +34,19 @@ namespace CK.Env
         /// <summary>
         /// Automatic discovery of all git folders below the <see cref="Root"/>.
         /// </summary>
-        public void DiscoverGitFolders() => DiscoverGitFolders( Root );
+        public void DiscoverGitFolders( IWorldName world ) => DiscoverGitFolders( Root, world );
 
-        void DiscoverGitFolders( string parent )
+        void DiscoverGitFolders( string parent, IWorldName world )
         {
             foreach( var d in Directory.EnumerateDirectories( parent ) )
             {
                 var gitFolder = Path.Combine( d, ".git" );
                 if( Directory.Exists( gitFolder ) )
                 {
-                    _gits.Add( new GitFolder( this, gitFolder, LocalBlankFeedProvider ) );
+                    _gits.Add( new GitFolder( this, gitFolder, LocalBlankFeedProvider, world ) );
                     return;
                 }
-                DiscoverGitFolders( d );
+                DiscoverGitFolders( d, world );
             }
         }
 
@@ -71,18 +72,32 @@ namespace CK.Env
         /// The folder path is a sub path of <see cref="Root"/> and contains the .git sub folder.
         /// </param>
         /// <returns>The <see cref="GitFolder"/> or null if there is not .git subfolder.</returns>
-        public GitFolder EnsureGitFolder( NormalizedPath folderPath )
+        public GitFolder EnsureGitFolder( IActivityMonitor m, IWorldName world, NormalizedPath folderPath, string urlRepository = null )
         {
             GitFolder g = GitFolders.FirstOrDefault( f => f.SubPath == folderPath );
             if( g == null )
             {
                 folderPath = Root.Combine( folderPath );
                 var gitFolder = Path.Combine( folderPath, ".git" );
-                if( Directory.Exists( gitFolder ) )
+                if( !Directory.Exists( gitFolder ) )
                 {
-                    g = new GitFolder( this, gitFolder, LocalBlankFeedProvider );
-                    _gits.Add( g );
+                    if( String.IsNullOrWhiteSpace( urlRepository ) )
+                    {
+                        m.Warn( "Url repository is not specified. Skipping automatic clone." );
+                        return null;
+                    }
+                    using( m.OpenInfo( $"Checking out '{folderPath}' from '{urlRepository}' on {world.DevelopBranchName}." ) )
+                    {
+                        Repository.Clone( urlRepository, folderPath, new CloneOptions()
+                        {
+                            CredentialsProvider = GitFolder.DefaultCredentialHandler,
+                            BranchName = world.DevelopBranchName,
+                            Checkout = true
+                        } );
+                    }
                 }
+                g = new GitFolder( this, gitFolder, LocalBlankFeedProvider, world );
+                _gits.Add( g );
             }
             return g;
         }
@@ -97,6 +112,13 @@ namespace CK.Env
                 g.Dispose();
             }
         }
+
+        /// <summary>
+        /// Tries to find the <see cref="GitFolder"/> for a path below the <see cref="Root"/>.
+        /// </summary>
+        /// <param name="subPath">The path (<see cref="Root"/> based). Can be any path inside the Git folder.</param>
+        /// <returns>The Git folder or null if not found.</returns>
+        public GitFolder FindGitFolder( NormalizedPath subPath ) => GitFolders.FirstOrDefault( f => subPath.StartsWith( f.SubPath, strict: false ) );
 
         /// <summary>
         /// Gets the directory content for a path below the <see cref="Root"/>.

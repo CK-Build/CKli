@@ -22,16 +22,8 @@ namespace CKli
             {
                 using( m.OpenInfo( $"Fetching {xgit.Name} 'origin' remote" ) )
                 {
-                    if( xgit.GitFolder == null )
-                    {
-                        // No git folder: Clone it (single remote, default branch)
-                        xgit.EnsureOrCloneGitDirectory( m );
-                    }
-                    else
-                    {
-                        // With git folder: Fetch 'origin'.
-                        if( !xgit.GitFolder.FetchAll( m ) ) return false;
-                    }
+                    // With git folder: Fetch 'origin'.
+                    if( !xgit.GitFolder.FetchAll( m ) ) return false;
                 }
             }
             return true;

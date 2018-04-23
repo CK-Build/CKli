@@ -9,6 +9,7 @@ using System.Xml.Linq;
 
 namespace CK.Env.MSBuild
 {
+
     public class MSBuildContext
     {
         /// <summary>
@@ -140,30 +141,54 @@ namespace CK.Env.MSBuild
         /// </summary>
         public FileSystem FileSystem => _fileSystem;
 
-        public Solution GetSolution( IActivityMonitor m, string branchName, NormalizedPath path )
+        public (Solution Solution, bool Loaded) FindOrLoadSolution( IActivityMonitor m, NormalizedPath path, Solution primary = null, SolutionSpecialType type = SolutionSpecialType.None, bool force = false )
         {
-            return FindOrLoadSolution( m, branchName, path ).Solution;
+            if( primary == null && type != SolutionSpecialType.None ) throw new ArgumentException( $"Primary solution, type must be None." );
+            if( primary != null && type == SolutionSpecialType.None ) throw new ArgumentException( $"Secodary solution, type must be IncludedSecondarySolution or IndependantSecondarySolution." );
+            if( !force && _solutions.TryGetValue( path, out Solution s ) )
+            {
+                if( (primary == null && s.PrimarySolution == null)
+                    || (primary != null && s.PrimarySolution == primary && type == s.SpecialType) )
+                {
+                    return (s, false);
+                }
+            }
+            s = DoLoad( m, path );
+            if( s != null )
+            {
+                if( primary != null ) s.SetAsSecondarySolution( primary, type );
+                return (s, true);
+            }
+            return (null, false);
         }
 
-        public (Solution Solution, bool Loaded) FindOrLoadSolution( IActivityMonitor m, string branchName, NormalizedPath path )
+        Solution DoLoad( IActivityMonitor m, NormalizedPath path )
         {
-            if( _solutions.TryGetValue( path, out Solution s ) )
-            {
-                return (s,false);
-            }
             using( m.OpenTrace( $"Loading solution {path}." ) )
             {
+                if( _solutions.TryGetValue( path, out Solution previous ) )
+                {
+                    _solutions.Remove( path );
+                    if( previous.LoadedSecodarySolutions != null )
+                    {
+                        foreach( var secondary in previous.LoadedSecodarySolutions )
+                        {
+                            _solutions.Remove( secondary.FilePath );
+                        }
+                    }
+                }
                 try
                 {
-                    s = Solution.Load( m, this, branchName, path );
+                    Solution s = Solution.Load( m, this, path );
                     if( s != null ) _solutions.Add( path, s );
+                    return s;
                 }
                 catch( Exception ex )
                 {
                     m.Error( ex );
                 }
+                return null;
             }
-            return (s,true);
         }
 
         internal File FindOrLoadProjectFile( IActivityMonitor m, NormalizedPath path )
@@ -197,6 +222,6 @@ namespace CK.Env.MSBuild
             }
         }
 
-        internal bool Unload( NormalizedPath path ) => _files.Remove( path );
+        internal bool UnloadFile( NormalizedPath path ) => _files.Remove( path );
     }
 }

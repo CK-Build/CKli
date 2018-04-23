@@ -71,7 +71,7 @@ namespace CKli
 
         protected override bool CreateIssue( IRunContextIssue builder )
         {
-            var toRemove = _solutions.AllDevelopSolutions.Select( s => s.Solution )
+            var toRemove = _solutions.AllDevelopSolutions.Select( s => s.GetSolution( builder.Monitor, false ) )
                         .SelectMany( s => s.AllProjects )
                         .Select( p => (Project: p,
                                        Applicable: _knownDeps.Where( dep => p.Deps.Filter( dep.Frameworks )

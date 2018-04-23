@@ -14,6 +14,7 @@ namespace CKli
     {
         /// <summary>
         /// No release required.
+        /// Either it is already done or it should be canceled.
         /// </summary>
         None,
 

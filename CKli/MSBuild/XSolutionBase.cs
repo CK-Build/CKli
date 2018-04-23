@@ -15,7 +15,7 @@ namespace CKli
         readonly XSolutionCentral _central;
         readonly XBranch _branch;
 
-        public XSolutionBase(
+        protected XSolutionBase(
             Initializer initializer,
             XBranch branch,
             XSolutionCentral central,
@@ -35,23 +35,18 @@ namespace CKli
 
         public XBranch GitBranch => _branch;
 
-        public abstract Solution Solution { get; }
+        public Solution GetSolution( IActivityMonitor m, bool reload ) => GetSolution( m, FullPath, reload );
 
-        public Solution GetSolutionInBranch( IActivityMonitor m, string branchName )
+        public Solution GetSolutionInBranch( IActivityMonitor m, string branchName, bool reload )
         {
-            if( branchName == _branch.Name ) return Solution;
+            if( branchName == _branch.Name ) return GetSolution( m, reload );
             var path = GitBranch.FullPath
                                  .RemoveLastPart()
                                  .AppendPart( branchName )
-                                 .Combine( Solution.FilePath.RemovePrefix( GitBranch.FullPath ) );
-            var s = SolutionCentral.MSBuildContext.FindOrLoadSolution( m, branchName, path );
-            if( s.Solution != null && s.Loaded )
-            {
-                ConfigureSolution( m, s.Solution );
-            }
-            return s.Solution;
+                                 .Combine( FullPath.RemovePrefix( GitBranch.FullPath ) );
+            return GetSolution( m, path, reload );
         }
 
-        protected abstract void ConfigureSolution( IActivityMonitor m, Solution solution );
+        protected abstract Solution GetSolution( IActivityMonitor m, NormalizedPath path, bool reload );
     }
 }

@@ -8,6 +8,7 @@ using CK.Core;
 using System.IO;
 using System.Xml.Linq;
 using CK.Setup;
+using System.Diagnostics;
 
 namespace CK.Env.MSBuild
 {
@@ -17,6 +18,7 @@ namespace CK.Env.MSBuild
     public sealed class Solution : IDependentItemContainerRef
     {
         SolutionSpecialType _specialType;
+        List<Solution> _secondarySolutions;
         bool _isDirty;
 
         /// <summary>
@@ -30,7 +32,15 @@ namespace CK.Env.MSBuild
         public NormalizedPath SolutionFolderPath { get; }
 
         /// <summary>
+        /// Gets the <see cref="GitFolder"/> to which the solution belongs
+        /// or null if the solution was not in a Git repository.
+        /// </summary>
+        public GitFolder GitFolder { get; }
+
+        /// <summary>
         /// Gets the branch name.
+        /// Null if <see cref="GitFolder"/> is null or if the solution
+        /// is not in "branches" or "remotes".
         /// </summary>
         public string BranchName { get; }
 
@@ -78,7 +88,7 @@ namespace CK.Env.MSBuild
 
         /// <summary>
         /// Gets the solution name. This should be unique accross any possible world.
-        /// For primary solution, this is the folder name (the .sln file name without the .sln extension).
+        /// For primary solution, this is the folder name (same as the .sln file name without the .sln extension).
         /// For secondary solutions, this is the "name of the primary solution"/"solution file name" (including
         /// the .sln extension) in order for the secondary solution to be scoped by the primary name and, with
         /// the traling .sln to easily be spotted as a secondary solution.
@@ -128,21 +138,6 @@ namespace CK.Env.MSBuild
         public SolutionSpecialType SpecialType => _specialType;
 
         /// <summary>
-        /// Declares this solution as a secondary solution of an existing one.
-        /// <see cref="PublishedProjects"/> is cleared when this method is called since a secondary solution
-        /// is not aimed at producing packages.
-        /// </summary>
-        /// <param name="primarySolution">The required primary solution.</param>
-        /// <param name="type">The solution type.</param>
-        public void SetAsSecondarySolution( Solution primarySolution, SolutionSpecialType type )
-        {
-            if( primarySolution == null ) throw new ArgumentNullException( nameof( primarySolution ) );
-            PrimarySolution = primarySolution;
-            _specialType = type;
-            PublishedProjects.Clear();
-        }
-
-        /// <summary>
         /// Gets all solution projects, including any <see cref="SolutionFolder"/>.
         /// </summary>
         public IReadOnlyCollection<ProjectBase> AllBaseProjects { get; }
@@ -189,7 +184,32 @@ namespace CK.Env.MSBuild
 
         bool IDependentItemRef.Optional => false;
 
+        /// <summary>
+        /// Gets the list of secodary solutions if any of them has been loaded.
+        /// </summary>
+        internal IEnumerable<Solution> LoadedSecodarySolutions => _secondarySolutions;
+
+        /// <summary>
+        /// Declares this solution as a secondary solution of an existing one.
+        /// <see cref="PublishedProjects"/> is cleared when this method is called since a secondary solution
+        /// is not aimed at producing packages.
+        /// </summary>
+        /// <param name="primarySolution">The required primary solution.</param>
+        /// <param name="type">The solution type.</param>
+        internal void SetAsSecondarySolution( Solution primarySolution, SolutionSpecialType type )
+        {
+            Debug.Assert( primarySolution != null && primarySolution.PrimarySolution == null );
+            Debug.Assert( PrimarySolution == null );
+            Debug.Assert( type != SolutionSpecialType.None );
+            PrimarySolution = primarySolution;
+            _specialType = type;
+            PublishedProjects.Clear();
+            if( primarySolution._secondarySolutions == null ) primarySolution._secondarySolutions = new List<Solution>();
+            primarySolution._secondarySolutions.Add( this );
+        }
+
         Solution(
+            GitFolder gitFolder,
             string branchName,
             NormalizedPath filePath,
             NormalizedPath folderPath,
@@ -198,6 +218,7 @@ namespace CK.Env.MSBuild
             string minimumVisualStudioVersion,
             IReadOnlyCollection<ProjectBase> projects )
         {
+            GitFolder = gitFolder;
             BranchName = branchName;
             FilePath = filePath;
             SolutionFolderPath = folderPath;
@@ -214,7 +235,7 @@ namespace CK.Env.MSBuild
                                                           .ToList();
         }
 
-        static internal Solution Load( IActivityMonitor m, MSBuildContext ctx, string branchName, NormalizedPath filePath )
+        static internal Solution Load( IActivityMonitor m, MSBuildContext ctx, NormalizedPath filePath )
         {
             if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
             var file = ctx.FileSystem.GetFileInfo( filePath ).AsTextFileInfo();
@@ -263,7 +284,26 @@ namespace CK.Env.MSBuild
                         ParseNestedProjectLine( projects, trimmed );
                     }
                 }
+                // Finds the GitFolder and then the branch name if inside a Git folder.
+                var gitFolder = ctx.FileSystem.FindGitFolder( folderPath );
+                string branchName = null;
+                if( gitFolder != null )
+                {
+                    var p = folderPath.RemovePrefix( gitFolder.SubPath );
+                    if( p.FirstPart == "branches" )
+                    {
+                        branchName = p.Parts[1];
+                    }
+                    else if( p.FirstPart == "remotes" )
+                    {
+                        // Skips the remote name.
+                        branchName = p.Parts[2];
+                    }
+                    // Otherwise (like commit hash or other virtual directory), let the
+                    // branch name be null.
+                }
                 var s = new Solution(
+                    gitFolder,
                     branchName,
                     filePath,
                     folderPath,

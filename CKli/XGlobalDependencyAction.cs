@@ -59,7 +59,7 @@ namespace CKli
 
         public override bool Run( IActivityMonitor m )
         {
-            var all = _solutions.AllDevelopSolutions.Select( s => s.Solution );
+            var all = _solutions.AllDevelopSolutions.Select( s => s.GetSolution( m, true ) );
             var deps = DependencyContext.Create( m, all );
             if( deps == null ) return false;
             switch( _choice.Value )
