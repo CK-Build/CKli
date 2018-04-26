@@ -66,12 +66,24 @@ namespace CKli
                 if( !info.IsValid ) return _releaseInfo;
                 requirements = requirements.CombineRequirement( info );
 
-                _packageVersionUpdate.AddRange( GlobalResult.DependencyTable
+                //var update  = GlobalResult.ProjectDependencies.DependencyTable
+                //                .Where( r => !r.IsExternalDependency
+                //                             && r.SourceProject.Project.PrimarySolution == Solution.Solution
+                //                             && r.TargetPackage.Project.PrimarySolution == s.Solution
+                //                             && r.Version != info.Version.ToString( CSVersionFormat.ShortForm ) )
+
+                //                                    .Where( r => r.Origin?.PrimarySolution == Solution.Solution
+                //                                                 && r.Target.PrimarySolution == s.Solution )
+                //                                    .SelectMany( r => r.Origin.Deps.Packages )
+                //                                    .Where( p => p.Version.ToString() != info.Version.ToString( CSVersionFormat.ShortForm ) )
+                //                                    .Select( p => (p, info.Version) );
+                var updates = GlobalResult.DependencyTable
                                                     .Where( r => r.Origin?.PrimarySolution == Solution.Solution
                                                                  && r.Target.PrimarySolution == s.Solution )
-                                                    .SelectMany( r => r.Target.Deps.Packages )
+                                                    .SelectMany( r => r.Origin.Deps.Packages )
                                                     .Where( p => p.Version.ToString() != info.Version.ToString( CSVersionFormat.ShortForm ) )
-                                                    .Select( p => (p, info.Version) ) );
+                                                    .Select( p => (p, info.Version) );
+                _packageVersionUpdate.AddRange( updates );
             }
             // Handle package references updates.
             //  - if none and a Release tag already exists on the commit point, there
@@ -88,7 +100,7 @@ namespace CKli
                     // This may happen if our package versions just need to be fixed: this is a perfectly
                     // valid scenario.
                     // So what are the choices of the user in such case?
-                    // None is not an option: the updated dependencies may break something here. A fix must be released.
+                    // None is not an option: the updated dependencies may break something here. At least a fix must be released.
                     requirements = requirements.WithLevel( ReleaseLevel.Fix );
                 }
                 Debug.Assert( requirements.Level != ReleaseLevel.None );
@@ -140,39 +152,37 @@ namespace CKli
             {
                 return HandleSingleVersion( m, versionSelector, requirements, filteredVersions[0] );
             }
-            // Multiple versions are possible.
-            // 1 - First choose between Official and Preleases if both are possible.
-            m.Info( $"Choosing version for {Solution.Solution.UniqueSolutionName} among {filteredVersions.Count} possible versions." );
-            if( (requirements.Constraint & ReleaseConstraint.MustBePreRelease) == 0 )
-            {
-                var officials = filteredVersions.Where( v => !v.IsPreRelease );
-                var prereleases = filteredVersions.Where( v => v.IsPreRelease );
-                if( officials.Any() && prereleases.Any() )
-                {
-                    var choice = versionSelector.ChooseBetweenOfficialAndPreReleaseVersions( m, Solution, officials, prereleases );
-                    if( choice == null ) return _releaseInfo;
-                    filteredVersions = choice.ToList();
-                }
-            }
-            if( filteredVersions.Count == 1 )
-            {
-                return HandleSingleVersion( m, versionSelector, requirements, filteredVersions[0] );
-            }
+            // Decide the release level.
             if( requirements.Level != ReleaseLevel.BreakingChange )
             {
                 var level = versionSelector.ChooseReleaseLevel( m, Solution, requirements.Level );
                 if( level == ReleaseLevel.None ) return _releaseInfo;
                 if( level < requirements.Level ) throw new InvalidOperationException( "ChooseReleaseLevel can not decrease the current level." );
-                if( level != requirements.Level )
+                requirements = requirements.WithLevel( level );
+                filteredVersions = FilterVersions( filteredVersions, requirements.Constraint, true ).ToList();
+                if( filteredVersions.Count == 1 )
                 {
-                    requirements = requirements.WithLevel( level );
-                    filteredVersions = FilterVersions( filteredVersions, requirements.Constraint, true ).ToList();
-                    if( filteredVersions.Count == 1 )
-                    {
-                        return HandleSingleVersion( m, versionSelector, requirements, filteredVersions[0] );
-                    }
+                    return HandleSingleVersion( m, versionSelector, requirements, filteredVersions[0] );
                 }
             }
+            //// Multiple versions are possible.
+            //// 1 - First choose between Official and Preleases if both are possible.
+            //m.Info( $"Choosing version for {Solution.Solution.UniqueSolutionName} among {filteredVersions.Count} possible versions." );
+            //if( (requirements.Constraint & ReleaseConstraint.MustBePreRelease) == 0 )
+            //{
+            //    var officials = filteredVersions.Where( v => !v.IsPreRelease );
+            //    var prereleases = filteredVersions.Where( v => v.IsPreRelease );
+            //    if( officials.Any() && prereleases.Any() )
+            //    {
+            //        var choice = versionSelector.ChooseBetweenOfficialAndPreReleaseVersions( m, Solution, officials, prereleases );
+            //        if( choice == null ) return _releaseInfo;
+            //        filteredVersions = choice.ToList();
+            //    }
+            //}
+            //if( filteredVersions.Count == 1 )
+            //{
+            //    return HandleSingleVersion( m, versionSelector, requirements, filteredVersions[0] );
+            //}
             Debug.Assert( filteredVersions.Count > 1, "There are still multiple versions." );
             var finalVersion = versionSelector.ChooseFinalVersion( m, Solution, filteredVersions, requirements );
             if( finalVersion == null ) return _releaseInfo;

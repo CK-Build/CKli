@@ -35,18 +35,20 @@ namespace CKli
 
         public XBranch GitBranch => _branch;
 
-        public Solution GetSolution( IActivityMonitor m, bool reload ) => GetSolution( m, FullPath, reload );
-
-        public Solution GetSolutionInBranch( IActivityMonitor m, string branchName, bool reload )
+        public NormalizedPath GetSolutionFilePath( string projectToBranchName = null )
         {
-            if( branchName == _branch.Name ) return GetSolution( m, reload );
-            var path = GitBranch.FullPath
-                                 .RemoveLastPart()
-                                 .AppendPart( branchName )
-                                 .Combine( FullPath.RemovePrefix( GitBranch.FullPath ) );
-            return GetSolution( m, path, reload );
+            var path = FullPath;
+            if( !String.IsNullOrWhiteSpace( projectToBranchName ) && projectToBranchName != GitBranch.Name )
+            {
+                path = GitBranch.FullPath
+                                     .RemoveLastPart()
+                                     .AppendPart( projectToBranchName )
+                                     .Combine( FullPath.RemovePrefix( GitBranch.FullPath ) );
+            }
+            return path;
         }
 
-        protected abstract Solution GetSolution( IActivityMonitor m, NormalizedPath path, bool reload );
+        public abstract Solution GetSolution( IActivityMonitor m, bool reload, string projectToBranchName = null );
     }
 }
+

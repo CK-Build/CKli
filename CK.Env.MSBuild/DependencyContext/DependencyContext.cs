@@ -285,7 +285,7 @@ namespace CK.Env.MSBuild
                     depSolutions[r.Index] = new SolutionDependencyResult.DependentSolution( current, r.Index, table, s => depSolutions.First( x => x.Solution == s ) );
                 }
             }
-            return new SolutionDependencyResult( content, result, table, depSolutions );
+            return new SolutionDependencyResult( content, result, ProjectDependencies, table, depSolutions );
         }
 
 

@@ -40,7 +40,7 @@ namespace CKli
             var byActiveBranch = gitFolders.GroupBy( g => g.CurrentBranchName );
             if( byActiveBranch.Count() > 1 )
             {
-                using( m.OpenWarn( $"{gitFolders.Count} git folders are not on the same branch. All folders must be on 'develop' or '{GitFolder.BlanckDevBranchName}' to switch." ) )
+                using( m.OpenWarn( $"{gitFolders.Count} git folders are not on the same branch. All folders must be on 'develop' or '{_solutions.World.DevelopLocalBranchName}' to switch." ) )
                 {
                     foreach( var b in byActiveBranch )
                     {
@@ -50,9 +50,9 @@ namespace CKli
                 return true;
             }
             string current = byActiveBranch.Single().Key;
-            if( current == "develop" )
+            if( current == _solutions.World.DevelopBranchName )
             {
-                Console.Write( $"Currently on 'develop'. Switch to '{GitFolder.BlanckDevBranchName}'? (Y/N):" );
+                Console.Write( $"Currently on 'develop'. Switch to '{_solutions.World.DevelopLocalBranchName}'? (Y/N):" );
                 string a;
                 while( (a = Console.ReadLine()) != "Y" && a != "N" ) ;
                 if( a == "Y" )
@@ -63,9 +63,9 @@ namespace CKli
                     }
                 }
             }
-            else if( current == GitFolder.BlanckDevBranchName )
+            else if( current == _solutions.World.DevelopLocalBranchName )
             {
-                Console.Write( $"Currently on '{GitFolder.BlanckDevBranchName}'. Switch to 'develop'? (Y/N):" );
+                Console.Write( $"Currently on '{_solutions.World.DevelopLocalBranchName}'. Switch to 'develop'? (Y/N):" );
                 string a;
                 while( (a = Console.ReadLine()) != "Y" && a != "N" ) ;
                 if( a == "Y" )
@@ -78,7 +78,7 @@ namespace CKli
             }
             else
             {
-                m.Warn( $"Git folders must be on 'develop' or '{GitFolder.BlanckDevBranchName}', not '{current}'." );
+                m.Warn( $"Git folders must be on 'develop' or '{_solutions.World.DevelopLocalBranchName}', not '{current}'." );
             }
             return true;
         }

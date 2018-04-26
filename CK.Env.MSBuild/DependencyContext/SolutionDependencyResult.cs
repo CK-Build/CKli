@@ -129,7 +129,7 @@ namespace CK.Env.MSBuild
             /// <summary>
             /// Gets the maximal set of impacted solutions (the transitive closure of this <see cref="Impacts"/>).
             /// </summary>
-            public IReadOnlyList<DependentSolution> TransitiveImpacts { get; private set; }
+            public IReadOnlyCollection<DependentSolution> TransitiveImpacts { get; private set; }
 
             /// <summary>
             /// Gets the global <see cref="SolutionDependencyResult"/> to which this <see cref="DependentSolution"/> belongs.
@@ -139,13 +139,15 @@ namespace CK.Env.MSBuild
             internal void Initialize( SolutionDependencyResult global )
             {
                 GlobalResult = global;
-                Impacts = global.DependencyTable.Where( r => r.Target != null && r.Target.Solution == Solution )
+                Impacts = global.DependencyTable.Where( r => r.Target != null && r.Target.PrimarySolution == Solution )
                                                 .Select( r => r.Solution )
                                                 .Distinct()
                                                 .Select( i => global.Solutions.First( d => d.Solution == i ) )
                                                 .ToList();
                 MinimalImpacts = Impacts.Except( Impacts.SelectMany( r => r.TransitiveImpacts ) ).ToList();
-                TransitiveImpacts = Impacts.SelectMany( r => r.TransitiveImpacts ).Distinct().ToList();
+                var transitive = new HashSet<DependentSolution>( Impacts );
+                foreach( var i in Impacts.SelectMany( r => r.TransitiveImpacts ) ) transitive.Add( i );
+                TransitiveImpacts = transitive;
             }
 
             /// <summary>
@@ -204,11 +206,17 @@ namespace CK.Env.MSBuild
             Solutions = Array.Empty<DependentSolution>();
         }
 
-        internal SolutionDependencyResult( SolutionSortStrategy c, IDependencySorterResult r, IReadOnlyList<DependencyRow> t, IReadOnlyList<DependentSolution> solutions )
+        internal SolutionDependencyResult(
+            SolutionSortStrategy c,
+            IDependencySorterResult r,
+            ProjectDependencyResult projectDeps,
+            IReadOnlyList<DependencyRow> t,
+            IReadOnlyList<DependentSolution> solutions )
         {
             Debug.Assert( r != null && r.IsComplete && t != null && solutions != null );
             Content = c;
             RawSorterResult = r;
+            ProjectDependencies = projectDeps;
             DependencyTable = t;
             Solutions = solutions;
             for( int i = solutions.Count - 1; i >= 0; --i ) solutions[i].Initialize( this );
@@ -218,6 +226,13 @@ namespace CK.Env.MSBuild
         /// Gets the kind of projects that have been considered to sort solutions.
         /// </summary>
         public SolutionSortStrategy Content { get; }
+
+
+        /// <summary>
+        /// Gets the project dependency result.
+        /// </summary>
+        public ProjectDependencyResult ProjectDependencies { get; }
+
 
         /// <summary>
         /// Gets the details of the dependencies between solutions.

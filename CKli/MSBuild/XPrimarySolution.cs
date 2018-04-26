@@ -42,9 +42,9 @@ namespace CKli
         /// </summary>
         public bool TestProjectsArePublished { get; private set; }
 
-        protected override Solution GetSolution( IActivityMonitor m, NormalizedPath path, bool reload )
+        public override Solution GetSolution( IActivityMonitor m, bool reload, string projectToBranchName = null )
         {
-            var (s, loaded) = SolutionCentral.MSBuildContext.FindOrLoadSolution( m, path, null, SolutionSpecialType.None, reload );
+            var (s, loaded) = SolutionCentral.MSBuildContext.FindOrLoadSolution( m, GetSolutionFilePath( projectToBranchName ), null, SolutionSpecialType.None, reload );
             if( loaded && TestProjectsArePublished )
             {
                 s.PublishedProjects.AddRange( s.TestProjects );

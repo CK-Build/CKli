@@ -56,7 +56,7 @@ namespace CKli
         /// Gets all Git folders that have a <see cref="IWorldName.DevelopBranchName"/>
         /// and at least one solution in it.
         /// </summary>
-        public IEnumerable<XGitFolder> AllGitFoldersWithDevelopBranchName => _allGitFoldersWithDevelopBranchName;
+        public IReadOnlyCollection<XGitFolder> AllGitFoldersWithDevelopBranchName => _allGitFoldersWithDevelopBranchName;
 
         /// <summary>
         /// Gets all the solutions regardless of their type or branch.
@@ -65,7 +65,7 @@ namespace CKli
 
         /// <summary>
         /// Gets all the solutions regardless of their type in branch <see cref="World"/>.<see cref="GlobalContext.World.DevelopBranchName">DevelopBranchName</see>.
-        /// The order is important here: Primary solutions necessarily appear before any of their secodary solutions.
+        /// The order is important here: Primary solutions necessarily appear before any of their secondary solutions.
         /// <see cref="GetGlobalReleaseContext"/> relies on this order to avois useless reloading.
         /// </summary>
         public IReadOnlyList<XSolutionBase> AllDevelopSolutions => _allDevelopSolutions;

@@ -112,6 +112,7 @@ namespace CKli
         /// <returns>The selected level.</returns>
         public ReleaseLevel ChooseReleaseLevel( IActivityMonitor m, SolutionDependencyResult.DependentSolution solution, ReleaseLevel currentLevel )
         {
+            Console.WriteLine( "=========" );
             Console.WriteLine( $"Solution {solution.Solution.UniqueSolutionName}:" );
             if( currentLevel == ReleaseLevel.Fix )
             {
@@ -129,14 +130,14 @@ namespace CKli
             while( "123X".IndexOf( (c = Console.ReadKey().KeyChar) ) < 0 && (currentLevel != ReleaseLevel.Fix || c == '3') ) ;
             if( currentLevel == ReleaseLevel.Fix )
             {
-                if( c == 1 ) return ReleaseLevel.Fix;
-                if( c == 2 ) return ReleaseLevel.Feature;
-                if( c == 3 ) return ReleaseLevel.BreakingChange;
+                if( c == '1' ) return ReleaseLevel.Fix;
+                if( c == '2' ) return ReleaseLevel.Feature;
+                if( c == '3' ) return ReleaseLevel.BreakingChange;
             }
             else
             {
-                if( c == 1 ) return ReleaseLevel.Feature;
-                if( c == 2 ) return ReleaseLevel.BreakingChange;
+                if( c == '1' ) return ReleaseLevel.Feature;
+                if( c == '2' ) return ReleaseLevel.BreakingChange;
             }
             return ReleaseLevel.None;
         }

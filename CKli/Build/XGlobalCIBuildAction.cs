@@ -58,84 +58,97 @@ namespace CKli
             if( r.HasError ) r.RawSorterResult.LogError( m );
             else
             {
-                using( m.OpenInfo( "Solutions to build:" ) )
+                DisplaySolutionList( m, r );
+                int startAt = 0;
+                Console.Write( "Start at:" );
+                while( !int.TryParse( Console.ReadLine(), out startAt ) ) ;
+
+                foreach( var build in r.Solutions.Skip( startAt ) )
                 {
-                    var list = r.DependencyTable.GroupBy( d => d.Index )
-                                             .OrderBy( g => g.Key )
-                                             .Select( g => (Index: g.Key, Rows: g.ToList()) )
-                                             .Select( g => (
-                                                            g.Index,
-                                                            g.Rows[0].Solution,
-                                                            HasAtLeastOneTargetProject: g.Rows[0].Target != null,
-                                                            g.Rows) )
-                                             .ToList();
-                    int startAt = 0;
-                    foreach( var build in list )
+                    XGlobalCIBuildAction.DisplaySolutionList( m, r, build.Index );
+                    using( m.OpenInfo( $"{build.Index} - {build.Solution}" ) )
                     {
-                        m.Info( $"{build.Index} - {build.Solution} {(build.HasAtLeastOneTargetProject ? "(has dependencies)" : "")}" );
-                    }
-                    Console.Write( "Start at:" );
-                    while( !int.TryParse( Console.ReadLine(), out startAt ) ) ;
+                        //Console.WriteLine( "Hit 'c' to continue. Other key to stop." );
+                        //if( Console.ReadKey().KeyChar != 'c' ) return true;
 
-                    foreach( var build in list.Skip( startAt ) )
-                    {
-                        using( m.OpenInfo( $"{build.Index} - {build.Solution}" ) )
+                        if( !UpgradeSolutionPackagesToTheMax( m, _localPackages, deps, build.Solution, false, false ) ) return false;
+
+                        var gitFolder = build.Solution.GitFolder;
+                        bool resetSuccess = false;
+                        using( Util.CreateDisposableAction( () => resetSuccess = gitFolder.ResetHard( m ) ) )
                         {
-                            //Console.WriteLine( "Hit 'c' to continue. Other key to stop." );
-                            //if( Console.ReadKey().KeyChar != 'c' ) return true;
-
-                            // Updates all projects (even BuildProjects) with locally available
-                            // better version.
-                            var toUp = deps.ProjectDependencies.DependencyTable
-                                                .Where( d => d.SourceProject.Project.PrimarySolution == build.Solution
-                                                             && !d.IsExternalDependency )
-                                                .Select( d => (
-                                                        Row: d,
-                                                        Version: _localPackages.GetLocalLastVersion( m, d.PackageId, false )) )
-                                                .Where( d => d.Version == null || d.Version != d.Row.RawPackageDependency.Version )
-                                                .ToList();
-                            var missings = toUp.Where( d => d.Version == null );
-                            if( missings.Any() )
-                            {
-                                m.Fatal( $"Packages not found locally: {missings.Select( u => u.Row.PackageId ).Concatenate()}." );
-                                return false;
-                            }
-                            var downgrade = toUp.Where( d => d.Version < d.Row.RawPackageDependency.Version );
-                            if( downgrade.Any() )
-                            {
-                                foreach( var d in downgrade )
-                                {
-                                    m.Fatal( $"Local package {d.Row.PackageId} found locally in version {d.Version} but current reference has a greater version {d.Row.RawPackageDependency.Version}." );
-                                }
-                                return false;
-                            }
-                            using( m.OpenInfo( $"Upgrading {toUp.GroupBy( u => u.Row.PackageId).Count()} locally available packages." ) )
-                            {
-                                foreach( var u in toUp )
-                                {
-                                    u.Row.SourceProject.Project.SetPackageReferenceVersion( m, u.Row.SourceProject.Project.TargetFrameworks, u.Row.PackageId, u.Version );
-                                }
-                                if( !build.Solution.Save( m, _fileSystem ) ) return false;
-                            }
-
-                            var gitFolder = build.Solution.GitFolder;
-                            if( !gitFolder.Commit( m, "Global Build from CK-Env." ).Success ) return false;
-
-                            bool resetSuccess = false;
-                            using( Util.CreateDisposableAction( () => resetSuccess = gitFolder.ResetHard( m ) ) )
-                            {
-                                if( !gitFolder.EnsureLocalFeedNuGetSource( m ) ) return false;
-                                if( !gitFolder.SetRepositoryXmlIgnoreDirtyFolders( m ) ) return false;
-                                var path = _fileSystem.GetFileInfo( build.Solution.SolutionFolderPath ).PhysicalPath;
-                                if( !Run( m, path, "dotnet", "run --project CodeCakeBuilder -autointeraction", environmentVariables ) ) return false;
-                                if( !CopyReleasesPackagesToLocalFolder( m, _localPackages, build.Solution, false ) ) return false;
-                            }
-                            if( !resetSuccess ) return false;
+                            if( !gitFolder.EnsureLocalFeedNuGetSource( m ) ) return false;
+                            if( !gitFolder.SetRepositoryXmlIgnoreDirtyFolders( m ) ) return false;
+                            var path = _fileSystem.GetFileInfo( build.Solution.SolutionFolderPath ).PhysicalPath;
+                            if( !Run( m, path, "dotnet", "run --project CodeCakeBuilder -autointeraction", environmentVariables ) ) return false;
+                            if( !CopyReleasesPackagesToLocalFolder( m, _localPackages, build.Solution, false ) ) return false;
                         }
+                        if( !resetSuccess ) return false;
                     }
                 }
             }
             return true;
+        }
+
+        internal static void DisplaySolutionList( IActivityMonitor m, SolutionDependencyResult r, int currentIdx = -1 )
+        {
+            using( m.OpenInfo( "Solutions to build:" ) )
+            {
+                int rank = -1;
+                foreach( var s in r.Solutions )
+                {
+                    if( rank != s.Rank )
+                    {
+                        rank = s.Rank;
+                        m.Info( $" -- Rank {rank}" );
+                    }
+                    m.Info( $"{(currentIdx == s.Index ? '*' : ' ')}   {s.Index} - {s.Solution} => {s.MinimalImpacts.Count}/{s.Impacts.Count}/{s.TransitiveImpacts.Count}" );
+                }
+            }
+        }
+
+        internal static bool UpgradeSolutionPackagesToTheMax(
+            IActivityMonitor m,
+            XPublishedPackageFeeds feeds,
+            DependencyContext deps,
+            Solution solution,
+            bool withBlankFeed,
+            bool allowDowngrade )
+        {
+            // Updates all projects (even BuildProjects) with locally available
+            // better version.
+            var toUp = deps.ProjectDependencies.DependencyTable
+                                .Where( d => d.SourceProject.Project.PrimarySolution == solution
+                                             && !d.IsExternalDependency )
+                                .Select( d => (
+                                        Row: d,
+                                        Version: feeds.GetLocalLastVersion( m, d.PackageId, withBlankFeed )) )
+                                .Where( d => d.Version == null || d.Version != d.Row.RawPackageDependency.Version )
+                                .ToList();
+            var missings = toUp.Where( d => d.Version == null );
+            if( missings.Any() )
+            {
+                m.Fatal( $"Packages not found locally: {missings.Select( u => u.Row.PackageId ).Concatenate()}." );
+                return false;
+            }
+            var downgrade = toUp.Where( d => d.Version < d.Row.RawPackageDependency.Version );
+            if( downgrade.Any() )
+            {
+                foreach( var d in downgrade )
+                {
+                    m.Log( allowDowngrade ? LogLevel.Warn : LogLevel.Fatal, $"Local package {d.Row.PackageId} found locally in version {d.Version} but current reference has a greater version {d.Row.RawPackageDependency.Version}." );
+                }
+                if( !allowDowngrade ) return false;
+            }
+            using( m.OpenInfo( $"Upgrading {toUp.GroupBy( u => u.Row.PackageId ).Count()} locally available packages." ) )
+            {
+                foreach( var u in toUp )
+                {
+                    u.Row.SourceProject.Project.SetPackageReferenceVersion( m, u.Row.SourceProject.Project.TargetFrameworks, u.Row.PackageId, u.Version );
+                }
+                if( !solution.Save( m, feeds.FileSystem ) ) return false;
+            }
+            return solution.GitFolder.Commit( m, "Global Build from CK-Env." ).Success;
         }
 
         static internal bool CopyReleasesPackagesToLocalFolder( IActivityMonitor m, XPublishedPackageFeeds localPackages, Solution solution, bool toBlankFolder )
@@ -170,8 +183,11 @@ namespace CKli
                          string arguments,
                          IEnumerable<(string, string)> environmentVariables = null )
         {
+            var encoding = Encoding.GetEncoding( 437 );
             ProcessStartInfo cmdStartInfo = new ProcessStartInfo
             {
+                StandardOutputEncoding = encoding,
+                StandardErrorEncoding = encoding,
                 WorkingDirectory = workingDir,
                 UseShellExecute = false,
                 CreateNoWindow = true,
@@ -188,14 +204,19 @@ namespace CKli
             using( m.OpenTrace( $"{fileName} {cmdStartInfo.Arguments}" ) )
             using( Process cmdProcess = new Process() )
             {
+                StringBuilder errorCapture = new StringBuilder();
                 cmdProcess.StartInfo = cmdStartInfo;
-                cmdProcess.ErrorDataReceived += ( o, e ) => { if( !string.IsNullOrEmpty( e.Data ) ) m.Info( "<StdErr> " + e.Data ); };
+                cmdProcess.ErrorDataReceived += ( o, e ) => { if( !string.IsNullOrEmpty( e.Data ) ) errorCapture.AppendLine( e.Data ); };
                 cmdProcess.OutputDataReceived += ( o, e ) => { if( e.Data != null ) m.Info( "<StdOut> " + e.Data ); };
                 cmdProcess.Start();
                 cmdProcess.BeginErrorReadLine();
                 cmdProcess.BeginOutputReadLine();
                 cmdProcess.WaitForExit();
-
+                if( errorCapture.Length > 0 )
+                {
+                    m.Error( $"Received errors on <StdErr>:" );
+                    m.Error( errorCapture.ToString() );
+                }
                 if( cmdProcess.ExitCode != 0 )
                 {
                     m.Error( $"Process returned ExitCode {cmdProcess.ExitCode}." );

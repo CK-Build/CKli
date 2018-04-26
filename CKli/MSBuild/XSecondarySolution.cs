@@ -41,10 +41,10 @@ namespace CKli
         /// </summary>
         public SolutionSpecialType SpecialType { get; private set; }
 
-        protected override Solution GetSolution( IActivityMonitor m, NormalizedPath path, bool reload )
+        public override Solution GetSolution( IActivityMonitor m, bool reload, string projectToBranchName = null )
         {
-            var primary = PrimarySolution.GetSolution( m, false );
-            return SolutionCentral.MSBuildContext.FindOrLoadSolution( m, path, primary, SpecialType, reload ).Solution;
+            var primary = PrimarySolution.GetSolution( m, false, projectToBranchName );
+            return SolutionCentral.MSBuildContext.FindOrLoadSolution( m, GetSolutionFilePath( projectToBranchName ), primary, SpecialType, reload ).Solution;
         }
     }
 }
