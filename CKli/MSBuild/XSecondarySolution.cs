@@ -14,8 +14,6 @@ namespace CKli
 
     public class XSecondarySolution : XSolutionBase
     {
-        readonly Solution _solution;
-
         public XSecondarySolution(
             Initializer initializer,
             XPrimarySolution primary,

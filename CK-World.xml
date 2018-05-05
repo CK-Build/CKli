@@ -2,9 +2,9 @@
 <CK-World>
 
   <SharedHttpClient />
+  <PublishedPackageFeeds />
   <ReferentialFolder Path="CK-Env/CKli/Referential" />
   <SolutionCentral />
-  <PublishedPackageFeeds />
 
   <KnownPackageVersions>
     <Package Name="Mono.Cecil" MinVersion="0.10.0" />
@@ -28,8 +28,9 @@
   <GitPushAction Title="Pushes all current branches to their tracked remote." />
   <GlobalDependencyAction Title="Solutions &amp; Projects management." />
   <GlobalSwitchBranchAction Title="Switch between 'develop-blank' &lt;=&gt; 'develop' branches." />
-  <GlobalCIBuildAction Title="CI Build: Build all Solutions in develop to CI packages, optionally pushing them to MyGet invenietis-ci feed." />
-  <GlobalBlankBuildAction Title="Blank build: Build all Solutions locally in 'develop-local' branch." />
+  <GlobalLocalBuildAction Title="Local CI Build: Build all Solutions in develop or local branch, pushing packages to LocalFeed or LocalFeed/Blanck feeds (optionally pushing them to MyGet invenietis-ci feed for 'develop' branch)." />
+  <GlobalFixBuildScriptAction Title="Fix build script (must be in 'local' branch)." />
+  <!--<GlobalBlankBuildAction Title="Blank build: Build all Solutions locally in 'develop-local' branch." />-->
   <GlobalReleaserAction Title="Global Release." />
   
   <!-- Unsafe brutal tools.

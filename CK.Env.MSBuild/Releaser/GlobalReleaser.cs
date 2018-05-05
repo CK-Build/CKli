@@ -10,17 +10,19 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace CKli
+namespace CK.Env
 {
     public class GlobalReleaser
     {
         readonly IReadOnlyList<SolutionReleaser> _releasers;
 
-        GlobalReleaser( IReadOnlyList<SolutionReleaser> solutions )
+        internal GlobalReleaser( IReadOnlyList<SolutionReleaser> solutions )
         {
             _releasers = solutions;
             foreach( var s in solutions ) s.Initialize( this );
         }
+
+        public bool IsValid => _releasers.All( r => r.CurrentReleaseInfo.IsValid );
 
         public SolutionReleaser FindByName( string uniqueSolutionName ) => _releasers.FirstOrDefault( r => r.Solution.Solution.UniqueSolutionName == uniqueSolutionName );
 
@@ -58,7 +60,7 @@ namespace CKli
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="versionSelector">The version selector to use.</param>
-        /// <returns>The Xml roadmap or null on error.</returns>
+        /// <returns>The Xml roadmap or null on error or cancellation.</returns>
         public XElement ComputeFullRoadMap( IActivityMonitor m, IReleaseVersionSelector versionSelector )
         {
             var result = new XElement( "RoadMap" );
@@ -72,21 +74,5 @@ namespace CKli
             return result;
         }
 
-        public static GlobalReleaser Create( IActivityMonitor m, GlobalReleaseContext ctx )
-        {
-            if( ctx == null ) throw new ArgumentNullException( nameof(ctx) );
-            if( !ctx.FetchAllDone ) throw new Exception( "ci-build not supported yet." );
-
-            var deps = DependencyContext.Create( m, ctx.AllSolutions );
-            if( deps == null ) return null;
-            SolutionDependencyResult r = deps.AnalyzeDependencies( m, SolutionSortStrategy.EverythingExceptBuildProjects );
-            if( r.HasError )
-            {
-                r.RawSorterResult.LogError( m );
-                return null;
-            }
-            var releasers = r.Solutions.Select( s => new SolutionReleaser( s, ctx.AllGitFolders[s.Solution.GitFolder] ) ).ToList();
-            return new GlobalReleaser( releasers );
-        }
     }
 }

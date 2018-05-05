@@ -14,6 +14,7 @@ using LibGit2Sharp.Handlers;
 using System.Xml.Linq;
 using Microsoft.Alm.Authentication;
 using SimpleGitVersion;
+using CSemVer;
 
 namespace CK.Env
 {
@@ -60,7 +61,6 @@ namespace CK.Env
             _remoteBranchesFolder = new RemotesFolder( this );
             _thisDir = new RootDir( this, SubPath.LastPart );
         }
-
 
         /// <summary>
         /// Gets the current <see cref="World"/>.
@@ -220,12 +220,12 @@ namespace CK.Env
         /// Gets the simple git version <see cref="RepositoryInfo"/> from a branch.
         /// Returns null if an error occurred or if RepositoryInfo.xml has not been successfully read.
         /// </summary>
-        /// <param name="m"></param>
-        /// <param name="branchName"></param>
-        /// <returns></returns>
-        public RepositoryInfo ReadVersionInfo( IActivityMonitor m, string branchName )
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="branchName">Defaults to <see cref="CurrentBranchName"/>.</param>
+        /// <returns>True on success, false on error.</returns>
+        public RepositoryInfo ReadVersionInfo( IActivityMonitor m, string branchName = null )
         {
-            Debug.Assert( branchName != null );
+            if( branchName == null ) branchName = CurrentBranchName;
             try
             {
                 Branch b = _git.Branches[branchName];
@@ -266,6 +266,59 @@ namespace CK.Env
                 return null;
             }
         }
+
+        /// <summary>
+        /// Sets a version lightweight tag on the current head.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="v">The version to set.</param>
+        /// <returns>Success and whether the tag has been created or was already defined.</returns>
+        public (bool Success, bool Created) SetVersionTag( IActivityMonitor m, SVersion v )
+        {
+            try
+            {
+                var exists = _git.Tags[v.ToString()];
+                if( exists != null && exists.PeeledTarget == _git.Head.Tip )
+                {
+                    m.Info( $"Version Tag {v} is already set." );
+                    return (true,false);
+                }
+                _git.ApplyTag( v.ToString() );
+                m.Info( $"Set Version tag {v} on {CurrentBranchName}." );
+                return (true,true);
+            }
+            catch( Exception ex )
+            {
+                m.Error( $"SetVersionTag {v} on {CurrentBranchName} failed.", ex );
+                return (false,false);
+            }
+        }
+
+        /// <summary>
+        /// Sets a version lightweight tag on the current head.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="v">The version to set.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool ClearVersionTag( IActivityMonitor m, SVersion v )
+        {
+            try
+            {
+                _git.Tags.Remove( v.ToString() );
+                m.Info( $"Removing Version tag {v} on {CurrentBranchName}." );
+                return true;
+            }
+            catch( Exception ex )
+            {
+                m.Error( $"ClearVersionTag {v} on {CurrentBranchName} failed.", ex );
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Gets the current commit SHA1.
+        /// </summary>
+        public string HeadCommitSHA1 => _git.Head.Tip.Sha;
 
         /// <summary>
         /// Captures <see cref="GitFolder.Commit(IActivityMonitor, string)"/> result.
@@ -375,59 +428,70 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Checkouts the <see cref="BlanckDevBranchName"/>. If the repository is already
-        /// on the blank dev branch, 'develop' is merged into it. Otherwise, the <see cref="CurrentBranchName"/> must
-        /// be 'develop', a <see cref="Commit"/> is done to save any current work, the blank dev branch is created
-        /// if needed, checked out. 'develop' branch is always merged into it.
-        /// If the the merge fails, repository is cleaned up and a manual operation is required.
+        /// Checkouts the <see cref="IWorldName.LocalBranchName"/>, always merging <see cref="IWorldName.DevelopBranchName"/> into it.
+        /// If the repository is not on the 'local' branch, it must be on 'develop': a <see cref="Commit"/> is done to save any
+        /// current work, the 'local' branch is created if needed and checked out.
+        /// 'develop' branch is always merged into it.
+        /// If the the merge fails, a manual operation is required.
         /// On success, RepositoryInfo.xml and nuget.config are modified to work on LocalFeed/Blank.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool SwitchFromDevelopToBlankDev( IActivityMonitor m )
+        public bool SwitchFromDevelopToLocal( IActivityMonitor m, bool autoCommit = true )
         {
-            using( m.OpenInfo( $"Switching '{SubPath}' to branch '{World.DevelopLocalBranchName}')." ) )
+            using( m.OpenInfo( $"Switching '{SubPath}' to branch '{World.LocalBranchName}')." ) )
             {
                 try
                 {
-                    Branch bBranch = _git.Branches[World.DevelopLocalBranchName];
-                    Branch bDevelop = _git.Branches[World.DevelopBranchName];
-                    if( bBranch == null || !bBranch.IsCurrentRepositoryHead )
+                    Branch develop = _git.Branches[World.DevelopBranchName];
+                    if( develop == null )
                     {
-                        if( bDevelop == null || !bDevelop.IsCurrentRepositoryHead )
+                        m.Error( $"Unable to find branch '{World.DevelopBranchName}'." );
+                        return false;
+                    }
+                    Branch local = _git.Branches[World.LocalBranchName];
+                    if( local == null || !local.IsCurrentRepositoryHead )
+                    {
+                        if( !develop.IsCurrentRepositoryHead )
                         {
-                            m.Error( $"Expected current branch to be '{World.DevelopBranchName}'. Only '{World.DevelopBranchName}' can be switched to '{World.DevelopLocalBranchName}'." );
+                            m.Error( $"Expected current branch to be '{World.DevelopBranchName}' or '{World.LocalBranchName}'." );
                             return false;
                         }
-                        if( !Commit( m, $"Switching to {World.DevelopLocalBranchName} branch." ).Success ) return false;
-                        if( bBranch == null )
+                        if( autoCommit )
                         {
-                            m.Info( $"Creating the {World.DevelopLocalBranchName}." );
-                            bBranch = _git.CreateBranch( World.DevelopLocalBranchName );
+                            if( !Commit( m, $"Switching to {World.LocalBranchName} branch." ).Success ) return false;
                         }
-                        Commands.Checkout( _git, bBranch );
+                        else
+                        {
+                            if( !CheckCleanCommit( m ) ) return false;
+                        }
+                        if( local == null )
+                        {
+                            m.Info( $"Creating the {World.LocalBranchName}." );
+                            local = _git.CreateBranch( World.LocalBranchName );
+                        }
+                        Commands.Checkout( _git, local );
                     }
-                    else m.Trace( $"Already on {World.DevelopLocalBranchName}." );
+                    else m.Trace( $"Already on {World.LocalBranchName}." );
 
                     var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
-                    var r = _git.Merge( bDevelop, merger, new MergeOptions
+                    var r = _git.Merge( develop, merger, new MergeOptions
                     {
                         FastForwardStrategy = FastForwardStrategy.NoFastForward,
                         CommitOnSuccess = true,
-                        FailOnConflict = true,
-                        MergeFileFavor = MergeFileFavor.Theirs,
-                        FileConflictStrategy = CheckoutFileConflictStrategy.Theirs
+                        FailOnConflict = true
                     } );
                     if( r.Status == MergeStatus.Conflicts )
                     {
-                        m.Error( $"Merge failed from '{World.DevelopBranchName}' to '{World.DevelopLocalBranchName}': conflicts must be manually resolved." );
-                        _git.Reset( ResetMode.Hard );
+                        m.Error( $"Merge failed from '{World.DevelopBranchName}' to '{World.LocalBranchName}': conflicts must be manually resolved." );
                         return false;
                     }
-                    if( !EnsureBlankRemoteStoreTestHelperConfig( m ) ) return false;
+
+                    var blankStorePath = Path.Combine( _feedProvider.GetLocalFeedFolder( m ).PhysicalPath, "CKSetupStore" );
+                    if( !EnsureCKSetupStoreTestHelperConfig( m, blankStorePath ) ) return false;
                     if( !EnsureRepositoryXmlBlankDevBranch( m ) ) return false;
-                    if( !EnsureLocalFeedNuGetSource( m, blankFeed: true ) ) return false;
-                    if( !Commit( m, "Updated Repository.xml and nuget.config for blank dev branch." ).Success ) return false;
+                    if( !EnsureLocalFeedsNuGetSource( m ).Success ) return false;
+                    if( !Commit( m, "Updated Repository.xml and nuget.config for 'local' branch." ).Success ) return false;
                     if( r.Status != MergeStatus.UpToDate )
                     {
                         m.CloseGroup( $"Success (with merge from '{World.DevelopBranchName}')." );
@@ -443,38 +507,114 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Checkouts the '<see cref="IWorldName.DevelopBranchName"/>' branch.
-        /// Must be on <see cref="IWorldName.DevelopLocalBranchName"/>.
+        /// Checkouts the <see cref="IWorldName.MasterBranchName"/>, always merging <see cref="IWorldName.DevelopBranchName"/> into it.
+        /// If the repository is not already on the 'master' branch, it must be on 'develop' and on a clean commit.
+        /// The 'master' branch is created if needed and checked out.
+        /// 'develop' branch is always merged into it.
+        /// If the the merge fails, a manual operation is required.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool SwitchFromBlankDevToDevelop( IActivityMonitor m )
+        public bool SwitchFromDevelopToMaster( IActivityMonitor m )
         {
-            using( m.OpenInfo( $"Switching '{SubPath}' to branch 'develop'." ) )
+            using( m.OpenInfo( $"Switching '{SubPath}' to branch '{World.MasterBranchName}')." ) )
             {
                 try
                 {
-                    Branch bBranch = _git.Branches[World.DevelopLocalBranchName];
-                    if( bBranch == null || !bBranch.IsCurrentRepositoryHead )
-                    {
-                        m.Error( $"Expected current branch to be '{World.DevelopLocalBranchName}'." );
-                        return false;
-                    }
                     Branch bDevelop = _git.Branches[World.DevelopBranchName];
                     if( bDevelop == null )
                     {
-                        m.Error( $"Unable to find 'develop' branch." );
+                        m.Error( $"Unable to find branch '{World.DevelopBranchName}'." );
                         return false;
                     }
-
-                    if( !RemoveBlankRemoteStoreTestHelperConfig( m ) ) return false;
-                    if( !RemoveRepositoryXmlBlankDevBranch( m ) ) return false;
-                    if( !RemoveLocalFeedNuGetSource( m ) ) return false;
-                    if( !Commit( m, $"Switching to 'develop' branch." ).Success ) return false;
-                    Commands.Checkout( _git, bDevelop );
+                    Branch master = _git.Branches[World.MasterBranchName];
+                    if( master == null || !master.IsCurrentRepositoryHead )
+                    {
+                        if( !bDevelop.IsCurrentRepositoryHead )
+                        {
+                            m.Error( $"Expected current branch to be '{World.DevelopBranchName}' or '{World.MasterBranchName}'." );
+                            return false;
+                        }
+                        if( !CheckCleanCommit( m ) ) return false;
+                        if( master == null )
+                        {
+                            m.Info( $"Creating the {World.MasterBranchName }." );
+                            master = _git.CreateBranch( World.MasterBranchName );
+                        }
+                        Commands.Checkout( _git, master );
+                    }
+                    else m.Trace( $"Already on {World.MasterBranchName}." );
 
                     var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
-                    var r = _git.Merge( bBranch, merger, new MergeOptions
+                    var r = _git.Merge( bDevelop, merger, new MergeOptions
+                    {
+                        FastForwardStrategy = FastForwardStrategy.NoFastForward,
+                        CommitOnSuccess = true,
+                        FailOnConflict = true
+                    } );
+                    if( r.Status == MergeStatus.Conflicts )
+                    {
+                        m.Error( $"Merge failed from '{World.DevelopBranchName}' to '{World.MasterBranchName}': conflicts must be manually resolved." );
+                        return false;
+                    }
+                    if( r.Status != MergeStatus.UpToDate )
+                    {
+                        m.CloseGroup( $"Success (with merge from '{World.DevelopBranchName}')." );
+                    }
+                    return true;
+                }
+                catch( Exception ex )
+                {
+                    m.Error( ex );
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Checkouts '<see cref="IWorldName.DevelopBranchName"/>' branch and merges current 'local' in it.
+        /// A CI-Build of the whole stack should be executed with the nuget.config file containing the 'LocalFeed' source. 
+        /// followed by an update of BuildProjects package references.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool SwitchFromLocalToDevelop( IActivityMonitor m )
+        {
+            using( m.OpenInfo( $"Switching '{SubPath}' to branch '{World.DevelopBranchName}'." ) )
+            {
+                try
+                {
+                    Branch bDevelop = _git.Branches[World.DevelopBranchName];
+                    if( bDevelop == null )
+                    {
+                        m.Error( $"Unable to find '{World.DevelopBranchName}' branch." );
+                        return false;
+                    }
+                    Branch bLocal = _git.Branches[World.LocalBranchName];
+                    if( bLocal == null )
+                    {
+                        m.Error( $"Unable to find '{World.LocalBranchName}' branch." );
+                        return false;
+                    }
+                    if( !bDevelop.IsCurrentRepositoryHead && !bLocal.IsCurrentRepositoryHead )
+                    {
+                        m.Error( $"Must be on '{World.LocalBranchName}' or '{World.DevelopBranchName}' branch." );
+                        return false;
+                    }
+                    if( !RemoveCKSetupStoreTestHelperConfig( m ) ) return false;
+                    if( !RemoveRepositoryXmlBlankDevBranch( m ) ) return false;
+                    if( bLocal.IsCurrentRepositoryHead )
+                    {
+                        if( !Commit( m, $"Switching to '{World.DevelopBranchName}' branch." ).Success ) return false;
+                        Commands.Checkout( _git, bDevelop );
+                    }
+                    else
+                    {
+                        if( !Commit( m, $"Auto commit on '{World.DevelopBranchName}' branch." ).Success ) return false;
+                    }
+
+                    var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
+                    var r = _git.Merge( bLocal, merger, new MergeOptions
                     {
                         FastForwardStrategy = FastForwardStrategy.NoFastForward,
                         FailOnConflict = true,
@@ -482,13 +622,51 @@ namespace CK.Env
                     } );
                     if( r.Status == MergeStatus.Conflicts )
                     {
-                        m.Error( $"Merge failed from '{World.DevelopLocalBranchName}' into '{World.DevelopBranchName}': conflicts must be manually resolved." );
-                        _git.Reset( ResetMode.Hard );
+                        m.Error( $"Merge failed from '{World.LocalBranchName}' into '{World.DevelopBranchName}': conflicts must be manually resolved." );
                         return false;
                     }
                     if( r.Status != MergeStatus.UpToDate )
                     {
-                        m.CloseGroup( $"Success (with merge from '{World.DevelopLocalBranchName}')." );
+                        m.CloseGroup( $"Success (with merge from '{World.LocalBranchName}')." );
+                    }
+                    return true;
+                }
+                catch( Exception ex )
+                {
+                    m.Error( ex );
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Simple safe check out of the <see cref="IWorldName.DevelopBranchName"/> (that must exist) from
+        /// the <see cref="IWorldName.MasterBranchName"/> (that may not exist).
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool SwitchFromMasterToDevelop( IActivityMonitor m )
+        {
+            using( m.OpenInfo( $"Switching '{SubPath}' to branch '{World.DevelopBranchName}'." ) )
+            {
+                try
+                {
+                    Branch develop = _git.Branches[World.DevelopBranchName];
+                    if( develop == null )
+                    {
+                        m.Error( $"Unable to find '{World.DevelopBranchName}' branch." );
+                        return false;
+                    }
+                    Branch master = _git.Branches[World.MasterBranchName];
+                    if( !develop.IsCurrentRepositoryHead && (master == null || !master.IsCurrentRepositoryHead) )
+                    {
+                        m.Error( $"Must be on '{World.MasterBranchName}' or '{World.DevelopBranchName}' branch." );
+                        return false;
+                    }
+                    if( master != null && master.IsCurrentRepositoryHead )
+                    {
+                        if( !CheckCleanCommit( m ) ) return false;
+                        Commands.Checkout( _git, develop );
                     }
                     return true;
                 }
@@ -507,44 +685,77 @@ namespace CK.Env
             if( !rXml.Exists || rXml.IsDirectory || rXml.PhysicalPath == null )
             {
                 m.Fatal( $"{pathXml} must exist." );
-                return (null,null);
+                return (null, null);
             }
             return (rXml.ReadAsXDocument(), pathXml);
         }
 
-        public bool EnsureLocalFeedNuGetSource( IActivityMonitor m, bool blankFeed = false )
+        (XDocument Doc, string Path, XElement PackageSources) GetNuGetConfigFile( IActivityMonitor m )
         {
             var (xDoc, pathXml) = GetXmlDocument( m, "nuget.config" );
-            if( xDoc == null ) return false;
+            if( xDoc == null ) return (null, null, null );
 
             var e = xDoc.Root;
             var packageSources = e.Element( "packageSources" );
             if( packageSources == null )
             {
                 m.Fatal( $"nuget.config must contain at least one <packageSources> element." );
-                return false;
+                return (null, null, null);
             }
-            if( !packageSources.Elements( "add" ).Any( x => (string)x.Attribute( "key" ) == "Local Feed" ) )
-            {
-                var localFeed = blankFeed
-                                ? _feedProvider.EnsureLocalFeedBlankFolder( m ).PhysicalPath
-                                : _feedProvider.EnsureLocalFeedFolder( m ).PhysicalPath;
-                packageSources.Add( new XElement( "add",
-                                                new XAttribute( "key", "Local Feed" ),
-                                                new XAttribute( "value", localFeed ) ) );
-            }
-            return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );
+            return (xDoc, pathXml, packageSources);
         }
 
-        public bool RemoveLocalFeedNuGetSource( IActivityMonitor m )
+        public (bool Success, bool Added) EnsureLocalFeedsNuGetSource( IActivityMonitor m, bool ensureRelease = true, bool ensureCI = true, bool ensureLocal = true )
         {
-            var (xDoc, pathXml) = GetXmlDocument( m, "nuget.config" );
-            if( xDoc == null ) return false;
-            xDoc.Root.Element( "packageSources" )
+            var (xDoc, pathXml, packageSources) = GetNuGetConfigFile( m );
+            if( xDoc == null ) return (false,false);
+            bool added = false;
+            if( ensureRelease && !packageSources.Elements( "add" ).Any( x => (string)x.Attribute( "key" ) == "LocalFeed-Release" ) )
+            {
+                var localFeed = _feedProvider.GetReleaseFeedFolder( m ).PhysicalPath;
+                packageSources.Add( new XElement( "add",
+                                                new XAttribute( "key", "LocalFeed-Release" ),
+                                                new XAttribute( "value", localFeed ) ) );
+                added = true;
+            }
+            if( ensureCI && !packageSources.Elements( "add" ).Any( x => (string)x.Attribute( "key" ) == "LocalFeed-CI" ) )
+            {
+                var localFeed = _feedProvider.GetCIFeedFolder( m ).PhysicalPath;
+                packageSources.Add( new XElement( "add",
+                                                new XAttribute( "key", "LocalFeed-CI" ),
+                                                new XAttribute( "value", localFeed ) ) );
+                added = true;
+            }
+            if( ensureLocal && !packageSources.Elements( "add" ).Any( x => (string)x.Attribute( "key" ) == "LocalFeed-Local" ) )
+            {
+                var blankFeed = _feedProvider.GetLocalFeedFolder( m ).PhysicalPath;
+                packageSources.Add( new XElement( "add",
+                                                new XAttribute( "key", "LocalFeed-Local" ),
+                                                new XAttribute( "value", blankFeed ) ) );
+                added = true;
+            }
+            if( added )
+            {
+                return (FileSystem.CopyTo( m, xDoc.ToString(), pathXml ), true );
+            }
+            return (true, false);
+        }
+
+        public (bool Success, bool Removed) RemoveLocalFeedsNuGetSource( IActivityMonitor m )
+        {
+            var (xDoc, pathXml, packageSources) = GetNuGetConfigFile( m );
+            if( xDoc == null ) return (false,false);
+            var e = packageSources
                      .Elements( "add" )
-                     .Where( b => (string)b.Attribute( "key" ) == "Local Feed" )
-                     .Remove();
-            return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );
+                     .Where( b => (string)b.Attribute( "key" ) == "LocalFeed-Local"
+                                    || (string)b.Attribute( "key" ) == "LocalFeed-CI"
+                                    || (string)b.Attribute( "key" ) == "LocalFeed-Release" );
+            if( e.Any() )
+            {
+                e.Remove();
+                return (FileSystem.CopyTo( m, xDoc.ToString(), pathXml ), true);
+            }
+            return (true,false);
         }
 
         public bool SetRepositoryXmlIgnoreDirtyFolders( IActivityMonitor m )
@@ -570,12 +781,12 @@ namespace CK.Env
             if( branches == null ) e.Add( branches = new XElement( SVGNS + "Branches" ) );
 
             var branch = branches.Elements( SVGNS + "Branch" )
-                                 .Where( b => (string)b.Attribute( "Name" ) == World.DevelopLocalBranchName );
+                                 .Where( b => (string)b.Attribute( "Name" ) == World.LocalBranchName );
             if( !branch.Any() )
             {
                 branches.Add( new XElement( SVGNS + "Branch",
-                                   new XAttribute( "Name", World.DevelopLocalBranchName ),
-                                   new XAttribute( "VersionName", "blank" ),
+                                   new XAttribute( "Name", World.LocalBranchName ),
+                                   new XAttribute( "VersionName", "local" ),
                                    new XAttribute( "CIVersionMode", "LastReleaseBased" ) ) );
             }
             else
@@ -593,14 +804,14 @@ namespace CK.Env
             if( xDoc == null ) return false;
             xDoc.Root.Element( SVGNS + "Branches" )
                      .Elements( SVGNS + "Branch" )
-                     .Where( b => (string)b.Attribute( "Name" ) == World.DevelopLocalBranchName )
+                     .Where( b => (string)b.Attribute( "Name" ) == World.LocalBranchName )
                      .Remove();
             return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );
         }
 
-        bool EnsureBlankRemoteStoreTestHelperConfig( IActivityMonitor m )
+        public bool EnsureCKSetupStoreTestHelperConfig( IActivityMonitor m, string storePath )
         {
-            var path = SubPath.AppendPart( "branches" ).AppendPart( CurrentBranchName ).AppendPart( "BlankRemoteStore.TestHelper.config" );
+            var path = SubPath.AppendPart( "branches" ).AppendPart( CurrentBranchName ).AppendPart( "RemoteStore.TestHelper.config" );
             var f = FileSystem.GetFileInfo( path );
             if( f.IsDirectory )
             {
@@ -609,20 +820,19 @@ namespace CK.Env
             }
             if( !f.Exists )
             {
-                var blankStorePath = Path.Combine( _feedProvider.EnsureLocalFeedBlankFolder( m ).PhysicalPath, "CKSetupStore" );
                 var text = "<configuration><appSettings>" + Environment.NewLine;
-                text += "  -- This forces the Solutions that generate components to use the LocalFeed/Blank/CKSetupStore" + Environment.NewLine;;
-                text += $@"  <add key=""CKSetup/DefaultStoreUrl"" value=""{blankStorePath}"" />" + Environment.NewLine;
-                text += $@"  <add key=""CKSetup/DefaultStorePath"" value=""{blankStorePath}"" />" + Environment.NewLine;
+                text += "  -- This forces the Solutions that generate components to use the LocalFeed/Local/CKSetupStore" + Environment.NewLine;;
+                text += $@"  <add key=""CKSetup/DefaultStoreUrl"" value=""{storePath}"" />" + Environment.NewLine;
+                text += $@"  <add key=""CKSetup/DefaultStorePath"" value=""{storePath}"" />" + Environment.NewLine;
                 text += "</appSettings></configuration>";
                 if( !FileSystem.CopyTo( m, text, path ) ) return false;
             }
             return true;
         }
 
-        bool RemoveBlankRemoteStoreTestHelperConfig( IActivityMonitor m )
+        public bool RemoveCKSetupStoreTestHelperConfig( IActivityMonitor m )
         {
-            var path = SubPath.AppendPart( "branches" ).AppendPart( CurrentBranchName ).AppendPart( "BlankRemoteStore.TestHelper.config" );
+            var path = SubPath.AppendPart( "branches" ).AppendPart( CurrentBranchName ).AppendPart( "RemoteStore.TestHelper.config" );
             return FileSystem.Delete( m, path );
         }
 

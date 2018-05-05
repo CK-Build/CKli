@@ -12,11 +12,11 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace CKli
+namespace CK.Env
 {
     public class SolutionReleaser
     {
-        readonly List<(DeclaredPackageDependency Dep, CSVersion Version)> _packageVersionUpdate;
+        readonly List<(DeclaredPackageDependency Dep, SVersion Version)> _packageVersionUpdate;
         GlobalReleaser _releaser;
 
         ReleaseInfo _releaseInfo;
@@ -24,19 +24,24 @@ namespace CKli
 
         internal SolutionReleaser(
             SolutionDependencyResult.DependentSolution solution,
-            RepositoryInfo info
-            )
+            RepositoryInfo info )
         {
             Debug.Assert( info != null && info.PossibleVersions != null );
             Solution = solution;
             RepositoryInfo = info;
-            _packageVersionUpdate = new List<(DeclaredPackageDependency Dep, CSVersion Version)>();
+            _packageVersionUpdate = new List<(DeclaredPackageDependency Dep, SVersion Version)>();
         }
 
         /// <summary>
         /// Gets the global <see cref="SolutionDependencyResult"/> of the <see cref="DependentSolution"/>.
         /// </summary>
         public SolutionDependencyResult GlobalResult => Solution.GlobalResult;
+
+        /// <summary>
+        /// Gets the current <see cref="ReleaseInfo"/>: the result of the last <see cref="EnsureReleaseInfo"/> call.
+        /// May not be valid.
+        /// </summary>
+        public ReleaseInfo CurrentReleaseInfo => _releaseInfo;
 
         /// <summary>
         /// This is the heart of the global releaser system.
@@ -66,23 +71,19 @@ namespace CKli
                 if( !info.IsValid ) return _releaseInfo;
                 requirements = requirements.CombineRequirement( info );
 
-                //var update  = GlobalResult.ProjectDependencies.DependencyTable
-                //                .Where( r => !r.IsExternalDependency
-                //                             && r.SourceProject.Project.PrimarySolution == Solution.Solution
-                //                             && r.TargetPackage.Project.PrimarySolution == s.Solution
-                //                             && r.Version != info.Version.ToString( CSVersionFormat.ShortForm ) )
+                var updates = GlobalResult.ProjectDependencies.DependencyTable
+                                .Where( r => !r.IsExternalDependency
+                                             && r.SourceProject.Project.PrimarySolution == Solution.Solution
+                                             && r.TargetPackage.Project.PrimarySolution == s.Solution
+                                             && r.Version != info.Version )
+                                .Select( p => (p.RawPackageDependency, (SVersion)info.Version) );
 
+                //var updates = GlobalResult.DependencyTable
                 //                                    .Where( r => r.Origin?.PrimarySolution == Solution.Solution
                 //                                                 && r.Target.PrimarySolution == s.Solution )
                 //                                    .SelectMany( r => r.Origin.Deps.Packages )
                 //                                    .Where( p => p.Version.ToString() != info.Version.ToString( CSVersionFormat.ShortForm ) )
                 //                                    .Select( p => (p, info.Version) );
-                var updates = GlobalResult.DependencyTable
-                                                    .Where( r => r.Origin?.PrimarySolution == Solution.Solution
-                                                                 && r.Target.PrimarySolution == s.Solution )
-                                                    .SelectMany( r => r.Origin.Deps.Packages )
-                                                    .Where( p => p.Version.ToString() != info.Version.ToString( CSVersionFormat.ShortForm ) )
-                                                    .Select( p => (p, info.Version) );
                 _packageVersionUpdate.AddRange( updates );
             }
             // Handle package references updates.
@@ -205,7 +206,7 @@ namespace CKli
             // If the version is a pre release then all dependent versions will also be prereleases, 
             // pre-releases don't care about breaking changes however they care about
             // fixes vs. features or breaking changes for automatic computation.
-            if( v.IsPreRelease || v.Major == 0 )
+            if( v.IsPrerelease || v.Major == 0 )
             {
                 ReleaseLevel level;
                 if( requirements.Level == ReleaseLevel.Fix )
@@ -217,7 +218,7 @@ namespace CKli
                 Debug.Assert( requirements.Level == ReleaseLevel.Feature );
                 // It is already a feature. For true pre-release, the feature/breaking changes is
                 // not relevant so we let it go. However for the 0 Major this is important.
-                if( v.IsPreRelease )
+                if( v.IsPrerelease )
                 {
                     m.Info( $"Version automatically infered: {v}." );
                     return _releaseInfo = requirements.WithVersion( v );
@@ -250,7 +251,7 @@ namespace CKli
             //     The 0 major is excluded from this filter.
             if( (c & ReleaseConstraint.MustBePreRelease) != 0 )
             {
-                filtered = filtered.Where( v => v.Major == 0 || v.IsPreRelease );
+                filtered = filtered.Where( v => v.Major == 0 || v.IsPrerelease );
             }
             // 2 - If a breaking change or a feature occurred, this can not be a Patch, regardless
             //     of the Official vs. PreRelease status of the version.
@@ -269,7 +270,7 @@ namespace CKli
             //     The 0 major is excluded from this filter.
             if( (c & ReleaseConstraint.HasBreakingChanges) != 0 )
             {
-                filtered = filtered.Where( v => v.Major == 0 || v.IsPreRelease || (v.Minor == 0 && v.Patch == 0) );
+                filtered = filtered.Where( v => v.Major == 0 || v.IsPrerelease || (v.Minor == 0 && v.Patch == 0) );
             }
             return filtered;
         }
@@ -302,7 +303,7 @@ namespace CKli
                                                         new XAttribute( "Name", g.Key.UniqueSolutionName ),
                                                         g.Select( p => ToUpgradeXml( p.Dep, p.Version ) ) ) ) ); 
 
-                XElement ToUpgradeXml( DeclaredPackageDependency dep, CSVersion version )
+                XElement ToUpgradeXml( DeclaredPackageDependency dep, SVersion version )
                 {
                     return new XElement( "Upgrade",
                             new XAttribute( "Project", dep.Owner.Path ),

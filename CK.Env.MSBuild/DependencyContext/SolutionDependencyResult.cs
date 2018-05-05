@@ -60,7 +60,7 @@ namespace CK.Env.MSBuild
         }
 
         /// <summary>
-        /// Simple model for a dependent solution with its direct, minimal and transitive requiremnts and impacts.
+        /// Simple model for a dependent solution with its direct, minimal and transitive requirements and impacts.
         /// </summary>
         public class DependentSolution
         {
@@ -148,6 +148,60 @@ namespace CK.Env.MSBuild
                 var transitive = new HashSet<DependentSolution>( Impacts );
                 foreach( var i in Impacts.SelectMany( r => r.TransitiveImpacts ) ) transitive.Add( i );
                 TransitiveImpacts = transitive;
+            }
+
+            /// <summary>
+            /// Updates all projects (except BuildProjects) with locally available
+            /// better version and saves the solution and its updated projects.
+            /// </summary>
+            /// <param name="m">The monitor to use.</param>
+            /// <param name="feeds">The local feed provider.</param>
+            /// <param name="fileSystem">The file system.</param>
+            /// <param name="allowDowngrade">Optional allow downgrade. Should not be necessary.</param>
+            /// <param name="allowMissing">Defaults to true to be able to start with empty local feeds.</param>
+            /// <returns>Whether the upgrade succeeded.</returns>
+            public bool UpgradePackagesToTheMax(
+                IActivityMonitor m,
+                ILocalFeedProvider feeds,
+                FileSystem fileSystem,
+                bool allowDowngrade = false,
+                bool allowMissing = true,
+                bool buildProjects = false )
+            {
+                var all = GlobalResult.ProjectDependencies.DependencyTable
+                                    .Where( d => d.SourceProject.Project.PrimarySolution == Solution
+                                                 && !d.IsExternalDependency
+                                                 && d.SourceProject.Project.IsBuildProject == buildProjects )
+                                    .Select( d => (
+                                            Row: d,
+                                            LocalVersion: feeds.GetBestLocalVersion( m, d.PackageId )) )
+                                    .ToList();
+
+                var changes = all.Where( d => d.LocalVersion == null || d.LocalVersion != d.Row.RawPackageDependency.Version );
+                var missings = changes.Where( d => d.LocalVersion == null );
+                if( missings.Any() )
+                {
+                    m.Log( allowMissing ? LogLevel.Warn : LogLevel.Fatal,$"Packages not found locally: {missings.Select( u => u.Row.PackageId ).Concatenate()}." );
+                    if( !allowMissing ) return false;
+                }
+                var downgrade = changes.Where( d => d.LocalVersion != null && d.LocalVersion < d.Row.RawPackageDependency.Version );
+                if( downgrade.Any() )
+                {
+                    foreach( var d in downgrade )
+                    {
+                        m.Log( allowDowngrade ? LogLevel.Warn : LogLevel.Fatal, $"Local package {d.Row.PackageId} found locally in version {d.LocalVersion} but current reference has a greater version {d.Row.RawPackageDependency.Version}." );
+                    }
+                    if( !allowDowngrade ) return false;
+                }
+                var availableChanges = changes.Where( c => c.LocalVersion != null );
+                using( m.OpenInfo( $"Upgrading {availableChanges.GroupBy( u => u.Row.PackageId ).Count()} locally available packages." ) )
+                {
+                    foreach( var u in availableChanges )
+                    {
+                        u.Row.SourceProject.Project.SetPackageReferenceVersion( m, u.Row.SourceProject.Project.TargetFrameworks, u.Row.PackageId, u.LocalVersion );
+                    }
+                    return Solution.Save( m, fileSystem );
+                }
             }
 
             /// <summary>

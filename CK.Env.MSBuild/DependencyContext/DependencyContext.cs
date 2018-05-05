@@ -97,7 +97,7 @@ namespace CK.Env.MSBuild
             {
                 _p = p;
                 cache.Add( p, this );
-                _requires = p.Deps.Projects.Select( dep => Create( dep.Project, cache ) ).ToList<IDependentItemRef>();
+                _requires = p.Deps.Projects.Select( dep => Create( dep.TargetProject, cache ) ).ToList<IDependentItemRef>();
             }
 
             static public ProjectItem Create( Project p, Dictionary<Project,ProjectItem> cache )

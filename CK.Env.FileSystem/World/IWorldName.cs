@@ -15,7 +15,7 @@ namespace CK.Env
         /// <summary>
         /// Gets tne name of this world.
         /// </summary>
-        string WorldName { get; }
+        string Name { get; }
 
         /// <summary>
         /// Gets the LTS key. Normalized to null for current.
@@ -33,9 +33,14 @@ namespace CK.Env
         string MasterBranchName { get; }
 
         /// <summary>
-        /// Gets the develop local branch name.
+        /// Gets the local branch name.
         /// </summary>
-        string DevelopLocalBranchName { get; }
+        string LocalBranchName { get; }
+
+        /// <summary>
+        /// Gets the <see cref="Name"/> or <see cref="Name"/>-<see cref="LTSKey"/> if the key is not null.
+        /// </summary>
+        string FullName { get; }
 
     }
 }

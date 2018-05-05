@@ -3,21 +3,10 @@ using CK.Core;
 using CK.Env.MSBuild;
 using CSemVer;
 
-namespace CKli
+namespace CK.Env
 {
     public interface IReleaseVersionSelector
     {
-        /// <summary>
-        /// This method must choose between an Official or Prerelease versions.
-        /// By returning null, this method can cancel the process.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="solution">The solution.</param>
-        /// <param name="officials">Officials releases possible versions.</param>
-        /// <param name="prereleases">Prereleases possible versions</param>
-        /// <returns>The selected set of versions or null to cancel the process.</returns>
-        IEnumerable<CSVersion> ChooseBetweenOfficialAndPreReleaseVersions( IActivityMonitor m, SolutionDependencyResult.DependentSolution solution, IEnumerable<CSVersion> officials, IEnumerable<CSVersion> prereleases );
-
         /// <summary>
         /// This method must choose the <see cref="ReleaseLevel"/> for the solution.
         /// It may return <see cref="ReleaseLevel.None"/> to cancel the process, but should return
@@ -40,7 +29,7 @@ namespace CKli
         /// <param name="v">The only possible version.</param>
         /// <param name="mustAnswerBetweenFeatureAndBreakingChange">
         /// True if the choice between <see cref="ReleaseLevel.Feature"/> and <see cref="ReleaseLevel.BreakingChange"/> is required.
-        /// This is false for true prereleases (not a zero major version) since for prereleases breaking changes are allowed.
+        /// This is false for normal prereleases (not a zero major version) since for normal prereleases breaking changes are allowed.
         /// </param>
         /// <returns>The level to consider for the release.</returns>
         ReleaseLevel GetPreReleaseSingleVersionFixActualLevel( IActivityMonitor m, SolutionDependencyResult.DependentSolution solution, CSVersion v, bool mustAnswerBetweenFeatureAndBreakingChange );

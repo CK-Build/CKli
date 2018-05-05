@@ -3,7 +3,6 @@ using CK.Env;
 using CK.Env.Analysis;
 using CK.Env.MSBuild;
 using CK.Text;
-using CKSetup;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -14,13 +13,13 @@ using System.Xml.Linq;
 
 namespace CKli
 {
-    public class XGlobalSwitchBranchAction : XAction
+    public class XGlobalLocalBuildAction : XAction
     {
         readonly XSolutionCentral _solutions;
         readonly FileSystem _fileSystem;
         readonly XPublishedPackageFeeds _localPackages;
 
-        public XGlobalSwitchBranchAction(
+        public XGlobalLocalBuildAction(
             Initializer intializer,
             FileSystem fileSystem,
             XPublishedPackageFeeds localPackages,
@@ -39,28 +38,17 @@ namespace CKli
             if( ctx == null ) return false;
             if( ctx.HasWorkPending )
             {
-                m.Info( $"Context is already switching: {ctx.GlobalGitStatus}. Finishing the transition." );
+                m.Info( $"Context is switching: {ctx.GlobalGitStatus}. Finishing the transition." );
                 return ctx.ConcludeCurrentWork( m );
             }
-            if( ctx.CanSwitchToDevelop )
-            {
-                Console.Write( $"Current branch is '{ctx.World.DevelopBranchName}'. Do you want to switch to '{ctx.World.LocalBranchName}'? (Y/N)" );
-                char a;
-                while( (a = Console.ReadKey().KeyChar) == 'Y' || a == 'N' ) ;
-                if( a == 'Y' ) return ctx.SwitchToLocal( m );
-                return false;
-            }
-            if( ctx.CanSwitchToLocal )
-            {
-                Console.Write( $"Current branch is '{ctx.World.LocalBranchName}'. Do you want to switch to '{ctx.World.DevelopBranchName}'? (Y/N)" );
-                char a;
-                while( (a = Console.ReadKey().KeyChar) == 'Y' || a == 'N' ) ;
-                if( a == 'Y' ) return ctx.SwitchToDevelop( m );
-                return false;
-            }
+            m.Info( $"Current Global Status: {ctx.GlobalGitStatus}." );
+            if( ctx.CanRunCIBuild ) return ctx.RunCIBuild( m );
             m.Error( $"Invalid state {ctx.GlobalGitStatus}." );
             return false;
         }
 
+
     }
+
+
 }

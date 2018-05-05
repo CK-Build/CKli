@@ -19,76 +19,10 @@ namespace CKli
         readonly string _rootPath;
         readonly IssueCollector _issues;
         readonly ActionCollector _actions;
+        readonly IWorldStore _worldStore;
         FileSystem _fs;
         XRunnable _root;
-        World _currentWorld;
-
-        public class World : IWorldName
-        {
-            /// <summary>
-            /// 
-            /// </summary>
-            public string FilePath { get; }
-
-            /// <summary>
-            /// Gets tne name of this world.
-            /// </summary>
-            public string WorldName { get; }
-
-            /// <summary>
-            /// Gets the LTS key. Normalized to null for current.
-            /// </summary>
-            public string LTSKey { get; }
-
-            /// <summary>
-            /// Gets the develop branch name.
-            /// </summary>
-            public string DevelopBranchName { get; }
-
-            /// <summary>
-            /// Gets the master branch name.
-            /// </summary>
-            public string MasterBranchName { get; }
-
-            /// <summary>
-            /// Gets the develop local branch name.
-            /// </summary>
-            public string DevelopLocalBranchName { get; }
-
-            internal World( string path, string worldName, string ltsKey )
-            {
-                if( String.IsNullOrWhiteSpace( path ) ) throw new ArgumentNullException( nameof( path ) );
-                if( String.IsNullOrWhiteSpace( worldName ) ) throw new ArgumentNullException( nameof( worldName ) );
-                FilePath = path;
-                WorldName = worldName;
-                if( !String.IsNullOrWhiteSpace( ltsKey ) )
-                {
-                    LTSKey = ltsKey;
-                    MasterBranchName = "master-" + ltsKey;
-                    DevelopBranchName = "develop-" + ltsKey;
-                    DevelopLocalBranchName = $"develop-{ltsKey}-local";
-                }
-                else
-                {
-                    MasterBranchName = "master";
-                    DevelopBranchName = "develop";
-                    DevelopLocalBranchName = $"develop-local";
-                }
-            }
-
-            public static World Parse( string filePath )
-            {
-                Debug.Assert( filePath.EndsWith( "-World.xml" ) );
-                var fName = Path.GetFileName( filePath );
-                fName = fName.Substring( 0, fName.Length - 10 );
-                int idx = fName.IndexOf( '-' );
-                if( idx < 0 )
-                {
-                    return new World( filePath, fName, null );
-                }
-                return new World( filePath, fName.Substring( 0, idx ), fName.Substring( idx + 1 ) );
-            }
-        }
+        IWorldName _currentWorld;
 
         public GlobalContext( IActivityMonitor monitor, XTypedFactory factory, string rootPath )
         {
@@ -97,9 +31,10 @@ namespace CKli
             _rootPath = rootPath;
             _issues = new IssueCollector();
             _actions = new ActionCollector();
+            _worldStore = new LocalWorldStore( Path.Combine( _rootPath, "CK-Env" ) );
         }
 
-        public World CurrentWorld => _currentWorld;
+        public IWorldName CurrentWorld => _currentWorld;
 
         public event EventHandler CurrentWorldChanged;
 
@@ -107,7 +42,7 @@ namespace CKli
         public bool Open()
         {
             Close();
-            var w = ChooseWorld();
+            var w = ChooseWorld( _monitor );
             if( w == null ) return false;
 
             _currentWorld = null;
@@ -116,10 +51,11 @@ namespace CKli
             baseProvider.Add<ISimpleObjectActivator>( new SimpleObjectActivator() );
             baseProvider.Add( _fs );
             baseProvider.Add( w );
+            baseProvider.Add( _worldStore );
             baseProvider.Add( _issues );
             baseProvider.Add( _actions );
 
-            var original = XDocument.Load( w.FilePath ).Root;
+            var original = _worldStore.ReadWorldDescription( _monitor, w ).Root;
             var expanded = XTypedFactory.PreProcess( _monitor, original );
             if( expanded.Errors.Count > 0 )
             {
@@ -132,26 +68,24 @@ namespace CKli
             return true;
         }
 
-        World ChooseWorld()
+        IWorldName ChooseWorld(IActivityMonitor m)
         {
-            var files = Directory.GetFiles( Path.Combine( _rootPath, "CK-Env" ), "*-World.xml" )
-                                .Select( ( p, idx ) => (Idx: idx+1, File: World.Parse( p )) )
-                                .ToList();
+            var worlds = _worldStore.ReadWorlds( m ).Select( (w,idx) => (Idx:idx, World:w) ).ToList();
             for(; ;)
             {
-                foreach( var g in files.GroupBy( f => f.File.WorldName ) )
+                foreach( var g in worlds.GroupBy( f => f.World.Name ) )
                 {
                     Console.WriteLine( $"- {g.Key}" );
                     foreach( var lts in g )
                     {
-                        Console.WriteLine( $"   > {lts.Idx} - {lts.File.LTSKey ?? "<Current>"}" );
+                        Console.WriteLine( $"   > {lts.Idx+1} - {lts.World.LTSKey ?? "<Current>"}" );
                     }
                 }
                 Console.WriteLine( "   > x - Exit" );
                 string r = Console.ReadLine();
-                if( Int32.TryParse( r, out int result ) && result >= 1 && result <= files.Count )
+                if( Int32.TryParse( r, out int result ) && result >= 1 && result <= worlds.Count )
                 {
-                    return files.First( f => f.Idx == result ).File;
+                    return worlds[result-1].World;
                 }
                 if( r == "x" ) return null;
             }

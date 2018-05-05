@@ -10,10 +10,9 @@ using CK.Text;
 using CSemVer;
 
 namespace CKli
-{ 
-    public class ReleaseVersionSelector : IReleaseVersionSelector
+{
+    public class MasterReleaseVersionSelector : IReleaseVersionSelector
     {
-
         /// <summary>
         /// This method must answer whether a pre-release (or a 0 Major version) actually
         /// introduces new features or breaking changes.
@@ -33,27 +32,8 @@ namespace CKli
             CSVersion v,
             bool mustAnswerBetweenFeatureAndBreakingChange )
         {
-            Console.WriteLine( "=========" );
-            Console.WriteLine( $"Only one version is available for '{solution.Solution.UniqueSolutionName}': {v}" );
-            Console.WriteLine( $" 1 - This version only fixes bugs." );
-            if( !mustAnswerBetweenFeatureAndBreakingChange )
-            {
-                Console.WriteLine( $" 2 - This version introduces new features or breaking changes." );
-            }
-            else
-            {
-                Console.WriteLine( $" 2 - This version introduces new features." );
-                Console.WriteLine( $" 3 - This version introduces breaking changes." );
-            }
-            Console.WriteLine( $" X - Cancel." );
-            char c;
-            while( "123X".IndexOf( (c = Console.ReadKey().KeyChar) ) < 0 && (!mustAnswerBetweenFeatureAndBreakingChange || c == '3') ) ;
-            if( c == '1' ) return ReleaseLevel.Fix;
-            if( c == '2' ) return ReleaseLevel.Feature;
-            if( c == '3' ) return ReleaseLevel.BreakingChange;
-            return ReleaseLevel.None;
+            return ReleaseLevel.BreakingChange;
         }
-
 
         /// <summary>
         /// This method must handle the zero major in Feature level edge case.
@@ -68,16 +48,7 @@ namespace CKli
         /// <returns>The level.</returns>
         public ReleaseLevel GetZeroMajorSingleVersionFeatureActualLevel( IActivityMonitor m, SolutionDependencyResult.DependentSolution solution, CSVersion v )
         {
-            Console.WriteLine( "=========" );
-            Console.WriteLine( $"Solution '{solution.Solution.UniqueSolutionName}' will be released with version {v} that has 0 as its Major." );
-            Console.WriteLine( $"We need to know whether this release introduces a breaking change:" );
-            Console.WriteLine( $" 1 - Yes, this release introduces a breaking change:" );
-            Console.WriteLine( $" 2 - No, this is only a feature release." );
-            Console.WriteLine( $" X - Cancel." );
-            char c;
-            while( "12X".IndexOf( (c = Console.ReadKey().KeyChar) ) < 0 ) ;
-            if( c == 'X' ) return ReleaseLevel.None;
-            return c == '1' ? ReleaseLevel.BreakingChange : ReleaseLevel.Feature;
+            return ReleaseLevel.BreakingChange;
         }
 
         /// <summary>
@@ -92,34 +63,7 @@ namespace CKli
         /// <returns>The selected level.</returns>
         public ReleaseLevel ChooseReleaseLevel( IActivityMonitor m, SolutionDependencyResult.DependentSolution solution, ReleaseLevel currentLevel )
         {
-            Console.WriteLine( "=========" );
-            Console.WriteLine( $"Solution {solution.Solution.UniqueSolutionName}:" );
-            if( currentLevel == ReleaseLevel.Fix )
-            {
-                Console.WriteLine( $" 1 - This release only fixes bugs." );
-                Console.WriteLine( $" 2 - This release introduces new features." );
-                Console.WriteLine( $" 3 - This release introduces breaking changes." );
-            }
-            else 
-            {
-                Console.WriteLine( $" 1 - This release only fixes bugs or introduces new features." );
-                Console.WriteLine( $" 2 - This release introduces breaking changes." );
-            }
-            Console.WriteLine( $" X - Cancel." );
-            char c;
-            while( "123X".IndexOf( (c = Console.ReadKey().KeyChar) ) < 0 && (currentLevel != ReleaseLevel.Fix || c == '3') ) ;
-            if( currentLevel == ReleaseLevel.Fix )
-            {
-                if( c == '1' ) return ReleaseLevel.Fix;
-                if( c == '2' ) return ReleaseLevel.Feature;
-                if( c == '3' ) return ReleaseLevel.BreakingChange;
-            }
-            else
-            {
-                if( c == '1' ) return ReleaseLevel.Feature;
-                if( c == '2' ) return ReleaseLevel.BreakingChange;
-            }
-            return ReleaseLevel.None;
+            return ReleaseLevel.BreakingChange;
         }
 
         /// <summary>
@@ -134,9 +78,20 @@ namespace CKli
         public CSVersion ChooseFinalVersion( IActivityMonitor m, SolutionDependencyResult.DependentSolution solution, IReadOnlyList<CSVersion> possibleVersions, ReleaseInfo current )
         {
             Console.WriteLine( $"Solution {solution.Solution.UniqueSolutionName}, release information: {current} " );
-            for( int i = 0; i < possibleVersions.Count; ++i )
+            var releases = possibleVersions.Where( v => !v.IsPrerelease ).ToList();
+            if( releases.Count == 0 )
             {
-                Console.WriteLine( $" {i} - {possibleVersions[i]}" );
+                m.Error( $"There is no Official versions available. Available were: {possibleVersions.Select( v => v.ToString() ).Concatenate()}" );
+                return null;
+            }
+            if( releases.Count == 1 )
+            {
+                m.Error( $"Only one Official versions available {releases[0]}." );
+                return releases[0];
+            }
+            for( int i = 0; i < releases.Count; ++i )
+            {
+                Console.WriteLine( $" {i} - {releases[i]}" );
             }
             Console.WriteLine( $" X - Cancel." );
             for( ; ; )
@@ -146,7 +101,7 @@ namespace CKli
                 if( line == "X" ) return null;
                 if( Int32.TryParse( line, out var num ) && num >= 0 && num < possibleVersions.Count )
                 {
-                    return possibleVersions[num];
+                    return releases[num];
                 }
                 Console.WriteLine();
             }

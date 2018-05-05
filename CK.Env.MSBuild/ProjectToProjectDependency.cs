@@ -10,7 +10,7 @@ namespace CK.Env.MSBuild
         internal ProjectToProjectDependency( Project o, Project target, CKTrait frameworks )
         {
             Owner = o;
-            Project = target;
+            TargetProject = target;
             Frameworks = frameworks;
         }
 
@@ -24,7 +24,7 @@ namespace CK.Env.MSBuild
         /// It necessarily belongs to the same <see cref="ProjectBase.Solution"/>
         /// as the <see cref="Owner"/>.
         /// </summary>
-        public Project Project { get; }
+        public Project TargetProject { get; }
 
         /// <summary>
         /// Gets the frameworks to which this dependency applies.

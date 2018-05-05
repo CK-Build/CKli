@@ -17,8 +17,6 @@ namespace CKli
     /// </summary>
     public class XPrimarySolution : XSolutionBase
     {
-        Solution _solution;
-
         public XPrimarySolution(
             Initializer initializer,
             XBranch branch,

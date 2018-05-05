@@ -15,8 +15,7 @@
   
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.FileProviders.Physical" Version="2.0.1" />
-    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="9.0.4" />
-    <PackageReference Include="CKSetup.Core" Version="6.0.0-r09-00-develop-0014" />
+    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="9.0.5-C0051-develop" />
     <PackageReference Include="SharpYaml" Version="1.6.2" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
   </ItemGroup>

@@ -5,10 +5,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CKli
+namespace CK.Env
 {
     /// <summary>
-    /// Encpasulates logic to build a <see cref="ReleaseLevel"/> and <see cref="ReleaseConstraint"/>.
+    /// Immutable value type that encpasulates logic to build a <see cref="ReleaseLevel"/> and <see cref="ReleaseConstraint"/>.
     /// </summary>
     public struct ReleaseInfo
     {
@@ -63,7 +63,7 @@ namespace CKli
         public ReleaseInfo WithVersion( CSVersion v )
         {
             if( v == null ) throw new ArgumentNullException( nameof( v ) );
-            var c = v.IsPreRelease && v.Major != 0
+            var c = v.IsPrerelease && v.Major != 0
                         ? Constraint | ReleaseConstraint.MustBePreRelease
                         : Constraint;
             return new ReleaseInfo( Level, c, v );

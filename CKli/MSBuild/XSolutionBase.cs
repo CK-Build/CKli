@@ -35,6 +35,7 @@ namespace CKli
 
         public XBranch GitBranch => _branch;
 
+
         public NormalizedPath GetSolutionFilePath( string projectToBranchName = null )
         {
             var path = FullPath;

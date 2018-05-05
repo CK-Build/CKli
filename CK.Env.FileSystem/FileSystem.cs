@@ -336,6 +336,35 @@ namespace CK.Env
             return true;
         }
 
+
+        /// <summary>
+        /// Helper that deletes a local directory (with linear timed retries).
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="dirPath">The directory path on the local file system to delete.</param>
+        public void RawDeleteLocalDirectory( IActivityMonitor m, string dirPath )
+        {
+            if( Directory.Exists( dirPath ) )
+            {
+                m.Info( $"Deleting {dirPath}." );
+                int tryCount = 0;
+                for(; ; )
+                {
+                    try
+                    {
+                        if( Directory.Exists( dirPath ) ) Directory.Delete( dirPath, true );
+                        return;
+                    }
+                    catch( Exception ex )
+                    {
+                        m.Warn( $"Error while deleting {dirPath}.", ex );
+                        if( ++tryCount > 4 ) throw;
+                        System.Threading.Thread.Sleep( 100 * tryCount );
+                    }
+                }
+            }
+        }
+
         class FileSystemInfoWrapper : IFileInfo
         {
             readonly FileSystemInfo _info;

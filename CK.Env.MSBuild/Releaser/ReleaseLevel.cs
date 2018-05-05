@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CKli
+namespace CK.Env
 {
     /// <summary>
     /// Defines the 4 possible release level.

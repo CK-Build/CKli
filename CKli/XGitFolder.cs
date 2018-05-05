@@ -12,7 +12,7 @@ namespace CKli
         public XGitFolder(
             Initializer initializer,
             XPathItem parent,
-            GlobalContext.World world,
+            IWorldName world,
             IssueCollector issueCollector
             )
             : base( initializer, parent.FileSystem, parent )

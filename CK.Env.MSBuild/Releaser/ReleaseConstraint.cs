@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CKli
+namespace CK.Env
 {
     /// <summary>
     /// Defines composable constraints on versions.

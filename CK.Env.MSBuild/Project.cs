@@ -111,7 +111,6 @@ namespace CK.Env.MSBuild
                     else
                     {
                         TargetFrameworks = MSBuildContext.ParseSemiColonFrameworks( f.Value );
-                        m.Debug( $"TargetFrameworks = {TargetFrameworks}" );
                         bool? isTestProject = (bool?)_file.Document.Root.Elements( "PropertyGroup" )
                                                           .Elements( "IsTestProject" )
                                                           .FirstOrDefault();
@@ -158,6 +157,12 @@ namespace CK.Env.MSBuild
         /// is not defined, Service Include is used.
         /// </summary>
         public bool IsTestProject { get; private set; }
+
+        /// <summary>
+        /// Gets whether this project is a build project (typically the CodeCakeBuilder project).
+        /// It is contained in this <see cref="Solution"/>'s <see cref="Solution.BuildProjects"/>.
+        /// </summary>
+        public bool IsBuildProject => Solution.BuildProjects.Contains( this );
 
         /// <summary>
         /// Gets the dependencies.
@@ -292,12 +297,12 @@ namespace CK.Env.MSBuild
                         || String.IsNullOrWhiteSpace( p.RawVersion )
                         || (
                              !(isPropVersion = p.RawVersion.StartsWith( "$(" ))
-                             && !(version = SVersionRange.TryParseSimpleRange( p.RawVersion )).IsValidSyntax
+                             && !(version = SVersionRange.TryParseSimpleRange( p.RawVersion )).IsValid
                            ) )
                     {
                         if( version != null )
                         {
-                            m.Error( $"Unable to parse Version attribute on element {p.Origin}: {version.ParseErrorMessage}" );
+                            m.Error( $"Unable to parse Version attribute on element {p.Origin}: {version.ErrorMessage}" );
                         }
                         else
                         {
@@ -397,9 +402,9 @@ namespace CK.Env.MSBuild
             }
             XElement propertyDef = candidates[0];
             version = SVersionRange.TryParseSimpleRange( propertyDef.Value );
-            if( !version.IsValidSyntax )
+            if( !version.IsValid)
             {
-                m.Error( $"Invalid $({propName}) version definition {p.Origin} in {propertyDef}: {version.ParseErrorMessage}." );
+                m.Error( $"Invalid $({propName}) version definition {p.Origin} in {propertyDef}: {version.ErrorMessage}." );
                 return null;
             }
             return propertyDef;

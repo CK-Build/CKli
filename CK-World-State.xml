@@ -1,0 +1,247 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<CK-World-State GlobalGitStatus="Releasing">
+  <XmlState>
+    <RoadMap>
+      <S Name="CK-WeakAssemblyNameResolver" Version="0.5.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades />
+        <Build />
+      </S>
+      <S Name="CodeCake" Version="0.26.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades />
+        <Build />
+      </S>
+      <S Name="CK-AspNet-Tester" Version="2.0.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades />
+        <Build />
+      </S>
+      <S Name="CK-Auth-Abstractions" Version="0.6.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades />
+        <Build />
+      </S>
+      <S Name="CK-Reflection" Version="7.0.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades />
+        <Build />
+      </S>
+      <S Name="CSemVer-Net" Version="2.0.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades />
+        <Build />
+      </S>
+      <S Name="Yodii-Script" Version="0.6.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades />
+        <Build />
+      </S>
+      <S Name="CK-Text" Version="7.0.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades />
+        <Build />
+      </S>
+      <S Name="SGV-Net" Version="0.33.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades>
+          <Upgrade Project="SimpleGitVersion\SGV-Net\branches\develop\SimpleGitVersion.Core\SimpleGitVersion.Core.csproj" PackageId="CSemVer" Version="2.0.0" />
+          <Upgrade Project="SimpleGitVersion\SGV-Net\branches\develop\SimpleGitVersion.Cake\SimpleGitVersion.Cake.csproj" PackageId="Code.Cake" Version="0.26.0" />
+        </Upgrades>
+        <Build />
+      </S>
+      <S Name="CK-Core" Version="10.0.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades>
+          <Upgrade Project="CK-Core-Projects\CK-Core\branches\develop\CodeCakeBuilder\CodeCakeBuilder.csproj" PackageId="CK.Text" Version="7.0.0" />
+          <Upgrade Project="CK-Core-Projects\CK-Core\branches\develop\CK.Core\CK.Core.csproj" PackageId="CK.Text" Version="7.0.0" />
+        </Upgrades>
+        <Build />
+      </S>
+      <S Name="CK-ActivityMonitor" Version="10.0.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades>
+          <Upgrade Project="CK-Core-Projects\CK-ActivityMonitor\branches\develop\Tests\WeakNameConsole\WeakNameConsole.csproj" PackageId="CK.WeakAssemblyNameResolver" Version="0.5.0" />
+          <Upgrade Project="CK-Core-Projects\CK-ActivityMonitor\branches\develop\CK.ActivityMonitor\CK.ActivityMonitor.csproj" PackageId="CK.Core" Version="10.0.0" />
+        </Upgrades>
+        <Build />
+      </S>
+      <S Name="CK-SqlServer-Parser-Model" Version="6.0.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades>
+          <Upgrade Project="CK-Database-Projects\CK-SqlServer-Parser-Model\branches\develop\CK.SqlServer.Parser.Model\CK.SqlServer.Parser.Model.csproj" PackageId="CK.ActivityMonitor.SimpleSender" Version="10.0.0" />
+        </Upgrades>
+        <Build />
+      </S>
+      <S Name="CK-CodeGen" Version="0.2.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades>
+          <Upgrade Project="CK-Database-Projects\CK-CodeGen\branches\develop\Tests\CK.CodeGen.Tests\CK.CodeGen.Tests.csproj" PackageId="CK.ActivityMonitor.SimpleSender" Version="10.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-CodeGen\branches\develop\Tests\CK.CodeGen.NetCore.Tests\CK.CodeGen.NetCore.Tests.csproj" PackageId="CK.ActivityMonitor.SimpleSender" Version="10.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-CodeGen\branches\develop\CK.CodeGen.Roslyn\CK.CodeGen.Roslyn.csproj" PackageId="CK.ActivityMonitor.SimpleSender" Version="10.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-CodeGen\branches\develop\CK.CodeGen.Roslyn\CK.CodeGen.Roslyn.csproj" PackageId="CK.WeakAssemblyNameResolver" Version="0.5.0" />
+          <Upgrade Project="CK-Database-Projects\CK-CodeGen\branches\develop\CK.CodeGen\CK.CodeGen.csproj" PackageId="CK.Text" Version="7.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-CodeGen\branches\develop\CodeCakeBuilder\CodeCakeBuilder.csproj" PackageId="CK.Text" Version="7.0.0" />
+        </Upgrades>
+        <Build />
+      </S>
+      <S Name="CK-Monitoring" Version="9.0.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades>
+          <Upgrade Project="CK-Core-Projects\CK-Monitoring\branches\develop\CK.Monitoring\CK.Monitoring.csproj" PackageId="CK.ActivityMonitor" Version="10.0.0" />
+          <Upgrade Project="CK-Core-Projects\CK-Monitoring\branches\develop\Tests\CK.Monitoring.Tests\CK.Monitoring.Tests.csproj" PackageId="CK.ActivityMonitor.SimpleSender" Version="10.0.0" />
+          <Upgrade Project="CK-Core-Projects\CK-Monitoring\branches\develop\Tests\CK.Monitoring.NetCore.Tests\CK.Monitoring.NetCore.Tests.csproj" PackageId="CK.ActivityMonitor.SimpleSender" Version="10.0.0" />
+        </Upgrades>
+        <Build />
+      </S>
+      <S Name="CK-Setup-Dependency" Version="7.0.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades>
+          <Upgrade Project="CK-Database-Projects\CK-Setup-Dependency\branches\develop\CK.Setup.Dependency\CK.Setup.Dependency.csproj" PackageId="CK.ActivityMonitor.SimpleSender" Version="10.0.0" />
+        </Upgrades>
+        <Build />
+      </S>
+      <S Name="CK-AspNet" Version="2.0.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades>
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet\branches\develop\Tests\CK.AspNet.Tests\CK.AspNet.Tests.csproj" PackageId="CK.AspNet.Tester" Version="2.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet\branches\develop\Tests\CK.AspNet.NetCore.Tests\CK.AspNet.NetCore.Tests.csproj" PackageId="CK.AspNet.Tester" Version="2.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet\branches\develop\Tests\CK.AspNet.Tests\CK.AspNet.Tests.csproj" PackageId="CK.ActivityMonitor.SimpleSender" Version="10.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet\branches\develop\Tests\CK.AspNet.NetCore.Tests\CK.AspNet.NetCore.Tests.csproj" PackageId="CK.ActivityMonitor.SimpleSender" Version="10.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet\branches\develop\CK.AspNet\CK.AspNet.csproj" PackageId="CK.Monitoring" Version="9.0.0" />
+        </Upgrades>
+        <Build />
+      </S>
+      <S Name="CK-Testing" Version="0.4.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades>
+          <Upgrade Project="CK-Core-Projects\CK-Testing\branches\develop\CK.Testing.Monitoring\CK.Testing.Monitoring.csproj" PackageId="CK.Monitoring" Version="9.0.0" />
+          <Upgrade Project="CK-Core-Projects\CK-Testing\branches\develop\CK.Testing.Monitoring\CK.Testing.Monitoring.csproj" PackageId="CK.ActivityMonitor.SimpleSender" Version="10.0.0" />
+          <Upgrade Project="CK-Core-Projects\CK-Testing\branches\develop\CK.Testing\CK.Testing.csproj" PackageId="CK.Core" Version="10.0.0" />
+          <Upgrade Project="CK-Core-Projects\CK-Testing\branches\develop\CK.Testing\CK.Testing.csproj" PackageId="CK.Reflection" Version="7.0.0" />
+          <Upgrade Project="CK-Core-Projects\CK-Testing\branches\develop\CK.Testing\CK.Testing.csproj" PackageId="CK.WeakAssemblyNameResolver" Version="0.5.0" />
+        </Upgrades>
+        <Build />
+      </S>
+      <S Name="CK-Setup" Version="6.0.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades>
+          <Upgrade Project="CK-Database-Projects\CK-Setup\branches\develop\CKSetup.Cake\CKSetup.Cake.csproj" PackageId="Code.Cake" Version="0.26.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Setup\branches\develop\CKSetup.Core\CKSetup.Core.csproj" PackageId="CK.ActivityMonitor.SimpleSender" Version="10.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Setup\branches\develop\Tests\StupidEngine\StupidEngine.csproj" PackageId="CK.ActivityMonitor.SimpleSender" Version="10.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Setup\branches\develop\CK.Testing.CKSetup\CK.Testing.CKSetup.csproj" PackageId="CK.Testing.Monitoring" Version="0.4.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Setup\branches\develop\CKSetup.Core\CKSetup.Core.csproj" PackageId="CK.Monitoring" Version="9.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Setup\branches\develop\CKSetup.Runner\CKSetup.Runner.csproj" PackageId="CK.Monitoring" Version="9.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Setup\branches\develop\CKSetup.Runner\CKSetup.Runner.csproj" PackageId="CK.WeakAssemblyNameResolver" Version="0.5.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Setup\branches\develop\CKSetup.Core\CKSetup.Core.csproj" PackageId="CSemVer" Version="2.0.0" />
+        </Upgrades>
+        <Build />
+      </S>
+      <S Name="CK-SqlServer-Parser" Version="8.0.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades>
+          <Upgrade Project="CK-Database-Projects\CK-SqlServer-Parser\branches\develop\CK.Testing.SqlTransform\CK.Testing.SqlTransform.csproj" PackageId="CK.Testing.Monitoring" Version="0.4.0" />
+          <Upgrade Project="CK-Database-Projects\CK-SqlServer-Parser\branches\develop\CK.SqlServer.Parser\CK.SqlServer.Parser.csproj" PackageId="CK.ActivityMonitor.SimpleSender" Version="10.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-SqlServer-Parser\branches\develop\CK.SqlServer.Parser\CK.SqlServer.Parser.csproj" PackageId="CK.SqlServer.Parser.Model" Version="6.0.0" />
+        </Upgrades>
+        <Build />
+      </S>
+      <S Name="CKSetupRemoteStore" Version="0.1.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades>
+          <Upgrade Project="CK-Database-Projects\CKSetupRemoteStore\branches\develop\CKSetupInstaller\CKSetupInstaller.csproj" PackageId="CSemVer" Version="2.0.0" />
+          <Upgrade Project="CK-Database-Projects\CKSetupRemoteStore\branches\develop\Tests\CKSetupRemoteStore.Tests\CKSetupRemoteStore.Tests.csproj" PackageId="CK.AspNet.Tester" Version="2.0.0" />
+          <Upgrade Project="CK-Database-Projects\CKSetupRemoteStore\branches\develop\CodeCakeBuilder\CodeCakeBuilder.csproj" PackageId="CKSetup.Cake" Version="6.0.0" />
+          <Upgrade Project="CK-Database-Projects\CKSetupRemoteStore\branches\develop\CKSetupRemoteStore\CKSetupRemoteStore.csproj" PackageId="CKSetup.Core" Version="6.0.0" />
+          <Upgrade Project="CK-Database-Projects\CKSetupRemoteStore\branches\develop\Tests\CKSetupRemoteStore.Tests\CKSetupRemoteStore.Tests.csproj" PackageId="CKSetup.Core" Version="6.0.0" />
+          <Upgrade Project="CK-Database-Projects\CKSetupRemoteStore\branches\develop\Tests\CKSetupRemoteStore.Tests\CKSetupRemoteStore.Tests.csproj" PackageId="CK.Testing.Monitoring" Version="0.4.0" />
+          <Upgrade Project="CK-Database-Projects\CKSetupRemoteStore\branches\develop\CKSetupRemoteStore\CKSetupRemoteStore.csproj" PackageId="CK.AspNet" Version="2.0.0" />
+        </Upgrades>
+        <Build />
+      </S>
+      <S Name="CK-Database" Version="6.0.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades>
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\CodeCakeBuilder\CodeCakeBuilder.csproj" PackageId="CKSetup.Cake" Version="6.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\CK.Testing.StObjSetup\CK.Testing.StObjSetup.csproj" PackageId="CK.Testing.CKSetup" Version="6.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\CK.DB.AspNet\CK.DB.AspNet.csproj" PackageId="CK.AspNet" Version="2.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\CK.Testing.DBSetup\CK.Testing.DBSetup.csproj" PackageId="CK.Testing.SqlServer" Version="0.4.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\CK.Testing.StObjMap\CK.Testing.StObjMap.csproj" PackageId="CK.Testing.Monitoring" Version="0.4.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\CK.SqlServer.Setup.Engine\CK.SqlServer.Setup.Engine.csproj" PackageId="CK.SqlServer.Transform" Version="8.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\Tests\BasicModels\SqlActorPackage.Runtime\SqlActorPackage.Runtime.csproj" PackageId="CK.SqlServer.Parser" Version="8.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\Tests\BasicModels\SqlZonePackage.Runtime\SqlZonePackage.Runtime.csproj" PackageId="CK.SqlServer.Parser" Version="8.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\CK.DB.Tests.NUnit\CK.DB.Tests.NUnit.csproj" PackageId="CK.Testing.SqlTransform" Version="8.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\CK.SqlServer.Setup.Runtime\CK.SqlServer.Setup.Runtime.csproj" PackageId="CK.SqlServer.Parser.Model" Version="6.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\CK.SqlServer.Setup.Runtime\CK.SqlServer.Setup.Runtime.csproj" PackageId="Yodii.Script" Version="0.6.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\CK.StObj.Runtime\CK.StObj.Runtime.csproj" PackageId="CK.Reflection" Version="7.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\CK.SqlServer.Setup.Runtime\CK.SqlServer.Setup.Runtime.csproj" PackageId="CK.Reflection" Version="7.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\CK.StObj.Runtime\CK.StObj.Runtime.csproj" PackageId="CK.Setup.Dependency" Version="7.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\CK.Setupable.Runtime\CK.Setupable.Runtime.csproj" PackageId="CK.Setup.Dependency" Version="7.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\CK.StObj.Engine\CK.StObj.Engine.csproj" PackageId="CK.Core" Version="10.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\CK.StObj.Runtime\CK.StObj.Runtime.csproj" PackageId="CK.CodeGen.Roslyn" Version="0.2.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\CK.StObj.Runtime\CK.StObj.Runtime.csproj" PackageId="CK.CodeGen" Version="0.2.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Database\branches\develop\CK.StObj.Model\CK.StObj.Model.csproj" PackageId="CK.ActivityMonitor.SimpleSender" Version="10.0.0" />
+        </Upgrades>
+        <Build />
+      </S>
+      <S Name="CK-Sqlite" Version="0.1.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades>
+          <Upgrade Project="CK-Database-Projects\CK-Sqlite\branches\develop\CK.Sqlite.Setup.Model\CK.Sqlite.Setup.Model.csproj" PackageId="CK.Setupable.Model" Version="6.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Sqlite\branches\develop\CK.Sqlite.Setup.Runtime\CK.Sqlite.Setup.Runtime.csproj" PackageId="CK.Setupable.Runtime" Version="6.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Sqlite\branches\develop\CK.Testing.SqliteDBSetup\CK.Testing.SqliteDBSetup.csproj" PackageId="CK.Testing.SetupableSetup" Version="6.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-Sqlite\branches\develop\CK.Sqlite.Setup.Runtime\CK.Sqlite.Setup.Runtime.csproj" PackageId="Yodii.Script" Version="0.6.0" />
+        </Upgrades>
+        <Build />
+      </S>
+      <S Name="CK-DB" Version="1.0.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades>
+          <Upgrade Project="CK-Database-Projects\CK-DB\branches\develop\CK.DB.Actor\CK.DB.Actor.csproj" PackageId="CK.SqlServer.Setup.Model" Version="6.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-DB\branches\develop\Tests\CK.DB.Actor.Tests\CK.DB.Actor.Tests.csproj" PackageId="CK.DB.Tests.NUnit" Version="6.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-DB\branches\develop\CK.DB.Auth.AuthScope\CK.DB.Auth.AuthScope.csproj" PackageId="CK.SqlServer.Setup.Model" Version="6.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-DB\branches\develop\CK.DB.Culture\CK.DB.Culture.csproj" PackageId="CK.SqlServer.Setup.Model" Version="6.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-DB\branches\develop\CK.DB.Res\CK.DB.Res.csproj" PackageId="CK.SqlServer.Setup.Model" Version="6.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-DB\branches\develop\Tests\CK.DB.Auth.AuthScope.Tests\CK.DB.Auth.AuthScope.Tests.csproj" PackageId="CK.DB.Tests.NUnit" Version="6.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-DB\branches\develop\Tests\CK.DB.Culture.Tests\CK.DB.Culture.Tests.csproj" PackageId="CK.DB.Tests.NUnit" Version="6.0.0" />
+          <Upgrade Project="CK-Database-Projects\CK-DB\branches\develop\Tests\CK.DB.Res.Tests\CK.DB.Res.Tests.csproj" PackageId="CK.DB.Tests.NUnit" Version="6.0.0" />
+        </Upgrades>
+        <Build />
+      </S>
+      <S Name="CK-AspNet-Auth" Version="1.0.0">
+        <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
+        <Upgrades>
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\CK.DB.AspNet.Auth\CK.DB.AspNet.Auth.csproj" PackageId="CK.DB.Auth" Version="1.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\CK.DB.AspNet.Auth.Tests\CK.DB.AspNet.Auth.Tests.csproj" PackageId="CK.DB.User.UserPassword" Version="1.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\CK.DB.AspNet.Auth.Tests\CK.DB.AspNet.Auth.Tests.csproj" PackageId="CK.DB.User.UserGoogle" Version="1.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\Integration\WebApp.Tests\WebApp.Tests.csproj" PackageId="CK.DB.User.UserPassword" Version="1.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\Integration\WebApp.Tests\WebApp.Tests.csproj" PackageId="CK.DB.User.UserGoogle" Version="1.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\Integration\WebApp.Tests\WebApp.Tests.csproj" PackageId="CK.DB.User.UserOidc" Version="1.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\Integration\WebApp\WebApp.csproj" PackageId="CK.DB.User.UserPassword" Version="1.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\Integration\WebApp\WebApp.csproj" PackageId="CK.DB.User.UserGoogle" Version="1.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\Integration\WebApp\WebApp.csproj" PackageId="CK.DB.User.UserOidc" Version="1.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\CK.DB.AspNet.Auth.NetCore.Tests\CK.DB.AspNet.Auth.NetCore.Tests.csproj" PackageId="CK.DB.User.UserPassword" Version="1.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\CK.DB.AspNet.Auth.NetCore.Tests\CK.DB.AspNet.Auth.NetCore.Tests.csproj" PackageId="CK.DB.User.UserGoogle" Version="1.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\DBWithPasswordAndGoogle\DBWithPasswordAndGoogle.csproj" PackageId="CK.DB.User.UserPassword" Version="1.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\DBWithPasswordAndGoogle\DBWithPasswordAndGoogle.csproj" PackageId="CK.DB.User.UserGoogle" Version="1.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\CK.AspNet.Auth.Tests\CK.AspNet.Auth.Tests.csproj" PackageId="CK.AspNet.Tester" Version="2.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\CK.DB.AspNet.Auth.Tests\CK.DB.AspNet.Auth.Tests.csproj" PackageId="CK.AspNet.Tester" Version="2.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\Integration\WebApp.Tests\WebApp.Tests.csproj" PackageId="CK.AspNet.Tester" Version="2.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\CK.AspNet.Auth.NetCore.Tests\CK.AspNet.Auth.NetCore.Tests.csproj" PackageId="CK.AspNet.Tester" Version="2.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\CK.DB.AspNet.Auth.NetCore.Tests\CK.DB.AspNet.Auth.NetCore.Tests.csproj" PackageId="CK.AspNet.Tester" Version="2.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\CK.DB.AspNet.Auth\CK.DB.AspNet.Auth.csproj" PackageId="CK.DB.AspNet" Version="6.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\CK.DB.AspNet.Auth.Tests\CK.DB.AspNet.Auth.Tests.csproj" PackageId="CK.DB.Tests.NUnit" Version="6.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\Integration\WebApp.Tests\WebApp.Tests.csproj" PackageId="CK.DB.Tests.NUnit" Version="6.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\Integration\WebApp.Tests\WebApp.Tests.csproj" PackageId="CK.Testing.DBSetup" Version="6.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\CK.DB.AspNet.Auth.NetCore.Tests\CK.DB.AspNet.Auth.NetCore.Tests.csproj" PackageId="CK.DB.Tests.NUnit" Version="6.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\Tests\Integration\WebApp\WebApp.csproj" PackageId="CK.Monitoring" Version="9.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\CK.AspNet.Auth\CK.AspNet.Auth.csproj" PackageId="CK.Auth.Abstractions" Version="0.6.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\CK.AspNet.Auth\CK.AspNet.Auth.csproj" PackageId="CK.ActivityMonitor.SimpleSender" Version="10.0.0" />
+          <Upgrade Project="CK-AspNet-Projects\CK-AspNet-Auth\branches\develop\CK.AspNet.Auth\CK.AspNet.Auth.csproj" PackageId="CK.AspNet" Version="2.0.0" />
+        </Upgrades>
+        <Build />
+      </S>
+    </RoadMap>
+    <TestedCommitMemory>061053e9f9d28902260f175a2ca4a71b40fa98bc|0031d3853d042ca2e29733fd51870d9d53eb0437|84f1a4030eb1aac47c0ba092a72c27bdcc9ae8e1|441ecfe119d3e023a28b2166ceb3d2ca0da0b11d|dcdb8cccf70c1c1b903e32f6287155bb799d7b78|123ff93d95da500bcc30bb8f06856c908599e9d3|260fb69a790245583e4808511c9c4990b0e53884|6a71dc7bba7391e7a78a2bc0408bf68b7e6aa1d7|452dcbd74e7e2f11786b50288880bc1457092838|fc121591fb54570e77bcf2d9882abc774ff1b210|31a40655bedf0f90ba9471730322524c4d776a83|eb14c92a1a9254c86b36073bb58af38e369c66fd|ef03a29926d0827f19bdff7e87b1234c2edce5a1|94a26783c7e48cd4d76fce354bb4329ab2932916|a8d1a4e742771511773886bf2b2f1399140870b3|75fb1b517a9758442772a9382742ba8a38a50175|4058f3e20b7776dda59b1d24d8e60e121fc27f0a|d13eb676a879de1e4d2d389c89924494767f5a94|b1ff9207bd77cb0df39cca22bbe29c3c7beccd7b|628459921df3a505442463dac7d1d62b0c89ee7b|a9e4d11581345db5fe141a45b8f501aef61995e7|7afaa2d925d8a0cba51a252c094196dada1edb86|c8ec69328aa62296fa3ec58f145fa851fa1b0d06|d5debf772b2e4141a3729715034a54ac3e830a8c</TestedCommitMemory>
+  </XmlState>
+</CK-World-State>
