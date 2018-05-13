@@ -3,6 +3,7 @@ using CK.Text;
 using CKSetup;
 using CSemVer;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -13,23 +14,9 @@ using System.Xml.Linq;
 
 namespace CK.Env.MSBuild
 {
-    public class GlobalBuilderRelease : GlobalBuilder
+    class GlobalBuilderRelease : GlobalBuilder
     {
-        readonly List<Entry> _roadMap;
-
-        struct Entry
-        {
-            public readonly string SolutionName;
-            public readonly SVersion TargetVersion;
-            public readonly bool Build;
-
-            public Entry( XElement e )
-            {
-                SolutionName = (string)e.Attribute( "Name" );
-                TargetVersion = SVersion.Parse( (string)e.Attribute( "Version" ) );
-                Build = e.Element( "Build" ) != null;
-            }
-        }
+        readonly SimpleRoadmap _roadmap;
 
         public GlobalBuilderRelease(
             SolutionDependencyResult r,
@@ -37,36 +24,67 @@ namespace CK.Env.MSBuild
             ILocalFeedProvider feeds,
             ITestRunMemory testRunMemory,
             GlobalBuilderInfo buildInfo,
-            XElement roadMap )
+            SimpleRoadmap roadmap )
             : base( r, fileSystem, feeds, testRunMemory, buildInfo )
         {
-            if( roadMap == null ) throw new ArgumentNullException( nameof( roadMap ) );
-            _roadMap = roadMap.Elements( "S" )
-                                .Select( e => new Entry( e ) )
-                                .ToList();
+            if( roadmap == null ) throw new ArgumentNullException( nameof( roadmap ) );
+            if( BuildInfo.WorkStatus != WorkStatus.Releasing && BuildInfo.WorkStatus != WorkStatus.CancellingRelease )
+            {
+                throw new InvalidOperationException( nameof( WorkStatus ) );
+            }
+            _roadmap = roadmap;
         }
+
+        bool Releasing => BuildInfo.WorkStatus == WorkStatus.Releasing;
+
+        bool CancelingRelease => BuildInfo.WorkStatus == WorkStatus.CancellingRelease;
 
         protected override IReadOnlyList<SolutionDependencyResult.DependentSolution> FilterSolutions( IReadOnlyList<SolutionDependencyResult.DependentSolution> solutions )
         {
-            return solutions.Where( s => _roadMap.FirstOrDefault( r => r.SolutionName == s.Solution.UniqueSolutionName ).SolutionName != null ).ToList();
+            return solutions.Where( s => _roadmap.FirstOrDefault( r => r.SolutionName == s.Solution.UniqueSolutionName ).SolutionName != null ).ToList();
+        }
+
+        protected override bool StartBuilding( IActivityMonitor m, IReadOnlyList<SolutionDependencyResult.DependentSolution> solutions, SolutionDependencyResult.DependentSolution s )
+        {
+            if( CancelingRelease )
+            {
+                var v = GetTargetVersionFromRoadmap( s );
+                if( v != null ) s.Solution.GitFolder.ClearVersionTag( m, v );
+            }
+            return base.StartBuilding( m, solutions, s );
+        }
+
+        protected override SVersion GetDependentPackageVersion( IActivityMonitor m, string packageId )
+        {
+            return CancelingRelease
+                    ? Feeds.GetBestLocalCIVersion( m, packageId )
+                    : Feeds.GetAllPackageFilesInReleaseFeed( m ).Single( p => p.PackageId == packageId ).Version;
         }
 
         protected override SVersion GetTargetVersion( IActivityMonitor m, SolutionDependencyResult.DependentSolution s )
         {
-            var entry = _roadMap.FirstOrDefault( r => r.SolutionName == s.Solution.UniqueSolutionName );
+            if( CancelingRelease ) return base.GetTargetVersion( m, s );
+            return GetTargetVersionFromRoadmap( s );
+        }
+
+        SVersion GetTargetVersionFromRoadmap( SolutionDependencyResult.DependentSolution s )
+        {
+            var entry = _roadmap.FirstOrDefault( r => r.SolutionName == s.Solution.UniqueSolutionName );
             return entry.Build ? entry.TargetVersion : null;
         }
 
         protected override bool OnBuildStart( IActivityMonitor m, SolutionDependencyResult.DependentSolution s, SVersion v )
         {
-            if( v.Prerelease.Length == 0 )
+            if( Releasing )
             {
-                if( !s.Solution.GitFolder.SwitchFromDevelopToMaster( m ) ) return false;
+                if( v.Prerelease.Length == 0 )
+                {
+                    if( !s.Solution.GitFolder.SwitchFromDevelopToMaster( m ) ) return false;
+                }
+
+                if( !s.Solution.GitFolder.SetVersionTag( m, v ).Success ) return false;
             }
-
-            if( !s.Solution.GitFolder.SetVersionTag( m, v ).Success ) return false;
-
-            var storePath = Path.Combine( GetTargetFeedFolderPath( m ), "CKSetupStore" );
+            var storePath = Path.Combine( GetTargetFeedFolderPath( m ), LocalFeedProviderExtension.CKSetupStoreName );
 
             if( !s.Solution.GitFolder.EnsureCKSetupStoreTestHelperConfig( m, storePath ) 
                 || !s.Solution.GitFolder.EnsureLocalFeedsNuGetSource( m, ensureRelease: true, ensureCI: true ).Success 

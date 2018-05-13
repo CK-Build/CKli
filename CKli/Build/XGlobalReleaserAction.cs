@@ -41,14 +41,28 @@ namespace CKli
             if( ctx == null ) return false;
             if( ctx.HasWorkPending )
             {
-                m.Info( $"Context is already switching: {ctx.GlobalGitStatus}. Finishing the transition." );
+                if( ctx.CanCancelRelease )
+                {
+                    Console.Write( $"Current release can be canceled. Do you want to cancel it? (Y/N)" );
+                    char a;
+                    while( (a = Console.ReadKey().KeyChar) != 'Y' && a != 'N' ) ;
+                    if( a == 'Y' ) return ctx.CancelRelease( m );
+                }
+                if( ctx.CanPublishRelease )
+                {
+                    Console.Write( $"Current release can be published. Do you want to publish it? (Y/N)" );
+                    char a;
+                    while( (a = Console.ReadKey().KeyChar) != 'Y' && a != 'N' ) ;
+                    if( a == 'Y' ) return ctx.PublishRelease( m );
+                }
+                m.Info( $"Work in progress: {ctx.WorkStatus}. Finishing the job." );
                 return ctx.ConcludeCurrentWork( m );
             }
             if( ctx.CanRelease )
             {
                 return ctx.Release( m, new MasterReleaseVersionSelector(), false );
             }
-            m.Error( $"Invalid state {ctx.GlobalGitStatus}." );
+            m.Error( $"Invalid state {ctx.WorkStatus}/{ctx.GlobalGitStatus}." );
             return false;
         }
 

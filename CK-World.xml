@@ -3,6 +3,7 @@
 
   <SharedHttpClient />
   <PublishedPackageFeeds />
+  <PublishKeyStore />
   <ReferentialFolder Path="CK-Env/CKli/Referential" />
   <SolutionCentral />
 
@@ -25,7 +26,6 @@
   <GitCheckoutAction Title="Checkout all repositories on a specific branch name." />
   <GitCommitAction Title="Commits all pending changes to the current branch of all the repositories." />
   <GitFetchAction Title="Fetches all remotes in all repositories." />
-  <GitPushAction Title="Pushes all current branches to their tracked remote." />
   <GlobalDependencyAction Title="Solutions &amp; Projects management." />
   <GlobalSwitchBranchAction Title="Switch between 'develop-blank' &lt;=&gt; 'develop' branches." />
   <GlobalLocalBuildAction Title="Local CI Build: Build all Solutions in develop or local branch, pushing packages to LocalFeed or LocalFeed/Blanck feeds (optionally pushing them to MyGet invenietis-ci feed for 'develop' branch)." />
@@ -271,7 +271,9 @@
 
     <GitFolder Name="CKSetupRemoteStore" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/cksetupremotestore.git">
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
+        <PrimarySolution NotPublishedProjects="CKSetupRemoteStore;CKSetupInstaller" >
+          <TestProjectsStandardConventions />
+        </PrimarySolution>
         <Reuse Name="StandardFiles" />
         <AppVeyorFile />
       </Branch>

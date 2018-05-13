@@ -38,12 +38,13 @@ namespace CKli
             if( ctx == null ) return false;
             if( ctx.HasWorkPending )
             {
-                m.Info( $"Context is switching: {ctx.GlobalGitStatus}. Finishing the transition." );
+                m.Info( $"Work in progress: {ctx.WorkStatus}. Finishing the job." );
                 return ctx.ConcludeCurrentWork( m );
             }
             m.Info( $"Current Global Status: {ctx.GlobalGitStatus}." );
             if( ctx.CanRunCIBuild ) return ctx.RunCIBuild( m );
-            m.Error( $"Invalid state {ctx.GlobalGitStatus}." );
+
+            m.Error( $"Invalid state {ctx.WorkStatus}/{ctx.GlobalGitStatus}." );
             return false;
         }
 

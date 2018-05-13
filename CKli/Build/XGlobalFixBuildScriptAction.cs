@@ -33,14 +33,14 @@ namespace CKli
             if( ctx == null ) return false;
             if( ctx.HasWorkPending )
             {
-                m.Info( $"Context is switching: {ctx.GlobalGitStatus}. Finishing the transition." );
+                m.Info( $"Work in progress: {ctx.WorkStatus}. Finishing the job." );
                 return ctx.ConcludeCurrentWork( m );
             }
             if( ctx.CanLocalFixToZeroBuildProjects )
             {
                 return ctx.LocalFixToZeroBuildProjects( m );
             }
-            m.Error( $"Must be on {ctx.World.LocalBranchName} branch." );
+            m.Error( $"Invalid state {ctx.WorkStatus}/{ctx.GlobalGitStatus}." );
             return false;
         }
 

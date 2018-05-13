@@ -7,16 +7,17 @@ using System.Threading.Tasks;
 
 namespace CK.Env.MSBuild
 {
-    public class GlobalBuilderInfo
+    class GlobalBuilderInfo
     {
-        string _remoteStorePushApiKey;
+        readonly IPublishKeyStore _keyStore;
         string _myGetApiKey;
+        string _remoteStorePushApiKey;
         GlobalGitStatus _gitStatus;
+        WorkStatus _workStatus;
 
-        public GlobalBuilderInfo()
+        public GlobalBuilderInfo( IPublishKeyStore keyStore )
         {
-            _myGetApiKey = "e36689df-cf38-496e-a80c-6f1c47489334";
-            _remoteStorePushApiKey = @"6L~48.M9+Hdssd87632EHjbgnI736/\TYEGJHB";
+            _keyStore = keyStore;
         }
 
         /// <summary>
@@ -26,7 +27,9 @@ namespace CK.Env.MSBuild
 
         public bool EnsureRemotesAvailable( IActivityMonitor m )
         {
-            if( GetMyGetApiKey( m ) == null || GetRemoteStorePushKey( m ) == null )
+            _myGetApiKey = _keyStore.GetMyGetPushKey( m );
+            _remoteStorePushApiKey = _keyStore.GetCKSetupRemoteStorePushKey( m );
+            if( _myGetApiKey == null || _remoteStorePushApiKey == null )
             {
                 m.Error( "Remote info is required." );
                 return false;
@@ -36,46 +39,71 @@ namespace CK.Env.MSBuild
 
         public GlobalGitStatus GlobalGitStatus => _gitStatus;
 
-        public void SetGlobalGitStatus( GlobalGitStatus s )
+        public WorkStatus WorkStatus => _workStatus;
+
+        public void SetStatus( WorkStatus w, GlobalGitStatus g )
         {
-            _gitStatus = s;
-            if( _gitStatus == GlobalGitStatus.DevelopBranch )
+            _gitStatus = g;
+            _workStatus = w;
+            if( _workStatus == WorkStatus.Idle )
             {
-                RunUnitTests = true;
-                AutoCommit = false;
-                IsRemotesRequired = null;
+                if( _gitStatus == GlobalGitStatus.DevelopBranch )
+                {
+                    TargetLocal = false;
+                    RunUnitTests = true;
+                    AutoCommit = false;
+                    IsRemotesRequired = null;
+                    AllowPackageDependenciesDowngrade = false;
+                }
+                else if( _gitStatus == GlobalGitStatus.LocalBranch )
+                {
+                    TargetLocal = true;
+                    RunUnitTests = false;
+                    AutoCommit = false;
+                    IsRemotesRequired = false;
+                    AllowPackageDependenciesDowngrade = false;
+                }
             }
-            else if( _gitStatus == GlobalGitStatus.LocalBranch )
+            else if( _workStatus == WorkStatus.SwitchingToDevelop )
             {
-                RunUnitTests = false;
-                AutoCommit = false;
-                IsRemotesRequired = false;
-            }
-            else if( _gitStatus == GlobalGitStatus.FromLocalToDevelop )
-            {
+                TargetLocal = false;
                 RunUnitTests = false;
                 AutoCommit = false;
                 IsRemotesRequired = true;
+                AllowPackageDependenciesDowngrade = false;
             }
-            else if( _gitStatus == GlobalGitStatus.FromDevelopToLocal )
+            else if( _workStatus == WorkStatus.SwitchingToLocal )
             {
+                TargetLocal = true;
                 RunUnitTests = false;
                 AutoCommit = false;
                 IsRemotesRequired = false;
+                AllowPackageDependenciesDowngrade = false;
             }
-            else if( _gitStatus == GlobalGitStatus.Releasing )
+            else if( _workStatus == WorkStatus.Releasing )
             {
+                TargetLocal = false;
                 RunUnitTests = true;
                 AutoCommit = false;
                 IsRemotesRequired = false;
+                AllowPackageDependenciesDowngrade = false;
             }
+            else if( _workStatus == WorkStatus.CancellingRelease )
+            {
+                TargetLocal = false;
+                RunUnitTests = false;
+                AutoCommit = false;
+                IsRemotesRequired = false;
+                AllowPackageDependenciesDowngrade = true;
+            }
+            else throw new InvalidOperationException( nameof( WorkStatus ) );
         }
 
-        public bool TargetLocal => _gitStatus == GlobalGitStatus.FromDevelopToLocal || _gitStatus == GlobalGitStatus.LocalBranch;
+        public bool TargetLocal { get; private set; }
 
-        public bool TargetDevelop => _gitStatus == GlobalGitStatus.FromLocalToDevelop || _gitStatus == GlobalGitStatus.DevelopBranch;
+        public bool TargetDevelop => !TargetLocal && !TargetRelease;
 
-        public bool TargetRelease => _gitStatus == GlobalGitStatus.Releasing;
+        public bool TargetRelease => _workStatus == WorkStatus.Releasing;
 
         public string RemoteStorePushApiKey => _remoteStorePushApiKey;
 
@@ -85,27 +113,7 @@ namespace CK.Env.MSBuild
 
         public bool AutoCommit { get; set; }
 
-        string GetMyGetApiKey( IActivityMonitor m )
-        {
-            if( _myGetApiKey == null )
-            {
-                Console.Write( "Enter MYGET_API_KEY to push packages to remote feed: " );
-                _myGetApiKey = Console.ReadLine();
-                if( String.IsNullOrEmpty( _myGetApiKey ) ) _myGetApiKey = null;
-            }
-            return _myGetApiKey;
-        }
-
-        string GetRemoteStorePushKey( IActivityMonitor m )
-        {
-            if( _remoteStorePushApiKey == null )
-            {
-                Console.Write( "Enter https://cksetup.invenietis.net/ key to push components: " );
-                _remoteStorePushApiKey = Console.ReadLine();
-                if( String.IsNullOrEmpty( _remoteStorePushApiKey ) ) _remoteStorePushApiKey = null;
-            }
-            return _remoteStorePushApiKey;
-        }
+        public bool AllowPackageDependenciesDowngrade { get; set; }
 
     }
 

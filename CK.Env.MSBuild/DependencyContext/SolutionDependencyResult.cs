@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Setup;
 using CK.Text;
+using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -155,14 +156,14 @@ namespace CK.Env.MSBuild
             /// better version and saves the solution and its updated projects.
             /// </summary>
             /// <param name="m">The monitor to use.</param>
-            /// <param name="feeds">The local feed provider.</param>
+            /// <param name="localPackageFinder">The local package version resolver.</param>
             /// <param name="fileSystem">The file system.</param>
-            /// <param name="allowDowngrade">Optional allow downgrade. Should not be necessary.</param>
+            /// <param name="allowDowngrade">Optional allow downgrade. Necessary when cancelling a release.</param>
             /// <param name="allowMissing">Defaults to true to be able to start with empty local feeds.</param>
             /// <returns>Whether the upgrade succeeded.</returns>
-            public bool UpgradePackagesToTheMax(
+            public bool UpdatePackageDependencies(
                 IActivityMonitor m,
-                ILocalFeedProvider feeds,
+                Func<IActivityMonitor,string,SVersion> localPackageFinder,
                 FileSystem fileSystem,
                 bool allowDowngrade = false,
                 bool allowMissing = true,
@@ -174,14 +175,14 @@ namespace CK.Env.MSBuild
                                                  && d.SourceProject.Project.IsBuildProject == buildProjects )
                                     .Select( d => (
                                             Row: d,
-                                            LocalVersion: feeds.GetBestLocalVersion( m, d.PackageId )) )
+                                            LocalVersion: localPackageFinder( m, d.PackageId )) )
                                     .ToList();
 
                 var changes = all.Where( d => d.LocalVersion == null || d.LocalVersion != d.Row.RawPackageDependency.Version );
                 var missings = changes.Where( d => d.LocalVersion == null );
                 if( missings.Any() )
                 {
-                    m.Log( allowMissing ? LogLevel.Warn : LogLevel.Fatal,$"Packages not found locally: {missings.Select( u => u.Row.PackageId ).Concatenate()}." );
+                    m.Log( allowMissing ? LogLevel.Warn : LogLevel.Fatal, $"Packages not found locally: {missings.Select( u => u.Row.PackageId ).Concatenate()}." );
                     if( !allowMissing ) return false;
                 }
                 var downgrade = changes.Where( d => d.LocalVersion != null && d.LocalVersion < d.Row.RawPackageDependency.Version );
@@ -280,7 +281,6 @@ namespace CK.Env.MSBuild
         /// Gets the kind of projects that have been considered to sort solutions.
         /// </summary>
         public SolutionSortStrategy Content { get; }
-
 
         /// <summary>
         /// Gets the project dependency result.

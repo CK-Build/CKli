@@ -21,22 +21,8 @@ namespace CK.Env
         /// <summary>
         /// All GitFolders are on <see cref="IWorldName.DevelopBranchName"/>.
         /// </summary>
-        DevelopBranch,
+        DevelopBranch
 
-        /// <summary>
-        /// GitFolders are transitioning from 'develop' to 'local' branches.
-        /// </summary>
-        FromDevelopToLocal,
-
-        /// <summary>
-        /// GitFolders are transitioning from  'local' to 'develop' branches.
-        /// </summary>
-        FromLocalToDevelop,
-
-        /// <summary>
-        /// A release is being done.
-        /// </summary>
-        Releasing
     }
 
 }

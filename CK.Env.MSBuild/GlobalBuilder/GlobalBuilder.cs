@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace CK.Env.MSBuild
 {
-    public class GlobalBuilder
+    class GlobalBuilder
     {
         readonly SolutionDependencyResult _dependencyResult;
         readonly FileSystem _fileSystem;
@@ -42,7 +42,7 @@ namespace CK.Env.MSBuild
             {
                 Console.Write( "Do you want to push packages to remotes? (Y/N):" );
                 char a;
-                while( (a = Console.ReadKey().KeyChar) == 'Y' || a == 'N');
+                while( (a = Console.ReadKey().KeyChar) != 'Y' && a != 'N' ) ;
                 _buildInfo.IsRemotesRequired = a == 'Y';
             }
             Debug.Assert( _buildInfo.IsRemotesRequired.HasValue );
@@ -79,16 +79,15 @@ namespace CK.Env.MSBuild
             var filteredSolutions = FilterSolutions( _dependencyResult.Solutions );
             foreach( var s in filteredSolutions )
             {
-                DisplaySolutionList( m, filteredSolutions, s );
+                if( !StartBuilding( m, filteredSolutions,s ) ) return false;
                 var gitFolder = s.Solution.GitFolder;
                 if( !_buildInfo.AutoCommit && !gitFolder.CheckCleanCommit( m ) )
                 {
                     m.Error( $"GitFolder {gitFolder.SubPath} must be commited." );
                     return false;
                 }
-                if( !s.UpgradePackagesToTheMax( m, _feeds, _fileSystem, allowDowngrade: true ) ) return false;
-
-                var result = gitFolder.Commit( m, "GlobalCIBuild commit." );
+                if( !s.UpdatePackageDependencies( m, GetDependentPackageVersion, _fileSystem, _buildInfo.AllowPackageDependenciesDowngrade ) ) return false;
+                var result = gitFolder.Commit( m, "Global build commit." );
                 if( !result.Success ) return false;
 
                 bool buildRequired = true;
@@ -103,7 +102,7 @@ namespace CK.Env.MSBuild
                 m.Info( $"Target Version = {v}" );
                 if( !result.CommitCreated )
                 {
-                    var existingPackages = s.Solution.PublishedProjects.Select( p => (p.Name, _feeds.FindInLocalFeeds( m, p.Name, v )) ).ToList();
+                    var existingPackages = s.Solution.PublishedProjects.Select( p => (p.Name, _feeds.FindInAnyLocalFeeds( m, p.Name, v )) ).ToList();
                     if( existingPackages.All( e => e.Item2 ) )
                     {
                         if( !_buildInfo.RunUnitTests )
@@ -121,7 +120,7 @@ namespace CK.Env.MSBuild
                     else m.Info( $"Packages to produce: {existingPackages.Where( e => !e.Item2 ).Select( e => e.Item1 ).Concatenate()}" );
                 }
 
-                Debug.Assert( buildRequired || _buildInfo.RunUnitTests );
+                Debug.Assert( buildRequired || (_buildInfo.RunUnitTests && !_testRunMemory.HasBeenTested( m, commitSHA1 )) );
 
                 var path = gitFolder.FileSystem.GetFileInfo( s.Solution.SolutionFolderPath ).PhysicalPath;
                 var args = "run --project CodeCakeBuilder -autointeraction";
@@ -155,6 +154,8 @@ namespace CK.Env.MSBuild
 
         protected GlobalBuilderInfo BuildInfo => _buildInfo;
 
+        protected ILocalFeedProvider Feeds => _feeds;
+
         protected string GetTargetFeedFolderPath( IActivityMonitor m )
         {
             return _buildInfo.TargetLocal
@@ -167,6 +168,17 @@ namespace CK.Env.MSBuild
         protected virtual IReadOnlyList<SolutionDependencyResult.DependentSolution> FilterSolutions( IReadOnlyList<SolutionDependencyResult.DependentSolution> solutions )
         {
             return solutions;
+        }
+
+        protected virtual bool StartBuilding( IActivityMonitor m, IReadOnlyList<SolutionDependencyResult.DependentSolution> solutions, SolutionDependencyResult.DependentSolution s )
+        {
+            DisplaySolutionList( m, solutions, s );
+            return true;
+        }
+
+        protected virtual SVersion GetDependentPackageVersion( IActivityMonitor m, string packageId )
+        {
+            return _feeds.GetBestAnyLocalVersion( m, packageId );
         }
 
         protected virtual SVersion GetTargetVersion( IActivityMonitor m, SolutionDependencyResult.DependentSolution s )

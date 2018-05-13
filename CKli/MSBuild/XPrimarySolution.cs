@@ -7,6 +7,7 @@ using CK.Core;
 using CK.Env.MSBuild;
 using CK.Env.Analysis;
 using CK.Text;
+using System.Linq;
 
 namespace CKli
 {
@@ -40,12 +41,33 @@ namespace CKli
         /// </summary>
         public bool TestProjectsArePublished { get; private set; }
 
+        /// <summary>
+        /// Gets a semicolon separated list of project names that must be removed from <see cref="CK.Env.MSBuild.Solution.PublishedProjects"/>.
+        /// </summary>
+        public string NotPublishedProjects { get; private set; }
+
         public override Solution GetSolution( IActivityMonitor m, bool reload, string projectToBranchName = null )
         {
             var (s, loaded) = SolutionCentral.MSBuildContext.FindOrLoadSolution( m, GetSolutionFilePath( projectToBranchName ), null, SolutionSpecialType.None, reload );
-            if( loaded && TestProjectsArePublished )
+            if( loaded )
             {
-                s.PublishedProjects.AddRange( s.TestProjects );
+                if( TestProjectsArePublished )
+                {
+                    s.PublishedProjects.AddRange( s.TestProjects );
+                }
+                string[] unpublish = NotPublishedProjects?.Split( ';' );
+                if( unpublish != null )
+                {
+                    foreach( var u in unpublish )
+                    {
+                        var idxU = s.PublishedProjects.IndexOf( p => p.Name == u );
+                        if( idxU < 0 )
+                        {
+                            m.Warn( $"NotPublishedProject '{u}' not found in solution PublishedProjects: {s.PublishedProjects.Select( p => p.Name ).Concatenate()}." );
+                        }
+                        else s.PublishedProjects.RemoveAt( idxU );
+                    }
+                }
             }
             return s;
         }

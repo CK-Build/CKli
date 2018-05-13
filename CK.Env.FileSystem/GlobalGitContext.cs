@@ -26,7 +26,7 @@ namespace CK.Env
             FileSystem = _gitFolders[0].FileSystem;
         }
 
-        public bool CheckStatus( IActivityMonitor m, ref GlobalGitStatus readGitStatus )
+        public bool CheckStatus( IActivityMonitor m, ref GlobalGitStatus gitStatus )
         {
             var bBadBranches = _gitFolders
                                 .Where( g => g.CurrentBranchName != World.DevelopBranchName
@@ -58,68 +58,39 @@ namespace CK.Env
                     }
                 }
 
-                switch( readGitStatus )
+                if( gitStatus  == GlobalGitStatus.Unknwon )
                 {
-                    case GlobalGitStatus.Unknwon:
-                        DumpMixDetail( LogLevel.Error, "Unable to initialize status." );
-                        return false;
-                    case GlobalGitStatus.FromDevelopToLocal:
-                    case GlobalGitStatus.FromLocalToDevelop:
-                        DumpMixDetail( LogLevel.Error, $"This is compatible with recorded status '{readGitStatus}'." );
-                        return true;
-                    default:
-                        Debug.Assert( readGitStatus == GlobalGitStatus.LocalBranch
-                                      || readGitStatus == GlobalGitStatus.DevelopBranch
-                                      || readGitStatus == GlobalGitStatus.Releasing );
-                        DumpMixDetail( LogLevel.Error, $"Current recorded status {readGitStatus} is invalid." );
-                        return false;
+                    DumpMixDetail( LogLevel.Error, "Unable to initialize status." );
+                    return false;
                 }
+                DumpMixDetail( LogLevel.Error, $"This is compatible with recorded status '{gitStatus}'." );
+                return true;
             }
             else if( current == World.DevelopBranchName )
             {
-                switch( readGitStatus )
+                if( gitStatus == GlobalGitStatus.Unknwon )
                 {
-                    case GlobalGitStatus.Unknwon:
-                        readGitStatus = GlobalGitStatus.DevelopBranch;
-                        m.Info( $"Initializing status on {readGitStatus}." );
-                        return true;
-                    case GlobalGitStatus.DevelopBranch:
-                        return true;
-                    case GlobalGitStatus.Releasing:
-                        m.Info( $"A release is beeing done." );
-                        return true;
-                    case GlobalGitStatus.FromLocalToDevelop:
-                        m.Info( $"All Git folders are on {World.DevelopBranchName}. this is compatible with status '{readGitStatus}'." );
-                        return true;
-                    default:
-                        Debug.Assert( readGitStatus == GlobalGitStatus.LocalBranch || readGitStatus == GlobalGitStatus.FromDevelopToLocal );
-                        m.Error( $"All Git folders are on {World.DevelopBranchName}. this is not compatible with status '{readGitStatus}'." );
-                        return false;
+                    gitStatus = GlobalGitStatus.DevelopBranch;
+                    m.Info( $"Initializing status on {gitStatus}." );
+                    return true;
                 }
+                if( gitStatus == GlobalGitStatus.DevelopBranch )  return true;
+                m.Error( $"All Git folders are on {World.DevelopBranchName}. this is not compatible with status '{gitStatus}'." );
+                return false;
             }
             else
             {
                 Debug.Assert( current == World.LocalBranchName );
-                switch( readGitStatus )
+                if( gitStatus == GlobalGitStatus.Unknwon )
                 {
-                    case GlobalGitStatus.Unknwon:
-                        readGitStatus = GlobalGitStatus.LocalBranch;
-                        m.Info( $"Initializing status on {readGitStatus}." );
-                        return true;
-                    case GlobalGitStatus.LocalBranch:
-                        return true;
-                    case GlobalGitStatus.FromDevelopToLocal:
-                        m.Info( $"All Git folders are on {World.LocalBranchName}. this is compatible with status '{readGitStatus}'." );
-                        return true;
-                    default:
-                        Debug.Assert( readGitStatus == GlobalGitStatus.DevelopBranch
-                                      || readGitStatus == GlobalGitStatus.FromLocalToDevelop
-                                      || readGitStatus == GlobalGitStatus.Releasing );
-                        m.Error( $"All Git folders are on {World.LocalBranchName}. this is not compatible with status '{readGitStatus}'." );
-                        return false;
+                    gitStatus = GlobalGitStatus.LocalBranch;
+                    m.Info( $"Initializing status on {gitStatus}." );
+                    return true;
                 }
+                if( gitStatus == GlobalGitStatus.LocalBranch ) return true;
+                m.Error( $"All Git folders are on {World.LocalBranchName}. this is not compatible with status '{gitStatus}'." );
+                return false;
             }
-
         }
 
         public FileSystem FileSystem { get; }

@@ -344,7 +344,7 @@ namespace CK.Env.MSBuild
                             ProjectItem projectItem = projectItems[p];
                             projectItem.IsPublished = true;
                             packages.Add( p.Name, new Package( projectItem ) );
-                            m.Info( $"Package {p.Name} created." );
+                            m.Debug( $"Package {p.Name} created." );
                         }
                     }
                 }

@@ -17,6 +17,7 @@ namespace CKli
         readonly XPublishedPackageFeeds _packageFeeds;
         readonly MSBuildContext _msBuildContext;
         readonly XReferentialFolder _referential;
+        readonly XPublishKeyStore _publishKeyStore;
         readonly List<XSolutionBase> _allSolutions;
         readonly List<XSolutionBase> _allDevelopSolutions;
         readonly List<XGitFolder> _allGitFoldersWithDevelopBranchName;
@@ -27,6 +28,7 @@ namespace CKli
             IWorldName world,
             IWorldStore worldStore,
             XReferentialFolder referential,
+            XPublishKeyStore publishKeyStore,
             XPublishedPackageFeeds packageFeeds,
             Initializer initializer )
             : base( initializer )
@@ -35,12 +37,12 @@ namespace CKli
             _worldStore = worldStore;
             _packageFeeds = packageFeeds;
             _referential = referential;
+            _publishKeyStore = publishKeyStore;
             _msBuildContext = new MSBuildContext( fileSystem );
             initializer.Services.Add( this );
             _allSolutions = new List<XSolutionBase>();
             _allDevelopSolutions = new List<XSolutionBase>();
             _allGitFoldersWithDevelopBranchName = new List<XGitFolder>();
-            initializer.InitializationState.Add( this, new HashSet<(int, XGitFolder)>() );
         }
 
         internal void Register( XSolutionBase s )
@@ -71,6 +73,7 @@ namespace CKli
                                     _worldStore,
                                     _packageFeeds,
                                     _referential.FileProvider,
+                                    _publishKeyStore,
                                     AllGitFoldersWithDevelopBranchName.Select( g => g.GitFolder ),
                                     ( monitor, branchName ) => AllDevelopSolutions.Select( s => s.GetSolution( monitor, true, branchName ) ).ToList() );
 

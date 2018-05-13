@@ -111,23 +111,23 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor.</param>
         /// <param name="branchName">The local name of the branch.</param>
-        /// <param name="alwaysFetchAll">True to always call <see cref="FetchAll"/>.</param>
+        /// <param name="alwaysPullAll">True to always call <see cref="PullAll"/>.</param>
         /// <returns>
         /// Success is true on success, false on error (such as merge conflicts) and in case of success,
         /// the result states whether a reload should be required or if nothing changed.
         /// </returns>
-        public (bool Success, bool ReloadNeeded) CheckoutAndPull( IActivityMonitor m, string branchName, bool alwaysFetchAll = false )
+        public (bool Success, bool ReloadNeeded) CheckoutAndPull( IActivityMonitor m, string branchName, bool alwaysPullAll = false )
         {
             using( m.OpenInfo( $"Checking out branch '{branchName}' in '{SubPath}'." ) )
             {
                 try
                 {
-                    if( alwaysFetchAll && !FetchAll( m ) ) return (false,false);
+                    if( alwaysPullAll && !PullAll( m ) ) return (false,false);
                     Branch b = _git.Branches[branchName];
                     if( b == null )
                     {
                         m.Info( $"No local branch '{branchName}' in '{SubPath}'." );
-                        if( !alwaysFetchAll && !FetchAll( m ) ) return (false,false);
+                        if( !alwaysPullAll && !PullAll( m ) ) return (false,false);
                         string remoteName = "origin/" + branchName;
                         var remote = _git.Branches[remoteName];
                         if( remote == null )
@@ -172,7 +172,7 @@ namespace CK.Env
                     } );
                     if( result.Status == MergeStatus.Conflicts )
                     {
-                        m.Error( "Merge conflicts occurred. Unable to Pull changes from the remote." );
+                        m.Error( "Merge conflicts occurred. Unable to merge changes from the remote." );
                         return (false,false);
                     }
                     return (true, reloadNeeded || result.Status != MergeStatus.UpToDate);
@@ -186,26 +186,43 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Fetches 'origin' or all remotes changes into this repository.
+        /// Fetches 'origin' (or all remotes) and merge changes into this repository.
+        /// There current head must be clean.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool FetchAll( IActivityMonitor m, bool originOnly = true )
+        public bool PullAll( IActivityMonitor m, bool originOnly = true )
         {
-            using( m.OpenInfo( $"Fetching {(originOnly ? "origin" : "all remotes")} in repository '{FullPath}'" ) )
+            using( m.OpenInfo( $"Pulling {(originOnly ? "origin" : "all remotes")} in repository '{FullPath}'" ) )
             {
                 try
                 {
+                    if( !CheckCleanCommit( m ) ) return false;
+                    var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
+                    var mOpt = new MergeOptions
+                    {
+                        CommitOnSuccess = true,
+                        FailOnConflict = true,
+                        FastForwardStrategy = FastForwardStrategy.Default,
+                        SkipReuc = true
+                    };
                     foreach( Remote remote in _git.Network.Remotes.Where( r => !originOnly || r.Name == "origin" ) )
                     {
-                        m.Info( $"Fetching remote {remote.Name}" );
+                        m.Info( $"Fetching remote '{remote.Name}'." );
                         IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification );
                         Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
                         {
                             CredentialsProvider = DefaultCredentialHandler,
                             TagFetchMode = TagFetchMode.All
-                        }, $"Fetching remote {remote.Name}" );
+                        }, $"Fetching remote '{remote.Name}'." );
+                        MergeResult r = _git.MergeFetchedRefs( merger, mOpt );
+                        if( r.Status == MergeStatus.Conflicts )
+                        {
+                            m.Error( "Merge conflicts occurred. Unable to merge changes from the remote." );
+                            return false;
+                        }
                     }
+                    return true;
                 }
                 catch( Exception ex )
                 {
@@ -213,7 +230,6 @@ namespace CK.Env
                     return false;
                 }
             }
-            return true;
         }
 
         /// <summary>
@@ -281,36 +297,68 @@ namespace CK.Env
                 if( exists != null && exists.PeeledTarget == _git.Head.Tip )
                 {
                     m.Info( $"Version Tag {v} is already set." );
-                    return (true,false);
+                    return (true, false);
                 }
                 _git.ApplyTag( v.ToString() );
                 m.Info( $"Set Version tag {v} on {CurrentBranchName}." );
-                return (true,true);
+                return (true, true);
             }
             catch( Exception ex )
             {
                 m.Error( $"SetVersionTag {v} on {CurrentBranchName} failed.", ex );
-                return (false,false);
+                return (false, false);
             }
         }
 
         /// <summary>
-        /// Sets a version lightweight tag on the current head.
+        /// Pushes a version lightweight tag to the 'origin' remote.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="v">The version to set.</param>
+        /// <param name="v">The version to push.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool PushVersionTag( IActivityMonitor m, SVersion v )
+        {
+            using( m.OpenInfo( $"Pushing tag {v} to remote for {SubPath}." ) )
+            {
+                try
+                {
+                    Remote remote = _git.Network.Remotes["origin"];
+                    var options = new PushOptions() { CredentialsProvider = DefaultCredentialHandler };
+
+                    var exists = _git.Tags[v.ToString()];
+                    if( exists == null )
+                    {
+                        m.Error( $"Version Tag {v} does not exist in {SubPath}." );
+                        return false;
+                    }
+                    _git.Network.Push( remote, exists.CanonicalName, options );
+                    return true;
+                }
+                catch( Exception ex )
+                {
+                    m.Error( $"PushVersionTags failed ({v} on {SubPath}).", ex );
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Removes a version lightweight tag from the repository.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="v">The version to remove.</param>
         /// <returns>True on success, false on error.</returns>
         public bool ClearVersionTag( IActivityMonitor m, SVersion v )
         {
             try
             {
                 _git.Tags.Remove( v.ToString() );
-                m.Info( $"Removing Version tag {v} on {CurrentBranchName}." );
+                m.Info( $"Removing Version tag '{v}' from {SubPath}." );
                 return true;
             }
             catch( Exception ex )
             {
-                m.Error( $"ClearVersionTag {v} on {CurrentBranchName} failed.", ex );
+                m.Error( $"ClearVersionTag {v} on {SubPath} failed.", ex );
                 return false;
             }
         }
@@ -378,22 +426,33 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Pushes changes from the current branch to the origin.
+        /// Pushes changes from a branch to the origin.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
+        /// <param name="branchName">Local branch name.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool Push( IActivityMonitor m )
+        public bool Push( IActivityMonitor m, string branchName )
         {
-            using( m.OpenInfo( $"Pushing '{SubPath}' (branch '{CurrentBranchName}') to origin." ) )
+            using( m.OpenInfo( $"Pushing '{SubPath}' (branch '{branchName}') to origin." ) )
             {
                 try
                 {
-                    if( !CheckCleanCommit( m ) ) return false;
+                    var b = _git.Branches[branchName];
+                    if( b == null )
+                    {
+                        m.Error( $"Unable to find branch '{branchName}'." );
+                        return false;
+                    }
+                    if( !b.IsTracking )
+                    {
+                        m.Warn( $"Branch '{branchName}' does not exist on the remote. Creating the remote branch on 'origin'." );
+                        _git.Branches.Update( b, u => { u.Remote = "origin"; u.UpstreamBranch = b.CanonicalName; } );
+                    }
                     var options = new PushOptions()
                     {
                         CredentialsProvider = DefaultCredentialHandler
                     };
-                    _git.Network.Push( _git.Head, options );
+                    _git.Network.Push( b, options );
                     return true;
                 }
                 catch( Exception ex )
@@ -487,8 +546,8 @@ namespace CK.Env
                         return false;
                     }
 
-                    var blankStorePath = Path.Combine( _feedProvider.GetLocalFeedFolder( m ).PhysicalPath, "CKSetupStore" );
-                    if( !EnsureCKSetupStoreTestHelperConfig( m, blankStorePath ) ) return false;
+                    var localStorePath = _feedProvider.GetLocalCKSetupStorePath( m );
+                    if( !EnsureCKSetupStoreTestHelperConfig( m, localStorePath ) ) return false;
                     if( !EnsureRepositoryXmlBlankDevBranch( m ) ) return false;
                     if( !EnsureLocalFeedsNuGetSource( m ).Success ) return false;
                     if( !Commit( m, "Updated Repository.xml and nuget.config for 'local' branch." ).Success ) return false;

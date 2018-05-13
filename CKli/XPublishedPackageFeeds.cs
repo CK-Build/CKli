@@ -8,12 +8,14 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace CKli
 {
     public class XPublishedPackageFeeds : XTypedObject, ILocalFeedProvider
     {
         static readonly NormalizedPath _localNuGetCache = Path.GetFullPath( Environment.ExpandEnvironmentVariables( "%UserProfile%/.nuget/packages/" ) );
+        static string _nugetCommandLineDirectory;
 
         readonly XSharedHttpClient _http;
         readonly FileSystem _fs;
@@ -127,27 +129,37 @@ namespace CKli
             }
         }
 
-        public SVersion GetBestLocalVersion( IActivityMonitor m, string packageId )
+        public SVersion GetBestAnyLocalVersion( IActivityMonitor m, string packageId )
         {
             SVersion Max( SVersion v1, SVersion v2 ) => v1 > v2 ? v1 : v2;
 
-            var localFeed = GetCIFeedFolder( m ).PhysicalPath;
-            var blankFeed = GetLocalFeedFolder( m ).PhysicalPath;
+            var localFeed = GetLocalFeedFolder( m ).PhysicalPath;
+            var ciFeed = GetCIFeedFolder( m ).PhysicalPath;
             var releaseFeed = GetReleaseFeedFolder( m ).PhysicalPath;
-            var inBlank = GetMaxVersionFromFeed( blankFeed, packageId );
-            var inLocalFeed = GetMaxVersionFromFeed( localFeed, packageId );
+            var inLocal = GetMaxVersionFromFeed( localFeed, packageId );
+            var inCIFeed = GetMaxVersionFromFeed( ciFeed, packageId );
             var inRelease = GetMaxVersionFromFeed( releaseFeed, packageId );
-            return Max( inBlank, Max( inLocalFeed, inRelease ) );
+            return Max( inLocal, Max( inCIFeed, inRelease ) );
         }
 
-        /// <summary>
-        /// Finds a package in a specific version in the local feeds.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="packageId">The package identifier.</param>
-        /// <param name="version">The exact version.</param>
-        /// <returns>True if the package exists.</returns>
-        public bool FindInLocalFeeds( IActivityMonitor m, string packageId, SVersion version )
+        public SVersion GetBestLocalCIVersion( IActivityMonitor m, string packageId )
+        {
+            return GetMaxVersionFromFeed( GetCIFeedFolder( m ).PhysicalPath, packageId );
+        }
+
+        public LocalPackageFile GetBestLocalCIPackage( IActivityMonitor m )
+        {
+            return GetBestLocalPackage( m, GetCIFeedFolder( m ).PhysicalPath );
+        }
+
+        public LocalPackageFile GetLocalCIPackage( IActivityMonitor m, string packageId, SVersion v )
+        {
+            var f = Path.Combine( GetCIFeedFolder( m ).PhysicalPath, packageId + '.' + v.ToString() + ".nupkg" );
+            return File.Exists( f ) ? new LocalPackageFile( f, packageId, v, false ) : null;
+        }
+
+
+        public bool FindInAnyLocalFeeds( IActivityMonitor m, string packageId, SVersion version )
         {
             var feed = GetCIFeedFolder( m ).PhysicalPath;
             if( GetAllVersionsFromFeed( feed, packageId ).Any( v => v == version ) ) return true;
@@ -171,6 +183,25 @@ namespace CKli
                                 .Select( v => SVersion.Parse( v ) );
         }
 
+        public IEnumerable<LocalPackageFile> GetAllPackageFilesInReleaseFeed( IActivityMonitor m, bool withSymbols = false )
+        {
+            return GetAllPackageFiles( m, GetReleaseFeedFolder( m ).PhysicalPath, withSymbols );
+        }
+
+        LocalPackageFile GetBestLocalPackage( IActivityMonitor m, string feedPath )
+        {
+            return GetAllPackageFiles( m, feedPath, false )
+                    .OrderByDescending( p => p.Version )
+                    .FirstOrDefault();
+        }
+
+        IEnumerable<LocalPackageFile> GetAllPackageFiles( IActivityMonitor m, string feedPath, bool withSymbols )
+        {
+            return Directory.EnumerateFiles( feedPath, "*.nupkg" )
+                            .Where( f => withSymbols || !f.EndsWith( ".symbols.nupkg" ) )
+                            .Select( f => LocalPackageFile.Parse( f ) );
+        }
+
         SVersion GetMaxVersionFromFeed( string path, string packageId )
         {
             // Note: Max on reference type returns null on empty source.
@@ -184,6 +215,29 @@ namespace CKli
                 .Select( p => SafeParse( m, p ) )
                 .Where( v => v != null )
                 .Max( v => v );
+        }
+
+        public string GetNuGetCommandLineDirectory( IActivityMonitor m )
+        {
+            if( _nugetCommandLineDirectory == null )
+            {
+                _nugetCommandLineDirectory = Directory.GetDirectories( _localNuGetCache.AppendPart( "nuget.commandline" ) )
+                    .Select( p => (Dir: p, Version: SafeParse( m, p )) )
+                    .Where( t => t.Version != null )
+                    .OrderByDescending( t => t.Version )
+                    .FirstOrDefault().Dir;
+                if( _nugetCommandLineDirectory == null )
+                {
+                    _nugetCommandLineDirectory = String.Empty;
+                    m.Warn( $"Unable to find NuGet.exe from NuGet.CommandLine package." );
+                }
+                else
+                {
+                    _nugetCommandLineDirectory = Path.Combine( _nugetCommandLineDirectory, "tools" );
+                    m.Info( $"Best NuGet.exe found: "+ _nugetCommandLineDirectory );
+                }
+            }
+            return _nugetCommandLineDirectory.Length > 0 ? _nugetCommandLineDirectory : null;
         }
 
         public void RemoveFromNuGetCache( IActivityMonitor m, string packageId, SVersion version )

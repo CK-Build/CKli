@@ -23,7 +23,7 @@ namespace CKli
                 using( m.OpenInfo( $"Fetching {xgit.Name} 'origin' remote" ) )
                 {
                     // With git folder: Fetch 'origin'.
-                    if( !xgit.GitFolder.FetchAll( m ) ) return false;
+                    if( !xgit.GitFolder.PullAll( m ) ) return false;
                 }
             }
             return true;

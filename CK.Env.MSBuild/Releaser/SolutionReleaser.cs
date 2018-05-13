@@ -67,23 +67,17 @@ namespace CK.Env
             // package upgrade.
             foreach( var s in Solution.Requirements )
             {
-                var info = _releaser.FindBySolution( s ).EnsureReleaseInfo( m, versionSelector );
-                if( !info.IsValid ) return _releaseInfo;
-                requirements = requirements.CombineRequirement( info );
+                var sInfo = _releaser.FindBySolution( s ).EnsureReleaseInfo( m, versionSelector );
+                if( !sInfo.IsValid ) return _releaseInfo;
+                requirements = requirements.CombineRequirement( sInfo );
 
                 var updates = GlobalResult.ProjectDependencies.DependencyTable
                                 .Where( r => !r.IsExternalDependency
                                              && r.SourceProject.Project.PrimarySolution == Solution.Solution
                                              && r.TargetPackage.Project.PrimarySolution == s.Solution
-                                             && r.Version != info.Version )
-                                .Select( p => (p.RawPackageDependency, (SVersion)info.Version) );
+                                             && r.Version != sInfo.Version )
+                                .Select( p => (p.RawPackageDependency, (SVersion)sInfo.Version) );
 
-                //var updates = GlobalResult.DependencyTable
-                //                                    .Where( r => r.Origin?.PrimarySolution == Solution.Solution
-                //                                                 && r.Target.PrimarySolution == s.Solution )
-                //                                    .SelectMany( r => r.Origin.Deps.Packages )
-                //                                    .Where( p => p.Version.ToString() != info.Version.ToString( CSVersionFormat.ShortForm ) )
-                //                                    .Select( p => (p, info.Version) );
                 _packageVersionUpdate.AddRange( updates );
             }
             // Handle package references updates.
