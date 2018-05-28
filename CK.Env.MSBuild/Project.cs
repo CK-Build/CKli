@@ -43,15 +43,27 @@ namespace CK.Env.MSBuild
             public bool IsInitialized => Packages != null;
 
             /// <summary>
-            /// Gets the <see cref="DeclaredPackageDependency"/> that applies to frameworks.
+            /// Gets the <see cref="DeclaredPackageDependency"/> that applies to a given set of frameworks.
             /// </summary>
             /// <param name="frameworks">Frameworks to consider. When empty, all dependencies apply.</param>
             /// <returns>The filtered set of dependencies.</returns>
-            public IEnumerable<DeclaredPackageDependency> Filter( CKTrait frameworks )
+            public IEnumerable<DeclaredPackageDependency> GetFilteredPackageReferences( CKTrait frameworks )
             {
                 return frameworks.IsEmpty
                         ? Packages
                         : Packages.Where( p => p.Frameworks.Intersect( frameworks ) == frameworks );
+            }
+
+            /// <summary>
+            /// Gets the <see cref="ProjectToProjectDependency"/> that applies to a given set of frameworks.
+            /// </summary>
+            /// <param name="frameworks">Frameworks to consider. When empty, all dependencies apply.</param>
+            /// <returns>The filtered set of dependencies.</returns>
+            public IEnumerable<ProjectToProjectDependency> GetFilteredProjectReferences( CKTrait frameworks )
+            {
+                return frameworks.IsEmpty
+                        ? Projects
+                        : Projects.Where( p => p.Frameworks.Intersect( frameworks ) == frameworks );
             }
 
             internal Dependencies(

@@ -74,7 +74,7 @@ namespace CKli
             var toRemove = _solutions.AllDevelopSolutions.Select( s => s.GetSolution( builder.Monitor, false ) )
                         .SelectMany( s => s.AllProjects )
                         .Select( p => (Project: p,
-                                       Applicable: _knownDeps.Where( dep => p.Deps.Filter( dep.Frameworks )
+                                       Applicable: _knownDeps.Where( dep => p.Deps.GetFilteredPackageReferences( dep.Frameworks )
                                                                                   .Where( d => dep.Name == d.PackageId ).Any() )) )
                         .Select( t => (t.Project,
                                        ToRemove: t.Project.Deps.Packages

@@ -9,6 +9,9 @@ using System.Threading.Tasks;
 
 namespace CK.Env
 {
+    /// <summary>
+    /// Captures an immuatble set of <see cref="GitFolder"/> and a <see cref="IWorldName"/>. 
+    /// </summary>
     public class GlobalGitContext
     {
         readonly IReadOnlyList<GitFolder> _gitFolders;
@@ -26,6 +29,13 @@ namespace CK.Env
             FileSystem = _gitFolders[0].FileSystem;
         }
 
+        /// <summary>
+        /// Checks whether a <see cref="GlobalGitStatus"/> is compatible with the current state
+        /// of the repositories.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="gitStatus">The status to check.</param>
+        /// <returns>True if the status is valid according to the state of the actual repositories.</returns>
         public bool CheckStatus( IActivityMonitor m, ref GlobalGitStatus gitStatus )
         {
             var bBadBranches = _gitFolders
@@ -93,10 +103,19 @@ namespace CK.Env
             }
         }
 
+        /// <summary>
+        /// Gets the file system.
+        /// </summary>
         public FileSystem FileSystem { get; }
 
+        /// <summary>
+        /// Gest immutable the world.
+        /// </summary>
         public IWorldName World { get; }
 
+        /// <summary>
+        /// Gets all the Git folders.
+        /// </summary>
         public IReadOnlyList<GitFolder> GitFolders => _gitFolders;
 
     }

@@ -20,8 +20,7 @@ namespace CK.Env.MSBuild
             CKTrait frameworks )
         {
             Owner = owner;
-            PackageId = packageId;
-            Version = version;
+            Package = new VersionedPackage( packageId, version );
             OriginElement = originElement;
             PropertyVersionElement = finalDeclaration;
             Frameworks = frameworks;
@@ -33,14 +32,19 @@ namespace CK.Env.MSBuild
         public Project Owner { get; }
 
         /// <summary>
+        /// Gets the package identifier and version.
+        /// </summary>
+        public VersionedPackage Package { get; }
+
+        /// <summary>
         /// Gets the package identifier.
         /// </summary>
-        public string PackageId { get; }
+        public string PackageId => Package.PackageId;
 
         /// <summary>
         /// Gets the version.
         /// </summary>
-        public SVersion Version { get; }
+        public SVersion Version => Package.Version;
 
         /// <summary>
         /// Gets the frameworks to which this dependency applies.

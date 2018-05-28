@@ -9,11 +9,16 @@
 
   <KnownPackageVersions>
     <Package Name="Mono.Cecil" MinVersion="0.10.0" />
-    <Package Name="Code.Cake" MinVersion="0.25.0" />
-    <Package Name="FluentAssertions" Version="5.2.0" />
+    <Package Name="FluentAssertions" Version="5.3.0" />
     <Package Name="NUnit" Version="2.6.4" Frameworks="net461" />
     <Package Name="NUnitLite" Version="3.10.1" Frameworks="netstandard2.0;netcoreapp2.0" />
     <Package Name="NUnit" MinVersion="3.10.1" Frameworks="netstandard2.0;netcoreapp2.0" />
+    <Package Name="Microsoft.Extensions.Options" MinVersion="2.0.2" />
+    <Package Name="Microsoft.AspNetCore.Http" MinVersion="2.0.3" />
+    <Package Name="Microsoft.AspNetCore" MinVersion="2.0.3" />
+    <Package Name="Microsoft.AspNetCore.Hosting" MinVersion="2.0.3" />
+    <Package Name="Microsoft.CodeAnalysis.CSharp" MinVersion="2.8.2" />
+    <Package Name="System.Data.SqlClient" MinVersion="4.4.3" />
   </KnownPackageVersions>
 
   <KnownPackageDependencies>
@@ -32,6 +37,7 @@
   <GlobalFixBuildScriptAction Title="Fix build script (must be in 'local' branch)." />
   <!--<GlobalBlankBuildAction Title="Blank build: Build all Solutions locally in 'develop-local' branch." />-->
   <GlobalReleaserAction Title="Global Release." />
+  <ExternalPackagesAction Title="External packages analysis." />
   
   <!-- Unsafe brutal tools.
     
@@ -249,7 +255,17 @@
           <TestProjectsStandardConventions />
         </SecondarySolution>
         <Reuse Name="StandardFiles" />
-        <AppVeyorFile SqlServer="2016" PushToRemoteStore="True" />
+        <AppVeyorFile SqlServer="2016" />
+      </Branch>
+    </GitFolder>
+
+    <GitFolder Name="CK-DB-Github" Url="https://github.com/Invenietis/CK-DB-Github.git">
+      <Branch Name="develop">
+        <PrimarySolution TestProjectsArePublished="True">
+          <TestProjectsStandardConventions />
+        </PrimarySolution>
+        <Reuse Name="StandardFiles" />
+        <AppVeyorFile SqlServer="2016" />
       </Branch>
     </GitFolder>
 

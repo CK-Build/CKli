@@ -147,6 +147,9 @@ namespace CK.Env.MSBuild
 
         public bool IsTransitioning => _workStatus == WorkStatus.SwitchingToLocal || _workStatus == WorkStatus.SwitchingToDevelop;
 
+        /// <summary>
+        /// Gets whether the <see cref="WorkStatus"/> is not <see cref="WorkStatus.Idle"/>.
+        /// </summary>
         public bool HasWorkPending => _workStatus != WorkStatus.Idle;
 
         public bool ConcludeCurrentWork( IActivityMonitor m )
@@ -300,6 +303,23 @@ namespace CK.Env.MSBuild
             return b.Build( m );
         }
 
+        /// <summary>
+        /// Gets whether <see cref="CreateSolutionDependencyResult"/> can be called.
+        /// <see cref="WorkStatus"/> must be <see cref="WorkStatus.Idle"/>.
+        /// </summary>
+        public bool CanCreateSolutionDependencyResult => WorkStatus == WorkStatus.Idle;
+
+        /// <summary>
+        /// Creates a new <see cref="SolutionDependencyResult"/> based on <see cref="CurrentBranchName"/>.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>The solution result. Can be null on error.</returns>
+        public SolutionDependencyResult CreateSolutionDependencyResult( IActivityMonitor m )
+        {
+            if( !CanCreateSolutionDependencyResult ) throw new InvalidOperationException( nameof( CanCreateSolutionDependencyResult ) );
+            return GetSolutionDependencyResult( m, CurrentBranchName );
+        }
+
         public bool CanLocalFixToZeroBuildProjects => WorkStatus == WorkStatus.Idle && GlobalGitStatus == GlobalGitStatus.LocalBranch;
 
         public bool LocalFixToZeroBuildProjects( IActivityMonitor m, bool commitChanges = false )
@@ -309,51 +329,46 @@ namespace CK.Env.MSBuild
             var r = GetSolutionDependencyResult( m, World.LocalBranchName );
             if( r == null ) return false;
 
-            // Build projects should be handled independently.
-            // The dependency graph of the build dependencies projects (igonring solutions) should be computed.
-            // This works for the moment but is not the definitive implementation.
-            var buildDeps = r.ProjectDependencies.BuildDependencies;
-            var buildDepNames = r.ProjectDependencies.BuildDependencies.Select( p => p.Name ) ;
+            var buildDepNames = r.BuildProjectsInfo.DependenciesToBuild.Select( p => p.Project.Project.Name ) ;
 
-            using( m.OpenInfo( $"Removing {buildDepNames.Concatenate()} packages ZeroVersion from local NuGet cache." ) )
+            using( m.OpenInfo( $"Removing {buildDepNames.Concatenate()} packages ZeroVersion from local NuGet cache if they exist." ) )
             {
-                foreach( var n in buildDepNames )
+                foreach( var pName in buildDepNames )
                 {
-                    _feeds.RemoveFromNuGetCache( m, n, SVersion.ZeroVersion );
+                    _feeds.RemoveFromNuGetCache( m, pName, SVersion.ZeroVersion );
                 }
             }
+
+            using( m.OpenInfo( $"Updating package references to ZeroVersion." ) )
+            {
+                foreach( var sp in r.BuildProjectsInfo.ProjectsToUpgrade.GroupBy( p => p.Project.Project.PrimarySolution ) )
+                {
+                    foreach( var projectAndDeps in sp )
+                    {
+                        var project = projectAndDeps.Project.Project;
+                        foreach( var dep in projectAndDeps.Packages )
+                        {
+                            project.SetPackageReferenceVersion( m, project.TargetFrameworks, dep.PackageId, SVersion.ZeroVersion );
+                        }
+                    }
+                    if( !sp.Key.Save( m, FileSystem ) ) return false;
+                }
+            }
+
+            using( m.OpenInfo( $"Generating ZeroVersion in LocalFeed/Local feed for packages: {buildDepNames.Concatenate()}" ) )
+            {
+                var args = $@"pack --output ""{_feeds.GetLocalFeedFolder( m ).PhysicalPath}"" --include-symbols --configuration Debug /p:Version=""{SVersion.ZeroVersion}"" /p:AssemblyVersion=""{InformationalVersion.ZeroAssemblyVersion}"" /p:FileVersion=""{InformationalVersion.ZeroFileVersion}"" /p:InformationalVersion=""{InformationalVersion.ZeroInformationalVersion}"" ";
+                foreach( var p in r.BuildProjectsInfo.DependenciesToBuild )
+                {
+                    var path = FileSystem.GetFileInfo( p.Project.Project.Path.RemoveLastPart() ).PhysicalPath;
+                    FileSystem.RawDeleteLocalDirectory( m, Path.Combine( path, "bin" ) );
+                    FileSystem.RawDeleteLocalDirectory( m, Path.Combine( path, "obj" ) );
+                    if( !GlobalBuilder.Run( m, path, "dotnet", args ) ) return false;
+                }
+            }
+
             foreach( var s in r.Solutions )
             {
-                var projects = buildDeps.Where( d => d.PrimarySolution == s.Solution ).ToList();
-                m.Info( $"Solution {s.Solution.UniqueSolutionName} has {s.Solution.BuildProjects.Count} build dependencies project(s)." );
-                foreach( var p in projects.Concat( s.Solution.BuildProjects ) )
-                {
-                    foreach( var dep in p.Deps.Packages.Where( rawDep => buildDepNames.Contains( rawDep.PackageId ) ) )
-                    {
-                        p.SetPackageReferenceVersion( m, p.TargetFrameworks, dep.PackageId, SVersion.ZeroVersion );
-                    }
-                }
-                if( !s.Solution.Save( m, FileSystem ) ) return false;
-                if( projects.Count > 0 )
-                {
-                    using( m.OpenInfo( $"Generating ZeroVersion in LocalFeed/Local feed for packages: {projects.Select( p => p.Name ).Concatenate()}" ) )
-                    {
-                        var args = $@"pack --output ""{_feeds.GetLocalFeedFolder( m ).PhysicalPath}"" --include-symbols --configuration Debug /p:Version=""{SVersion.ZeroVersion}"" /p:AssemblyVersion=""{InformationalVersion.ZeroAssemblyVersion}"" /p:FileVersion=""{InformationalVersion.ZeroFileVersion}"" /p:InformationalVersion=""{InformationalVersion.ZeroInformationalVersion}"" ";
-                        foreach( var p in projects )
-                        {
-                            var path = FileSystem.GetFileInfo( p.Path.RemoveLastPart() ).PhysicalPath;
-                            FileSystem.RawDeleteLocalDirectory( m, Path.Combine( path, "bin" ) );
-                            FileSystem.RawDeleteLocalDirectory( m, Path.Combine( path, "obj" ) );
-                        }
-                        // Quick and dirty fix: ordering by project references count may avoid here the need
-                        // to sort projects according to their project to project dependencies which should be done...
-                        foreach( var p in projects.OrderBy( p => p.Deps.Projects.Count ) )
-                        {
-                            var path = FileSystem.GetFileInfo( p.Path.RemoveLastPart() ).PhysicalPath;
-                            if( !GlobalBuilder.Run( m, path, "dotnet", args ) ) return false;
-                        }
-                    }
-                }
                 using( m.OpenInfo( $"Updating standard CodeCakeBuilder files." ) )
                 {
                     var codeCakeBuilderPath = s.Solution.SolutionFolderPath.AppendPart( "CodeCakeBuilder" );
@@ -432,7 +447,6 @@ namespace CK.Env.MSBuild
             return SetState( m, WorkStatus.CancellingRelease ) && ConcludeCurrentWork( m );
         }
 
-
         public bool CanPublishRelease => WorkStatus == WorkStatus.WaitingReleaseConfirmation;
 
         public bool PublishRelease( IActivityMonitor m )
@@ -443,16 +457,16 @@ namespace CK.Env.MSBuild
 
         bool DoPublishRelease( IActivityMonitor m )
         {
-            //string storeApiKey = _publishKeyStore.GetCKSetupRemoteStorePushKey( m );
-            //if( storeApiKey == null ) return false;
-            //string myGetPushKey = _publishKeyStore.GetMyGetPushKey( m );
-            //if( myGetPushKey == null ) return false;
-            //string nuGetDirectory = _feeds.GetNuGetCommandLineDirectory( m );
-            //if( nuGetDirectory == null )
-            //{
-            //    m.Error( "Unable to find required NuGet.exe." );
-            //    return false;
-            //}
+            string storeApiKey = _publishKeyStore.GetCKSetupRemoteStorePushKey( m );
+            if( storeApiKey == null ) return false;
+            string myGetPushKey = _publishKeyStore.GetMyGetPushKey( m );
+            if( myGetPushKey == null ) return false;
+            string nuGetDirectory = _feeds.GetNuGetCommandLineDirectory( m );
+            if( nuGetDirectory == null )
+            {
+                m.Error( "Unable to find required NuGet.exe." );
+                return false;
+            }
             var roadmap = GetSimpleRoadmap( m );
             if( roadmap == null ) return false;
 
@@ -487,13 +501,13 @@ namespace CK.Env.MSBuild
             if( WorkStatus == WorkStatus.WaitingReleaseConfirmation && !SetState( m, WorkStatus.PublishingRelease ) ) return false;
 
             // Push LocalFeed/Release/RemoteStore
-            //string storePath = _feeds.GetReleaseCKSetupStorePath( m );
-            //using( LocalStore store = LocalStore.OpenOrCreate( m, storePath ) )
-            //{
-            //    if( store == null || !store.PushComponents( comp => true, Facade.DefaultStoreUrl, storeApiKey ) ) return false;
-            //}
-            //// Push packages to myget.
-            //if( !PushNuGetPackages( m, nuGetDirectory, myGetPushKey, toPush ) ) return false;
+            string storePath = _feeds.GetReleaseCKSetupStorePath( m );
+            using( LocalStore store = LocalStore.OpenOrCreate( m, storePath ) )
+            {
+                if( store == null || !store.PushComponents( comp => true, Facade.DefaultStoreUrl, storeApiKey ) ) return false;
+            }
+            // Push packages to myget.
+            if( !PushNuGetPackages( m, nuGetDirectory, myGetPushKey, toPush ) ) return false;
 
             // Push release tags, masters (for Official Release) and develops branches.
             foreach( var g in _globalGitContext.GitFolders )
@@ -561,7 +575,7 @@ namespace CK.Env.MSBuild
             SolutionDependencyResult r = deps.AnalyzeDependencies( m, SolutionSortStrategy.EverythingExceptBuildProjects );
             if( r.HasError )
             {
-                r.RawSorterResult.LogError( m );
+                r.RawSolutionSorterResult.LogError( m );
                 return null;
             }
             return r;

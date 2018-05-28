@@ -184,7 +184,7 @@ namespace CK.Env.MSBuild
         protected virtual SVersion GetTargetVersion( IActivityMonitor m, SolutionDependencyResult.DependentSolution s )
         {
             var info = s.Solution.GitFolder.ReadVersionInfo( m );
-            return info.ValidReleaseTag ?? info.CIRelease?.BuildVersionNuGet;
+            return info.ContentOrFinalNuGetVersion;
         }
 
         protected virtual bool OnBuildStart( IActivityMonitor m, SolutionDependencyResult.DependentSolution s, SVersion v )

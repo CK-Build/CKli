@@ -13,8 +13,6 @@ namespace CK.Env.MSBuild
     /// </summary>
     public class ProjectDependencyResult
     {
-        HashSet<Project> _buildDeps;
-
         /// <summary>
         /// Exposes a dependency from a source project to a package, be it locally produced
         /// or external.
@@ -67,13 +65,33 @@ namespace CK.Env.MSBuild
                 TargetPackage = t;
             }
 
-            public override string ToString() => RawPackageDependency.ToString();
+            public override string ToString() => (IsExternalDependency ? "" : "Local: ") + RawPackageDependency.ToString();
         }
 
         /// <summary>
         /// Gets all dependencies.
         /// </summary>
         public IReadOnlyList<ProjectDepencyRow> DependencyTable { get; }
+
+
+
+        public void GetExternalDependencies()
+        {
+            var monoVersions = new List<VersionedPackage>();
+
+            foreach( var dep in DependencyTable.Where( d => d.IsExternalDependency )
+                                   .GroupBy( d => d.PackageId )
+                                   .Select( g => (PackageId: g.Key, Rows: g ) ) )
+            {
+                var count = dep.Rows.GroupBy( r => r.Version ).Count();
+                Debug.Assert( count > 0 );
+                if( count == 1 ) monoVersions.Add( dep.Rows.First().RawPackageDependency.Package );
+                else
+                {
+
+                }
+            }
+        }
 
         /// <summary>
         /// Captures <see cref="DeclaredPackageDependency"/> filtered by applicable target framework.
@@ -90,7 +108,7 @@ namespace CK.Env.MSBuild
             /// </summary>
             public IReadOnlyList<ProjectDepencyRow> DependencyTable { get; }
 
-            internal FrameworkDependencies(CKTrait f, IReadOnlyList<ProjectDepencyRow> table )
+            internal FrameworkDependencies( CKTrait f, IReadOnlyList<ProjectDepencyRow> table )
             {
                 Debug.Assert( f.IsAtomic && !f.IsEmpty );
                 Framework = f;
@@ -109,45 +127,9 @@ namespace CK.Env.MSBuild
         /// </summary>
         public IReadOnlyList<FrameworkDependencies> VersionDiscrepancies { get; }
 
-        /// <summary>
-        /// Gets the projects that are locally published and used by at least one
-        /// Build project without duplicates.
-        /// </summary>
-        public IReadOnlyCollection<Project> BuildDependencies
-        {
-            get
-            {
-                if( _buildDeps != null ) return _buildDeps;
-
-                void AddBuidDeps( Project p, HashSet<Project> collector )
-                {
-                    if( collector.Add( p ) )
-                    {
-                        foreach( var d in DependencyTable
-                                            .Where( row => row.SourceProject.Project == p && row.TargetPackage.Project != null )
-                                            .Select( row => row.TargetPackage.Project ) )
-                        {
-                            AddBuidDeps( d, collector );
-                        }
-                        foreach( var inSolution in p.Deps.Projects.Select( p2p => p2p.TargetProject ) )
-                        {
-                            AddBuidDeps( inSolution, collector );
-                        }
-                    }
-                }
-
-                _buildDeps = new HashSet<Project>();
-                foreach( var p in DependencyTable
-                                    .Where( row => row.SourceProject.Project.IsBuildProject && row.TargetPackage.Project != null )
-                                    .Select( row => row.TargetPackage.Project ) )
-                {
-                    AddBuidDeps( p, _buildDeps );
-                }
-                return _buildDeps;
-            }
-        }
-
-        internal ProjectDependencyResult( IReadOnlyList<ProjectDepencyRow> all, IReadOnlyList<FrameworkDependencies> perFramework )
+        internal ProjectDependencyResult(
+            IReadOnlyList<ProjectDepencyRow> all,
+            IReadOnlyList<FrameworkDependencies> perFramework )
         {
             DependencyTable = all;
             PerFrameworkDependencies = perFramework;

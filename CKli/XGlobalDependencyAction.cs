@@ -60,6 +60,7 @@ namespace CKli
         public override bool Run( IActivityMonitor m )
         {
             var all = _solutions.AllDevelopSolutions.Select( s => s.GetSolution( m, true ) );
+            if( all.Any( s => s == null ) ) return false;
             var deps = DependencyContext.Create( m, all );
             if( deps == null ) return false;
             switch( _choice.Value )
@@ -91,7 +92,7 @@ namespace CKli
 
         void CreateIssues( IActivityMonitor m, DependencyContext deps )
         {
-            _issueCollector.ClearIssues( m, i => i.Identifier.StartsWith( "ProjectVersionDeps:" ) );
+            _issueCollector.ClearIssues( m, i => i.Identifier?.StartsWith( "ProjectVersionDeps:" ) ?? false );
 
             var toFix = deps.ProjectDependencies.VersionDiscrepancies
                             .SelectMany( d =>
@@ -156,7 +157,7 @@ namespace CKli
         {
             using( m.OpenInfo( $"Solutions sorted ({result.Content}): " ) )
             {
-                if( result.HasError ) result.RawSorterResult.LogError( m );
+                if( result.HasError ) result.RawSolutionSorterResult.LogError( m );
                 else
                 {
                     StringBuilder b = new StringBuilder();
@@ -182,7 +183,7 @@ namespace CKli
         {
             using( m.OpenInfo( $"Solutions sorted ({result.Content}): " ) )
             {
-                if( result.HasError ) result.RawSorterResult.LogError( m );
+                if( result.HasError ) result.RawSolutionSorterResult.LogError( m );
                 else
                 {
                     var display = result.DependencyTable

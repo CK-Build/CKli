@@ -152,14 +152,15 @@ namespace CK.Env.MSBuild
             }
 
             /// <summary>
-            /// Updates all projects (except BuildProjects) with locally available
-            /// better version and saves the solution and its updated projects.
+            /// Updates all projects (except Build projects by default or only Build projects) with versions that are
+            /// given by <paramref name="localPackageFinder"/> and saves the solution and its updated projects.
             /// </summary>
             /// <param name="m">The monitor to use.</param>
             /// <param name="localPackageFinder">The local package version resolver.</param>
             /// <param name="fileSystem">The file system.</param>
             /// <param name="allowDowngrade">Optional allow downgrade. Necessary when cancelling a release.</param>
             /// <param name="allowMissing">Defaults to true to be able to start with empty local feeds.</param>
+            /// <param name="buildProjects">Whether build projects (and not normal ones) must be considered.</param>
             /// <returns>Whether the upgrade succeeded.</returns>
             public bool UpdatePackageDependencies(
                 IActivityMonitor m,
@@ -251,12 +252,19 @@ namespace CK.Env.MSBuild
         /// Error constructor.
         /// </summary>
         /// <param name="c">The content strategy.</param>
-        /// <param name="r">The dependency sorter result.</param>
-        internal SolutionDependencyResult( SolutionSortStrategy c, IDependencySorterResult r )
+        /// <param name="rSolution">The dependency sorter result.</param>
+        internal SolutionDependencyResult(
+            SolutionSortStrategy c,
+            IDependencySorterResult rSolution,
+            ProjectDependencyResult projectDeps,
+            BuildProjectsInfo buildProjectsInfo )
         {
-            Debug.Assert( r != null && !r.IsComplete );
+            Debug.Assert( projectDeps != null );
+            Debug.Assert( buildProjectsInfo != null && rSolution != null && !rSolution.IsComplete );
             Content = c;
-            RawSorterResult = r;
+            RawSolutionSorterResult = rSolution;
+            BuildProjectsInfo = buildProjectsInfo;
+            ProjectDependencies = projectDeps;
             DependencyTable = Array.Empty<DependencyRow>();
             Solutions = Array.Empty<DependentSolution>();
         }
@@ -266,12 +274,14 @@ namespace CK.Env.MSBuild
             IDependencySorterResult r,
             ProjectDependencyResult projectDeps,
             IReadOnlyList<DependencyRow> t,
-            IReadOnlyList<DependentSolution> solutions )
+            IReadOnlyList<DependentSolution> solutions,
+            BuildProjectsInfo buildProjectsInfo )
         {
             Debug.Assert( r != null && r.IsComplete && t != null && solutions != null );
             Content = c;
-            RawSorterResult = r;
+            RawSolutionSorterResult = r;
             ProjectDependencies = projectDeps;
+            BuildProjectsInfo = buildProjectsInfo;
             DependencyTable = t;
             Solutions = solutions;
             for( int i = solutions.Count - 1; i >= 0; --i ) solutions[i].Initialize( this );
@@ -284,9 +294,9 @@ namespace CK.Env.MSBuild
 
         /// <summary>
         /// Gets the project dependency result.
+        /// Never null.
         /// </summary>
         public ProjectDependencyResult ProjectDependencies { get; }
-
 
         /// <summary>
         /// Gets the details of the dependencies between solutions.
@@ -300,15 +310,21 @@ namespace CK.Env.MSBuild
 
         /// <summary>
         /// Gets the <see cref="IDependencySorterResult"/> of the Solution/Project graph.
+        /// Never null.
         /// </summary>
-        public IDependencySorterResult RawSorterResult { get; }
+        public IDependencySorterResult RawSolutionSorterResult { get; }
 
         /// <summary>
-        /// Gets whether solutions and their projects have been successfully ordered.
+        /// Gets whether solutions and their projects failed to be successfully ordered
+        /// or <see cref="BuildProjectsInfo"/> is on error.
         /// </summary>
-        public bool HasError => !RawSorterResult.IsComplete;
+        public bool HasError => !RawSolutionSorterResult.IsComplete || BuildProjectsInfo.HasError;
 
-
+        /// <summary>
+        /// Gets the build info.
+        /// Never null.
+        /// </summary>
+        public BuildProjectsInfo BuildProjectsInfo { get; }
 
     }
 
