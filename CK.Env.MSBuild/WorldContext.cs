@@ -595,7 +595,7 @@ namespace CK.Env.MSBuild
             var worldState = worldStore.GetLocalState( m, world );
             var workStatus = worldState.XmlState.AttributeEnum( xWorkStatus, WorkStatus.Idle );
             var gitStatus = worldState.GlobalGitStatus;
-            if( !gitContext.CheckStatus( m, ref gitStatus ) ) return null;
+            if( !gitContext.CheckStatus( m, ref gitStatus, workStatus == WorkStatus.SwitchingToDevelop || workStatus == WorkStatus.SwitchingToLocal ) ) return null;
             Debug.Assert( gitStatus != GlobalGitStatus.Unknwon );
             worldState.GlobalGitStatus = gitStatus;
             return new WorldContext( gitContext, worldStore, feeds, referential, publishKeyStore, workStatus, worldState, branchSolutionsLoader );

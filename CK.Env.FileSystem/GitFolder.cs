@@ -851,7 +851,7 @@ namespace CK.Env
             else
             {
                 var b = branch.First();
-                b.SetAttributeValue( "VersionName", "blank" );
+                b.SetAttributeValue( "VersionName", "local" );
                 b.SetAttributeValue( "CIVersionMode", "LastReleaseBased" );
             }
             return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );

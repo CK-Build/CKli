@@ -38,7 +38,24 @@ namespace CKli
             }
             var deps = ctx.CreateSolutionDependencyResult( m );
             if( deps == null ) return false;
-            deps.ProjectDependencies.GetExternalDependencies();
+            var allDeps = deps.ProjectDependencies.ExternalPackageDependencies;
+            foreach( var p in allDeps.MonoVersions )
+            {
+                m.Info( $"{p.Package} <- {p.Projects.Select( x => x.FullName ).Concatenate()}" );
+            }
+            using( m.OpenInfo( "Multiple versions" ) )
+            {
+                foreach( var p in allDeps.MultiVersions.GroupBy( p => p.Package.PackageId ) )
+                {
+                    using( m.OpenInfo( p.Key ) )
+                    {
+                        foreach( var v in p )
+                        {
+                            m.Info( $"{v.Package.Version} <- {v.Projects.Select( x => x.ToString() ).Concatenate()}" );
+                        }
+                    }
+                }
+            }
             return true;
         }
     }

@@ -13,6 +13,11 @@ namespace CK.Env.MSBuild
     /// </summary>
     public class ProjectDependencyResult
     {
+        readonly ProjectFrameworkCache _projectFrameworkCache;
+        PackageDependencyAnalysisResult _allDeps;
+        PackageDependencyAnalysisResult _externalDeps;
+        PackageDependencyAnalysisResult _localDeps;
+
         /// <summary>
         /// Exposes a dependency from a source project to a package, be it locally produced
         /// or external.
@@ -73,24 +78,46 @@ namespace CK.Env.MSBuild
         /// </summary>
         public IReadOnlyList<ProjectDepencyRow> DependencyTable { get; }
 
+        /// <summary>
+        /// Gets the <see cref="PackageDependencyAnalysisResult"/> for all packages (local and external).
+        /// </summary>
+        public PackageDependencyAnalysisResult AllPackageDependencies => _allDeps ?? (_allDeps = ComputeExternalDependencies( null ));
 
+        /// <summary>
+        /// Gets the <see cref="PackageDependencyAnalysisResult"/> for external packages.
+        /// </summary>
+        public PackageDependencyAnalysisResult ExternalPackageDependencies => _externalDeps ?? (_externalDeps = ComputeExternalDependencies( true ));
 
-        public void GetExternalDependencies()
+        /// <summary>
+        /// Gets the <see cref="PackageDependencyAnalysisResult"/> for local packages.
+        /// </summary>
+        public PackageDependencyAnalysisResult LocalPackageDependencies => _localDeps ?? (_localDeps = ComputeExternalDependencies( false ));
+
+        PackageDependencyAnalysisResult ComputeExternalDependencies( bool? externalDependencies = null )
         {
-            var monoVersions = new List<VersionedPackage>();
+            var monoVersions = new List<(VersionedPackage Package, IReadOnlyList<IDependentProject> Projects)>();
+            var multiVersions = new List<(VersionedPackage Package, IReadOnlyList<IProjectFramework> Projects)>();
 
-            foreach( var dep in DependencyTable.Where( d => d.IsExternalDependency )
-                                   .GroupBy( d => d.PackageId )
-                                   .Select( g => (PackageId: g.Key, Rows: g ) ) )
+            IEnumerable<ProjectDepencyRow> all = DependencyTable;
+            if( externalDependencies.HasValue ) all = all.Where( r => r.IsExternalDependency == externalDependencies.Value );
+
+            foreach( var dep in all.GroupBy( d => d.PackageId )
+                                   .Select( g => (PackageId: g.Key, ByVersion: g.GroupBy( r => r.Version )) ) )
             {
-                var count = dep.Rows.GroupBy( r => r.Version ).Count();
+                var count = dep.ByVersion.Count();
                 Debug.Assert( count > 0 );
-                if( count == 1 ) monoVersions.Add( dep.Rows.First().RawPackageDependency.Package );
+                if( count == 1 ) monoVersions.Add( (dep.ByVersion.First().First().RawPackageDependency.Package, dep.ByVersion.First().Select( r => r.SourceProject ).Distinct().ToArray() ) );
                 else
                 {
-
+                    foreach( var v in dep.ByVersion )
+                    {
+                        VersionedPackage p = new VersionedPackage( dep.PackageId, v.Key );
+                        IReadOnlyList<IProjectFramework> refs = _projectFrameworkCache.Create( v ).ToList();
+                        multiVersions.Add( (p, refs) );
+                    }
                 }
             }
+            return new PackageDependencyAnalysisResult( externalDependencies, monoVersions, multiVersions );
         }
 
         /// <summary>
@@ -132,6 +159,7 @@ namespace CK.Env.MSBuild
             IReadOnlyList<FrameworkDependencies> perFramework )
         {
             DependencyTable = all;
+            _projectFrameworkCache = new ProjectFrameworkCache( all );
             PerFrameworkDependencies = perFramework;
             VersionDiscrepancies = perFramework.Select( r => new FrameworkDependencies
                                              (

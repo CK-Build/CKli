@@ -104,5 +104,37 @@ namespace CKli
         /// </summary>
         public IReadOnlyList<XSolutionBase> AllDevelopSolutions => _allDevelopSolutions;
 
+
+        public void UpdateCodeCakeBuilderFiles( IActivityMonitor m, string branchName )
+        {
+            var solutions = AllDevelopSolutions.Select( s => s.GetSolution( m, true, branchName ) );
+            foreach( var s in solutions )
+            {
+                using( m.OpenInfo( $"Updating standard CodeCakeBuilder files." ) )
+                {
+                    var codeCakeBuilderPath = s.SolutionFolderPath.AppendPart( "CodeCakeBuilder" );
+                    foreach( var name in new[]
+                    {
+                        "Build.StandardCheckRepository.cs",
+                        "Build.StandardCreateNuGetPackages.cs",
+                        "Build.StandardPushNuGetPackages.cs",
+                        "Build.StandardSolutionBuild.cs",
+                        "Build.StandardUnitTests.cs"
+                    } )
+                    {
+                        var path = codeCakeBuilderPath.AppendPart( name );
+                        var f = _msBuildContext.FileSystem.GetFileInfo( path );
+                        if( f.Exists )
+                        {
+                            var source = _referential.FileProvider.GetFileInfo( "InitialCodeCakeBuilder/" + name );
+                            _msBuildContext.FileSystem.CopyTo( m, source, path );
+                        }
+                    }
+                    _msBuildContext.FileSystem.CopyTo( m,
+                        _referential.FileProvider.GetFileInfo( "SimpleFiles/.editorconfig" ),
+                        s.SolutionFolderPath.AppendPart( ".editorconfig" ) );
+                }
+            }
+        }
     }
 }

@@ -35,8 +35,9 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="gitStatus">The status to check.</param>
+        /// <param name="isTransitioning">Whether we are transitioning between 'develop' and 'develop-local' branches.</param>
         /// <returns>True if the status is valid according to the state of the actual repositories.</returns>
-        public bool CheckStatus( IActivityMonitor m, ref GlobalGitStatus gitStatus )
+        public bool CheckStatus( IActivityMonitor m, ref GlobalGitStatus gitStatus, bool isTransitioning )
         {
             var bBadBranches = _gitFolders
                                 .Where( g => g.CurrentBranchName != World.DevelopBranchName
@@ -68,7 +69,7 @@ namespace CK.Env
                     }
                 }
 
-                if( gitStatus  == GlobalGitStatus.Unknwon )
+                if( gitStatus == GlobalGitStatus.Unknwon )
                 {
                     DumpMixDetail( LogLevel.Error, "Unable to initialize status." );
                     return false;
@@ -76,31 +77,33 @@ namespace CK.Env
                 DumpMixDetail( LogLevel.Error, $"This is compatible with recorded status '{gitStatus}'." );
                 return true;
             }
-            else if( current == World.DevelopBranchName )
+            m.Info( $"All Git folders are on {current}." );
+            if( current == World.DevelopBranchName )
             {
+                if( !isTransitioning && gitStatus == GlobalGitStatus.LocalBranch )
+                {
+                    m.Error( $"All Git folders are on {World.DevelopBranchName}. Status is '{gitStatus}'." );
+                    return false;
+                }
                 if( gitStatus == GlobalGitStatus.Unknwon )
                 {
                     gitStatus = GlobalGitStatus.DevelopBranch;
                     m.Info( $"Initializing status on {gitStatus}." );
-                    return true;
                 }
-                if( gitStatus == GlobalGitStatus.DevelopBranch )  return true;
-                m.Error( $"All Git folders are on {World.DevelopBranchName}. this is not compatible with status '{gitStatus}'." );
-                return false;
+                return true;
             }
-            else
+            Debug.Assert( current == World.LocalBranchName );
+            if( !isTransitioning && gitStatus == GlobalGitStatus.DevelopBranch )
             {
-                Debug.Assert( current == World.LocalBranchName );
-                if( gitStatus == GlobalGitStatus.Unknwon )
-                {
-                    gitStatus = GlobalGitStatus.LocalBranch;
-                    m.Info( $"Initializing status on {gitStatus}." );
-                    return true;
-                }
-                if( gitStatus == GlobalGitStatus.LocalBranch ) return true;
-                m.Error( $"All Git folders are on {World.LocalBranchName}. this is not compatible with status '{gitStatus}'." );
+                m.Error( $"All Git folders are on {World.LocalBranchName}. Status is '{gitStatus}'." );
                 return false;
             }
+            if( gitStatus == GlobalGitStatus.Unknwon )
+            {
+                gitStatus = GlobalGitStatus.LocalBranch;
+                m.Info( $"Initializing status on {gitStatus}." );
+            }
+            return true;
         }
 
         /// <summary>

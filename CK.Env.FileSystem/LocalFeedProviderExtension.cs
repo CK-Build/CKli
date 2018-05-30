@@ -24,7 +24,7 @@ namespace CK.Env
 
         public static string GetLocalCKSetupStorePath( this ILocalFeedProvider @this, IActivityMonitor m )
         {
-            return Path.Combine( @this.GetCIFeedFolder( m ).PhysicalPath, CKSetupStoreName );
+            return Path.Combine( @this.GetLocalFeedFolder( m ).PhysicalPath, CKSetupStoreName );
         }
 
     }

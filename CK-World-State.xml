@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <CK-World-State GlobalGitStatus="DevelopBranch">
-  <XmlState WorkStatus="Idle">
+  <XmlState WorkStatus="SwitchingToLocal">
     <RoadMap>
       <S Name="CK-WeakAssemblyNameResolver" Version="0.5.0">
         <ReleaseInfo Level="BreakingChange" Constraint="HasBreakingChanges" />
