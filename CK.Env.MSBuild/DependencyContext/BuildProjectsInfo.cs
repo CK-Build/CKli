@@ -18,15 +18,13 @@ namespace CK.Env.MSBuild
         internal BuildProjectsInfo(
             IDependencySorterResult sortResult,
             IReadOnlyList<(int Rank, IDependentProject Project)> dependenciesToBuild,
-            IReadOnlyList<(IDependentProject Project, IReadOnlyList<IDependentPackage> Packages)> projectsToUpgrade,
-            IReadOnlyList<IDependentProject> buildProjects )
+            IReadOnlyList<(IDependentProject Project, IReadOnlyList<IDependentPackage> Packages)> projectsToUpgrade )
         {
             Debug.Assert( sortResult != null );
-            Debug.Assert( sortResult.IsComplete == (dependenciesToBuild != null && projectsToUpgrade != null && buildProjects != null) );
+            Debug.Assert( sortResult.IsComplete == (dependenciesToBuild != null && projectsToUpgrade != null) );
             RawBuildProjectsInfoSorterResult = sortResult;
             DependenciesToBuild = dependenciesToBuild ?? Array.Empty<(int Rank, IDependentProject Project)>();
             ProjectsToUpgrade = projectsToUpgrade ?? Array.Empty<(IDependentProject Project, IReadOnlyList<IDependentPackage> Packages)>();
-            BuildProjects = buildProjects ?? Array.Empty<IDependentProject>();
         }
 
         /// <summary>
@@ -53,12 +51,6 @@ namespace CK.Env.MSBuild
         /// Never null. Empty if <see cref="HasError"/> is true.
         /// </summary>
         public IReadOnlyList<(IDependentProject Project, IReadOnlyList<IDependentPackage> Packages)> ProjectsToUpgrade { get; }
-
-        /// <summary>
-        /// Gets the build projects themselves. There should be at least one build project per solution.
-        /// Never null. Empty if <see cref="HasError"/> is true.
-        /// </summary>
-        public IReadOnlyList<IDependentProject> BuildProjects { get; }
 
     }
 }

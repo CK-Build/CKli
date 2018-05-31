@@ -58,8 +58,8 @@ namespace CK.Env.MSBuild
                 else if( _gitStatus == GlobalGitStatus.LocalBranch )
                 {
                     TargetLocal = true;
-                    RunUnitTests = false;
-                    AutoCommit = false;
+                    RunUnitTests = true;
+                    AutoCommit = true;
                     IsRemotesRequired = false;
                     AllowPackageDependenciesDowngrade = false;
                 }

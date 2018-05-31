@@ -229,7 +229,7 @@ namespace CK.Env.MSBuild
                     else
                     {
                         // If it is not a published package, then we must find it as an external package.
-                        p = _packages[d.PackageId + '/' + d.Version];
+                        p = _packages[d.Package.ToString()];
                     }
                     return p;
                 }
@@ -264,30 +264,31 @@ namespace CK.Env.MSBuild
                 if( !rBuildProjects.IsComplete )
                 {
                     rBuildProjects.LogError( m );
-                    return new BuildProjectsInfo( rBuildProjects, null, null, null );
+                    return new BuildProjectsInfo( rBuildProjects, null, null );
                 }
                 else
                 {
                     var rankedProjects = rBuildProjects.SortedItems
-                                                .Where( i => i is IDependentProject )
+                                                .Where( i => i.Item is IDependentProject )
                                                 .Select( i => (Rank: i.Rank, Project: (IDependentProject)i.Item) );
 
-                    var dependenciesToBuild = rankedProjects
+                    var localDepsToBuild = rankedProjects
                                                 .Where( p => p.Project.IsPublished )
                                                 .ToArray();
+                    var localDepsName = new HashSet<string>( localDepsToBuild.Select( d => d.Project.Project.Name ) );
 
                     var projectsToUpgrade = rankedProjects.Where( p => p.Project.Project.Deps.Packages.Any() )
                                                           .Select( p => (
                                                                     Project: p.Project,
                                                                     Packages: (IReadOnlyList<IDependentPackage>)p.Project.Project
                                                                                 .Deps.Packages
-                                                                                .Select( a => _packages[a.PackageId] ).ToArray()
+                                                                                .Where( a => localDepsName.Contains( a.PackageId ) )
+                                                                                .Select( a => _packages[a.PackageId] )
+                                                                                .ToArray()
                                                                         ) )
                                                           .ToArray();
 
-                    var buildProjects = rankedProjects.Where( p => p.Project.IsPublished ).Select( p => p.Project ).ToArray();
-
-                    return new BuildProjectsInfo( rBuildProjects, dependenciesToBuild, projectsToUpgrade, buildProjects );
+                    return new BuildProjectsInfo( rBuildProjects, localDepsToBuild, projectsToUpgrade );
                 }
             }
             finally

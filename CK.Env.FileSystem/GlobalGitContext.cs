@@ -53,9 +53,8 @@ namespace CK.Env
                 }
                 return false;
             }
-            var byActiveBranch = _gitFolders.GroupBy( g => g.CurrentBranchName );
-            string current = byActiveBranch.SingleOrDefault().Key;
-            if( current == null )
+            var byActiveBranch = _gitFolders.GroupBy( g => g.CurrentBranchName ).ToList();
+            if( byActiveBranch.Count != 1 )
             {
                 void DumpMixDetail( LogLevel level, string conclusion )
                 {
@@ -77,6 +76,7 @@ namespace CK.Env
                 DumpMixDetail( LogLevel.Error, $"This is compatible with recorded status '{gitStatus}'." );
                 return true;
             }
+            string current = byActiveBranch[0].Key;
             m.Info( $"All Git folders are on {current}." );
             if( current == World.DevelopBranchName )
             {
