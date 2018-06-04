@@ -159,12 +159,21 @@ namespace CK.Env.MSBuild
                 foreach( var g in _globalGitContext.GitFolders )
                 {
                     if( !g.SwitchFromLocalToDevelop( m ) ) return false;
-                    // Coming from local, build needs to access the local feeds.
-                    // This should be the case but this corrects the files if needed.
-                    g.EnsureLocalFeedsNuGetSource( m );
                 }
                 var r = GetSolutionDependencyResult( m, World.DevelopBranchName );
                 if( r == null ) return false;
+
+                // 
+                foreach( var s in r.Solutions )
+                {
+                    s.UpdatePackageDependencies( m, ( monior, name ) =>
+                    {
+                        if( name == "SimpleGitVersion.Core" || name == "SimpleGitVersion.Cake" ) return SVersion.Parse( "0.33.1-C0017-develop" );
+                        return null;
+                    }, FileSystem, allowDowngrade: true, allowMissing: true, buildProjects: true );
+                    if( !s.Solution.GitFolder.Commit( m, "Updated Build projects with fixed SimpleGitVersion." ).Success ) return false;
+                }
+
                 _buildInfo.SetStatus( WorkStatus, GlobalGitStatus );
                 var b = new GlobalBuilder( r, FileSystem, _feeds, _testedCommits, _buildInfo );
                 if( !b.Build( m ) ) return false;
@@ -232,7 +241,7 @@ namespace CK.Env.MSBuild
                     var publishedProjects = roadmap.SelectMany( e => r.Solutions.First( s => s.Solution.UniqueSolutionName == e.SolutionName )
                                                                             .Solution
                                                                             .PublishedProjects
-                                                                            .Select( p => (P: p, V: e.TargetVersion) ) );
+                                                                            .Select( p => (P: p, V: e.ReleaseInfo.Version) ) );
                     foreach( var p in publishedProjects )
                     {
                         _feeds.RemoveFromNuGetCache( m, p.P.Name, p.V );
@@ -512,7 +521,7 @@ namespace CK.Env.MSBuild
             // Push release tags, masters (for Official Release) and develops branches.
             foreach( var g in _globalGitContext.GitFolders )
             {
-                var v = roadmap.FirstOrDefault( e => e.SolutionName == g.SubPath.LastPart ).TargetVersion;
+                var v = roadmap.FirstOrDefault( e => e.Build && e.SolutionName == g.SubPath.LastPart )?.ReleaseInfo.Version;
                 if( v != null )
                 {
                     if( !g.PushVersionTag( m, v ) ) return false;

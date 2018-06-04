@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
+using CK.Core;
 
 namespace CK.Env
 {
@@ -38,6 +40,32 @@ namespace CK.Env
             Level = l;
             Constraint = c;
             Version = v;
+        }
+
+        /// <summary>
+        /// Creates a <see cref="ReleaseInfo"/> from a <see cref="XElement"/> (see <see cref="ToXml"/>).
+        /// </summary>
+        /// <param name="e">The Xml element.</param>
+        public ReleaseInfo( XElement e )
+        {
+            var sV = (string)e.AttributeRequired( "Version" );
+            Version = sV.Length == 0 ? null : CSVersion.Parse( sV );
+            Level = e.AttributeEnum( "Level", ReleaseLevel.None );
+            Constraint = e.AttributeEnum( "Constraint", ReleaseConstraint.None );
+        }
+
+
+        /// <summary>
+        /// Creates an xml element from this <see cref="ReleaseInfo"/>.
+        /// When <see cref="IsValid"/> is false, the Version attribute will be empty.
+        /// </summary>
+        /// <returns>A new XElement.</returns>
+        public XElement ToXml()
+        {
+            return new XElement( "ReleaseInfo",
+                                    new XAttribute( "Version", Version ),
+                                    new XAttribute( "Level", Level ),
+                                    new XAttribute( "Constraint", Constraint ) );
         }
 
         /// <summary>
@@ -82,6 +110,7 @@ namespace CK.Env
             else if( level == ReleaseLevel.Feature ) c |= ReleaseConstraint.HasFeatures;
             return new ReleaseInfo( level, c, Version );
         }
+
 
         /// <summary>
         /// Overridden to return a sitring with <see cref="Constraint"/>, <see cref="Level"/>

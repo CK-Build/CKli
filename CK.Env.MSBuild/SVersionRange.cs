@@ -7,14 +7,14 @@ namespace CK.Env.MSBuild
 {
     public class SVersionRange
     {
-        static public SVersion TryParseSimpleRange( string r )
+        static public (bool Locked, SVersion Version) TryParseSimpleRange( string r )
         {
             SVersion v = SVersion.TryParse( r );
-            if( !v.IsValid && r != null && r.Length > 3 && r[0] == '[' && r[r.Length-1] == ']' )
+            if( !v.IsValid && r != null && r.Length > 3 && r[0] == '[' && r[r.Length - 1] == ']' )
             {
-                v = SVersion.TryParse( r.Substring( 1, r.Length - 2 ) );
+                return (true, SVersion.TryParse( r.Substring( 1, r.Length - 2 ) ));
             }
-            return v;
+            return (false, v);
         }
 
     }

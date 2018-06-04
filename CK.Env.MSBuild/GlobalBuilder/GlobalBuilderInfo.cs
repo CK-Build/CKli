@@ -86,7 +86,7 @@ namespace CK.Env.MSBuild
                 RunUnitTests = true;
                 AutoCommit = false;
                 IsRemotesRequired = false;
-                AllowPackageDependenciesDowngrade = false;
+                AllowPackageDependenciesDowngrade = true;
             }
             else if( _workStatus == WorkStatus.CancellingRelease )
             {

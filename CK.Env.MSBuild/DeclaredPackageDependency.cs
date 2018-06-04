@@ -14,6 +14,7 @@ namespace CK.Env.MSBuild
         internal DeclaredPackageDependency(
             Project owner,
             string packageId,
+            bool versionLocked,
             SVersion version,
             XElement originElement,
             XElement finalDeclaration,
@@ -40,6 +41,11 @@ namespace CK.Env.MSBuild
         /// Gets the package identifier.
         /// </summary>
         public string PackageId => Package.PackageId;
+
+        /// <summary>
+        /// Gets whether the version is locked: it is inside square brackets (ex. Version="[2.6.4]").
+        /// </summary>
+        public bool VersionLocked { get; }
 
         /// <summary>
         /// Gets the version.

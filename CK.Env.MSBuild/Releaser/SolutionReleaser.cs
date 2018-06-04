@@ -119,11 +119,32 @@ namespace CK.Env
                 // and here we must keep the ReleaseLevel.None.
                 if( RepositoryInfo.ValidReleaseTag != null )
                 {
+                    m.Info( $"This commit has already a version tag: {RepositoryInfo.ValidReleaseTag}. We use it." );
                     AllPossibleVersions = new[] { RepositoryInfo.ValidReleaseTag };
                     return _releaseInfo = requirements.WithVersion( RepositoryInfo.ValidReleaseTag );
                 }
+                if( RepositoryInfo.CommitContentHasTag )
+                {
+                    var vContent = RepositoryInfo.CommitVersionInfo.ThisContentCommit.ThisTag;
+                    m.Info( $"This commit has a content version tag: {vContent}. We use it." );
+                    AllPossibleVersions = new[] { vContent };
+                    return _releaseInfo = requirements.WithVersion( vContent );
+                }
                 // We are on a commit point that has no tag.
-                // The new code that is contained in this commit MUST be released at least as a fix.
+                // The new code that is contained in this commit:
+                // - MAY have no actual changes: the previous version could be used.
+                // - or MUST be released at least as a fix.
+                var prevVersion = RepositoryInfo.CommitVersionInfo.PreviousMaxTag;
+                if( prevVersion != null )
+                {
+                    bool? usePrevious = versionSelector.CanUsePreviousVersion( m, Solution, prevVersion );
+                    if( !usePrevious.HasValue ) return _releaseInfo;
+                    if( usePrevious.Value == true )
+                    {
+                        AllPossibleVersions = new[] { prevVersion };
+                        return _releaseInfo = requirements.WithVersion( prevVersion );
+                    }
+                }
                 requirements = requirements.WithLevel( ReleaseLevel.Fix );
                 AllPossibleVersions = RepositoryInfo.PossibleVersions;
             }
@@ -160,24 +181,7 @@ namespace CK.Env
                     return HandleSingleVersion( m, versionSelector, requirements, filteredVersions[0] );
                 }
             }
-            //// Multiple versions are possible.
-            //// 1 - First choose between Official and Preleases if both are possible.
-            //m.Info( $"Choosing version for {Solution.Solution.UniqueSolutionName} among {filteredVersions.Count} possible versions." );
-            //if( (requirements.Constraint & ReleaseConstraint.MustBePreRelease) == 0 )
-            //{
-            //    var officials = filteredVersions.Where( v => !v.IsPreRelease );
-            //    var prereleases = filteredVersions.Where( v => v.IsPreRelease );
-            //    if( officials.Any() && prereleases.Any() )
-            //    {
-            //        var choice = versionSelector.ChooseBetweenOfficialAndPreReleaseVersions( m, Solution, officials, prereleases );
-            //        if( choice == null ) return _releaseInfo;
-            //        filteredVersions = choice.ToList();
-            //    }
-            //}
-            //if( filteredVersions.Count == 1 )
-            //{
-            //    return HandleSingleVersion( m, versionSelector, requirements, filteredVersions[0] );
-            //}
+            // Multiple versions are possible.
             Debug.Assert( filteredVersions.Count > 1, "There are still multiple versions." );
             var finalVersion = versionSelector.ChooseFinalVersion( m, Solution, filteredVersions, requirements );
             if( finalVersion == null ) return _releaseInfo;
@@ -280,10 +284,9 @@ namespace CK.Env
             Debug.Assert( _releaseInfoAvailable && _releaseInfo.IsValid );
             return new XElement( "S",
                         new XAttribute( "Name", Solution.Solution.UniqueSolutionName ),
-                        new XAttribute( "Version", _releaseInfo.Version ),
-                        new XElement( "ReleaseInfo", new XAttribute( "Level", _releaseInfo.Level ), new XAttribute( "Constraint", _releaseInfo.Constraint ) ),
+                        _releaseInfo.ToXml(),
                         new XElement( "Upgrades", PackageVersionUpdateToXml( Solution.Solution ) ),
-                        addBuild ? new XElement( "Build" ) : null );
+                        addBuild && _releaseInfo.Level != ReleaseLevel.None ? new XElement( "Build" ) : null );
 
             IEnumerable<XElement> PackageVersionUpdateToXml( Solution primary )
             {

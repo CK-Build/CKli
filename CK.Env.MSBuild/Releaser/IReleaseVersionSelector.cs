@@ -8,6 +8,16 @@ namespace CK.Env
     public interface IReleaseVersionSelector
     {
         /// <summary>
+        /// When a solution has no obligation to be released (even as a fix), this method may decide
+        /// to NOT release it at all and use the last released version.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="solution">The solution.</param>
+        /// <param name="prevVersion">The previous released version.</param>
+        /// <returns>True to use the previous version, false to release at least a fix and null to cancel the process.</returns>
+        bool? CanUsePreviousVersion( IActivityMonitor m, SolutionDependencyResult.DependentSolution solution, CSVersion prevVersion );
+
+        /// <summary>
         /// This method must choose the <see cref="ReleaseLevel"/> for the solution.
         /// It may return <see cref="ReleaseLevel.None"/> to cancel the process, but should return
         /// a level greater or equal to the <paramref name="currentLevel"/> (that is necessarily
@@ -57,6 +67,5 @@ namespace CK.Env
         /// <param name="current">Current release information.</param>
         /// <returns>The version to release or null to cancel the process.</returns>
         CSVersion ChooseFinalVersion( IActivityMonitor m, SolutionDependencyResult.DependentSolution solution, IReadOnlyList<CSVersion> possibleVersions, ReleaseInfo current );
-
     }
 }

@@ -208,6 +208,7 @@ namespace CK.Env.MSBuild
         {
             if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
             if( frameworks.IsEmpty ) throw new ArgumentException( "Must not be empty.", nameof(frameworks) );
+            var sV = version.AsCSVersion?.ToString( CSVersionFormat.NuGetPackage ) ?? version.ToString();
             int changeCount = 0;
             foreach( var r in _dependencies.Packages.Where( p => p.PackageId == packageId
                                                                  && p.Version != version
@@ -216,16 +217,16 @@ namespace CK.Env.MSBuild
                 var e = r.PropertyVersionElement;
                 if( e != null )
                 {
-                    e.Value = version.ToString();
+                    e.Value = sV;
                 }
                 else
                 {
                     e = r.OriginElement;
-                    e.Attribute( "Version" ).SetValue( version.ToString() );
+                    e.Attribute( "Version" ).SetValue( sV );
                 }
                 ++changeCount;
             }
-            m.Trace( $"{changeCount} version update in {ToString()} for package reference {packageId} -> {version}." );
+            m.Trace( $"{changeCount} version update in {ToString()} for package reference {packageId} -> {sV}." );
             if( changeCount > 0 ) OnChange( m );
             return changeCount;
         }
@@ -304,12 +305,13 @@ namespace CK.Env.MSBuild
                 if( p.Origin.Name.LocalName == "PackageReference" )
                 {
                     bool isPropVersion;
+                    bool versionLocked = false;
                     SVersion version = null;
                     if( String.IsNullOrWhiteSpace( p.PackageId )
                         || String.IsNullOrWhiteSpace( p.RawVersion )
                         || (
                              !(isPropVersion = p.RawVersion.StartsWith( "$(" ))
-                             && !(version = SVersionRange.TryParseSimpleRange( p.RawVersion )).IsValid
+                             && !((versionLocked,version) = SVersionRange.TryParseSimpleRange( p.RawVersion )).version.IsValid
                            ) )
                     {
                         if( version != null )
@@ -325,7 +327,7 @@ namespace CK.Env.MSBuild
                     XElement propertyDef = null;
                     if( isPropVersion )
                     {
-                        propertyDef = FollowRefPropertyVersion( m, p, ref version );
+                        propertyDef = FollowRefPropertyVersion( m, p, ref versionLocked, ref version );
                         if( propertyDef == null ) return;
                     }
                     CKTrait frameworks = ComputeFrameworks( m, p.Origin, conditionEvaluator );
@@ -335,7 +337,7 @@ namespace CK.Env.MSBuild
                         m.Warn( $"Useless PackageReference (applies to undeclared frameworks): {p.Origin}." );
                         uselessDeps.Add( p.Origin );
                     }
-                    else deps.Add( new DeclaredPackageDependency( this, p.PackageId, version, p.Origin, propertyDef, frameworks ) );
+                    else deps.Add( new DeclaredPackageDependency( this, p.PackageId, versionLocked, version, p.Origin, propertyDef, frameworks ) );
                 }
                 else
                 {
@@ -389,7 +391,7 @@ namespace CK.Env.MSBuild
             return frameworks;
         }
 
-        XElement FollowRefPropertyVersion( IActivityMonitor m, (XElement Origin, string PackageId, string RawVersion) p, ref SVersion version )
+        XElement FollowRefPropertyVersion( IActivityMonitor m, (XElement Origin, string PackageId, string RawVersion) p, ref bool versionLocked, ref SVersion version )
         {
             if( !p.RawVersion.EndsWith( "Version)" ) )
             {
@@ -413,12 +415,14 @@ namespace CK.Env.MSBuild
                 return null;
             }
             XElement propertyDef = candidates[0];
-            version = SVersionRange.TryParseSimpleRange( propertyDef.Value );
-            if( !version.IsValid)
+            var v = SVersionRange.TryParseSimpleRange( propertyDef.Value );
+            if( !v.Version.IsValid)
             {
                 m.Error( $"Invalid $({propName}) version definition {p.Origin} in {propertyDef}: {version.ErrorMessage}." );
                 return null;
             }
+            version = v.Version;
+            versionLocked = v.Locked;
             return propertyDef;
         }
     }

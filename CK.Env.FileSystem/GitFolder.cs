@@ -291,21 +291,22 @@ namespace CK.Env
         /// <returns>Success and whether the tag has been created or was already defined.</returns>
         public (bool Success, bool Created) SetVersionTag( IActivityMonitor m, SVersion v )
         {
+            var sv = 'v' + v.ToString();
             try
             {
-                var exists = _git.Tags[v.ToString()];
+                var exists = _git.Tags[sv];
                 if( exists != null && exists.PeeledTarget == _git.Head.Tip )
                 {
-                    m.Info( $"Version Tag {v} is already set." );
+                    m.Info( $"Version Tag {sv} is already set." );
                     return (true, false);
                 }
-                _git.ApplyTag( v.ToString() );
-                m.Info( $"Set Version tag {v} on {CurrentBranchName}." );
+                _git.ApplyTag( sv );
+                m.Info( $"Set Version tag {sv} on {CurrentBranchName}." );
                 return (true, true);
             }
             catch( Exception ex )
             {
-                m.Error( $"SetVersionTag {v} on {CurrentBranchName} failed.", ex );
+                m.Error( $"SetVersionTag {sv} on {CurrentBranchName} failed.", ex );
                 return (false, false);
             }
         }
@@ -318,17 +319,18 @@ namespace CK.Env
         /// <returns>True on success, false on error.</returns>
         public bool PushVersionTag( IActivityMonitor m, SVersion v )
         {
-            using( m.OpenInfo( $"Pushing tag {v} to remote for {SubPath}." ) )
+            var sv = 'v' + v.ToString();
+            using( m.OpenInfo( $"Pushing tag {sv} to remote for {SubPath}." ) )
             {
                 try
                 {
                     Remote remote = _git.Network.Remotes["origin"];
                     var options = new PushOptions() { CredentialsProvider = DefaultCredentialHandler };
 
-                    var exists = _git.Tags[v.ToString()];
+                    var exists = _git.Tags[sv];
                     if( exists == null )
                     {
-                        m.Error( $"Version Tag {v} does not exist in {SubPath}." );
+                        m.Error( $"Version Tag {sv} does not exist in {SubPath}." );
                         return false;
                     }
                     _git.Network.Push( remote, exists.CanonicalName, options );
@@ -336,7 +338,7 @@ namespace CK.Env
                 }
                 catch( Exception ex )
                 {
-                    m.Error( $"PushVersionTags failed ({v} on {SubPath}).", ex );
+                    m.Error( $"PushVersionTags failed ({sv} on {SubPath}).", ex );
                     return false;
                 }
             }
@@ -350,15 +352,16 @@ namespace CK.Env
         /// <returns>True on success, false on error.</returns>
         public bool ClearVersionTag( IActivityMonitor m, SVersion v )
         {
+            var sv = 'v' + v.ToString();
             try
             {
-                _git.Tags.Remove( v.ToString() );
-                m.Info( $"Removing Version tag '{v}' from {SubPath}." );
+                _git.Tags.Remove( sv );
+                m.Info( $"Removing Version tag '{sv}' from {SubPath}." );
                 return true;
             }
             catch( Exception ex )
             {
-                m.Error( $"ClearVersionTag {v} on {SubPath} failed.", ex );
+                m.Error( $"ClearVersionTag {sv} on {SubPath} failed.", ex );
                 return false;
             }
         }

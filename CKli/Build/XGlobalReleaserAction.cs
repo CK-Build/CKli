@@ -60,7 +60,7 @@ namespace CKli
             }
             if( ctx.CanRelease )
             {
-                return ctx.Release( m, new MasterReleaseVersionSelector(), false );
+                return ctx.Release( m, new ReleaseVersionSelector(), false );
             }
             m.Error( $"Invalid state {ctx.WorkStatus}/{ctx.GlobalGitStatus}." );
             return false;

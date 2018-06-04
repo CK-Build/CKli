@@ -13,6 +13,20 @@ namespace CKli
 {
     public class MasterReleaseVersionSelector : IReleaseVersionSelector
     {
+
+        /// <summary>
+        /// When a solution has no obligation to be released (even as a fix), this method may decide
+        /// to NOT release it at all and use the last released version.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="solution">The solution.</param>
+        /// <param name="prevVersion">The previous released version.</param>
+        /// <returns>True to use the previous version, false to release at least a fix and null to cancel the process.</returns>
+        public bool? CanUsePreviousVersion( IActivityMonitor m, SolutionDependencyResult.DependentSolution solution, CSVersion prevVersion )
+        {
+            return false;
+        }
+
         /// <summary>
         /// This method must answer whether a pre-release (or a 0 Major version) actually
         /// introduces new features or breaking changes.
@@ -106,5 +120,6 @@ namespace CKli
                 Console.WriteLine();
             }
         }
+
     }
 }

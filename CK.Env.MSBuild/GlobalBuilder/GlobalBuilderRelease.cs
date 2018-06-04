@@ -41,15 +41,20 @@ namespace CK.Env.MSBuild
 
         protected override IReadOnlyList<SolutionDependencyResult.DependentSolution> FilterSolutions( IReadOnlyList<SolutionDependencyResult.DependentSolution> solutions )
         {
-            return solutions.Where( s => _roadmap.FirstOrDefault( r => r.SolutionName == s.Solution.UniqueSolutionName ).SolutionName != null ).ToList();
+            return solutions.Where( s => _roadmap[s.Solution]?.Build ?? false ).ToList();
         }
+
+        SimpleRoadmap.Entry _currentEntry;
 
         protected override bool StartBuilding( IActivityMonitor m, IReadOnlyList<SolutionDependencyResult.DependentSolution> solutions, SolutionDependencyResult.DependentSolution s )
         {
+            _currentEntry = _roadmap[s.Solution];
+            Debug.Assert( _currentEntry != null && _currentEntry.Build );
             if( CancelingRelease )
             {
-                var v = GetTargetVersionFromRoadmap( s );
-                if( v != null ) s.Solution.GitFolder.ClearVersionTag( m, v );
+                var v = _currentEntry.ReleaseInfo.Version;
+                Debug.Assert( v != null );
+                s.Solution.GitFolder.ClearVersionTag( m, v );
             }
             return base.StartBuilding( m, solutions, s );
         }
@@ -58,19 +63,13 @@ namespace CK.Env.MSBuild
         {
             return CancelingRelease
                     ? Feeds.GetBestLocalCIVersion( m, packageId )
-                    : Feeds.GetAllPackageFilesInReleaseFeed( m ).Single( p => p.PackageId == packageId ).Version;
+                    : _currentEntry.Upgrades.FirstOrDefault( u => u.PackageId == packageId ).Version;
         }
 
         protected override SVersion GetTargetVersion( IActivityMonitor m, SolutionDependencyResult.DependentSolution s )
         {
             if( CancelingRelease ) return base.GetTargetVersion( m, s );
-            return GetTargetVersionFromRoadmap( s );
-        }
-
-        SVersion GetTargetVersionFromRoadmap( SolutionDependencyResult.DependentSolution s )
-        {
-            var entry = _roadmap.FirstOrDefault( r => r.SolutionName == s.Solution.UniqueSolutionName );
-            return entry.Build ? entry.TargetVersion : null;
+            return _currentEntry.ReleaseInfo.Version;
         }
 
         protected override bool OnBuildStart( IActivityMonitor m, SolutionDependencyResult.DependentSolution s, SVersion v )
@@ -101,6 +100,7 @@ namespace CK.Env.MSBuild
 
         protected override bool OnBuildSucceed( IActivityMonitor m, SolutionDependencyResult.DependentSolution s, SVersion v )
         {
+            _currentEntry = null;
             // This is an untracked file. It has to be removed.
             s.Solution.GitFolder.RemoveCKSetupStoreTestHelperConfig( m );
             if( !s.Solution.GitFolder.ResetHard( m ) ) return false; 
@@ -113,6 +113,7 @@ namespace CK.Env.MSBuild
 
         protected override void OnBuildFailed( IActivityMonitor m, SolutionDependencyResult.DependentSolution s, SVersion v )
         {
+            _currentEntry = null;
             s.Solution.GitFolder.ClearVersionTag( m, v );
             // This is an untracked file. It has to be removed.
             s.Solution.GitFolder.RemoveCKSetupStoreTestHelperConfig( m );

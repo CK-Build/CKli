@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using CK.Core;
 
 namespace CK.Env.MSBuild
 {
@@ -13,17 +14,33 @@ namespace CK.Env.MSBuild
     {
         readonly List<Entry> _entries;
 
-        public struct Entry
+        public struct Upgrade
+        {
+            public string ProjectPath { get; }
+            public string PackageId { get; }
+            public CSVersion Version { get; }
+
+            public Upgrade( XElement e )
+            {
+                ProjectPath = (string)e.AttributeRequired( "Project" );
+                PackageId = (string)e.AttributeRequired( "PackageId" );
+                Version = CSVersion.Parse( (string)e.AttributeRequired( "Version" ) );
+            }
+        }
+
+        public class Entry
         {
             public readonly string SolutionName;
-            public readonly SVersion TargetVersion;
+            public readonly ReleaseInfo ReleaseInfo;
+            public readonly IReadOnlyCollection<Upgrade> Upgrades;
             public readonly bool Build;
 
             internal Entry( XElement e )
             {
                 SolutionName = (string)e.Attribute( "Name" );
-                TargetVersion = SVersion.Parse( (string)e.Attribute( "Version" ) );
+                ReleaseInfo = new ReleaseInfo( e.Element("ReleaseInfo") );
                 Build = e.Element( "Build" ) != null;
+                Upgrades = e.Elements( "Upgrades" ).Elements( "Upgrade" ).Select( u => new Upgrade( u ) ).ToArray();
             }
         }
 
@@ -36,6 +53,8 @@ namespace CK.Env.MSBuild
         }
 
         public Entry this[int index] => _entries[index];
+
+        public Entry this[Solution s] => _entries.FirstOrDefault( e => e.SolutionName == s.UniqueSolutionName );
 
         public int Count => _entries.Count;
 

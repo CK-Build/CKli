@@ -189,16 +189,28 @@ namespace CK.Env.MSBuild
 
         protected virtual bool OnBuildStart( IActivityMonitor m, SolutionDependencyResult.DependentSolution s, SVersion v )
         {
+            if( BuildInfo.WorkStatus == WorkStatus.SwitchingToDevelop )
+            {
+                // Coming from local, build needs to access the local feeds.
+                // This should be the case but this corrects the files if needed.
+                if( !s.Solution.GitFolder.EnsureLocalFeedsNuGetSource( m ).Success
+                    || !s.Solution.GitFolder.SetRepositoryXmlIgnoreDirtyFolders( m ) )
+                {
+                    return false;
+                }
+            }
             return true;
         }
 
         protected virtual bool OnBuildSucceed( IActivityMonitor m, SolutionDependencyResult.DependentSolution s, SVersion v )
         {
+            if( BuildInfo.WorkStatus == WorkStatus.SwitchingToDevelop && !s.Solution.GitFolder.ResetHard( m ) ) return false;
             return true;
         }
 
         protected virtual void OnBuildFailed( IActivityMonitor m, SolutionDependencyResult.DependentSolution s, SVersion v )
         {
+            if( BuildInfo.WorkStatus == WorkStatus.SwitchingToDevelop ) s.Solution.GitFolder.ResetHard( m );
         }
 
         static void DisplaySolutionList( IActivityMonitor m, IReadOnlyList<SolutionDependencyResult.DependentSolution> all, SolutionDependencyResult.DependentSolution current = null )
