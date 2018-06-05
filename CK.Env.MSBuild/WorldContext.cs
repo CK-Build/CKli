@@ -163,17 +163,6 @@ namespace CK.Env.MSBuild
                 var r = GetSolutionDependencyResult( m, World.DevelopBranchName );
                 if( r == null ) return false;
 
-                // 
-                foreach( var s in r.Solutions )
-                {
-                    s.UpdatePackageDependencies( m, ( monior, name ) =>
-                    {
-                        if( name == "SimpleGitVersion.Core" || name == "SimpleGitVersion.Cake" ) return SVersion.Parse( "0.33.1-C0017-develop" );
-                        return null;
-                    }, FileSystem, allowDowngrade: true, allowMissing: true, buildProjects: true );
-                    if( !s.Solution.GitFolder.Commit( m, "Updated Build projects with fixed SimpleGitVersion." ).Success ) return false;
-                }
-
                 _buildInfo.SetStatus( WorkStatus, GlobalGitStatus );
                 var b = new GlobalBuilder( r, FileSystem, _feeds, _testedCommits, _buildInfo );
                 if( !b.Build( m ) ) return false;
@@ -227,7 +216,27 @@ namespace CK.Env.MSBuild
                 _buildInfo.SetStatus( WorkStatus, GlobalGitStatus );
                 var b = new GlobalBuilderRelease( r, FileSystem, _feeds, _testedCommits, _buildInfo, roadmap );
                 if( !b.Build( m ) ) return false;
-                FileSystem.RawDeleteLocalDirectory( m, _feeds.GetReleaseFeedFolder( m ).PhysicalPath );
+
+                // This should be in the SimpleRoadmap.
+                var publishedPackages = roadmap.Where( e => e.Build )
+                               .SelectMany( e => r.Solutions.First( s => s.Solution.UniqueSolutionName == e.SolutionName )
+                                                   .Solution
+                                                   .PublishedProjects
+                                                   .Select( p => (PackageId: p.Name, e.ReleaseInfo.Version) ) )
+                               .ToList();
+                using( m.OpenInfo( $"Removing published components from Release local store." ) )
+                {
+                    using( var store = LocalStore.Open( m, _feeds.GetReleaseCKSetupStorePath( m ) ) )
+                    {
+                        if( store != null )
+                        {
+                            int removedCount = store.RemoveComponents( c => publishedPackages.Any( p => p.PackageId == c.Name && p.Version == c.Version ) );
+                            m.Info( $"Removed {removedCount} components from Release local store." );
+                            removedCount = store.GarbageCollectFiles();
+                            m.Info( $"Removed {removedCount} files from Release local store." );
+                        }
+                    }
+                }
                 using( m.OpenInfo( $"Upgrading Build projects dependencies to use CI builds." ) )
                 {
                     foreach( var s in r.Solutions )
@@ -238,13 +247,9 @@ namespace CK.Env.MSBuild
                 }
                 using( m.OpenInfo( $"Clearing NuGet local cache." ) )
                 {
-                    var publishedProjects = roadmap.SelectMany( e => r.Solutions.First( s => s.Solution.UniqueSolutionName == e.SolutionName )
-                                                                            .Solution
-                                                                            .PublishedProjects
-                                                                            .Select( p => (P: p, V: e.ReleaseInfo.Version) ) );
-                    foreach( var p in publishedProjects )
+                    foreach( var p in publishedPackages )
                     {
-                        _feeds.RemoveFromNuGetCache( m, p.P.Name, p.V );
+                        _feeds.RemoveFromNuGetCache( m, p.PackageId, p.Version );
                     }
                 }
                 if( !SetState( m, WorkStatus.Idle, GlobalGitStatus.DevelopBranch ) ) return false;

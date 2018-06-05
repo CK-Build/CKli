@@ -1,7 +1,7 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <CK-World-State GlobalGitStatus="DevelopBranch">
   <XmlState WorkStatus="Releasing">
-    <TestedCommitMemory>|f89bbe543c86c095d8660058aca1d2ec7fd7ab3c|9d549bae50062c3fe4217dabaf83215fe4af6e3d|397fab7e03d726d6d2152fdcee7f029646791c3b|b0ec7dedb6b022113fc5e487bdeb2fa8e0b94ad5|4e0f5a8212d923a6d867be47597d48f8bc551b64|00769eb8735a71f265ec86966625e7e0ab0d9183|f5ad9a98058b222e9112a12c7d745aa2a1a94bd6|d06d4a0ad62c6ceff7267a810262cf5f782ade1b|74dcb7c5b4e150fbdd60e1947d3fea8adf1b5a68</TestedCommitMemory>
+    <TestedCommitMemory>|f89bbe543c86c095d8660058aca1d2ec7fd7ab3c|9d549bae50062c3fe4217dabaf83215fe4af6e3d|397fab7e03d726d6d2152fdcee7f029646791c3b|b0ec7dedb6b022113fc5e487bdeb2fa8e0b94ad5|4e0f5a8212d923a6d867be47597d48f8bc551b64|00769eb8735a71f265ec86966625e7e0ab0d9183|f5ad9a98058b222e9112a12c7d745aa2a1a94bd6|d06d4a0ad62c6ceff7267a810262cf5f782ade1b|74dcb7c5b4e150fbdd60e1947d3fea8adf1b5a68|75416f8a6c60b452bc486af6d49eb16c22b108dc|db773d6e9ba3d7bcaf752634b3707850a28177e1|9280e65f8280f1fdfb739392b4e322afca71d4fb|44b38ffca2159bfce567ef43aeaea3f46968dabb</TestedCommitMemory>
     <RoadMap>
       <S Name="CK-WeakAssemblyNameResolver">
         <ReleaseInfo Version="0.5.0" Level="None" Constraint="None" />
@@ -27,8 +27,9 @@
         <Upgrades />
       </S>
       <S Name="CSemVer-Net">
-        <ReleaseInfo Version="2.0.0" Level="None" Constraint="None" />
+        <ReleaseInfo Version="2.1.0" Level="Feature" Constraint="HasFeatures" />
         <Upgrades />
+        <Build />
       </S>
       <S Name="Yodii-Script">
         <ReleaseInfo Version="0.7.0" Level="Feature" Constraint="HasFeatures" />
