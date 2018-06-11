@@ -147,17 +147,16 @@ namespace CKli
             return GetMaxVersionFromFeed( GetCIFeedFolder( m ).PhysicalPath, packageId );
         }
 
-        public LocalPackageFile GetBestLocalCIPackage( IActivityMonitor m )
-        {
-            return GetBestLocalPackage( m, GetCIFeedFolder( m ).PhysicalPath );
-        }
-
         public LocalPackageFile GetLocalCIPackage( IActivityMonitor m, string packageId, SVersion v )
         {
-            var f = Path.Combine( GetCIFeedFolder( m ).PhysicalPath, packageId + '.' + v.ToString() + ".nupkg" );
+            var f = GetPackagePath( GetCIFeedFolder( m ).PhysicalPath, packageId, v );
             return File.Exists( f ) ? new LocalPackageFile( f, packageId, v, false ) : null;
         }
 
+        static string GetPackagePath( string path, string packageId, SVersion v )
+        {
+            return Path.Combine( path, packageId + '.' + (v.AsCSVersion?.ToString(CSVersionFormat.NuGetPackage) ?? v.ToString()) + ".nupkg" );
+        }
 
         public bool FindInAnyLocalFeeds( IActivityMonitor m, string packageId, SVersion version )
         {
@@ -186,13 +185,6 @@ namespace CKli
         public IEnumerable<LocalPackageFile> GetAllPackageFilesInReleaseFeed( IActivityMonitor m, bool withSymbols = false )
         {
             return GetAllPackageFiles( m, GetReleaseFeedFolder( m ).PhysicalPath, withSymbols );
-        }
-
-        LocalPackageFile GetBestLocalPackage( IActivityMonitor m, string feedPath )
-        {
-            return GetAllPackageFiles( m, feedPath, false )
-                    .OrderByDescending( p => p.Version )
-                    .FirstOrDefault();
         }
 
         IEnumerable<LocalPackageFile> GetAllPackageFiles( IActivityMonitor m, string feedPath, bool withSymbols )
@@ -246,6 +238,26 @@ namespace CKli
             var dirPath = _localNuGetCache.AppendPart( packageId ).AppendPart( packageVersion );
             FileSystem.RawDeleteLocalDirectory( m, dirPath );
         }
+
+        public void RemoveFromFeeds( IActivityMonitor m, string packageId, SVersion version )
+        {
+            var dir = GetCIFeedFolder( m ).PhysicalPath;
+            var path = GetPackagePath( dir, packageId, version );
+            if( File.Exists( path ) ) File.Delete( path );
+
+            dir = GetLocalFeedFolder( m ).PhysicalPath;
+            path = GetPackagePath( dir, packageId, version );
+            if( File.Exists( path ) ) File.Delete( path );
+
+            dir = GetReleaseFeedFolder( m ).PhysicalPath;
+            path = GetPackagePath( dir, packageId, version );
+            if( File.Exists( path ) ) File.Delete( path );
+
+            dir = EnsureRootFolder( m ).PhysicalPath;
+            path = GetPackagePath( dir, packageId, version );
+            if( File.Exists( path ) ) File.Delete( path );
+        }
+
 
         static SVersion SafeParse( IActivityMonitor m, string path )
         {

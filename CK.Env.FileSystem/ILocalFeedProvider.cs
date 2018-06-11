@@ -49,13 +49,21 @@ namespace CK.Env
         SVersion GetBestAnyLocalVersion( IActivityMonitor m, string packageId );
 
         /// <summary>
-        /// Gets the version for a package in LocalFeed/CI.
+        /// Gets the best version for a package in LocalFeed/CI.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="packageId">The package name.</param>
         /// <returns>The version or null if not found.</returns>
         SVersion GetBestLocalCIVersion( IActivityMonitor m, string packageId );
 
+        /// <summary>
+        /// Gets a package file from CI feed.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="packageId">The package name.</param>
+        /// <param name="v">The package version.</param>
+        /// <returns></returns>
+        LocalPackageFile GetLocalCIPackage( IActivityMonitor m, string packageId, SVersion v );
 
         /// <summary>
         /// Gets all package files in LocalFeed/Release folder.
@@ -65,10 +73,6 @@ namespace CK.Env
         /// <returns>The package files.</returns>
         IEnumerable<LocalPackageFile> GetAllPackageFilesInReleaseFeed( IActivityMonitor m, bool withSymbols = false );
 
-        LocalPackageFile GetBestLocalCIPackage( IActivityMonitor m );
-
-        LocalPackageFile GetLocalCIPackage( IActivityMonitor m, string packageId, SVersion v );
-
         /// <summary>
         /// Removes a specific version of a package from the local NuGet cache.
         /// </summary>
@@ -76,6 +80,15 @@ namespace CK.Env
         /// <param name="packageId">The package identifier.</param>
         /// <param name="version">The package's version.</param>
         void RemoveFromNuGetCache( IActivityMonitor m, string packageId, SVersion version );
+
+        /// <summary>
+        /// Removes a specific version of a package from the Local, CI, Release feeds and also
+        /// from the root 'LocalFeed' directory.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="packageId">The package identifier.</param>
+        /// <param name="version">The package's version.</param>
+        void RemoveFromFeeds( IActivityMonitor m, string packageId, SVersion version );
 
         /// <summary>
         /// Gets the nuget.exe directory to use.

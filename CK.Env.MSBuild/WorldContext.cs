@@ -181,12 +181,15 @@ namespace CK.Env.MSBuild
             {
                 foreach( var g in _globalGitContext.GitFolders )
                 {
-                    if( !g.SwitchFromDevelopToLocal( m ) ) return false;
+                    if( !g.SwitchFromDevelopToLocal( m, autoCommit:true, commitLocalChanges:false ) ) return false;
                 }
                 var r = GetSolutionDependencyResult( m, World.LocalBranchName );
                 if( r == null ) return false;
+                if( !DoLocalZeroBuildProjects( m, r, true ) ) return false;
+                var rZeroBuildDeps = GetSolutionDependencyResult( m, World.LocalBranchName );
+                if( rZeroBuildDeps == null ) return false;
                 _buildInfo.SetStatus( WorkStatus, GlobalGitStatus );
-                var b = new GlobalBuilder( r, FileSystem, _feeds, _testedCommits, _buildInfo );
+                var b = new GlobalBuilder( rZeroBuildDeps, FileSystem, _feeds, _testedCommits, _buildInfo );
                 if( !b.Build( m ) ) return false;
                 if( !SetState( m, WorkStatus.Idle, GlobalGitStatus.LocalBranch ) ) return false;
             }
@@ -237,19 +240,20 @@ namespace CK.Env.MSBuild
                         }
                     }
                 }
+                using( m.OpenInfo( $"Clearing locally published packages and NuGet local cache." ) )
+                {
+                    foreach( var p in publishedPackages )
+                    {
+                        _feeds.RemoveFromFeeds( m, p.PackageId, p.Version );
+                        _feeds.RemoveFromNuGetCache( m, p.PackageId, p.Version );
+                    }
+                }
                 using( m.OpenInfo( $"Upgrading Build projects dependencies to use CI builds." ) )
                 {
                     foreach( var s in r.Solutions )
                     {
                         if( !s.UpdatePackageDependencies( m, _feeds.GetBestAnyLocalVersion, FileSystem, allowDowngrade: true, buildProjects: true ) ) return false;
                         if( !s.Solution.GitFolder.Commit( m, "Updated Build projects to use CI builds." ).Success ) return false;
-                    }
-                }
-                using( m.OpenInfo( $"Clearing NuGet local cache." ) )
-                {
-                    foreach( var p in publishedPackages )
-                    {
-                        _feeds.RemoveFromNuGetCache( m, p.PackageId, p.Version );
                     }
                 }
                 if( !SetState( m, WorkStatus.Idle, GlobalGitStatus.DevelopBranch ) ) return false;
@@ -339,11 +343,14 @@ namespace CK.Env.MSBuild
         public bool LocalFixToZeroBuildProjects( IActivityMonitor m, bool commitChanges = false )
         {
             if( !CanLocalFixToZeroBuildProjects ) throw new InvalidOperationException( nameof( CanLocalFixToZeroBuildProjects ) );
-
             var r = GetSolutionDependencyResult( m, World.LocalBranchName );
             if( r == null ) return false;
+            return DoLocalZeroBuildProjects( m, r, commitChanges );
+        }
 
-            var buildDepNames = r.BuildProjectsInfo.DependenciesToBuild.Select( p => p.Project.Project.Name ) ;
+        bool DoLocalZeroBuildProjects( IActivityMonitor m, SolutionDependencyResult r, bool commitChanges )
+        {
+            var buildDepNames = r.BuildProjectsInfo.DependenciesToBuild.Select( p => p.Project.Project.Name );
 
             using( m.OpenInfo( $"Removing {buildDepNames.Concatenate()} packages ZeroVersion from local NuGet cache if they exist." ) )
             {

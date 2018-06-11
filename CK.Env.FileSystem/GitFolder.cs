@@ -499,7 +499,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool SwitchFromDevelopToLocal( IActivityMonitor m, bool autoCommit = true )
+        public bool SwitchFromDevelopToLocal( IActivityMonitor m, bool autoCommit = true, bool commitLocalChanges = true )
         {
             using( m.OpenInfo( $"Switching '{SubPath}' to branch '{World.LocalBranchName}')." ) )
             {
@@ -553,7 +553,8 @@ namespace CK.Env
                     if( !EnsureCKSetupStoreTestHelperConfig( m, localStorePath ) ) return false;
                     if( !EnsureRepositoryXmlBlankDevBranch( m ) ) return false;
                     if( !EnsureLocalFeedsNuGetSource( m ).Success ) return false;
-                    if( !Commit( m, "Updated Repository.xml and nuget.config for 'local' branch." ).Success ) return false;
+                    if( commitLocalChanges
+                        && !Commit( m, "Updated Repository.xml and nuget.config for 'local' branch." ).Success ) return false;
                     if( r.Status != MergeStatus.UpToDate )
                     {
                         m.CloseGroup( $"Success (with merge from '{World.DevelopBranchName}')." );

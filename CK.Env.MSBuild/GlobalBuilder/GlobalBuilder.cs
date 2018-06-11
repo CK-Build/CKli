@@ -193,9 +193,26 @@ namespace CK.Env.MSBuild
             {
                 // Coming from local, build needs to access the local feeds.
                 // This should be the case but this corrects the files if needed.
+                Debug.Assert( _buildInfo.RunUnitTests == false );
+                // Since we do not need unit tests here, no need for CKSetup test helper config.
                 if( !s.Solution.GitFolder.EnsureLocalFeedsNuGetSource( m ).Success
                     || !s.Solution.GitFolder.SetRepositoryXmlIgnoreDirtyFolders( m ) )
                 {
+                    return false;
+                }
+            }
+            else if( _buildInfo.TargetDevelop && _buildInfo.IsRemotesRequired == false )
+            {
+                // Building in Develop without Remote pushes: we need to access LocalFeed/CI
+                // and CKSetup test helper config file (just like the GlobalBuilderRelease).
+                var storePath = Path.Combine( GetTargetFeedFolderPath( m ), LocalFeedProviderExtension.CKSetupStoreName );
+                if( !s.Solution.GitFolder.EnsureCKSetupStoreTestHelperConfig( m, storePath )
+                    || !s.Solution.GitFolder.EnsureLocalFeedsNuGetSource( m, ensureRelease: true, ensureCI: true ).Success
+                    || !s.Solution.GitFolder.SetRepositoryXmlIgnoreDirtyFolders( m ) )
+                {
+                    // This is an untracked file. It has to be removed.
+                    s.Solution.GitFolder.RemoveCKSetupStoreTestHelperConfig( m );
+                    s.Solution.GitFolder.ResetHard( m );
                     return false;
                 }
             }
@@ -205,12 +222,24 @@ namespace CK.Env.MSBuild
         protected virtual bool OnBuildSucceed( IActivityMonitor m, SolutionDependencyResult.DependentSolution s, SVersion v )
         {
             if( BuildInfo.WorkStatus == WorkStatus.SwitchingToDevelop && !s.Solution.GitFolder.ResetHard( m ) ) return false;
+            else if( _buildInfo.TargetDevelop && _buildInfo.IsRemotesRequired == false )
+            {
+                // This is an untracked file. It has to be removed.
+                s.Solution.GitFolder.RemoveCKSetupStoreTestHelperConfig( m );
+                if( !s.Solution.GitFolder.ResetHard( m ) ) return false;
+            }
             return true;
         }
 
         protected virtual void OnBuildFailed( IActivityMonitor m, SolutionDependencyResult.DependentSolution s, SVersion v )
         {
             if( BuildInfo.WorkStatus == WorkStatus.SwitchingToDevelop ) s.Solution.GitFolder.ResetHard( m );
+            else
+            {
+                // This is an untracked file. It has to be removed.
+                s.Solution.GitFolder.RemoveCKSetupStoreTestHelperConfig( m );
+                s.Solution.GitFolder.ResetHard( m );
+            }
         }
 
         static void DisplaySolutionList( IActivityMonitor m, IReadOnlyList<SolutionDependencyResult.DependentSolution> all, SolutionDependencyResult.DependentSolution current = null )

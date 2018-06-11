@@ -8,17 +8,6 @@
   <SolutionCentral />
 
   <KnownPackageVersions>
-    <Package Name="Mono.Cecil" MinVersion="0.10.0" />
-    <Package Name="FluentAssertions" Version="5.3.0" />
-    <Package Name="NUnit" Version="2.6.4" Frameworks="net461" />
-    <Package Name="NUnitLite" Version="3.10.1" Frameworks="netstandard2.0;netcoreapp2.0" />
-    <Package Name="NUnit" MinVersion="3.10.1" Frameworks="netstandard2.0;netcoreapp2.0" />
-    <Package Name="Microsoft.Extensions.Options" MinVersion="2.0.2" />
-    <Package Name="Microsoft.AspNetCore.Http" MinVersion="2.0.3" />
-    <Package Name="Microsoft.AspNetCore" MinVersion="2.0.3" />
-    <Package Name="Microsoft.AspNetCore.Hosting" MinVersion="2.0.3" />
-    <Package Name="Microsoft.CodeAnalysis.CSharp" MinVersion="2.8.2" />
-    <Package Name="System.Data.SqlClient" MinVersion="4.4.3" />
   </KnownPackageVersions>
 
   <KnownPackageDependencies>
@@ -32,6 +21,7 @@
   <GitResetAction Title="ResetHard: Totally reset current changes on current branch for all repository." />
   <GitCommitAction Title="Commits all pending changes to the current branch of all the repositories." />
   <GitFetchAction Title="Fetches all remotes in all repositories." />
+  <GitPushAction Title="Push develop branches of all repositories." />
   <GlobalDependencyAction Title="Solutions &amp; Projects management." />
   <GlobalSwitchBranchAction Title="Switch between 'develop-blank' &lt;=&gt; 'develop' branches." />
   <GlobalLocalBuildAction Title="Local CI Build: Build all Solutions in develop or local branch, pushing packages to LocalFeed or LocalFeed/Blanck feeds (optionally pushing them to MyGet invenietis-ci feed for 'develop' branch)." />
@@ -336,6 +326,7 @@
 
   </Folder>
 
+
   <Folder Name="SimpleGitVersion">
 
     <GitFolder Name="CodeCake" Url="https://github.com/SimpleGitVersion/CodeCake.git">
@@ -366,6 +357,24 @@
     </GitFolder>
 
   </Folder>
+
+<!--
+
+  <Folder Name="CK-Sample-Projects">
+
+    <GitFolder Name="CK-Sample" Url="https://github.com/Invenietis/CK-Sample.git">
+      <Branch Name="develop">
+        <PrimarySolution NotPublishedProjects="CK.Sample.Data;WebApp" >
+          <TestProjectsStandardConventions />
+        </PrimarySolution>
+        <Reuse Name="StandardFiles" />
+        <AppVeyorFile SqlServer="2016" />
+      </Branch>
+    </GitFolder>
+
+  </Folder>
+  
+-->
 
   <File Name="CK-World">
     <MustExist Content="SimpleFiles/CK-World"/>
