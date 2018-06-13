@@ -124,7 +124,7 @@ namespace CK.Env.MSBuild
 
                 var path = gitFolder.FileSystem.GetFileInfo( s.Solution.SolutionFolderPath ).PhysicalPath;
                 var args = "run --project CodeCakeBuilder -autointeraction";
-                if( !buildRequired ) args += " -target=\"Unit-Testing\" -exclusive -IgnoreNoPackagesToProduce=Y";
+                if( !buildRequired ) args += " -target=\"Unit-Testing\" -exclusiveOptional -IgnoreNoPackagesToProduce=Y";
                 if( !_buildInfo.RunUnitTests ) args += " -RunUnitTests=N";
 
                 if( !OnBuildStart( m, s, v ) ) return false;

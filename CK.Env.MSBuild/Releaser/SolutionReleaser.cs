@@ -69,8 +69,10 @@ namespace CK.Env
             {
                 var sInfo = _releaser.FindBySolution( s ).EnsureReleaseInfo( m, versionSelector );
                 if( !sInfo.IsValid ) return _releaseInfo;
-                requirements = requirements.CombineRequirement( sInfo );
-
+                if( Solution.PublishedRequirements.Contains( s ) )
+                {
+                    requirements = requirements.CombineRequirement( sInfo );
+                }
                 var updates = GlobalResult.ProjectDependencies.DependencyTable
                                 .Where( r => !r.IsExternalDependency
                                              && r.SourceProject.Project.PrimarySolution == Solution.Solution
@@ -83,7 +85,7 @@ namespace CK.Env
             // Handle package references updates.
             //  - if none and a Release tag already exists on the commit point, there
             //    is nothing to do (we exit directly with the only ReleaseLevel.None possible).
-            //  - For all other cases, we compute the right AllPossibleVersions and adjust the Release
+            //  - For all other cases, we compute the correct AllPossibleVersions and adjust the Release
             //    level of the requirements.
             if( _packageVersionUpdate.Count > 0 )
             {

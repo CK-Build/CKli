@@ -371,7 +371,7 @@ namespace CK.Env.MSBuild
                 if( current != r.Solution )
                 {
                     current = r.Solution;
-                    depSolutions[r.Index] = new SolutionDependencyResult.DependentSolution( current, r.Index, table, s => depSolutions.First( x => x.Solution == s ) );
+                    depSolutions[r.Index] = new SolutionDependencyResult.DependentSolution( current, r.Index, ProjectDependencies, table, s => depSolutions.First( x => x.Solution == s ) );
                 }
             }
             return new SolutionDependencyResult( content, result, ProjectDependencies, table, depSolutions, GetBuildProjectInfo( m ) );

@@ -68,6 +68,7 @@ namespace CK.Env.MSBuild
             internal DependentSolution(
                 Solution s,
                 int index,
+                ProjectDependencyResult projectDependencies,
                 IReadOnlyList<DependencyRow> dependencyTable,
                 Func<Solution,DependentSolution> others )
             {
@@ -78,9 +79,25 @@ namespace CK.Env.MSBuild
                                 .Distinct()
                                 .Select( others )
                                 .ToList();
+
+                Requirements = dependencyTable.Where( r => r.Solution == s && r.Target != null )
+                                .Select( r => r.Target.Solution )
+                                .Distinct()
+                                .Select( others )
+                                .ToList();
+
                 MinimalRequirements = Requirements.Except( Requirements.SelectMany( r => r.MinimalRequirements ) ).ToList();
                 Rank = MinimalRequirements.Count == 0 ? 0 : MinimalRequirements.Max( r => r.Rank ) + 1;
                 TransitiveRequirements = Requirements.SelectMany( r => r.TransitiveRequirements ).Distinct().ToList();
+
+                PublishedRequirements = projectDependencies.DependencyTable
+                            .Where( r => r.SourceProject.IsPublished
+                                        && r.SourceProject.Project.PrimarySolution == Solution
+                                        && r.TargetPackage.Project != null )
+                            .Select( r => others( r.TargetPackage.Project.PrimarySolution ) )
+                            .ToList();
+
+                Debug.Assert( PublishedRequirements.All( d => Requirements.Contains( d ) ) );
             }
 
             /// <summary>
@@ -103,6 +120,13 @@ namespace CK.Env.MSBuild
             /// used in this <see cref="Solution"/>.
             /// </summary>
             public IReadOnlyList<DependentSolution> Requirements { get; }
+
+            /// <summary>
+            /// Gets the direct required solutions for the published packages of this solution:
+            /// this corresponds to the solutions that generate a package used ba a published package in
+            /// this <see cref="Solution"/>.
+            /// </summary>
+            public IReadOnlyList<DependentSolution> PublishedRequirements { get; }
 
             /// <summary>
             /// Gets the minimal set of required solutions: this is the sub set of the <see cref="Requirements"/>
