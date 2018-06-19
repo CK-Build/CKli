@@ -260,6 +260,16 @@
       </Branch>
     </GitFolder>
 
+    <GitFolder Name="CK-DB-SqlCKTrait" Url="https://github.com/Invenietis/CK-DB-SqlCKTrait.git">
+      <Branch Name="develop">
+        <PrimarySolution TestProjectsArePublished="True">
+          <TestProjectsStandardConventions />
+        </PrimarySolution>
+        <Reuse Name="StandardFiles" />
+        <AppVeyorFile SqlServer="2016" />
+      </Branch>
+    </GitFolder>
+
     <GitFolder Name="CK-Setup" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-setup.git">
       <Branch Name="develop">
         <Reuse Name="StandardPrimarySolution" />

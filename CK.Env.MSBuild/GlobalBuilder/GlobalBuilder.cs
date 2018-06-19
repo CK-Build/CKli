@@ -90,7 +90,6 @@ namespace CK.Env.MSBuild
                 var result = gitFolder.Commit( m, "Global build commit." );
                 if( !result.Success ) return false;
 
-                bool buildRequired = true;
                 SVersion v = GetTargetVersion( m, s );
                 if( v == null )
                 {
@@ -98,8 +97,10 @@ namespace CK.Env.MSBuild
                     continue;
                 }
 
-                var commitSHA1 = s.Solution.GitFolder.HeadCommitSHA1;
                 m.Info( $"Target Version = {v}" );
+                var commitSHA1 = s.Solution.GitFolder.HeadCommitSHA1;
+                bool buildRequired = true;
+                bool unitTestsRequired = _buildInfo.RunUnitTests && !_testRunMemory.HasBeenTested( m, commitSHA1 );
                 if( !result.CommitCreated )
                 {
                     var existingPackages = s.Solution.PublishedProjects.Select( p => (p.Name, _feeds.FindInAnyLocalFeeds( m, p.Name, v )) ).ToList();
@@ -110,7 +111,7 @@ namespace CK.Env.MSBuild
                             m.Info( $"Skipping this solution build since no tests must be done and all packages exist locally: {existingPackages.Select( e => e.Item1 ).Concatenate()}" );
                             continue;
                         }
-                        if( _testRunMemory.HasBeenTested( m, commitSHA1 ) )
+                        if( !unitTestsRequired )
                         {
                             m.Info( $"Skipping this solution build since this has been already tested and all packages exist locally: {existingPackages.Select( e => e.Item1 ).Concatenate()}" );
                             continue;
@@ -119,13 +120,12 @@ namespace CK.Env.MSBuild
                     }
                     else m.Info( $"Packages to produce: {existingPackages.Where( e => !e.Item2 ).Select( e => e.Item1 ).Concatenate()}" );
                 }
-
-                Debug.Assert( buildRequired || (_buildInfo.RunUnitTests && !_testRunMemory.HasBeenTested( m, commitSHA1 )) );
+                Debug.Assert( buildRequired || unitTestsRequired );
 
                 var path = gitFolder.FileSystem.GetFileInfo( s.Solution.SolutionFolderPath ).PhysicalPath;
                 var args = "run --project CodeCakeBuilder -autointeraction";
                 if( !buildRequired ) args += " -target=\"Unit-Testing\" -exclusiveOptional -IgnoreNoPackagesToProduce=Y";
-                if( !_buildInfo.RunUnitTests ) args += " -RunUnitTests=N";
+                if( !unitTestsRequired ) args += " -RunUnitTests=N";
 
                 if( !OnBuildStart( m, s, v ) ) return false;
                 try

@@ -89,18 +89,8 @@ namespace CK.Env
             //    level of the requirements.
             if( _packageVersionUpdate.Count > 0 )
             {
-                // Since we'll need a commit to upgrade the package versions.
+                // Since we'll need a commit to upgrade the package versions, we consider the NextPossibleVersions.
                 AllPossibleVersions = RepositoryInfo.NextPossibleVersions;
-                if( requirements.Level == ReleaseLevel.None )
-                {
-                    // Our packages need an update but dependent solutions did not need to build...
-                    // This may happen if our package versions just need to be fixed: this is a perfectly
-                    // valid scenario.
-                    // So what are the choices of the user in such case?
-                    // None is not an option: the updated dependencies may break something here. At least a fix must be released.
-                    requirements = requirements.WithLevel( ReleaseLevel.Fix );
-                }
-                Debug.Assert( requirements.Level != ReleaseLevel.None );
             }
             else
             {
@@ -127,12 +117,18 @@ namespace CK.Env
                 }
                 if( RepositoryInfo.CommitContentHasTag )
                 {
+                    // TODO: ensure that this is the tag of the commit point merged into master branch.
                     var vContent = RepositoryInfo.CommitVersionInfo.ThisContentCommit.ThisTag;
                     m.Info( $"This commit has a content version tag: {vContent}. We use it." );
                     AllPossibleVersions = new[] { vContent };
                     return _releaseInfo = requirements.WithVersion( vContent );
                 }
-                // We are on a commit point that has no tag.
+                AllPossibleVersions = RepositoryInfo.PossibleVersions;
+            }
+
+            if( requirements.Level == ReleaseLevel.None )
+            {
+                // There are no reasons to release becasue of the dependencies.
                 // The new code that is contained in this commit:
                 // - MAY have no actual changes: the previous version could be used.
                 // - or MUST be released at least as a fix.
@@ -148,8 +144,8 @@ namespace CK.Env
                     }
                 }
                 requirements = requirements.WithLevel( ReleaseLevel.Fix );
-                AllPossibleVersions = RepositoryInfo.PossibleVersions;
             }
+
             Debug.Assert( requirements.Level >= ReleaseLevel.Fix );
 
             // Handles the versions now.

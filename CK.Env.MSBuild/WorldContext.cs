@@ -273,6 +273,13 @@ namespace CK.Env.MSBuild
             if( roadmap == null )
             {
                 m.Error( "Unable to find the RoadMap element in WorldState XmlState." );
+                return null;
+            }
+            int count = _worldState.XmlState.Elements( "RoadMap" ).Count();
+            if( count > 1 )
+            {
+                m.Error( $"Found {count} RoadMap elements in WorldState XmlState. Only one must exist." );
+                return null;
             }
             return new SimpleRoadmap( roadmap );
         }
@@ -448,7 +455,14 @@ namespace CK.Env.MSBuild
             var releaser = new GlobalReleaser( releasers );
             XElement roadmap = releaser.ComputeFullRoadMap( m, versionSelector );
             if( roadmap == null ) return false;
-            if( !SetState( m, WorkStatus.Releasing, state => state.XmlState.Add( roadmap ) ) ) return false;
+            if( !SetState( m, WorkStatus.Releasing, state =>
+            {
+                state.XmlState.Element( "RoadMap" )?.Remove();
+                state.XmlState.Add( roadmap );
+            } ) )
+            {
+                return false;
+            }
             return DoRelease( m, r, new SimpleRoadmap( roadmap ) );
         }
 
