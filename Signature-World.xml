@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <Signature-World>
+    <SharedHttpClient />
+    <PublishedPackageFeeds />
+    <PublishKeyStore />
 
     <ReferentialFolder Path="CK-Env/Referential" />
     <SolutionCentral />
@@ -13,7 +16,7 @@
         UsernameEnvironmentVariable="GIT_USERNAME"
         PasswordEnvironmentVariable="GIT_PASSWORD" />
 
-    <Folder Name="Clients">
+    <Folder Name="Signature-Customer-Projects">
 
         <GitFolder Name="Dominos" Url="https://invenietis.visualstudio.com/DefaultCollection/Signature/_git/Dominos">
             <Branch Name="develop">
@@ -41,7 +44,7 @@
 
     </Folder>
 
-    <Folder Name="SDK">
+    <Folder Name="Signature-Library-Projects">
 
         <GitFolder Name="SignatureSdk" Url="https://invenietis.visualstudio.com/DefaultCollection/Signature/_git/SignatureSdk">
             <Branch Name="develop">
@@ -67,10 +70,6 @@
             </Branch>
         </GitFolder>
 
-    </Folder>
-
-    <Folder Name="WCS">
-
         <GitFolder Name="SignatureModules" Url="https://invenietis.visualstudio.com/DefaultCollection/Signature/_git/SignatureModules">
             <Branch Name="develop">
                 <MustExist />
@@ -83,19 +82,11 @@
             </Branch>
         </GitFolder>
 
-    </Folder>
-
-    <Folder Name="Tools">
-
         <GitFolder Name="SignatureEmulator" Url="https://invenietis.visualstudio.com/DefaultCollection/Signature/_git/SignatureEmulator">
             <Branch Name="develop">
                 <MustExist />
             </Branch>
         </GitFolder>
-
-    </Folder>
-
-    <Folder Name="Process">
 
         <GitFolder Name="SignatureProcess" Url="https://invenietis.visualstudio.com/DefaultCollection/Signature/_git/SignatureProcess">
             <Branch Name="develop">
@@ -105,7 +96,7 @@
 
     </Folder>
 
-    <Folder Name="CK">
+    <Folder Name="CK-Misc-Projects">
 
         <GitFolder Name="CK-Communication" Url="https://invenietis.visualstudio.com/DefaultCollection/CK/_git/CK-Communication">
             <Branch Name="develop">
@@ -121,7 +112,7 @@
 
     </Folder>
 
-    <Folder Name="Deprecated">
+    <Folder Name="Deprecated-Projects">
 
         <GitFolder Name="SignatureApp" Url="https://invenietis.visualstudio.com/DefaultCollection/Signature/_git/SignatureApp">
             <Branch Name="develop">
