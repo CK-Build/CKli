@@ -23,8 +23,8 @@
   <GitFetchAction Title="Fetches all remotes in all repositories." />
   <GitPushAction Title="Push develop branches of all repositories." />
   <GlobalDependencyAction Title="Solutions &amp; Projects management." />
-  <GlobalSwitchBranchAction Title="Switch between 'develop-blank' &lt;=&gt; 'develop' branches." />
-  <GlobalLocalBuildAction Title="Local CI Build: Build all Solutions in develop or local branch, pushing packages to LocalFeed or LocalFeed/Blanck feeds (optionally pushing them to MyGet invenietis-ci feed for 'develop' branch)." />
+  <GlobalSwitchBranchAction Title="Switch between 'develop-local' &lt;=&gt; 'develop' branches." />
+  <GlobalLocalBuildAction Title="CI Build: Build all Solutions in 'develop' or 'develop-local' branch, pushing packages to LocalFeed or LocalFeed/Blanck feeds (optionally pushing them to MyGet invenietis-ci feed for 'develop' branch), propagating CI versions across dependent solutions." />
   <GlobalFixBuildScriptAction Title="Fix build script (must be in 'local' branch)." />
   <!--<GlobalBlankBuildAction Title="Blank build: Build all Solutions locally in 'develop-local' branch." />-->
   <GlobalReleaserAction Title="Global Release." />
@@ -206,6 +206,14 @@
         <AppVeyorFile />
       </Branch>
     </GitFolder>
+    
+    <GitFolder Name="CK-UnitsOfMeasure" Url="https://github.com/Invenietis/CK-UnitsOfMeasure.git">
+      <Branch Name="develop">
+        <Reuse Name="StandardPrimarySolution" />
+        <Reuse Name="StandardFiles" />
+        <AppVeyorFile />
+      </Branch>
+    </GitFolder>
 
     <GitFolder Name="CK-WeakAssemblyNameResolver" Url="https://github.com/Invenietis/CK-WeakAssemblyNameResolver.git">
       <Branch Name="develop">
@@ -242,9 +250,6 @@
         <PrimarySolution TestProjectsArePublished="True">
           <TestProjectsStandardConventions />
         </PrimarySolution>
-        <SecondarySolution Path="IntegrationTests/IntegrationTests.sln" SpecialType="IncludedSecondarySolution">
-          <TestProjectsStandardConventions />
-        </SecondarySolution>
         <Reuse Name="StandardFiles" />
         <AppVeyorFile SqlServer="2016" />
       </Branch>
@@ -261,6 +266,26 @@
     </GitFolder>
 
     <GitFolder Name="CK-DB-SqlCKTrait" Url="https://github.com/Invenietis/CK-DB-SqlCKTrait.git">
+      <Branch Name="develop">
+        <PrimarySolution TestProjectsArePublished="True">
+          <TestProjectsStandardConventions />
+        </PrimarySolution>
+        <Reuse Name="StandardFiles" />
+        <AppVeyorFile SqlServer="2016" />
+      </Branch>
+    </GitFolder>
+
+    <GitFolder Name="CK-DB-User-SimpleInvitation" Url="https://github.com/Invenietis/CK-DB-User-SimpleInvitation.git">
+      <Branch Name="develop">
+        <PrimarySolution TestProjectsArePublished="True">
+          <TestProjectsStandardConventions />
+        </PrimarySolution>
+        <Reuse Name="StandardFiles" />
+        <AppVeyorFile SqlServer="2016" />
+      </Branch>
+    </GitFolder>
+
+    <GitFolder Name="CK-DB-User-UserPassword" Url="https://github.com/Invenietis/CK-DB-User-UserPassword.git">
       <Branch Name="develop">
         <PrimarySolution TestProjectsArePublished="True">
           <TestProjectsStandardConventions />

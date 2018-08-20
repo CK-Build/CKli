@@ -38,7 +38,8 @@ namespace CKli
             if( ctx == null ) return false;
             if( ctx.HasWorkPending )
             {
-                m.Info( $"Work in progress: {ctx.WorkStatus}. Finishing the job." );
+                m.Info( $"Work in progress: {ctx.WorkStatus}. Finishing the job. Press Enter." );
+                Console.ReadLine();
                 return ctx.ConcludeCurrentWork( m );
             }
             m.Info( $"Current Global Status: {ctx.GlobalGitStatus}." );
