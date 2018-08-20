@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net461</TargetFramework>
@@ -6,13 +6,13 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="NuGet.CommandLine" Version="4.6.2" />
+        <PackageReference Include="NuGet.CommandLine" Version="4.7.1" />
         <PackageReference Include="CK.Text" Version="7.0.0" />
-        <PackageReference Include="Code.Cake" Version="0.26.0" />
+        <PackageReference Include="Code.Cake" Version="0.27.0" />
         <PackageReference Include="NUnit.ConsoleRunner" Version="3.8.0" />
         <PackageReference Include="NUnit.Runners.Net4" Version="2.6.4" />
-        <PackageReference Include="SimpleGitVersion.Cake" Version="0.33.1-C0001-explore" />
-        <PackageReference Include="SimpleGitVersion.Core" Version="0.33.1-C0001-explore" />
+        <PackageReference Include="SimpleGitVersion.Cake" Version="0.35.0" />
+        <PackageReference Include="SimpleGitVersion.Core" Version="0.35.0" />
     </ItemGroup>
 
 </Project>
