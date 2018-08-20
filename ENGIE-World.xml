@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ENGIE-World>
+    <SharedHttpClient />
+    <PublishedPackageFeeds />
+    <PublishKeyStore />
+
+    <ReferentialFolder Path="CK-Env/Referential" />
+    <SolutionCentral />
+    
+    <GitStatusAction Title="Displays statuses of all the repositories." />
+    <GitCheckoutAction Title="Checkout all repositories on a specific branch name." />
+    <GitCommitAction Title="Commits all pending changes to the current branch of all the repositories." />
+    <GitFetchAction Title="Fetches all remotes in all repositories." />
+
+    <GitCredentials
+        UsernameEnvironmentVariable="GIT_USERNAME"
+        PasswordEnvironmentVariable="GIT_PASSWORD" />
+
+    <Folder Name="ENGIE-Customer-Projects">
+
+        <GitFolder Name="Cofely" Url="https://invenietis.visualstudio.com/DefaultCollection/Cofely/_git/Cofely">
+        </GitFolder>
+
+        <GitFolder Name="Feedermarket.Client" Url="https://invenietis.visualstudio.com/DefaultCollection/Cofely/_git/Feedermarket.Client">
+        </GitFolder>
+
+        <GitFolder Name="Feedermarket.Content" Url="https://invenietis.visualstudio.com/DefaultCollection/Cofely/_git/Feedermarket.Content">
+        </GitFolder>
+
+        <GitFolder Name="Feedermarket.Transformers" Url="https://invenietis.visualstudio.com/DefaultCollection/Cofely/_git/Feedermarket.Transformers">
+        </GitFolder>
+
+        <GitFolder Name="CK-DB-Feedermarket" Url="https://invenietis.visualstudio.com/DefaultCollection/Cofely/_git/CK-DB-Feedermarket">
+        </GitFolder>
+
+        <GitFolder Name="Feedermarket-Auth" Url="https://invenietis.visualstudio.com/DefaultCollection/Cofely/_git/Feedermarket-Auth">
+        </GitFolder>
+
+        <GitFolder Name="Feedermarket-Buildings" Url="https://invenietis.visualstudio.com/DefaultCollection/Cofely/_git/Feedermarket-Buildings">
+        </GitFolder>
+
+        <GitFolder Name="Feedermarket-GED" Url="https://invenietis.visualstudio.com/DefaultCollection/Cofely/_git/Feedermarket-GED">
+        </GitFolder>
+
+        <GitFolder Name="Feedermarket-Notifications" Url="https://invenietis.visualstudio.com/DefaultCollection/Cofely/_git/Feedermarket-Notifications">
+        </GitFolder>
+
+        <GitFolder Name="Feedermarket-Utils" Url="https://invenietis.visualstudio.com/DefaultCollection/Cofely/_git/Feedermarket-Utils">
+        </GitFolder>
+
+    </Folder>
+    <Folder Name="CK-Misc-Projects">
+
+        <GitFolder Name="CK-Gis" Url="https://invenietis.visualstudio.com/DefaultCollection/CK/_git/CK-Gis">
+        </GitFolder>
+
+        <GitFolder Name="CK-Crs" Url="https://github.com/Invenietis/crs.git">
+        </GitFolder>
+
+        <GitFolder Name="CK-Crs-Client" Url="https://github.com/Invenietis/crs-client.git">
+        </GitFolder>
+        
+    </Folder>
+</ENGIE-World>
