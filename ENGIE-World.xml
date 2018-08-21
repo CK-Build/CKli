@@ -59,6 +59,9 @@
 
         <GitFolder Name="CK-Crs-Client" Url="https://github.com/Invenietis/crs-client.git">
         </GitFolder>
+
+        <GitFolder Name="CK-Sagas" Url="https://invenietis.visualstudio.com/DefaultCollection/CK/_git/CK-Sagas">
+        </GitFolder>
         
     </Folder>
 </ENGIE-World>
