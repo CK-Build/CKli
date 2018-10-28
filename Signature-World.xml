@@ -42,6 +42,12 @@
             </Branch>
         </GitFolder>
 
+        <GitFolder Name="Philibert" Url="https://invenietis.visualstudio.com/DefaultCollection/Signature/_git/Philibert">
+            <Branch Name="develop">
+                <MustExist />
+            </Branch>
+        </GitFolder>
+
     </Folder>
 
     <Folder Name="Signature-Library-Projects">
