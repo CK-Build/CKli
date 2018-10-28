@@ -88,6 +88,11 @@ namespace CK.Env
         public string CurrentBranchName => _git.Head.FriendlyName;
 
         /// <summary>
+        /// Gets the local feed provider.
+        /// </summary>
+        public ILocalFeedProvider FeedProvider => _feedProvider;
+
+        /// <summary>
         /// Checks that the current head is a clean commit (working directory is clean and no staging files exists).
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -269,9 +274,9 @@ namespace CK.Env
                     m.Error( $"Unable to read RepositoryInfo. RepositoryError: {result.RepositoryError}." );
                     return null;
                 }
-                if( result.HasError )
+                if( result.Error != null )
                 {
-                    m.Error( result.ReleaseTagErrorText );
+                    m.Error( result.ReleaseTagError );
                     return null;
                 }
                 return result;
@@ -552,7 +557,7 @@ namespace CK.Env
                     var localStorePath = _feedProvider.GetLocalCKSetupStorePath( m );
                     if( !EnsureCKSetupStoreTestHelperConfig( m, localStorePath ) ) return false;
                     if( !EnsureRepositoryXmlBlankDevBranch( m ) ) return false;
-                    if( !EnsureLocalFeedsNuGetSource( m ).Success ) return false;
+                    if( !GetNuGetConfigFile( m )?.EnsureLocalFeedsNuGetSource( m ).Success ?? false ) return false;
                     if( commitLocalChanges
                         && !Commit( m, "Updated Repository.xml and nuget.config for 'local' branch." ).Success ) return false;
                     if( r.Status != MergeStatus.UpToDate )
@@ -741,7 +746,13 @@ namespace CK.Env
             }
         }
 
-        (XDocument Doc, string Path) GetXmlDocument( IActivityMonitor m, string fileName )
+        /// <summary>
+        /// Reads a Xml document file in the <see cref="CurrentBranchName"/>.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="fileName">The path and file name (root based).</param>
+        /// <returns>The document and its path. Document is null if it can't be read and a fatal error is logged.</returns>
+        public (XDocument Doc, NormalizedPath Path) GetXmlDocument( IActivityMonitor m, string fileName )
         {
             var pathXml = SubPath.AppendPart( "branches" ).AppendPart( CurrentBranchName ).AppendPart( fileName );
             var rXml = FileSystem.GetFileInfo( pathXml );
@@ -753,72 +764,16 @@ namespace CK.Env
             return (rXml.ReadAsXDocument(), pathXml);
         }
 
-        (XDocument Doc, string Path, XElement PackageSources) GetNuGetConfigFile( IActivityMonitor m )
+        /// <summary>
+        /// Gets the NuGet.config file.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="reload">True to force a reload of the file.</param>
+        /// <returns>Null if unable to load file.</returns>
+        public NuGetConfigFile GetNuGetConfigFile( IActivityMonitor m )
         {
-            var (xDoc, pathXml) = GetXmlDocument( m, "nuget.config" );
-            if( xDoc == null ) return (null, null, null );
-
-            var e = xDoc.Root;
-            var packageSources = e.Element( "packageSources" );
-            if( packageSources == null )
-            {
-                m.Fatal( $"nuget.config must contain at least one <packageSources> element." );
-                return (null, null, null);
-            }
-            return (xDoc, pathXml, packageSources);
-        }
-
-        public (bool Success, bool Added) EnsureLocalFeedsNuGetSource( IActivityMonitor m, bool ensureRelease = true, bool ensureCI = true, bool ensureLocal = true )
-        {
-            var (xDoc, pathXml, packageSources) = GetNuGetConfigFile( m );
-            if( xDoc == null ) return (false,false);
-            bool added = false;
-            if( ensureRelease && !packageSources.Elements( "add" ).Any( x => (string)x.Attribute( "key" ) == "LocalFeed-Release" ) )
-            {
-                var localFeed = _feedProvider.GetReleaseFeedFolder( m ).PhysicalPath;
-                packageSources.Add( new XElement( "add",
-                                                new XAttribute( "key", "LocalFeed-Release" ),
-                                                new XAttribute( "value", localFeed ) ) );
-                added = true;
-            }
-            if( ensureCI && !packageSources.Elements( "add" ).Any( x => (string)x.Attribute( "key" ) == "LocalFeed-CI" ) )
-            {
-                var localFeed = _feedProvider.GetCIFeedFolder( m ).PhysicalPath;
-                packageSources.Add( new XElement( "add",
-                                                new XAttribute( "key", "LocalFeed-CI" ),
-                                                new XAttribute( "value", localFeed ) ) );
-                added = true;
-            }
-            if( ensureLocal && !packageSources.Elements( "add" ).Any( x => (string)x.Attribute( "key" ) == "LocalFeed-Local" ) )
-            {
-                var blankFeed = _feedProvider.GetLocalFeedFolder( m ).PhysicalPath;
-                packageSources.Add( new XElement( "add",
-                                                new XAttribute( "key", "LocalFeed-Local" ),
-                                                new XAttribute( "value", blankFeed ) ) );
-                added = true;
-            }
-            if( added )
-            {
-                return (FileSystem.CopyTo( m, xDoc.ToString(), pathXml ), true );
-            }
-            return (true, false);
-        }
-
-        public (bool Success, bool Removed) RemoveLocalFeedsNuGetSource( IActivityMonitor m )
-        {
-            var (xDoc, pathXml, packageSources) = GetNuGetConfigFile( m );
-            if( xDoc == null ) return (false,false);
-            var e = packageSources
-                     .Elements( "add" )
-                     .Where( b => (string)b.Attribute( "key" ) == "LocalFeed-Local"
-                                    || (string)b.Attribute( "key" ) == "LocalFeed-CI"
-                                    || (string)b.Attribute( "key" ) == "LocalFeed-Release" );
-            if( e.Any() )
-            {
-                e.Remove();
-                return (FileSystem.CopyTo( m, xDoc.ToString(), pathXml ), true);
-            }
-            return (true,false);
+            var f = new NuGetConfigFile( this, m );
+            return f.IsValid ? f : null;
         }
 
         public bool SetRepositoryXmlIgnoreDirtyFolders( IActivityMonitor m )

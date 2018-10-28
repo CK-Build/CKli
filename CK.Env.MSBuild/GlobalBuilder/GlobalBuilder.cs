@@ -67,12 +67,12 @@ namespace CK.Env.MSBuild
                     return path;
                 }
                 string releaseStore = EnsureStore( _feeds.GetReleaseFeedFolder( m ), Facade.DefaultStoreUrl );
-                string developStore = EnsureStore( _feeds.GetCIFeedFolder( m ), new Uri( releaseStore ) );
-                string localStore = EnsureStore( _feeds.GetLocalFeedFolder( m ), new Uri( developStore ) );
+                string ciStore = EnsureStore( _feeds.GetCIFeedFolder( m ), new Uri( releaseStore ) );
+                string localStore = EnsureStore( _feeds.GetLocalFeedFolder( m ), new Uri( ciStore ) );
                 string current = _buildInfo.TargetLocal
                                     ? localStore
                                     : (_buildInfo.TargetDevelop
-                                         ? developStore
+                                         ? ciStore
                                          : releaseStore);
                 environmentVariables.Add( ("CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL", current) );
             }
@@ -184,7 +184,7 @@ namespace CK.Env.MSBuild
         protected virtual SVersion GetTargetVersion( IActivityMonitor m, SolutionDependencyResult.DependentSolution s )
         {
             var info = s.Solution.GitFolder.ReadVersionInfo( m );
-            return info.ContentOrFinalNuGetVersion;
+            return info.BetterExistingVersion?.ThisTag ?? info.FinalNuGetVersion;
         }
 
         protected virtual bool OnBuildStart( IActivityMonitor m, SolutionDependencyResult.DependentSolution s, SVersion v )
@@ -195,7 +195,7 @@ namespace CK.Env.MSBuild
                 // This should be the case but this corrects the files if needed.
                 Debug.Assert( _buildInfo.RunUnitTests == false );
                 // Since we do not need unit tests here, no need for CKSetup test helper config.
-                if( !s.Solution.GitFolder.EnsureLocalFeedsNuGetSource( m ).Success
+                if( !s.Solution.GitFolder.GetNuGetConfigFile( m )?.EnsureLocalFeedsNuGetSource( m ).Success ?? false
                     || !s.Solution.GitFolder.SetRepositoryXmlIgnoreDirtyFolders( m ) )
                 {
                     return false;
@@ -207,7 +207,9 @@ namespace CK.Env.MSBuild
                 // and CKSetup test helper config file (just like the GlobalBuilderRelease).
                 var storePath = Path.Combine( GetTargetFeedFolderPath( m ), LocalFeedProviderExtension.CKSetupStoreName );
                 if( !s.Solution.GitFolder.EnsureCKSetupStoreTestHelperConfig( m, storePath )
-                    || !s.Solution.GitFolder.EnsureLocalFeedsNuGetSource( m, ensureRelease: true, ensureCI: true ).Success
+                    || !(s.Solution.GitFolder.GetNuGetConfigFile( m )?.
+                                EnsureLocalFeedsNuGetSource( m, ensureRelease: true, ensureCI: true ).Success
+                                ?? false)
                     || !s.Solution.GitFolder.SetRepositoryXmlIgnoreDirtyFolders( m ) )
                 {
                     // This is an untracked file. It has to be removed.

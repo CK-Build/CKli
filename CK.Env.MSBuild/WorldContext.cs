@@ -171,7 +171,7 @@ namespace CK.Env.MSBuild
                     foreach( var s in r.Solutions )
                     {
                         if( !s.UpdatePackageDependencies( m, _feeds.GetBestAnyLocalVersion, FileSystem, allowDowngrade: false, buildProjects: true ) ) return false;
-                        if( !s.Solution.GitFolder.RemoveLocalFeedsNuGetSource( m ).Success ) return false;
+                        if( !s.Solution.GitFolder.GetNuGetConfigFile( m )?.RemoveLocalFeedsNuGetSource( m ).Success ?? false ) return false;
                         if( !s.Solution.GitFolder.Commit( m, "Updated Build projects and removed LocalFeed NuGet sources." ).Success ) return false;
                     }
                 }
@@ -186,6 +186,7 @@ namespace CK.Env.MSBuild
                 var r = GetSolutionDependencyResult( m, World.LocalBranchName );
                 if( r == null ) return false;
                 if( !DoLocalZeroBuildProjects( m, r, true ) ) return false;
+
                 var rZeroBuildDeps = GetSolutionDependencyResult( m, World.LocalBranchName );
                 if( rZeroBuildDeps == null ) return false;
                 _buildInfo.SetStatus( WorkStatus, GlobalGitStatus );
@@ -367,10 +368,12 @@ namespace CK.Env.MSBuild
                 }
             }
 
+            var touchedSolutions = new List<Solution>();
             using( m.OpenInfo( $"Updating package references to ZeroVersion." ) )
             {
                 foreach( var sp in r.BuildProjectsInfo.ProjectsToUpgrade.GroupBy( p => p.Project.Project.PrimarySolution ) )
                 {
+                    touchedSolutions.Add( sp.Key );
                     foreach( var projectAndDeps in sp )
                     {
                         var project = projectAndDeps.Project.Project;
@@ -395,6 +398,17 @@ namespace CK.Env.MSBuild
                 }
             }
 
+            // This appeared to be required once the ZeroVersions are avalaible otherwise
+            // updated dependencies are ignored.
+            using( m.OpenInfo( "Forcing a dotnet restore --force on all touched solutions." ) )
+            {
+                foreach( var s in touchedSolutions )
+                {
+                    var path = FileSystem.GetFileInfo( s.SolutionFolderPath ).PhysicalPath;
+                    if( !GlobalBuilder.Run( m, path, "dotnet", "restore --force" ) ) return false;
+                }
+            }
+
             foreach( var s in r.Solutions )
             {
                 using( m.OpenInfo( $"Updating standard CodeCakeBuilder files." ) )
@@ -402,16 +416,18 @@ namespace CK.Env.MSBuild
                     var codeCakeBuilderPath = s.Solution.SolutionFolderPath.AppendPart( "CodeCakeBuilder" );
                     foreach( var name in new[]
                     {
-                        "Build.StandardCheckRepository.cs",
-                        "Build.StandardCreateNuGetPackages.cs",
-                        "Build.StandardPushNuGetPackages.cs",
-                        "Build.StandardSolutionBuild.cs",
-                        "Build.StandardUnitTests.cs"
+                        ("Build.NuGetHelper.cs",true),
+                        ("Build.StandardCheckRepository.cs",true),
+                        ("Build.StandardCreateNuGetPackages.cs",false),
+                        ("Build.StandardPushNuGetPackages.cs",false),
+                        ("Build.StandardSolutionBuild.cs",false),
+                        ("Build.StandardUnitTests.cs",false),
+                        ("InstallCredentialProvider.ps1",true)
                     } )
                     {
-                        var path = codeCakeBuilderPath.AppendPart( name );
+                        var path = codeCakeBuilderPath.AppendPart( name.Item1 );
                         var f = FileSystem.GetFileInfo( path );
-                        if( f.Exists )
+                        if( f.Exists || name.Item2 )
                         {
                             var source = _referential.GetFileInfo( "InitialCodeCakeBuilder/" + name );
                             FileSystem.CopyTo( m, source, path );

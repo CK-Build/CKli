@@ -40,7 +40,7 @@
   <Reusable Name="CodeCakeBuilder">
     <Folder Name="CodeCakeBuilder">
       <MustExist InitialContent="InitialCodeCakeBuilder" />
-      <Region Title="Removing files and folders that should not more exist.">
+      <Region Title="Removing files and folders that should no more exist.">
         <Folder Name="Properties">
           <MustNotExist />
         </Folder>
@@ -79,6 +79,9 @@
           </FileTransform>
         </MustExist>
       </File>
+      <File Name="Build.NuGetHelper.cs">
+        <MustExist Content="InitialCodeCakeBuilder/Build.NuGetHelper.cs.cs" />
+      </File>
       <File Name="Build.StandardCheckRepository.cs">
         <MustExist Content="InitialCodeCakeBuilder/Build.StandardCheckRepository.cs" />
       </File>
@@ -93,6 +96,9 @@
       </File>
       <File Name="Build.StandardPushNuGetPackages.cs">
         <MustExist Content="InitialCodeCakeBuilder/Build.StandardPushNuGetPackages.cs" />
+      </File>
+      <File Name="InstallCredentialProvider.ps1">
+        <MustExist Content="InitialCodeCakeBuilder/InstallCredentialProvider.ps1" />
       </File>
     </Folder>
   </Reusable>
@@ -175,6 +181,14 @@
       </Branch>
     </GitFolder>
 
+    <GitFolder Name="CK-SqlServer" Url="https://github.com/Invenietis/CK-SqlServer.git">
+      <Branch Name="develop">
+        <Reuse Name="StandardPrimarySolution" />
+        <Reuse Name="StandardFiles" />
+        <AppVeyorFile SqlServer="2016" />
+      </Branch>
+    </GitFolder>
+
     <GitFolder Name="CK-Monitoring" Url="https://github.com/Invenietis/CK-Monitoring.git">
       <Branch Name="develop">
         <Reuse Name="StandardPrimarySolution" />
@@ -200,6 +214,14 @@
     </GitFolder>
 
     <GitFolder Name="CK-Text" Url="https://github.com/Invenietis/CK-Text.git">
+      <Branch Name="develop">
+        <Reuse Name="StandardPrimarySolution" />
+        <Reuse Name="StandardFiles" />
+        <AppVeyorFile />
+      </Branch>
+    </GitFolder>
+
+    <GitFolder Name="CK-MicroBenchmark" Url="https://github.com/Invenietis/CK-MicroBenchmark.git">
       <Branch Name="develop">
         <Reuse Name="StandardPrimarySolution" />
         <Reuse Name="StandardFiles" />
@@ -237,7 +259,7 @@
       </Branch>
     </GitFolder>
 
-    <GitFolder Name="CK-Database" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-database.git">
+    <GitFolder Name="CK-Database" Url="https://gitlab.com/signature-code/CK-Database.git">
       <Branch Name="develop">
         <Reuse Name="StandardPrimarySolution" />
         <Reuse Name="StandardFiles" />
@@ -255,7 +277,7 @@
       </Branch>
     </GitFolder>
 
-    <GitFolder Name="CK-DB-Github" Url="https://github.com/Invenietis/CK-DB-Github.git">
+    <GitFolder Name="CK-DB-GitHub" Url="https://github.com/Invenietis/CK-DB-GitHub.git">
       <Branch Name="develop">
         <PrimarySolution TestProjectsArePublished="True">
           <TestProjectsStandardConventions />

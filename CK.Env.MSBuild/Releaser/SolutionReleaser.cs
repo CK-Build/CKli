@@ -115,10 +115,10 @@ namespace CK.Env
                     AllPossibleVersions = new[] { RepositoryInfo.ValidReleaseTag };
                     return _releaseInfo = requirements.WithVersion( RepositoryInfo.ValidReleaseTag );
                 }
-                if( RepositoryInfo.CommitContentHasTag )
+                if( RepositoryInfo.BetterExistingVersion != null )
                 {
                     // TODO: ensure that this is the tag of the commit point merged into master branch.
-                    var vContent = RepositoryInfo.CommitVersionInfo.ThisContentCommit.ThisTag;
+                    var vContent = RepositoryInfo.BetterExistingVersion.ThisTag;
                     m.Info( $"This commit has a content version tag: {vContent}. We use it." );
                     AllPossibleVersions = new[] { vContent };
                     return _releaseInfo = requirements.WithVersion( vContent );
@@ -132,7 +132,7 @@ namespace CK.Env
                 // The new code that is contained in this commit:
                 // - MAY have no actual changes: the previous version could be used.
                 // - or MUST be released at least as a fix.
-                var prevVersion = RepositoryInfo.CommitVersionInfo.PreviousMaxTag;
+                var prevVersion = RepositoryInfo.CommitInfo.BasicInfo?.BestCommitBelow.ThisTag;
                 if( prevVersion != null )
                 {
                     bool? usePrevious = versionSelector.CanUsePreviousVersion( m, Solution, prevVersion );

@@ -204,29 +204,54 @@ namespace CK.Env.MSBuild
         /// <param name="packageId">The package identifier.</param>
         /// <param name="version">The new version to set.</param>
         /// <returns>The number of changes.</returns>
-        public int SetPackageReferenceVersion( IActivityMonitor m, CKTrait frameworks, string packageId, SVersion version )
+        public int SetPackageReferenceVersion( IActivityMonitor m, CKTrait frameworks, string packageId, SVersion version, bool addIfNotExists = false )
         {
             if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
             if( frameworks.IsEmpty ) throw new ArgumentException( "Must not be empty.", nameof(frameworks) );
             var sV = version.AsCSVersion?.ToString( CSVersionFormat.NuGetPackage ) ?? version.ToString();
+            bool found = false;
             int changeCount = 0;
             foreach( var r in _dependencies.Packages.Where( p => p.PackageId == packageId
-                                                                 && p.Version != version
                                                                  && p.Frameworks.Intersect( frameworks ).IsEmpty == false ) )
             {
-                var e = r.PropertyVersionElement;
-                if( e != null )
+                found = true;
+                if( r.Version != version )
                 {
-                    e.Value = sV;
+                    var e = r.PropertyVersionElement;
+                    if( e != null )
+                    {
+                        e.Value = sV;
+                    }
+                    else
+                    {
+                        e = r.OriginElement;
+                        e.Attribute( "Version" ).SetValue( sV );
+                    }
+                    ++changeCount;
                 }
-                else
-                {
-                    e = r.OriginElement;
-                    e.Attribute( "Version" ).SetValue( sV );
-                }
-                ++changeCount;
             }
-            m.Trace( $"{changeCount} version update in {ToString()} for package reference {packageId} -> {sV}." );
+            if( changeCount == 0 )
+            {
+                if( found )
+                {
+                    m.Trace( $"Package reference {packageId} is already in version {sV} for {ToString()}." );
+                }
+                else if( addIfNotExists )
+                {
+                    var pRef = new XElement( "ItemGroup",
+                                    new XElement( "PackageReference",
+                                        new XAttribute( "Include", packageId ),
+                                        new XAttribute( "Version", sV ) ) );
+                    if( TargetFrameworks == frameworks )
+                    {
+                        ProjectFile.Document.Root.Element( "PropertyGroup" ).AddAfterSelf( pRef );
+                    }
+                }
+            }
+            else
+            {
+                m.Trace( $"{changeCount} version update in {ToString()} for package reference {packageId} -> {sV}." );
+            }
             if( changeCount > 0 ) OnChange( m );
             return changeCount;
         }
