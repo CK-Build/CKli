@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net461</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NuGet.Credentials" Version="4.8.0" />
+    <PackageReference Include="NuGet.Protocol" Version="4.8.0" />
+    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="10.1.2--0014-develop" />
+  </ItemGroup>
+</Project>

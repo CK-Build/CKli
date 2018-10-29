@@ -122,7 +122,7 @@ namespace CK.Env.MSBuild
                     }
                     else
                     {
-                        TargetFrameworks = MSBuildContext.ParseSemiColonFrameworks( f.Value );
+                        TargetFrameworks = MSBuildContext.Traits.FindOrCreate( f.Value );
                         bool? isTestProject = (bool?)_file.Document.Root.Elements( "PropertyGroup" )
                                                           .Elements( "IsTestProject" )
                                                           .FirstOrDefault();
@@ -194,6 +194,31 @@ namespace CK.Env.MSBuild
         }
 
         /// <summary>
+        /// Sets the TargetFramework(s) element in the project file.
+        /// The dependencies are analysed and new <see cref="Dependencies.UselessDependencies"/> may appear.
+        /// </summary>
+        /// <param name="m">The activity monitor to use.</param>
+        /// <param name="frameworks">The framework(s) to set.</param>
+        /// <returns>True if the change has been made. False if the frameworks are the same as the current one.</returns>
+        public bool SetTargetFrameworks( IActivityMonitor m, CKTrait frameworks )
+        {
+            if( frameworks?.IsEmpty ?? true ) throw new ArgumentException( "Must not be null or empty.", nameof( frameworks ) );
+            if( frameworks.Context != MSBuildContext.Traits ) throw new ArgumentException( "Must be from MSBuildContext.Traits context.", nameof( frameworks ) );
+            if( _file == null ) throw new InvalidOperationException( "Invalid project file." );
+            if( TargetFrameworks != frameworks ) return false;
+            XElement f = _file.Document.Root
+                            .Elements( "PropertyGroup" )
+                            .Elements()
+                            .Where( x => x.Name.LocalName == "TargetFramework" || x.Name.LocalName == "TargetFrameworks" )
+                            .SingleOrDefault();
+            f.ReplaceWith( new XElement( frameworks.IsAtomic ? "TargetFramework" : "TargetFrameworks", frameworks.ToString() ) );
+            m.Trace( $"Replacing TargetFrameworks='{TargetFrameworks}' with '{frameworks}' in {ToString()}." );
+            TargetFrameworks = frameworks;
+            OnChange( m );
+            return true;
+        }
+
+        /// <summary>
         /// Sets a package reference and returns the number of changes.
         /// </summary>
         /// <param name="m">The monitor.</param>
@@ -203,54 +228,72 @@ namespace CK.Env.MSBuild
         /// </param>
         /// <param name="packageId">The package identifier.</param>
         /// <param name="version">The new version to set.</param>
+        /// <param name="addIfNotExists">True to add the reference. By default, it is only updated.</param>
         /// <returns>The number of changes.</returns>
         public int SetPackageReferenceVersion( IActivityMonitor m, CKTrait frameworks, string packageId, SVersion version, bool addIfNotExists = false )
         {
             if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
             if( frameworks.IsEmpty ) throw new ArgumentException( "Must not be empty.", nameof(frameworks) );
+            var actualFrameworks = TargetFrameworks.Intersect( frameworks );
+            if( actualFrameworks.IsEmpty ) throw new ArgumentException( $"No {frameworks} in {TargetFrameworks}.", nameof(frameworks) );
             var sV = version.AsCSVersion?.ToString( CSVersionFormat.NuGetPackage ) ?? version.ToString();
-            bool found = false;
             int changeCount = 0;
-            foreach( var r in _dependencies.Packages.Where( p => p.PackageId == packageId
-                                                                 && p.Frameworks.Intersect( frameworks ).IsEmpty == false ) )
+            CKTrait pFrameworks = null;
+            foreach( var p in _dependencies.Packages.Where( p => p.PackageId == packageId
+                                                                 && !(pFrameworks = p.Frameworks.Intersect( actualFrameworks )).IsEmpty ) )
             {
-                found = true;
-                if( r.Version != version )
+                actualFrameworks = actualFrameworks.Except( pFrameworks );
+                if( p.Version != version )
                 {
-                    var e = r.PropertyVersionElement;
+                    var e = p.PropertyVersionElement;
                     if( e != null )
                     {
                         e.Value = sV;
                     }
                     else
                     {
-                        e = r.OriginElement;
+                        e = p.OriginElement;
                         e.Attribute( "Version" ).SetValue( sV );
                     }
                     ++changeCount;
                 }
             }
-            if( changeCount == 0 )
+            if( changeCount > 0 )
             {
-                if( found )
+                m.Trace( $"{changeCount} version update in {ToString()} for package reference {packageId} -> {sV}." );
+            }
+            // Handle creation if needed.
+            if( actualFrameworks.IsEmpty )
+            {
+                if( changeCount == 0 )
                 {
                     m.Trace( $"Package reference {packageId} is already in version {sV} for {ToString()}." );
                 }
-                else if( addIfNotExists )
+            }
+            else if( addIfNotExists )
+            {
+                var firstPropertyGroup = ProjectFile.Document.Root.Element( "PropertyGroup" );
+                var pRef = new XElement( "ItemGroup",
+                                new XElement( "PackageReference",
+                                    new XAttribute( "Include", packageId ),
+                                    new XAttribute( "Version", sV ) ) );
+                if( TargetFrameworks == actualFrameworks )
                 {
-                    var pRef = new XElement( "ItemGroup",
-                                    new XElement( "PackageReference",
-                                        new XAttribute( "Include", packageId ),
-                                        new XAttribute( "Version", sV ) ) );
-                    if( TargetFrameworks == frameworks )
+                    ++changeCount;
+                    firstPropertyGroup.AddAfterSelf( pRef );
+                    m.Trace( $"Added unconditional package reference {packageId} -> {sV} for {ToString()}." );
+                }
+                else
+                {
+                    foreach( var f in actualFrameworks.AtomicTraits )
                     {
-                        ProjectFile.Document.Root.Element( "PropertyGroup" ).AddAfterSelf( pRef );
+                        ++changeCount;
+                        var withCond = new XElement( pRef );
+                        withCond.SetAttributeValue( "Condition", $"'(TargetFrameWork)' == '{f}' " );
+                        firstPropertyGroup.AddAfterSelf( withCond );
+                        m.Trace( $"Added conditional {f} package reference {packageId} -> {sV} for {ToString()}." );
                     }
                 }
-            }
-            else
-            {
-                m.Trace( $"{changeCount} version update in {ToString()} for package reference {packageId} -> {sV}." );
             }
             if( changeCount > 0 ) OnChange( m );
             return changeCount;

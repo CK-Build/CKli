@@ -86,7 +86,7 @@ namespace CK.Env.MSBuild
             var storePath = Path.Combine( GetTargetFeedFolderPath( m ), LocalFeedProviderExtension.CKSetupStoreName );
 
             if( !s.Solution.GitFolder.EnsureCKSetupStoreTestHelperConfig( m, storePath ) 
-                || !s.Solution.GitFolder.EnsureLocalFeedsNuGetSource( m, ensureRelease: true, ensureCI: true ).Success 
+                || !(s.Solution.GitFolder.GetNuGetConfigFile( m )?.EnsureLocalFeedsNuGetSource( m, ensureRelease: true, ensureCI: true ).Success ?? false) 
                 || !s.Solution.GitFolder.SetRepositoryXmlIgnoreDirtyFolders( m ) )
             {
                 s.Solution.GitFolder.ClearVersionTag( m, v );

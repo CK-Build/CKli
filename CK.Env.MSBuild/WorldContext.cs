@@ -413,6 +413,10 @@ namespace CK.Env.MSBuild
             {
                 using( m.OpenInfo( $"Updating standard CodeCakeBuilder files." ) )
                 {
+                    var cp = s.Solution.BuildProjects.Where( p => p.Name == "CodeCakeBuilder" ).Single();
+                    cp.SetTargetFrameworks( m, MSBuildContext.Traits.FindOrCreate( "netcoreapp2.1" ) );
+                    cp.SetPackageReferenceVersion( m, cp.TargetFrameworks, "NuGet.Credentials", SVersion.Parse( "4.8.0" ) );
+                    cp.SetPackageReferenceVersion( m, cp.TargetFrameworks, "NuGet.Protocol", SVersion.Parse( "4.8.0" ) );
                     var codeCakeBuilderPath = s.Solution.SolutionFolderPath.AppendPart( "CodeCakeBuilder" );
                     foreach( var name in new[]
                     {

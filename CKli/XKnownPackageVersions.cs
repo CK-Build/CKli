@@ -44,7 +44,7 @@ namespace CKli
                 Name = name;
                 Version = SVersion.Parse( v );
                 IsExactVersion = isExact;
-                Frameworks = MSBuildContext.ParseSemiColonFrameworks( frameworks );
+                Frameworks = MSBuildContext.Traits.FindOrCreate( frameworks );
             }
 
             public override string ToString()

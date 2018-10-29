@@ -49,7 +49,7 @@ namespace CodeCake
 
             #region Credential provider for Credential section of nuget.config.
             // Must be upgraded when a 4.9 or 5.0 is out.
-            // This currently only support "basic" authentication type.
+            // This currently only support "Basic" authentication type.
             public class SettingsCredentialProvider : ICredentialProvider
             {
                 private readonly IPackageSourceProvider _packageSourceProvider;
@@ -115,7 +115,7 @@ namespace CodeCake
                     }
                     // In 4.8.0 version, there is not yet the ValidAuthenticationTypes nor the ToICredentials() method.
                     // return source.Credentials.ToICredentials();
-                    return new AuthTypeFilteredCredentials( new NetworkCredential( source.Credentials.Username, source.Credentials.Password ), new[] { "basic" } );
+                    return new AuthTypeFilteredCredentials( new NetworkCredential( source.Credentials.Username, source.Credentials.Password ), new[] { "Basic" } );
                 }
 
                 /// <summary>

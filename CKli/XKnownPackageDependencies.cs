@@ -38,7 +38,7 @@ namespace CKli
             {
                 if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
                 Name = name;
-                Frameworks = MSBuildContext.ParseSemiColonFrameworks( frameworks );
+                Frameworks = MSBuildContext.Traits.FindOrCreate( frameworks );
                 Requires = requires?.Split( new[] { ';' }, StringSplitOptions.RemoveEmptyEntries );
                 if( Requires == null || Requires.Count == 0 ) throw new ArgumentException( "Must specify at leas one package name.", nameof( requires ) );
             }

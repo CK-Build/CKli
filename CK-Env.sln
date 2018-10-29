@@ -27,6 +27,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.MSBuild", "CK.Env.MS
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.MSBuild.Tests", "Tests\CK.Env.MSBuild.Tests\CK.Env.MSBuild.Tests.csproj", "{49349794-CE5E-468D-BAA1-726D59F21F64}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.NuGetClient", "CK.NuGetClient\CK.NuGetClient.csproj", "{D581E3F6-C9AE-4C74-B373-C0B803524DC9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -61,6 +63,10 @@ Global
 		{49349794-CE5E-468D-BAA1-726D59F21F64}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{49349794-CE5E-468D-BAA1-726D59F21F64}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{49349794-CE5E-468D-BAA1-726D59F21F64}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D581E3F6-C9AE-4C74-B373-C0B803524DC9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D581E3F6-C9AE-4C74-B373-C0B803524DC9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D581E3F6-C9AE-4C74-B373-C0B803524DC9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D581E3F6-C9AE-4C74-B373-C0B803524DC9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

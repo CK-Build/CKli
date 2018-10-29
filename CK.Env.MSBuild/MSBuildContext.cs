@@ -15,25 +15,7 @@ namespace CK.Env.MSBuild
         /// <summary>
         /// Traits are used to manage framework names.
         /// </summary>
-        static readonly public CKTraitContext Traits = new CKTraitContext( "ProjectFileContext" );
-
-        /// <summary>
-        /// Parses a semi colon separated framework string that can be null or empty (the empty trait is returned).
-        /// </summary>
-        /// <param name="frameworks">Semi colon separated traits.</param>
-        /// <returns>The traits from <see cref="Traits"/> context.</returns>
-        public static CKTrait ParseSemiColonFrameworks( string frameworks )
-        {
-            CKTrait f = Traits.EmptyTrait;
-            if( frameworks != null )
-            {
-                foreach( var t in frameworks.Split( new[] { ';' }, StringSplitOptions.RemoveEmptyEntries ) )
-                {
-                    f = f.Union( Traits.FindOrCreate( t ) );
-                }
-            }
-            return f;
-        }
+        static readonly public CKTraitContext Traits = new CKTraitContext( "ProjectFileContext", ';' );
 
         /// <summary>
         /// Defines import of a <see cref="File"/> from another File.
