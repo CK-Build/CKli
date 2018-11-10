@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
@@ -7,6 +7,9 @@
   <ItemGroup>
     <PackageReference Include="NuGet.Credentials" Version="4.8.0" />
     <PackageReference Include="NuGet.Protocol" Version="4.8.0" />
-    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="10.1.2--0014-develop" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CK.NuGetClient.Abstraction\CK.NuGetClient.Abstraction.csproj" />
   </ItemGroup>
 </Project>

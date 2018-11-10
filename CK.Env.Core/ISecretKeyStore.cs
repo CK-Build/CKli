@@ -7,11 +7,9 @@ using System.Threading.Tasks;
 
 namespace CK.Env
 {
-    public interface IPublishKeyStore
+    public interface ISecretKeyStore
     {
-        string GetMyGetPushKey( IActivityMonitor m );
-
-        string GetCKSetupRemoteStorePushKey( IActivityMonitor m );
+        string GetSecretKey( IActivityMonitor m, string name, bool throwOnEmpty, string reason = null );
 
     }
 }

@@ -205,7 +205,7 @@ namespace CK.Env.MSBuild
             if( frameworks?.IsEmpty ?? true ) throw new ArgumentException( "Must not be null or empty.", nameof( frameworks ) );
             if( frameworks.Context != MSBuildContext.Traits ) throw new ArgumentException( "Must be from MSBuildContext.Traits context.", nameof( frameworks ) );
             if( _file == null ) throw new InvalidOperationException( "Invalid project file." );
-            if( TargetFrameworks != frameworks ) return false;
+            if( TargetFrameworks == frameworks ) return false;
             XElement f = _file.Document.Root
                             .Elements( "PropertyGroup" )
                             .Elements()

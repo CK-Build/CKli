@@ -45,10 +45,14 @@ namespace CK.Env
             };
         }
 
-        internal GitFolder( FileSystem fs, string gitFolder, ILocalFeedProvider blankFeedProvider, IWorldName world )
+        internal GitFolder(
+            FileSystem fs,
+            string gitFolder,
+            ILocalFeedProvider localFeedProvider,
+            IWorldName world )
         {
             Debug.Assert( gitFolder.StartsWith( fs.Root.Path ) && gitFolder.EndsWith( ".git" ) );
-            _feedProvider = blankFeedProvider;
+            _feedProvider = localFeedProvider;
             FullPath = new NormalizedPath( gitFolder.Remove( gitFolder.Length - 4 ) );
             SubPath = FullPath.RemovePrefix( fs.Root );
             if( SubPath.IsEmpty ) throw new InvalidOperationException( "Root path can not be a Git folder." );
@@ -60,7 +64,21 @@ namespace CK.Env
             _branchesFolder = new BranchesFolder( this, "branches", isRemote: false );
             _remoteBranchesFolder = new RemotesFolder( this );
             _thisDir = new RootDir( this, SubPath.LastPart );
+
+            string origin = _git.Network.Remotes["origin"]?.Url;
+            if( origin != null )
+            {
+                if( origin.IndexOf( "github.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.GitHub;
+                else if( origin.IndexOf( "gitlab.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.GitLab;
+                else if( origin.IndexOf( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.Vsts;
+                else if( origin.IndexOf( "bitbucket.org", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.Bitbucket;               
+            }
         }
+
+        /// <summary>
+        /// Gets the known Git provider.
+        /// </summary>
+        public KnownGitProvider KnownGitProvider { get; }
 
         /// <summary>
         /// Gets the current <see cref="World"/>.
@@ -553,13 +571,10 @@ namespace CK.Env
                         m.Error( $"Merge failed from '{World.DevelopBranchName}' to '{World.LocalBranchName}': conflicts must be manually resolved." );
                         return false;
                     }
+                    if( !OnDevelopToLocal( m ) ) return false;
 
-                    var localStorePath = _feedProvider.GetLocalCKSetupStorePath( m );
-                    if( !EnsureCKSetupStoreTestHelperConfig( m, localStorePath ) ) return false;
-                    if( !EnsureRepositoryXmlBlankDevBranch( m ) ) return false;
-                    if( !GetNuGetConfigFile( m )?.EnsureLocalFeedsNuGetSource( m ).Success ?? false ) return false;
                     if( commitLocalChanges
-                        && !Commit( m, "Updated Repository.xml and nuget.config for 'local' branch." ).Success ) return false;
+                        && !Commit( m, "Updated Repository.xml and NuGet.config for 'local' branch." ).Success ) return false;
                     if( r.Status != MergeStatus.UpToDate )
                     {
                         m.CloseGroup( $"Success (with merge from '{World.DevelopBranchName}')." );
@@ -572,6 +587,17 @@ namespace CK.Env
                     return false;
                 }
             }
+        }
+
+        bool OnDevelopToLocal( IActivityMonitor m )
+        {
+            var localStorePath = _feedProvider.GetLocalCKSetupStorePath( m );
+            if( !EnsureCKSetupStoreTestHelperConfig( m, localStorePath ) ) return false;
+            if( !EnsureRepositoryXmlBlankDevBranch( m ) ) return false;
+            var fNuGet = new NuGetConfigBaseFile( this );
+            fNuGet.EnsureLocalFeeds( m );
+            if( !fNuGet.Save( m ) ) return false;
+            return true;
         }
 
         /// <summary>
@@ -669,8 +695,7 @@ namespace CK.Env
                         m.Error( $"Must be on '{World.LocalBranchName}' or '{World.DevelopBranchName}' branch." );
                         return false;
                     }
-                    if( !RemoveCKSetupStoreTestHelperConfig( m ) ) return false;
-                    if( !RemoveRepositoryXmlBlankDevBranch( m ) ) return false;
+                    if( !OnLocalToDevelop( m ) ) return false;
                     if( bLocal.IsCurrentRepositoryHead )
                     {
                         if( !Commit( m, $"Switching to '{World.DevelopBranchName}' branch." ).Success ) return false;
@@ -705,6 +730,13 @@ namespace CK.Env
                     return false;
                 }
             }
+        }
+
+        bool OnLocalToDevelop( IActivityMonitor m )
+        {
+            if( !RemoveCKSetupStoreTestHelperConfig( m ) ) return false;
+            if( !RemoveRepositoryXmlBlankDevBranch( m ) ) return false;
+            return true;
         }
 
         /// <summary>
@@ -746,39 +778,9 @@ namespace CK.Env
             }
         }
 
-        /// <summary>
-        /// Reads a Xml document file in the <see cref="CurrentBranchName"/>.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="fileName">The path and file name (root based).</param>
-        /// <returns>The document and its path. Document is null if it can't be read and a fatal error is logged.</returns>
-        public (XDocument Doc, NormalizedPath Path) GetXmlDocument( IActivityMonitor m, string fileName )
-        {
-            var pathXml = SubPath.AppendPart( "branches" ).AppendPart( CurrentBranchName ).AppendPart( fileName );
-            var rXml = FileSystem.GetFileInfo( pathXml );
-            if( !rXml.Exists || rXml.IsDirectory || rXml.PhysicalPath == null )
-            {
-                m.Fatal( $"{pathXml} must exist." );
-                return (null, null);
-            }
-            return (rXml.ReadAsXDocument(), pathXml);
-        }
-
-        /// <summary>
-        /// Gets the NuGet.config file.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="reload">True to force a reload of the file.</param>
-        /// <returns>Null if unable to load file.</returns>
-        public NuGetConfigFile GetNuGetConfigFile( IActivityMonitor m )
-        {
-            var f = new NuGetConfigFile( this, m );
-            return f.IsValid ? f : null;
-        }
-
         public bool SetRepositoryXmlIgnoreDirtyFolders( IActivityMonitor m )
         {
-            var (xDoc, pathXml) = GetXmlDocument( m, "RepositoryInfo.xml" );
+            var (xDoc, pathXml) = this.GetXmlDocument( m, "RepositoryInfo.xml" );
             if( xDoc == null ) return false;
             var e = xDoc.Root;
             var debug = e.Element( SVGNS + "Debug" );
@@ -792,7 +794,7 @@ namespace CK.Env
 
         bool EnsureRepositoryXmlBlankDevBranch( IActivityMonitor m )
         {
-            var (xDoc, pathXml) = GetXmlDocument( m, "RepositoryInfo.xml" );
+            var (xDoc, pathXml) = this.GetXmlDocument( m, "RepositoryInfo.xml" );
             if( xDoc == null ) return false;
             var e = xDoc.Root;
             var branches = e.Element( SVGNS + "Branches" );
@@ -818,7 +820,7 @@ namespace CK.Env
 
         bool RemoveRepositoryXmlBlankDevBranch( IActivityMonitor m )
         {
-            var (xDoc, pathXml) = GetXmlDocument( m, "RepositoryInfo.xml" );
+            var (xDoc, pathXml) = this.GetXmlDocument( m, "RepositoryInfo.xml" );
             if( xDoc == null ) return false;
             xDoc.Root.Element( SVGNS + "Branches" )
                      .Elements( SVGNS + "Branch" )

@@ -9,13 +9,13 @@ namespace CK.Env.MSBuild
 {
     class GlobalBuilderInfo
     {
-        readonly IPublishKeyStore _keyStore;
-        string _myGetApiKey;
+        readonly ISecretKeyStore _keyStore;
+        string _packageFeedPushKey;
         string _remoteStorePushApiKey;
         GlobalGitStatus _gitStatus;
         WorkStatus _workStatus;
 
-        public GlobalBuilderInfo( IPublishKeyStore keyStore )
+        public GlobalBuilderInfo( ISecretKeyStore keyStore )
         {
             _keyStore = keyStore;
         }
@@ -27,9 +27,9 @@ namespace CK.Env.MSBuild
 
         public bool EnsureRemotesAvailable( IActivityMonitor m )
         {
-            _myGetApiKey = _keyStore.GetMyGetPushKey( m );
+            _packageFeedPushKey = _keyStore.GetSignatureOpenSourceFeedPAT( m );
             _remoteStorePushApiKey = _keyStore.GetCKSetupRemoteStorePushKey( m );
-            if( _myGetApiKey == null || _remoteStorePushApiKey == null )
+            if( _packageFeedPushKey == null || _remoteStorePushApiKey == null )
             {
                 m.Error( "Remote info is required." );
                 return false;
@@ -107,7 +107,7 @@ namespace CK.Env.MSBuild
 
         public string RemoteStorePushApiKey => _remoteStorePushApiKey;
 
-        public string MyGetApiKey => _myGetApiKey;
+        public string MyGetApiKey => _packageFeedPushKey;
 
         public bool RunUnitTests { get; set; }
 

@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.NuGetClient;
 using CK.Text;
 using CKSetup;
 using CSemVer;
@@ -22,8 +23,9 @@ namespace CK.Env.MSBuild
         readonly GlobalGitContext _globalGitContext;
         readonly IWorldStore _worldStore;
         readonly ILocalFeedProvider _feeds;
+        readonly INuGetClient _nugetClient;
         readonly IFileProvider _referential;
-        readonly IPublishKeyStore _publishKeyStore;
+        readonly ISecretKeyStore _secretKeyStore;
         readonly Func<IActivityMonitor, string, IReadOnlyList<Solution>> _branchSolutionsLoader;
         readonly WorldState _worldState;
         readonly TestedCommitMemory _testedCommits;
@@ -73,8 +75,9 @@ namespace CK.Env.MSBuild
             GlobalGitContext git,
             IWorldStore store,
             ILocalFeedProvider feeds,
+            INuGetClient nuGetClient,
             IFileProvider referential,
-            IPublishKeyStore publishKeyStore,
+            ISecretKeyStore secretKeyStore,
             WorkStatus wStatus,
             WorldState worldState,
             Func<IActivityMonitor, string, IReadOnlyList<Solution>> branchSolutionsLoader )
@@ -82,13 +85,14 @@ namespace CK.Env.MSBuild
             _globalGitContext = git;
             _worldStore = store;
             _feeds = feeds;
+            _nugetClient = nuGetClient;
             _referential = referential;
-            _publishKeyStore = publishKeyStore;
+            _secretKeyStore = secretKeyStore;
             _worldState = worldState;
             _workStatus = wStatus;
             _branchSolutionsLoader = branchSolutionsLoader;
             _testedCommits = new TestedCommitMemory( this );
-            _buildInfo = new GlobalBuilderInfo( publishKeyStore );
+            _buildInfo = new GlobalBuilderInfo( secretKeyStore );
         }
 
         bool SetState( IActivityMonitor m, Action<WorldState> a ) => _worldStore.SetState( m, _worldState, a );
@@ -171,7 +175,9 @@ namespace CK.Env.MSBuild
                     foreach( var s in r.Solutions )
                     {
                         if( !s.UpdatePackageDependencies( m, _feeds.GetBestAnyLocalVersion, FileSystem, allowDowngrade: false, buildProjects: true ) ) return false;
-                        if( !s.Solution.GitFolder.GetNuGetConfigFile( m )?.RemoveLocalFeedsNuGetSource( m ).Success ?? false ) return false;
+                        var fNuGet = new NuGetConfigBaseFile( s.Solution.GitFolder );
+                        fNuGet.RemoveLocalFeeds( m );
+                        if( !fNuGet.Save( m ) ) return false;
                         if( !s.Solution.GitFolder.Commit( m, "Updated Build projects and removed LocalFeed NuGet sources." ).Success ) return false;
                     }
                 }
@@ -362,78 +368,87 @@ namespace CK.Env.MSBuild
 
             using( m.OpenInfo( $"Removing {buildDepNames.Concatenate()} packages ZeroVersion from local NuGet cache if they exist." ) )
             {
-                foreach( var pName in buildDepNames )
-                {
-                    _feeds.RemoveFromNuGetCache( m, pName, SVersion.ZeroVersion );
-                }
+                //foreach( var pName in buildDepNames )
+                //{
+                //    _feeds.RemoveFromNuGetCache( m, pName, SVersion.ZeroVersion );
+                //}
             }
 
             var touchedSolutions = new List<Solution>();
             using( m.OpenInfo( $"Updating package references to ZeroVersion." ) )
             {
-                foreach( var sp in r.BuildProjectsInfo.ProjectsToUpgrade.GroupBy( p => p.Project.Project.PrimarySolution ) )
-                {
-                    touchedSolutions.Add( sp.Key );
-                    foreach( var projectAndDeps in sp )
-                    {
-                        var project = projectAndDeps.Project.Project;
-                        foreach( var dep in projectAndDeps.Packages )
-                        {
-                            project.SetPackageReferenceVersion( m, project.TargetFrameworks, dep.PackageId, SVersion.ZeroVersion );
-                        }
-                    }
-                    if( !sp.Key.Save( m, FileSystem ) ) return false;
-                }
+                //foreach( var sp in r.BuildProjectsInfo.ProjectsToUpgrade.GroupBy( p => p.Project.Project.PrimarySolution ) )
+                //{
+                //    touchedSolutions.Add( sp.Key );
+                //    foreach( var projectAndDeps in sp )
+                //    {
+                //        var project = projectAndDeps.Project.Project;
+                //        foreach( var dep in projectAndDeps.Packages )
+                //        {
+                //            project.SetPackageReferenceVersion( m, project.TargetFrameworks, dep.PackageId, SVersion.ZeroVersion );
+                //        }
+                //    }
+                //    if( !sp.Key.Save( m, FileSystem ) ) return false;
+                //}
             }
 
             using( m.OpenInfo( $"Generating ZeroVersion in LocalFeed/Local feed for packages: {buildDepNames.Concatenate()}" ) )
             {
-                var args = $@"pack --output ""{_feeds.GetLocalFeedFolder( m ).PhysicalPath}"" --include-symbols --configuration Debug /p:Version=""{SVersion.ZeroVersion}"" /p:AssemblyVersion=""{InformationalVersion.ZeroAssemblyVersion}"" /p:FileVersion=""{InformationalVersion.ZeroFileVersion}"" /p:InformationalVersion=""{InformationalVersion.ZeroInformationalVersion}"" ";
-                foreach( var p in r.BuildProjectsInfo.DependenciesToBuild )
-                {
-                    var path = FileSystem.GetFileInfo( p.Project.Project.Path.RemoveLastPart() ).PhysicalPath;
-                    FileSystem.RawDeleteLocalDirectory( m, Path.Combine( path, "bin" ) );
-                    FileSystem.RawDeleteLocalDirectory( m, Path.Combine( path, "obj" ) );
-                    if( !GlobalBuilder.Run( m, path, "dotnet", args ) ) return false;
-                }
+                //var args = $@"pack --output ""{_feeds.GetLocalFeedFolder( m ).PhysicalPath}"" --include-symbols --configuration Debug /p:Version=""{SVersion.ZeroVersion}"" /p:AssemblyVersion=""{InformationalVersion.ZeroAssemblyVersion}"" /p:FileVersion=""{InformationalVersion.ZeroFileVersion}"" /p:InformationalVersion=""{InformationalVersion.ZeroInformationalVersion}"" ";
+                //foreach( var p in r.BuildProjectsInfo.DependenciesToBuild )
+                //{
+                //    var path = FileSystem.GetFileInfo( p.Project.Project.Path.RemoveLastPart() ).PhysicalPath;
+                //    FileSystem.RawDeleteLocalDirectory( m, Path.Combine( path, "bin" ) );
+                //    FileSystem.RawDeleteLocalDirectory( m, Path.Combine( path, "obj" ) );
+                //    if( !GlobalBuilder.Run( m, path, "dotnet", args ) ) return false;
+                //}
             }
 
             // This appeared to be required once the ZeroVersions are avalaible otherwise
             // updated dependencies are ignored.
             using( m.OpenInfo( "Forcing a dotnet restore --force on all touched solutions." ) )
             {
-                foreach( var s in touchedSolutions )
-                {
-                    var path = FileSystem.GetFileInfo( s.SolutionFolderPath ).PhysicalPath;
-                    if( !GlobalBuilder.Run( m, path, "dotnet", "restore --force" ) ) return false;
-                }
+                //foreach( var s in touchedSolutions )
+                //{
+                //    var path = FileSystem.GetFileInfo( s.SolutionFolderPath ).PhysicalPath;
+                //    if( !GlobalBuilder.Run( m, path, "dotnet", "restore --force" ) ) return false;
+                //}
             }
 
             foreach( var s in r.Solutions )
             {
+                var fNuGet = new NugetConfigFile( s.Solution );
+                fNuGet.ApplySettings( m );
+                if( !fNuGet.Save( m ) ) return false;
+
+                SharedPropsFile fSharedProps = new SharedPropsFile( s.Solution );
+                if( !fSharedProps.ApplyProperties( m ) ) return false;
+                if( !fSharedProps.Save( m ) ) return false;
+
                 using( m.OpenInfo( $"Updating standard CodeCakeBuilder files." ) )
                 {
                     var cp = s.Solution.BuildProjects.Where( p => p.Name == "CodeCakeBuilder" ).Single();
                     cp.SetTargetFrameworks( m, MSBuildContext.Traits.FindOrCreate( "netcoreapp2.1" ) );
-                    cp.SetPackageReferenceVersion( m, cp.TargetFrameworks, "NuGet.Credentials", SVersion.Parse( "4.8.0" ) );
-                    cp.SetPackageReferenceVersion( m, cp.TargetFrameworks, "NuGet.Protocol", SVersion.Parse( "4.8.0" ) );
+                    cp.SetPackageReferenceVersion( m, cp.TargetFrameworks, "NuGet.Credentials", SVersion.Parse( "4.8.0" ), true );
+                    cp.SetPackageReferenceVersion( m, cp.TargetFrameworks, "NuGet.Protocol", SVersion.Parse( "4.8.0" ), true );
+                    if( !cp.Save( m, FileSystem ) ) return false;
                     var codeCakeBuilderPath = s.Solution.SolutionFolderPath.AppendPart( "CodeCakeBuilder" );
                     foreach( var name in new[]
                     {
-                        ("Build.NuGetHelper.cs",true),
-                        ("Build.StandardCheckRepository.cs",true),
+                        ("Build.NuGetHelper.cs",false),
+                        ("Build.StandardCheckRepository.cs",false),
                         ("Build.StandardCreateNuGetPackages.cs",false),
                         ("Build.StandardPushNuGetPackages.cs",false),
                         ("Build.StandardSolutionBuild.cs",false),
                         ("Build.StandardUnitTests.cs",false),
-                        ("InstallCredentialProvider.ps1",true)
+                        ("InstallCredentialProvider.ps1",false)
                     } )
                     {
                         var path = codeCakeBuilderPath.AppendPart( name.Item1 );
                         var f = FileSystem.GetFileInfo( path );
                         if( f.Exists || name.Item2 )
                         {
-                            var source = _referential.GetFileInfo( "InitialCodeCakeBuilder/" + name );
+                            var source = _referential.GetFileInfo( "InitialCodeCakeBuilder/" + name.Item1 );
                             FileSystem.CopyTo( m, source, path );
                         }
                     }
@@ -512,22 +527,14 @@ namespace CK.Env.MSBuild
 
         bool DoPublishRelease( IActivityMonitor m )
         {
-            string storeApiKey = _publishKeyStore.GetCKSetupRemoteStorePushKey( m );
+            string storeApiKey = _secretKeyStore.GetCKSetupRemoteStorePushKey( m );
             if( storeApiKey == null ) return false;
-            string myGetPushKey = _publishKeyStore.GetMyGetPushKey( m );
-            if( myGetPushKey == null ) return false;
-            string nuGetDirectory = _feeds.GetNuGetCommandLineDirectory( m );
-            if( nuGetDirectory == null )
-            {
-                m.Error( "Unable to find required NuGet.exe." );
-                return false;
-            }
             var roadmap = GetSimpleRoadmap( m );
             if( roadmap == null ) return false;
 
             // Collects all packages that must be pushed: all packages in LocalFeed/Releases and
             // all CI dependencies of build projects.
-            var toPush = new HashSet<LocalPackageFile>( _feeds.GetAllPackageFilesInReleaseFeed( m ) );
+            var toPush = new HashSet<LocalNuGetPackageFile>( _feeds.GetAllPackageFilesInReleaseFeed( m ) );
             bool hasError = false;
             foreach( var p in toPush.Where( p => !p.Version.IsValid || p.Version.AsCSVersion == null ) )
             {
@@ -535,11 +542,13 @@ namespace CK.Env.MSBuild
                 hasError = true;
             }
             if( hasError ) return false;
-            // Adds CI builds required for Build projects.
-            // The list of build dependencies packages should be in the roadmap/XmlState.
+
+            // Gets all the solutions.
             IReadOnlyList<Solution> solutions = _branchSolutionsLoader( m, World.DevelopBranchName );
             if( solutions.Any( s => s == null ) ) return false;
 
+            // Adds CI builds required for Build projects.
+            // The list of build dependencies packages should be in the roadmap/XmlState.
             foreach( var buildDep in solutions.SelectMany( s => s.BuildProjects )
                                       .SelectMany( b => b.Deps.Packages.Where( d => d.Version.AsCSVersion == null ) ) )
             {
@@ -553,21 +562,65 @@ namespace CK.Env.MSBuild
             }
             if( hasError ) return false;
 
+            var feedPackages = solutions
+                                  .Select( s => (
+                                        Feeds: s.Settings.NuGetPushFeeds.Select( info => _nugetClient.FindOrCreate( info ) ), 
+                                        Packages: toPush.Where( t => s.PublishedProjects.Any( p => t.PackageId == p.Name ) ).ToList() ) )
+                                  .Aggregate(
+                                        new Dictionary<INuGetFeed,List<LocalNuGetPackageFile>>(),
+                                        (accumulator, x) =>
+                                        {
+                                            foreach( var f in x.Feeds )
+                                            {
+                                                if( !accumulator.TryGetValue( f, out var packages ) )
+                                                {
+                                                    packages = new List<LocalNuGetPackageFile>();
+                                                    accumulator.Add( f, packages );
+                                                }
+                                                packages.AddRange( x.Packages );
+                                            }
+                                            return accumulator;
+                                        } );
+
+            if( feedPackages.Count == 0 )
+            {
+                m.Error( $"No NuGet push feed found for solutions." );
+                return false;
+            }
+            foreach( var f in feedPackages )
+            {
+                if( f.Key.ResolveSecret( m ) == null )
+                {
+                    m.Error( $"Unable to acquire required secret required to push NuGet packages." );
+                    return false;
+                }
+            }
+
             if( WorkStatus == WorkStatus.WaitingReleaseConfirmation && !SetState( m, WorkStatus.PublishingRelease ) ) return false;
 
             // Push LocalFeed/Release/RemoteStore
             string storePath = _feeds.GetReleaseCKSetupStorePath( m );
             using( LocalStore store = LocalStore.OpenOrCreate( m, storePath ) )
             {
-                if( store == null || !store.PushComponents( comp => true, Facade.DefaultStoreUrl, storeApiKey ) ) return false;
+                if( store == null || !store.PushComponents( comp => true, Facade.DefaultStoreUrl, storeApiKey ) )
+                {
+                    return false;
+                }
             }
-            // Push packages to myget.
-            if( !PushNuGetPackages( m, nuGetDirectory, myGetPushKey, toPush ) ) return false;
+            // Push packages to their respective feeds.
+            foreach( var f in feedPackages )
+            {
+                using( m.OpenInfo( $"Pushing {f.Value.Count} packages to {f.Key.Info.Name}." ) )
+                {
+                    f.Key.PushPackagesAsync( m, f.Value ).GetAwaiter().GetResult();
+                }
+            }
 
             // Push release tags, masters (for Official Release) and develops branches.
             foreach( var g in _globalGitContext.GitFolders )
             {
-                var v = roadmap.FirstOrDefault( e => e.Build && e.SolutionName == g.SubPath.LastPart )?.ReleaseInfo.Version;
+                var v = roadmap.FirstOrDefault( e => e.Build && e.SolutionName == g.SubPath.LastPart )
+                               ?.ReleaseInfo.Version;
                 if( v != null )
                 {
                     if( !g.PushVersionTag( m, v ) ) return false;
@@ -584,41 +637,6 @@ namespace CK.Env.MSBuild
             }
             return SetState( m, WorkStatus.Idle );
         }
-
-        bool PushNuGetPackages( IActivityMonitor m, string nuGetDirectory, string myGetPushKey, IEnumerable<LocalPackageFile> files )
-        {
-            using( m.OpenInfo( "Pushing packages to MyGet." ) )
-            {
-                try
-                {
-                    foreach( var p in files )
-                    {
-                        string feedName;
-                        var csVersion = p.Version.AsCSVersion;
-                        if( csVersion == null ) feedName = "invenietis-ci";
-                        else
-                        {
-                            string prerelease = csVersion.PrereleaseName;
-                            feedName = prerelease.Length == 0 || prerelease == "rc" || prerelease == "pre"
-                                            ? "invenietis-release"
-                                            : "invenietis-preview";
-                        }
-                        string pushUrl = $"https://www.myget.org/F/{feedName}/api/v2/package";
-                        string pushSymbolUrl = $"https://www.myget.org/F/{feedName}/symbols/api/v2/package";
-
-                        var args = $"push \"{p.FullPath}\" -ApiKey {myGetPushKey} -Source {pushUrl} -SymbolApiKey {myGetPushKey} -SymbolSource {pushSymbolUrl}";
-                        if( !GlobalBuilder.Run( m, nuGetDirectory, Path.Combine( nuGetDirectory, "NuGet.exe" ), args ) ) return false;
-                    }
-                }
-                catch( Exception ex )
-                {
-                    m.Error( ex );
-                    return false;
-                }
-            }
-            return true;
-        }
-
 
         SolutionDependencyResult GetSolutionDependencyResult( IActivityMonitor m, string branchName )
         {
@@ -641,8 +659,9 @@ namespace CK.Env.MSBuild
             IWorldName world,
             IWorldStore worldStore,
             ILocalFeedProvider feeds,
+            INuGetClient nugetClient,
             IFileProvider referential,
-            IPublishKeyStore publishKeyStore,
+            ISecretKeyStore publishKeyStore,
             IEnumerable<GitFolder> gitFolders,
             Func<IActivityMonitor, string, IReadOnlyList<Solution>> branchSolutionsLoader )
         {
@@ -653,7 +672,7 @@ namespace CK.Env.MSBuild
             if( !gitContext.CheckStatus( m, ref gitStatus, workStatus == WorkStatus.SwitchingToDevelop || workStatus == WorkStatus.SwitchingToLocal ) ) return null;
             Debug.Assert( gitStatus != GlobalGitStatus.Unknwon );
             worldState.GlobalGitStatus = gitStatus;
-            return new WorldContext( gitContext, worldStore, feeds, referential, publishKeyStore, workStatus, worldState, branchSolutionsLoader );
+            return new WorldContext( gitContext, worldStore, feeds, nugetClient, referential, publishKeyStore, workStatus, worldState, branchSolutionsLoader );
         }
 
     }

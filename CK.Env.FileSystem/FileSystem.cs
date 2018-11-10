@@ -32,25 +32,6 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Automatic discovery of all git folders below the <see cref="Root"/>.
-        /// </summary>
-        public void DiscoverGitFolders( IWorldName world ) => DiscoverGitFolders( Root, world );
-
-        void DiscoverGitFolders( string parent, IWorldName world )
-        {
-            foreach( var d in Directory.EnumerateDirectories( parent ) )
-            {
-                var gitFolder = Path.Combine( d, ".git" );
-                if( Directory.Exists( gitFolder ) )
-                {
-                    _gits.Add( new GitFolder( this, gitFolder, LocalBlankFeedProvider, world ) );
-                    return;
-                }
-                DiscoverGitFolders( d, world );
-            }
-        }
-
-        /// <summary>
         /// Gets or sets the provider for blank feed local folder.
         /// </summary>
         public ILocalFeedProvider LocalBlankFeedProvider { get; set; }

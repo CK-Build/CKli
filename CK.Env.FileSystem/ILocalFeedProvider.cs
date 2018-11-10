@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.NuGetClient;
 using CSemVer;
 using Microsoft.Extensions.FileProviders;
 using System;
@@ -63,7 +64,7 @@ namespace CK.Env
         /// <param name="packageId">The package name.</param>
         /// <param name="v">The package version.</param>
         /// <returns></returns>
-        LocalPackageFile GetLocalCIPackage( IActivityMonitor m, string packageId, SVersion v );
+        LocalNuGetPackageFile GetLocalCIPackage( IActivityMonitor m, string packageId, SVersion v );
 
         /// <summary>
         /// Gets all package files in LocalFeed/Release folder.
@@ -71,7 +72,7 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="withSymbols">True to return .symbols.nupkg files.</param>
         /// <returns>The package files.</returns>
-        IEnumerable<LocalPackageFile> GetAllPackageFilesInReleaseFeed( IActivityMonitor m, bool withSymbols = false );
+        IEnumerable<LocalNuGetPackageFile> GetAllPackageFilesInReleaseFeed( IActivityMonitor m, bool withSymbols = false );
 
         /// <summary>
         /// Removes a specific version of a package from the local NuGet cache.
@@ -89,13 +90,6 @@ namespace CK.Env
         /// <param name="packageId">The package identifier.</param>
         /// <param name="version">The package's version.</param>
         void RemoveFromFeeds( IActivityMonitor m, string packageId, SVersion version );
-
-        /// <summary>
-        /// Gets the nuget.exe directory to use.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <returns>The full directory path where nuget.exe can be found or null.</returns>
-        string GetNuGetCommandLineDirectory( IActivityMonitor m );
 
     }
 }

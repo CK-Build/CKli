@@ -19,13 +19,13 @@ namespace CKli
     {
         readonly XSolutionCentral _solutions;
         readonly FileSystem _fileSystem;
-        readonly XPublishedPackageFeeds _localPackages;
+        readonly XLocalFeedProvider _localPackages;
 
         public XGlobalReleaserAction(
             Initializer intializer,
             FileSystem fileSystem,
             ActionCollector collector,
-            XPublishedPackageFeeds localPackages,
+            XLocalFeedProvider localPackages,
             XSolutionCentral solutions )
             : base( intializer, collector )
         {

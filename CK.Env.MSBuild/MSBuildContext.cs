@@ -123,7 +123,13 @@ namespace CK.Env.MSBuild
         /// </summary>
         public FileSystem FileSystem => _fileSystem;
 
-        public (Solution Solution, bool Loaded) FindOrLoadSolution( IActivityMonitor m, NormalizedPath path, Solution primary = null, SolutionSpecialType type = SolutionSpecialType.None, bool force = false )
+        public (Solution Solution, bool Loaded) FindOrLoadSolution(
+            IActivityMonitor m,
+            NormalizedPath path,
+            ISolutionSettings settings,
+            Solution primary = null,
+            SolutionSpecialType type = SolutionSpecialType.None,
+            bool force = false )
         {
             if( primary == null && type != SolutionSpecialType.None ) throw new ArgumentException( $"Primary solution, type must be None." );
             if( primary != null && type == SolutionSpecialType.None ) throw new ArgumentException( $"Secodary solution, type must be IncludedSecondarySolution or IndependantSecondarySolution." );
@@ -135,7 +141,7 @@ namespace CK.Env.MSBuild
                     return (s, false);
                 }
             }
-            s = DoLoad( m, path );
+            s = DoLoad( m, path, settings );
             if( s != null )
             {
                 if( primary != null ) s.SetAsSecondarySolution( primary, type );
@@ -144,7 +150,7 @@ namespace CK.Env.MSBuild
             return (null, false);
         }
 
-        Solution DoLoad( IActivityMonitor m, NormalizedPath path )
+        Solution DoLoad( IActivityMonitor m, NormalizedPath path, ISolutionSettings settings )
         {
             using( m.OpenTrace( $"Loading solution {path}." ) )
             {
@@ -161,7 +167,7 @@ namespace CK.Env.MSBuild
                 }
                 try
                 {
-                    Solution s = Solution.Load( m, this, path );
+                    Solution s = Solution.Load( m, this, path, settings );
                     if( s != null ) _solutions.Add( path, s );
                     return s;
                 }

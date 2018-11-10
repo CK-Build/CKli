@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Env;
+using CK.NuGetClient;
 using CK.Text;
 using CSemVer;
 using Microsoft.Extensions.FileProviders;
@@ -12,10 +13,9 @@ using System.Text.RegularExpressions;
 
 namespace CKli
 {
-    public class XPublishedPackageFeeds : XTypedObject, ILocalFeedProvider
+    public class XLocalFeedProvider : XTypedObject, ILocalFeedProvider
     {
         static readonly NormalizedPath _localNuGetCache = Path.GetFullPath( Environment.ExpandEnvironmentVariables( "%UserProfile%/.nuget/packages/" ) );
-        static string _nugetCommandLineDirectory;
 
         readonly XSharedHttpClient _http;
         readonly FileSystem _fs;
@@ -24,7 +24,7 @@ namespace CKli
         IFileInfo _ciFeed;
         IFileInfo _localFeed;
 
-        public XPublishedPackageFeeds(
+        public XLocalFeedProvider(
             Initializer initializer,
             FileSystem fs,
             XSharedHttpClient http )
@@ -111,24 +111,6 @@ namespace CKli
             return _releaseFeed;
         }
 
-        public SVersion GetMyGetLastVersion( IActivityMonitor m, string feedName, string packageId )
-        {
-            var url = $"https://www.myget.org/feed/{feedName}/package/nuget/{packageId}";
-            try
-            {
-                using( var res = _http.Shared.GetAsync( url ).GetAwaiter().GetResult() )
-                {
-                    var body = res.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                    return SVersion.Parse( body.Substring( body.IndexOf( packageId ) + 1 ) );
-                }
-            }
-            catch( Exception ex )
-            {
-                m.Error( $"Unable to extract last version from: " + url, ex );
-                return null;
-            }
-        }
-
         public SVersion GetBestAnyLocalVersion( IActivityMonitor m, string packageId )
         {
             SVersion Max( SVersion v1, SVersion v2 ) => v1 > v2 ? v1 : v2;
@@ -147,10 +129,10 @@ namespace CKli
             return GetMaxVersionFromFeed( GetCIFeedFolder( m ).PhysicalPath, packageId );
         }
 
-        public LocalPackageFile GetLocalCIPackage( IActivityMonitor m, string packageId, SVersion v )
+        public LocalNuGetPackageFile GetLocalCIPackage( IActivityMonitor m, string packageId, SVersion v )
         {
             var f = GetPackagePath( GetCIFeedFolder( m ).PhysicalPath, packageId, v );
-            return File.Exists( f ) ? new LocalPackageFile( f, packageId, v, false ) : null;
+            return File.Exists( f ) ? new LocalNuGetPackageFile( f, packageId, v, false ) : null;
         }
 
         static string GetPackagePath( string path, string packageId, SVersion v )
@@ -182,16 +164,16 @@ namespace CKli
                                 .Select( v => SVersion.Parse( v ) );
         }
 
-        public IEnumerable<LocalPackageFile> GetAllPackageFilesInReleaseFeed( IActivityMonitor m, bool withSymbols = false )
+        public IEnumerable<LocalNuGetPackageFile> GetAllPackageFilesInReleaseFeed( IActivityMonitor m, bool withSymbols = false )
         {
             return GetAllPackageFiles( m, GetReleaseFeedFolder( m ).PhysicalPath, withSymbols );
         }
 
-        IEnumerable<LocalPackageFile> GetAllPackageFiles( IActivityMonitor m, string feedPath, bool withSymbols )
+        IEnumerable<LocalNuGetPackageFile> GetAllPackageFiles( IActivityMonitor m, string feedPath, bool withSymbols )
         {
             return Directory.EnumerateFiles( feedPath, "*.nupkg" )
                             .Where( f => withSymbols || !f.EndsWith( ".symbols.nupkg" ) )
-                            .Select( f => LocalPackageFile.Parse( f ) );
+                            .Select( f => LocalNuGetPackageFile.Parse( f ) );
         }
 
         SVersion GetMaxVersionFromFeed( string path, string packageId )
@@ -207,29 +189,6 @@ namespace CKli
                 .Select( p => SafeParse( m, p ) )
                 .Where( v => v != null )
                 .Max( v => v );
-        }
-
-        public string GetNuGetCommandLineDirectory( IActivityMonitor m )
-        {
-            if( _nugetCommandLineDirectory == null )
-            {
-                _nugetCommandLineDirectory = Directory.GetDirectories( _localNuGetCache.AppendPart( "nuget.commandline" ) )
-                    .Select( p => (Dir: p, Version: SafeParse( m, p )) )
-                    .Where( t => t.Version != null )
-                    .OrderByDescending( t => t.Version )
-                    .FirstOrDefault().Dir;
-                if( _nugetCommandLineDirectory == null )
-                {
-                    _nugetCommandLineDirectory = String.Empty;
-                    m.Warn( $"Unable to find NuGet.exe from NuGet.CommandLine package." );
-                }
-                else
-                {
-                    _nugetCommandLineDirectory = Path.Combine( _nugetCommandLineDirectory, "tools" );
-                    m.Info( $"Best NuGet.exe found: "+ _nugetCommandLineDirectory );
-                }
-            }
-            return _nugetCommandLineDirectory.Length > 0 ? _nugetCommandLineDirectory : null;
         }
 
         public void RemoveFromNuGetCache( IActivityMonitor m, string packageId, SVersion version )

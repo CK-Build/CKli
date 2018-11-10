@@ -12,29 +12,30 @@ namespace CKli
 {
     public abstract class XSolutionBase : XPathItem
     {
-        readonly XSolutionCentral _central;
         readonly XBranch _branch;
 
         protected XSolutionBase(
             Initializer initializer,
             XBranch branch,
             XSolutionCentral central,
+            XSolutionSettings solutionSettings,
             NormalizedPath branchBasedSolutionFilePath )
             : base( initializer,
                     branch.FileSystem,
                     FileSystemItemKind.File,
                     branch.FullPath.Combine( branchBasedSolutionFilePath ) )
         {
-            _central = central;
             _branch = branch;
+            SolutionSettings = solutionSettings;
             initializer.ChildServices.Add( this );
-            central.Register( this );
+            branch.Register( this );
         }
 
-        public XSolutionCentral SolutionCentral => _central;
+        public XSolutionCentral SolutionCentral => GitBranch.Parent.SolutionCentral;
 
         public XBranch GitBranch => _branch;
 
+        public XSolutionSettings SolutionSettings { get; }
 
         public NormalizedPath GetSolutionFilePath( string projectToBranchName = null )
         {

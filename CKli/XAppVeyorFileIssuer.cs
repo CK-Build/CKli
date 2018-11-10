@@ -51,7 +51,7 @@ namespace CKli
                 }
             }
             firstMapping.Remove( new YamlValue( "init" ) );
-            firstMapping.Remove( new YamlValue( "install" ) );
+            EnsureKeyValue( firstMapping, "install", "ps: ./CodeCakeBuilder/InstallCredentialProvider.ps1 - AddNetfx" );
             EnsureKeyValue( firstMapping, "version", "build{build}" );
             EnsureKeyValue( firstMapping, "image", "Visual Studio 2017" );
             EnsureKeyValue( firstMapping, "clone_folder", "C:\\CK-World\\" + _gitBranch.Parent.FullPath.Path.Replace( '/', '\\' ) );
@@ -62,9 +62,14 @@ namespace CKli
             EnsureDefaultBranches( firstMapping );
             YamlMapping env = FindOrCreateEnvironment( builder.Monitor, firstMapping );
             if( env == null ) return false;
-            EnsureDoubleKeyValue( env, "MYGET_RELEASE_API_KEY", "secure", "BmENGV1y8uv5cLhMhwpoDLwQiLJh4C66c53+FW8FuuVfu5Lf4Ac6NvSuqO/1MbPm" );
-            EnsureDoubleKeyValue( env, "MYGET_PREVIEW_API_KEY", "secure", "CfEqNYjhrGX9DyalZ4jcadzJ/x8q25GulMCbZQDRRs+XetfHn2AEP79OJXE1wSJ8" );
-            EnsureDoubleKeyValue( env, "MYGET_CI_API_KEY", "secure", "z3ZFnSM3FPCaJYkLhqjZmFTCw1Wf1hmRznQ0/UfxY/5haxctmymvFhh+PTz+/eHw" );
+
+            EnsureDoubleKeyValue( env, "AZURE_FEED_PAT", "secure", "MOjOpNMfab3UseEjZW3bGL6+7uXkbmExMOLMn2Mg+61uUO0qdrSZ28DsChFgR60/Huc+D2bcJ/GXP4CB8Cb8Vg==" );
+            EnsureDoubleKeyValue( env, "VSS_NUGET_EXTERNAL_FEED_ENDPOINTS", "secure", "Nz3VB+UKkzYqapOqgvXXK0wAQkcbjlc7sjrwhYTA7zZ5MdEedplC/poHzeJh2jLFi/qniofrG9Pe8qz8l/CV2mK/1F8vPXuo7csnGxeuR27I9qKPDZncV7VtCuKHDL7DRDiQKyua1ZP5ZlVLsVmNhuQ/wc7s3zvE3Kk4a7pN/qR80fs1ZTGBKxqMrNVIACkkZq8dICYk4cko/SO9DUKyw+hvA99ehzlYcq/C9PISrBnAqAEwKUaCSe9/1SaS7jEBUwAJZbwSjqKuorPeC1hgQCkCiCRlguru/7/3c8IcoGNu9k5yGdIciy7OYNcVeqXgrLsRJjRfiJb4Ch6HsL4x+A==" );
+
+            env.Remove( "MYGET_RELEASE_API_KEY" );
+            env.Remove( "MYGET_PREVIEW_API_KEY" );
+            env.Remove( "MYGET_CI_API_KEY" );
+
             if( PushToRemoteStore )
             {
                 EnsureDoubleKeyValue( env, "CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL", "secure", "ffSyq7zhajO1GUXQraZnZiZGtrPjUMGXXhlS71JUDos5aibfGQQ0zf4BWRjM02dn3zrvVnGZBp6bZwULB/ffASa7PO3mcKcqvppnG6eLYDU=" );

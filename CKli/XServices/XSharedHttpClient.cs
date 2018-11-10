@@ -18,12 +18,7 @@ namespace CKli
             initializer.Services.Add( this );
         }
 
-        public HttpClient Shared => _shared ?? (_shared = CreateHttpClient());
-
-        HttpClient CreateHttpClient()
-        {
-            return new HttpClient();
-        }
+        public HttpClient Shared => _shared ?? (_shared = new HttpClient());
 
         void IDisposable.Dispose()
         {

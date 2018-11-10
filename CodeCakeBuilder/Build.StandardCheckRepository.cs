@@ -6,6 +6,7 @@ using Cake.Common.Tools.NuGet;
 using Cake.Common.Tools.NuGet.List;
 using Cake.Core;
 using CK.Text;
+using CSemVer;
 using NuGet.Protocol.Core.Types;
 using SimpleGitVersion;
 using System;
@@ -24,6 +25,18 @@ namespace CodeCake
         /// </summary>
         class CheckRepositoryInfo
         {
+            public CheckRepositoryInfo( SimpleRepositoryInfo gitInfo, IEnumerable<SolutionProject> projectsToPublish )
+            {
+                GitInfo = gitInfo;
+                Version = SVersion.TryParse( gitInfo.SafeNuGetVersion );
+                NuGetPackagesToPublish = projectsToPublish.Select( p => new SimplePackageId( p.Name, Version ) ).ToList();
+            }
+
+            /// <summary>
+            /// Gets the SimpleRepositoryInfo from SimpleGitVersion.
+            /// </summary>
+            public SimpleRepositoryInfo GitInfo { get; }
+
             /// <summary>
             /// Gets or sets the build configuration: either "Debug" or "Release".
             /// Defaults to "Debug".
@@ -31,19 +44,30 @@ namespace CodeCake
             public string BuildConfiguration { get; set; } = "Debug";
 
             /// <summary>
-            /// Gets or sets the version of the packages.
+            /// Gets the version of the packages.
             /// </summary>
-            public string Version { get; set; }
+            public SVersion Version { get; }
 
             /// <summary>
             /// Gets the version of the packages, without any build meta information (if any).
             /// </summary>
-            public string FilePartVersion => CSemVer.SVersion.Parse( Version ).NormalizedText;
+            public string FilePartVersion => Version.NormalizedText;
 
             /// <summary>
             /// Gets whether this is a blank build.
             /// </summary>
             public bool IsLocalCIRelease { get; set; }
+
+            /// <summary>
+            /// Gets all the NuGet packages to publish. This is a simple projection of
+            /// the projectsToPublish script variable.
+            /// </summary>
+            public IReadOnlyList<SimplePackageId> NuGetPackagesToPublish { get; }
+
+            /// Gets or sets the local feed path.
+            /// Can be null if no local feed exists or if local feed should be ignored.
+            /// </summary>
+            public string LocalFeedPath { get; set; }
 
             /// <summary>
             /// Gets the mutable list of remote feeds to which packages should be pushed.
@@ -53,7 +77,7 @@ namespace CodeCake
             /// <summary>
             /// Gets the union of <see cref="Feeds"/>'s <see cref="NuGetHelper.Feed.PackagesToPublish"/> without duplicates.
             /// </summary>
-            public IEnumerable<SolutionProject> ActualPackagesToPublish => Feeds.SelectMany( f => f.PackagesToPublish ).Distinct();
+            public IEnumerable<SimplePackageId> ActualPackagesToPublish => Feeds.SelectMany( f => f.PackagesToPublish ).Distinct();
 
             /// <summary>
             /// Gets whether it is useless to continue. By default if <see cref="NoPackagesToProduce"/> is true, this is true,
@@ -74,7 +98,7 @@ namespace CodeCake
         }
 
         /// <summary>
-        /// Creates a new <see cref="CheckRepositoryInfo"/>. This selects the feeds (a local and/or e remote one)
+        /// Creates a new <see cref="CheckRepositoryInfo"/>. This selects the feeds (a local and/or remote one)
         /// and checks the packages that sould actually be produced for them.
         /// When running on Appveyor, the build number is set.
         /// </summary>
@@ -83,7 +107,7 @@ namespace CodeCake
         /// <returns>A new info object.</returns>
         CheckRepositoryInfo StandardCheckRepository( IEnumerable<SolutionProject> projectsToPublish, SimpleRepositoryInfo gitInfo )
         {
-            var result = new CheckRepositoryInfo { Version = gitInfo.SafeNuGetVersion };
+            var result = new CheckRepositoryInfo( gitInfo, projectsToPublish );
 
             // We build in Debug for any prerelease except "rc": the last prerelease step is in "Release".
             result.BuildConfiguration = gitInfo.IsValidRelease
@@ -125,47 +149,27 @@ namespace CodeCake
                     System.IO.Directory.CreateDirectory( localFeed );
                 }
                 result.IsLocalCIRelease = isLocalCIRelease;
+                result.LocalFeedPath = localFeed;
 
                 if( localFeed != null )
                 {
                     result.Feeds.Add( new LocalFeed( localFeed ) );
                 }
 
-                // Creating the right NuGetRemoteFeed according to the release level.
+                // Creating the right remote feed.
                 if( !isLocalCIRelease )
                 {
-                    if( gitInfo.IsValidRelease )
-                    {
-                        if( gitInfo.PreReleaseName == "" )
-                        {
-                            result.Feeds.Add( new SignatureOpenSourcePublicFeed( "Stable" ) );
-                        }
-                        else if( gitInfo.PreReleaseName == "prerelease"
-                                || gitInfo.PreReleaseName == "rc" )
-                        {
-                            result.Feeds.Add( new SignatureOpenSourcePublicFeed( "Latest" ) );
-                        }
-                        else
-                        {
-                            // An alpha, beta, delta, epsilon, gamma, kappa goes to preview feed.
-                            result.Feeds.Add( new SignatureOpenSourcePublicFeed( "Preview" ) );
-                        }
-                    }
-                    else
-                    {
-                        Debug.Assert( gitInfo.IsValidCIBuild );
-                        result.Feeds.Add( new SignatureOpenSourcePublicFeed( "CI" ) );
-                    }
+                    result.Feeds.Add( new SignatureVSTSFeed() );
                 }
             }
 
             // Now that Local/RemoteFeeds are selected, we can check the packages that already exist
             // in those feeds.
-            var all = result.Feeds.Select( f => f.InitializePackagesToPublishAsync( Cake, projectsToPublish, gitInfo.SafeNuGetVersion ) );
+            var all = result.Feeds.Select( f => f.InitializePackagesToPublishAsync( Cake, result.NuGetPackagesToPublish ) );
             System.Threading.Tasks.Task.WaitAll( all.ToArray() );
             foreach( var feed in result.Feeds )
             {
-                feed.Information( Cake, projectsToPublish );
+                feed.Information( Cake, result.NuGetPackagesToPublish );
             }
 
             int nbPackagesToPublish = result.ActualPackagesToPublish.Count();
@@ -179,7 +183,7 @@ namespace CodeCake
             }
             else
             {
-                Cake.Information( $"Should actually publish {nbPackagesToPublish} out of {projectsToPublish.Count()} projects with version={gitInfo.SafeNuGetVersion} and configuration={result.BuildConfiguration}: {result.ActualPackagesToPublish.Select( p => p.Name ).Concatenate()}" );
+                Cake.Information( $"Should actually publish {nbPackagesToPublish} out of {projectsToPublish.Count()} projects with version={gitInfo.SafeNuGetVersion} and configuration={result.BuildConfiguration}: {result.ActualPackagesToPublish.Select( p => p.PackageId ).Concatenate()}" );
             }
             var appVeyor = Cake.AppVeyor();
             if( appVeyor.IsRunningOnAppVeyor )

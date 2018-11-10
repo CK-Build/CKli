@@ -14,10 +14,13 @@ namespace CKli
     {
         readonly IWorldName _world;
         readonly IWorldStore _worldStore;
-        readonly XPublishedPackageFeeds _packageFeeds;
+        readonly XLocalFeedProvider _packageFeeds;
+        readonly XNuGetClient _nuGetClient;
         readonly MSBuildContext _msBuildContext;
         readonly XReferentialFolder _referential;
-        readonly XPublishKeyStore _publishKeyStore;
+        readonly XSecretKeyStore _publishKeyStore;
+        readonly List<XGitFolder> _allGitFolders;
+
         readonly List<XSolutionBase> _allSolutions;
         readonly List<XSolutionBase> _allDevelopSolutions;
         readonly List<XGitFolder> _allGitFoldersWithDevelopBranchName;
@@ -28,34 +31,56 @@ namespace CKli
             IWorldName world,
             IWorldStore worldStore,
             XReferentialFolder referential,
-            XPublishKeyStore publishKeyStore,
-            XPublishedPackageFeeds packageFeeds,
+            XSecretKeyStore publishKeyStore,
+            XLocalFeedProvider packageFeeds,
+            XNuGetClient nuGetClient,
             Initializer initializer )
             : base( initializer )
         {
             _world = world;
             _worldStore = worldStore;
             _packageFeeds = packageFeeds;
+            _nuGetClient = nuGetClient;
             _referential = referential;
             _publishKeyStore = publishKeyStore;
             _msBuildContext = new MSBuildContext( fileSystem );
+            _allGitFolders = new List<XGitFolder>();
             initializer.Services.Add( this );
+
             _allSolutions = new List<XSolutionBase>();
             _allDevelopSolutions = new List<XSolutionBase>();
             _allGitFoldersWithDevelopBranchName = new List<XGitFolder>();
         }
 
-        internal void Register( XSolutionBase s )
+        internal void Register( XGitFolder g )
         {
-            _allSolutions.Add( s );
-            if( s.GitBranch.Name == _world.DevelopBranchName )
+            _allGitFolders.Add( g );
+        }
+
+        protected override bool OnCreated( Initializer initializer )
+        {
+            foreach( var g in _allGitFolders )
             {
-                if( !_allGitFoldersWithDevelopBranchName.Contains( s.GitBranch.Parent ) )
+                bool hasDevelop = false;
+                foreach( var b in g.Branches )
                 {
-                    _allGitFoldersWithDevelopBranchName.Add( s.GitBranch.Parent );
+                    if( b.Solutions.Count > 0 )
+                    {
+                        bool isDevelop = b.Name == _world.DevelopBranchName;
+                        foreach( var s in b.Solutions )
+                        {
+                            _allSolutions.Add( s );
+                            if( isDevelop )
+                            {
+                                _allDevelopSolutions.Add( s );
+                                hasDevelop = true;
+                            }
+                        }
+                    }
                 }
-                _allDevelopSolutions.Add( s );
+                if( hasDevelop ) _allGitFoldersWithDevelopBranchName.Add( g );
             }
+            return base.OnCreated( initializer );
         }
 
         /// <summary>
@@ -72,13 +97,35 @@ namespace CKli
                                     _world,
                                     _worldStore,
                                     _packageFeeds,
+                                    _nuGetClient.NuGetClient,
                                     _referential.FileProvider,
                                     _publishKeyStore,
                                     AllGitFoldersWithDevelopBranchName.Select( g => g.GitFolder ),
-                                    ( monitor, branchName ) => AllDevelopSolutions.Select( s => s.GetSolution( monitor, true, branchName ) ).ToList() );
+                                    (monitor,branchName) => GetAllSolutions( monitor, true, branchName ) );
 
             }
             return _worldContext;
+        }
+
+        public IReadOnlyList<Solution> GetAllSolutions( IActivityMonitor m, bool reload, string branchName )
+        {
+            if( branchName == _world.DevelopBranchName )
+            {
+                return AllDevelopSolutions.Select( s => s.GetSolution( m, reload, branchName ) ).ToList();
+            }
+            var solutions = new List<Solution>();
+            foreach( var g in _allGitFolders )
+            {
+                var b = g.Branches.FirstOrDefault( x => x.Name == branchName ) ?? g.DevelopBranch;
+                if( b != null )
+                {
+                    foreach( var s in b.Solutions )
+                    {
+                        solutions.Add( s.GetSolution( m, reload, branchName ) );
+                    }
+                }
+            }
+            return solutions;
         }
 
         /// <summary>
@@ -90,51 +137,19 @@ namespace CKli
         /// Gets all Git folders that have a <see cref="IWorldName.DevelopBranchName"/>
         /// and at least one solution in it in the order of their definition in the World xml file.
         /// </summary>
-        public IReadOnlyList<XGitFolder> AllGitFoldersWithDevelopBranchName => _allGitFoldersWithDevelopBranchName;
+        public IReadOnlyCollection<XGitFolder> AllGitFoldersWithDevelopBranchName => _allGitFoldersWithDevelopBranchName;
 
         /// <summary>
-        /// Gets all the solutions regardless of their type or branch in the order of their definition in the World xml file.
+        /// Gets all the solutions regardless of their type or branch in the order of their definition in
+        /// the World xml file.
         /// </summary>
         public IReadOnlyList<XSolutionBase> AllSolutions => _allSolutions;
 
         /// <summary>
         /// Gets all the solutions regardless of their type in branch <see cref="World"/>.<see cref="GlobalContext.World.DevelopBranchName">DevelopBranchName</see>.
         /// The order is important here (order of their definition in the World xml file): Primary solutions necessarily
-        /// appear before any of their secondary solutions.
+        /// appear before any of their secondary solutions (this is to avoid loading twice the secondary solutions).
         /// </summary>
         public IReadOnlyList<XSolutionBase> AllDevelopSolutions => _allDevelopSolutions;
-
-
-        public void UpdateCodeCakeBuilderFiles( IActivityMonitor m, string branchName )
-        {
-            var solutions = AllDevelopSolutions.Select( s => s.GetSolution( m, true, branchName ) );
-            foreach( var s in solutions )
-            {
-                using( m.OpenInfo( $"Updating standard CodeCakeBuilder files." ) )
-                {
-                    var codeCakeBuilderPath = s.SolutionFolderPath.AppendPart( "CodeCakeBuilder" );
-                    foreach( var name in new[]
-                    {
-                        "Build.StandardCheckRepository.cs",
-                        "Build.StandardCreateNuGetPackages.cs",
-                        "Build.StandardPushNuGetPackages.cs",
-                        "Build.StandardSolutionBuild.cs",
-                        "Build.StandardUnitTests.cs"
-                    } )
-                    {
-                        var path = codeCakeBuilderPath.AppendPart( name );
-                        var f = _msBuildContext.FileSystem.GetFileInfo( path );
-                        if( f.Exists )
-                        {
-                            var source = _referential.FileProvider.GetFileInfo( "InitialCodeCakeBuilder/" + name );
-                            _msBuildContext.FileSystem.CopyTo( m, source, path );
-                        }
-                    }
-                    _msBuildContext.FileSystem.CopyTo( m,
-                        _referential.FileProvider.GetFileInfo( "SimpleFiles/.editorconfig" ),
-                        s.SolutionFolderPath.AppendPart( ".editorconfig" ) );
-                }
-            }
-        }
     }
 }

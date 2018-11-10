@@ -85,9 +85,13 @@ namespace CK.Env.MSBuild
             }
             var storePath = Path.Combine( GetTargetFeedFolderPath( m ), LocalFeedProviderExtension.CKSetupStoreName );
 
-            if( !s.Solution.GitFolder.EnsureCKSetupStoreTestHelperConfig( m, storePath ) 
-                || !(s.Solution.GitFolder.GetNuGetConfigFile( m )?.EnsureLocalFeedsNuGetSource( m, ensureRelease: true, ensureCI: true ).Success ?? false) 
-                || !s.Solution.GitFolder.SetRepositoryXmlIgnoreDirtyFolders( m ) )
+            bool success = s.Solution.GitFolder.EnsureCKSetupStoreTestHelperConfig( m, storePath );
+            var fNuGet = new NuGetConfigBaseFile( s.Solution.GitFolder );
+            fNuGet.EnsureLocalFeeds( m, ensureRelease: true, ensureCI: true );
+            success &= fNuGet.Save( m );
+            success &= s.Solution.GitFolder.SetRepositoryXmlIgnoreDirtyFolders( m );
+
+            if( !success )
             {
                 s.Solution.GitFolder.ClearVersionTag( m, v );
                 // This is an untracked file. It has to be removed.

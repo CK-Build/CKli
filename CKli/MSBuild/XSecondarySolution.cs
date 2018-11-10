@@ -22,6 +22,7 @@ namespace CKli
             : base( initializer,
                     primary.GitBranch,
                     central,
+                    primary.SolutionSettings,
                     (string)initializer.Element.Attribute( "Name" ) ?? (string)initializer.Element.AttributeRequired( "Path" ) )
         {
             PrimarySolution = primary;
@@ -42,7 +43,13 @@ namespace CKli
         public override Solution GetSolution( IActivityMonitor m, bool reload, string projectToBranchName = null )
         {
             var primary = PrimarySolution.GetSolution( m, false, projectToBranchName );
-            return SolutionCentral.MSBuildContext.FindOrLoadSolution( m, GetSolutionFilePath( projectToBranchName ), primary, SpecialType, reload ).Solution;
+            return SolutionCentral.MSBuildContext.FindOrLoadSolution(
+                        m,
+                        GetSolutionFilePath( projectToBranchName ),
+                        SolutionSettings.SolutionSettings,
+                        primary,
+                        SpecialType,
+                        reload ).Solution;
         }
     }
 }

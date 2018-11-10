@@ -18,12 +18,12 @@ namespace CKli
     {
         readonly XSolutionCentral _solutions;
         readonly FileSystem _fileSystem;
-        readonly XPublishedPackageFeeds _localPackages;
+        readonly XLocalFeedProvider _localPackages;
 
         public XGlobalSwitchBranchAction(
             Initializer intializer,
             FileSystem fileSystem,
-            XPublishedPackageFeeds localPackages,
+            XLocalFeedProvider localPackages,
             XSolutionCentral solutions,
             ActionCollector collector )
             : base( intializer, collector )

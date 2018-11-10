@@ -8,6 +8,7 @@ using CK.Env.MSBuild;
 using CK.Env.Analysis;
 using CK.Text;
 using System.Linq;
+using System.Xml.Linq;
 
 namespace CKli
 {
@@ -18,16 +19,21 @@ namespace CKli
     /// </summary>
     public class XPrimarySolution : XSolutionBase
     {
+        readonly XElement _xElement;
+
         public XPrimarySolution(
             Initializer initializer,
             XBranch branch,
+            XSolutionSettings solutionSettings,
             XSolutionCentral central )
             : base( initializer,
                     branch,
                     central,
+                    solutionSettings,
                     branch.Parent.Name + ".sln" )
         {
             if( !(initializer.Parent is XBranch) ) throw new Exception( "A primary solution must be a direct child of a Git branch." );
+            _xElement = initializer.Element;
             initializer.Services.Add( this );
         }
 
@@ -48,7 +54,13 @@ namespace CKli
 
         public override Solution GetSolution( IActivityMonitor m, bool reload, string projectToBranchName = null )
         {
-            var (s, loaded) = SolutionCentral.MSBuildContext.FindOrLoadSolution( m, GetSolutionFilePath( projectToBranchName ), null, SolutionSpecialType.None, reload );
+            var (s, loaded) = SolutionCentral.MSBuildContext.FindOrLoadSolution(
+                                                    m,
+                                                    GetSolutionFilePath( projectToBranchName ),
+                                                    SolutionSettings.SolutionSettings,
+                                                    null,
+                                                    SolutionSpecialType.None,
+                                                    reload );
             if( loaded )
             {
                 if( TestProjectsArePublished )
