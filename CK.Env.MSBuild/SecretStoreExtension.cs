@@ -9,14 +9,9 @@ namespace CK.Env.MSBuild
 {
     public static class SecretStoreExtension
     {
-        public static string GetCKSetupRemoteStorePushKey( this ISecretKeyStore @this, IActivityMonitor m )
+        public static (string Key, string Secret) GetCKSetupRemoteStorePushKey( this ISecretKeyStore @this, IActivityMonitor m )
         {
-            return @this.GetSecretKey( m, "CKSETUPREMOTESTORE_PUSH_API_KEY", false, "Required to push components to https://cksetup.invenietis.net/." );
-        }
-
-        public static string GetSignatureOpenSourceFeedPAT( this ISecretKeyStore @this, IActivityMonitor m )
-        {
-            return @this.GetSecretKey( m, "AZURE_FEED_PAT", false, "Required to push packages to Signature-OpenSource feed." );
+            return ("CKSETUPREMOTESTORE_PUSH_API_KEY", @this.GetSecretKey( m, "CKSETUPREMOTESTORE_PUSH_API_KEY", false, "Required to push components to https://cksetup.invenietis.net/." ));
         }
     }
 }

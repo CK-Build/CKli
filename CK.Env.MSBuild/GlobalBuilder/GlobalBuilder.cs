@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.NuGetClient;
 using CK.Text;
 using CKSetup;
 using CSemVer;
@@ -18,6 +19,7 @@ namespace CK.Env.MSBuild
         readonly SolutionDependencyResult _dependencyResult;
         readonly FileSystem _fileSystem;
         readonly ILocalFeedProvider _feeds;
+        readonly INuGetClient _nugetClient;
         readonly ITestRunMemory _testRunMemory;
         readonly GlobalBuilderInfo _buildInfo;
 
@@ -25,12 +27,14 @@ namespace CK.Env.MSBuild
             SolutionDependencyResult r,
             FileSystem fileSystem,
             ILocalFeedProvider feeds,
+            INuGetClient nugetClient,
             ITestRunMemory testRunMemory,
             GlobalBuilderInfo buildInfo )
         {
             _dependencyResult = r;
             _fileSystem = fileSystem;
             _feeds = feeds;
+            _nugetClient = nugetClient;
             _testRunMemory = testRunMemory;
             _buildInfo = buildInfo;
         }
@@ -48,11 +52,12 @@ namespace CK.Env.MSBuild
             Debug.Assert( _buildInfo.IsRemotesRequired.HasValue );
             if( _buildInfo.IsRemotesRequired.Value )
             {
-                if( !_buildInfo.EnsureRemotesAvailable( m ) ) return false;
-                environmentVariables.Add( ("MYGET_CI_API_KEY", _buildInfo.MyGetApiKey) );
-                environmentVariables.Add( ("MYGET_PREVIEW_API_KEY", _buildInfo.MyGetApiKey) );
-                environmentVariables.Add( ("MYGET_RELEASE_API_KEY", _buildInfo.MyGetApiKey) );
-                environmentVariables.Add( ("CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL", _buildInfo.RemoteStorePushApiKey + "|https://cksetup.invenietis.net") );
+                var secrets = _buildInfo.EnsureRequiredSecretsAvailable( m, _nugetClient, _dependencyResult.Solutions.Select( s => s.Solution ) );
+                if( secrets == null ) return false;
+                foreach( var secret in secrets )
+                {
+                    environmentVariables.Add( secret );
+                }
             }
             else
             {

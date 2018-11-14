@@ -58,6 +58,8 @@ namespace CK.Env
         /// <summary>
         /// Gets or sets the <see cref="XDocument"/>.
         /// Null if it does not exist.
+        /// This document is mutable and any change to it are tracked (<see cref="IsDirty"/>
+        /// is dynamically updated).
         /// </summary>
         public XDocument Document
         {
@@ -83,7 +85,7 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Saves this <see cref="Document"/> if it is <see cref="IsDirty"/>.
+        /// Saves this <see cref="Document"/> if <see cref="IsDirty"/> is true.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>

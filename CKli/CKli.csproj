@@ -12,6 +12,7 @@
     <ProjectReference Include="..\CK.Env.XTyping\CK.Env.XTyping.csproj" />
     <ProjectReference Include="..\CK.Env.MSBuild\CK.Env.MSBuild.csproj" />
     <ProjectReference Include="..\CK.NuGetClient\CK.NuGetClient.csproj" />
+    <ProjectReference Include="..\CK.SimpleKeyVault\CK.SimpleKeyVault.csproj" />
   </ItemGroup>
   
   <ItemGroup>

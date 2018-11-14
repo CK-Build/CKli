@@ -19,7 +19,14 @@ namespace CK.NuGetClient
         INuGetFeedInfo Info { get; }
 
         /// <summary>
-        /// Ensures that the secret required to push is available.
+        /// Must provide the secret key name.
+        /// </summary>
+        string SecretKeyName { get; }
+
+        /// <summary>
+        /// Ensures that the secret behind the <see cref="SecretKeyName"/> is available.
+        /// The implementation must ensure that the secret only depends from the <see cref="SecretKeyName"/>:
+        /// if two feeds share the same SecretKeyName, the resolved secret must be the same.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The non empty secret or null.</returns>

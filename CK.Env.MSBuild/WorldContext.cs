@@ -168,7 +168,7 @@ namespace CK.Env.MSBuild
                 if( r == null ) return false;
 
                 _buildInfo.SetStatus( WorkStatus, GlobalGitStatus );
-                var b = new GlobalBuilder( r, FileSystem, _feeds, _testedCommits, _buildInfo );
+                var b = new GlobalBuilder( r, FileSystem, _feeds, _nugetClient, _testedCommits, _buildInfo );
                 if( !b.Build( m ) ) return false;
                 using( m.OpenInfo( $"Upgrading Build projects dependencies and removing LocalFeed NuGet sources." ) )
                 {
@@ -196,7 +196,7 @@ namespace CK.Env.MSBuild
                 var rZeroBuildDeps = GetSolutionDependencyResult( m, World.LocalBranchName );
                 if( rZeroBuildDeps == null ) return false;
                 _buildInfo.SetStatus( WorkStatus, GlobalGitStatus );
-                var b = new GlobalBuilder( rZeroBuildDeps, FileSystem, _feeds, _testedCommits, _buildInfo );
+                var b = new GlobalBuilder( rZeroBuildDeps, FileSystem, _feeds, _nugetClient, _testedCommits, _buildInfo );
                 if( !b.Build( m ) ) return false;
                 if( !SetState( m, WorkStatus.Idle, GlobalGitStatus.LocalBranch ) ) return false;
             }
@@ -224,7 +224,7 @@ namespace CK.Env.MSBuild
                 var r = GetSolutionDependencyResult( m, World.DevelopBranchName );
                 if( r == null ) return false;
                 _buildInfo.SetStatus( WorkStatus, GlobalGitStatus );
-                var b = new GlobalBuilderRelease( r, FileSystem, _feeds, _testedCommits, _buildInfo, roadmap );
+                var b = new GlobalBuilderRelease( r, FileSystem, _feeds, _nugetClient, _testedCommits, _buildInfo, roadmap );
                 if( !b.Build( m ) ) return false;
 
                 // This should be in the SimpleRoadmap.
@@ -295,7 +295,7 @@ namespace CK.Env.MSBuild
         {
             Debug.Assert( _workStatus == WorkStatus.Releasing );
             _buildInfo.SetStatus( WorkStatus, GlobalGitStatus );
-            var b = new GlobalBuilderRelease( r, FileSystem, _feeds, _testedCommits, _buildInfo, roadmap );
+            var b = new GlobalBuilderRelease( r, FileSystem, _feeds, _nugetClient, _testedCommits, _buildInfo, roadmap );
             if( !b.Build( m ) ) return false;
             return SetState( m, WorkStatus.WaitingReleaseConfirmation );
         }
@@ -331,7 +331,7 @@ namespace CK.Env.MSBuild
                                                         ? World.LocalBranchName
                                                         : World.DevelopBranchName );
             if( r == null ) return false;
-            var b = new GlobalBuilder( r, FileSystem, _feeds, _testedCommits, _buildInfo );
+            var b = new GlobalBuilder( r, FileSystem, _feeds, _nugetClient, _testedCommits, _buildInfo );
             return b.Build( m );
         }
 
@@ -527,7 +527,7 @@ namespace CK.Env.MSBuild
 
         bool DoPublishRelease( IActivityMonitor m )
         {
-            string storeApiKey = _secretKeyStore.GetCKSetupRemoteStorePushKey( m );
+            string storeApiKey = _secretKeyStore.GetCKSetupRemoteStorePushKey( m ).Secret;
             if( storeApiKey == null ) return false;
             var roadmap = GetSimpleRoadmap( m );
             if( roadmap == null ) return false;
@@ -666,7 +666,7 @@ namespace CK.Env.MSBuild
             Func<IActivityMonitor, string, IReadOnlyList<Solution>> branchSolutionsLoader )
         {
             var gitContext = new GlobalGitContext( world, gitFolders );
-            var worldState = worldStore.GetLocalState( m, world );
+            var worldState = worldStore.GetOrCreateLocalState( m, world );
             var workStatus = worldState.XmlState.AttributeEnum( xWorkStatus, WorkStatus.Idle );
             var gitStatus = worldState.GlobalGitStatus;
             if( !gitContext.CheckStatus( m, ref gitStatus, workStatus == WorkStatus.SwitchingToDevelop || workStatus == WorkStatus.SwitchingToLocal ) ) return null;

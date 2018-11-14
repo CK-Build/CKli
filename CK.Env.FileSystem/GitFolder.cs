@@ -64,6 +64,8 @@ namespace CK.Env
             _branchesFolder = new BranchesFolder( this, "branches", isRemote: false );
             _remoteBranchesFolder = new RemotesFolder( this );
             _thisDir = new RootDir( this, SubPath.LastPart );
+            ServiceContainer = new SimpleServiceContainer( FileSystem.ServiceContainer );
+            PluginManager = new GitPluginManager( ServiceContainer, world.DevelopBranchName );
 
             string origin = _git.Network.Remotes["origin"]?.Url;
             if( origin != null )
@@ -81,7 +83,17 @@ namespace CK.Env
         public KnownGitProvider KnownGitProvider { get; }
 
         /// <summary>
-        /// Gets the current <see cref="World"/>.
+        /// Gets the service container for this GitFolder.
+        /// </summary>
+        public SimpleServiceContainer ServiceContainer { get; }
+
+        /// <summary>
+        /// Gets the plugin manager for this GitFolder and its branches.
+        /// </summary>
+        public GitPluginManager PluginManager { get; }
+
+        /// <summary>
+        /// Gets the current <see cref="IWorldName"/>.
         /// </summary>
         public IWorldName World { get; }
 

@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 namespace CK.Env
 {
     /// <summary>
-    /// Basic text file.
+    /// Basic base class for text files.
     /// </summary>
     public abstract class GitFolderTextFileBase
     {
@@ -37,6 +37,8 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the text file content or null if it does not exist.
+        /// To update this content, <see cref="CreateOrUpdate(IActivityMonitor, string)"/> must
+        /// be used.
         /// </summary>
         public string TextContent => GetFile()?.TextContent;
 
@@ -54,14 +56,19 @@ namespace CK.Env
             OnDeleted( m );
         }
 
+        /// <summary>
+        /// Called by <see cref="Delete"/> once <see cref="TextContent"/> is null
+        /// and the file has been deleted from the file system.
+        /// </summary>
+        /// <param name="m"></param>
         protected virtual void OnDeleted( IActivityMonitor m )
         {
         }
 
         /// <summary>
-        /// Saves (creates or updates), this file with a new content or deletes it if content is null.
-        /// If the content is the same as the current <see cref="TextContent"/>
-        /// the save is skipped.
+        /// Saves (creates or updates), this file with a new content or calls <see cref="Delete"/>
+        /// if content is null.
+        /// If the content is the same as the current <see cref="TextContent"/> the save is skipped.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="newContent">The content. Null to delete the file.</param>

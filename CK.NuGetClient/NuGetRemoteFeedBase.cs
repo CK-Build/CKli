@@ -49,11 +49,13 @@ namespace CK.NuGetClient
 
         /// <summary>
         /// Must provide the secret key name.
+        /// When null or empty, <see cref="ResolveSecret"/> always return null.
         /// </summary>
-        protected abstract string SecretKeyName { get; }
+        public abstract string SecretKeyName { get; }
 
         /// <summary>
         /// Must resolve the push API key.
+        /// The push API key is not necessarily the secret behind <see cref="SecretKeyName"/>.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The API key or null.</returns>
@@ -61,8 +63,12 @@ namespace CK.NuGetClient
 
         /// <summary>
         /// Ensures that the secret behind the <see cref="SecretKeyName"/> is available.
+        /// This always returns null if <see cref="SecretKeyName"/> is null.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
+        /// <param name="throwOnEmpty">
+        /// True to throw if SecretKeyName is not null or empty and the secret xan not be resolved.
+        /// </param>
         /// <returns>The non empty secret or null.</returns>
         public virtual string ResolveSecret( IActivityMonitor m, bool throwOnEmpty = false )
         {

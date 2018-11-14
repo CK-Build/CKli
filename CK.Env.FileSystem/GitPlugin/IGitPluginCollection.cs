@@ -1,0 +1,35 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace CK.Env
+{
+    /// <summary>
+    /// Plugin collection of <see cref="IGitPlugin"/> or <see cref="IGitBranchPlugin"/>.
+    /// </summary>
+    /// <typeparam name="T">Actual plugin type.</typeparam>
+    public interface IGitPluginCollection<T> : IReadOnlyCollection<T>
+        where T : class
+    {
+        /// <summary>
+        /// Gets the branch name. This is null for root plugins.
+        /// </summary>
+        string BranchName { get; }
+
+        /// <summary>
+        /// Gets a plugin.
+        /// </summary>
+        /// <param name="t">Type of the plugin.</param>
+        /// <returns>The plugin instance or null.</returns>
+        T GetPlugin( Type t );
+
+        /// <summary>
+        /// Typed version of <see cref="GetPlugin(Type)"/>.
+        /// </summary>
+        /// <typeparam name="P">Type of the plugin.</typeparam>
+        /// <returns>The plugin instance or null.</returns>
+        P GetPlugin<P>() where P : T;
+    }
+}

@@ -22,7 +22,15 @@ namespace CKli
             parent.Register( this );
         }
 
+        /// <summary>
+        /// Gets the parent <see cref="XGitFolder"/> object.
+        /// </summary>
         public new XGitFolder Parent => (XGitFolder)base.Parent;
+
+        /// <summary>
+        /// Gets the primary solution if one is defined in this branch.
+        /// </summary>
+        public XPrimarySolution PrimarySolution { get; private set; }
 
         /// <summary>
         /// Gets all the solutions regardless of their type in this branch in the order of
@@ -33,6 +41,7 @@ namespace CKli
         internal void Register( XSolutionBase s )
         {
             _solutions.Add( s );
+            if( s is XPrimarySolution p ) PrimarySolution = p;
         }
     }
 }

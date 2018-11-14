@@ -1,10 +1,6 @@
 using CK.Core;
-using CK.Text;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Xml.Linq;
 
 namespace CK.Env
@@ -28,10 +24,21 @@ namespace CK.Env
         /// Ensures that packageSources element is the first element of the non null <see cref="GitFolderXmlFile.Document"/>.
         /// If the Document is null, this is null.
         /// </summary>
-        public XElement PackageSources => _packageSources ?? (_packageSources = Document.Root.EnsureFirstElement( "packageSources" ) );
+        public XElement PackageSources => _packageSources ?? (_packageSources = Document?.Root.EnsureFirstElement( "packageSources" ));
+
+        /// <summary>
+        /// Ensures that packageSources element is the first element of the <see cref="GitFolderXmlFile.Document"/>.
+        /// <see cref="EnsureDocument()"/> is called.
+        /// </summary>
+        public XElement EnsurePackageSources()
+        {
+            EnsureDocument();
+            return PackageSources;
+        }
 
         /// <summary>
         /// Ensures that a feed identified by its name is a given path or url.
+        /// The document is created if it does not exist.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="feedName">The name of the feed. This is the key.</param>
@@ -41,11 +48,12 @@ namespace CK.Env
         {
             if( String.IsNullOrWhiteSpace( feedName ) ) throw new ArgumentNullException( nameof( feedName ) );
             if( String.IsNullOrWhiteSpace( urlOrPath ) ) throw new ArgumentNullException( nameof( urlOrPath ) );
-            PackageSources.EnsureAddKeyValue( feedName, urlOrPath );
+            EnsurePackageSources().EnsureAddKeyValue( feedName, urlOrPath );
         }
 
         /// <summary>
         /// Ensures that credential section exists and a feed has a given credential.
+        /// The document is created if it does not exist.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="feedName">The nameof the feed.</param>
@@ -56,7 +64,7 @@ namespace CK.Env
             if( String.IsNullOrWhiteSpace( userName ) ) throw new ArgumentNullException( nameof( userName ) );
             if( String.IsNullOrWhiteSpace( clearTextPassword ) ) throw new ArgumentNullException( nameof( clearTextPassword ) );
 
-            var rootCred = Document.Root.EnsureElement("packageSourceCredentials");
+            var rootCred = EnsureDocument().Root.EnsureElement("packageSourceCredentials");
             var safeName = feedName.Replace( " ", "_x0020_" );
             var entry = rootCred.EnsureElement( safeName );
             entry.EnsureAddKeyValue( "Username", userName );
@@ -95,11 +103,14 @@ namespace CK.Env
         /// <param name="withCredentials">True to remove credentials.</param>
         public void RemoveFeed( IActivityMonitor m, string feedName, bool withCredentials = true )
         {
-            _packageSources
-                    .Elements( "add" )
-                    .FirstOrDefault( b => (string)b.Attribute( "key" ) == feedName )
-                    ?.Remove();
-            if( withCredentials ) RemoveFeedCredential( m, feedName );
+            if( PackageSources != null )
+            {
+                _packageSources
+                        .Elements( "add" )
+                        .FirstOrDefault( b => (string)b.Attribute( "key" ) == feedName )
+                        ?.Remove();
+                if( withCredentials ) RemoveFeedCredential( m, feedName );
+            }
         }
 
         /// <summary>
@@ -109,9 +120,8 @@ namespace CK.Env
         /// <param name="feedName">The feed name.</param>
         public void RemoveFeedCredential( IActivityMonitor m, string feedName )
         {
-            var safeName = feedName.Replace( " ", "_x0020_" );
-            Document.Root.Element( "packageSourceCredentials" )
-                         ?.Element( safeName )
+            Document?.Root.Element( "packageSourceCredentials" )
+                         ?.Element( feedName.Replace( " ", "_x0020_" ) )
                          ?.Remove();
         }
 
@@ -126,7 +136,6 @@ namespace CK.Env
             RemoveFeed( m, "LocalFeed-CI", false );
             RemoveFeed( m, "LocalFeed-Release", false );
         }
-
 
     }
 }

@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.NuGetClient;
 using CK.Text;
 using CKSetup;
 using CSemVer;
@@ -22,10 +23,11 @@ namespace CK.Env.MSBuild
             SolutionDependencyResult r,
             FileSystem fileSystem,
             ILocalFeedProvider feeds,
+            INuGetClient nuGetClient,
             ITestRunMemory testRunMemory,
             GlobalBuilderInfo buildInfo,
             SimpleRoadmap roadmap )
-            : base( r, fileSystem, feeds, testRunMemory, buildInfo )
+            : base( r, fileSystem, feeds, nuGetClient, testRunMemory, buildInfo )
         {
             if( roadmap == null ) throw new ArgumentNullException( nameof( roadmap ) );
             if( BuildInfo.WorkStatus != WorkStatus.Releasing && BuildInfo.WorkStatus != WorkStatus.CancellingRelease )

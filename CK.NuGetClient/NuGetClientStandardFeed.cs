@@ -16,7 +16,6 @@ namespace CK.NuGetClient
         public NuGetClientStandardFeed( NuGetClient c, NuGetStandardFeedInfo info )
             : base( c, new PackageSource( info.Url, info.Name ), info )
         {
-            SecretKeyName = info.SecretKeyName;
         }
 
         /// <summary>
@@ -24,7 +23,10 @@ namespace CK.NuGetClient
         /// </summary>
         public new NuGetStandardFeedInfo Info => (NuGetStandardFeedInfo)base.Info;
 
-        protected override string SecretKeyName { get; }
+        /// <summary>
+        /// Gets the <see cref="NuGetStandardFeedInfo.SecretKeyName"/>.
+        /// </summary>
+        public override string SecretKeyName => Info.SecretKeyName;
 
         protected override string ResolvePushAPIKey( IActivityMonitor m ) => ResolveSecret( m );
     }

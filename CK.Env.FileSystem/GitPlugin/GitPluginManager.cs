@@ -1,0 +1,195 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using CK.Core;
+
+namespace CK.Env
+{
+    /// <summary>
+    /// Handles Git plugins that can be <see cref="IGitPlugin"/> on the Git repository
+    /// or <see cref="IGitBranchPlugin"/> that are scoped to a specific branch with associated
+    /// settings that are explicitly registered mere objects.
+    /// A default branch must be provided: plugins registered in this default branch are used as fallbacks
+    /// for unconfigured branch.
+    /// </summary>
+    public class GitPluginManager
+    {
+        readonly IServiceProvider _baseProvider;
+        readonly GitPluginRegistry _registry;
+        readonly string _defaultBranchName;
+        readonly PluginCollection<IGitPlugin> _plugins;
+        readonly Branches _branches;
+
+        class Branches : IGitBranchPluginCollection
+        {
+            readonly GitPluginManager _manager;
+            readonly Dictionary<string, PluginCollection<IGitBranchPlugin>> _branchPlugins;
+
+            public Branches( GitPluginManager manager )
+            {
+                _manager = manager;
+                _branchPlugins = new Dictionary<string, PluginCollection<IGitBranchPlugin>>();
+            }
+
+            public IGitPluginCollection<IGitBranchPlugin> this[ string branchName ] => FindOrCreate( branchName );
+
+            public PluginCollection<IGitBranchPlugin> FindOrCreate( string branchName )
+            {
+                if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
+                if( !_branchPlugins.TryGetValue( branchName, out var c ) )
+                {
+                    c = new PluginCollection<IGitBranchPlugin>( _manager, _manager._plugins, branchName );
+                    _branchPlugins.Add( branchName, c );
+                }
+                return c;
+            }
+
+            public int Count => _branchPlugins.Count;
+
+            public IEnumerator<IGitPluginCollection<IGitBranchPlugin>> GetEnumerator() => _branchPlugins.Values.GetEnumerator();
+
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+            public void Reload( string branchName )
+            {
+                if( branchName == null )
+                {
+                    foreach( var c in _branchPlugins.Values ) c.Reload();
+                }
+                else
+                {
+                    if( _branchPlugins.TryGetValue( branchName, out var b ) ) b.Reload();
+                }
+            }
+        }
+
+        class PluginCollection<T> : IGitPluginCollection<T>, IDisposable, IServiceProvider where T : class
+        {
+            readonly Dictionary<Type, object> _mappings;
+            readonly IServiceProvider _baseProvider;
+            readonly GitPluginManager _manager;
+            int _pluginCount;
+
+            public PluginCollection( GitPluginManager manager, IServiceProvider baseProvider, string branchName )
+            {
+                _manager = manager;
+                _baseProvider = baseProvider;
+                BranchName = branchName;
+                _mappings = new Dictionary<Type, object>();
+            }
+
+            public void Reload()
+            {
+                Reset();
+                _pluginCount = _manager._registry.FillMappings( _mappings, _baseProvider, BranchName, BranchName != null ? _manager._defaultBranchName : null );
+            }
+
+            public void Dispose() => Reset();
+
+            void Reset()
+            {
+                var pluginKeys = _mappings.Keys.Where( k => GitPluginRegistry.IsGitFolderPlugin( k ) ).ToList();
+                foreach( var k in pluginKeys )
+                {
+                    var disposable = _mappings[k] as IDisposable;
+                    disposable?.Dispose();
+                    _mappings.Remove( k );
+                }
+            }
+
+            public string BranchName { get; }
+
+            public int Count => _mappings.Count;
+
+            public IEnumerator<T> GetEnumerator() => _mappings.Values.OfType<T>().GetEnumerator();
+
+            public T GetPlugin( Type t ) => _mappings.GetValueWithDefault( t, null ) as T;
+
+            public P GetPlugin<P>() where P : T => (P)_mappings.GetValueWithDefault( typeof( T ), null );
+
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+            object IServiceProvider.GetService( Type serviceType )
+            {
+                return _mappings.TryGetValue( serviceType, out var o ) ? o : _baseProvider.GetService( serviceType );
+            }
+        }
+
+        /// <summary>
+        /// Initializes a new plugin manager.
+        /// </summary>
+        /// <param name="baseProvider">The base service provider.</param>
+        /// <param name="defaultBranchName">The default branch name (typically "develop"). Must not be null or empty.</param>
+        public GitPluginManager( IServiceProvider baseProvider, string defaultBranchName )
+        {
+            if( String.IsNullOrWhiteSpace(defaultBranchName) ) throw new ArgumentNullException( nameof( defaultBranchName ) );
+            _baseProvider = baseProvider;
+            _defaultBranchName = defaultBranchName;
+            _registry = new GitPluginRegistry();
+            _plugins = new PluginCollection<IGitPlugin>( this, baseProvider, null );
+            _branches = new Branches( this );
+        }
+
+        /// <summary>
+        /// Gets the root <see cref="IGitPlugin"/> plugins.
+        /// </summary>
+        public IGitPluginCollection<IGitPlugin> Plugins => _plugins;
+
+        /// <summary>
+        /// Gets the <see cref="IGitBranchPluginCollection"/> that epxoses
+        /// the <see cref="IGitBranchPlugin"/> plugins for each branch.
+        /// </summary>
+        public IGitBranchPluginCollection BranchPlugins => _branches;
+
+        /// <summary>
+        /// Reloads the whole set of plugins or the ones of a specific branch.
+        /// </summary>
+        /// <param name="branchName">The branc name or null for all plugins.</param>
+        public void Reload( string branchName = null )
+        {
+            if( branchName == null ) _plugins.Reload();
+            _branches.Reload( branchName );
+        }
+
+        /// <summary>
+        /// Registers a type that must be <see cref="IGitPlugin"/>.
+        /// The plugin will be available in all branches (after a subsequent <see cref="Reload"/>).
+        /// </summary>
+        /// <param name="pluginType">The type of the plugin. Must be a non null <see cref="IGitPlugin"/>.</param>
+        public void Register( Type pluginType ) => _registry.Register( pluginType );
+
+        /// <summary>
+        /// Registers a type that must be <see cref="IGitBranchPlugin"/>.
+        /// The plugin will be available only in the specific branch (after a subsequent <see cref="Reload"/>).
+        /// </summary>
+        /// <param name="pluginType">The type of the plugin. Must be a non null <see cref="IGitBranchPlugin"/>.</param>
+        /// <param name="branchName">Branch name. Must not be null.</param>
+        public void Register( Type pluginType, string branchName ) => _registry.Register( pluginType, branchName );
+
+        /// <summary>
+        /// Registers a settings object.
+        /// The instance will be available in all branches if <paramref name="branchName"/> is null.
+        /// Note that if an instance has already been registered, it is replaced.
+        /// It will be available after a subsequent <see cref="Reload"/>.
+        /// </summary>
+        /// <param name="type">The type to register. Must not be null.</param>
+        /// <param name="instance">The instance. Must not be null.</param>
+        /// <param name="branchName">The branch name or null for a root setting.</param>
+        public void RegisterSettings( Type type, object instance, string branchName = null ) => _registry.RegisterSettings( type, instance, branchName );
+
+        /// <summary>
+        /// Registers a settings object.
+        /// The instance will be available in all branches if <paramref name="branchName"/> is null.
+        /// If an instance has already been registered, it is replaced.
+        /// It will be available after a subsequent <see cref="Reload"/>.
+        /// </summary>
+        /// <param name="instance">The instance. Must not be null.</param>
+        /// <param name="branchName">The branch name or null for a root setting.</param>
+        public void RegisterSettings( object instance, string branchName = null ) => RegisterSettings( branchName );
+
+    }
+}

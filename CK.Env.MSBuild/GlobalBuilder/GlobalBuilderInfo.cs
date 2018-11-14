@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.NuGetClient;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,8 +11,7 @@ namespace CK.Env.MSBuild
     class GlobalBuilderInfo
     {
         readonly ISecretKeyStore _keyStore;
-        string _packageFeedPushKey;
-        string _remoteStorePushApiKey;
+        IReadOnlyList<(string Key, string Secret)> _requiredSecrets;
         GlobalGitStatus _gitStatus;
         WorkStatus _workStatus;
 
@@ -25,16 +25,21 @@ namespace CK.Env.MSBuild
         /// </summary>
         public bool? IsRemotesRequired { get; set; }
 
-        public bool EnsureRemotesAvailable( IActivityMonitor m )
+        public IReadOnlyList<(string Key,string Secret)> EnsureRequiredSecretsAvailable( IActivityMonitor m, INuGetClient nugetClient, IEnumerable<Solution> solutions )
         {
-            _packageFeedPushKey = _keyStore.GetSignatureOpenSourceFeedPAT( m );
-            _remoteStorePushApiKey = _keyStore.GetCKSetupRemoteStorePushKey( m );
-            if( _packageFeedPushKey == null || _remoteStorePushApiKey == null )
+            _requiredSecrets = solutions.SelectMany( s => s.Settings.NuGetPushFeeds.Select( info => nugetClient.FindOrCreate( info ) ) )
+                                    .Distinct()
+                                    .Where( feed => !String.IsNullOrWhiteSpace( feed.SecretKeyName ) )
+                                    .GroupBy( feed => feed.SecretKeyName )
+                                    .Select( g => ( g.Key, Secret: g.First().ResolveSecret( m ) ) )
+                                    .Append( _keyStore.GetCKSetupRemoteStorePushKey( m ) )
+                                    .ToList();
+            if( _requiredSecrets.Any( r => r.Secret == null ) )
             {
-                m.Error( "Remote info is required." );
-                return false;
+                m.Error( "A required secret is missing." );
+                return null;
             }
-            return true;
+            return _requiredSecrets;
         }
 
         public GlobalGitStatus GlobalGitStatus => _gitStatus;
@@ -104,10 +109,6 @@ namespace CK.Env.MSBuild
         public bool TargetDevelop => !TargetLocal && !TargetRelease;
 
         public bool TargetRelease => _workStatus == WorkStatus.Releasing;
-
-        public string RemoteStorePushApiKey => _remoteStorePushApiKey;
-
-        public string MyGetApiKey => _packageFeedPushKey;
 
         public bool RunUnitTests { get; set; }
 

@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Xml.Linq;
 using CK.Core;
 using CK.Text;
@@ -63,7 +60,7 @@ namespace CK.Env
                                 .ToList();
         }
 
-        public WorldState GetLocalState( IActivityMonitor m, IWorldName w )
+        public WorldState GetOrCreateLocalState( IActivityMonitor m, IWorldName w )
         {
             if( w == null ) throw new ArgumentNullException( nameof( w ) );
             var path = ToStateFilePath( w );
@@ -86,6 +83,7 @@ namespace CK.Env
 
         public bool WriteWorldDescription( IActivityMonitor m, IWorldName w, XDocument content )
         {
+            if( content == null ) throw new ArgumentNullException( nameof( content ) );
             content.Save( ToLocal( w ).FilePath );
             return true;
         }

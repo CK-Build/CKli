@@ -38,9 +38,15 @@ namespace CK.NuGetClient
         protected override string ResolvePushAPIKey( IActivityMonitor m ) => ResolveSecret( m ) != null ? "VSTS" : null;
 
         /// <summary>
-        /// The secret key name is  "AZURE_FEED_" + Organization.ToUpperInvariant() + "_PAT".
+        /// The secret key name is:
+        /// "AZURE_FEED_" + Organization.ToUpperInvariant().Replace( '-', '_' ).Replace( ' ', '_' ) + "_PAT".
         /// </summary>
-        protected override string SecretKeyName => "AZURE_FEED_" + Info.Organization.ToUpperInvariant() + "_PAT";
+        public override string SecretKeyName => "AZURE_FEED_"
+                                                + Info.Organization
+                                                      .ToUpperInvariant()
+                                                      .Replace( '-', '_' )
+                                                      .Replace( ' ', '_' )
+                                                + "_PAT";
 
         /// <summary>
         /// Gets the url api.

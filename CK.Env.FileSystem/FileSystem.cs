@@ -29,7 +29,14 @@ namespace CK.Env
         {
             Root = new NormalizedPath( Path.GetFullPath( rootPath ) );
             _gits = new List<GitFolder>();
+            ServiceContainer = new SimpleServiceContainer();
         }
+
+        /// <summary>
+        /// Gets the service container at the file system level.
+        /// Each <see cref="GitFolder.ServiceContainer"/> are bound to this one.
+        /// </summary>
+        public SimpleServiceContainer ServiceContainer { get; }
 
         /// <summary>
         /// Gets or sets the provider for blank feed local folder.
@@ -223,7 +230,7 @@ namespace CK.Env
                 }
         }
 
-        private IFileInfo GetWritableDestination( IActivityMonitor m, ref NormalizedPath destination )
+        IFileInfo GetWritableDestination( IActivityMonitor m, ref NormalizedPath destination )
         {
             destination = destination.ResolveDots();
             if( destination.IsEmpty ) throw new ArgumentNullException( nameof( destination ) );
