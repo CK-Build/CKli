@@ -10,10 +10,15 @@ using System.Xml.Linq;
 namespace CK.Env.MSBuild
 {
 
+    /// <summary>
+    /// Central root class that manages <see cref="Solution"/> loading and caching.
+    /// </summary>
     public class MSBuildContext
     {
         /// <summary>
         /// Traits are used to manage framework names.
+        /// The <see cref="CKTraitContext.Separator"/> is the ';' to match the one used by csproj (parsing and
+        /// string representation becomes straightforward).
         /// </summary>
         static readonly public CKTraitContext Traits = new CKTraitContext( "ProjectFileContext", ';' );
 
@@ -123,6 +128,16 @@ namespace CK.Env.MSBuild
         /// </summary>
         public FileSystem FileSystem => _fileSystem;
 
+        /// <summary>
+        /// Returns a newly loaded <see cref="Solution"/> or retrieves it from the cache.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="path">The path in the <see cref="FileSystem"/>.</param>
+        /// <param name="settings"></param>
+        /// <param name="primary">The primary solution if this solution is a secondary solution.</param>
+        /// <param name="type">The special secondary solution type.</param>
+        /// <param name="force">True to force the reload of the solution.</param>
+        /// <returns>The solution and whether it has been loaded or obtained from the cache.</returns>
         public (Solution Solution, bool Loaded) FindOrLoadSolution(
             IActivityMonitor m,
             NormalizedPath path,
@@ -157,9 +172,9 @@ namespace CK.Env.MSBuild
                 if( _solutions.TryGetValue( path, out Solution previous ) )
                 {
                     _solutions.Remove( path );
-                    if( previous.LoadedSecodarySolutions != null )
+                    if( previous.LoadedSecondarySolutions != null )
                     {
-                        foreach( var secondary in previous.LoadedSecodarySolutions )
+                        foreach( var secondary in previous.LoadedSecondarySolutions )
                         {
                             _solutions.Remove( secondary.FilePath );
                         }

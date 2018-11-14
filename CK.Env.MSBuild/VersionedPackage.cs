@@ -7,6 +7,10 @@ using System.Threading.Tasks;
 
 namespace CK.Env.MSBuild
 {
+    /// <summary>
+    /// A versioned package is an immutable struct that contains a <see cref="PackageId"/>
+    /// associated to a <see cref="Version"/>.
+    /// </summary>
     public struct VersionedPackage : IEquatable<VersionedPackage>
     {
         /// <summary>

@@ -5,7 +5,7 @@ using System.Text;
 
 namespace CK.Env.MSBuild
 {
-    public class SVersionRange
+    class SVersionRange
     {
         static public (bool Locked, SVersion Version) TryParseSimpleRange( string r )
         {

@@ -37,13 +37,16 @@ namespace CK.Env
 
             public IGitPluginCollection<IGitBranchPlugin> this[ string branchName ] => FindOrCreate( branchName );
 
+            public IGitPluginCollection<IGitBranchPlugin> GetPlugins( string branchName ) => FindOrCreate( branchName );
+
             public PluginCollection<IGitBranchPlugin> FindOrCreate( string branchName )
             {
                 if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
                 if( !_branchPlugins.TryGetValue( branchName, out var c ) )
                 {
+                    _manager._plugins.EnsureFirstLoad();
                     c = new PluginCollection<IGitBranchPlugin>( _manager, _manager._plugins, branchName );
-                    _branchPlugins.Add( branchName, c );
+                    _branchPlugins.Add( branchName, c.EnsureFirstLoad() );
                 }
                 return c;
             }
@@ -81,10 +84,15 @@ namespace CK.Env
                 BranchName = branchName;
                 _mappings = new Dictionary<Type, object>();
             }
+            public PluginCollection<T> EnsureFirstLoad()
+            {
+                if( _pluginCount == 0 ) Reload();
+                return this;
+            }
 
             public void Reload()
             {
-                Reset();
+                if( _pluginCount != 0 ) Reset();
                 _pluginCount = _manager._registry.FillMappings( _mappings, _baseProvider, BranchName, BranchName != null ? _manager._defaultBranchName : null );
             }
 
@@ -137,10 +145,10 @@ namespace CK.Env
         /// <summary>
         /// Gets the root <see cref="IGitPlugin"/> plugins.
         /// </summary>
-        public IGitPluginCollection<IGitPlugin> Plugins => _plugins;
+        public IGitPluginCollection<IGitPlugin> Plugins => _plugins.EnsureFirstLoad();
 
         /// <summary>
-        /// Gets the <see cref="IGitBranchPluginCollection"/> that epxoses
+        /// Gets the <see cref="IGitBranchPluginCollection"/> that exposes
         /// the <see cref="IGitBranchPlugin"/> plugins for each branch.
         /// </summary>
         public IGitBranchPluginCollection BranchPlugins => _branches;

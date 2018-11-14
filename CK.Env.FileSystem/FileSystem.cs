@@ -30,6 +30,8 @@ namespace CK.Env
             Root = new NormalizedPath( Path.GetFullPath( rootPath ) );
             _gits = new List<GitFolder>();
             ServiceContainer = new SimpleServiceContainer();
+            ServiceContainer.Add( this );
+            ServiceContainer.Add<IFileProvider>( this );
         }
 
         /// <summary>

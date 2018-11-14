@@ -9,6 +9,11 @@ using System.Text;
 
 namespace CK.Env.MSBuild
 {
+    /// <summary>
+    /// Root class of dependency analysis.
+    /// A DependencyContext can be created on any set of <see cref="Solution"/> thanks to the
+    /// factory method <see cref="Create(IActivityMonitor, IEnumerable{Solution})"/>.
+    /// </summary>
     public class DependencyContext
     {
         readonly Solution[] _solutions;
@@ -254,6 +259,12 @@ namespace CK.Env.MSBuild
             }
         }
 
+        /// <summary>
+        /// Gets the information about build projects (see <see cref="Project.IsBuildProject"/>)
+        /// and their dependencies.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>The build projects information.</returns>
         BuildProjectsInfo GetBuildProjectInfo( IActivityMonitor m )
         {
             Debug.Assert( !_projects.PureProjectsMode );
@@ -296,7 +307,6 @@ namespace CK.Env.MSBuild
                 _projects.PureProjectsMode = false;
             }
         }
-
 
         public SolutionDependencyResult AnalyzeDependencies( IActivityMonitor m, SolutionSortStrategy content )
         {

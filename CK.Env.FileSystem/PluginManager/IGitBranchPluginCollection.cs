@@ -12,10 +12,19 @@ namespace CK.Env
     public interface IGitBranchPluginCollection : IReadOnlyCollection<IGitPluginCollection<IGitBranchPlugin>>
     {
         /// <summary>
-        /// Gets the plugins for a specified branch. The collection is created as needed.
+        /// Gets the plugins for a specified branch. The collection is created as needed: this is the same
+        /// as calling <see cref="GetPlugins"/>.
         /// </summary>
         /// <param name="branchName">The branch name. Cannot be null or whitespace.</param>
         /// <returns>The branch plugin collection for the specified branch.</returns>
         IGitPluginCollection<IGitBranchPlugin> this[string branchName] { get; }
+
+        /// <summary>
+        /// Gets the plugins for a specified branch. The collection is created as needed.
+        /// </summary>
+        /// <param name="branchName">The branch name. Cannot be null or whitespace.</param>
+        /// <returns>The branch plugin collection for the specified branch.</returns>
+        IGitPluginCollection<IGitBranchPlugin> GetPlugins( string branchName );
+
     }
 }

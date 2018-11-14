@@ -13,13 +13,18 @@ using System.Diagnostics;
 namespace CK.Env.MSBuild
 {
     /// <summary>
-    /// A MSBuild solution file.
+    /// A MSBuild solution file that may be in a <see cref="GitFolder"/> or not.
     /// </summary>
     public sealed class Solution : IDependentItemContainerRef
     {
         SolutionSpecialType _specialType;
         List<Solution> _secondarySolutions;
         bool _isDirty;
+
+        /// <summary>
+        /// Gets the file system from which this solution has been loaded.
+        /// </summary>
+        public IFileProvider FileSystem { get; }
 
         /// <summary>
         /// Gets the .sln path (relative to the <see cref="FileSystem"/>).
@@ -55,7 +60,7 @@ namespace CK.Env.MSBuild
         public bool IsDirty => _isDirty;
 
         /// <summary>
-        /// Raised whenever 
+        /// Raised whenever <see cref="IsDirty"/> has changed.
         /// </summary>
         public event EventHandler IsDirtyChanged;
 
@@ -112,11 +117,6 @@ namespace CK.Env.MSBuild
         }
 
         /// <summary>
-        /// Gets the file system from which this solution has been loaded.
-        /// </summary>
-        public IFileProvider FileSystem { get; }
-
-        /// <summary>
         /// Gets the file format version.
         /// </summary>
         public string Version { get; }
@@ -164,7 +164,7 @@ namespace CK.Env.MSBuild
         /// <summary>
         /// Gets the test projects. These projetcs are by default
         /// all projects whose name ends with ".Tests".
-        /// They sould be located in a "Tests" directory.
+        /// They should be located in a "Tests" directory.
         /// </summary>
         public IList<Project> TestProjects { get; }
 
@@ -190,9 +190,9 @@ namespace CK.Env.MSBuild
         bool IDependentItemRef.Optional => false;
 
         /// <summary>
-        /// Gets the list of secodary solutions if any of them has been loaded.
+        /// Gets the list of secondary solutions if any of them has been loaded.
         /// </summary>
-        internal IEnumerable<Solution> LoadedSecodarySolutions => _secondarySolutions;
+        internal IEnumerable<Solution> LoadedSecondarySolutions => _secondarySolutions;
 
         /// <summary>
         /// Declares this solution as a secondary solution of an existing one.

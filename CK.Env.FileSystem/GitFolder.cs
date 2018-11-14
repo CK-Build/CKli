@@ -65,6 +65,7 @@ namespace CK.Env
             _remoteBranchesFolder = new RemotesFolder( this );
             _thisDir = new RootDir( this, SubPath.LastPart );
             ServiceContainer = new SimpleServiceContainer( FileSystem.ServiceContainer );
+            ServiceContainer.Add( this );
             PluginManager = new GitPluginManager( ServiceContainer, world.DevelopBranchName );
 
             string origin = _git.Network.Remotes["origin"]?.Url;
@@ -111,6 +112,16 @@ namespace CK.Env
         /// Gets the file ssytem.
         /// </summary>
         public FileSystem FileSystem { get; }
+
+        /// <summary>
+        /// Fires whenever we switched to the local branch.
+        /// </summary>
+        public event EventHandler<EventMonitoredArgs> OnLocalBranchEntered;
+
+        /// <summary>
+        /// Fires whenever we are up to leave the local branch back to the develop one.
+        /// </summary>
+        public event EventHandler<EventMonitoredArgs> OnLocalBranchLeaving;
 
         /// <summary>
         /// Gets the current branch name (name of the repository's HEAD).
@@ -583,6 +594,9 @@ namespace CK.Env
                         m.Error( $"Merge failed from '{World.DevelopBranchName}' to '{World.LocalBranchName}': conflicts must be manually resolved." );
                         return false;
                     }
+
+                    if( !RaiseEnteredLocalBranch( m, true ) ) return false;
+
                     if( !OnDevelopToLocal( m ) ) return false;
 
                     if( commitLocalChanges
@@ -601,6 +615,36 @@ namespace CK.Env
             }
         }
 
+        bool RaiseEnteredLocalBranch( IActivityMonitor m, bool enter )
+        {
+            // This ensures that the plugins are loaded for the local branch.
+            PluginManager.BranchPlugins.GetPlugins( World.LocalBranchName ); 
+            using( m.OpenTrace( $"{ToString()}: Raising {(enter ? "OnLocalBranchEntered" : "OnLocalBranchLeaving")} event." ) )
+            {
+                try
+                {
+                    bool hasError = false;
+                    using( m.OnError( () => hasError = true ) )
+                    {
+                        if( enter )
+                        {
+                            OnLocalBranchEntered?.Invoke( this, new EventMonitoredArgs( m ) );
+                        }
+                        else
+                        {
+                            OnLocalBranchLeaving?.Invoke( this, new EventMonitoredArgs( m ) );
+                        }
+                    }
+                    return !hasError;
+                }
+                catch( Exception ex )
+                {
+                    m.Error( ex );
+                    return false;
+                }
+            }
+        }
+
         bool OnDevelopToLocal( IActivityMonitor m )
         {
             var localStorePath = _feedProvider.GetLocalCKSetupStorePath( m );
@@ -609,6 +653,13 @@ namespace CK.Env
             var fNuGet = new NuGetConfigBaseFile( this );
             fNuGet.EnsureLocalFeeds( m );
             if( !fNuGet.Save( m ) ) return false;
+            return true;
+        }
+
+        bool OnLocalToDevelop( IActivityMonitor m )
+        {
+            if( !RemoveCKSetupStoreTestHelperConfig( m ) ) return false;
+            if( !RemoveRepositoryXmlBlankDevBranch( m ) ) return false;
             return true;
         }
 
@@ -707,7 +758,10 @@ namespace CK.Env
                         m.Error( $"Must be on '{World.LocalBranchName}' or '{World.DevelopBranchName}' branch." );
                         return false;
                     }
+                    if( !RaiseEnteredLocalBranch( m, false ) ) return false;
+
                     if( !OnLocalToDevelop( m ) ) return false;
+
                     if( bLocal.IsCurrentRepositoryHead )
                     {
                         if( !Commit( m, $"Switching to '{World.DevelopBranchName}' branch." ).Success ) return false;
@@ -742,13 +796,6 @@ namespace CK.Env
                     return false;
                 }
             }
-        }
-
-        bool OnLocalToDevelop( IActivityMonitor m )
-        {
-            if( !RemoveCKSetupStoreTestHelperConfig( m ) ) return false;
-            if( !RemoveRepositoryXmlBlankDevBranch( m ) ) return false;
-            return true;
         }
 
         /// <summary>

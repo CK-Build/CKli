@@ -26,7 +26,7 @@ namespace CK.Env.MSBuild
         bool WithExternalDependencies { get; }
 
         /// <summary>
-        /// Gets whether the local dependencies (dependencis to locally published projects) have been considered.
+        /// Gets whether the local dependencies (dependencies to locally published projects) have been considered.
         /// </summary>
         bool WithLocalDependencies { get; }
 

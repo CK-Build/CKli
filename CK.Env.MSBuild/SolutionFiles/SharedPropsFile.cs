@@ -9,11 +9,11 @@ using System.Xml.Linq;
 
 namespace CK.Env.MSBuild
 {
-    public class SharedPropsFile : GitFolderXmlFile
+    public class SharedPropsFile : GitFolderXmlFile, IGitBranchPlugin
     {
         readonly Solution _solution;
 
-        public SharedPropsFile( Solution s )
+        public SharedPropsFile( Solution s, string branchName )
             : base( s.GitFolder, "Common/Shared.props" )
         {
             _solution = s;

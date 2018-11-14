@@ -10,7 +10,7 @@ namespace CK.Env
     public interface ISolutionSettings
     {
         /// <summary>
-        /// Gets whether the NuGet.config file muts exist.
+        /// Gets whether the NuGet.config file must exist.
         /// </summary>
         bool SuppressNuGetConfigFile { get; }
 

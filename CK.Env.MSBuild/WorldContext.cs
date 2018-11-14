@@ -421,7 +421,7 @@ namespace CK.Env.MSBuild
                 fNuGet.ApplySettings( m );
                 if( !fNuGet.Save( m ) ) return false;
 
-                SharedPropsFile fSharedProps = new SharedPropsFile( s.Solution );
+                SharedPropsFile fSharedProps = new SharedPropsFile( s.Solution, null );
                 if( !fSharedProps.ApplyProperties( m ) ) return false;
                 if( !fSharedProps.Save( m ) ) return false;
 

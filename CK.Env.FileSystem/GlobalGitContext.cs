@@ -10,12 +10,18 @@ using System.Threading.Tasks;
 namespace CK.Env
 {
     /// <summary>
-    /// Captures an immuatble set of <see cref="GitFolder"/> and a <see cref="IWorldName"/>. 
+    /// Captures an immutable set of <see cref="GitFolder"/> and a <see cref="IWorldName"/> and
+    /// provides a way to check a <see cref="GlobalGitStatus"/> against them.
     /// </summary>
     public class GlobalGitContext
     {
         readonly IReadOnlyList<GitFolder> _gitFolders;
 
+        /// <summary>
+        /// Initializes a new <see cref="GlobalGitContext"/>.
+        /// </summary>
+        /// <param name="world">The world.</param>
+        /// <param name="gitFolders">The set of <see cref="GitFolder"/> to consider. Must not be empty.</param>
         public GlobalGitContext( IWorldName world, IEnumerable<GitFolder> gitFolders )
         {
             if( world == null ) throw new ArgumentNullException( nameof( world ) );
@@ -112,7 +118,7 @@ namespace CK.Env
         public FileSystem FileSystem { get; }
 
         /// <summary>
-        /// Gest immutable the world.
+        /// Gets the immutable world.
         /// </summary>
         public IWorldName World { get; }
 

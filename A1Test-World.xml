@@ -1,0 +1,56 @@
+<A1Test>
+
+  <SharedHttpClient />
+  <LocalFeedProvider />
+  <SecretKeyStore />
+  <NuGetClient />
+  <ReferentialFolder Path="CK-Env/CKli/Referential" />
+  <SolutionCentral />
+
+  <GitStatusAction Title="Displays statuses of all the repositories." />
+  <GitCheckoutAction Title="Checkout all repositories on a specific branch name." />
+  <GitResetAction Title="ResetHard: Totally reset current changes on current branch for all repository." />
+  <GitCommitAction Title="Commits all pending changes to the current branch of all the repositories." />
+  <GitFetchAction Title="Fetches all remotes in all repositories." />
+  <GitPushAction Title="Push develop branches of all repositories." />
+  <GlobalDependencyAction Title="Solutions &amp; Projects management." />
+  <GlobalSwitchBranchAction Title="Switch between 'develop-local' &lt;=&gt; 'develop' branches." />
+  <GlobalLocalBuildAction Title="CI Build: Build all Solutions in 'develop' or 'develop-local' branch, pushing packages to LocalFeed or LocalFeed/Blanck feeds (optionally pushing them to MyGet invenietis-ci feed for 'develop' branch), propagating CI versions across dependent solutions." />
+  <GlobalFixBuildScriptAction Title="Fix build script (must be in 'local' branch)." />
+  <!--<GlobalBlankBuildAction Title="Blank build: Build all Solutions locally in 'develop-local' branch." />-->
+  <GlobalReleaserAction Title="Global Release." />
+  <ExternalPackagesAction Title="External packages analysis." />
+
+  <SolutionSettings>
+    <NuGetSources>
+      <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json" >
+        <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
+      </add>
+    </NuGetSources>
+    <ExcludedNuGetSourceNames>
+      <add Name="Invenietis - Release" />
+      <add Name="Invenietis - Preview" />
+      <add Name="Invenietis - CI" />
+    </ExcludedNuGetSourceNames>
+    <NuGetPushFeeds>
+      <add Type="Azure" Organization="Signature-OpenSource" FeedName="Default" />
+    </NuGetPushFeeds>
+  </SolutionSettings>
+
+  <Folder Name="CK-Env">
+    <Folder Name="Tests" >
+      <Folder Name="A1Test" >
+        <GitFolder Name="CK-UnitsOfMeasure" Url="https://github.com/Invenietis/CK-UnitsOfMeasure.git">
+          <Branch Name="develop">
+            <PrimarySolution />
+          </Branch>
+        </GitFolder>
+      </Folder>
+    </Folder>
+  </Folder>
+
+  <File Name="CK-World">
+    <MustExist Content="SimpleFiles/CK-World"/>
+  </File>
+
+</A1Test>
