@@ -23,7 +23,7 @@ namespace CK.Env
             if( d.Root.Name != w.FullName+"-World-State" ) throw new ArgumentException( $"Invalid state document root. Must be {w.FullName+"-World-State"}, found {d.Root.Name}.", nameof( d ) );
             _world = w;
             _doc = d;
-            GlobalGitStatus = d.Root.AttributeEnum( xGlobalGitStatusName, CK.Env.GlobalGitStatus.Unknwon );
+            GlobalGitStatus = d.Root.AttributeEnum( xGlobalGitStatusName, CK.Env.StandardGitStatus.Unknwon );
             _xmlState = d.Root.Element( xXmlStateName );
             if( _xmlState == null )
             {
@@ -49,7 +49,7 @@ namespace CK.Env
         /// <summary>
         /// Gets or sets the current <see cref="GlobalGitStatus"/>.
         /// </summary>
-        public GlobalGitStatus GlobalGitStatus { get; set; }
+        public StandardGitStatus GlobalGitStatus { get; set; }
 
         /// <summary>
         /// Gets the state <see cref="XElement"/>.

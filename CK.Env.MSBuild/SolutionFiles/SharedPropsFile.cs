@@ -11,34 +11,26 @@ namespace CK.Env.MSBuild
 {
     public class SharedPropsFile : GitFolderXmlFile, IGitBranchPlugin
     {
-        readonly Solution _solution;
+        readonly ISolutionSettings _settings;
 
-        public SharedPropsFile( Solution s, string branchName )
-            : base( s.GitFolder, "Common/Shared.props" )
+        public SharedPropsFile( GitFolder f, ISolutionSettings s )
+            : base( f, "Common/Shared.props" )
         {
-            _solution = s;
+            _settings = s;
         }
 
-        public bool ApplyProperties( IActivityMonitor m )
+        public void ApplySettings( IActivityMonitor m )
         {
-            if( _solution.Settings.SuppressNuGetConfigFile )
+            if( Document == null ) Document = new XDocument( new XElement( "Project" ) );
+            if( _settings.DisableSourceLink )
             {
-                Delete( m );
-                return true;
+                XCommentSection.FindOrCreate( Document.Root, "SourceLink", false )?.Remove();
             }
             else
             {
-                if( Document == null ) Document = new XDocument( new XElement( "Project" ) );
-                if( _solution.Settings.DisableSourceLink )
-                {
-                    XCommentSection.FindOrCreate( Document.Root, "SourceLink", false )?.Remove();
-                    return true;
-                }
-                else
-                {
-                    return EnsureSourceLink( m );
-                }
+                EnsureSourceLink( m );
             }
+            Save( m );
         }
 
         bool EnsureSourceLink( IActivityMonitor m )

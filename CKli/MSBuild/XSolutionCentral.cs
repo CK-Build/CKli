@@ -44,6 +44,8 @@ namespace CKli
             _referential = referential;
             _publishKeyStore = publishKeyStore;
             _msBuildContext = new MSBuildContext( fileSystem );
+            fileSystem.ServiceContainer.Add( _msBuildContext );
+
             _allGitFolders = new List<XGitFolder>();
             initializer.Services.Add( this );
 
@@ -57,7 +59,7 @@ namespace CKli
             _allGitFolders.Add( g );
         }
 
-        protected override bool OnCreated( Initializer initializer )
+        protected override bool OnSiblingsCreated( IActivityMonitor m )
         {
             foreach( var g in _allGitFolders )
             {
@@ -80,7 +82,7 @@ namespace CKli
                 }
                 if( hasDevelop ) _allGitFoldersWithDevelopBranchName.Add( g );
             }
-            return base.OnCreated( initializer );
+            return base.OnSiblingsCreated( m );
         }
 
         /// <summary>

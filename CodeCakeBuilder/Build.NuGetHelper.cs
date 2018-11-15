@@ -24,7 +24,7 @@ namespace CodeCake
     public partial class Build
     {
         /// <summary>
-        /// Package with both PackageIdentity from NuGet) and SVersion (from CSemVer).
+        /// Package with both PackageIdentity (from NuGet) and SVersion (from CSemVer).
         /// </summary>
         struct SimplePackageId
         {

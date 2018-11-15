@@ -1,3 +1,4 @@
+using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,6 +18,12 @@ namespace CK.Env
         /// Gets the branch name. This is null for root plugins.
         /// </summary>
         string BranchName { get; }
+
+        /// <summary>
+        /// Gets the service container for this <see cref="BranchName"/>
+        /// or the <see cref="GitPluginManager.ServiceContainer"/> when <see cref="BranchName"/> is null.
+        /// </summary>
+        SimpleServiceContainer ServiceContainer { get; }
 
         /// <summary>
         /// Gets a plugin.

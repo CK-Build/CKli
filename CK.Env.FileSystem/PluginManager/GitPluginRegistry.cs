@@ -41,27 +41,17 @@ namespace CK.Env
         {
             public readonly PluginKey Key;
             public readonly ConstructorInfo Ctor;
-            public readonly int BranchParameterIdx;
-            readonly ParameterInfo[] _parameters;
+            public readonly ParameterInfo[] Parameters;
             public object Settings;
 
             public Descriptor( PluginKey k, Type origin, object instance )
             {
                 Key = k;
                 Ctor = k.Type.GetConstructors().Single();
-                _parameters = Ctor.GetParameters();
-                if( typeof( IGitBranchPlugin ).IsAssignableFrom( k.Type ) )
+                Parameters = Ctor.GetParameters();
+                for( int i = 0; i < Parameters.Length; ++i )
                 {
-                    BranchParameterIdx = _parameters.IndexOf( p => p.Name == "branchName" && p.ParameterType == typeof( string ) );
-                    if( BranchParameterIdx < 0 )
-                    {
-                        throw new ArgumentException( $"Constructor of {k.Type.FullName} must have a string branchName parameter.", nameof( PluginKey ) );
-                    }
-                }
-                BranchParameterIdx = -1;
-                for( int i = 0; i < _parameters.Length; ++i )
-                {
-                    var p = _parameters[i];
+                    var p = Parameters[i];
                     if( IsGitFolderPlugin( p.ParameterType ) )
                     {
                         if( p.ParameterType == origin ) throw new ArgumentException( $"Invalid plugin graph: cycle between {k.Type.FullName} and {origin.FullName}.", nameof( PluginKey ) );
@@ -71,18 +61,6 @@ namespace CK.Env
                             throw new ArgumentException( $"Invalid plugin dependency: {k.Type.FullName} depends on {p.ParameterType.FullName} that is Branch dependent.", nameof( PluginKey ) );
                         }
                     }
-                    else if( p.Name == "branchName" && p.ParameterType == typeof( string ) )
-                    {
-                        if( k.BranchName == null )
-                        {
-                            throw new ArgumentException( $"Invalid plugin: {k.Type.FullName} is not a IGitFolderBranchPlugin: it can not have a string branchName parameter.", nameof( PluginKey ) );
-                        }
-                        BranchParameterIdx = i;
-                    }
-                }
-                if( BranchParameterIdx < 0 && k.BranchName != null )
-                {
-                    throw new ArgumentException( $"Constructor of {k.Type.FullName} must have a string branchName parameter.", nameof( PluginKey ) );
                 }
             }
 
@@ -93,7 +71,6 @@ namespace CK.Env
                 Settings = instance;
             }
 
-            public IReadOnlyList<ParameterInfo> Parameters => _parameters;
         }
 
         public GitPluginRegistry()
@@ -173,39 +150,35 @@ namespace CK.Env
             Descriptor desc,
             string branchName,
             string defaultBranchName,
-            Dictionary<Type, object> container,
+            Dictionary<Type, object> mappings,
             ref int pluginCount )
         {
             Debug.Assert( (branchName != null) == (defaultBranchName != null) );
-            Debug.Assert( !container.ContainsKey( desc.Key.Type ) );
+            Debug.Assert( !mappings.ContainsKey( desc.Key.Type ) );
             Debug.Assert( desc.Settings == null );
             ++pluginCount;
             var parameters = new object[desc.Parameters.Count];
             for( int i = 0; i < parameters.Length; ++i )
             {
-                if( i == desc.BranchParameterIdx ) parameters[i] = branchName;
+                var pType = desc.Parameters[i].ParameterType;
+                if( mappings.TryGetValue( pType, out var already ) )
+                {
+                    parameters[i] = already;
+                }
                 else
                 {
-                    var pType = desc.Parameters[i].ParameterType;
-                    if( container.TryGetValue( pType, out var already ) )
+                    Descriptor pDesc = FindBestDescriptor( pType, branchName, defaultBranchName );
+                    if( pDesc != null )
                     {
-                        parameters[i] = already;
+                        object obj = pDesc.Settings
+                                        ?? CreateInstance( provider, pDesc, branchName, defaultBranchName, mappings, ref pluginCount );
+                        mappings.Add( pDesc.Key.Type, obj );
+                        parameters[i] = obj;
                     }
                     else
                     {
-                        Descriptor pDesc = FindBestDescriptor( pType, branchName, defaultBranchName );
-                        if( pDesc != null )
-                        {
-                            object obj = pDesc.Settings
-                                         ?? CreateInstance( provider, pDesc, branchName, defaultBranchName, container, ref pluginCount );
-                            container.Add( pDesc.Key.Type, obj );
-                            parameters[i] = obj;
-                        }
-                        else
-                        {
-                            parameters[i] = provider.GetService( pType );
-                            if( parameters[i] == null ) throw new Exception( $"Unable to resolve '{pType}' for {desc.Key.Type.FullName} plugin constructor." );
-                        }
+                        parameters[i] = provider.GetService( pType );
+                        if( parameters[i] == null ) throw new Exception( $"Unable to resolve '{pType}' for {desc.Key.Type.FullName} plugin constructor." );
                     }
                 }
             }

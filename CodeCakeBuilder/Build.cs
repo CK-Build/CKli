@@ -38,7 +38,7 @@ namespace CodeCake
             Cake.Log.Verbosity = Verbosity.Diagnostic;
 
             // solutionName is the name of default solution (same as the git folder name).
-            const string solutionName = "CK-Env";
+            const string solutionName = "CK-Env"; // !Transformable
             const string solutionFileName = solutionName + ".sln";
 
             var releasesDir = Cake.Directory( "CodeCakeBuilder/Releases" );
@@ -72,7 +72,7 @@ namespace CodeCake
                  {
                      Cake.CleanDirectories( projects.Select( p => p.Path.GetDirectory().Combine( "bin" ) ) );
                      Cake.CleanDirectories( releasesDir );
-                    Cake.DeleteFiles( "Tests/**/TestResult*.xml" );
+                     Cake.DeleteFiles( "Tests/**/TestResult*.xml" );
                  } );
 
             Task( "Build" )

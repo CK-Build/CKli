@@ -7,12 +7,13 @@ using System.Threading.Tasks;
 namespace CK.Env
 {
     /// <summary>
-    /// Defines the two stable global git status: either all the repositories in a world
-    /// are on <see cref="DevelopBranch"/> (the default) or on the <see cref="LocalBranch"/>.
+    /// Defines the two standard git status that applies to one or multiple repositories.
+    /// Either all the repositories in a world are on <see cref="DevelopBranch"/> (the default) or
+    /// on the <see cref="LocalBranch"/>.
     /// Any other configurations results in a <see cref="Unknwon"/> status and when a world
-    /// is in this unknown status no global operation can be done.
+    /// is in this unknown status some operations cannot be done.
     /// </summary>
-    public enum GlobalGitStatus
+    public enum StandardGitStatus
     {
         /// <summary>
         /// Unknow status.
@@ -20,12 +21,12 @@ namespace CK.Env
         Unknwon,
 
         /// <summary>
-        /// All Git repositories are on <see cref="IWorldName.LocalBranchName"/>.
+        /// On <see cref="IWorldName.LocalBranchName"/>.
         /// </summary>
         LocalBranch,
 
         /// <summary>
-        /// All Git repositories are on <see cref="IWorldName.DevelopBranchName"/>.
+        /// On <see cref="IWorldName.DevelopBranchName"/>.
         /// </summary>
         DevelopBranch
 

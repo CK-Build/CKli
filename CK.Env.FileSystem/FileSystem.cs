@@ -41,12 +41,7 @@ namespace CK.Env
         public SimpleServiceContainer ServiceContainer { get; }
 
         /// <summary>
-        /// Gets or sets the provider for blank feed local folder.
-        /// </summary>
-        public ILocalFeedProvider LocalBlankFeedProvider { get; set; }
-
-        /// <summary>
-        /// Gets the <see cref="GitFolder"/> loaded so far (<see cref="EnsureGitFolder(NormalizedPath)"/>).
+        /// Gets the <see cref="GitFolder"/> loaded so far (see <see cref="EnsureGitFolder(NormalizedPath)"/>).
         /// </summary>
         public IReadOnlyList<GitFolder> GitFolders => _gits;
 
@@ -86,7 +81,7 @@ namespace CK.Env
                         } );
                     }
                 }
-                g = new GitFolder( this, gitFolder, LocalBlankFeedProvider, world );
+                g = new GitFolder( this, gitFolder, world );
                 _gits.Add( g );
             }
             return g;
@@ -230,6 +225,39 @@ namespace CK.Env
                     m.Fatal( ex );
                     return false;
                 }
+        }
+
+        /// <summary>
+        /// Ensures that a path is a directory, creating it as necessary (if
+        /// the path is writable).
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="dir">The target path in this file system.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool EnsureDirectory( IActivityMonitor m, NormalizedPath dir )
+        {
+            dir = dir.ResolveDots();
+            if( dir.IsEmpty ) throw new ArgumentNullException( nameof( dir ) );
+            var p = GetFileInfo( dir );
+            if( !p.Exists )
+            {
+                if( p.PhysicalPath == null )
+                {
+                    m.Error( $"Directory path '{dir}' is not writable." );
+                    return false;
+                }
+                if( !Directory.Exists( p.PhysicalPath ) )
+                {
+                    m.Trace( $"Creating directory '{p.PhysicalPath}'." );
+                    Directory.CreateDirectory( p.PhysicalPath );
+                }
+            }
+            else if( !p.IsDirectory )
+            {
+                m.Error( $"Path '{dir}' is a file. Cannot transform it into a directory." );
+                return false;
+            }
+            return true;
         }
 
         IFileInfo GetWritableDestination( IActivityMonitor m, ref NormalizedPath destination )

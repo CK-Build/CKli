@@ -43,6 +43,18 @@ namespace CK.Env.MSBuild
         public GitFolder GitFolder { get; }
 
         /// <summary>
+        /// Gets a <see cref="IGitBranchPlugin"/> in the current <see cref="BranchName"/>.
+        /// </summary>
+        /// <typeparam name="T">Plugin type.</typeparam>
+        /// <returns>The plugin or null.</returns>
+        public T GetPlugin<T>() where T : class, IGitBranchPlugin
+        {
+            return BranchName != null
+                    ? GitFolder.PluginManager.BranchPlugins[BranchName].GetPlugin<T>()
+                    : null;
+        }
+
+        /// <summary>
         /// Gets the solution settings that applies to this solution.
         /// </summary>
         public ISolutionSettings Settings { get; }

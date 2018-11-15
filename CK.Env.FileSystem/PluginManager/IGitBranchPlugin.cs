@@ -8,7 +8,7 @@ namespace CK.Env
 {
     /// <summary>
     /// Marker interface.
-    /// The single public constructor must have a parameter 'string branchName'.
+    /// The single public constructor can have a parameter 'string branchName'.
     /// </summary>
     public interface IGitBranchPlugin : IGitPlugin
     {

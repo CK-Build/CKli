@@ -18,7 +18,6 @@ namespace CK.Env
     /// </summary>
     public class GitPluginManager
     {
-        readonly IServiceProvider _baseProvider;
         readonly GitPluginRegistry _registry;
         readonly string _defaultBranchName;
         readonly PluginCollection<IGitPlugin> _plugins;
@@ -45,7 +44,7 @@ namespace CK.Env
                 if( !_branchPlugins.TryGetValue( branchName, out var c ) )
                 {
                     _manager._plugins.EnsureFirstLoad();
-                    c = new PluginCollection<IGitBranchPlugin>( _manager, _manager._plugins, branchName );
+                    c = new PluginCollection<IGitBranchPlugin>( _manager, branchName );
                     _branchPlugins.Add( branchName, c.EnsureFirstLoad() );
                 }
                 return c;
@@ -73,17 +72,21 @@ namespace CK.Env
         class PluginCollection<T> : IGitPluginCollection<T>, IDisposable, IServiceProvider where T : class
         {
             readonly Dictionary<Type, object> _mappings;
-            readonly IServiceProvider _baseProvider;
             readonly GitPluginManager _manager;
             int _pluginCount;
 
-            public PluginCollection( GitPluginManager manager, IServiceProvider baseProvider, string branchName )
+            public PluginCollection( GitPluginManager manager, string branchName )
             {
                 _manager = manager;
-                _baseProvider = baseProvider;
                 BranchName = branchName;
+                ServiceContainer = branchName == null
+                                    ? manager.ServiceContainer
+                                    : new SimpleServiceContainer( manager._plugins );
                 _mappings = new Dictionary<Type, object>();
             }
+
+            public SimpleServiceContainer ServiceContainer { get; }
+
             public PluginCollection<T> EnsureFirstLoad()
             {
                 if( _pluginCount == 0 ) Reload();
@@ -93,7 +96,7 @@ namespace CK.Env
             public void Reload()
             {
                 if( _pluginCount != 0 ) Reset();
-                _pluginCount = _manager._registry.FillMappings( _mappings, _baseProvider, BranchName, BranchName != null ? _manager._defaultBranchName : null );
+                _pluginCount = _manager._registry.FillMappings( _mappings, ServiceContainer, BranchName, BranchName != null ? _manager._defaultBranchName : null );
             }
 
             public void Dispose() => Reset();
@@ -123,7 +126,7 @@ namespace CK.Env
 
             object IServiceProvider.GetService( Type serviceType )
             {
-                return _mappings.TryGetValue( serviceType, out var o ) ? o : _baseProvider.GetService( serviceType );
+                return _mappings.TryGetValue( serviceType, out var o ) ? o : ServiceContainer.GetService( serviceType );
             }
         }
 
@@ -132,15 +135,20 @@ namespace CK.Env
         /// </summary>
         /// <param name="baseProvider">The base service provider.</param>
         /// <param name="defaultBranchName">The default branch name (typically "develop"). Must not be null or empty.</param>
-        public GitPluginManager( IServiceProvider baseProvider, string defaultBranchName )
+        public GitPluginManager( ISimpleServiceContainer baseProvider, string defaultBranchName )
         {
             if( String.IsNullOrWhiteSpace(defaultBranchName) ) throw new ArgumentNullException( nameof( defaultBranchName ) );
-            _baseProvider = baseProvider;
+            ServiceContainer = new SimpleServiceContainer( baseProvider );
             _defaultBranchName = defaultBranchName;
             _registry = new GitPluginRegistry();
-            _plugins = new PluginCollection<IGitPlugin>( this, baseProvider, null );
+            _plugins = new PluginCollection<IGitPlugin>( this, null );
             _branches = new Branches( this );
         }
+
+        /// <summary>
+        /// Gets the primary service container.
+        /// </summary>
+        public SimpleServiceContainer ServiceContainer { get; }
 
         /// <summary>
         /// Gets the root <see cref="IGitPlugin"/> plugins.

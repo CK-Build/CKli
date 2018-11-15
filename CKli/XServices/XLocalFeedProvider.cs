@@ -31,7 +31,7 @@ namespace CKli
             : base( initializer )
         {
             _fs = fs;
-            _fs.LocalBlankFeedProvider = this;
+            _fs.ServiceContainer.Add<ILocalFeedProvider>( this );
             initializer.Services.Add( this );
             _http = http;
         }

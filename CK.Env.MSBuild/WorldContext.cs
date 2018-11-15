@@ -97,7 +97,7 @@ namespace CK.Env.MSBuild
 
         bool SetState( IActivityMonitor m, Action<WorldState> a ) => _worldStore.SetState( m, _worldState, a );
 
-        bool SetState( IActivityMonitor m, GlobalGitStatus gitStatus, Action<WorldState> a = null )
+        bool SetState( IActivityMonitor m, StandardGitStatus gitStatus, Action<WorldState> a = null )
         {
             Action<WorldState> aS = state =>
             {
@@ -119,7 +119,7 @@ namespace CK.Env.MSBuild
             return true;
         }
 
-        bool SetState( IActivityMonitor m, WorkStatus workStatus, GlobalGitStatus gitStatus, Action<WorldState> a = null )
+        bool SetState( IActivityMonitor m, WorkStatus workStatus, StandardGitStatus gitStatus, Action<WorldState> a = null )
         {
             Action<WorldState> aW = state =>
             {
@@ -136,16 +136,16 @@ namespace CK.Env.MSBuild
 
         public FileSystem FileSystem => _globalGitContext.FileSystem;
 
-        public GlobalGitStatus GlobalGitStatus => _worldState.GlobalGitStatus;
+        public StandardGitStatus GlobalGitStatus => _worldState.GlobalGitStatus;
 
         public WorkStatus WorkStatus => _workStatus;
 
         /// <summary>
         /// Gets the current, stable, branch name. This is null when <see cref="IsTransitioning"/> is true.
         /// </summary>
-        public string CurrentBranchName => _worldState.GlobalGitStatus == GlobalGitStatus.DevelopBranch
+        public string CurrentBranchName => _worldState.GlobalGitStatus == StandardGitStatus.DevelopBranch
                                                 ? World.DevelopBranchName
-                                                : (_worldState.GlobalGitStatus == GlobalGitStatus.LocalBranch
+                                                : (_worldState.GlobalGitStatus == StandardGitStatus.LocalBranch
                                                       ? World.LocalBranchName
                                                       : null);
 
@@ -175,13 +175,13 @@ namespace CK.Env.MSBuild
                     foreach( var s in r.Solutions )
                     {
                         if( !s.UpdatePackageDependencies( m, _feeds.GetBestAnyLocalVersion, FileSystem, allowDowngrade: false, buildProjects: true ) ) return false;
-                        var fNuGet = new NuGetConfigBaseFile( s.Solution.GitFolder );
+                        var fNuGet = s.Solution.GetPlugin<NugetConfigFile>();
                         fNuGet.RemoveLocalFeeds( m );
                         if( !fNuGet.Save( m ) ) return false;
                         if( !s.Solution.GitFolder.Commit( m, "Updated Build projects and removed LocalFeed NuGet sources." ).Success ) return false;
                     }
                 }
-                if( !SetState( m, WorkStatus.Idle, GlobalGitStatus.DevelopBranch ) ) return false;
+                if( !SetState( m, WorkStatus.Idle, StandardGitStatus.DevelopBranch ) ) return false;
             }
             else if( _workStatus == WorkStatus.SwitchingToLocal )
             {
@@ -198,7 +198,7 @@ namespace CK.Env.MSBuild
                 _buildInfo.SetStatus( WorkStatus, GlobalGitStatus );
                 var b = new GlobalBuilder( rZeroBuildDeps, FileSystem, _feeds, _nugetClient, _testedCommits, _buildInfo );
                 if( !b.Build( m ) ) return false;
-                if( !SetState( m, WorkStatus.Idle, GlobalGitStatus.LocalBranch ) ) return false;
+                if( !SetState( m, WorkStatus.Idle, StandardGitStatus.LocalBranch ) ) return false;
             }
             else if( _workStatus == WorkStatus.Releasing )
             {
@@ -263,7 +263,7 @@ namespace CK.Env.MSBuild
                         if( !s.Solution.GitFolder.Commit( m, "Updated Build projects to use CI builds." ).Success ) return false;
                     }
                 }
-                if( !SetState( m, WorkStatus.Idle, GlobalGitStatus.DevelopBranch ) ) return false;
+                if( !SetState( m, WorkStatus.Idle, StandardGitStatus.DevelopBranch ) ) return false;
             }
             else if( _workStatus == WorkStatus.PublishingRelease )
             {
@@ -300,7 +300,7 @@ namespace CK.Env.MSBuild
             return SetState( m, WorkStatus.WaitingReleaseConfirmation );
         }
 
-        public bool CanSwitchToDevelop => WorkStatus == WorkStatus.Idle && GlobalGitStatus == GlobalGitStatus.LocalBranch;
+        public bool CanSwitchToDevelop => WorkStatus == WorkStatus.Idle && GlobalGitStatus == StandardGitStatus.LocalBranch;
 
         public bool SwitchToDevelop( IActivityMonitor m )
         {
@@ -308,7 +308,7 @@ namespace CK.Env.MSBuild
             return SetState( m, WorkStatus.SwitchingToDevelop ) && ConcludeCurrentWork( m );
         }
 
-        public bool CanSwitchToLocal => WorkStatus == WorkStatus.Idle && GlobalGitStatus == GlobalGitStatus.DevelopBranch;
+        public bool CanSwitchToLocal => WorkStatus == WorkStatus.Idle && GlobalGitStatus == StandardGitStatus.DevelopBranch;
 
         public bool SwitchToLocal( IActivityMonitor m )
         {
@@ -327,7 +327,7 @@ namespace CK.Env.MSBuild
         {
             if( !CanRunCIBuild ) throw new InvalidOperationException( nameof( CanRunCIBuild ) );
             _buildInfo.SetStatus( WorkStatus, GlobalGitStatus );
-            var r = GetSolutionDependencyResult( m, GlobalGitStatus == GlobalGitStatus.LocalBranch
+            var r = GetSolutionDependencyResult( m, GlobalGitStatus == StandardGitStatus.LocalBranch
                                                         ? World.LocalBranchName
                                                         : World.DevelopBranchName );
             if( r == null ) return false;
@@ -352,7 +352,7 @@ namespace CK.Env.MSBuild
             return GetSolutionDependencyResult( m, CurrentBranchName );
         }
 
-        public bool CanLocalFixToZeroBuildProjects => WorkStatus == WorkStatus.Idle && GlobalGitStatus == GlobalGitStatus.LocalBranch;
+        public bool CanLocalFixToZeroBuildProjects => WorkStatus == WorkStatus.Idle && GlobalGitStatus == StandardGitStatus.LocalBranch;
 
         public bool LocalFixToZeroBuildProjects( IActivityMonitor m, bool commitChanges = false )
         {
@@ -417,14 +417,6 @@ namespace CK.Env.MSBuild
 
             foreach( var s in r.Solutions )
             {
-                var fNuGet = new NugetConfigFile( s.Solution );
-                fNuGet.ApplySettings( m );
-                if( !fNuGet.Save( m ) ) return false;
-
-                SharedPropsFile fSharedProps = new SharedPropsFile( s.Solution, null );
-                if( !fSharedProps.ApplyProperties( m ) ) return false;
-                if( !fSharedProps.Save( m ) ) return false;
-
                 using( m.OpenInfo( $"Updating standard CodeCakeBuilder files." ) )
                 {
                     var cp = s.Solution.BuildProjects.Where( p => p.Name == "CodeCakeBuilder" ).Single();
@@ -461,7 +453,7 @@ namespace CK.Env.MSBuild
             return true;
         }
 
-        public bool CanRelease => WorkStatus == WorkStatus.Idle && GlobalGitStatus == GlobalGitStatus.DevelopBranch;
+        public bool CanRelease => WorkStatus == WorkStatus.Idle && GlobalGitStatus == StandardGitStatus.DevelopBranch;
 
         /// <summary>
         /// Starts a release after an optional <see cref="GitFolder.PullAll"/>.
@@ -670,7 +662,7 @@ namespace CK.Env.MSBuild
             var workStatus = worldState.XmlState.AttributeEnum( xWorkStatus, WorkStatus.Idle );
             var gitStatus = worldState.GlobalGitStatus;
             if( !gitContext.CheckStatus( m, ref gitStatus, workStatus == WorkStatus.SwitchingToDevelop || workStatus == WorkStatus.SwitchingToLocal ) ) return null;
-            Debug.Assert( gitStatus != GlobalGitStatus.Unknwon );
+            Debug.Assert( gitStatus != StandardGitStatus.Unknwon );
             worldState.GlobalGitStatus = gitStatus;
             return new WorldContext( gitContext, worldStore, feeds, nugetClient, referential, publishKeyStore, workStatus, worldState, branchSolutionsLoader );
         }

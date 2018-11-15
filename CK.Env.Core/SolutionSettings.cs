@@ -14,6 +14,7 @@ namespace CK.Env
         public SolutionSettings( XElement e )
         {
             DisableSourceLink = (bool?)e.Attribute( nameof(DisableSourceLink) ) ?? false;
+            ProduceCKSetupComponents = (bool?)e.Attribute( nameof(ProduceCKSetupComponents) ) ?? false;
             NuGetSources = e.Elements( nameof( NuGetSources) )
                              .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Name" ), s => new NuGetSource( s ) )
                              .Values;
@@ -29,6 +30,7 @@ namespace CK.Env
         public SolutionSettings( ISolutionSettings other, XElement applyConfig = null )
         {
             SuppressNuGetConfigFile = other.SuppressNuGetConfigFile;
+            ProduceCKSetupComponents = other.ProduceCKSetupComponents;
             DisableSourceLink = other.DisableSourceLink;
             if( applyConfig == null )
             {
@@ -46,6 +48,9 @@ namespace CK.Env
 
                 var disableSourceLink = (bool?)applyConfig.Attribute( nameof( DisableSourceLink ) );
                 if( disableSourceLink.HasValue ) DisableSourceLink = disableSourceLink.Value;
+
+                var produceCKSetupComponents = (bool?)applyConfig.Attribute( nameof( ProduceCKSetupComponents ) );
+                if( produceCKSetupComponents.HasValue ) ProduceCKSetupComponents= produceCKSetupComponents.Value;
 
                 var suppressNuGetConfigFile = (bool?)applyConfig.Attribute( nameof( SuppressNuGetConfigFile ) );
                 if( suppressNuGetConfigFile.HasValue ) SuppressNuGetConfigFile = suppressNuGetConfigFile.Value;
@@ -66,6 +71,8 @@ namespace CK.Env
         public SolutionSettings With( XElement e ) => new SolutionSettings( this, e );
 
         public bool SuppressNuGetConfigFile { get; }
+
+        public bool ProduceCKSetupComponents { get; }
 
         public bool DisableSourceLink { get; }
 

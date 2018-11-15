@@ -5,7 +5,7 @@ using System.Xml.Linq;
 
 namespace CK.Env
 {
-    public class RepositoryXmlFile : GitFolderXmlFile
+    public class RepositoryXmlFile : GitFolderXmlFile, IGitBranchPlugin
     {
         static readonly XNamespace SVGNS = XNamespace.Get( "http://csemver.org/schemas/2015" );
         static readonly XName XRootName = SVGNS + "RepositoryInfo";
@@ -18,6 +18,20 @@ namespace CK.Env
         public RepositoryXmlFile( GitFolder f )
             : base( f, "RepositoryInfo.xml" )
         {
+        }
+
+        public void ApplySettings( IActivityMonitor m )
+        {
+            EnsureBranchMapping( m, Folder.World.DevelopBranchName, "develop" );
+            if( Folder.StandardGitStatus == StandardGitStatus.LocalBranch )
+            {
+                EnsureLocalBranch( m );
+            }
+            else
+            {
+                RemoveLocalBranch( m );
+            }
+            Save( m );
         }
 
         /// <summary>
@@ -52,34 +66,51 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Ensures that the document and the local branch mapping exists.
+        /// Ensures that the document exists and the specified branch mapping exists.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        void EnsureLocalBranch( IActivityMonitor m )
+        /// <param name="branchName">The actual branch name (ex: "develop-local").</param>
+        /// <param name="versionName">The package suffix (ex: "local").</param>
+        void EnsureBranchMapping( IActivityMonitor m, string branchName, string versionName )
         {
             var branches = EnsureBranches();
 
             var branch = branches.Elements( XBranchName )
-                                 .FirstOrDefault( b => (string)b.Attribute( "Name" ) == Folder.World.LocalBranchName );
+                                 .FirstOrDefault( b => (string)b.Attribute( "Name" ) == branchName );
             if( branch == null )
             {
-                branches.Add( branch = new XElement( XBranchesName,
-                                            new XAttribute( "Name", Folder.World.LocalBranchName ) ) );
+                branches.Add( branch = new XElement( XBranchName,
+                                            new XAttribute( "Name", branchName ) ) );
             }
-            branch.SetAttributeValue( "VersionName", "local" );
+            branch.SetAttributeValue( "VersionName", versionName );
             branch.SetAttributeValue( "CIVersionMode", "LastReleaseBased" );
         }
 
         /// <summary>
-        /// Removes the local branch mapping if it exists.
+        /// Removes the branch mapping if it exists.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        void RemoveLocalBranch( IActivityMonitor m )
+        /// <param name="branchName">The actual branch name (ex: "develop-local").</param>
+        void RemoveBranchMapping( IActivityMonitor m, string branchName )
         {
             Document?.Root.Element( XBranchesName )
                      .Elements( XBranchName )
-                     .Where( b => (string)b.Attribute( "Name" ) == Folder.World.LocalBranchName )
+                     .Where( b => (string)b.Attribute( "Name" ) == branchName )
                      .Remove();
         }
+
+        /// <summary>
+        /// Ensures that the document and the local branch mapping exists:
+        /// <see cref="IWorldName.LocalBranchName"/> is mapped to "local".
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        void EnsureLocalBranch( IActivityMonitor m ) => EnsureBranchMapping( m, Folder.World.LocalBranchName, "local" );
+
+        /// <summary>
+        /// Removes the <see cref="IWorldName.LocalBranchName"/> branch mapping if it exists.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        void RemoveLocalBranch( IActivityMonitor m ) => RemoveBranchMapping( m, Folder.World.LocalBranchName );
+
     }
 }

@@ -12,7 +12,7 @@ namespace CK.Env.MSBuild
     {
         readonly ISecretKeyStore _keyStore;
         IReadOnlyList<(string Key, string Secret)> _requiredSecrets;
-        GlobalGitStatus _gitStatus;
+        StandardGitStatus _gitStatus;
         WorkStatus _workStatus;
 
         public GlobalBuilderInfo( ISecretKeyStore keyStore )
@@ -42,17 +42,17 @@ namespace CK.Env.MSBuild
             return _requiredSecrets;
         }
 
-        public GlobalGitStatus GlobalGitStatus => _gitStatus;
+        public StandardGitStatus GlobalGitStatus => _gitStatus;
 
         public WorkStatus WorkStatus => _workStatus;
 
-        public void SetStatus( WorkStatus w, GlobalGitStatus g )
+        public void SetStatus( WorkStatus w, StandardGitStatus g )
         {
             _gitStatus = g;
             _workStatus = w;
             if( _workStatus == WorkStatus.Idle )
             {
-                if( _gitStatus == GlobalGitStatus.DevelopBranch )
+                if( _gitStatus == StandardGitStatus.DevelopBranch )
                 {
                     TargetLocal = false;
                     RunUnitTests = true;
@@ -60,7 +60,7 @@ namespace CK.Env.MSBuild
                     IsRemotesRequired = null;
                     AllowPackageDependenciesDowngrade = false;
                 }
-                else if( _gitStatus == GlobalGitStatus.LocalBranch )
+                else if( _gitStatus == StandardGitStatus.LocalBranch )
                 {
                     TargetLocal = true;
                     RunUnitTests = true;

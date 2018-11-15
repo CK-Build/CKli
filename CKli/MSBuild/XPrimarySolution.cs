@@ -35,6 +35,13 @@ namespace CKli
             if( !(initializer.Parent is XBranch) ) throw new Exception( "A primary solution must be a direct child of a Git branch." );
             _xElement = initializer.Element;
             initializer.Services.Add( this );
+            branch.Parent.GitFolder.PluginManager.RegisterSettings( solutionSettings.SolutionSettings, branch.Name );
+            branch.Parent.GitFolder.PluginManager.Register( typeof( CodeCakeBuilderFolder ), branch.Name );
+            branch.Parent.GitFolder.PluginManager.Register( typeof( CodeCakeBuilderCSProjFile ), branch.Name );
+            branch.Parent.GitFolder.PluginManager.Register( typeof( CKSetupStoreTestHelperConfigFile ), branch.Name );
+            branch.Parent.GitFolder.PluginManager.Register( typeof( RepositoryXmlFile ), branch.Name );
+            branch.Parent.GitFolder.PluginManager.Register( typeof( NugetConfigFile ), branch.Name );
+            branch.Parent.GitFolder.PluginManager.Register( typeof( SharedPropsFile ), branch.Name );
         }
 
         /// <summary>

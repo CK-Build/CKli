@@ -14,7 +14,12 @@ namespace CK.Env
         /// </summary>
         bool SuppressNuGetConfigFile { get; }
 
-        /// <summary>
+         /// <summary>
+        /// Gets whether the solution produces CKSetup components.
+        /// </summary>
+        bool ProduceCKSetupComponents { get; }
+
+       /// <summary>
         /// Gets whether source link is disabled.
         /// Impacts Common/Shared.props file.
         /// </summary>

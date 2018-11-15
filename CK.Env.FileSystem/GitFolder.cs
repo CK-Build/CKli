@@ -28,7 +28,6 @@ namespace CK.Env
         readonly HeadFolder _headFolder;
         readonly BranchesFolder _branchesFolder;
         readonly RemotesFolder _remoteBranchesFolder;
-        readonly ILocalFeedProvider _feedProvider;
         bool _branchRefreshed;
 
         static GitFolder()
@@ -48,11 +47,9 @@ namespace CK.Env
         internal GitFolder(
             FileSystem fs,
             string gitFolder,
-            ILocalFeedProvider localFeedProvider,
             IWorldName world )
         {
             Debug.Assert( gitFolder.StartsWith( fs.Root.Path ) && gitFolder.EndsWith( ".git" ) );
-            _feedProvider = localFeedProvider;
             FullPath = new NormalizedPath( gitFolder.Remove( gitFolder.Length - 4 ) );
             SubPath = FullPath.RemovePrefix( fs.Root );
             if( SubPath.IsEmpty ) throw new InvalidOperationException( "Root path can not be a Git folder." );
@@ -129,9 +126,13 @@ namespace CK.Env
         public string CurrentBranchName => _git.Head.FriendlyName;
 
         /// <summary>
-        /// Gets the local feed provider.
+        /// Gets the standard git status, based on the <see cref="CurrentBranchName"/>.
         /// </summary>
-        public ILocalFeedProvider FeedProvider => _feedProvider;
+        public StandardGitStatus StandardGitStatus => CurrentBranchName == World.LocalBranchName
+                                                        ? StandardGitStatus.LocalBranch
+                                                        : (CurrentBranchName == World.DevelopBranchName
+                                                            ? StandardGitStatus.DevelopBranch
+                                                            : StandardGitStatus.Unknwon);
 
         /// <summary>
         /// Checks that the current head is a clean commit (working directory is clean and no staging files exists).
@@ -293,7 +294,7 @@ namespace CK.Env
                 Branch b = _git.Branches[branchName];
                 if( b == null )
                 {
-                    m.Error( $"Unknown local branch {branchName}." );
+                    m.Error( $"Unknown branch {branchName}." );
                     return null;
                 }
                 var pathOpt = b.IsRemote
@@ -597,8 +598,6 @@ namespace CK.Env
 
                     if( !RaiseEnteredLocalBranch( m, true ) ) return false;
 
-                    if( !OnDevelopToLocal( m ) ) return false;
-
                     if( commitLocalChanges
                         && !Commit( m, "Updated Repository.xml and NuGet.config for 'local' branch." ).Success ) return false;
                     if( r.Status != MergeStatus.UpToDate )
@@ -643,24 +642,6 @@ namespace CK.Env
                     return false;
                 }
             }
-        }
-
-        bool OnDevelopToLocal( IActivityMonitor m )
-        {
-            var localStorePath = _feedProvider.GetLocalCKSetupStorePath( m );
-            if( !EnsureCKSetupStoreTestHelperConfig( m, localStorePath ) ) return false;
-            if( !EnsureRepositoryXmlBlankDevBranch( m ) ) return false;
-            var fNuGet = new NuGetConfigBaseFile( this );
-            fNuGet.EnsureLocalFeeds( m );
-            if( !fNuGet.Save( m ) ) return false;
-            return true;
-        }
-
-        bool OnLocalToDevelop( IActivityMonitor m )
-        {
-            if( !RemoveCKSetupStoreTestHelperConfig( m ) ) return false;
-            if( !RemoveRepositoryXmlBlankDevBranch( m ) ) return false;
-            return true;
         }
 
         /// <summary>
@@ -760,8 +741,6 @@ namespace CK.Env
                     }
                     if( !RaiseEnteredLocalBranch( m, false ) ) return false;
 
-                    if( !OnLocalToDevelop( m ) ) return false;
-
                     if( bLocal.IsCurrentRepositoryHead )
                     {
                         if( !Commit( m, $"Switching to '{World.DevelopBranchName}' branch." ).Success ) return false;
@@ -835,84 +814,6 @@ namespace CK.Env
                     return false;
                 }
             }
-        }
-
-        public bool SetRepositoryXmlIgnoreDirtyFolders( IActivityMonitor m )
-        {
-            var (xDoc, pathXml) = this.GetXmlDocument( m, "RepositoryInfo.xml" );
-            if( xDoc == null ) return false;
-            var e = xDoc.Root;
-            var debug = e.Element( SVGNS + "Debug" );
-            if( debug == null ) e.Add( debug = new XElement( SVGNS + "Debug" ) );
-            if( (string)debug.Attribute( "IgnoreDirtyWorkingFolder" ) != "true" )
-            {
-                debug.SetAttributeValue( "IgnoreDirtyWorkingFolder", "true" );
-            }
-            return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );
-        }
-
-        bool EnsureRepositoryXmlBlankDevBranch( IActivityMonitor m )
-        {
-            var (xDoc, pathXml) = this.GetXmlDocument( m, "RepositoryInfo.xml" );
-            if( xDoc == null ) return false;
-            var e = xDoc.Root;
-            var branches = e.Element( SVGNS + "Branches" );
-            if( branches == null ) e.Add( branches = new XElement( SVGNS + "Branches" ) );
-
-            var branch = branches.Elements( SVGNS + "Branch" )
-                                 .Where( b => (string)b.Attribute( "Name" ) == World.LocalBranchName );
-            if( !branch.Any() )
-            {
-                branches.Add( new XElement( SVGNS + "Branch",
-                                   new XAttribute( "Name", World.LocalBranchName ),
-                                   new XAttribute( "VersionName", "local" ),
-                                   new XAttribute( "CIVersionMode", "LastReleaseBased" ) ) );
-            }
-            else
-            {
-                var b = branch.First();
-                b.SetAttributeValue( "VersionName", "local" );
-                b.SetAttributeValue( "CIVersionMode", "LastReleaseBased" );
-            }
-            return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );
-        }
-
-        bool RemoveRepositoryXmlBlankDevBranch( IActivityMonitor m )
-        {
-            var (xDoc, pathXml) = this.GetXmlDocument( m, "RepositoryInfo.xml" );
-            if( xDoc == null ) return false;
-            xDoc.Root.Element( SVGNS + "Branches" )
-                     .Elements( SVGNS + "Branch" )
-                     .Where( b => (string)b.Attribute( "Name" ) == World.LocalBranchName )
-                     .Remove();
-            return FileSystem.CopyTo( m, xDoc.ToString(), pathXml );
-        }
-
-        public bool EnsureCKSetupStoreTestHelperConfig( IActivityMonitor m, string storePath )
-        {
-            var path = SubPath.AppendPart( "branches" ).AppendPart( CurrentBranchName ).AppendPart( "RemoteStore.TestHelper.config" );
-            var f = FileSystem.GetFileInfo( path );
-            if( f.IsDirectory )
-            {
-                m.Fatal( $"{path} exists as a directory." );
-                return false;
-            }
-            if( !f.Exists )
-            {
-                var text = "<configuration><appSettings>" + Environment.NewLine;
-                text += "  -- This forces the Solutions that generate components to use the LocalFeed/Local/CKSetupStore" + Environment.NewLine;;
-                text += $@"  <add key=""CKSetup/DefaultStoreUrl"" value=""{storePath}"" />" + Environment.NewLine;
-                text += $@"  <add key=""CKSetup/DefaultStorePath"" value=""{storePath}"" />" + Environment.NewLine;
-                text += "</appSettings></configuration>";
-                if( !FileSystem.CopyTo( m, text, path ) ) return false;
-            }
-            return true;
-        }
-
-        public bool RemoveCKSetupStoreTestHelperConfig( IActivityMonitor m )
-        {
-            var path = SubPath.AppendPart( "branches" ).AppendPart( CurrentBranchName ).AppendPart( "RemoteStore.TestHelper.config" );
-            return FileSystem.Delete( m, path );
         }
 
         internal void Dispose()
