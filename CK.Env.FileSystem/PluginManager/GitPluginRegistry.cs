@@ -157,7 +157,7 @@ namespace CK.Env
             Debug.Assert( !mappings.ContainsKey( desc.Key.Type ) );
             Debug.Assert( desc.Settings == null );
             ++pluginCount;
-            var parameters = new object[desc.Parameters.Count];
+            var parameters = new object[desc.Parameters.Length];
             for( int i = 0; i < parameters.Length; ++i )
             {
                 var pType = desc.Parameters[i].ParameterType;
