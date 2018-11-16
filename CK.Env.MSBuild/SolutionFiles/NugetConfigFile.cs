@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,21 +9,27 @@ using System.Xml.Linq;
 
 namespace CK.Env.MSBuild
 {
-    public class NugetConfigFile : GitFolderXmlFile, IGitBranchPlugin
+    public class NugetConfigFile : GitFolderXmlFile, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly ISolutionSettings _settings;
         readonly ILocalFeedProvider _localFeedProvider;
         XElement _packageSources;
 
-        public NugetConfigFile( GitFolder f, ILocalFeedProvider localFeedProvider, ISolutionSettings s )
+        public NugetConfigFile( GitFolder f, ILocalFeedProvider localFeedProvider, ISolutionSettings s, NormalizedPath branchPath )
             : base( f, "NuGet.config" )
         {
             _localFeedProvider = localFeedProvider;
             _settings = s;
+            BranchPath = branchPath;
         }
+
+        public NormalizedPath BranchPath { get; }
+
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => BranchPath;
 
         public void ApplySettings( IActivityMonitor m )
         {
+            if( !this.CheckCurrentBranch( m ) ) return;
             if( _settings.SuppressNuGetConfigFile )
             {
                 Delete( m );

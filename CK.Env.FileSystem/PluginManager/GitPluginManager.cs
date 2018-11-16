@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using CK.Core;
+using CK.Text;
 
 namespace CK.Env
 {
@@ -135,12 +136,13 @@ namespace CK.Env
         /// </summary>
         /// <param name="baseProvider">The base service provider.</param>
         /// <param name="defaultBranchName">The default branch name (typically "develop"). Must not be null or empty.</param>
-        public GitPluginManager( ISimpleServiceContainer baseProvider, string defaultBranchName )
+        /// <param name="branchesPath">Required root /branches path relative from the root FileSystem.</param>
+        public GitPluginManager( ISimpleServiceContainer baseProvider, string defaultBranchName, NormalizedPath branchesPath )
         {
             if( String.IsNullOrWhiteSpace(defaultBranchName) ) throw new ArgumentNullException( nameof( defaultBranchName ) );
             ServiceContainer = new SimpleServiceContainer( baseProvider );
             _defaultBranchName = defaultBranchName;
-            _registry = new GitPluginRegistry();
+            _registry = new GitPluginRegistry( branchesPath );
             _plugins = new PluginCollection<IGitPlugin>( this, null );
             _branches = new Branches( this );
         }
@@ -163,8 +165,9 @@ namespace CK.Env
 
         /// <summary>
         /// Reloads the whole set of plugins or the ones of a specific branch.
+        /// Exisitng IDisposable plugins are disposed first.
         /// </summary>
-        /// <param name="branchName">The branc name or null for all plugins.</param>
+        /// <param name="branchName">The branch name or null for all plugins.</param>
         public void Reload( string branchName = null )
         {
             if( branchName == null ) _plugins.Reload();

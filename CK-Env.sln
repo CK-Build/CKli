@@ -42,6 +42,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.SimpleKeyVault.Tests", "
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.World.Abstraction", "CK.Env.World.Abstraction\CK.Env.World.Abstraction.csproj", "{69F5FC76-F45F-45EB-AA4A-199435D5453D}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Command", "CK.Env.Command\CK.Env.Command.csproj", "{3D6459DB-218B-46C6-9D19-550E62D87A4D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -104,6 +106,10 @@ Global
 		{69F5FC76-F45F-45EB-AA4A-199435D5453D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{69F5FC76-F45F-45EB-AA4A-199435D5453D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{69F5FC76-F45F-45EB-AA4A-199435D5453D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3D6459DB-218B-46C6-9D19-550E62D87A4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D6459DB-218B-46C6-9D19-550E62D87A4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D6459DB-218B-46C6-9D19-550E62D87A4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D6459DB-218B-46C6-9D19-550E62D87A4D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

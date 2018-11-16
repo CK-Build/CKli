@@ -18,9 +18,12 @@ using CSemVer;
 
 namespace CK.Env
 {
+    /// <summary>
+    /// Implements Git repository mapping.
+    /// GitFolder are internally created (and disposed) by <see cref="FileSystem"/>.
+    /// </summary>
     public class GitFolder
     {
-        static readonly XNamespace SVGNS = XNamespace.Get( "http://csemver.org/schemas/2015" );
         static internal readonly CredentialsHandler DefaultCredentialHandler;
 
         readonly Repository _git;
@@ -63,7 +66,7 @@ namespace CK.Env
             _thisDir = new RootDir( this, SubPath.LastPart );
             ServiceContainer = new SimpleServiceContainer( FileSystem.ServiceContainer );
             ServiceContainer.Add( this );
-            PluginManager = new GitPluginManager( ServiceContainer, world.DevelopBranchName );
+            PluginManager = new GitPluginManager( ServiceContainer, world.DevelopBranchName, SubPath.AppendPart( "branches" ) );
 
             string origin = _git.Network.Remotes["origin"]?.Url;
             if( origin != null )
@@ -106,7 +109,7 @@ namespace CK.Env
         public NormalizedPath SubPath { get; }
 
         /// <summary>
-        /// Gets the file ssytem.
+        /// Gets the file system.
         /// </summary>
         public FileSystem FileSystem { get; }
 

@@ -9,17 +9,22 @@ using System.Xml.Linq;
 
 namespace CK.Env.MSBuild
 {
-    public class CodeCakeBuilderCSProjFile : GitFolderXmlFile, IGitBranchPlugin
+    public class CodeCakeBuilderCSProjFile : GitFolderXmlFile, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly CodeCakeBuilderFolder _f;
         readonly ISolutionSettings _settings;
 
-        public CodeCakeBuilderCSProjFile( CodeCakeBuilderFolder f, ISolutionSettings s )
+        public CodeCakeBuilderCSProjFile( CodeCakeBuilderFolder f, ISolutionSettings s, NormalizedPath branchPath )
             : base( f.Folder, "CodeCakeBuilder/CodeCakeBuilder.csproj" )
         {
             _f = f;
             _settings = s;
+            BranchPath = branchPath;
         }
+
+        public NormalizedPath BranchPath { get; }
+
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => BranchPath;
 
         public void ApplySettings( IActivityMonitor m )
         {

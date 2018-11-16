@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -14,6 +15,7 @@ namespace CK.Env
     /// </summary>
     class GitPluginRegistry
     {
+        readonly NormalizedPath _branchesPath;
         readonly Dictionary<PluginKey, Descriptor> _descriptors;
 
         readonly struct PluginKey : IEquatable<PluginKey>
@@ -41,6 +43,7 @@ namespace CK.Env
         {
             public readonly PluginKey Key;
             public readonly ConstructorInfo Ctor;
+            public readonly int BranchParameterIdx;
             public readonly ParameterInfo[] Parameters;
             public object Settings;
 
@@ -61,6 +64,18 @@ namespace CK.Env
                             throw new ArgumentException( $"Invalid plugin dependency: {k.Type.FullName} depends on {p.ParameterType.FullName} that is Branch dependent.", nameof( PluginKey ) );
                         }
                     }
+                    else if( p.Name == "branchName" && p.ParameterType == typeof( string ) )
+                    {
+                        if( k.BranchName == null )
+                        {
+                            throw new ArgumentException( $"Invalid plugin: {k.Type.FullName} is not a IGitBranchPlugin: it can not have a 'string branchName' parameter.", nameof( PluginKey ) );
+                        }
+                        BranchParameterIdx = i;
+                    }
+                }
+                if( BranchParameterIdx < 0 && k.BranchName != null )
+                {
+                    throw new ArgumentException( $"Constructor of {k.Type.FullName} must have a 'string branchName' parameter.", nameof( PluginKey ) );
                 }
             }
 
@@ -73,8 +88,13 @@ namespace CK.Env
 
         }
 
-        public GitPluginRegistry()
+        /// <summary>
+        /// Initializes a new <see cref="GitPluginRegistry"/>.
+        /// </summary>
+        /// <param name="branchesPath">Required root /branches path relative from the root FileSystem.</param>
+        public GitPluginRegistry( NormalizedPath branchesPath )
         {
+            _branchesPath = branchesPath;
             _descriptors = new Dictionary<PluginKey, Descriptor>();
         }
 
@@ -160,25 +180,29 @@ namespace CK.Env
             var parameters = new object[desc.Parameters.Length];
             for( int i = 0; i < parameters.Length; ++i )
             {
-                var pType = desc.Parameters[i].ParameterType;
-                if( mappings.TryGetValue( pType, out var already ) )
-                {
-                    parameters[i] = already;
-                }
+                if( i == desc.BranchParameterIdx ) parameters[i] = _branchesPath.AppendPart( branchName );
                 else
                 {
-                    Descriptor pDesc = FindBestDescriptor( pType, branchName, defaultBranchName );
-                    if( pDesc != null )
+                    var pType = desc.Parameters[i].ParameterType;
+                    if( mappings.TryGetValue( pType, out var already ) )
                     {
-                        object obj = pDesc.Settings
-                                        ?? CreateInstance( provider, pDesc, branchName, defaultBranchName, mappings, ref pluginCount );
-                        mappings.Add( pDesc.Key.Type, obj );
-                        parameters[i] = obj;
+                        parameters[i] = already;
                     }
                     else
                     {
-                        parameters[i] = provider.GetService( pType );
-                        if( parameters[i] == null ) throw new Exception( $"Unable to resolve '{pType}' for {desc.Key.Type.FullName} plugin constructor." );
+                        Descriptor pDesc = FindBestDescriptor( pType, branchName, defaultBranchName );
+                        if( pDesc != null )
+                        {
+                            object obj = pDesc.Settings
+                                            ?? CreateInstance( provider, pDesc, branchName, defaultBranchName, mappings, ref pluginCount );
+                            mappings.Add( pDesc.Key.Type, obj );
+                            parameters[i] = obj;
+                        }
+                        else
+                        {
+                            parameters[i] = provider.GetService( pType );
+                            if( parameters[i] == null ) throw new Exception( $"Unable to resolve '{pType}' for {desc.Key.Type.FullName} plugin constructor." );
+                        }
                     }
                 }
             }

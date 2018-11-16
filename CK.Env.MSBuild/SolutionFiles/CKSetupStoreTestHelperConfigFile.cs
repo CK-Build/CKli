@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,21 +14,30 @@ namespace CK.Env.MSBuild
         readonly ISolutionSettings _settings;
         readonly ILocalFeedProvider _localFeedProvider;
 
-        public CKSetupStoreTestHelperConfigFile( GitFolder f, ISolutionSettings settings, ILocalFeedProvider localFeedProvider )
+        public CKSetupStoreTestHelperConfigFile(
+            GitFolder f,
+            ISolutionSettings settings,
+            ILocalFeedProvider localFeedProvider,
+            NormalizedPath branchPath )
             : base( f, "RemoteStore.TestHelper.config" )
         {
             _settings = settings;
             _localFeedProvider = localFeedProvider;
-            if( settings.ProduceCKSetupComponents )
+            BranchPath = branchPath;
+            if( IsActive )
             {
                 f.OnLocalBranchEntered += OnLocalBranchEntered;
                 f.OnLocalBranchLeaving += OnLocalBranchLeaving;
             }
         }
 
+        public NormalizedPath BranchPath { get; }
+
+        public bool IsActive => Folder.StandardGitStatus == StandardGitStatus.LocalBranch && _settings.ProduceCKSetupComponents;
+
         public void Dispose()
         {
-            if( _settings.ProduceCKSetupComponents )
+            if( IsActive )
             {
                 Folder.OnLocalBranchEntered -= OnLocalBranchEntered;
                 Folder.OnLocalBranchLeaving -= OnLocalBranchLeaving;

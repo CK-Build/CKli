@@ -12,24 +12,29 @@ using System.Xml.Linq;
 
 namespace CK.Env.MSBuild
 {
-    public class CodeCakeBuilderFolder : IGitBranchPlugin
+    public class CodeCakeBuilderFolder : IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly Dictionary<string, string> _resources;
 
-        public CodeCakeBuilderFolder( GitFolder f )
+        public CodeCakeBuilderFolder( GitFolder f, NormalizedPath branchPath )
         {
             Folder = f;
-            CodeCakeBuilderPath = Folder.SubPath.AppendPart( Folder.CurrentBranchName ).AppendPart( "CodecakeBuilder" );
+            BranchPath = branchPath;
+            CodeCakeBuilderPath = branchPath.AppendPart( "CodecakeBuilder" );
             _resources = new Dictionary<string, string>();
         }
 
         public GitFolder Folder { get; }
 
+        public NormalizedPath BranchPath { get; }
+
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => BranchPath;
+
         public NormalizedPath CodeCakeBuilderPath { get; }
 
         public bool EnsureDirectory( IActivityMonitor m )
         {
-            return Folder.FileSystem.EnsureDirectory( m, CodeCakeBuilderPath );
+            return this.CheckCurrentBranch( m ) && Folder.FileSystem.EnsureDirectory( m, CodeCakeBuilderPath );
         }
 
         public void ApplySettings( IActivityMonitor m )

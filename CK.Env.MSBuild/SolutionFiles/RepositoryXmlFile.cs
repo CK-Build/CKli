@@ -1,11 +1,12 @@
 using CK.Core;
+using CK.Text;
 using System;
 using System.Linq;
 using System.Xml.Linq;
 
 namespace CK.Env
 {
-    public class RepositoryXmlFile : GitFolderXmlFile, IGitBranchPlugin
+    public class RepositoryXmlFile : GitFolderXmlFile, IGitBranchPlugin, ICommandMethodsProvider
     {
         static readonly XNamespace SVGNS = XNamespace.Get( "http://csemver.org/schemas/2015" );
         static readonly XName XRootName = SVGNS + "RepositoryInfo";
@@ -15,13 +16,19 @@ namespace CK.Env
 
         XElement _branches;
 
-        public RepositoryXmlFile( GitFolder f )
+        public RepositoryXmlFile( GitFolder f, NormalizedPath branchPath )
             : base( f, "RepositoryInfo.xml" )
         {
+            BranchPath = branchPath;
         }
+
+        public NormalizedPath BranchPath { get; }
+
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => BranchPath;
 
         public void ApplySettings( IActivityMonitor m )
         {
+            if( !this.CheckCurrentBranch( m ) ) return;
             EnsureBranchMapping( m, Folder.World.DevelopBranchName, "develop" );
             if( Folder.StandardGitStatus == StandardGitStatus.LocalBranch )
             {

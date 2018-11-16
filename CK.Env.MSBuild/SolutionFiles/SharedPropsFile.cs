@@ -9,18 +9,24 @@ using System.Xml.Linq;
 
 namespace CK.Env.MSBuild
 {
-    public class SharedPropsFile : GitFolderXmlFile, IGitBranchPlugin
+    public class SharedPropsFile : GitFolderXmlFile, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly ISolutionSettings _settings;
 
-        public SharedPropsFile( GitFolder f, ISolutionSettings s )
+        public SharedPropsFile( GitFolder f, ISolutionSettings s, NormalizedPath branchPath )
             : base( f, "Common/Shared.props" )
         {
             _settings = s;
+            BranchPath = branchPath;
         }
+
+        public NormalizedPath BranchPath { get; }
+
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => BranchPath;
 
         public void ApplySettings( IActivityMonitor m )
         {
+            if( !this.CheckCurrentBranch( m ) ) return;
             if( Document == null ) Document = new XDocument( new XElement( "Project" ) );
             if( _settings.DisableSourceLink )
             {
