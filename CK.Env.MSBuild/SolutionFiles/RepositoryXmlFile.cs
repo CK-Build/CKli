@@ -17,15 +17,16 @@ namespace CK.Env
         XElement _branches;
 
         public RepositoryXmlFile( GitFolder f, NormalizedPath branchPath )
-            : base( f, "RepositoryInfo.xml" )
+            : base( f, branchPath.AppendPart( "RepositoryInfo.xml" ) )
         {
             BranchPath = branchPath;
         }
 
         public NormalizedPath BranchPath { get; }
 
-        NormalizedPath ICommandMethodsProvider.CommandProviderName => BranchPath;
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
+        [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
@@ -38,6 +39,8 @@ namespace CK.Env
             {
                 RemoveLocalBranch( m );
             }
+            // Obsolete:
+            Document.Root.Elements( SVGNS+"PossibleVersionsMode" ).Remove();
             Save( m );
         }
 

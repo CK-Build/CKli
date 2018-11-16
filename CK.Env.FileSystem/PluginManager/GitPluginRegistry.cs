@@ -16,70 +16,66 @@ namespace CK.Env
     class GitPluginRegistry
     {
         readonly NormalizedPath _branchesPath;
-        readonly Dictionary<PluginKey, Descriptor> _descriptors;
+        readonly Dictionary<EntryKey, Descriptor> _descriptors;
 
-        readonly struct PluginKey : IEquatable<PluginKey>
+        readonly struct EntryKey : IEquatable<EntryKey>
         {
             public readonly Type Type;
             public readonly string BranchName;
 
-            public PluginKey( Type t, string b )
+            public EntryKey( Type t, string b )
             {
-                Debug.Assert( t != null
-                              && IsGitFolderPlugin( t )
-                              && (IsGitFolderBranchPlugin( t ) == (b != null)) );    
                 Type = t;
                 BranchName = b;
             }
 
-            public bool Equals( PluginKey other ) => Type == other.Type && BranchName == other.BranchName;
+            public bool Equals( EntryKey other ) => Type == other.Type && BranchName == other.BranchName;
 
-            public override bool Equals( object obj ) => obj is PluginKey k && Equals( k );
+            public override bool Equals( object obj ) => obj is EntryKey k && Equals( k );
 
             public override int GetHashCode() => Type.GetHashCode() ^ (BranchName?.GetHashCode() ?? 0);
         }
 
         class Descriptor
         {
-            public readonly PluginKey Key;
+            public readonly EntryKey Key;
             public readonly ConstructorInfo Ctor;
             public readonly int BranchParameterIdx;
             public readonly ParameterInfo[] Parameters;
             public object Settings;
 
-            public Descriptor( PluginKey k, Type origin, object instance )
+            public Descriptor( EntryKey k )
             {
                 Key = k;
                 Ctor = k.Type.GetConstructors().Single();
+                BranchParameterIdx = -1;
                 Parameters = Ctor.GetParameters();
                 for( int i = 0; i < Parameters.Length; ++i )
                 {
                     var p = Parameters[i];
                     if( IsGitFolderPlugin( p.ParameterType ) )
                     {
-                        if( p.ParameterType == origin ) throw new ArgumentException( $"Invalid plugin graph: cycle between {k.Type.FullName} and {origin.FullName}.", nameof( PluginKey ) );
-                        bool isParamOnBranch = IsGitFolderBranchPlugin( p.ParameterType );
-                        if( isParamOnBranch && k.BranchName == null )
+                        if( k.BranchName == null && IsGitFolderBranchPlugin( p.ParameterType ) )
                         {
-                            throw new ArgumentException( $"Invalid plugin dependency: {k.Type.FullName} depends on {p.ParameterType.FullName} that is Branch dependent.", nameof( PluginKey ) );
+                            throw new ArgumentException( $"Invalid plugin dependency: {k.Type.FullName} depends on {p.ParameterType.FullName} that is Branch dependent.", nameof( EntryKey ) );
                         }
                     }
-                    else if( p.Name == "branchName" && p.ParameterType == typeof( string ) )
+                    else if( p.Name == "branchPath" && p.ParameterType == typeof( NormalizedPath ) )
                     {
                         if( k.BranchName == null )
                         {
-                            throw new ArgumentException( $"Invalid plugin: {k.Type.FullName} is not a IGitBranchPlugin: it can not have a 'string branchName' parameter.", nameof( PluginKey ) );
+                            throw new ArgumentException( $"Invalid plugin: {k.Type.FullName} is not a IGitBranchPlugin: it can not have a 'NormalizedPath branchPath' parameter.", nameof( EntryKey ) );
                         }
                         BranchParameterIdx = i;
                     }
                 }
                 if( BranchParameterIdx < 0 && k.BranchName != null )
                 {
-                    throw new ArgumentException( $"Constructor of {k.Type.FullName} must have a 'string branchName' parameter.", nameof( PluginKey ) );
+                    throw new ArgumentException( $"Constructor of {k.Type.FullName} must have a 'NormalizedPath branchPath' parameter.", nameof( EntryKey ) );
                 }
             }
 
-            public Descriptor( PluginKey k, object instance )
+            public Descriptor( object instance, EntryKey k )
             {
                 Debug.Assert( instance != null );
                 Key = k;
@@ -95,7 +91,7 @@ namespace CK.Env
         public GitPluginRegistry( NormalizedPath branchesPath )
         {
             _branchesPath = branchesPath;
-            _descriptors = new Dictionary<PluginKey, Descriptor>();
+            _descriptors = new Dictionary<EntryKey, Descriptor>();
         }
 
         public void RegisterSettings( Type type, object instance, string branchName = null )
@@ -104,12 +100,12 @@ namespace CK.Env
             if( instance == null ) throw new ArgumentNullException( nameof( instance ) );
             if( IsGitFolderPlugin( type ) )
             {
-                throw new Exception( $"A plugin cannot be registered as an instance: {type.FullName}." );
+                throw new Exception( $"A plugin cannot be registered as a setting: {type.FullName}." );
             }
-            var key = new PluginKey( type, branchName );
+            var key = new EntryKey( type, branchName );
             if( !_descriptors.TryGetValue( key, out var desc ) )
             {
-                desc = new Descriptor( key, instance );
+                desc = new Descriptor(instance, key);
                 _descriptors.Add( key, desc );
             }
             else if( desc.Settings != null )
@@ -123,27 +119,32 @@ namespace CK.Env
         public void Register( Type pluginType )
         {
             CheckPluginType( pluginType );
-            Register( pluginType, null, pluginType );
+            DoRegister( pluginType, null );
         }
 
         public void Register( Type pluginType, string branchName )
         {
             CheckBranchPluginType( pluginType, branchName );
-            Register( pluginType, branchName, pluginType );
+            DoRegister( pluginType, branchName );
         }
 
-        Descriptor Register( Type pluginType, string branchName, Type origin )
+        Descriptor DoRegister( Type pluginType, string branchName )
         {
-            var key = new PluginKey( pluginType, branchName );
+            var key = new EntryKey( pluginType, branchName );
             if( !_descriptors.TryGetValue( key, out var desc ) )
             {
-                desc = new Descriptor( key, origin );
+                desc = new Descriptor( key );
                 _descriptors.Add( key, desc );
             }
             return desc;
         }
 
-        internal int FillMappings( Dictionary<Type, object> mappings, IServiceProvider baseProvider, string branchName, string defaultBranchName )
+        internal int FillMappings(
+            Dictionary<Type, object> mappings,
+            IServiceProvider baseProvider,
+            CommandRegister commandRegister,
+            string branchName,
+            string defaultBranchName )
         {
             Debug.Assert( (branchName != null) == (defaultBranchName != null) );
             Debug.Assert( !mappings.Keys.Any( k => IsGitFolderPlugin( k ) ), "There must not be any plugin. Only settings." );
@@ -152,13 +153,13 @@ namespace CK.Env
             IEnumerable<Descriptor> forBranch = _descriptors.Values.Where( d => d.Key.BranchName == branchName
                                                        || (defaultBranchName != null
                                                            && d.Key.BranchName == defaultBranchName
-                                                           && !_descriptors.ContainsKey( new PluginKey( d.Key.Type, branchName ) )) );
+                                                           && !_descriptors.ContainsKey( new EntryKey( d.Key.Type, branchName ) )) );
             foreach( var desc in forBranch )
             {
                 if( !mappings.TryGetValue( desc.Key.Type, out var obj ) )
                 {
                     obj = desc.Settings
-                            ?? CreateInstance( baseProvider, desc, branchName, defaultBranchName, mappings, ref pluginCount );
+                            ?? CreateInstance( baseProvider, desc, branchName, defaultBranchName, mappings, commandRegister, ref pluginCount );
                     mappings.Add( desc.Key.Type, obj );
                 }
             }
@@ -171,6 +172,7 @@ namespace CK.Env
             string branchName,
             string defaultBranchName,
             Dictionary<Type, object> mappings,
+            CommandRegister commandRegister,
             ref int pluginCount )
         {
             Debug.Assert( (branchName != null) == (defaultBranchName != null) );
@@ -194,7 +196,7 @@ namespace CK.Env
                         if( pDesc != null )
                         {
                             object obj = pDesc.Settings
-                                            ?? CreateInstance( provider, pDesc, branchName, defaultBranchName, mappings, ref pluginCount );
+                                            ?? CreateInstance( provider, pDesc, branchName, defaultBranchName, mappings, commandRegister, ref pluginCount );
                             mappings.Add( pDesc.Key.Type, obj );
                             parameters[i] = obj;
                         }
@@ -206,7 +208,12 @@ namespace CK.Env
                     }
                 }
             }
-            return Activator.CreateInstance( desc.Key.Type, parameters );
+            object o = Activator.CreateInstance( desc.Key.Type, parameters );
+            if( o is ICommandMethodsProvider c )
+            {
+                commandRegister.Register( c );
+            }
+            return o;
         }
 
         Descriptor FindBestDescriptor( Type type, string branchName, string defaultBranchName )
@@ -214,12 +221,12 @@ namespace CK.Env
             Debug.Assert( type != null );
             Debug.Assert( (branchName != null) == (defaultBranchName != null) );
 
-            PluginKey key = new PluginKey( type, branchName );
+            EntryKey key = new EntryKey( type, branchName );
             if( !_descriptors.TryGetValue( key, out var desc ) )
             {
                 if( branchName != null )
                 {
-                    key = new PluginKey( type, defaultBranchName );
+                    key = new EntryKey( type, defaultBranchName );
                     _descriptors.TryGetValue( key, out desc );
                 }
             }

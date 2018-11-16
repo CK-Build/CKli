@@ -12,60 +12,24 @@ using System.Xml.Linq;
 
 namespace CK.Env.MSBuild
 {
-    public class CodeCakeBuilderFolder : IGitBranchPlugin, ICommandMethodsProvider
+    public class CodeCakeBuilderFolder : PluginFolderBase
     {
-        readonly Dictionary<string, string> _resources;
-
         public CodeCakeBuilderFolder( GitFolder f, NormalizedPath branchPath )
+            : base( f, branchPath, "CodecakeBuilder" )
         {
-            Folder = f;
-            BranchPath = branchPath;
-            CodeCakeBuilderPath = branchPath.AppendPart( "CodecakeBuilder" );
-            _resources = new Dictionary<string, string>();
         }
 
-        public GitFolder Folder { get; }
-
-        public NormalizedPath BranchPath { get; }
-
-        NormalizedPath ICommandMethodsProvider.CommandProviderName => BranchPath;
-
-        public NormalizedPath CodeCakeBuilderPath { get; }
-
-        public bool EnsureDirectory( IActivityMonitor m )
+        protected override void DoCopyResources( IActivityMonitor m )
         {
-            return this.CheckCurrentBranch( m ) && Folder.FileSystem.EnsureDirectory( m, CodeCakeBuilderPath );
-        }
-
-        public void ApplySettings( IActivityMonitor m )
-        {
-            var fs = Folder.FileSystem;
-
-            bool CopyResource( string path, Func<string,string> adapter = null )
-            {
-                var target = CodeCakeBuilderPath.AppendPart( path );
-                if( adapter == null )
-                {
-                    return fs.CopyTo( m, _resources[path], target );
-                }
-                string text = fs.GetFileInfo( target ).AsTextFileInfo()?.TextContent ?? _resources[path];
-                var transformed = adapter( text );
-                return transformed != text ? fs.CopyTo( m, adapter(text), target ) : true;
-            }
-
-            if( EnsureDirectory( m ) )
-            {
-                EnsureLoadResources();
-                CopyResource( "InstallCredentialProvider.ps1" );
-                CopyResource( "Program.cs" );
-                CopyResource( "Build.cs", AdaptBuild );
-                CopyResource( "Build.NuGetHelper.cs" );
-                CopyResource( "Build.StandardCheckRepository.cs" );
-                CopyResource( "Build.StandardSolutionBuild.cs" );
-                CopyResource( "Build.StandardUnitTests.cs" );
-                CopyResource( "Build.StandardCreateNuGetPackages.cs" );
-                CopyResource( "Build.StandardPushNuGetPackages.cs" );
-            }
+            CopyTextResource( m, "InstallCredentialProvider.ps1" );
+            CopyTextResource( m, "Program.cs" );
+            CopyTextResource( m, "Build.cs", AdaptBuild );
+            CopyTextResource( m, "Build.NuGetHelper.cs" );
+            CopyTextResource( m, "Build.StandardCheckRepository.cs" );
+            CopyTextResource( m, "Build.StandardSolutionBuild.cs" );
+            CopyTextResource( m, "Build.StandardUnitTests.cs" );
+            CopyTextResource( m, "Build.StandardCreateNuGetPackages.cs" );
+            CopyTextResource( m, "Build.StandardPushNuGetPackages.cs" );
         }
 
         string AdaptBuild( string text )
@@ -76,31 +40,5 @@ namespace CK.Env.MSBuild
                   RegexOptions.ExplicitCapture | RegexOptions.CultureInvariant );
             return r.Replace( text, "$1"+name+"$2" );
         }
-
-        void EnsureLoadResources()
-        {
-            string ReadText( Assembly a, string path )
-            {
-                using( var r = new StreamReader( GetType().Assembly.GetManifestResourceStream( "CK.Env.MSBuild.SolutionFiles.CodeCakeBuilder.Build.Res.NuGetHelper.txt" ) ) )
-                {
-                    return r.ReadToEnd();
-                }
-            }
-
-            string KeepLocalPath( string r, string prefix )
-            {
-                return r.Substring( prefix.Length, r.Length - prefix.Length - 3 );
-            }
-
-            if( _resources.Count == 0 )
-            {
-                var a = GetType().Assembly;
-                string prefix = "CK.Env.MSBuild.SolutionFiles.CodeCakeBuilder.Build.Res.";
-                var resNames = a.GetManifestResourceNames().Where( p => p.StartsWith( prefix ) );
-                var kv = resNames.Select( r => new KeyValuePair<string, string>( KeepLocalPath( r, prefix ), ReadText( a, r ) ) );
-                _resources.AddRange( kv );
-            }
-        }
-
     }
 }

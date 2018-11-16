@@ -14,10 +14,10 @@ namespace CK.Env
 
         bool GetEnabled();
 
-        bool HasPayload { get; }
+        Type PayloadType { get; }
 
         object CreatePayload();
 
-        void Handle( IActivityMonitor m, object payload );
+        void Execute( IActivityMonitor m, object payload );
     }
 }

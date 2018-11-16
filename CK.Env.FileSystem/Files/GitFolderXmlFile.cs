@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace CK.Env
@@ -17,8 +18,17 @@ namespace CK.Env
         XDocument _doc;
         string _currentText;
 
-        public GitFolderXmlFile( GitFolder f, NormalizedPath path )
-            : base( f, path )
+        static readonly XmlWriterSettings _stdSettings = new XmlWriterSettings()
+        {
+            Indent = true,
+            IndentChars = "  ",
+            OmitXmlDeclaration = true,
+            NewLineOnAttributes = false,
+            NewLineHandling = NewLineHandling.Replace
+        };
+
+        public GitFolderXmlFile( GitFolder f, NormalizedPath filePath )
+            : base( f, filePath )
         {
         }
 
@@ -50,7 +60,12 @@ namespace CK.Env
         {
             if( _currentText == null && GetDocument() != null )
             {
-                _currentText = _doc.ToString();
+                var b = new StringBuilder();
+                using( var w = XmlWriter.Create( b, _stdSettings ) )
+                {
+                    _doc.WriteTo( w );
+                }
+                _currentText = b.ToString();
             }
             return _currentText;
         }
@@ -69,7 +84,7 @@ namespace CK.Env
                 if( value != _doc )
                 {
                     ClearDocument();
-                    if( _doc != null ) _doc.Changed += OnDocChanged;
+                    if( (_doc = value) != null ) _doc.Changed += OnDocChanged;
                 }
             }
         }

@@ -24,7 +24,6 @@ namespace CK.Env.MSBuild
         readonly IWorldStore _worldStore;
         readonly ILocalFeedProvider _feeds;
         readonly INuGetClient _nugetClient;
-        readonly IFileProvider _referential;
         readonly ISecretKeyStore _secretKeyStore;
         readonly Func<IActivityMonitor, string, IReadOnlyList<Solution>> _branchSolutionsLoader;
         readonly WorldState _worldState;
@@ -76,7 +75,6 @@ namespace CK.Env.MSBuild
             IWorldStore store,
             ILocalFeedProvider feeds,
             INuGetClient nuGetClient,
-            IFileProvider referential,
             ISecretKeyStore secretKeyStore,
             WorkStatus wStatus,
             WorldState worldState,
@@ -86,7 +84,6 @@ namespace CK.Env.MSBuild
             _worldStore = store;
             _feeds = feeds;
             _nugetClient = nuGetClient;
-            _referential = referential;
             _secretKeyStore = secretKeyStore;
             _worldState = worldState;
             _workStatus = wStatus;
@@ -368,83 +365,55 @@ namespace CK.Env.MSBuild
 
             using( m.OpenInfo( $"Removing {buildDepNames.Concatenate()} packages ZeroVersion from local NuGet cache if they exist." ) )
             {
-                //foreach( var pName in buildDepNames )
-                //{
-                //    _feeds.RemoveFromNuGetCache( m, pName, SVersion.ZeroVersion );
-                //}
+                foreach( var pName in buildDepNames )
+                {
+                    _feeds.RemoveFromNuGetCache( m, pName, SVersion.ZeroVersion );
+                }
             }
 
             var touchedSolutions = new List<Solution>();
             using( m.OpenInfo( $"Updating package references to ZeroVersion." ) )
             {
-                //foreach( var sp in r.BuildProjectsInfo.ProjectsToUpgrade.GroupBy( p => p.Project.Project.PrimarySolution ) )
-                //{
-                //    touchedSolutions.Add( sp.Key );
-                //    foreach( var projectAndDeps in sp )
-                //    {
-                //        var project = projectAndDeps.Project.Project;
-                //        foreach( var dep in projectAndDeps.Packages )
-                //        {
-                //            project.SetPackageReferenceVersion( m, project.TargetFrameworks, dep.PackageId, SVersion.ZeroVersion );
-                //        }
-                //    }
-                //    if( !sp.Key.Save( m, FileSystem ) ) return false;
-                //}
+                foreach( var sp in r.BuildProjectsInfo.ProjectsToUpgrade.GroupBy( p => p.Project.Project.PrimarySolution ) )
+                {
+                    touchedSolutions.Add( sp.Key );
+                    foreach( var projectAndDeps in sp )
+                    {
+                        var project = projectAndDeps.Project.Project;
+                        foreach( var dep in projectAndDeps.Packages )
+                        {
+                            project.SetPackageReferenceVersion( m, project.TargetFrameworks, dep.PackageId, SVersion.ZeroVersion );
+                        }
+                    }
+                    if( !sp.Key.Save( m, FileSystem ) ) return false;
+                }
             }
 
             using( m.OpenInfo( $"Generating ZeroVersion in LocalFeed/Local feed for packages: {buildDepNames.Concatenate()}" ) )
             {
-                //var args = $@"pack --output ""{_feeds.GetLocalFeedFolder( m ).PhysicalPath}"" --include-symbols --configuration Debug /p:Version=""{SVersion.ZeroVersion}"" /p:AssemblyVersion=""{InformationalVersion.ZeroAssemblyVersion}"" /p:FileVersion=""{InformationalVersion.ZeroFileVersion}"" /p:InformationalVersion=""{InformationalVersion.ZeroInformationalVersion}"" ";
-                //foreach( var p in r.BuildProjectsInfo.DependenciesToBuild )
-                //{
-                //    var path = FileSystem.GetFileInfo( p.Project.Project.Path.RemoveLastPart() ).PhysicalPath;
-                //    FileSystem.RawDeleteLocalDirectory( m, Path.Combine( path, "bin" ) );
-                //    FileSystem.RawDeleteLocalDirectory( m, Path.Combine( path, "obj" ) );
-                //    if( !GlobalBuilder.Run( m, path, "dotnet", args ) ) return false;
-                //}
+                var args = $@"pack --output ""{_feeds.GetLocalFeedFolder( m ).PhysicalPath}"" --include-symbols --configuration Debug /p:Version=""{SVersion.ZeroVersion}"" /p:AssemblyVersion=""{InformationalVersion.ZeroAssemblyVersion}"" /p:FileVersion=""{InformationalVersion.ZeroFileVersion}"" /p:InformationalVersion=""{InformationalVersion.ZeroInformationalVersion}"" ";
+                foreach( var p in r.BuildProjectsInfo.DependenciesToBuild )
+                {
+                    var path = FileSystem.GetFileInfo( p.Project.Project.Path.RemoveLastPart() ).PhysicalPath;
+                    FileSystem.RawDeleteLocalDirectory( m, Path.Combine( path, "bin" ) );
+                    FileSystem.RawDeleteLocalDirectory( m, Path.Combine( path, "obj" ) );
+                    if( !GlobalBuilder.Run( m, path, "dotnet", args ) ) return false;
+                }
             }
 
             // This appeared to be required once the ZeroVersions are avalaible otherwise
             // updated dependencies are ignored.
             using( m.OpenInfo( "Forcing a dotnet restore --force on all touched solutions." ) )
             {
-                //foreach( var s in touchedSolutions )
-                //{
-                //    var path = FileSystem.GetFileInfo( s.SolutionFolderPath ).PhysicalPath;
-                //    if( !GlobalBuilder.Run( m, path, "dotnet", "restore --force" ) ) return false;
-                //}
+                foreach( var s in touchedSolutions )
+                {
+                    var path = FileSystem.GetFileInfo( s.SolutionFolderPath ).PhysicalPath;
+                    if( !GlobalBuilder.Run( m, path, "dotnet", "restore --force" ) ) return false;
+                }
             }
 
             foreach( var s in r.Solutions )
             {
-                using( m.OpenInfo( $"Updating standard CodeCakeBuilder files." ) )
-                {
-                    var cp = s.Solution.BuildProjects.Where( p => p.Name == "CodeCakeBuilder" ).Single();
-                    cp.SetTargetFrameworks( m, MSBuildContext.Traits.FindOrCreate( "netcoreapp2.1" ) );
-                    cp.SetPackageReferenceVersion( m, cp.TargetFrameworks, "NuGet.Credentials", SVersion.Parse( "4.8.0" ), true );
-                    cp.SetPackageReferenceVersion( m, cp.TargetFrameworks, "NuGet.Protocol", SVersion.Parse( "4.8.0" ), true );
-                    if( !cp.Save( m, FileSystem ) ) return false;
-                    var codeCakeBuilderPath = s.Solution.SolutionFolderPath.AppendPart( "CodeCakeBuilder" );
-                    foreach( var name in new[]
-                    {
-                        ("Build.NuGetHelper.cs",false),
-                        ("Build.StandardCheckRepository.cs",false),
-                        ("Build.StandardCreateNuGetPackages.cs",false),
-                        ("Build.StandardPushNuGetPackages.cs",false),
-                        ("Build.StandardSolutionBuild.cs",false),
-                        ("Build.StandardUnitTests.cs",false),
-                        ("InstallCredentialProvider.ps1",false)
-                    } )
-                    {
-                        var path = codeCakeBuilderPath.AppendPart( name.Item1 );
-                        var f = FileSystem.GetFileInfo( path );
-                        if( f.Exists || name.Item2 )
-                        {
-                            var source = _referential.GetFileInfo( "InitialCodeCakeBuilder/" + name.Item1 );
-                            FileSystem.CopyTo( m, source, path );
-                        }
-                    }
-                }
                 if( commitChanges && !s.Solution.GitFolder.Commit( m, $"Build project now uses ZeroVersion available dependencies in LocalFeed/Local feed." ).Success )
                 {
                     return false;
@@ -652,8 +621,7 @@ namespace CK.Env.MSBuild
             IWorldStore worldStore,
             ILocalFeedProvider feeds,
             INuGetClient nugetClient,
-            IFileProvider referential,
-            ISecretKeyStore publishKeyStore,
+            ISecretKeyStore secretKeyStore,
             IEnumerable<GitFolder> gitFolders,
             Func<IActivityMonitor, string, IReadOnlyList<Solution>> branchSolutionsLoader )
         {
@@ -664,7 +632,7 @@ namespace CK.Env.MSBuild
             if( !gitContext.CheckStatus( m, ref gitStatus, workStatus == WorkStatus.SwitchingToDevelop || workStatus == WorkStatus.SwitchingToLocal ) ) return null;
             Debug.Assert( gitStatus != StandardGitStatus.Unknwon );
             worldState.GlobalGitStatus = gitStatus;
-            return new WorldContext( gitContext, worldStore, feeds, nugetClient, referential, publishKeyStore, workStatus, worldState, branchSolutionsLoader );
+            return new WorldContext( gitContext, worldStore, feeds, nugetClient, secretKeyStore, workStatus, worldState, branchSolutionsLoader );
         }
 
     }

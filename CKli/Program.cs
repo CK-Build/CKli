@@ -57,52 +57,36 @@ namespace CKli
             if( !global.Open() ) return false;
             for(; ; )
             {
-                global.DisplayActions( Console.Out );
-                Console.WriteLine( $"r[estart] || i[ssues] || f[ix] all|#issue+ || a[ction] #action || e[xit]" );
                 Console.Write( $">" );
                 string rep = Console.ReadLine().Trim();
                 if( rep.Length == 0 )
                 {
-                    if( !global.Run( false ) ) return false;
-                    global.DisplayIssues( Console.Out, true );
+                    foreach( var c in global.CommandRegister.GetAll().OrderBy( c => c.UniqueName ) )
+                    {
+                        Console.WriteLine( c.UniqueName );
+                    }
                     continue;
                 }
-                if( rep[0] == 'i' )
-                {
-                    if( !global.Run( true ) ) return false;
-                    global.DisplayIssues( Console.Out, true );
-                    continue;
-                }
-                if( rep[0] == 'e' ) return true;
-                if( rep[0] == 'r' )
+                if( rep == "exit" ) return true;
+                if( rep == "refresh" )
                 {
                     if( !global.Open() ) return false;
                     continue;
                 }
-                if( rep[0] == 'a' )
+                if( rep.StartsWith( "run " ) )
                 {
-                    int act = ReadNumber( rep );
-                    if( act < 0 || act >= global.Actions.Count )
+                    rep = rep.Substring( 4 ).Trim();
+                    var handlersByType = global.CommandRegister.Select( rep )
+                                            .GroupBy( c => c.PayloadType )
+                                            .ToList();
+                    foreach( var h in handlersByType )
                     {
-                        Console.WriteLine( $"Invalid action number." );
-                    }
-                    else
-                    {
-                        global.RunAction( monitor, act );
-                    }
-                    continue;
-                }
-                if( rep[0] == 'f' )
-                {
-                    var issues = ReadNumbers( monitor, rep, 0, global.Issues.Count - 1 );
-                    if( issues.Count > 0 )
-                    {
-                        foreach( int iss in issues )
+                        var payload = h.First().CreatePayload();
+                        foreach( var c in h )
                         {
-                            if( !global.Issues[iss].AutoFix( monitor ) ) break;
+                            c.Execute( monitor, payload );
                         }
                     }
-                    else global.DisplayIssues( Console.Out, true );
                     continue;
                 }
             }

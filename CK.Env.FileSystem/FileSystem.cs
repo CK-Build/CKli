@@ -19,15 +19,17 @@ namespace CK.Env
     /// </summary>
     public class FileSystem : IFileProvider, IDisposable
     {
+        readonly CommandRegister _commandRegister;
         readonly List<GitFolder> _gits;
 
         /// <summary>
         /// Initializes a new <see cref="FileSystem"/> on a physical root path.
         /// </summary>
         /// <param name="rootPath">Physical root path.</param>
-        public FileSystem( string rootPath )
+        public FileSystem( string rootPath, CommandRegister commandRegister )
         {
             Root = new NormalizedPath( Path.GetFullPath( rootPath ) );
+            _commandRegister = commandRegister;
             _gits = new List<GitFolder>();
             ServiceContainer = new SimpleServiceContainer();
             ServiceContainer.Add( this );
@@ -81,7 +83,7 @@ namespace CK.Env
                         } );
                     }
                 }
-                g = new GitFolder( this, gitFolder, world );
+                g = new GitFolder( this, gitFolder, _commandRegister, world );
                 _gits.Add( g );
             }
             return g;

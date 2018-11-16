@@ -50,6 +50,7 @@ namespace CK.Env
         internal GitFolder(
             FileSystem fs,
             string gitFolder,
+            CommandRegister commandRegister,
             IWorldName world )
         {
             Debug.Assert( gitFolder.StartsWith( fs.Root.Path ) && gitFolder.EndsWith( ".git" ) );
@@ -66,7 +67,7 @@ namespace CK.Env
             _thisDir = new RootDir( this, SubPath.LastPart );
             ServiceContainer = new SimpleServiceContainer( FileSystem.ServiceContainer );
             ServiceContainer.Add( this );
-            PluginManager = new GitPluginManager( ServiceContainer, world.DevelopBranchName, SubPath.AppendPart( "branches" ) );
+            PluginManager = new GitPluginManager( ServiceContainer, commandRegister, world.DevelopBranchName, SubPath.AppendPart( "branches" ) );
 
             string origin = _git.Network.Remotes["origin"]?.Url;
             if( origin != null )
@@ -76,6 +77,7 @@ namespace CK.Env
                 else if( origin.IndexOf( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.Vsts;
                 else if( origin.IndexOf( "bitbucket.org", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.Bitbucket;               
             }
+            OriginUrl = origin;
         }
 
         /// <summary>
@@ -92,6 +94,11 @@ namespace CK.Env
         /// Gets the plugin manager for this GitFolder and its branches.
         /// </summary>
         public GitPluginManager PluginManager { get; }
+
+        /// <summary>
+        /// Gets the current remote origin url.
+        /// </summary>
+        public string OriginUrl { get; }
 
         /// <summary>
         /// Gets the current <see cref="IWorldName"/>.
@@ -821,6 +828,7 @@ namespace CK.Env
 
         internal void Dispose()
         {
+            ((IDisposable)PluginManager).Dispose();
             _git.Dispose();
         }
 

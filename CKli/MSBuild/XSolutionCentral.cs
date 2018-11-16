@@ -10,14 +10,13 @@ using System.Text;
 
 namespace CKli
 {
-    public class XSolutionCentral : XTypedObject
+    public class XSolutionCentral : XTypedObject, ICommandMethodsProvider
     {
         readonly IWorldName _world;
         readonly IWorldStore _worldStore;
         readonly XLocalFeedProvider _packageFeeds;
         readonly XNuGetClient _nuGetClient;
         readonly MSBuildContext _msBuildContext;
-        readonly XReferentialFolder _referential;
         readonly XSecretKeyStore _publishKeyStore;
         readonly List<XGitFolder> _allGitFolders;
 
@@ -30,10 +29,10 @@ namespace CKli
             FileSystem fileSystem,
             IWorldName world,
             IWorldStore worldStore,
-            XReferentialFolder referential,
             XSecretKeyStore publishKeyStore,
             XLocalFeedProvider packageFeeds,
             XNuGetClient nuGetClient,
+            CommandRegister commandRegister,
             Initializer initializer )
             : base( initializer )
         {
@@ -41,7 +40,6 @@ namespace CKli
             _worldStore = worldStore;
             _packageFeeds = packageFeeds;
             _nuGetClient = nuGetClient;
-            _referential = referential;
             _publishKeyStore = publishKeyStore;
             _msBuildContext = new MSBuildContext( fileSystem );
             fileSystem.ServiceContainer.Add( _msBuildContext );
@@ -52,6 +50,47 @@ namespace CKli
             _allSolutions = new List<XSolutionBase>();
             _allDevelopSolutions = new List<XSolutionBase>();
             _allGitFoldersWithDevelopBranchName = new List<XGitFolder>();
+
+            CommandProviderName = "Solutions";
+            commandRegister.Register( this );
+        }
+
+        public NormalizedPath CommandProviderName { get; }
+
+        [CommandMethod]
+        public void DumpGitFolderStatus( IActivityMonitor m )
+        {
+            var gitFolders = _allGitFolders.Select( x => x.GitFolder );
+            int gitFoldersCount = 0;
+            var dirty = new List<string>();
+            foreach( var git in gitFolders )
+            {
+                ++gitFoldersCount;
+                using( m.OpenInfo( $"{git.SubPath} - branch: {git.CurrentBranchName}." ) )
+                {
+                    var pluginCount = $"({git.PluginManager.BranchPlugins[git.CurrentBranchName].Count} plugins)";
+                    if( git.CheckCleanCommit( m ) ) m.CloseGroup( "Up-to-date. " + pluginCount );
+                    else
+                    {
+                        dirty.Add( git.SubPath );
+                        m.CloseGroup( "Dirty. "+ pluginCount );
+                    }
+                }
+            }
+            m.CloseGroup( $"{dirty.Count} dirty (out of {gitFoldersCount})." );
+            if( dirty.Count > 0 ) m.Info( $"Dirty: {dirty.Concatenate()}" );
+            var byActiveBranch = gitFolders.GroupBy( g => g.CurrentBranchName );
+            if( byActiveBranch.Count() > 1 )
+            {
+                using( m.OpenInfo( $"{byActiveBranch.Count()} different branches:" ) )
+                {
+                    foreach( var b in byActiveBranch )
+                    {
+                        m.Info( $"Branch '{b.Key}': {b.Select( g => g.SubPath.Path ).Concatenate()}" );
+                    }
+                }
+            }
+            else m.Info( $"All {gitFoldersCount} git folders are on '{byActiveBranch.First().Key}' branch." );
         }
 
         internal void Register( XGitFolder g )
@@ -100,7 +139,6 @@ namespace CKli
                                     _worldStore,
                                     _packageFeeds,
                                     _nuGetClient.NuGetClient,
-                                    _referential.FileProvider,
                                     _publishKeyStore,
                                     AllGitFoldersWithDevelopBranchName.Select( g => g.GitFolder ),
                                     (monitor,branchName) => GetAllSolutions( monitor, true, branchName ) );
@@ -153,5 +191,6 @@ namespace CKli
         /// appear before any of their secondary solutions (this is to avoid loading twice the secondary solutions).
         /// </summary>
         public IReadOnlyList<XSolutionBase> AllDevelopSolutions => _allDevelopSolutions;
+
     }
 }

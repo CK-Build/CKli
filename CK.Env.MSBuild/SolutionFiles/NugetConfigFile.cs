@@ -16,7 +16,7 @@ namespace CK.Env.MSBuild
         XElement _packageSources;
 
         public NugetConfigFile( GitFolder f, ILocalFeedProvider localFeedProvider, ISolutionSettings s, NormalizedPath branchPath )
-            : base( f, "NuGet.config" )
+            : base( f, branchPath.AppendPart( "NuGet.config" ) )
         {
             _localFeedProvider = localFeedProvider;
             _settings = s;
@@ -25,8 +25,9 @@ namespace CK.Env.MSBuild
 
         public NormalizedPath BranchPath { get; }
 
-        NormalizedPath ICommandMethodsProvider.CommandProviderName => BranchPath;
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
+        [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
@@ -146,7 +147,7 @@ namespace CK.Env.MSBuild
                 _packageSources
                         .Elements( "add" )
                         .FirstOrDefault( b => (string)b.Attribute( "key" ) == feedName )
-                        ?.Remove();
+                        ?.RemoveCommentsBefore().Remove();
                 if( withCredentials ) RemoveFeedCredential( m, feedName );
             }
         }
@@ -160,7 +161,7 @@ namespace CK.Env.MSBuild
         {
             Document?.Root.Element( "packageSourceCredentials" )
                          ?.Element( feedName.Replace( " ", "_x0020_" ) )
-                         ?.Remove();
+                         ?.RemoveCommentsBefore().Remove();
         }
 
 

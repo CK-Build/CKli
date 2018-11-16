@@ -4,10 +4,9 @@
   <LocalFeedProvider />
   <SecretKeyStore />
   <NuGetClient />
-  <ReferentialFolder Path="CK-Env/CKli/Referential" />
   <SolutionCentral />
 
-  <GitStatusAction Title="Displays statuses of all the repositories." />
+  <!--<GitStatusAction Title="Displays statuses of all the repositories." />
   <GitCheckoutAction Title="Checkout all repositories on a specific branch name." />
   <GitResetAction Title="ResetHard: Totally reset current changes on current branch for all repository." />
   <GitCommitAction Title="Commits all pending changes to the current branch of all the repositories." />
@@ -16,10 +15,10 @@
   <GlobalDependencyAction Title="Solutions &amp; Projects management." />
   <GlobalSwitchBranchAction Title="Switch between 'develop-local' &lt;=&gt; 'develop' branches." />
   <GlobalLocalBuildAction Title="CI Build: Build all Solutions in 'develop' or 'develop-local' branch, pushing packages to LocalFeed or LocalFeed/Blanck feeds (optionally pushing them to MyGet invenietis-ci feed for 'develop' branch), propagating CI versions across dependent solutions." />
-  <GlobalFixBuildScriptAction Title="Fix build script (must be in 'local' branch)." />
+  <GlobalFixBuildScriptAction Title="Fix build script (must be in 'local' branch)." />-->
   <!--<GlobalBlankBuildAction Title="Blank build: Build all Solutions locally in 'develop-local' branch." />-->
-  <GlobalReleaserAction Title="Global Release." />
-  <ExternalPackagesAction Title="External packages analysis." />
+  <!--<GlobalReleaserAction Title="Global Release." />
+  <ExternalPackagesAction Title="External packages analysis." />-->
 
   <SolutionSettings>
     <NuGetSources>
@@ -48,9 +47,5 @@
       </Folder>
     </Folder>
   </Folder>
-
-  <File Name="CK-World">
-    <MustExist Content="SimpleFiles/CK-World"/>
-  </File>
 
 </A1Test>

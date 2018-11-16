@@ -17,14 +17,15 @@ namespace CK.Env
     /// A default branch must be provided: plugins registered in this default branch are used as fallbacks
     /// for unconfigured branch.
     /// </summary>
-    public class GitPluginManager
+    public class GitPluginManager : IDisposable
     {
         readonly GitPluginRegistry _registry;
+        readonly CommandRegister _commandRegister;
         readonly string _defaultBranchName;
         readonly PluginCollection<IGitPlugin> _plugins;
         readonly Branches _branches;
 
-        class Branches : IGitBranchPluginCollection
+        class Branches : IGitBranchPluginCollection, IDisposable
         {
             readonly GitPluginManager _manager;
             readonly Dictionary<string, PluginCollection<IGitBranchPlugin>> _branchPlugins;
@@ -68,6 +69,15 @@ namespace CK.Env
                     if( _branchPlugins.TryGetValue( branchName, out var b ) ) b.Reload();
                 }
             }
+
+            public void Dispose()
+            {
+                foreach( var b in _branchPlugins.Values )
+                {
+                    b.Dispose();
+                }
+                _branchPlugins.Clear();
+            }
         }
 
         class PluginCollection<T> : IGitPluginCollection<T>, IDisposable, IServiceProvider where T : class
@@ -97,7 +107,12 @@ namespace CK.Env
             public void Reload()
             {
                 if( _pluginCount != 0 ) Reset();
-                _pluginCount = _manager._registry.FillMappings( _mappings, ServiceContainer, BranchName, BranchName != null ? _manager._defaultBranchName : null );
+                _pluginCount = _manager._registry.FillMappings(
+                                                    _mappings,
+                                                    ServiceContainer,
+                                                    _manager._commandRegister,
+                                                    BranchName,
+                                                    BranchName != null ? _manager._defaultBranchName : null );
             }
 
             public void Dispose() => Reset();
@@ -107,15 +122,22 @@ namespace CK.Env
                 var pluginKeys = _mappings.Keys.Where( k => GitPluginRegistry.IsGitFolderPlugin( k ) ).ToList();
                 foreach( var k in pluginKeys )
                 {
-                    var disposable = _mappings[k] as IDisposable;
-                    disposable?.Dispose();
+                    var p = _mappings[k];
+                    if( p is ICommandMethodsProvider commandProvider)
+                    {
+                        _manager._commandRegister.Unregister( commandProvider );
+                    }
+                    if( p is IDisposable disposable )
+                    {
+                        disposable.Dispose();
+                    }
                     _mappings.Remove( k );
                 }
             }
 
             public string BranchName { get; }
 
-            public int Count => _mappings.Count;
+            public int Count => _pluginCount;
 
             public IEnumerator<T> GetEnumerator() => _mappings.Values.OfType<T>().GetEnumerator();
 
@@ -135,13 +157,16 @@ namespace CK.Env
         /// Initializes a new plugin manager.
         /// </summary>
         /// <param name="baseProvider">The base service provider.</param>
+        /// <param name="commandRegister">Command registerer.</param>
         /// <param name="defaultBranchName">The default branch name (typically "develop"). Must not be null or empty.</param>
         /// <param name="branchesPath">Required root /branches path relative from the root FileSystem.</param>
-        public GitPluginManager( ISimpleServiceContainer baseProvider, string defaultBranchName, NormalizedPath branchesPath )
+        public GitPluginManager( ISimpleServiceContainer baseProvider, CommandRegister commandRegister, string defaultBranchName, NormalizedPath branchesPath )
         {
             if( String.IsNullOrWhiteSpace(defaultBranchName) ) throw new ArgumentNullException( nameof( defaultBranchName ) );
+            if( commandRegister == null ) throw new ArgumentNullException( nameof( commandRegister ) );
             ServiceContainer = new SimpleServiceContainer( baseProvider );
             _defaultBranchName = defaultBranchName;
+            _commandRegister = commandRegister;
             _registry = new GitPluginRegistry( branchesPath );
             _plugins = new PluginCollection<IGitPlugin>( this, null );
             _branches = new Branches( this );
@@ -195,20 +220,27 @@ namespace CK.Env
         /// Note that if an instance has already been registered, it is replaced.
         /// It will be available after a subsequent <see cref="Reload"/>.
         /// </summary>
+        /// <typeparam name="T">Type of the settings.</typeparam>
+        /// <param name="instance">The instance. Must not be null.</param>
+        /// <param name="branchName">The branch name or null for a root setting.</param>
+        public void RegisterSettings<T>( T instance, string branchName = null ) => _registry.RegisterSettings( typeof(T), instance, branchName );
+
+        /// <summary>
+        /// Registers a settings object.
+        /// The instance will be available in all branches if <paramref name="branchName"/> is null.
+        /// Note that if an instance has already been registered, it is replaced.
+        /// It will be available after a subsequent <see cref="Reload"/>.
+        /// </summary>
         /// <param name="type">The type to register. Must not be null.</param>
         /// <param name="instance">The instance. Must not be null.</param>
         /// <param name="branchName">The branch name or null for a root setting.</param>
         public void RegisterSettings( Type type, object instance, string branchName = null ) => _registry.RegisterSettings( type, instance, branchName );
 
-        /// <summary>
-        /// Registers a settings object.
-        /// The instance will be available in all branches if <paramref name="branchName"/> is null.
-        /// If an instance has already been registered, it is replaced.
-        /// It will be available after a subsequent <see cref="Reload"/>.
-        /// </summary>
-        /// <param name="instance">The instance. Must not be null.</param>
-        /// <param name="branchName">The branch name or null for a root setting.</param>
-        public void RegisterSettings( object instance, string branchName = null ) => RegisterSettings( branchName );
+        void IDisposable.Dispose()
+        {
+            _branches.Dispose();
+            _plugins.Dispose();
+        }
 
     }
 }

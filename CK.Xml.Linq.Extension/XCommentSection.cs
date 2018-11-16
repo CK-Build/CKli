@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace System.Xml.Linq
 {
     public class XCommentSection
     {
+        static readonly Regex _startRegex = new Regex( "^<(?<1>[a-zA-Z]\\w*)>", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture );
         readonly string _startMarker;
         readonly string _endMarker;
         readonly XComment _start;
@@ -30,14 +32,26 @@ namespace System.Xml.Linq
             XComment end = null;
             if( start != null )
             {
-                end = start.NodesAfterSelf().OfType<XComment>().Where( n => n.Value.StartsWith( endMarker ) ).SingleOrDefault();
-                if( end == null ) throw new Exception( $"Invalid Comment Section: Unable to find closing <!--{endMarker}--> in '{parent}'." );
+                end = start.NodesAfterSelf().OfType<XComment>().FirstOrDefault( n => n.Value.StartsWith( endMarker ) );
+                if( end == null )
+                {
+                    var next = start.NodesAfterSelf().OfType<XComment>().FirstOrDefault( n => _startRegex.Match( n.Value ).Success );
+                    end = new XComment( endMarker );
+                    if( next != null )
+                    {
+                        next.AddBeforeSelf( end, new XText( Environment.NewLine ) );
+                    }
+                    else
+                    {
+                        parent.Add( end, new XText( Environment.NewLine ) );
+                    }
+                }
             }
             else if( createIfNotExists )
             {
                 start = new XComment( startMarker );
                 end = new XComment( endMarker );
-                parent.Add( start, end );
+                parent.Add( new XText( Environment.NewLine ), start, end, new XText( Environment.NewLine ) );
             }
             return start != null ? new XCommentSection( name, startMarker, endMarker, start, end ) : null;
         }
@@ -69,13 +83,18 @@ namespace System.Xml.Linq
         public IEnumerable<XElement> Content => _start.NodesAfterSelf().TakeWhile( n => n != _end ).OfType<XElement>();
 
         /// <summary>
+        /// Gets all the nodes of this comment section.
+        /// </summary>
+        public IEnumerable<XNode> ContentNodes => _start.NodesAfterSelf().TakeWhile( n => n != _end );
+
+        /// <summary>
         /// Replaces the content of this comment section.
         /// </summary>
         /// <param name="objects">Content objects.</param>
         public void SetContent( params object[] objects )
         {
-            Content.Remove();
-            _start.AddAfterSelf( objects );
+            ContentNodes.Remove();
+            _start.AddAfterSelf( new XText( Environment.NewLine ), objects, new XText( Environment.NewLine ) );
         }
 
         /// <summary>

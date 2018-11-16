@@ -22,11 +22,25 @@ namespace System.Xml.Linq
 
         public static XElement EnsureFirstElement( this XElement @this, XName name )
         {
-            XElement e = @this.Element( name ) ?? new XElement( name );
+            XElement e = @this.Element( name );
+            if( e != null ) e.Remove();
+            else e = new XElement( name );
             @this.AddFirst( e );
             return e;
         }
 
+        public static XElement RemoveCommentsBefore( this XElement @this )
+        {
+            bool hasNewLine = false;
+            @this.NodesBeforeSelf()
+                 .Reverse()
+                 .TakeWhile( n => n is XComment || n is XText )
+                 .Reverse()
+                 .Select( n => { hasNewLine |= n is XText t && t.Value.IndexOf( '\n' ) >= 0; return n; } )
+                 .Remove();
+            if( hasNewLine ) @this.AddBeforeSelf( Environment.NewLine );
+            return @this;
+        }
 
         /// <summary>
         /// Ensures that a &lt;add key="..." value="..." /&gt; element exists
@@ -161,7 +175,7 @@ namespace System.Xml.Linq
             return set;
         }
 
-        #region IEnumerable<XElement> extensions.
+        #region IEnumerable<XElement> ApplyAddRemoveClear extensions.
         public static Dictionary<string, T> ApplyAddRemoveClear<T>(
             this IEnumerable<XElement> @this,
             Func<XElement, string> keyReader,

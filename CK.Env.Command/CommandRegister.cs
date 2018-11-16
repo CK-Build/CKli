@@ -34,14 +34,14 @@ namespace CK.Env
         {
             readonly object _instance;
             readonly MethodInfo _method;
-            readonly Type _payloadType;
             readonly Func<bool> _enabled;
 
             public MethodHandler( NormalizedPath n, object instance, MethodInfo method, Type payloadType, Func<bool> enabled )
             {
+                UniqueName = n;
                 _instance = instance;
                 _method = method;
-                _payloadType = payloadType;
+                PayloadType = payloadType;
                 _enabled = enabled;
             }
 
@@ -49,22 +49,32 @@ namespace CK.Env
 
             public bool GetEnabled() => _enabled != null ? _enabled() : true;
 
-            public bool HasPayload => _payloadType != null;
+            public Type PayloadType { get; }
 
             public object CreatePayload()
             {
-                return _payloadType != null ? Activator.CreateInstance( _payloadType ) : null;
+                return PayloadType != null ? Activator.CreateInstance( PayloadType ) : null;
             }
 
-            public void Handle( IActivityMonitor m, object payload )
+            public void Execute( IActivityMonitor m, object payload )
             {
-                if( _payloadType != null )
+                using( m.OpenTrace( $"Executing {UniqueName}." ) )
                 {
-                    _method.Invoke( _instance, new[] { m, payload } );
-                }
-                else
-                {
-                    _method.Invoke( _instance, new[] { m } );
+                    try
+                    {
+                        if( PayloadType != null )
+                        {
+                            _method.Invoke( _instance, new[] { m, payload } );
+                        }
+                        else
+                        {
+                            _method.Invoke( _instance, new[] { m } );
+                        }
+                    }
+                    catch( Exception ex )
+                    {
+                        m.Error( ex );
+                    }
                 }
             }
         }
@@ -130,15 +140,20 @@ namespace CK.Env
             }
         }
 
-        public List<ICommandHandler> Select( NormalizedPath globPattern, bool checkEnabled = true )
+        public void UnregisterAll()
         {
-            var result = new List<ICommandHandler>();
+            _commands.Clear();
+        }
+
+        public IEnumerable<ICommandHandler> GetAll( bool checkEnabled = true )
+        {
+            return checkEnabled ? _commands.Values.Where( c => c.GetEnabled() ) : _commands.Values;
+        }
+
+        public IEnumerable<ICommandHandler> Select( NormalizedPath globPattern, bool checkEnabled = true )
+        {
             var p = Glob.Parse( globPattern );
-            foreach( var c in _commands.Values )
-            {
-                if( p.IsMatch( c.UniqueName ) && (!checkEnabled || c.GetEnabled() ) ) result.Add( c );
-            }
-            return result;
+            return _commands.Values.Where( c => p.IsMatch( c.UniqueName ) && (!checkEnabled || c.GetEnabled()) );
         }
 
     }

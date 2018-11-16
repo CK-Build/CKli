@@ -15,15 +15,14 @@ namespace CK.Env
     {
         ITextFileInfo _file;
 
-        protected GitFolderTextFileBase( GitFolder f, NormalizedPath path )
+        protected GitFolderTextFileBase( GitFolder f, NormalizedPath filePath )
         {
+            if( !filePath.StartsWith( f.SubPath ) ) throw new ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
             Folder = f;
-            Path = f.SubPath
-                    .AppendPart( "branches" ).AppendPart( f.CurrentBranchName )
-                    .Combine( path );
+            FilePath = filePath;
         }
 
-        ITextFileInfo GetFile() => _file ?? (_file = Folder.FileSystem.GetFileInfo( Path ).AsTextFileInfo( ignoreExtension: true ));
+        ITextFileInfo GetFile() => _file ?? (_file = Folder.FileSystem.GetFileInfo( FilePath ).AsTextFileInfo( ignoreExtension: true ));
 
         /// <summary>
         /// Gets the Git folder.
@@ -33,7 +32,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the path in the <see cref="GitFolder.FileSystem"/> root.
         /// </summary>
-        public NormalizedPath Path { get; }
+        public NormalizedPath FilePath { get; }
 
         /// <summary>
         /// Gets the text file content or null if it does not exist.
@@ -50,7 +49,7 @@ namespace CK.Env
         {
             if( GetFile() != null )
             {
-                Folder.FileSystem.Delete( m, Path );
+                Folder.FileSystem.Delete( m, FilePath );
                 _file = null;
             }
             OnDeleted( m );
@@ -82,7 +81,7 @@ namespace CK.Env
                 Delete( m );
                 return true;
             }
-            if( !Folder.FileSystem.CopyTo( m, newContent, Path ) )
+            if( !Folder.FileSystem.CopyTo( m, newContent, FilePath ) )
             {
                 return false;
             }

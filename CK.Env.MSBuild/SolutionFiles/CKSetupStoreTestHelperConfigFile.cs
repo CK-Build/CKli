@@ -19,7 +19,7 @@ namespace CK.Env.MSBuild
             ISolutionSettings settings,
             ILocalFeedProvider localFeedProvider,
             NormalizedPath branchPath )
-            : base( f, "RemoteStore.TestHelper.config" )
+            : base( f, branchPath.AppendPart( "RemoteStore.TestHelper.config" ) )
         {
             _settings = settings;
             _localFeedProvider = localFeedProvider;

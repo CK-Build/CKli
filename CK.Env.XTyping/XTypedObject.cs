@@ -9,7 +9,7 @@ using System.Xml.Linq;
 
 namespace CK.Env
 {
-    public abstract class XTypedObject
+    public class XTypedObject
     {
         public class Initializer
         {
@@ -58,7 +58,7 @@ namespace CK.Env
 
         }
 
-        protected XTypedObject( Initializer initializer )
+        public XTypedObject( Initializer initializer )
         {
             Parent = initializer.Parent;
             XElement = initializer.Element;

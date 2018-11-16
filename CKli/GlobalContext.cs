@@ -17,27 +17,25 @@ namespace CKli
         readonly IActivityMonitor _monitor;
         readonly XTypedFactory _factory;
         readonly string _rootPath;
-        readonly IssueCollector _issues;
-        readonly ActionCollector _actions;
         readonly IWorldStore _worldStore;
         FileSystem _fs;
-        XRunnable _root;
         IWorldName _currentWorld;
+        XTypedObject _root;
 
         public GlobalContext( IActivityMonitor monitor, XTypedFactory factory, string rootPath )
         {
             _monitor = monitor;
             _factory = factory;
             _rootPath = rootPath;
-            _issues = new IssueCollector();
-            _actions = new ActionCollector();
+            CommandRegister = new CommandRegister();
             _worldStore = new LocalWorldStore( Path.Combine( _rootPath, "CK-Env" ) );
         }
+
+        public CommandRegister CommandRegister { get; }
 
         public IWorldName CurrentWorld => _currentWorld;
 
         public event EventHandler CurrentWorldChanged;
-
 
         public bool Open()
         {
@@ -46,14 +44,13 @@ namespace CKli
             if( w == null ) return false;
 
             _currentWorld = null;
-            _fs = new FileSystem( _rootPath );
+            _fs = new FileSystem( _rootPath, CommandRegister );
             var baseProvider = new SimpleServiceContainer();
             baseProvider.Add<ISimpleObjectActivator>( new SimpleObjectActivator() );
+            baseProvider.Add( CommandRegister );
             baseProvider.Add( _fs );
             baseProvider.Add( w );
             baseProvider.Add( _worldStore );
-            baseProvider.Add( _issues );
-            baseProvider.Add( _actions );
 
             var original = _worldStore.ReadWorldDescription( _monitor, w ).Root;
             var expanded = XTypedFactory.PreProcess( _monitor, original );
@@ -61,7 +58,7 @@ namespace CKli
             {
                 return false;
             }
-            _root = _factory.CreateInstance<XRunnable>( _monitor, expanded.Result, baseProvider );
+            _root = _factory.CreateInstance<XTypedObject>( _monitor, expanded.Result, baseProvider );
             if( _root == null ) return false;
             _currentWorld = w;
             CurrentWorldChanged?.Invoke( this, EventArgs.Empty );
@@ -91,77 +88,6 @@ namespace CKli
             }
         }
 
-        public bool Run( bool withIssues )
-        {
-            if( withIssues )
-            {
-                _issues.Clear();
-            }
-            _issues.Disabled = !withIssues;
-            var runContext = new XRunnable.DefaultContext( _monitor );
-            if( !_root.Run( runContext ) )
-            {
-                _monitor.Error( "Failed Run." );
-                return false;
-            }
-            return true;
-        }
-
-        public void DisplayIssues( TextWriter w, bool withDescription ) => _issues.DisplayIssues( w, withDescription );
-
-        public void DisplayActions( TextWriter w )
-        {
-            w.WriteLine( $"{_actions.Actions.Count} Actions:" );
-            foreach( var a in _actions.Actions )
-            {
-                w.Write( " > " );
-                w.WriteLine( a.ToString() );
-            }
-        }
-
-        public IReadOnlyList<IIssue> Issues => _issues.Issues;
-
-        public IReadOnlyList<XAction> Actions => _actions.Actions;
-
-        public void RunAction( IActivityMonitor monitor, int idxAction )
-        {
-            var a = _actions.Actions[idxAction];
-            using( monitor.OpenInfo( $"Executing action: {a.ToString()}" ) )
-            {
-                if( a.Parameters.Count > 0 )
-                {
-                    Console.WriteLine( $"{a.Parameters.Count} parameters required (type '!cancel' to cancel):" );
-                    foreach( var p in a.Parameters )
-                    {
-                        const string prefix = "     ";
-                        StringBuilder b = new StringBuilder();
-                        if( !String.IsNullOrWhiteSpace( p.Description ) )
-                        {
-                            b.AppendMultiLine( prefix, p.Description, true, true );
-                        }
-                        else b.Append( prefix );
-                        b.Append( "> " ).Append( p.Name ).Append( " => " );
-                        Console.Write( b.ToString() );
-                        string s;
-                        do
-                        {
-                            s = Console.ReadLine();
-                            if( s == "!cancel" )
-                            {
-                                monitor.CloseGroup( "Cancelled" );
-                                return;
-                            }
-                        }
-                        while( !p.ParseAndSet( monitor, s ) );
-                    }
-                }
-                if( !a.Run( monitor ) )
-                {
-                    monitor.CloseGroup( "Failed." );
-                }
-            }
-        }
-
         public void Close()
         {
             if( _fs != null )
@@ -174,10 +100,9 @@ namespace CKli
                     }
                     _root = null;
                 }
+                CommandRegister.UnregisterAll();
                 _fs.Dispose();
                 _fs = null;
-                _issues.Clear();
-                _actions.Clear();
             }
         }
 
