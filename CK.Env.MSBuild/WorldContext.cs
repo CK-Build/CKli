@@ -172,7 +172,7 @@ namespace CK.Env.MSBuild
                     foreach( var s in r.Solutions )
                     {
                         if( !s.UpdatePackageDependencies( m, _feeds.GetBestAnyLocalVersion, FileSystem, allowDowngrade: false, buildProjects: true ) ) return false;
-                        var fNuGet = s.Solution.GetPlugin<NugetConfigFile>();
+                        var fNuGet = s.Solution.GetPlugin<SolutionFiles.NugetConfigFile>();
                         fNuGet.RemoveLocalFeeds( m );
                         if( !fNuGet.Save( m ) ) return false;
                         if( !s.Solution.GitFolder.Commit( m, "Updated Build projects and removed LocalFeed NuGet sources." ).Success ) return false;

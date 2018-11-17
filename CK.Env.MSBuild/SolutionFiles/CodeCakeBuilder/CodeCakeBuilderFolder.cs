@@ -10,7 +10,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace CK.Env.MSBuild
+namespace CK.Env.MSBuild.SolutionFiles
 {
     public class CodeCakeBuilderFolder : PluginFolderBase
     {
@@ -36,7 +36,7 @@ namespace CK.Env.MSBuild
         {
             var name = Folder.SubPath.LastPart;
             Regex r = new Regex(
-                  "(?<1>const\\s+string\\s+solutionName\\s*=\\s*\")CK-Env(?<2>\";\\s*//\\s*!Transformable)",
+                  "(?<1>const\\s+string\\s+solutionName\\s*=\\s*\").*?(?<2>\";\\s*//\\s*!Transformable)",
                   RegexOptions.ExplicitCapture | RegexOptions.CultureInvariant );
             return r.Replace( text, "$1"+name+"$2" );
         }

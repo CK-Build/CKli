@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace CK.Env.MSBuild
+namespace CK.Env.MSBuild.SolutionFiles
 {
     public class SharedPropsFile : GitFolderXmlFile, IGitBranchPlugin, ICommandMethodsProvider
     {
@@ -59,18 +59,16 @@ namespace CK.Env.MSBuild
                         .Remove();
                 section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
             }
-            var prefix = Environment.NewLine + "  ";
             var p = new XElement( "PropertyGroup",
-                        prefix, new XElement( "AssemblyOriginatorKeyFile", "$(MSBuildThisFileDirectory))SharedKey.snk" ),
-                        prefix, new XElement( "SignAssembly", true ),
-                        prefix, new XElement( "PublicSign", new XAttribute( "Condition", " '$(OS)' != 'Windows_NT' " ), true ),
-                        prefix, new XElement( "RepositoryType", "git" ),
-                        prefix, new XElement( "RepositoryUrl", Folder.OriginUrl ),
-                        prefix, new XElement( "ProductName", Folder.World.FullName ),
-                        prefix, new XElement( "Company", "Signature Code" ),
-                        prefix, new XElement( "Authors", "Signature Code" ),
-                        prefix, new XElement( "Copyright", @"Copyright Invenietis 2007-$([System.DateTime]::UtcNow.ToString(""yyyy""))" ),
-                        Environment.NewLine );
+                            new XElement( "AssemblyOriginatorKeyFile", "$(MSBuildThisFileDirectory))SharedKey.snk" ),
+                            new XElement( "SignAssembly", true ),
+                            new XElement( "PublicSign", new XAttribute( "Condition", " '$(OS)' != 'Windows_NT' " ), true ),
+                            new XElement( "RepositoryType", "git" ),
+                            new XElement( "RepositoryUrl", Folder.OriginUrl ),
+                            new XElement( "ProductName", Folder.World.FullName ),
+                            new XElement( "Company", "Signature Code" ),
+                            new XElement( "Authors", "Signature Code" ),
+                            new XElement( "Copyright", @"Copyright Invenietis 2007-$([System.DateTime]::UtcNow.ToString(""yyyy""))" ) );
             section.SetContent( p );
         }
 
@@ -92,7 +90,7 @@ namespace CK.Env.MSBuild
                 XElement.Parse(
 @"<PropertyGroup Condition="" '$(IsInTestsFolder)' != 'true' And ('$(CakeBuild)' == 'true' Or '$(Configuration)' == 'Release') "">
   <GenerateDocumentationFile>true</GenerateDocumentationFile>
-</PropertyGroup>", LoadOptions.PreserveWhitespace ) );
+</PropertyGroup>" ) );
         }
 
         void HandleBasicDefinitions( IActivityMonitor m )
@@ -120,7 +118,7 @@ namespace CK.Env.MSBuild
   <IsInTestsFolder Condition=""$(MSBuildProjectDirectoryNoRoot.Contains('\Tests\'))"">true</IsInTestsFolder>
   <!-- SolutionDir is defined by Visual Studio, we unify the behavior here. -->
   <SolutionDir Condition="" $(SolutionDir) != '' "">$([System.IO.Path]::GetDirectoryName($([System.IO.Path]::GetDirectoryName($(MSBuildThisFileDirectory)))))\</SolutionDir>
-</PropertyGroup>", LoadOptions.PreserveWhitespace ) );
+</PropertyGroup>" ) );
         }
 
         void HandleReproducibleBuilds( IActivityMonitor m )
@@ -143,7 +141,7 @@ namespace CK.Env.MSBuild
   <!-- Finds the CK-World (empty file) that must exist at the root of the development directory. This is path to map to C:\CK-World. -->
   <CKWorldPath>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), CK-World))</CKWorldPath>
   <PathMap Condition="" '$(CKWorldPath)' != '' "">$(CKWorldPath)=C:\CK-World</PathMap>
-</PropertyGroup>", LoadOptions.PreserveWhitespace ) );
+</PropertyGroup>" ) );
         }
 
         void HandleZeroVersion( IActivityMonitor m )
@@ -162,7 +160,7 @@ namespace CK.Env.MSBuild
   <AssemblyVersion>0.0.0</AssemblyVersion>
   <FileVersion>0.0.0.0</FileVersion>
   <InformationalVersion>0.0.0-0 (0.0.0-0) - SHA1: 0000000000000000000000000000000000000000 - CommitDate: 0001-01-01 00:00:00Z</InformationalVersion>
-</PropertyGroup>", LoadOptions.PreserveWhitespace ) );
+</PropertyGroup>" ) );
 
         }
 
@@ -196,12 +194,11 @@ namespace CK.Env.MSBuild
   <PublishRepositoryUrl>true</PublishRepositoryUrl>
   <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
-</PropertyGroup>", LoadOptions.PreserveWhitespace ),
-                Environment.NewLine,
+</PropertyGroup>" ),
                 XElement.Parse(
 $@"<ItemGroup Condition="" '$(CakeBuild)' == 'true' "">
    <PackageReference Include=""Microsoft.SourceLink.{linkName}"" Version=""1.0.0-beta-63127-02"" PrivateAssets=""All""/>
-</ItemGroup>", LoadOptions.PreserveWhitespace )
+</ItemGroup>" )
                 );
             return true;
         }

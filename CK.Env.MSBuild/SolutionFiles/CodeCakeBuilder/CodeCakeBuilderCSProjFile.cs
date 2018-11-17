@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace CK.Env.MSBuild
+namespace CK.Env.MSBuild.SolutionFiles
 {
     public class CodeCakeBuilderCSProjFile : GitFolderXmlFile, IGitBranchPlugin, ICommandMethodsProvider
     {
@@ -57,8 +57,7 @@ namespace CK.Env.MSBuild
                 var itemGroup = Document.Root.Elements( "ItemGroup" ).FirstOrDefault( g => g.Element( "PackageReference" ) != null )
                                 ?? Document.Root.EnsureElement( "ItemGroup" );
                 itemGroup.Add( r = new XElement( "PackageReference",
-                                            new XAttribute( "Include", packageId ) ),
-                               Environment.NewLine );
+                                            new XAttribute( "Include", packageId ) ) );
             }
             r.SetAttributeValue( "Version", version );
         }

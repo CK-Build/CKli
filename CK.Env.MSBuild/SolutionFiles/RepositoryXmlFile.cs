@@ -4,7 +4,7 @@ using System;
 using System.Linq;
 using System.Xml.Linq;
 
-namespace CK.Env
+namespace CK.Env.MSBuild.SolutionFiles
 {
     public class RepositoryXmlFile : GitFolderXmlFile, IGitBranchPlugin, ICommandMethodsProvider
     {
@@ -51,10 +51,10 @@ namespace CK.Env
         public XDocument EnsureDocument() => Document ?? (Document = new XDocument( new XElement( XRootName ) ));
 
         /// <summary>
-        /// Ensures that Branches element is the first element of the non null <see cref="GitFolderXmlFile.Document"/>.
+        /// Ensures that Branches element exists in the non null <see cref="GitFolderXmlFile.Document"/>.
         /// If the Document is null, this is null.
         /// </summary>
-        public XElement Branches => _branches ?? (_branches = Document?.Root.EnsureFirstElement( XBranchesName ) );
+        public XElement Branches => _branches ?? (_branches = Document?.Root.EnsureElement( XBranchesName ) );
 
         /// <summary>
         /// Ensures that document and the branches element exists.

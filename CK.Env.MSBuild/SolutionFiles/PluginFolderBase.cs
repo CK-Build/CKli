@@ -10,20 +10,25 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace CK.Env.MSBuild
+namespace CK.Env.MSBuild.SolutionFiles
 {
     public abstract class PluginFolderBase : IGitBranchPlugin, ICommandMethodsProvider
     {
-        const string _resourcePrefix = "CK.Env.MSBuild.SolutionFiles.Res.";
         const string _csProtocol = @"cs\";
-        const string _csResourcePrefix = _csProtocol + _resourcePrefix;
-        static readonly Dictionary<string, string> _textResources = new Dictionary<string, string>();
+        readonly Assembly _resourceAssembly;
+        readonly string _resourcePrefix;
+        readonly string _csResourcePrefix;
+        readonly Dictionary<string, string> _textResources = new Dictionary<string, string>();
 
-        public PluginFolderBase( GitFolder f, NormalizedPath branchPath, string folderPath )
+        public PluginFolderBase( GitFolder f, NormalizedPath branchPath, string folderPath, Type resourceHolder = null )
         {
             Folder = f;
             BranchPath = branchPath;
             FolderPath = branchPath.Combine( folderPath ).ResolveDots( branchPath.Parts.Count );
+            if( resourceHolder == null ) resourceHolder = GetType();
+            _resourceAssembly = resourceHolder.Assembly;
+            _resourcePrefix = resourceHolder.Namespace + ".Res.";
+            _csResourcePrefix = _csProtocol + _resourcePrefix;
         }
 
         public GitFolder Folder { get; }
@@ -74,7 +79,7 @@ namespace CK.Env.MSBuild
             }
         }
 
-        static void EnsureTextResources()
+        void EnsureTextResources()
         {
             string ReadText( Assembly a, string path )
             {
@@ -99,11 +104,11 @@ namespace CK.Env.MSBuild
 
             if( _textResources.Count == 0 )
             {
-                var a = Assembly.GetExecutingAssembly();
-                var resNames = a.GetManifestResourceNames()
+                var resNames = _resourceAssembly
+                                .GetManifestResourceNames()
                                 .Select( ProcessTextResourceName )
                                 .Where( p => p.ResPath != null );
-                var kv = resNames.Select( r => new KeyValuePair<string, string>( r.Name, ReadText( a, r.ResPath ) ) );
+                var kv = resNames.Select( r => new KeyValuePair<string, string>( r.Name, ReadText( _resourceAssembly, r.ResPath ) ) );
                 _textResources.AddRange( kv );
             }
         }

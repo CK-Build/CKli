@@ -9,6 +9,7 @@ using CK.Env.Analysis;
 using CK.Text;
 using System.Linq;
 using System.Xml.Linq;
+using CK.Env.MSBuild.SolutionFiles;
 
 namespace CKli
 {

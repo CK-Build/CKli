@@ -201,11 +201,11 @@ namespace CK.Env.MSBuild
                 Debug.Assert( _buildInfo.RunUnitTests == false );
                 // Since we do not need unit tests here, no need for CKSetup test helper config.
 
-                var rfile = s.Solution.GetPlugin<RepositoryXmlFile>();
+                var rfile = s.Solution.GetPlugin<SolutionFiles.RepositoryXmlFile>();
                 rfile.SetIgnoreDirtyFolders();
                 bool success = rfile.Save( m );
 
-                var fNuget = s.Solution.GetPlugin<NugetConfigFile>();
+                var fNuget = s.Solution.GetPlugin<SolutionFiles.NugetConfigFile>();
                 fNuget.EnsureLocalFeeds( m );
                 success &= fNuget.Save( m );
                 if( !success ) return false;
@@ -215,14 +215,14 @@ namespace CK.Env.MSBuild
                 // Building in Develop without Remote pushes: we need to access LocalFeed/CI
                 // and CKSetup test helper config file (just like the GlobalBuilderRelease).
                 var storePath = Path.Combine( GetTargetFeedFolderPath( m ), LocalFeedProviderExtension.CKSetupStoreName );
-                var fCKSetupStore = s.Solution.GetPlugin<CKSetupStoreTestHelperConfigFile>();
+                var fCKSetupStore = s.Solution.GetPlugin<SolutionFiles.CKSetupStoreTestHelperConfigFile>();
                 bool success = fCKSetupStore.EnsureStorePath( m, storePath );
 
-                var fNuGet = s.Solution.GetPlugin<NugetConfigFile>();
+                var fNuGet = s.Solution.GetPlugin<SolutionFiles.NugetConfigFile>();
                 fNuGet.EnsureLocalFeeds( m, ensureRelease: true, ensureCI: true );
                 success &= fNuGet.Save( m );
 
-                var rfile = s.Solution.GetPlugin<RepositoryXmlFile>();
+                var rfile = s.Solution.GetPlugin<SolutionFiles.RepositoryXmlFile>();
                 rfile.SetIgnoreDirtyFolders();
                 success &= rfile.Save( m );
 
@@ -243,7 +243,7 @@ namespace CK.Env.MSBuild
             else if( _buildInfo.TargetDevelop && _buildInfo.IsRemotesRequired == false )
             {
                 // This is an untracked file. It has to be removed.
-                s.Solution.GetPlugin<CKSetupStoreTestHelperConfigFile>().Delete( m );
+                s.Solution.GetPlugin<SolutionFiles.CKSetupStoreTestHelperConfigFile>().Delete( m );
                 if( !s.Solution.GitFolder.ResetHard( m ) ) return false;
             }
             return true;
@@ -255,7 +255,7 @@ namespace CK.Env.MSBuild
             else
             {
                 // This is an untracked file. It has to be removed.
-                s.Solution.GetPlugin<CKSetupStoreTestHelperConfigFile>().Delete( m );
+                s.Solution.GetPlugin<SolutionFiles.CKSetupStoreTestHelperConfigFile>().Delete( m );
                 s.Solution.GitFolder.ResetHard( m );
             }
         }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,6 +10,139 @@ namespace System.Xml.Linq
 {
     public static class XLinqExtension
     {
+        static readonly XName _xmlSpace = XName.Get( "xml", "space" );
+
+        /// <summary>
+        /// Handles insignificant white spaces.
+        /// There are 4 white spaces characters: carriage return '\r', linefeed '\n', tab '\t', and spacebar (' ').
+        /// This handles xml:space = "preserve" that protects any text in an element or its
+        /// descendants except inside any child with xml:space="default".
+        /// </summary>
+        /// <param name="this">This document.</param>
+        /// <param name="actualTextProcessor">
+        /// Optional transformer for texts that are not entirely white spaces and white spaces are not preserved.
+        /// The function is called with the current start line and the <see cref="StringBuilder"/> that can be
+        /// changed and must return true if the content of the StringBuilder must be considered.
+        /// </param>
+        /// <returns>This document.</returns>
+        public static XDocument Beautify( this XDocument @this, Func<string,StringBuilder,bool> actualTextProcessor = null )
+        {
+            bool? GetPreserve( XElement e )
+            {
+                var p = (string)e.Attribute( _xmlSpace );
+                return p == null ? (bool?)null : p == "preserve";
+            }
+
+            string indent = "  ";
+
+            void Process( XElement e, bool preserve, string outerStartLine, int depth )
+            {
+                string startLine = outerStartLine + indent;
+                if( preserve ) foreach( var c in e.Elements() ) Process( c, preserve, startLine, depth + 1 );
+                else
+                {
+                    bool hasContent = false;
+                    var currentXText = new List<XText>();
+                    var currentText = new StringBuilder();
+                    XNode c = e.FirstNode;
+                    while( c != null )
+                    {
+                        if( c is XText t )
+                        {
+                            currentXText.Add( t );
+                            currentText.Append( t.Value );
+                        }
+                        else
+                        {
+                            hasContent = true;
+                            Debug.Assert( c is XElement || c is XComment || c is XCData || c is XProcessingInstruction );
+                            // Handling current collected XText, possibly replacing them with a unique XText.
+                            HandleCollectedXText( actualTextProcessor, startLine, currentXText, currentText, c, false );
+                            if( c is XElement cE )
+                            {
+                                Process( cE, GetPreserve( cE ) ?? preserve, startLine, depth + 1 );
+                            }
+                            currentXText.Clear();
+                            currentText.Clear();
+                        }
+                        c = c.NextNode;
+                    }
+                    HandleCollectedXText( actualTextProcessor, outerStartLine, currentXText, currentText, e.LastNode, !hasContent );
+               }
+            }
+
+            Process( @this.Root, false, Environment.NewLine, 0 );
+            return @this;
+        }
+
+        static void HandleCollectedXText(
+            Func<string, StringBuilder, bool> actualTextProcessor,
+            string startLine,
+            List<XText> currentXText,
+            StringBuilder currentText,
+            XNode lastNode,
+            bool removeDefaultStartLine )
+        {
+            bool hasActualText = false;
+            if( currentXText.Count == 0 )
+            {
+                if( !removeDefaultStartLine )
+                {
+                    lastNode.AddAfterSelf( new XText( startLine ) );
+                }
+            }
+            else
+            {
+                int newLineCount = 0;
+                for( int i = 0; i < currentText.Length; ++i )
+                {
+                    char car = currentText[i];
+                    if( car == '\n' ) ++newLineCount;
+                    else if( car != '\r' && car != '\t' && car != ' ' )
+                    {
+                        hasActualText = true;
+                        break;
+                    }
+                }
+                XText replacement = null;
+                if( !hasActualText )
+                {
+                    if( !removeDefaultStartLine )
+                    {
+                        string newText = startLine;
+                        if( newLineCount >= 2 ) newText = Environment.NewLine + newText;
+                        if( currentXText.Count != 1 || currentXText[0].Value != newText )
+                        {
+                            replacement = new XText( newText );
+                        }
+                    }
+                }
+                else
+                {
+                    if( actualTextProcessor?.Invoke( startLine, currentText ) ?? false )
+                    {
+                        if( currentText.Length > 0 )
+                        {
+                            replacement = new XText( currentText.ToString() );
+                        }
+                        else
+                        {
+                            removeDefaultStartLine = true;
+                        }
+                    }
+                }
+                if( replacement != null )
+                {
+                    currentXText[currentXText.Count - 1].AddAfterSelf( replacement );
+                    currentXText.Remove();
+                }
+                else if( removeDefaultStartLine )
+                {
+                    currentXText.Remove();
+                }
+            }
+        }
+
         public static XElement EnsureElement( this XElement @this, XName name )
         {
             XElement e = @this.Element( name );

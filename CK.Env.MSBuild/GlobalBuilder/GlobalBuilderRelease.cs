@@ -87,14 +87,14 @@ namespace CK.Env.MSBuild
             }
             var storePath = Path.Combine( GetTargetFeedFolderPath( m ), LocalFeedProviderExtension.CKSetupStoreName );
 
-            var fCKSetupStore = s.Solution.GetPlugin<CKSetupStoreTestHelperConfigFile>();
+            var fCKSetupStore = s.Solution.GetPlugin<SolutionFiles.CKSetupStoreTestHelperConfigFile>();
             bool success = fCKSetupStore.EnsureStorePath( m, storePath );
 
-            var fNuGet = s.Solution.GetPlugin<NugetConfigFile>();
+            var fNuGet = s.Solution.GetPlugin<SolutionFiles.NugetConfigFile>();
             fNuGet.EnsureLocalFeeds( m, ensureRelease: true, ensureCI: true );
             success &= fNuGet.Save( m );
 
-            var rfile = s.Solution.GetPlugin<RepositoryXmlFile>();
+            var rfile = s.Solution.GetPlugin<SolutionFiles.RepositoryXmlFile>();
             rfile.SetIgnoreDirtyFolders();
             success &= rfile.Save( m );
 
@@ -113,7 +113,7 @@ namespace CK.Env.MSBuild
         {
             _currentEntry = null;
             // This is an untracked file. It has to be removed.
-            s.Solution.GetPlugin<CKSetupStoreTestHelperConfigFile>().Delete( m );
+            s.Solution.GetPlugin<SolutionFiles.CKSetupStoreTestHelperConfigFile>().Delete( m );
             if( !s.Solution.GitFolder.ResetHard( m ) ) return false; 
             if( v.Prerelease.Length == 0 )
             {
@@ -127,7 +127,7 @@ namespace CK.Env.MSBuild
             _currentEntry = null;
             s.Solution.GitFolder.ClearVersionTag( m, v );
             // This is an untracked file. It has to be removed.
-            s.Solution.GetPlugin<CKSetupStoreTestHelperConfigFile>().Delete( m );
+            s.Solution.GetPlugin<SolutionFiles.CKSetupStoreTestHelperConfigFile>().Delete( m );
             s.Solution.GitFolder.ResetHard( m ); 
             if( v.Prerelease.Length == 0 )
             {

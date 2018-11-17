@@ -18,15 +18,6 @@ namespace CK.Env
         XDocument _doc;
         string _currentText;
 
-        static readonly XmlWriterSettings _stdSettings = new XmlWriterSettings()
-        {
-            Indent = true,
-            IndentChars = "  ",
-            OmitXmlDeclaration = true,
-            NewLineOnAttributes = false,
-            NewLineHandling = NewLineHandling.Replace
-        };
-
         public GitFolderXmlFile( GitFolder f, NormalizedPath filePath )
             : base( f, filePath )
         {
@@ -60,12 +51,7 @@ namespace CK.Env
         {
             if( _currentText == null && GetDocument() != null )
             {
-                var b = new StringBuilder();
-                using( var w = XmlWriter.Create( b, _stdSettings ) )
-                {
-                    _doc.WriteTo( w );
-                }
-                _currentText = b.ToString();
+                _currentText = _doc.Beautify().ToString();
             }
             return _currentText;
         }
