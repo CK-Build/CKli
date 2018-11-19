@@ -447,7 +447,7 @@ namespace CK.Env.MSBuild
                 return true;
             }
 
-            return SetState( m, state => state.XmlState.SetElementValue( "BuildProjectsZeroVersionSHA1Signature", buildProjectsZeroVersionSHA1Signature );
+            return SetState( m, state => state.XmlState.SetElementValue( "BuildProjectsZeroVersionSHA1Signature", buildProjectsZeroVersionSHA1Signature ) );
        }
 
         public bool CanRelease => WorkStatus == WorkStatus.Idle && GlobalGitStatus == StandardGitStatus.DevelopBranch;
