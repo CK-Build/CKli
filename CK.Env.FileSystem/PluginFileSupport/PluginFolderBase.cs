@@ -10,7 +10,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace CK.Env.MSBuild.SolutionFiles
+namespace CK.Env
 {
     public abstract class PluginFolderBase : IGitBranchPlugin, ICommandMethodsProvider
     {
@@ -50,30 +50,62 @@ namespace CK.Env.MSBuild.SolutionFiles
             if( EnsureDirectory( m ) )
             {
                 EnsureTextResources();
-                DoCopyResources( m );
+                DoApplySettings( m );
             }
         }
 
-        protected abstract void DoCopyResources( IActivityMonitor m );
+        /// <summary>
+        /// Must <see cref="CopyBinaryResource"/>, <see cref="CopyTextResource"/> or <see cref="DeleteFile"/> as
+        /// needed.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        protected abstract void DoApplySettings( IActivityMonitor m );
 
-        protected bool CopyTextResource( IActivityMonitor m, string name, Func<string, string> adapter = null )
+        /// <summary>
+        /// Deletes a file in this folder.
+        /// The path must be relative to this folder and can not resolve to a file above this folder.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="filePath">File path relative to this folder.</param>
+        /// <returns>True on success, false on error.</returns>
+        protected bool DeleteFile( IActivityMonitor m, string filePath )
+        {
+            return Folder.FileSystem.Delete( m, FolderPath.Combine( filePath ).ResolveDots( FolderPath.Parts.Count ) );
+        }
+
+        /// <summary>
+        /// Copies the content of a textual embedded resource into this folder.
+        /// The embedded resource name must have a ".txt" suffix appended.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="name">The name of the text file (without ".txt" suffix).</param>
+        /// <param name="transformer">Optional transformer.</param>
+        /// <returns>True on success, false on error.</returns>
+        protected bool CopyTextResource( IActivityMonitor m, string name, Func<string, string> transformer = null )
         {
             var fs = Folder.FileSystem;
             var target = FolderPath.AppendPart( name );
-            if( adapter == null )
+            if( transformer == null )
             {
                 return fs.CopyTo( m, _textResources[name], target );
             }
             string text = fs.GetFileInfo( target ).AsTextFileInfo()?.TextContent ?? _textResources[name];
-            var transformed = adapter( text );
+            var transformed = transformer( text );
             return transformed != text ? fs.CopyTo( m, transformed, target ) : true;
         }
 
+        /// <summary>
+        /// Copies the content of a binary embedded resource into this folder.
+        /// The embedded resource name must have a ".bin" suffix appended.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="name">The name of the binary file (without ".bin" suffix).</param>
+        /// <returns>True on success, false on error.</returns>
         protected bool CopyBinaryResource( IActivityMonitor m, string name )
         {
             var fs = Folder.FileSystem;
             var target = FolderPath.AppendPart( name );
-            using( var s = Assembly.GetExecutingAssembly().GetManifestResourceStream( _resourcePrefix + name + ".bin" ) )
+            using( var s = _resourceAssembly.GetManifestResourceStream( _resourcePrefix + name + ".bin" ) )
             {
                 return fs.CopyTo( m, s, target );
             }

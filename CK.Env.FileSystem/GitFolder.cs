@@ -96,6 +96,22 @@ namespace CK.Env
         public GitPluginManager PluginManager { get; }
 
         /// <summary>
+        /// Ensures that plugins are loaded for the <see cref="CurrentBranchName"/>.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns></returns>
+        public bool EnsureCurrentBranchPlugins( IActivityMonitor m )
+        {
+            if( CurrentBranchName != null )
+            {
+                PluginManager.BranchPlugins.EnsurePlugins( m, CurrentBranchName, FullPath );
+                return true;
+            }
+            m.Error( $"No plugins since '{ToString()}' is not on a branch." );
+            return false;
+        }
+
+        /// <summary>
         /// Gets the current remote origin url.
         /// </summary>
         public string OriginUrl { get; }
@@ -626,8 +642,7 @@ namespace CK.Env
 
         bool RaiseEnteredLocalBranch( IActivityMonitor m, bool enter )
         {
-            // This ensures that the plugins are loaded for the local branch.
-            PluginManager.BranchPlugins.GetPlugins( World.LocalBranchName ); 
+            PluginManager.BranchPlugins.EnsurePlugins( m, World.LocalBranchName, FullPath ); 
             using( m.OpenTrace( $"{ToString()}: Raising {(enter ? "OnLocalBranchEntered" : "OnLocalBranchLeaving")} event." ) )
             {
                 try
@@ -831,6 +846,8 @@ namespace CK.Env
             ((IDisposable)PluginManager).Dispose();
             _git.Dispose();
         }
+
+        public override string ToString() => $"{FullPath} ({CurrentBranchName ?? "<no branch>" }).";
 
         abstract class BaseDirFileInfo : IFileInfo
         {

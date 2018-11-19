@@ -5,20 +5,9 @@
   <LocalFeedProvider />
   <SecretKeyStore />
   <NuGetClient />
-  <ReferentialFolder Path="CK-Env/CKli/Referential" />
   <SolutionCentral />
 
-  <KnownPackageVersions>
-  </KnownPackageVersions>
-
-  <KnownPackageDependencies>
-    <Package Name="Code.Cake" Requires="Cake.Core;Cake.Common" />
-    <Package Name="CK.Testing" Requires="FluentAssertions" />
-    <Package Name="CK.Testing.Monitoring" Requires="CK.Testing" />
-  </KnownPackageDependencies>
-
-  <GitStatusAction Title="Displays statuses of all the repositories." />
-  <GitCheckoutAction Title="Checkout all repositories on a specific branch name." />
+  <!--<GitCheckoutAction Title="Checkout all repositories on a specific branch name." />
   <GitResetAction Title="ResetHard: Totally reset current changes on current branch for all repository." />
   <GitCommitAction Title="Commits all pending changes to the current branch of all the repositories." />
   <GitFetchAction Title="Fetches all remotes in all repositories." />
@@ -26,10 +15,10 @@
   <GlobalDependencyAction Title="Solutions &amp; Projects management." />
   <GlobalSwitchBranchAction Title="Switch between 'develop-local' &lt;=&gt; 'develop' branches." />
   <GlobalLocalBuildAction Title="CI Build: Build all Solutions in 'develop' or 'develop-local' branch, pushing packages to LocalFeed or LocalFeed/Blanck feeds (optionally pushing them to MyGet invenietis-ci feed for 'develop' branch), propagating CI versions across dependent solutions." />
-  <GlobalFixBuildScriptAction Title="Fix build script (must be in 'local' branch)." />
+  <GlobalFixBuildScriptAction Title="Fix build script (must be in 'local' branch)." />-->
   <!--<GlobalBlankBuildAction Title="Blank build: Build all Solutions locally in 'develop-local' branch." />-->
-  <GlobalReleaserAction Title="Global Release." />
-  <ExternalPackagesAction Title="External packages analysis." />
+  <!--<GlobalReleaserAction Title="Global Release." />
+  <ExternalPackagesAction Title="External packages analysis." />-->
   
   <!-- Unsafe brutal tools.
     
@@ -37,137 +26,52 @@
     <RemoveXmlHeaderFromCSProjAction Title="Removes xml namespace from .csproj, .props and .proj files." />
 
 -->
-
-  <Reusable Name="CodeCakeBuilder">
-    <Folder Name="CodeCakeBuilder">
-      <MustExist InitialContent="InitialCodeCakeBuilder" />
-      <Region Title="Removing files and folders that should no more exist.">
-        <Folder Name="Properties">
-          <MustNotExist />
-        </Folder>
-        <Folder Name="Tools">
-          <MustNotExist />
-        </Folder>
-        <File Name="App.config">
-          <MustNotExist />
-        </File>
-        <File Name="CoreBuild.proj">
-          <MustNotExist />
-        </File>
-        <File Name="Bootstrap.ps1">
-          <MustNotExist />
-        </File>
-        <File Name="BootstrapAndBuild.ps1">
-          <MustNotExist />
-        </File>
-        <File Name="packages.config">
-          <MustNotExist />
-        </File>
-      </Region>
-      <File Name="CodeCakeBuilder.csproj">
-        <MustExist InitialContent="InitialCodeCakeBuilder/CodeCakeBuilder.csproj" />
-      </File>
-      <File Name="RepositoryInfo.xsd">
-        <MustExist Content="InitialCodeCakeBuilder/RepositoryInfo.xsd" />
-      </File>
-      <File Name="Program.cs">
-        <MustExist Content="InitialCodeCakeBuilder/Program.cs" />
-      </File>
-      <File Name="Build.cs">
-        <MustExist InitialContent="InitialCodeCakeBuilder/Build.cs" >
-          <FileTransform>
-            <TextReplace Text="$Solution Name$" SourceXPath="ancestor::Folder[1]" SourcePropertyName="Name" />
-          </FileTransform>
-        </MustExist>
-      </File>
-      <File Name="Build.NuGetHelper.cs">
-        <MustExist Content="InitialCodeCakeBuilder/Build.NuGetHelper.cs.cs" />
-      </File>
-      <File Name="Build.StandardCheckRepository.cs">
-        <MustExist Content="InitialCodeCakeBuilder/Build.StandardCheckRepository.cs" />
-      </File>
-      <File Name="Build.StandardSolutionBuild.cs">
-        <MustExist Content="InitialCodeCakeBuilder/Build.StandardSolutionBuild.cs" />
-      </File>
-      <File Name="Build.StandardUnitTests.cs">
-        <MustExist Content="InitialCodeCakeBuilder/Build.StandardUnitTests.cs" />
-      </File>
-      <File Name="Build.StandardCreateNuGetPackages.cs">
-        <MustExist Content="InitialCodeCakeBuilder/Build.StandardCreateNuGetPackages.cs" />
-      </File>
-      <File Name="Build.StandardPushNuGetPackages.cs">
-        <MustExist Content="InitialCodeCakeBuilder/Build.StandardPushNuGetPackages.cs" />
-      </File>
-      <File Name="InstallCredentialProvider.ps1">
-        <MustExist Content="InitialCodeCakeBuilder/InstallCredentialProvider.ps1" />
-      </File>
-    </Folder>
-  </Reusable>
-
-  <Reusable Name="StandardFiles">
-    <MustExist />
-    <Reuse Name="CodeCakeBuilder" />
-    <File Name="NuGet.config">
-      <MustExist Content="SimpleFiles/NuGet.config"/>
-    </File>
-    <File Name=".editorconfig">
-      <MustExist Content="SimpleFiles/.editorconfig"/>
-    </File>
-    <Folder Name="Common">
-      <MustExist />
-      <File Name="SharedKey.snk">
-        <MustExist Content="SimpleFiles/SharedKey.snk"/>
-      </File>
-    </Folder>
-  </Reusable>
-
-  <Reusable Name="StandardPrimarySolution" >
-    <PrimarySolution>
-      <TestProjectsStandardConventions />
-    </PrimarySolution>
-  </Reusable>
-
-  <CodeOrganization Name="Signature-OpenSource">
-    <DotNetProperties>
-      <NuGetSources>
-        <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json" >
-          <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
-        </add> 
-      </NuGetSources>
-      <ExcludedNuGetSourceNames>
-        <add Name="Invenietis - Release" />
-        <add Name="Invenietis - Preview" />
-        <add Name="Invenietis - CI" />
-      </ExcludedNuGetSourceNames>
-      <NuGetPushFeeds>
-        <add Type="Azure" Organization="Signature-OpenSource" FeedName="Default" />
-      </NuGetPushFeeds>
-    </DotNetProperties>
-  </CodeOrganization>
+  
+  <SolutionSettings>
+    <NuGetSources>
+      <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json" >
+        <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
+      </add>
+    </NuGetSources>
+    <ExcludedNuGetSourceNames>
+      <add Name="Invenietis - Release" />
+      <add Name="Invenietis - Preview" />
+      <add Name="Invenietis - CI" />
+    </ExcludedNuGetSourceNames>
+    <NuGetPushFeeds>
+      <add Type="Azure" Organization="Signature-OpenSource" FeedName="Default" />
+    </NuGetPushFeeds>
+    <Plugins>
+      <add Type="CK.Env.MSBuild.SolutionFiles.CodeCakeBuilderFolder, CK.Env.MSBuild" />
+      <add Type="CK.Env.MSBuild.SolutionFiles.CodeCakeBuilderCSProjFile, CK.Env.MSBuild" />
+      <add Type="CK.Env.MSBuild.SolutionFiles.CodeCakeBuilderKeyVaultFile, CK.Env.MSBuild" />
+      <add Type="CK.Env.MSBuild.SolutionFiles.CommonFolder, CK.Env.MSBuild" />
+      <add Type="CK.Env.MSBuild.SolutionFiles.SharedPropsFile, CK.Env.MSBuild" />
+      <add Type="CK.Env.MSBuild.SolutionFiles.CKSetupStoreTestHelperConfigFile, CK.Env.MSBuild" />
+      <add Type="CK.Env.MSBuild.SolutionFiles.RepositoryXmlFile, CK.Env.MSBuild" />
+      <add Type="CK.Env.MSBuild.SolutionFiles.NugetConfigFile, CK.Env.MSBuild" />
+      <add Type="CK.BuildSystem.Appveyor.AppveyorFile, CK.BuildSystem.Appveyor" />
+    </Plugins>
+  </SolutionSettings>
    
   <Folder Name="CK-AspNet-Projects">
 
     <GitFolder Name="CK-AspNet" Url="https://github.com/Invenietis/CK-AspNet.git" >
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-AspNet-Auth" Url="https://github.com/Invenietis/CK-AspNet-Auth.git">
+      <SolutionSettings SqlServer="2016" />
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile SqlServer="2016" />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-AspNet-Tester" Url="https://github.com/Invenietis/CK-AspNet-Tester.git">
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
@@ -177,91 +81,70 @@
 
     <GitFolder Name="CK-ActivityMonitor" Url="https://github.com/Invenietis/CK-ActivityMonitor.git">
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Auth-Abstractions" Url="https://github.com/Invenietis/CK-Auth-Abstractions.git">
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Core" Url="https://github.com/Invenietis/CK-Core.git">
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-SqlServer" Url="https://github.com/Invenietis/CK-SqlServer.git">
+      <SolutionSettings SqlServer="2016" />
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile SqlServer="2016" />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Monitoring" Url="https://github.com/Invenietis/CK-Monitoring.git">
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Reflection" Url="https://github.com/Invenietis/CK-Reflection.git">
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Testing" Url="https://github.com/Invenietis/CK-Testing.git">
+      <SolutionSettings SqlServer="2016" />
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile SqlServer="2016" />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Text" Url="https://github.com/Invenietis/CK-Text.git">
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-MicroBenchmark" Url="https://github.com/Invenietis/CK-MicroBenchmark.git">
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
     
     <GitFolder Name="CK-UnitsOfMeasure" Url="https://github.com/Invenietis/CK-UnitsOfMeasure.git">
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-WeakAssemblyNameResolver" Url="https://github.com/Invenietis/CK-WeakAssemblyNameResolver.git">
+      <SolutionSettings NoUnitTests="true" />
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles">
-          <Remove Target="Folder[@Name='CodeCakeBuilder']/File[@Name='Build.StandardUnitTests.cs']" />
-        </Reuse>
-        <AppVeyorFile />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
@@ -271,129 +154,95 @@
 
     <GitFolder Name="CK-CodeGen" Url="https://github.com/Invenietis/CK-CodeGen.git">
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Database" Url="https://gitlab.com/signature-code/CK-Database.git">
+      <SolutionSettings SqlServer="2016" ProduceCKSetupComponents="true" />
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile SqlServer="2016" PushToRemoteStore="True" />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-DB" Url="https://github.com/Invenietis/CK-DB.git">
+      <SolutionSettings SqlServer="2016"/>
       <Branch Name="develop">
-        <PrimarySolution TestProjectsArePublished="True">
-          <TestProjectsStandardConventions />
-        </PrimarySolution>
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile SqlServer="2016" />
+        <PrimarySolution TestProjectsArePublished="True" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-DB-GitHub" Url="https://github.com/Invenietis/CK-DB-GitHub.git">
+      <SolutionSettings SqlServer="2016"/>
       <Branch Name="develop">
-        <PrimarySolution TestProjectsArePublished="True">
-          <TestProjectsStandardConventions />
-        </PrimarySolution>
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile SqlServer="2016" />
+        <PrimarySolution TestProjectsArePublished="True" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-DB-Actor-ActorEMail" Url="https://github.com/Invenietis/CK-DB-Actor-ActorEMail.git">
+      <SolutionSettings SqlServer="2016"/>
       <Branch Name="develop">
-        <PrimarySolution TestProjectsArePublished="True">
-          <TestProjectsStandardConventions />
-        </PrimarySolution>
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile SqlServer="2016" />
+        <PrimarySolution TestProjectsArePublished="True" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-DB-SqlCKTrait" Url="https://github.com/Invenietis/CK-DB-SqlCKTrait.git">
+      <SolutionSettings SqlServer="2016"/>
       <Branch Name="develop">
-        <PrimarySolution TestProjectsArePublished="True">
-          <TestProjectsStandardConventions />
-        </PrimarySolution>
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile SqlServer="2016" />
+        <PrimarySolution TestProjectsArePublished="True" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-DB-User-SimpleInvitation" Url="https://github.com/Invenietis/CK-DB-User-SimpleInvitation.git">
+      <SolutionSettings SqlServer="2016"/>
       <Branch Name="develop">
-        <PrimarySolution TestProjectsArePublished="True">
-          <TestProjectsStandardConventions />
-        </PrimarySolution>
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile SqlServer="2016" />
+        <PrimarySolution TestProjectsArePublished="True" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-DB-User-UserPassword" Url="https://github.com/Invenietis/CK-DB-User-UserPassword.git">
+      <SolutionSettings SqlServer="2016"/>
       <Branch Name="develop">
-        <PrimarySolution TestProjectsArePublished="True">
-          <TestProjectsStandardConventions />
-        </PrimarySolution>
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile SqlServer="2016" />
+        <PrimarySolution TestProjectsArePublished="True" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Setup" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-setup.git">
+      <SolutionSettings ProduceCKSetupComponents="true" />
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile PushToRemoteStore="True" />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Setup-Dependency" Url="https://github.com/Invenietis/CK-Setup-Dependency.git">
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CKSetupRemoteStore" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/cksetupremotestore.git">
       <Branch Name="develop">
-        <PrimarySolution NotPublishedProjects="CKSetupRemoteStore;CKSetupInstaller" >
-          <TestProjectsStandardConventions />
-        </PrimarySolution>
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile />
+        <PrimarySolution NotPublishedProjects="CKSetupRemoteStore;CKSetupInstaller" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Sqlite" Url="https://github.com/Invenietis/CK-Sqlite.git">
+      <SolutionSettings ProduceCKSetupComponents="true" />
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile PushToRemoteStore="True" />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-SqlServer-Parser" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-sqlserver-parser.git">
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-SqlServer-Parser-Model" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-sqlserver-parser-model.git">
+      <SolutionSettings NoUnitTests="true" />
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles">
-          <Remove Target="Folder[@Name='CodeCakeBuilder']/File[@Name='Build.StandardUnitTests.cs']" />
-        </Reuse>
-        <AppVeyorFile />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
@@ -403,9 +252,7 @@
 
     <GitFolder Name="Yodii-Script" Url="https://github.com/Invenietis/yodii-script.git">
       <Branch Name="develop">
-        <Reuse Name="StandardPrimarySolution" />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile />
+        <PrimarySolution />
       </Branch>
     </GitFolder>
 
@@ -414,55 +261,25 @@
   <Folder Name="SimpleGitVersion">
 
     <GitFolder Name="CodeCake" Url="https://github.com/SimpleGitVersion/CodeCake.git">
+      <SolutionSettings NoUnitTests="true" NoStrongNameSigning="true" />
       <Branch Name="develop">
         <PrimarySolution />
-        <Reuse Name="StandardFiles">
-          <Remove Target="Folder[@Name='CodeCakeBuilder']/File[@Name='Build.StandardUnitTests.cs']" />
-          <Remove Target="Folder[@Name='Common']/File[@Name='SharedKey.snk']" />
-        </Reuse>
-        <AppVeyorFile />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CSemVer-Net" Url="https://github.com/SimpleGitVersion/CSemVer-Net.git">
       <Branch Name="develop">
         <PrimarySolution />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="SGV-Net" Url="https://github.com/SimpleGitVersion/SGV-Net.git">
-      <DotNetProperties DisableSourceLink="true" />
+      <SolutionSettings DisableSourceLink="true" />
       <Branch Name="develop">
         <PrimarySolution />
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile />
       </Branch>
     </GitFolder>
 
   </Folder>
-
-<!--
-
-  <Folder Name="CK-Sample-Projects">
-
-    <GitFolder Name="CK-Sample" Url="https://github.com/Invenietis/CK-Sample.git">
-      <Branch Name="develop">
-        <PrimarySolution NotPublishedProjects="CK.Sample.Data;WebApp" >
-          <TestProjectsStandardConventions />
-        </PrimarySolution>
-        <Reuse Name="StandardFiles" />
-        <AppVeyorFile SqlServer="2016" />
-      </Branch>
-    </GitFolder>
-
-  </Folder>
-  
--->
-
-  <File Name="CK-World">
-    <MustExist Content="SimpleFiles/CK-World"/>
-  </File>
 
 </CK-World>

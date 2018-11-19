@@ -10,9 +10,14 @@ namespace CK.Env
     public interface ISolutionSettings
     {
         /// <summary>
-        /// Gets whether the NuGet.config file must exist.
+        /// Gets whether the solution has no unit tests.
         /// </summary>
-        bool SuppressNuGetConfigFile { get; }
+        bool NoUnitTests { get; }
+
+        /// <summary>
+        /// Gets whether no strong name singing should be used.
+        /// </summary>
+        bool NoStrongNameSigning { get; }
 
          /// <summary>
         /// Gets whether the solution produces CKSetup components.
@@ -24,6 +29,14 @@ namespace CK.Env
         /// Impacts Common/Shared.props file.
         /// </summary>
         bool DisableSourceLink { get; }
+
+        /// <summary>
+        /// Gets the name of the SqlServer that is used.
+        /// Defaults to null.
+        /// Names are the ones of Appveyor (https://www.appveyor.com/docs/services-databases/).
+        /// "2008R2SP2", "2012SP1", "2014", "2016", "2017".
+        /// </summary>
+        string SqlServer { get; }
 
         /// <summary>
         /// Defines the set of NuGet sources that is used.
@@ -47,5 +60,11 @@ namespace CK.Env
         /// Gets the NuGet push feed names that must be excluded.
         /// </summary>
         IReadOnlyCollection<string> ExcludedNuGetPushFeedNames { get; }
+
+        /// <summary>
+        /// Defines the set of plugins that must apply.
+        /// </summary>
+        IReadOnlyCollection<Type> Plugins { get; }
+
     }
 }

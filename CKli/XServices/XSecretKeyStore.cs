@@ -26,6 +26,8 @@ namespace CKli
         {
             _keys = new Dictionary<string, string>();
             _fs = fs;
+            _fs.ServiceContainer.Add<ISecretKeyStore>( this );
+            _fs.ServiceContainer.Add<CK.NuGetClient.ISecretKeyStore>( this );
             _worldName = worldName;
             initializer.Services.Add( this );
             KeyVaultPath = _fs.Root.AppendPart( $"CKEnv-{_worldName.Name}-KeyVault.txt" );
@@ -38,8 +40,19 @@ namespace CKli
 
         bool KeyVaultFileExists => File.Exists( KeyVaultPath );
 
-        bool IsKeyVaultOpened => _passPhrase != null;
+        /// <summary>
+        /// Gets whether the key vault bound to the current <see cref="IWorldName"/> is opened.
+        /// </summary>
+        public bool IsKeyVaultOpened => _passPhrase != null;
 
+        /// <summary>
+        /// Opens the key vault bound to the current <see cref="IWorldName"/>.
+        /// Calling this when <see cref="IsKeyVaultOpened"/> is true, empties the current
+        /// secret memory.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="passPhrase">The key vault pass phrase.</param>
+        /// <returns>True on success.</returns>
         public bool OpenKeyVault( IActivityMonitor m, string passPhrase )
         {
             if( !CheckPassPhrase( m, passPhrase ) ) return false;
@@ -72,6 +85,12 @@ namespace CKli
             return true;
         }
 
+        /// <summary>
+        /// Saves the current secrets to the previously opened key vault bound to the current <see cref="IWorldName"/>.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="newPassPhrase">Optional new passphrase.</param>
+        /// <returns>True on success, false on error.</returns>
         public bool SaveKeyVault( IActivityMonitor m, string newPassPhrase = null )
         {
             if( _passPhrase == null )
@@ -90,17 +109,37 @@ namespace CKli
             return true;
         }
 
+        /// <summary>
+        /// May be modified to enforce constraints on the passphrase.
+        /// </summary>
         static bool CheckPassPhrase( IActivityMonitor m, string passPhrase )
         {
             if( String.IsNullOrEmpty( passPhrase ) ) throw new ArgumentNullException( nameof( passPhrase ) );
             return true;
         }
 
+        /// <summary>
+        /// Implements <see cref="ISecretKeyStore.GetSecretKey(IActivityMonitor, string, bool, string)"/> by
+        /// first using the key vault bound to the current <see cref="IWorldName"/> if it exists, asking for its
+        /// passphrase if it needs to be opened.
+        /// When the key is not found, the user must provide it and the secret is stored. 
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="name">The secret nam.</param>
+        /// <param name="throwOnEmpty">True to throw an exception if the secret cannot be obtained.</param>
+        /// <param name="message">Optional message displayed if the secret need to be entered.</param>
+        /// <returns>The secret or null if it cannot be obtained.</returns>
+        /// <returns></returns>
         public string GetSecretKey( IActivityMonitor m, string name, bool throwOnEmpty, string message = null )
         {
-            if( KeyVaultFileExists && !IsKeyVaultOpened )
+            if( !IsKeyVaultOpened )
             {
-                var passPhrase = PromptValue( KeyVaultKeyName, $"Open the CKEnv Key Vault for {_worldName.FullName}.", throwOnEmpty: false );
+                var passPhrase = Environment.GetEnvironmentVariable( KeyVaultKeyName );
+                if( passPhrase != null )
+                {
+                    m.Info( $"Using {KeyVaultKeyName} environment variable to open the Key Vault for {_worldName.FullName}." );
+                }
+                else passPhrase = PromptValue( KeyVaultKeyName, $"Open the Key Vault for {_worldName.FullName}.", throwOnEmpty: false );
                 if( passPhrase != null ) OpenKeyVault( m, passPhrase );
             }
             bool exists = _keys.TryGetValue( name, out var value );
@@ -131,8 +170,8 @@ namespace CKli
         {
             if( IsKeyVaultOpened )
             {
-                _passPhrase = null;
                 File.WriteAllText( KeyVaultPath, KeyVault.EncryptValuesToString( _keys, _passPhrase ) );
+                _passPhrase = null;
             }
         }
     }

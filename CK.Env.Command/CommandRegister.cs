@@ -119,7 +119,10 @@ namespace CK.Env
 
         Func<bool> GetEnabledMethod( object instance, MethodInfo[] methods, string commandMethodName )
         {
-            var enabled = methods.FirstOrDefault( e => e.Name == $"Is{commandMethodName}Enabled" );
+            var isEnabledName = $"Is{commandMethodName}Enabled";
+            var canName = $"Can{commandMethodName}";
+            var enabledNames = new string[] { isEnabledName, "get_" + isEnabledName, canName, "get_" + canName };
+            var enabled = methods.FirstOrDefault( e => enabledNames.Contains( e.Name ) );
             if( enabled != null )
             {
                 if( enabled.GetParameters().Length > 0 || enabled.ReturnType != typeof( bool ) )

@@ -13,8 +13,12 @@ namespace CK.Env
     {
         public SolutionSettings( XElement e )
         {
-            DisableSourceLink = (bool?)e.Attribute( nameof(DisableSourceLink) ) ?? false;
+            NoUnitTests = (bool?)e.Attribute( nameof( NoUnitTests ) ) ?? false;
+            NoStrongNameSigning = (bool?)e.Attribute( nameof( NoStrongNameSigning ) ) ?? false;
             ProduceCKSetupComponents = (bool?)e.Attribute( nameof(ProduceCKSetupComponents) ) ?? false;
+            DisableSourceLink = (bool?)e.Attribute( nameof(DisableSourceLink) ) ?? false;
+            SqlServer = (string)e.Attribute( nameof( SqlServer ) );
+
             NuGetSources = e.Elements( nameof( NuGetSources) )
                              .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Name" ), s => new NuGetSource( s ) )
                              .Values;
@@ -25,13 +29,18 @@ namespace CK.Env
                              .Values;
             ExcludedNuGetPushFeedNames = e.Elements( nameof( ExcludedNuGetPushFeedNames ) )
                                         .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Name" ) );
+            Plugins = e.Elements( nameof( Plugins ) )
+                             .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Type" ), s => SimpleTypeFinder.WeakResolver( (string)s.Attribute( "Type" ), true ) )
+                             .Values;
         }
 
         public SolutionSettings( ISolutionSettings other, XElement applyConfig = null )
         {
-            SuppressNuGetConfigFile = other.SuppressNuGetConfigFile;
+            NoUnitTests = other.NoUnitTests;
+            NoStrongNameSigning = other.NoStrongNameSigning;
             ProduceCKSetupComponents = other.ProduceCKSetupComponents;
             DisableSourceLink = other.DisableSourceLink;
+            SqlServer = other.SqlServer;
             if( applyConfig == null )
             {
                 ExcludedNuGetSourceNames = other.ExcludedNuGetSourceNames;
@@ -52,29 +61,45 @@ namespace CK.Env
                 var produceCKSetupComponents = (bool?)applyConfig.Attribute( nameof( ProduceCKSetupComponents ) );
                 if( produceCKSetupComponents.HasValue ) ProduceCKSetupComponents= produceCKSetupComponents.Value;
 
-                var suppressNuGetConfigFile = (bool?)applyConfig.Attribute( nameof( SuppressNuGetConfigFile ) );
-                if( suppressNuGetConfigFile.HasValue ) SuppressNuGetConfigFile = suppressNuGetConfigFile.Value;
+                var noUnitTests = (bool?)applyConfig.Attribute( nameof( NoUnitTests ) );
+                if( noUnitTests.HasValue ) NoUnitTests = noUnitTests.Value;
+
+                var noStrongNameSigning = (bool?)applyConfig.Attribute( nameof( NoStrongNameSigning ) );
+                if( noStrongNameSigning.HasValue ) NoStrongNameSigning = noStrongNameSigning.Value;
+
+                var sqlServer = (string)applyConfig.Attribute( nameof( SqlServer ) );
+                if( sqlServer != null ) SqlServer = sqlServer;
 
                 NuGetSources = applyConfig.Elements( nameof( NuGetSources ) )
                                 .ApplyAddRemoveClear( nuGetSources, s => (string)s.AttributeRequired( "Name" ), s => new NuGetSource( s ) )
                                 .Values;
+
                 ExcludedNuGetSourceNames = applyConfig.Elements( nameof( ExcludedNuGetSourceNames ) )
                                             .ApplyAddRemoveClear( excludedNuGetSourceNames, s => (string)s.AttributeRequired( "Name" ) );
+
                 NuGetPushFeeds = applyConfig.Elements( nameof( NuGetPushFeeds ) )
                                     .ApplyAddRemoveClear( nuGetPushFeeds, eF => NuGetFeedInfo.Create( eF ), f => f.Name )
                                     .Values;
+
                 ExcludedNuGetPushFeedNames = applyConfig.Elements( nameof( ExcludedNuGetPushFeedNames ) )
                            .ApplyAddRemoveClear( excludedNuGetPushFeedNames, s => (string)s.AttributeRequired( "Name" ) );
+
+                Plugins = applyConfig.Elements( nameof( Plugins ) )
+                     .ApplyAddRemoveClear( new HashSet<Type>( other.Plugins ), e => SimpleTypeFinder.WeakResolver( (string)e.AttributeRequired( "Type" ), true ) );
             }
         }
 
         public SolutionSettings With( XElement e ) => new SolutionSettings( this, e );
 
-        public bool SuppressNuGetConfigFile { get; }
+        public bool NoUnitTests { get; }
+
+        public bool NoStrongNameSigning { get; }
 
         public bool ProduceCKSetupComponents { get; }
 
         public bool DisableSourceLink { get; }
+
+        public string SqlServer { get; }
 
         public IReadOnlyCollection<INuGetSource> NuGetSources { get; }
 
@@ -84,5 +109,6 @@ namespace CK.Env
 
         public IReadOnlyCollection<string> ExcludedNuGetPushFeedNames { get; }
 
+        public IReadOnlyCollection<Type> Plugins { get; }
     }
 }

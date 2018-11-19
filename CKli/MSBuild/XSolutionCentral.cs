@@ -18,6 +18,7 @@ namespace CKli
         readonly XNuGetClient _nuGetClient;
         readonly MSBuildContext _msBuildContext;
         readonly XSecretKeyStore _publishKeyStore;
+        readonly CommandRegister _commandRegister;
         readonly List<XGitFolder> _allGitFolders;
 
         readonly List<XSolutionBase> _allSolutions;
@@ -41,6 +42,7 @@ namespace CKli
             _packageFeeds = packageFeeds;
             _nuGetClient = nuGetClient;
             _publishKeyStore = publishKeyStore;
+            _commandRegister = commandRegister;
             _msBuildContext = new MSBuildContext( fileSystem );
             fileSystem.ServiceContainer.Add( _msBuildContext );
 
@@ -56,42 +58,6 @@ namespace CKli
         }
 
         public NormalizedPath CommandProviderName { get; }
-
-        [CommandMethod]
-        public void DumpGitFolderStatus( IActivityMonitor m )
-        {
-            var gitFolders = _allGitFolders.Select( x => x.GitFolder );
-            int gitFoldersCount = 0;
-            var dirty = new List<string>();
-            foreach( var git in gitFolders )
-            {
-                ++gitFoldersCount;
-                using( m.OpenInfo( $"{git.SubPath} - branch: {git.CurrentBranchName}." ) )
-                {
-                    var pluginCount = $"({git.PluginManager.BranchPlugins[git.CurrentBranchName].Count} plugins)";
-                    if( git.CheckCleanCommit( m ) ) m.CloseGroup( "Up-to-date. " + pluginCount );
-                    else
-                    {
-                        dirty.Add( git.SubPath );
-                        m.CloseGroup( "Dirty. "+ pluginCount );
-                    }
-                }
-            }
-            m.CloseGroup( $"{dirty.Count} dirty (out of {gitFoldersCount})." );
-            if( dirty.Count > 0 ) m.Info( $"Dirty: {dirty.Concatenate()}" );
-            var byActiveBranch = gitFolders.GroupBy( g => g.CurrentBranchName );
-            if( byActiveBranch.Count() > 1 )
-            {
-                using( m.OpenInfo( $"{byActiveBranch.Count()} different branches:" ) )
-                {
-                    foreach( var b in byActiveBranch )
-                    {
-                        m.Info( $"Branch '{b.Key}': {b.Select( g => g.SubPath.Path ).Concatenate()}" );
-                    }
-                }
-            }
-            else m.Info( $"All {gitFoldersCount} git folders are on '{byActiveBranch.First().Key}' branch." );
-        }
 
         internal void Register( XGitFolder g )
         {
@@ -129,7 +95,50 @@ namespace CKli
         /// </summary>
         public IWorldName World => _world;
 
-        public WorldContext GetWorldContext( IActivityMonitor m )
+        [CommandMethod]
+        public void DumpGitFolderStatus( IActivityMonitor m )
+        {
+            var gitFolders = _allGitFolders.Select( x => x.GitFolder );
+            int gitFoldersCount = 0;
+            bool hasPluginInitError = false;
+            var dirty = new List<string>();
+            foreach( var git in gitFolders )
+            {
+                ++gitFoldersCount;
+                hasPluginInitError |= !git.EnsureCurrentBranchPlugins( m );
+                using( m.OpenInfo( $"{git.SubPath} - branch: {git.CurrentBranchName}." ) )
+                {
+                    var pluginCount = $"({git.PluginManager.BranchPlugins[git.CurrentBranchName].Count} plugins)";
+                    if( git.CheckCleanCommit( m ) ) m.CloseGroup( "Up-to-date. " + pluginCount );
+                    else
+                    {
+                        dirty.Add( git.SubPath );
+                        m.CloseGroup( "Dirty. "+ pluginCount );
+                    }
+                }
+            }
+            m.CloseGroup( $"{dirty.Count} dirty (out of {gitFoldersCount})." );
+            if( dirty.Count > 0 ) m.Info( $"Dirty: {dirty.Concatenate()}" );
+            var byActiveBranch = gitFolders.GroupBy( g => g.CurrentBranchName );
+            if( byActiveBranch.Count() > 1 )
+            {
+                using( m.OpenInfo( $"{byActiveBranch.Count()} different branches:" ) )
+                {
+                    foreach( var b in byActiveBranch )
+                    {
+                        m.Info( $"Branch '{b.Key}': {b.Select( g => g.SubPath.Path ).Concatenate()}" );
+                    }
+                }
+            }
+            else m.Info( $"All {gitFoldersCount} git folders are on '{byActiveBranch.First().Key}' branch." );
+            if( hasPluginInitError )
+            {
+                m.Error( "At least one git folder is unable to initialize its plugins." );
+            }
+        }
+
+        [CommandMethod]
+        public WorldContext InitializeWorldContext( IActivityMonitor m )
         {
             if( _worldContext == null )
             {
@@ -142,7 +151,17 @@ namespace CKli
                                     _publishKeyStore,
                                     AllGitFoldersWithDevelopBranchName.Select( g => g.GitFolder ),
                                     (monitor,branchName) => GetAllSolutions( monitor, true, branchName ) );
-
+                if( _worldContext != null )
+                {
+                    _commandRegister.Register( _worldContext );
+                }
+            }
+            if( _worldContext != null )
+            {
+                if( _worldContext.IsConcludeCurrentWorkEnabled )
+                {
+                    m.Info( $"Work in progress: {_worldContext.WorkStatus}. ConcludeCurrentWork should be called." );
+                }
             }
             return _worldContext;
         }

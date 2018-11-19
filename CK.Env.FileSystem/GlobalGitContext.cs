@@ -88,7 +88,7 @@ namespace CK.Env
             {
                 if( !isTransitioning && gitStatus == StandardGitStatus.LocalBranch )
                 {
-                    m.Error( $"All Git folders are on {World.DevelopBranchName}. Status is '{gitStatus}'." );
+                    m.Error( $"All Git folders are on {World.DevelopBranchName} but Status is '{gitStatus}'." );
                     return false;
                 }
                 if( gitStatus == StandardGitStatus.Unknwon )
@@ -101,7 +101,7 @@ namespace CK.Env
             Debug.Assert( current == World.LocalBranchName );
             if( !isTransitioning && gitStatus == StandardGitStatus.DevelopBranch )
             {
-                m.Error( $"All Git folders are on {World.LocalBranchName}. Status is '{gitStatus}'." );
+                m.Error( $"All Git folders are on {World.LocalBranchName} but Status is '{gitStatus}'." );
                 return false;
             }
             if( gitStatus == StandardGitStatus.Unknwon )

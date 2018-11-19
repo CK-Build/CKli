@@ -9,7 +9,7 @@ namespace CK.NuGetClient
 {
     public interface ISecretKeyStore
     {
-        string GetSecretKey( IActivityMonitor m, string name, bool throwOnEmpty, string reason = null );
+        string GetSecretKey( IActivityMonitor m, string name, bool throwOnEmpty, string message = null );
 
     }
 }

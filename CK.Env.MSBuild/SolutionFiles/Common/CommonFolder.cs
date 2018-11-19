@@ -14,14 +14,24 @@ namespace CK.Env.MSBuild.SolutionFiles
 {
     public class CommonFolder : PluginFolderBase
     {
-        public CommonFolder( GitFolder f, NormalizedPath branchPath )
+        readonly ISolutionSettings _settings;
+
+        public CommonFolder( GitFolder f, ISolutionSettings settings, NormalizedPath branchPath )
             : base( f, branchPath, "Common" )
         {
+            _settings = settings;
         }
 
-        protected override void DoCopyResources( IActivityMonitor m )
+        protected override void DoApplySettings( IActivityMonitor m )
         {
-            CopyBinaryResource( m, "SharedKey.snk" );
+            if( _settings.NoStrongNameSigning )
+            {
+                DeleteFile( m, "" );
+            }
+            else
+            {
+                CopyBinaryResource( m, "SharedKey.snk" );
+            }
         }
     }
 }

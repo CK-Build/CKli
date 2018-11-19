@@ -20,6 +20,7 @@ namespace CK.NuGetClient
 
         /// <summary>
         /// Must provide the secret key name.
+        /// A null or empty SecretKeyName means that the feed does not require any protection.
         /// </summary>
         string SecretKeyName { get; }
 

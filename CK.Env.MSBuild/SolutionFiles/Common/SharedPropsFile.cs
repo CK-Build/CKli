@@ -14,11 +14,11 @@ namespace CK.Env.MSBuild.SolutionFiles
         readonly CommonFolder _commonFolder;
         readonly ISolutionSettings _settings;
 
-        public SharedPropsFile( CommonFolder f, ISolutionSettings s, NormalizedPath branchPath )
+        public SharedPropsFile( CommonFolder f, ISolutionSettings settings, NormalizedPath branchPath )
             : base( f.Folder, f.FolderPath.AppendPart( "Shared.props" ) )
         {
             _commonFolder = f;
-            _settings = s;
+            _settings = settings;
             BranchPath = branchPath;
         }
 
@@ -60,15 +60,19 @@ namespace CK.Env.MSBuild.SolutionFiles
                 section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
             }
             var p = new XElement( "PropertyGroup",
-                            new XElement( "AssemblyOriginatorKeyFile", "$(MSBuildThisFileDirectory))SharedKey.snk" ),
-                            new XElement( "SignAssembly", true ),
-                            new XElement( "PublicSign", new XAttribute( "Condition", " '$(OS)' != 'Windows_NT' " ), true ),
-                            new XElement( "RepositoryType", "git" ),
                             new XElement( "RepositoryUrl", Folder.OriginUrl ),
                             new XElement( "ProductName", Folder.World.FullName ),
                             new XElement( "Company", "Signature Code" ),
                             new XElement( "Authors", "Signature Code" ),
-                            new XElement( "Copyright", @"Copyright Invenietis 2007-$([System.DateTime]::UtcNow.ToString(""yyyy""))" ) );
+                            new XElement( "Copyright", @"Copyright Invenietis 2007-$([System.DateTime]::UtcNow.ToString(""yyyy""))" ),
+                            new XElement( "RepositoryType", "git" ) );
+
+            if( !_settings.NoStrongNameSigning )
+            {
+                p.Add( new XElement( "AssemblyOriginatorKeyFile", "$(MSBuildThisFileDirectory))SharedKey.snk" ),
+                       new XElement( "SignAssembly", true ),
+                       new XElement( "PublicSign", new XAttribute( "Condition", " '$(OS)' != 'Windows_NT' " ), true ) );
+            }
             section.SetContent( p );
         }
 

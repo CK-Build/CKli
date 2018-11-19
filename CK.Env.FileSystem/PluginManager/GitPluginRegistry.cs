@@ -122,10 +122,16 @@ namespace CK.Env
             DoRegister( pluginType, null );
         }
 
-        public void Register( Type pluginType, string branchName )
+        public void Register( Type pluginType, string branchName, bool allowGitPlugin )
         {
-            CheckBranchPluginType( pluginType, branchName );
-            DoRegister( pluginType, branchName );
+            if( CheckBranchPluginType( pluginType, branchName, allowGitPlugin ) )
+            {
+                DoRegister( pluginType, branchName );
+            }
+            else
+            {
+                DoRegister( pluginType, null );
+            }
         }
 
         Descriptor DoRegister( Type pluginType, string branchName )
@@ -240,11 +246,17 @@ namespace CK.Env
             if( IsGitFolderBranchPlugin( pluginType ) ) throw new ArgumentException( $"Must not be a IGitBranchPlugin: {pluginType.FullName}", nameof( pluginType ) );
         }
 
-        internal static void CheckBranchPluginType( Type pluginType, string branchName )
+        internal static bool CheckBranchPluginType( Type pluginType, string branchName, bool allowGitPlugin )
         {
             if( pluginType == null ) throw new ArgumentNullException( nameof( pluginType ) );
             if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
-            if( !IsGitFolderBranchPlugin( pluginType ) ) throw new ArgumentException( $"Must be a IGitBranchPlugin: {pluginType.FullName}.", nameof( pluginType ) );
+            if( !IsGitFolderBranchPlugin( pluginType ) )
+            {
+                if( !allowGitPlugin ) throw new ArgumentException( $"Must be a IGitBranchPlugin: {pluginType.FullName}.", nameof( pluginType ) );
+                CheckPluginType( pluginType );
+                return false;
+            }
+            return true;
         }
 
         internal static bool IsGitFolderPlugin( Type t ) => typeof( IGitPlugin ).IsAssignableFrom( t );

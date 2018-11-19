@@ -14,11 +14,11 @@ namespace CK.Env.MSBuild.SolutionFiles
         readonly CodeCakeBuilderFolder _f;
         readonly ISolutionSettings _settings;
 
-        public CodeCakeBuilderCSProjFile( CodeCakeBuilderFolder f, ISolutionSettings s, NormalizedPath branchPath )
+        public CodeCakeBuilderCSProjFile( CodeCakeBuilderFolder f, ISolutionSettings settings, NormalizedPath branchPath )
             : base( f.Folder, f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" ) )
         {
             _f = f;
-            _settings = s;
+            _settings = settings;
             BranchPath = branchPath;
         }
 
@@ -40,27 +40,44 @@ namespace CK.Env.MSBuild.SolutionFiles
             EnsureProjectReference( m, "CK.Text", "7.1.1--0008-develop" );
             EnsureProjectReference( m, "NuGet.Credentials", "4.8.0" );
             EnsureProjectReference( m, "NuGet.Protocol", "4.8.0" );
-            EnsureProjectReference( m, "NUnit.ConsoleRunner", "3.9.0" );
-            EnsureProjectReference( m, "NUnit.Runners.Net4", "2.6.4" );
+            if( !_settings.NoUnitTests )
+            {
+                EnsureProjectReference( m, "NUnit.ConsoleRunner", "3.9.0" );
+                EnsureProjectReference( m, "NUnit.Runners.Net4", "2.6.4" );
+            }
             EnsureProjectReference( m, "SimpleGitVersion.Cake", "0.36.1--0015-develop" );
-
+            if( _settings.ProduceCKSetupComponents )
+            {
+                EnsureProjectReference( m, "CKSetup.Cake", "0.36.1--0015-develop" );
+            }
             Save( m );
         }
 
         void EnsureProjectReference( IActivityMonitor m, string packageId, string version )
         {
-            var r = Document.Root.Elements( "ItemGroup" )
-                                 .Elements( "PackageReference" )
-                                 .FirstOrDefault( b => (string)b.Attribute( "Include" ) == packageId );
-            if( r == null )
+            if( !IsProjectReference( m, packageId ) )
             {
-                var itemGroup = Document.Root.Elements( "ItemGroup" ).FirstOrDefault( g => g.Element( "PackageReference" ) != null )
-                                ?? Document.Root.EnsureElement( "ItemGroup" );
-                itemGroup.Add( r = new XElement( "PackageReference",
-                                            new XAttribute( "Include", packageId ) ) );
+                var r = Document.Root.Elements( "ItemGroup" )
+                                     .Elements( "PackageReference" )
+                                     .FirstOrDefault( b => (string)b.Attribute( "Include" ) == packageId );
+                if( r == null )
+                {
+                    var itemGroup = Document.Root.Elements( "ItemGroup" ).FirstOrDefault( g => g.Element( "PackageReference" ) != null )
+                                    ?? Document.Root.EnsureElement( "ItemGroup" );
+                    itemGroup.Add( r = new XElement( "PackageReference",
+                                                new XAttribute( "Include", packageId ) ) );
+                }
+                r.SetAttributeValue( "Version", version );
             }
-            r.SetAttributeValue( "Version", version );
         }
 
+        bool IsProjectReference( IActivityMonitor m, string packageId )
+        {
+            var p = packageId + ".csproj";
+            return Document.Root.Elements( "ItemGroup" )
+                                .Elements( "ProjectReference" )
+                                .Attributes( "Include" )
+                                .Any( a => new NormalizedPath( a.Value ).LastPart == p );
+        }
     }
 }

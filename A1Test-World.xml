@@ -34,6 +34,17 @@
     <NuGetPushFeeds>
       <add Type="Azure" Organization="Signature-OpenSource" FeedName="Default" />
     </NuGetPushFeeds>
+    <Plugins>
+      <add Type="CK.Env.MSBuild.SolutionFiles.CodeCakeBuilderFolder, CK.Env.MSBuild" />
+      <add Type="CK.Env.MSBuild.SolutionFiles.CodeCakeBuilderCSProjFile, CK.Env.MSBuild" />
+      <add Type="CK.Env.MSBuild.SolutionFiles.CodeCakeBuilderKeyVaultFile, CK.Env.MSBuild" />
+      <add Type="CK.Env.MSBuild.SolutionFiles.CommonFolder, CK.Env.MSBuild" />
+      <add Type="CK.Env.MSBuild.SolutionFiles.SharedPropsFile, CK.Env.MSBuild" />
+      <add Type="CK.Env.MSBuild.SolutionFiles.CKSetupStoreTestHelperConfigFile, CK.Env.MSBuild" />
+      <add Type="CK.Env.MSBuild.SolutionFiles.RepositoryXmlFile, CK.Env.MSBuild" />
+      <add Type="CK.Env.MSBuild.SolutionFiles.NugetConfigFile, CK.Env.MSBuild" />
+      <add Type="CK.BuildSystem.Appveyor.AppveyorFile, CK.BuildSystem.Appveyor" />
+    </Plugins>
   </SolutionSettings>
 
   <Folder Name="CK-Env">

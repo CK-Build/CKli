@@ -38,16 +38,28 @@ namespace CK.Env
 
             public IGitPluginCollection<IGitBranchPlugin> this[ string branchName ] => FindOrCreate( branchName );
 
-            public IGitPluginCollection<IGitBranchPlugin> GetPlugins( string branchName ) => FindOrCreate( branchName );
+            public bool EnsurePlugins( IActivityMonitor m, string branchName, string holderName ) => FindOrCreate( branchName, holderName, m ) != null;
 
-            public PluginCollection<IGitBranchPlugin> FindOrCreate( string branchName )
+            PluginCollection<IGitBranchPlugin> FindOrCreate( string branchName, string holderName = null, IActivityMonitor m = null )
             {
                 if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
                 if( !_branchPlugins.TryGetValue( branchName, out var c ) )
                 {
-                    _manager._plugins.EnsureFirstLoad();
-                    c = new PluginCollection<IGitBranchPlugin>( _manager, branchName );
-                    _branchPlugins.Add( branchName, c.EnsureFirstLoad() );
+                    using( m?.OpenTrace( $"Initializing plugins for '{holderName}' branch '{branchName}'." ) )
+                    {
+                        try
+                        {
+                            _manager._plugins.EnsureFirstLoad();
+                            c = new PluginCollection<IGitBranchPlugin>( _manager, branchName );
+                            _branchPlugins.Add( branchName, c.EnsureFirstLoad() );
+                        }
+                        catch( Exception ex )
+                        {
+                            if( m == null ) throw;
+                            m.Error( ex );
+                            return null;
+                        }
+                    }
                 }
                 return c;
             }
@@ -207,12 +219,13 @@ namespace CK.Env
         public void Register( Type pluginType ) => _registry.Register( pluginType );
 
         /// <summary>
-        /// Registers a type that must be <see cref="IGitBranchPlugin"/>.
-        /// The plugin will be available only in the specific branch (after a subsequent <see cref="Reload"/>).
+        /// Registers a type that must be <see cref="IGitBranchPlugin"/> (or a <see cref="IGitPlugin"/> if allowed).
+        /// A branch plugin will be available only in the specific branch (after a subsequent <see cref="Reload"/>).
         /// </summary>
-        /// <param name="pluginType">The type of the plugin. Must be a non null <see cref="IGitBranchPlugin"/>.</param>
+        /// <param name="pluginType">The type of the plugin. Must be a non null <see cref="IGitBranchPlugin"/> or <see cref="IGitPlugin"/> (if <paramref name="allowGitPlugin"/> is true).</param>
         /// <param name="branchName">Branch name. Must not be null.</param>
-        public void Register( Type pluginType, string branchName ) => _registry.Register( pluginType, branchName );
+        /// <param name="allowGitPlugin">True to allow <see cref="IGitPlugin"/> to be registered.</param>
+        public void Register( Type pluginType, string branchName, bool allowGitPlugin = false ) => _registry.Register( pluginType, branchName, allowGitPlugin );
 
         /// <summary>
         /// Registers a settings object.

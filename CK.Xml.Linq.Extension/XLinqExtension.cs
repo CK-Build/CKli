@@ -25,7 +25,7 @@ namespace System.Xml.Linq
         /// changed and must return true if the content of the StringBuilder must be considered.
         /// </param>
         /// <returns>This document.</returns>
-        public static XDocument Beautify( this XDocument @this, Func<string,StringBuilder,bool> actualTextProcessor = null )
+        public static XDocument Beautify( this XDocument @this, Func<string, StringBuilder, bool> actualTextProcessor = null )
         {
             bool? GetPreserve( XElement e )
             {
@@ -38,37 +38,55 @@ namespace System.Xml.Linq
             void Process( XElement e, bool preserve, string outerStartLine, int depth )
             {
                 string startLine = outerStartLine + indent;
-                if( preserve ) foreach( var c in e.Elements() ) Process( c, preserve, startLine, depth + 1 );
-                else
+                if( preserve )
                 {
-                    bool hasContent = false;
-                    var currentXText = new List<XText>();
-                    var currentText = new StringBuilder();
-                    XNode c = e.FirstNode;
-                    while( c != null )
+                    foreach( var child in e.Elements() )
                     {
-                        if( c is XText t )
+                        Process( child, preserve, startLine, depth + 1 );
+                    }
+                    return;
+                }
+                bool hasContent = false;
+                var currentXText = new List<XText>();
+                var currentText = new StringBuilder();
+                XNode c = e.FirstNode;
+                while( c != null )
+                {
+                    if( c is XText t )
+                    {
+                        currentXText.Add( t );
+                        currentText.Append( t.Value );
+                    }
+                    else
+                    {
+                        hasContent = true;
+                        Debug.Assert( c is XElement || c is XComment || c is XCData || c is XProcessingInstruction );
+                        // Handling current collected XText, possibly replacing them with a unique XText.
+                        if( currentXText.Count == 0 )
                         {
-                            currentXText.Add( t );
-                            currentText.Append( t.Value );
+                            c.AddBeforeSelf( new XText( startLine ) );
                         }
                         else
                         {
-                            hasContent = true;
-                            Debug.Assert( c is XElement || c is XComment || c is XCData || c is XProcessingInstruction );
-                            // Handling current collected XText, possibly replacing them with a unique XText.
-                            HandleCollectedXText( actualTextProcessor, startLine, currentXText, currentText, c, false );
-                            if( c is XElement cE )
-                            {
-                                Process( cE, GetPreserve( cE ) ?? preserve, startLine, depth + 1 );
-                            }
-                            currentXText.Clear();
-                            currentText.Clear();
+                            HandleCollectedXText( actualTextProcessor, startLine, currentXText, currentText, false );
                         }
-                        c = c.NextNode;
+                        if( c is XElement cE )
+                        {
+                            Process( cE, GetPreserve( cE ) ?? preserve, startLine, depth + 1 );
+                        }
+                        currentXText.Clear();
+                        currentText.Clear();
                     }
-                    HandleCollectedXText( actualTextProcessor, outerStartLine, currentXText, currentText, e.LastNode, !hasContent );
-               }
+                    c = c.NextNode;
+                }
+                if( currentXText.Count == 0 )
+                {
+                    if( hasContent ) e.LastNode.AddAfterSelf( new XText( outerStartLine ) );
+                }
+                else
+                {
+                    HandleCollectedXText( actualTextProcessor, outerStartLine, currentXText, currentText, !hasContent );
+                }
             }
 
             Process( @this.Root, false, Environment.NewLine, 0 );
@@ -80,66 +98,52 @@ namespace System.Xml.Linq
             string startLine,
             List<XText> currentXText,
             StringBuilder currentText,
-            XNode lastNode,
             bool removeDefaultStartLine )
         {
             bool hasActualText = false;
-            if( currentXText.Count == 0 )
+            Debug.Assert( currentXText.Count != 0 );
+            int newLineCount = 0;
+            for( int i = 0; i < currentText.Length; ++i )
+            {
+                char car = currentText[i];
+                if( car == '\n' ) ++newLineCount;
+                else if( car != '\r' && car != '\t' && car != ' ' )
+                {
+                    hasActualText = true;
+                    break;
+                }
+            }
+            XText replacement = null;
+            if( !hasActualText )
             {
                 if( !removeDefaultStartLine )
                 {
-                    lastNode.AddAfterSelf( new XText( startLine ) );
+                    string newText = startLine;
+                    if( newLineCount >= 2 ) newText = Environment.NewLine + newText;
+                    if( currentXText.Count != 1 || currentXText[0].Value != newText )
+                    {
+                        replacement = new XText( newText );
+                    }
                 }
             }
             else
             {
-                int newLineCount = 0;
-                for( int i = 0; i < currentText.Length; ++i )
+                if( actualTextProcessor?.Invoke( startLine, currentText ) ?? false )
                 {
-                    char car = currentText[i];
-                    if( car == '\n' ) ++newLineCount;
-                    else if( car != '\r' && car != '\t' && car != ' ' )
+                    if( currentText.Length > 0 )
                     {
-                        hasActualText = true;
-                        break;
+                        replacement = new XText( currentText.ToString() );
                     }
                 }
-                XText replacement = null;
-                if( !hasActualText )
-                {
-                    if( !removeDefaultStartLine )
-                    {
-                        string newText = startLine;
-                        if( newLineCount >= 2 ) newText = Environment.NewLine + newText;
-                        if( currentXText.Count != 1 || currentXText[0].Value != newText )
-                        {
-                            replacement = new XText( newText );
-                        }
-                    }
-                }
-                else
-                {
-                    if( actualTextProcessor?.Invoke( startLine, currentText ) ?? false )
-                    {
-                        if( currentText.Length > 0 )
-                        {
-                            replacement = new XText( currentText.ToString() );
-                        }
-                        else
-                        {
-                            removeDefaultStartLine = true;
-                        }
-                    }
-                }
-                if( replacement != null )
-                {
-                    currentXText[currentXText.Count - 1].AddAfterSelf( replacement );
-                    currentXText.Remove();
-                }
-                else if( removeDefaultStartLine )
-                {
-                    currentXText.Remove();
-                }
+            }
+            if( replacement != null )
+            {
+                currentXText[currentXText.Count - 1].AddAfterSelf( replacement );
+                currentXText.Remove();
+            }
+            else if( !hasActualText && removeDefaultStartLine )
+            {
+                currentXText.Remove();
             }
         }
 

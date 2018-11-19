@@ -14,12 +14,15 @@ namespace CK.Env.MSBuild.SolutionFiles
 {
     public class CodeCakeBuilderFolder : PluginFolderBase
     {
-        public CodeCakeBuilderFolder( GitFolder f, NormalizedPath branchPath )
+        readonly ISolutionSettings _settings;
+
+        public CodeCakeBuilderFolder( GitFolder f, ISolutionSettings settings, NormalizedPath branchPath )
             : base( f, branchPath, "CodecakeBuilder" )
         {
+            _settings = settings;
         }
 
-        protected override void DoCopyResources( IActivityMonitor m )
+        protected override void DoApplySettings( IActivityMonitor m )
         {
             CopyTextResource( m, "InstallCredentialProvider.ps1" );
             CopyTextResource( m, "Program.cs" );
@@ -27,7 +30,14 @@ namespace CK.Env.MSBuild.SolutionFiles
             CopyTextResource( m, "Build.NuGetHelper.cs" );
             CopyTextResource( m, "Build.StandardCheckRepository.cs" );
             CopyTextResource( m, "Build.StandardSolutionBuild.cs" );
-            CopyTextResource( m, "Build.StandardUnitTests.cs" );
+            if( _settings.NoUnitTests )
+            {
+                DeleteFile( m, "Build.StandardUnitTests.cs" );
+            }
+            else
+            {
+                CopyTextResource( m, "Build.StandardUnitTests.cs" );
+            }
             CopyTextResource( m, "Build.StandardCreateNuGetPackages.cs" );
             CopyTextResource( m, "Build.StandardPushNuGetPackages.cs" );
         }

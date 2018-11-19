@@ -37,13 +37,10 @@ namespace CKli
             _xElement = initializer.Element;
             initializer.Services.Add( this );
             branch.Parent.GitFolder.PluginManager.RegisterSettings( solutionSettings.SolutionSettings, branch.Name );
-            branch.Parent.GitFolder.PluginManager.Register( typeof( CodeCakeBuilderFolder ), branch.Name );
-            branch.Parent.GitFolder.PluginManager.Register( typeof( CodeCakeBuilderCSProjFile ), branch.Name );
-            branch.Parent.GitFolder.PluginManager.Register( typeof( CommonFolder ), branch.Name );
-            branch.Parent.GitFolder.PluginManager.Register( typeof( SharedPropsFile ), branch.Name );
-            branch.Parent.GitFolder.PluginManager.Register( typeof( CKSetupStoreTestHelperConfigFile ), branch.Name );
-            branch.Parent.GitFolder.PluginManager.Register( typeof( RepositoryXmlFile ), branch.Name );
-            branch.Parent.GitFolder.PluginManager.Register( typeof( NugetConfigFile ), branch.Name );
+            foreach( var type in solutionSettings.SolutionSettings.Plugins )
+            {
+                branch.Parent.GitFolder.PluginManager.Register( type, branch.Name, allowGitPlugin: true );
+            }
         }
 
         /// <summary>

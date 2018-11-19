@@ -37,9 +37,9 @@ namespace CKli
 
         public override bool Run( IActivityMonitor m )
         {
-            var ctx = _solutions.GetWorldContext( m );
+            var ctx = _solutions.InitializeWorldContext( m );
             if( ctx == null ) return false;
-            if( ctx.HasWorkPending )
+            if( ctx.IsConcludeCurrentWorkEnabled )
             {
                 if( ctx.CanCancelRelease )
                 {

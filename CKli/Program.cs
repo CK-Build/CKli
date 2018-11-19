@@ -10,6 +10,7 @@ using System.Linq;
 using CK.Env;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
+using CK.Text;
 
 namespace CKli
 {
@@ -79,12 +80,26 @@ namespace CKli
                     var handlersByType = global.CommandRegister.Select( rep )
                                             .GroupBy( c => c.PayloadType )
                                             .ToList();
-                    foreach( var h in handlersByType )
+                    if( handlersByType.Count == 0 )
                     {
-                        var payload = h.First().CreatePayload();
-                        foreach( var c in h )
+                        monitor.Warn( $"Pattern '{rep}' has no match." );
+                    }
+                    else if( handlersByType.Count == 1 )
+                    {
+                        var payload = handlersByType[0].First().CreatePayload();
+                        foreach( var c in handlersByType[0] )
                         {
                             c.Execute( monitor, payload );
+                        }
+                    }
+                    else
+                    {
+                        using( monitor.OpenWarn( $"Pattern '{rep}' matches require {handlersByType.Count} different payload types." ) )
+                        {
+                            foreach( var c in handlersByType )
+                            {
+                                monitor.OpenWarn( $"{c.Key?.Name ?? "<No payload>"}: {c.Select( n => n.UniqueName.ToString() ).Concatenate() }" );
+                            }
                         }
                     }
                     continue;

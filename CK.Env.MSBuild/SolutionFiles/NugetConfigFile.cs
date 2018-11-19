@@ -31,11 +31,6 @@ namespace CK.Env.MSBuild.SolutionFiles
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
-            if( _settings.SuppressNuGetConfigFile )
-            {
-                Delete( m );
-                return;
-            }
             EnsureDocument();
             PackageSources.EnsureFirstElement( "clear" );
             foreach( var s in _settings.NuGetSources )

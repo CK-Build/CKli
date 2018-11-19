@@ -50,33 +50,33 @@ namespace CKli
                     return false;
                 }
             }
-            firstMapping.Remove( new YamlValue( "init" ) );
-            EnsureKeyValue( firstMapping, "install", "ps: ./CodeCakeBuilder/InstallCredentialProvider.ps1 - AddNetfx" );
-            EnsureKeyValue( firstMapping, "version", "build{build}" );
-            EnsureKeyValue( firstMapping, "image", "Visual Studio 2017" );
-            EnsureKeyValue( firstMapping, "clone_folder", "C:\\CK-World\\" + _gitBranch.Parent.FullPath.Path.Replace( '/', '\\' ) );
-            if( SqlServer != null )
-            {
-                EnsureKeyValue( firstMapping, "services", "mssql"+SqlServer );
-            }
-            EnsureDefaultBranches( firstMapping );
-            YamlMapping env = FindOrCreateEnvironment( builder.Monitor, firstMapping );
-            if( env == null ) return false;
+            //firstMapping.Remove( new YamlValue( "init" ) );
+            //EnsureKeyValue( firstMapping, "install", "ps: ./CodeCakeBuilder/InstallCredentialProvider.ps1 - AddNetfx" );
+            //EnsureKeyValue( firstMapping, "version", "build{build}" );
+            //EnsureKeyValue( firstMapping, "image", "Visual Studio 2017" );
+            //EnsureKeyValue( firstMapping, "clone_folder", "C:\\CK-World\\" + _gitBranch.Parent.FullPath.Path.Replace( '/', '\\' ) );
+            //if( SqlServer != null )
+            //{
+            //    EnsureKeyValue( firstMapping, "services", "mssql"+SqlServer );
+            //}
+            //EnsureDefaultBranches( firstMapping );
+            //YamlMapping env = FindOrCreateEnvironment( builder.Monitor, firstMapping );
+            //if( env == null ) return false;
 
-            EnsureDoubleKeyValue( env, "AZURE_FEED_SIGNATURE_OPENSOURCE_PAT", "secure", "MOjOpNMfab3UseEjZW3bGL6+7uXkbmExMOLMn2Mg+61uUO0qdrSZ28DsChFgR60/Huc+D2bcJ/GXP4CB8Cb8Vg==" );
+            //EnsureDoubleKeyValue( env, "AZURE_FEED_SIGNATURE_OPENSOURCE_PAT", "secure", "MOjOpNMfab3UseEjZW3bGL6+7uXkbmExMOLMn2Mg+61uUO0qdrSZ28DsChFgR60/Huc+D2bcJ/GXP4CB8Cb8Vg==" );
 
-            env.Remove( "MYGET_RELEASE_API_KEY" );
-            env.Remove( "MYGET_PREVIEW_API_KEY" );
-            env.Remove( "MYGET_CI_API_KEY" );
+            //env.Remove( "MYGET_RELEASE_API_KEY" );
+            //env.Remove( "MYGET_PREVIEW_API_KEY" );
+            //env.Remove( "MYGET_CI_API_KEY" );
 
-            if( PushToRemoteStore )
-            {
-                EnsureDoubleKeyValue( env, "CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL", "secure", "ffSyq7zhajO1GUXQraZnZiZGtrPjUMGXXhlS71JUDos5aibfGQQ0zf4BWRjM02dn3zrvVnGZBp6bZwULB/ffASa7PO3mcKcqvppnG6eLYDU=" );
-            }
-            if( SqlServer != null )
-            {
-                EnsureKeyValue( env, "SqlServer/MasterConnectionString", $"Server=(local)\\SQL{SqlServer};Database=master;User ID=sa;Password=Password12!" );
-            }
+            //if( PushToRemoteStore )
+            //{
+            //    EnsureDoubleKeyValue( env, "CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL", "secure", "ffSyq7zhajO1GUXQraZnZiZGtrPjUMGXXhlS71JUDos5aibfGQQ0zf4BWRjM02dn3zrvVnGZBp6bZwULB/ffASa7PO3mcKcqvppnG6eLYDU=" );
+            //}
+            //if( SqlServer != null )
+            //{
+            //    EnsureKeyValue( env, "SqlServer/MasterConnectionString", $"Server=(local)\\SQL{SqlServer};Database=master;User ID=sa;Password=Password12!" );
+            //}
             EnsureSequence( firstMapping, "build_script", "dotnet run --project CodeCakeBuilder -nointeraction" );
             EnsureKeyValue( firstMapping, "test", "off" );
 

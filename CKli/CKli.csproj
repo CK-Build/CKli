@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\CK.BuildSystem.Appveyor\CK.BuildSystem.Appveyor.csproj" />
     <ProjectReference Include="..\CK.Env.FileSystem\CK.Env.FileSystem.csproj" />
     <ProjectReference Include="..\CK.Env.XTyping\CK.Env.XTyping.csproj" />
     <ProjectReference Include="..\CK.Env.MSBuild\CK.Env.MSBuild.csproj" />

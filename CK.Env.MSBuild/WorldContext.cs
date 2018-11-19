@@ -16,7 +16,7 @@ using System.Xml.Linq;
 
 namespace CK.Env.MSBuild
 {
-    public class WorldContext
+    public class WorldContext : ICommandMethodsProvider
     {
         static readonly XName xWorkStatus = XNamespace.None + "WorkStatus";
 
@@ -90,7 +90,10 @@ namespace CK.Env.MSBuild
             _branchSolutionsLoader = branchSolutionsLoader;
             _testedCommits = new TestedCommitMemory( this );
             _buildInfo = new GlobalBuilderInfo( secretKeyStore );
+            CommandProviderName = "WorldContext";
         }
+
+        public NormalizedPath CommandProviderName { get; }
 
         bool SetState( IActivityMonitor m, Action<WorldState> a ) => _worldStore.SetState( m, _worldState, a );
 
@@ -151,8 +154,9 @@ namespace CK.Env.MSBuild
         /// <summary>
         /// Gets whether the <see cref="WorkStatus"/> is not <see cref="WorkStatus.Idle"/>.
         /// </summary>
-        public bool HasWorkPending => _workStatus != WorkStatus.Idle;
+        public bool IsConcludeCurrentWorkEnabled => _workStatus != WorkStatus.Idle;
 
+        [CommandMethod]
         public bool ConcludeCurrentWork( IActivityMonitor m )
         {
             if( _workStatus == WorkStatus.SwitchingToDevelop )
@@ -313,6 +317,9 @@ namespace CK.Env.MSBuild
             return SetState( m, WorkStatus.SwitchingToLocal ) && ConcludeCurrentWork( m );
         }
 
+        /// <summary>
+        /// Gets whether <see cref="RunCIBuild"/> can be called.
+        /// </summary>
         public bool CanRunCIBuild => WorkStatus == WorkStatus.Idle;
 
         /// <summary>
@@ -320,6 +327,7 @@ namespace CK.Env.MSBuild
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
+        [CommandMethod]
         public bool RunCIBuild( IActivityMonitor m )
         {
             if( !CanRunCIBuild ) throw new InvalidOperationException( nameof( CanRunCIBuild ) );
@@ -625,11 +633,18 @@ namespace CK.Env.MSBuild
             IEnumerable<GitFolder> gitFolders,
             Func<IActivityMonitor, string, IReadOnlyList<Solution>> branchSolutionsLoader )
         {
+            if( !gitFolders.All( g => g.EnsureCurrentBranchPlugins( m ) ) )
+            {
+                return null;
+            }
             var gitContext = new GlobalGitContext( world, gitFolders );
             var worldState = worldStore.GetOrCreateLocalState( m, world );
             var workStatus = worldState.XmlState.AttributeEnum( xWorkStatus, WorkStatus.Idle );
             var gitStatus = worldState.GlobalGitStatus;
-            if( !gitContext.CheckStatus( m, ref gitStatus, workStatus == WorkStatus.SwitchingToDevelop || workStatus == WorkStatus.SwitchingToLocal ) ) return null;
+            if( !gitContext.CheckStatus( m, ref gitStatus, workStatus == WorkStatus.SwitchingToDevelop || workStatus == WorkStatus.SwitchingToLocal ) )
+            {
+                return null;
+            }
             Debug.Assert( gitStatus != StandardGitStatus.Unknwon );
             worldState.GlobalGitStatus = gitStatus;
             return new WorldContext( gitContext, worldStore, feeds, nugetClient, secretKeyStore, workStatus, worldState, branchSolutionsLoader );

@@ -13,25 +13,27 @@ namespace CKli
     {
         readonly XSharedHttpClient _sharedHttpClient;
         readonly XSecretKeyStore _secretKeyStore;
-        NuGetClient _nuGetClient;
+        readonly NuGetClient _nuGetClient;
 
         public XNuGetClient(
             XSharedHttpClient sharedHttpClient,
             XSecretKeyStore secretKeyStore,
+            FileSystem fs,
             Initializer initializer )
             : base( initializer )
         {
             _sharedHttpClient = sharedHttpClient;
             _secretKeyStore = secretKeyStore;
-
+            _nuGetClient = new NuGetClient( _sharedHttpClient.Shared, _secretKeyStore );
+            fs.ServiceContainer.Add<INuGetClient>( _nuGetClient );
             initializer.Services.Add( this );
         }
 
-        public INuGetClient NuGetClient => _nuGetClient ?? (_nuGetClient = new NuGetClient( _sharedHttpClient.Shared, _secretKeyStore ));       
+        public INuGetClient NuGetClient => _nuGetClient;       
 
         void IDisposable.Dispose()
         {
-            if( _nuGetClient != null ) _nuGetClient.Dispose();
+            _nuGetClient.Dispose();
         }
     }
 }
