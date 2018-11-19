@@ -37,7 +37,6 @@ namespace CK.Env.MSBuild.SolutionFiles
             p.SetElementValue( "OutputType", "Exe" );
             p.SetElementValue( "LangVersion", "7.2" );
 
-            EnsureProjectReference( m, "CK.Text", "7.1.1--0008-develop" );
             EnsureProjectReference( m, "NuGet.Credentials", "4.8.0" );
             EnsureProjectReference( m, "NuGet.Protocol", "4.8.0" );
             if( !_settings.NoUnitTests )
@@ -49,11 +48,28 @@ namespace CK.Env.MSBuild.SolutionFiles
             if( _settings.ProduceCKSetupComponents )
             {
                 EnsureProjectReference( m, "CKSetup.Cake", "0.36.1--0015-develop" );
+
+                // CKSetup.Cake transitively implies CK.Text.
+                // We must not have transitive references for build projects: this breaks the
+                // ZeroVersion fix!
+                RemovePackageReference( "CK.Text" );
+            }
+            else
+            {
+                EnsureProjectReference( m, "CK.Text", "7.1.1--0008-develop" );
             }
             Save( m );
         }
 
-        void EnsureProjectReference( IActivityMonitor m, string packageId, string version )
+        void RemovePackageReference( string packageId )
+        {
+            Document.Root.Elements( "ItemGroup" )
+                                 .Elements( "PackageReference" )
+                                 .Where( e => (string)e.Attribute( "Include" ) == packageId )
+                                 .Remove();
+        }
+
+        void EnsureProjectReference( IActivityMonitor m, string packageId, string initialVersion )
         {
             if( !IsProjectReference( m, packageId ) )
             {
@@ -65,9 +81,9 @@ namespace CK.Env.MSBuild.SolutionFiles
                     var itemGroup = Document.Root.Elements( "ItemGroup" ).FirstOrDefault( g => g.Element( "PackageReference" ) != null )
                                     ?? Document.Root.EnsureElement( "ItemGroup" );
                     itemGroup.Add( r = new XElement( "PackageReference",
-                                                new XAttribute( "Include", packageId ) ) );
+                                                new XAttribute( "Include", packageId ),
+                                                new XAttribute( "Version", initialVersion ) ) );
                 }
-                r.SetAttributeValue( "Version", version );
             }
         }
 

@@ -359,19 +359,32 @@ namespace CK.Env.MSBuild
 
         public bool CanLocalFixToZeroBuildProjects => WorkStatus == WorkStatus.Idle && GlobalGitStatus == StandardGitStatus.LocalBranch;
 
-        public bool LocalFixToZeroBuildProjects( IActivityMonitor m, bool commitChanges = false )
+        [CommandMethod]
+        public bool LocalFixToZeroBuildProjects( IActivityMonitor m )
         {
             if( !CanLocalFixToZeroBuildProjects ) throw new InvalidOperationException( nameof( CanLocalFixToZeroBuildProjects ) );
             var r = GetSolutionDependencyResult( m, World.LocalBranchName );
             if( r == null ) return false;
-            return DoLocalZeroBuildProjects( m, r, commitChanges );
+            return DoLocalZeroBuildProjects( m, r, false );
         }
 
         bool DoLocalZeroBuildProjects( IActivityMonitor m, SolutionDependencyResult r, bool commitChanges )
         {
             var buildDepNames = r.BuildProjectsInfo.DependenciesToBuild.Select( p => p.Project.Project.Name );
+            var buildDepNamesText = buildDepNames.Concatenate();
 
-            using( m.OpenInfo( $"Removing {buildDepNames.Concatenate()} packages ZeroVersion from local NuGet cache if they exist." ) )
+            var buildProjectsZeroVersionSHA1Signature = r.BuildProjectsInfo
+                                                         .DependenciesToBuild
+                                                         .Select( rp => rp.Project.Project.Solution.GitFolder.HeadCommitSHA1 )
+                                                         .Concatenate( "|" );
+
+            if( buildProjectsZeroVersionSHA1Signature == _worldState.XmlState.Element( "BuildProjectsZeroVersionSHA1Signature" )?.Value )
+            {
+                m.Info( $"Build project signature match. ZeroVersion Packages are already built and propagated (Build Projects: {buildDepNames})." );
+                return true;
+            }
+
+            using( m.OpenInfo( $"Removing {buildDepNamesText} packages ZeroVersion from local NuGet cache if they exist." ) )
             {
                 foreach( var pName in buildDepNames )
                 {
@@ -397,7 +410,7 @@ namespace CK.Env.MSBuild
                 }
             }
 
-            using( m.OpenInfo( $"Generating ZeroVersion in LocalFeed/Local feed for packages: {buildDepNames.Concatenate()}" ) )
+            using( m.OpenInfo( $"Generating ZeroVersion in LocalFeed/Local feed for packages: {buildDepNamesText}" ) )
             {
                 var args = $@"pack --output ""{_feeds.GetLocalFeedFolder( m ).PhysicalPath}"" --include-symbols --configuration Debug /p:Version=""{SVersion.ZeroVersion}"" /p:AssemblyVersion=""{InformationalVersion.ZeroAssemblyVersion}"" /p:FileVersion=""{InformationalVersion.ZeroFileVersion}"" /p:InformationalVersion=""{InformationalVersion.ZeroInformationalVersion}"" ";
                 foreach( var p in r.BuildProjectsInfo.DependenciesToBuild )
@@ -427,8 +440,15 @@ namespace CK.Env.MSBuild
                     return false;
                 }
             }
-            return true;
-        }
+
+            if( buildProjectsZeroVersionSHA1Signature == _worldState.XmlState.Element( "BuildProjectsZeroVersionSHA1Signature" )?.Value )
+            {
+                m.Info( $"Build project signature match. ZeroVersion Packages are already built and propagated (Build Projects: {buildDepNames})." );
+                return true;
+            }
+
+            return SetState( m, state => state.XmlState.SetElementValue( "BuildProjectsZeroVersionSHA1Signature", buildProjectsZeroVersionSHA1Signature );
+       }
 
         public bool CanRelease => WorkStatus == WorkStatus.Idle && GlobalGitStatus == StandardGitStatus.DevelopBranch;
 
@@ -609,18 +629,22 @@ namespace CK.Env.MSBuild
 
         SolutionDependencyResult GetSolutionDependencyResult( IActivityMonitor m, string branchName )
         {
-            IReadOnlyList<Solution> solutions = _branchSolutionsLoader( m, branchName );
-            if( solutions.Any( s => s == null ) ) return null;
-
-            var deps = DependencyContext.Create( m, solutions );
-            if( deps == null ) return null;
-            SolutionDependencyResult r = deps.AnalyzeDependencies( m, SolutionSortStrategy.EverythingExceptBuildProjects );
-            if( r.HasError )
+            using( m.OpenInfo( $"Computing SolutionDependencyResult for branch {branchName}." ) )
             {
-                r.RawSolutionSorterResult.LogError( m );
-                return null;
+                m.MinimalFilter = LogFilter.Terse;
+                IReadOnlyList<Solution> solutions = _branchSolutionsLoader( m, branchName );
+                if( solutions.Any( s => s == null ) ) return null;
+
+                var deps = DependencyContext.Create( m, solutions );
+                if( deps == null ) return null;
+                SolutionDependencyResult r = deps.AnalyzeDependencies( m, SolutionSortStrategy.EverythingExceptBuildProjects );
+                if( r.HasError )
+                {
+                    r.RawSolutionSorterResult.LogError( m );
+                    return null;
+                }
+                return r;
             }
-            return r;
         }
 
         public static WorldContext Create(

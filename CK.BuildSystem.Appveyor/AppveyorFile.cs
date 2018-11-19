@@ -48,10 +48,12 @@ namespace CK.BuildSystem.Appveyor
             {
                 m.Warn( "Update of CODECAKEBUILDER_SECRET_KEY secure key has been skipped." );
             }
+            env.Remove( "NUGET_API_KEY" );
             env.Remove( "MYGET_RELEASE_API_KEY" );
             env.Remove( "MYGET_PREVIEW_API_KEY" );
             env.Remove( "MYGET_CI_API_KEY" );
             env.Remove( "CK_DB_TEST_MASTER_CONNECTION_STRING" );
+            env.Remove( "AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" );
             env.Remove( "AZURE_FEED_PAT" );
             env.Remove( "VSS_NUGET_EXTERNAL_FEED_ENDPOINTS" );
             if( _settings.SqlServer != null )
@@ -67,7 +69,7 @@ namespace CK.BuildSystem.Appveyor
             EnsureKeyValue( firstMapping, "install", "ps: ./CodeCakeBuilder/InstallCredentialProvider.ps1" );
             EnsureKeyValue( firstMapping, "version", "build{build}" );
             EnsureKeyValue( firstMapping, "image", "Visual Studio 2017" );
-            EnsureKeyValue( firstMapping, "clone_folder", "C:\\CK-World\\" + Folder.FullPath.Path.Replace( '/', '\\' ) );
+            EnsureKeyValue( firstMapping, "clone_folder", "C:\\CK-World\\" + Folder.SubPath.Path.Replace( '/', '\\' ) );
             EnsureDefaultBranches( firstMapping );
             EnsureSequence( firstMapping, "build_script", "dotnet run --project CodeCakeBuilder -nointeraction" );
             EnsureKeyValue( firstMapping, "test", "off" );

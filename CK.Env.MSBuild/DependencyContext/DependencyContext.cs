@@ -430,11 +430,11 @@ namespace CK.Env.MSBuild
                     }
                 }
             }
-            using( m.OpenInfo( "Creating Package for all Published projects in all solutions." ) )
+            using( m.OpenDebug( "Creating Package for all Published projects in all solutions." ) )
             {
                 foreach( var s in solutions )
                 {
-                    using( m.OpenTrace( $"Solution {s.UniqueSolutionName}." ) )
+                    using( m.OpenDebug( $"Solution {s.UniqueSolutionName}." ) )
                     {
                         foreach( var p in s.PublishedProjects )
                         {

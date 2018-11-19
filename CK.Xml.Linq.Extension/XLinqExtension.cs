@@ -147,6 +147,16 @@ namespace System.Xml.Linq
             }
         }
 
+        public static void RemoveAllNamespaces( this XElement @this )
+        {
+            @this.Name = @this.Name.LocalName;
+
+            foreach( var c in @this.Elements() )
+            {
+                RemoveAllNamespaces( c );
+            }
+        }
+
         public static XElement EnsureElement( this XElement @this, XName name )
         {
             XElement e = @this.Element( name );

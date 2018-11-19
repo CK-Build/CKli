@@ -104,7 +104,7 @@ namespace CK.Env
         {
             if( CurrentBranchName != null )
             {
-                PluginManager.BranchPlugins.EnsurePlugins( m, CurrentBranchName, FullPath );
+                PluginManager.BranchPlugins.EnsurePlugins( m, CurrentBranchName, SubPath );
                 return true;
             }
             m.Error( $"No plugins since '{ToString()}' is not on a branch." );
@@ -642,7 +642,7 @@ namespace CK.Env
 
         bool RaiseEnteredLocalBranch( IActivityMonitor m, bool enter )
         {
-            PluginManager.BranchPlugins.EnsurePlugins( m, World.LocalBranchName, FullPath ); 
+            PluginManager.BranchPlugins.EnsurePlugins( m, World.LocalBranchName, SubPath ); 
             using( m.OpenTrace( $"{ToString()}: Raising {(enter ? "OnLocalBranchEntered" : "OnLocalBranchLeaving")} event." ) )
             {
                 try

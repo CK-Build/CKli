@@ -30,7 +30,11 @@ namespace CK.Env.MSBuild.SolutionFiles
         public void ApplySettings( IActivityMonitor m )
         {
             if( !_commonFolder.EnsureDirectory( m ) ) return;
+
+            // If Shared.props exists, we make sure ther is no xml namespace defined.
             if( Document == null ) Document = new XDocument( new XElement( "Project" ) );
+            else Document.Root.RemoveAllNamespaces();
+
             HandleBasicDefinitions( m );
             HandleStandardProperties( m );
             HandleReproducibleBuilds( m );
@@ -69,7 +73,7 @@ namespace CK.Env.MSBuild.SolutionFiles
 
             if( !_settings.NoStrongNameSigning )
             {
-                p.Add( new XElement( "AssemblyOriginatorKeyFile", "$(MSBuildThisFileDirectory))SharedKey.snk" ),
+                p.Add( new XElement( "AssemblyOriginatorKeyFile", "$(MSBuildThisFileDirectory)SharedKey.snk" ),
                        new XElement( "SignAssembly", true ),
                        new XElement( "PublicSign", new XAttribute( "Condition", " '$(OS)' != 'Windows_NT' " ), true ) );
             }
