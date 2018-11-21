@@ -155,7 +155,7 @@ namespace CK.Env
 
             public T GetPlugin( Type t ) => _mappings.GetValueWithDefault( t, null ) as T;
 
-            public P GetPlugin<P>() where P : T => (P)_mappings.GetValueWithDefault( typeof( T ), null );
+            public P GetPlugin<P>() where P : T => (P)_mappings.GetValueWithDefault( typeof( P ), null );
 
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
