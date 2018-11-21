@@ -194,7 +194,7 @@ namespace CK.Env.MSBuild
 
         protected virtual bool OnBuildStart( IActivityMonitor m, SolutionDependencyResult.DependentSolution s, SVersion v )
         {
-            if( BuildInfo.WorkStatus == WorkStatus.SwitchingToDevelop )
+            if( BuildInfo.WorkStatus == GlobalWorkStatus.SwitchingToDevelop )
             {
                 // Coming from local, build needs to access the local feeds.
                 // This should be the case but this corrects the files if needed.
@@ -239,7 +239,7 @@ namespace CK.Env.MSBuild
 
         protected virtual bool OnBuildSucceed( IActivityMonitor m, SolutionDependencyResult.DependentSolution s, SVersion v )
         {
-            if( BuildInfo.WorkStatus == WorkStatus.SwitchingToDevelop && !s.Solution.GitFolder.ResetHard( m ) ) return false;
+            if( BuildInfo.WorkStatus == GlobalWorkStatus.SwitchingToDevelop && !s.Solution.GitFolder.ResetHard( m ) ) return false;
             else if( _buildInfo.TargetDevelop && _buildInfo.IsRemotesRequired == false )
             {
                 // This is an untracked file. It has to be removed.
@@ -251,7 +251,7 @@ namespace CK.Env.MSBuild
 
         protected virtual void OnBuildFailed( IActivityMonitor m, SolutionDependencyResult.DependentSolution s, SVersion v )
         {
-            if( BuildInfo.WorkStatus == WorkStatus.SwitchingToDevelop ) s.Solution.GitFolder.ResetHard( m );
+            if( BuildInfo.WorkStatus == GlobalWorkStatus.SwitchingToDevelop ) s.Solution.GitFolder.ResetHard( m );
             else
             {
                 // This is an untracked file. It has to be removed.

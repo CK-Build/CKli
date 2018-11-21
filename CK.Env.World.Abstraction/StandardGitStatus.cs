@@ -8,9 +8,9 @@ namespace CK.Env
 {
     /// <summary>
     /// Defines the two standard git status that applies to one or multiple repositories.
-    /// Either all the repositories in a world are on <see cref="DevelopBranch"/> (the default) or
+    /// A repository (or a world of repositories) is either on <see cref="DevelopBranch"/> (the default) or
     /// on the <see cref="LocalBranch"/>.
-    /// Any other configurations results in a <see cref="Unknwon"/> status and when a world
+    /// Any other configurations results in a <see cref="Unknwon"/> status and when a world or a repository
     /// is in this unknown status some operations cannot be done.
     /// </summary>
     public enum StandardGitStatus

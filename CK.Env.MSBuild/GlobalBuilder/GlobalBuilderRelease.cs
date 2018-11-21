@@ -30,16 +30,16 @@ namespace CK.Env.MSBuild
             : base( r, fileSystem, feeds, nuGetClient, testRunMemory, buildInfo )
         {
             if( roadmap == null ) throw new ArgumentNullException( nameof( roadmap ) );
-            if( BuildInfo.WorkStatus != WorkStatus.Releasing && BuildInfo.WorkStatus != WorkStatus.CancellingRelease )
+            if( BuildInfo.WorkStatus != GlobalWorkStatus.Releasing && BuildInfo.WorkStatus != GlobalWorkStatus.CancellingRelease )
             {
-                throw new InvalidOperationException( nameof( WorkStatus ) );
+                throw new InvalidOperationException( nameof( GlobalWorkStatus ) );
             }
             _roadmap = roadmap;
         }
 
-        bool Releasing => BuildInfo.WorkStatus == WorkStatus.Releasing;
+        bool Releasing => BuildInfo.WorkStatus == GlobalWorkStatus.Releasing;
 
-        bool CancelingRelease => BuildInfo.WorkStatus == WorkStatus.CancellingRelease;
+        bool CancelingRelease => BuildInfo.WorkStatus == GlobalWorkStatus.CancellingRelease;
 
         protected override IReadOnlyList<SolutionDependencyResult.DependentSolution> FilterSolutions( IReadOnlyList<SolutionDependencyResult.DependentSolution> solutions )
         {

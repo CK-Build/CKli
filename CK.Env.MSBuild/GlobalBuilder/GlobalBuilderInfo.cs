@@ -13,7 +13,7 @@ namespace CK.Env.MSBuild
         readonly ISecretKeyStore _keyStore;
         IReadOnlyList<(string Key, string Secret)> _requiredSecrets;
         StandardGitStatus _gitStatus;
-        WorkStatus _workStatus;
+        GlobalWorkStatus _workStatus;
 
         public GlobalBuilderInfo( ISecretKeyStore keyStore )
         {
@@ -44,13 +44,13 @@ namespace CK.Env.MSBuild
 
         public StandardGitStatus GlobalGitStatus => _gitStatus;
 
-        public WorkStatus WorkStatus => _workStatus;
+        public GlobalWorkStatus WorkStatus => _workStatus;
 
-        public void SetStatus( WorkStatus w, StandardGitStatus g )
+        public void SetStatus( GlobalWorkStatus w, StandardGitStatus g )
         {
             _gitStatus = g;
             _workStatus = w;
-            if( _workStatus == WorkStatus.Idle )
+            if( _workStatus == GlobalWorkStatus.Idle )
             {
                 if( _gitStatus == StandardGitStatus.DevelopBranch )
                 {
@@ -69,7 +69,7 @@ namespace CK.Env.MSBuild
                     AllowPackageDependenciesDowngrade = false;
                 }
             }
-            else if( _workStatus == WorkStatus.SwitchingToDevelop )
+            else if( _workStatus == GlobalWorkStatus.SwitchingToDevelop )
             {
                 TargetLocal = false;
                 RunUnitTests = false;
@@ -77,7 +77,7 @@ namespace CK.Env.MSBuild
                 IsRemotesRequired = true;
                 AllowPackageDependenciesDowngrade = false;
             }
-            else if( _workStatus == WorkStatus.SwitchingToLocal )
+            else if( _workStatus == GlobalWorkStatus.SwitchingToLocal )
             {
                 TargetLocal = true;
                 RunUnitTests = false;
@@ -85,7 +85,7 @@ namespace CK.Env.MSBuild
                 IsRemotesRequired = false;
                 AllowPackageDependenciesDowngrade = false;
             }
-            else if( _workStatus == WorkStatus.Releasing )
+            else if( _workStatus == GlobalWorkStatus.Releasing )
             {
                 TargetLocal = false;
                 RunUnitTests = true;
@@ -93,7 +93,7 @@ namespace CK.Env.MSBuild
                 IsRemotesRequired = false;
                 AllowPackageDependenciesDowngrade = true;
             }
-            else if( _workStatus == WorkStatus.CancellingRelease )
+            else if( _workStatus == GlobalWorkStatus.CancellingRelease )
             {
                 TargetLocal = false;
                 RunUnitTests = false;
@@ -108,7 +108,7 @@ namespace CK.Env.MSBuild
 
         public bool TargetDevelop => !TargetLocal && !TargetRelease;
 
-        public bool TargetRelease => _workStatus == WorkStatus.Releasing;
+        public bool TargetRelease => _workStatus == GlobalWorkStatus.Releasing;
 
         public bool RunUnitTests { get; set; }
 
