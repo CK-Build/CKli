@@ -284,6 +284,29 @@ namespace CK.Env.MSBuild
             return SetState( m, GlobalWorkStatus.WaitingReleaseConfirmation );
         }
 
+        public bool IsOrderedPushDevelopEnabled => WorkStatus == GlobalWorkStatus.Idle && GlobalGitStatus == StandardGitStatus.DevelopBranch;
+
+        [CommandMethod]
+        public bool OrderedCommitAndPushOnDevelop( IActivityMonitor m, string commitMessage, int sleepTimeSeconds = 5 )
+        {
+            if( !IsOrderedPushDevelopEnabled ) throw new InvalidOperationException( nameof( IsOrderedPushDevelopEnabled ) );
+            if( String.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
+            // Secondary solutions are in the set. Handle GitGolder only once. 
+            var r = GetSolutionDependencyResult( m, World.DevelopBranchName );
+            if( r == null ) return false;
+            foreach( var g in r.Solutions.Select( s => s.Solution.GitFolder ).Distinct() )
+            {
+                var commit = g.Commit( m, commitMessage );
+                if( !commit.Success ) return false;
+                if( commit.CommitCreated )
+                {
+                    if( !g.Push( m ) ) return false;
+                    System.Threading.Thread.Sleep( sleepTimeSeconds * 1000 );
+                }
+            }
+            return true;
+        }
+
         public bool CanSwitchToDevelop => WorkStatus == GlobalWorkStatus.Idle && GlobalGitStatus == StandardGitStatus.LocalBranch;
 
         [CommandMethod]

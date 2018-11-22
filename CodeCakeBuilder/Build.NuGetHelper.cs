@@ -145,7 +145,9 @@ namespace CodeCake
                 _settings = Settings.LoadDefaultSettings( Environment.CurrentDirectory );
                 _sourceProvider = new PackageProviderProxy( _settings );
                 _vstsFeeds = new List<VSTSFeed>();
-                _sourceCache = new SourceCacheContext();
+                // Setting "NoCache" (?) here is required to be able to retry a push after a
+                // failure. Without it, the PUT is canceled.
+                _sourceCache = new SourceCacheContext().WithRefreshCacheTrue();
                 _providers = new List<Lazy<INuGetResourceProvider>>();
                 _providers.AddRange( Repository.Provider.GetCoreV3() );
                 SharedHttpClient = new HttpClient();
