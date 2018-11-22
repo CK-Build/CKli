@@ -71,12 +71,12 @@ namespace CK.NuGetClient
             var basicAuth = Convert.ToBase64String( Encoding.ASCII.GetBytes( ":" + personalAccessToken ) );
             foreach( var p in files )
             {
-                foreach( var view in GetViewNames( p.Version ) )
+                foreach( var view in p.Version.PackageQuality.GetLabels() )
                 {
                     using( HttpRequestMessage req = new HttpRequestMessage( HttpMethod.Post, GetAzureDevOpsUrlAPI() ) )
                     {
                         req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue( "Basic", basicAuth );
-                        var body = GetPromotionJSONBody( p.PackageId, p.Version.ToString(), view );
+                        var body = GetPromotionJSONBody( p.PackageId, p.Version.ToString(), view.ToString() );
                         req.Content = new StringContent( body, Encoding.UTF8, "application/json" );
                         using( var m = await Client.HttpClient.SendAsync( req ) )
                         {
@@ -93,18 +93,6 @@ namespace CK.NuGetClient
                     }
                 }
             }
-        }
-
-        IEnumerable<string> GetViewNames( SVersion v )
-        {
-            yield return "CI";
-            if( v.IsLatestLabel )
-            {
-                yield return "Latest";
-                yield return "Preview";
-                if( v.IsStableLabel ) yield return "Stable";
-            }
-            else if( v.IsPreviewLabel ) yield return "Preview";
         }
 
         string GetPromotionJSONBody( string packageName, string packageVersion, string viewId, bool npm = false )
