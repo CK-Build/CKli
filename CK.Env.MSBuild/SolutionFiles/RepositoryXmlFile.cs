@@ -39,6 +39,7 @@ namespace CK.Env.MSBuild.SolutionFiles
             {
                 RemoveLocalBranch( m );
             }
+            Document.Root.Elements( XDebugName ).Remove();
             // Obsolete:
             Document.Root.Elements( SVGNS+"PossibleVersionsMode" ).Remove();
             Save( m );
@@ -104,9 +105,9 @@ namespace CK.Env.MSBuild.SolutionFiles
         void RemoveBranchMapping( IActivityMonitor m, string branchName )
         {
             Document?.Root.Element( XBranchesName )
-                     .Elements( XBranchName )
-                     .Where( b => (string)b.Attribute( "Name" ) == branchName )
-                     .Remove();
+                             .Elements( XBranchName )
+                             .Where( b => (string)b.Attribute( "Name" ) == branchName )
+                             .Remove();
         }
 
         /// <summary>

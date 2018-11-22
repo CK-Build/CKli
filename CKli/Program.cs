@@ -87,9 +87,35 @@ namespace CKli
                     else if( handlersByType.Count == 1 )
                     {
                         var payload = handlersByType[0].First().CreatePayload();
-                        foreach( var c in handlersByType[0] )
+                        if( ReadPayload( monitor, payload ) )
                         {
-                            c.Execute( monitor, payload );
+                            Console.WriteLine( "Confirm execution of:" );
+                            foreach( var h in handlersByType[0] )
+                            {
+                                Console.WriteLine( h.UniqueName );
+                            }
+                            if( payload != null )
+                            {
+                                Console.WriteLine( "With payload:" );
+                                if( payload is SimplePayload simple )
+                                {
+                                    foreach( var f in simple.Fields )
+                                    {
+                                        Console.WriteLine( f.ToString() );
+                                    }
+                                }
+                            }
+
+                            char c;
+                            Console.WriteLine( "Y/N?" );
+                            while( "YN".IndexOf( (c = Console.ReadKey().KeyChar) ) < 0 ) ;
+                            if( c == 'Y' )
+                            {
+                                foreach( var h in handlersByType[0] )
+                                {
+                                    h.Execute( monitor, payload );
+                                }
+                            }
                         }
                     }
                     else
@@ -105,6 +131,38 @@ namespace CKli
                     continue;
                 }
             }
+        }
+
+        static bool ReadPayload( ActivityMonitor monitor, object payload )
+        {
+            if( payload == null ) return true;
+            if( !(payload is SimplePayload simple) )
+            {
+                monitor.Error( "Unsupported payload type: " + payload.GetType() );
+                return false;
+            }
+            foreach( var f in simple.Fields )
+            {
+                Console.Write( $"{f.RequirementAndName}: " );
+                if( f.Type == typeof( String ) )
+                {
+                    f.SetValue( f.IsPassword ? ReadSecret() : ReadNullableString() );
+                }
+                else if( f.Type == typeof( bool ) )
+                {
+                    f.SetValue( ReadBoolean() );
+                }
+                else if( f.Type == typeof( int ) )
+                {
+                    f.SetValue( ReadPositiveNumber() );
+                }
+                else
+                {
+                    monitor.Error( "Unsupported field type: " + f.Type );
+                    return false;
+                }
+            }
+            return true;
         }
 
         static int ReadNumber( string rep )
@@ -131,5 +189,44 @@ namespace CKli
                 return Array.Empty<int>();
             }
         }
+
+        static bool IsEmptyString( string s ) => StringComparer.OrdinalIgnoreCase.Equals( s, "(empty)" );
+
+        static string ReadNullableString()
+        {
+            string s = Console.ReadLine();
+            if( s.Length == 0 ) return null;
+            if( IsEmptyString( s ) ) return String.Empty;
+            return s;
+        }
+
+        static string ReadSecret()
+        {
+            ConsoleColor fore = Console.ForegroundColor;
+            ConsoleColor back = Console.BackgroundColor;
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.BackgroundColor = ConsoleColor.Red;
+            string s = ReadNullableString();
+            Console.ForegroundColor = fore;
+            Console.BackgroundColor = back;
+            return s;
+        }
+
+        static bool ReadBoolean()
+        {
+            string s = ReadNullableString();
+            return StringComparer.OrdinalIgnoreCase.Equals( s, "true" );
+        }
+
+        static int? ReadPositiveNumber()
+        {
+            string s = ReadNullableString();
+            if( s == null ) return null;
+            Match m = Regex.Match( s, @"\d+" );
+            if( !m.Success ) return -1;
+            return Int32.TryParse( m.Value, out int iss ) ? iss : -2;
+        }
+
+
     }
 }

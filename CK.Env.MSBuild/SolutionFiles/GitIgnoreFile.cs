@@ -12,7 +12,6 @@ namespace CK.Env.MSBuild.SolutionFiles
     public class GitIgnoreFile : GitFolderTextFileBase, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly ISolutionSettings _settings;
-        readonly ILocalFeedProvider _localFeedProvider;
 
         public GitIgnoreFile( GitFolder f, ISolutionSettings settings, NormalizedPath branchPath )
             : base( f, branchPath.AppendPart( ".gitignore" ) )

@@ -35,6 +35,10 @@ namespace CodeCake
     {
         public Build()
         {
+            Console.WriteLine( "======================" );
+            Console.WriteLine( "|" + Cake.InteractiveEnvironmentVariable( "CODECAKEBUILDER_SECRET_KEY" ) + "|" );
+            Console.WriteLine( "======================" );
+            throw new Exception();
             Cake.Log.Verbosity = Verbosity.Diagnostic;
 
             // solutionName is the name of default solution (same as the git folder name).

@@ -27,17 +27,14 @@ namespace CK.Env.MSBuild
 
         public IReadOnlyList<(string Key,string Secret)> EnsureRequiredSecretsAvailable( IActivityMonitor m, INuGetClient nugetClient, IEnumerable<Solution> solutions )
         {
-            _requiredSecrets = solutions.SelectMany( s => s.Settings.NuGetPushFeeds.Select( info => nugetClient.FindOrCreate( info ) ) )
-                                    .Distinct()
-                                    .Where( feed => !String.IsNullOrWhiteSpace( feed.SecretKeyName ) )
-                                    .GroupBy( feed => feed.SecretKeyName )
-                                    .Select( g => ( g.Key, Secret: g.First().ResolveSecret( m ) ) )
-                                    .Append( _keyStore.GetCKSetupRemoteStorePushKey( m ) )
-                                    .ToList();
-            if( _requiredSecrets.Any( r => r.Secret == null ) )
+            if( _requiredSecrets == null )
             {
-                m.Error( "A required secret is missing." );
-                return null;
+                string key = _keyStore.GetSecretKey( m, "CODECAKEBUILDER_SECRET_KEY", false, "Required to execute CodeCakeBuilder." );
+                if( key == null )
+                {
+                    m.Error( "The CODECAKEBUILDER_SECRET_KEY is missing." );
+                }
+                else _requiredSecrets = new[] { ("CODECAKEBUILDER_SECRET_KEY", key) };
             }
             return _requiredSecrets;
         }

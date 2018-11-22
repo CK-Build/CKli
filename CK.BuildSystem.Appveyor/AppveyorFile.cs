@@ -42,7 +42,7 @@ namespace CK.BuildSystem.Appveyor
             string appveyorSecure = _secretStore.GetSecretKey( m, "APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY", false );
             if( appveyorSecure != null )
             {
-                EnsureDoubleKeyValue( env, "CODECAKEBUILDER_SECRET_KEY", "secure", appveyorSecure );
+                env["CODECAKEBUILDER_SECRET_KEY"] = CreateKeyValue( "secure", appveyorSecure );
             }
             else
             {
@@ -58,21 +58,24 @@ namespace CK.BuildSystem.Appveyor
             env.Remove( "VSS_NUGET_EXTERNAL_FEED_ENDPOINTS" );
             if( _settings.SqlServer != null )
             {
-                EnsureKeyValue( env, "SqlServer/MasterConnectionString", $"Server=(local)\\SQL{_settings.SqlServer.ToUpperInvariant()};Database=master;User ID=sa;Password=Password12!" );
+                env["SqlServer/MasterConnectionString"] = new YamlValue( $"Server=(local)\\SQL{_settings.SqlServer.ToUpperInvariant()};Database=master;User ID=sa;Password=Password12!" );
             }
             //
             firstMapping.Remove( new YamlValue( "init" ) );
             if( _settings.SqlServer != null )
             {
-                EnsureKeyValue( firstMapping, "services", "mssql" + _settings.SqlServer.ToLowerInvariant() );
+                firstMapping["services"] = new YamlValue( "mssql" + _settings.SqlServer.ToLowerInvariant() );
             }
-            EnsureKeyValue( firstMapping, "install", "ps: ./CodeCakeBuilder/InstallCredentialProvider.ps1" );
-            EnsureKeyValue( firstMapping, "version", "build{build}" );
-            EnsureKeyValue( firstMapping, "image", "Visual Studio 2017" );
-            EnsureKeyValue( firstMapping, "clone_folder", "C:\\CK-World\\" + Folder.SubPath.Path.Replace( '/', '\\' ) );
+            var install = new YamlSequence();
+            install.Add( CreateKeyValue( "ps", "./CodeCakeBuilder/InstallCredentialProvider.ps1" ) );
+            firstMapping["install"] = install;
+
+            firstMapping["version"] = new YamlValue( "build{build}" );
+            firstMapping["image"] = new YamlValue( "Visual Studio 2017" );
+            firstMapping["clone_folder"] = new YamlValue( "C:\\CK-World\\" + Folder.SubPath.Path.Replace( '/', '\\' ) );
             EnsureDefaultBranches( firstMapping );
             EnsureSequence( firstMapping, "build_script", "dotnet run --project CodeCakeBuilder -nointeraction" );
-            EnsureKeyValue( firstMapping, "test", "off" );
+            firstMapping["test"] = new YamlValue( "off" );
 
             CreateOrUpdate( m, YamlMappingToString( m ) );
         }
@@ -126,12 +129,11 @@ namespace CK.BuildSystem.Appveyor
             return null;
         }
 
-        YamlMapping EnsureDoubleKeyValue( YamlMapping m, string key1, string key2, string value )
+        YamlMapping CreateKeyValue( string key, string value )
         {
-            var val = new YamlMapping();
-            val[key2] = new YamlValue( value );
-            m[key1] = val;
-            return m;
+            var kv = new YamlMapping();
+            kv[key] = new YamlValue( value );
+            return kv;
         }
 
         static YamlMapping FindOrCreateEnvironment( IActivityMonitor m, YamlMapping firstMapping )

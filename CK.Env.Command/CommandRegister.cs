@@ -35,13 +35,17 @@ namespace CK.Env
             readonly object _instance;
             readonly MethodInfo _method;
             readonly Func<bool> _enabled;
+            readonly ParameterInfo[] _parameters;
 
-            public MethodHandler( NormalizedPath n, object instance, MethodInfo method, Type payloadType, Func<bool> enabled )
+            public MethodHandler( NormalizedPath n, object instance, MethodInfo method, ParameterInfo[] parameters, Func<bool> enabled )
             {
                 UniqueName = n;
                 _instance = instance;
                 _method = method;
-                PayloadType = payloadType;
+                _parameters = parameters;
+                PayloadType = parameters.Length == 1
+                              ? null
+                              : typeof(SimplePayload);
                 _enabled = enabled;
             }
 
@@ -53,7 +57,7 @@ namespace CK.Env
 
             public object CreatePayload()
             {
-                return PayloadType != null ? Activator.CreateInstance( PayloadType ) : null;
+                return PayloadType != null ? new SimplePayload( _parameters.Skip( 1 ) ) : null;
             }
 
             public void Execute( IActivityMonitor m, object payload )
@@ -64,7 +68,18 @@ namespace CK.Env
                     {
                         if( PayloadType != null )
                         {
-                            _method.Invoke( _instance, new[] { m, payload } );
+                            if( !(payload is SimplePayload simple)
+                                || simple.Fields.Count != _parameters.Length - 1 )
+                            {
+                                throw new ArgumentException( nameof( payload ) );
+                            }
+                            var p = new object[_parameters.Length];
+                            p[0] = m;
+                            for( int i = 0; i < simple.Fields.Count; ++i )
+                            {
+                                p[i + 1] = simple.Fields[i].GetValue();
+                            }
+                            _method.Invoke( _instance, p );
                         }
                         else
                         {
@@ -90,11 +105,7 @@ namespace CK.Env
             {
                 throw new ArgumentException( $"Method {method} for command '{uniqueName}' must have a first IActivityMonitor parameter.", nameof( method ) );
             }
-            if( parameters.Length > 2 )
-            {
-                throw new ArgumentException( $"Method {method} for command '{uniqueName}' must have at most 2 parameters.", nameof( method ) );
-            }
-            var h = new MethodHandler( uniqueName, o, method, parameters.Length == 2 ? parameters[1].ParameterType : null, enabled );
+            var h = new MethodHandler( uniqueName, o, method, parameters, enabled );
             _commands.Add( uniqueName, h );
             return h;
         }

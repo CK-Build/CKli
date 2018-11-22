@@ -48,7 +48,6 @@ namespace CK.SimpleKeyVault.Tests
             vals2.Should().BeEquivalentTo( vals );
         }
 
-
         [TestCase( "" )]
         [TestCase( " " )]
         [TestCase( "a b" )]

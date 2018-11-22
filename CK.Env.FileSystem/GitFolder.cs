@@ -22,7 +22,7 @@ namespace CK.Env
     /// Implements Git repository mapping.
     /// GitFolder are internally created (and disposed) by <see cref="FileSystem"/>.
     /// </summary>
-    public class GitFolder
+    public class GitFolder : ICommandMethodsProvider
     {
         static internal readonly CredentialsHandler DefaultCredentialHandler;
 
@@ -31,6 +31,7 @@ namespace CK.Env
         readonly HeadFolder _headFolder;
         readonly BranchesFolder _branchesFolder;
         readonly RemotesFolder _remoteBranchesFolder;
+        readonly CommandRegister _commandRegister;
         bool _branchRefreshed;
 
         static GitFolder()
@@ -61,6 +62,7 @@ namespace CK.Env
             FileSystem = fs;
             World = world;
             _git = new Repository( gitFolder );
+            _commandRegister = commandRegister;
             _headFolder = new HeadFolder( this );
             _branchesFolder = new BranchesFolder( this, "branches", isRemote: false );
             _remoteBranchesFolder = new RemotesFolder( this );
@@ -78,7 +80,10 @@ namespace CK.Env
                 else if( origin.IndexOf( "bitbucket.org", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.Bitbucket;               
             }
             OriginUrl = origin;
+            commandRegister.Register( this );
         }
+
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => SubPath;
 
         /// <summary>
         /// Gets the known Git provider.
@@ -471,8 +476,10 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="commitMessage">Required commit message.</param>
+        /// <param name="amendPreviousCommit">True to amend the previous commit.</param>
         /// <returns>A commit result with success/error and whether a commit has actually been created..</returns>
-        public CommitResult Commit( IActivityMonitor m, string commitMessage )
+        [CommandMethod]
+        public CommitResult Commit( IActivityMonitor m, string commitMessage, bool amendPreviousCommit = false )
         {
             if( String.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
             using( m.OpenInfo( $"Committing changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
@@ -487,7 +494,8 @@ namespace CK.Env
                         m.Info( "Working Folder is dirty. Committing changes." );
                         var now = DateTimeOffset.Now;
                         var author = _git.Config.BuildSignature( now );
-                        _git.Commit( commitMessage, author, new Signature( "CKli", "none", now ) );
+                        var options = new CommitOptions { AmendPreviousCommit = amendPreviousCommit };
+                        _git.Commit( commitMessage, author, new Signature( "CKli", "none", now), options );
                         createdCommit = true;
                     }
                     else m.CloseGroup( "Working folder is up-to-date." );
@@ -505,10 +513,12 @@ namespace CK.Env
         /// Pushes changes from a branch to the origin.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="branchName">Local branch name.</param>
+        /// <param name="branchName">Local branch name. When null, the <see cref="CurrentBranchName"/> is used.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool Push( IActivityMonitor m, string branchName )
+        [CommandMethod]
+        public bool Push( IActivityMonitor m, string branchName = null )
         {
+            if( branchName == null ) branchName = CurrentBranchName;
             using( m.OpenInfo( $"Pushing '{SubPath}' (branch '{branchName}') to origin." ) )
             {
                 try
@@ -843,6 +853,7 @@ namespace CK.Env
 
         internal void Dispose()
         {
+            _commandRegister.Unregister( this );
             ((IDisposable)PluginManager).Dispose();
             _git.Dispose();
         }
