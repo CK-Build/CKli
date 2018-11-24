@@ -20,6 +20,7 @@
     <PackageReference Include="Microsoft.Extensions.FileProviders.Physical" Version="2.1.1" />
     <PackageReference Include="SharpYaml" Version="1.6.4" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
+    <!-- Fix run: cannot find git2-8e0b172.dll-->
     <PackageReference Include="LibGit2Sharp" Version="0.25.3" />
   </ItemGroup>
 
