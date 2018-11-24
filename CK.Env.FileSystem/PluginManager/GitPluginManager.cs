@@ -36,22 +36,29 @@ namespace CK.Env
                 _branchPlugins = new Dictionary<string, PluginCollection<IGitBranchPlugin>>();
             }
 
-            public IGitPluginCollection<IGitBranchPlugin> this[ string branchName ] => FindOrCreate( branchName );
+            internal PluginCollection<IGitBranchPlugin> FindOrCreateWithoutInitialization( string branchName ) => DoFindOrCreate( false, branchName );
 
-            public bool EnsurePlugins( IActivityMonitor m, string branchName, string holderName ) => FindOrCreate( branchName, holderName, m ) != null;
+            public IGitPluginCollection<IGitBranchPlugin> this[ string branchName ] => DoFindOrCreate( true, branchName );
 
-            PluginCollection<IGitBranchPlugin> FindOrCreate( string branchName, string holderName = null, IActivityMonitor m = null )
+            public bool EnsurePlugins( IActivityMonitor m, string branchName, string holderName ) => DoFindOrCreate( true, branchName, holderName, m ) != null;
+
+            PluginCollection<IGitBranchPlugin> DoFindOrCreate( bool ensureFirstLoad, string branchName, string holderName = null, IActivityMonitor m = null )
             {
                 if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
-                if( !_branchPlugins.TryGetValue( branchName, out var c ) )
+                if( !_branchPlugins.TryGetValue( branchName, out var c )
+                    || (ensureFirstLoad && !c.IsFirstLoadDone) )
                 {
-                    using( m?.OpenTrace( $"Initializing plugins for '{holderName}' branch '{branchName}'." ) )
+                    using( ensureFirstLoad && m != null ? m.OpenTrace( $"Initializing plugins for '{holderName}' branch '{branchName}'." ) : null )
                     {
                         try
                         {
                             _manager._plugins.EnsureFirstLoad();
-                            c = new PluginCollection<IGitBranchPlugin>( _manager, branchName );
-                            _branchPlugins.Add( branchName, c.EnsureFirstLoad() );
+                            if( c == null )
+                            {
+                                c = new PluginCollection<IGitBranchPlugin>( _manager, branchName );
+                                _branchPlugins.Add( branchName, ensureFirstLoad ? c.EnsureFirstLoad() : c );
+                            }
+                            else c.EnsureFirstLoad();
                         }
                         catch( Exception ex )
                         {
@@ -70,6 +77,12 @@ namespace CK.Env
 
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
+            /// <summary>
+            /// Reloads plugins from a branch or, when <paramref name="branchName"/> is null, all
+            /// plugins (<see cref="IGitPlugin"/> and <see cref="IGitBranchPlugin"/> for all branches).
+            /// Note that plugins that supports <see cref="IDisposable"/> are disposed.
+            /// </summary>
+            /// <param name="branchName">Branch name to reload. Null to reload all plugins.</param>
             public void Reload( string branchName )
             {
                 if( branchName == null )
@@ -109,6 +122,12 @@ namespace CK.Env
             }
 
             public SimpleServiceContainer ServiceContainer { get; }
+
+            /// <summary>
+            /// Gets whether plugins have been initialized at least one: consider that as long as no plugins
+            /// are loaded, this is false.
+            /// </summary>
+            public bool IsFirstLoadDone => _pluginCount > 0;
 
             public PluginCollection<T> EnsureFirstLoad()
             {
@@ -185,9 +204,22 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the primary service container.
+        /// Gets the primary service container. Use <see cref="GetServiceContainer(string)"/> to obtain the
+        /// service container for a branch.
         /// </summary>
         public SimpleServiceContainer ServiceContainer { get; }
+
+        /// <summary>
+        /// Gets a <see cref="SimpleServiceContainer"/> for a branch or, if <paramref name="branchName"/> is null,
+        /// the primary <see cref="ServiceContainer"/> without trigerring plugin initialization.
+        /// </summary>
+        /// <param name="branchName">Branch name.</param>
+        /// <returns>The primary service container or the container for the branch.</returns>
+        public SimpleServiceContainer GetServiceContainer( string branchName )
+        {
+            if( branchName == null ) return ServiceContainer;
+            return _branches.FindOrCreateWithoutInitialization( branchName ).ServiceContainer;
+        }
 
         /// <summary>
         /// Gets the root <see cref="IGitPlugin"/> plugins.
@@ -222,7 +254,10 @@ namespace CK.Env
         /// Registers a type that must be <see cref="IGitBranchPlugin"/> (or a <see cref="IGitPlugin"/> if allowed).
         /// A branch plugin will be available only in the specific branch (after a subsequent <see cref="Reload"/>).
         /// </summary>
-        /// <param name="pluginType">The type of the plugin. Must be a non null <see cref="IGitBranchPlugin"/> or <see cref="IGitPlugin"/> (if <paramref name="allowGitPlugin"/> is true).</param>
+        /// <param name="pluginType">
+        /// The type of the plugin. Must be a non null <see cref="IGitBranchPlugin"/> or <see cref="IGitPlugin"/>
+        /// (if <paramref name="allowGitPlugin"/> is true).
+        /// </param>
         /// <param name="branchName">Branch name. Must not be null.</param>
         /// <param name="allowGitPlugin">True to allow <see cref="IGitPlugin"/> to be registered.</param>
         public void Register( Type pluginType, string branchName, bool allowGitPlugin = false ) => _registry.Register( pluginType, branchName, allowGitPlugin );

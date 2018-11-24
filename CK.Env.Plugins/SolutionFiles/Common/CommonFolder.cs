@@ -10,7 +10,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace CK.Env.MSBuild.SolutionFiles
+namespace CK.Env.Plugins.SolutionFiles
 {
     public class CommonFolder : PluginFolderBase
     {

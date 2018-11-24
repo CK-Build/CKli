@@ -7,9 +7,9 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace CK.Env.MSBuild.SolutionFiles
+namespace CK.Env.Plugins.SolutionFiles
 {
-    public class CKSetupStoreTestHelperConfigFile : GitFolderTextFileBase, IGitBranchPlugin, IDisposable
+    public class CKSetupStoreTestHelperConfigFile : GitFolderTextFileBase, IGitBranchPlugin, ICommandMethodsProvider, IDisposable
     {
         readonly ISolutionSettings _settings;
         readonly ILocalFeedProvider _localFeedProvider;
@@ -24,7 +24,7 @@ namespace CK.Env.MSBuild.SolutionFiles
             _settings = settings;
             _localFeedProvider = localFeedProvider;
             BranchPath = branchPath;
-            if( IsActive )
+            if( IsOnLocalBranch )
             {
                 f.OnLocalBranchEntered += OnLocalBranchEntered;
                 f.OnLocalBranchLeaving += OnLocalBranchLeaving;
@@ -33,26 +33,41 @@ namespace CK.Env.MSBuild.SolutionFiles
 
         public NormalizedPath BranchPath { get; }
 
-        public bool IsActive => Folder.StandardGitStatus == StandardGitStatus.LocalBranch && _settings.ProduceCKSetupComponents;
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
+
+        [CommandMethod]
+        public void ApplySettings( IActivityMonitor m )
+        {
+            if( IsOnLocalBranch && _settings.ProduceCKSetupComponents )
+            {
+                EnsureLocalStorePath( m );
+            }
+            else
+            {
+                Delete( m );
+            }
+        }
+
+        public bool IsOnLocalBranch => BranchPath.LastPart == Folder.World.LocalBranchName;
 
         public void Dispose()
         {
-            if( IsActive )
+            if( IsOnLocalBranch )
             {
                 Folder.OnLocalBranchEntered -= OnLocalBranchEntered;
                 Folder.OnLocalBranchLeaving -= OnLocalBranchLeaving;
             }
         }
 
-        void OnLocalBranchLeaving( object sender, EventMonitoredArgs e )
-        {
-            Delete( e.Monitor );
-        }
+        void OnLocalBranchLeaving( object sender, EventMonitoredArgs e ) => Delete( e.Monitor );
 
         void OnLocalBranchEntered( object sender, EventMonitoredArgs e )
         {
-            var storePath = _localFeedProvider.GetLocalCKSetupStorePath( e.Monitor );
-            EnsureStorePath( e.Monitor, storePath );
+            if( _settings.ProduceCKSetupComponents ) EnsureLocalStorePath( e.Monitor );
+        }
+        public bool EnsureLocalStorePath( IActivityMonitor m )
+        {
+            return EnsureStorePath( m, _localFeedProvider.GetLocalCKSetupStorePath( m ) );
         }
 
         public bool EnsureStorePath( IActivityMonitor m, string storePath )

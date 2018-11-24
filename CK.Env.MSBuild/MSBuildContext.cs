@@ -130,6 +130,7 @@ namespace CK.Env.MSBuild
 
         /// <summary>
         /// Returns a newly loaded <see cref="Solution"/> or retrieves it from the cache.
+        /// Null if the solution doesn't exist.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="path">The path in the <see cref="FileSystem"/>.</param>
@@ -137,7 +138,7 @@ namespace CK.Env.MSBuild
         /// <param name="primary">The primary solution if this solution is a secondary solution.</param>
         /// <param name="type">The special secondary solution type.</param>
         /// <param name="force">True to force the reload of the solution.</param>
-        /// <returns>The solution and whether it has been loaded or obtained from the cache.</returns>
+        /// <returns>The solution and whether it has been loaded or obtained from the cache. Null if the solution doesn't exist.</returns>
         public (Solution Solution, bool Loaded) FindOrLoadSolution(
             IActivityMonitor m,
             NormalizedPath path,
@@ -147,7 +148,7 @@ namespace CK.Env.MSBuild
             bool force = false )
         {
             if( primary == null && type != SolutionSpecialType.None ) throw new ArgumentException( $"Primary solution, type must be None." );
-            if( primary != null && type == SolutionSpecialType.None ) throw new ArgumentException( $"Secodary solution, type must be IncludedSecondarySolution or IndependantSecondarySolution." );
+            if( primary != null && type == SolutionSpecialType.None ) throw new ArgumentException( $"Secondary solution, type must be IncludedSecondarySolution or IndependantSecondarySolution." );
             if( !force && _solutions.TryGetValue( path, out Solution s ) )
             {
                 if( (primary == null && s.PrimarySolution == null)

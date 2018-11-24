@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CK.Env
+namespace CK.Env.Plugins
 {
     /// <summary>
     /// Basic base class for text files.

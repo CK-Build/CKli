@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace CK.Env
+namespace CK.Env.Plugins
 {
     public static class GitFolderFilesExtension
     {

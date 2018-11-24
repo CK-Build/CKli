@@ -123,6 +123,9 @@ namespace CK.Env.MSBuild
                     else
                     {
                         TargetFrameworks = MSBuildContext.Traits.FindOrCreate( f.Value );
+
+                        LangVersion = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "LangVersion" ).FirstOrDefault()?.Value;
+                        OutputType = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "OutputType" ).FirstOrDefault()?.Value;
                         bool? isTestProject = (bool?)_file.Document.Root.Elements( "PropertyGroup" )
                                                           .Elements( "IsTestProject" )
                                                           .FirstOrDefault();
@@ -155,6 +158,18 @@ namespace CK.Env.MSBuild
         public string Sdk { get; private set; }
 
         /// <summary>
+        /// Gets the LangVersion value of the primary project file.
+        /// Null if the project can not be read or if LangVersion is not defined.
+        /// </summary>
+        public string LangVersion { get; private set; }
+
+        /// <summary>
+        /// Gets the OutputType element's value that is "Exe" for executable.
+        /// Null if the project can not be read or if OutputType is not defined.
+        /// </summary>
+        public string OutputType { get; private set; }
+
+        /// <summary>
         /// Gets the target frameforks from the primary project file.
         /// Null if the project can not be read.
         /// </summary>
@@ -185,12 +200,11 @@ namespace CK.Env.MSBuild
         /// Saves all files that have been modified.
         /// </summary>
         /// <param name="m">The monitor.</param>
-        /// <param name="fs">The file system.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool Save( IActivityMonitor m, FileSystem fs )
+        public bool Save( IActivityMonitor m )
         {
             if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
-            return _file.Save( m, fs );
+            return _file.Save( m, Solution.BuildContext.FileSystem );
         }
 
         /// <summary>
@@ -229,21 +243,32 @@ namespace CK.Env.MSBuild
         /// <param name="packageId">The package identifier.</param>
         /// <param name="version">The new version to set.</param>
         /// <param name="addIfNotExists">True to add the reference. By default, it is only updated.</param>
+        /// <param name="preserveExisting">True to keep any existing version.</param>
         /// <returns>The number of changes.</returns>
-        public int SetPackageReferenceVersion( IActivityMonitor m, CKTrait frameworks, string packageId, SVersion version, bool addIfNotExists = false )
+        public int SetPackageReferenceVersion(
+            IActivityMonitor m,
+            CKTrait frameworks,
+            string packageId,
+            SVersion version,
+            bool addIfNotExists = false,
+            bool preserveExisting = false )
         {
             if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
             if( frameworks.IsEmpty ) throw new ArgumentException( "Must not be empty.", nameof(frameworks) );
             var actualFrameworks = TargetFrameworks.Intersect( frameworks );
             if( actualFrameworks.IsEmpty ) throw new ArgumentException( $"No {frameworks} in {TargetFrameworks}.", nameof(frameworks) );
-            var sV = version.AsCSVersion?.ToString( CSVersionFormat.NuGetPackage ) ?? version.ToString();
+            if( _dependencies.Projects.Any( p => p.TargetProject.Name == packageId ) )
+            {
+                throw new ArgumentException( $"Package {packageId} is already a ProjectReference.", nameof( packageId ) );
+            }
+            var sV = version.ToNuGetPackageString();
             int changeCount = 0;
             CKTrait pFrameworks = null;
             foreach( var p in _dependencies.Packages.Where( p => p.PackageId == packageId
                                                                  && !(pFrameworks = p.Frameworks.Intersect( actualFrameworks )).IsEmpty ) )
             {
                 actualFrameworks = actualFrameworks.Except( pFrameworks );
-                if( p.Version != version )
+                if( p.Version != version && !preserveExisting )
                 {
                     var e = p.PropertyVersionElement;
                     if( e != null )
@@ -299,6 +324,52 @@ namespace CK.Env.MSBuild
             return changeCount;
         }
 
+        void DoSetSimpleProperty( IActivityMonitor m, string elementName, string value )
+        {
+            _file.Document.Root
+                    .Elements( "PropertyGroup" )
+                    .Elements( elementName ).Remove();
+            if( value != null )
+            {
+                _file.Document.Root
+                        .EnsureElement( "PropertyGroup" )
+                        .SetElementValue( elementName, value );
+            }
+            OnChange( m );
+        }
+
+        /// <summary>
+        /// Sets or removes the LangVersion element.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="langVersion">The new LangVersion or null to remove it.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool SetLangVersion( IActivityMonitor m, string langVersion )
+        {
+            if( LangVersion != langVersion )
+            {
+                DoSetSimpleProperty( m, "LangVersion", langVersion );
+                LangVersion = langVersion;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Sets the value or removes the OutputType element.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="outputType">The new output type or null to remove it.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool SetOutputType( IActivityMonitor m, string outputType )
+        {
+            if( OutputType != outputType )
+            {
+                DoSetSimpleProperty( m, "OutputType", outputType );
+                OutputType = outputType;
+            }
+            return true;
+        }
+
         /// <summary>
         /// Removes the <see cref="Dependencies.UselessDependencies"/> and returns the number of changes.
         /// </summary>
@@ -323,9 +394,27 @@ namespace CK.Env.MSBuild
         }
 
         /// <summary>
+        /// Removes any version of a package reference.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="packageId">Package identifier.</param>
+        /// <returns>The number of changes.</returns>
+        public int RemoveDependency( IActivityMonitor m, string packageId )
+        {
+            if( String.IsNullOrWhiteSpace( packageId ) ) throw new ArgumentNullException( nameof( packageId ) );
+            var toRemove = _dependencies.Packages.Where( d => d.PackageId == packageId ).ToList();
+            if( toRemove.Count > 0 )
+            {
+                return RemoveDependencies( m, toRemove );
+            }
+            return 0;
+        }
+
+        /// <summary>
         /// Removes a set of dependencies.
         /// </summary>
         /// <param name="toRemove">Set of dependenies to remove.</param>
+        /// <returns>The number of changes.</returns>
         public int RemoveDependencies( IActivityMonitor m, IReadOnlyList<DeclaredPackageDependency> toRemove )
         {
             if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );

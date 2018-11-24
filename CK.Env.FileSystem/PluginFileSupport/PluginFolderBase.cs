@@ -10,7 +10,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace CK.Env
+namespace CK.Env.Plugins
 {
     public abstract class PluginFolderBase : IGitBranchPlugin, ICommandMethodsProvider
     {

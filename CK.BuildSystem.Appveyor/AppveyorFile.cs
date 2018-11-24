@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Env;
+using CK.Env.Plugins;
 using CK.Text;
 using SharpYaml;
 using SharpYaml.Model;

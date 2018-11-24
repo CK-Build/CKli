@@ -158,8 +158,8 @@ namespace CK.Env.MSBuild
                 {
                     foreach( var s in r.Solutions )
                     {
-                        if( !s.UpdatePackageDependencies( m, _feeds.GetBestAnyLocalVersion, FileSystem, allowDowngrade: false, buildProjects: true ) ) return false;
-                        var fNuGet = s.Solution.GetPlugin<SolutionFiles.NugetConfigFile>();
+                        if( !s.UpdatePackageDependencies( m, _feeds.GetBestAnyLocalVersion, allowDowngrade: false, buildProjects: true ) ) return false;
+                        var fNuGet = s.Solution.GetPlugin<CK.Env.Plugins.SolutionFiles.NugetConfigFile>();
                         fNuGet.RemoveLocalFeeds( m );
                         if( !fNuGet.Save( m ) ) return false;
                         if( !s.Solution.GitFolder.Commit( m, "Updated Build projects and removed LocalFeed NuGet sources." ).Success ) return false;
@@ -243,7 +243,7 @@ namespace CK.Env.MSBuild
                 {
                     foreach( var s in r.Solutions )
                     {
-                        if( !s.UpdatePackageDependencies( m, _feeds.GetBestAnyLocalVersion, FileSystem, allowDowngrade: true, buildProjects: true ) ) return false;
+                        if( !s.UpdatePackageDependencies( m, _feeds.GetBestAnyLocalVersion, allowDowngrade: true, buildProjects: true ) ) return false;
                         if( !s.Solution.GitFolder.Commit( m, "Updated Build projects to use CI builds." ).Success ) return false;
                     }
                 }
@@ -414,7 +414,7 @@ namespace CK.Env.MSBuild
                             project.SetPackageReferenceVersion( m, project.TargetFrameworks, dep.PackageId, SVersion.ZeroVersion );
                         }
                     }
-                    if( !sp.Key.Save( m, FileSystem ) ) return false;
+                    if( !sp.Key.Save( m ) ) return false;
                 }
             }
 

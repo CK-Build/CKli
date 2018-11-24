@@ -19,12 +19,13 @@ namespace CK.Env.MSBuild
     {
         SolutionSpecialType _specialType;
         List<Solution> _secondarySolutions;
+        List<ProjectBase> _allProjects;
         bool _isDirty;
 
         /// <summary>
-        /// Gets the file system from which this solution has been loaded.
+        /// Gets the <see cref="MSBuildContext"/> from which this solution has been loaded.
         /// </summary>
-        public IFileProvider FileSystem { get; }
+        public MSBuildContext BuildContext { get; }
 
         /// <summary>
         /// Gets the .sln path (relative to the <see cref="FileSystem"/>).
@@ -80,15 +81,14 @@ namespace CK.Env.MSBuild
         /// Saves all files that have been modified.
         /// </summary>
         /// <param name="m">The monitor.</param>
-        /// <param name="fs">The file system.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool Save( IActivityMonitor m, FileSystem fs )
+        public bool Save( IActivityMonitor m )
         {
             if( _isDirty )
             {
                 foreach( var p in AllProjects )
                 {
-                    if( !p.ProjectFile.Save( m, fs ) ) return false;
+                    if( !p.ProjectFile.Save( m, BuildContext.FileSystem ) ) return false;
                 }
                 CheckDirty( false );
             }
@@ -157,7 +157,7 @@ namespace CK.Env.MSBuild
         /// <summary>
         /// Gets all solution projects, including any <see cref="SolutionFolder"/>.
         /// </summary>
-        public IReadOnlyCollection<ProjectBase> AllBaseProjects { get; }
+        public IReadOnlyCollection<ProjectBase> AllBaseProjects => _allProjects;
 
         /// <summary>
         /// Gets all projects.
@@ -195,6 +195,52 @@ namespace CK.Env.MSBuild
                                                         .Except( TestProjects )
                                                         .Except( BuildProjects );
 
+        /// <summary>
+        /// Creates a new project that must not already exist.
+        /// TODO: impact .sln (currently nothing is done).
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="framework">The framework or frameworks from <see cref="MSBuildContext.Traits"/>. Must not be empty.</param>
+        /// <param name="projectName">The project name. Must not be null or whitespace and must not already exist.</param>
+        /// <param name="configure">Optional configurator.</param>
+        /// <returns>The new project.</returns>
+        public Project CreateNewClassLibraryProject( IActivityMonitor m, CKTrait framework, string projectName, Action<XDocument> configure = null )
+        {
+            if( String.IsNullOrWhiteSpace( projectName ) ) throw new ArgumentNullException( nameof( projectName ) );
+            if( framework.IsEmpty || framework.Context != MSBuildContext.Traits ) throw new ArgumentException( "Invalid framework.", nameof( framework ) );
+            var project = AllProjects.FirstOrDefault( p => StringComparer.OrdinalIgnoreCase.Equals( p.Name, projectName ) );
+            if( project != null ) throw new InvalidOperationException( $"Project {projectName} already exists." );
+            {
+                var projectDirectory = SolutionFolderPath.AppendPart( projectName );
+                var projectFilePath = projectDirectory.AppendPart( projectName + ".csproj" );
+                var file = BuildContext.FileSystem.GetFileInfo( projectFilePath );
+                if( !file.Exists )
+                {
+                    XDocument d = new XDocument(
+                                    new XElement( "Project", new XAttribute( "Sdk", "Microsoft.NET.Sdk" ),
+                                      new XElement( "PropertyGroup",
+                                        new XElement( framework.IsAtomic ? "TargetFramework" : "TargetFrameworks", framework ) ) ) );
+                    configure?.Invoke( d );
+                    if(!BuildContext.FileSystem.EnsureDirectory( m, projectDirectory )
+                        || !BuildContext.FileSystem.CopyTo( m, d.Beautify().ToString(), projectFilePath ) )
+                    {
+                        return null;
+                    }
+                }
+                var projectGuid = Guid.NewGuid().ToString( "B" );
+                project = new Project( BuildContext, projectGuid, projectName, projectFilePath, "{9A19103F-16F7-4668-BE54-9A1E7A4F7556}" );
+                project.Solution = this;
+                if( project.ReloadProjectFile( m ) == null ) return null;
+                _allProjects.Add( project );
+            }
+            return project;
+        }
+
+
+        /// <summary>
+        /// Overridden to return the <see cref="BranchName"/>/<see cref="UniqueSolutionName"/>.
+        /// </summary>
+        /// <returns>A readable string.</returns>
         public override string ToString() => $"{BranchName}/{UniqueSolutionName}";
 
         string IDependentItemRef.FullName => UniqueSolutionName;
@@ -226,6 +272,7 @@ namespace CK.Env.MSBuild
         }
 
         Solution(
+            MSBuildContext buildContext,
             GitFolder gitFolder,
             string branchName,
             NormalizedPath filePath,
@@ -234,8 +281,9 @@ namespace CK.Env.MSBuild
             string version,
             string visualStudioVersion,
             string minimumVisualStudioVersion,
-            IReadOnlyCollection<ProjectBase> projects )
+            List<ProjectBase> projects )
         {
+            BuildContext = buildContext;
             GitFolder = gitFolder;
             BranchName = branchName;
             FilePath = filePath;
@@ -244,7 +292,7 @@ namespace CK.Env.MSBuild
             Version = version;
             VisualStudioVersion = visualStudioVersion;
             MinimumVisualStudioVersion = minimumVisualStudioVersion;
-            AllBaseProjects = projects;
+            _allProjects = projects;
             foreach( var p in projects ) p.Solution = this;
             BuildProjects = projects.OfType<Project>().Where( p => p.Name == "CodeCakeBuilder" ).ToList();
             TestProjects = projects.OfType<Project>().Where( p => p.Name.EndsWith( ".Tests" ) ).ToList();
@@ -326,6 +374,7 @@ namespace CK.Env.MSBuild
                     // branch name be null.
                 }
                 var s = new Solution(
+                    ctx,
                     gitFolder,
                     branchName,
                     filePath,
@@ -334,7 +383,7 @@ namespace CK.Env.MSBuild
                     version,
                     visualStudioVersion,
                     minimumVisualStudioVersion,
-                    projects.ToArray() );
+                    projects );
                 foreach( var p in s.AllProjects )
                 {
                     if( p.ReloadProjectFile( m ) == null )

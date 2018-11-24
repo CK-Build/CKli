@@ -118,7 +118,7 @@ namespace CKli
                         foreach( var f in fix.Rows )
                         {
                             f.RawPackageDependency.Owner.SetPackageReferenceVersion( m, fix.Framework, fix.PackageName, fix.MaxVer );
-                            f.RawPackageDependency.Owner.Save( m, _fileSystem );
+                            f.RawPackageDependency.Owner.Save( m );
                         }
                         return true;
                     } );

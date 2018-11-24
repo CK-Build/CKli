@@ -51,6 +51,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Xml.Linq.Extension.Tests
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.BuildSystem.Appveyor", "CK.BuildSystem.Appveyor\CK.BuildSystem.Appveyor.csproj", "{8446F2F2-1C84-44A2-BB79-1BF064312CA6}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugins", "CK.Env.Plugins\CK.Env.Plugins.csproj", "{C162156D-AA8F-4592-A31E-1D3BC66F050E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -125,6 +127,10 @@ Global
 		{8446F2F2-1C84-44A2-BB79-1BF064312CA6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8446F2F2-1C84-44A2-BB79-1BF064312CA6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8446F2F2-1C84-44A2-BB79-1BF064312CA6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C162156D-AA8F-4592-A31E-1D3BC66F050E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C162156D-AA8F-4592-A31E-1D3BC66F050E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C162156D-AA8F-4592-A31E-1D3BC66F050E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C162156D-AA8F-4592-A31E-1D3BC66F050E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

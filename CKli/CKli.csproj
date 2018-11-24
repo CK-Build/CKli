@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CK.BuildSystem.Appveyor\CK.BuildSystem.Appveyor.csproj" />
-    <ProjectReference Include="..\CK.Env.FileSystem\CK.Env.FileSystem.csproj" />
+    <ProjectReference Include="..\CK.Env.Plugins\CK.Env.Plugins.csproj" />
     <ProjectReference Include="..\CK.Env.XTyping\CK.Env.XTyping.csproj" />
     <ProjectReference Include="..\CK.Env.MSBuild\CK.Env.MSBuild.csproj" />
     <ProjectReference Include="..\CK.NuGetClient\CK.NuGetClient.csproj" />
@@ -20,6 +20,7 @@
     <PackageReference Include="Microsoft.Extensions.FileProviders.Physical" Version="2.1.1" />
     <PackageReference Include="SharpYaml" Version="1.6.4" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
+    <PackageReference Include="LibGit2Sharp" Version="0.25.3" />
   </ItemGroup>
 
   <ItemGroup>

@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Linq;
 
-namespace CK.Env
+namespace CK.Env.Plugins
 {
     /// <summary>
     /// Exposes a <see cref="XDocument"/> from a file.

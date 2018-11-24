@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CK.Env.MSBuild
+namespace CK.Env
 {
     /// <summary>
     /// A versioned package is an immutable struct that contains a <see cref="PackageId"/>

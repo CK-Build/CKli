@@ -4,7 +4,7 @@ using System;
 using System.Linq;
 using System.Xml.Linq;
 
-namespace CK.Env.MSBuild.SolutionFiles
+namespace CK.Env.Plugins.SolutionFiles
 {
     public class RepositoryXmlFile : GitFolderXmlFile, IGitBranchPlugin, ICommandMethodsProvider
     {
@@ -82,7 +82,8 @@ namespace CK.Env.MSBuild.SolutionFiles
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">The actual branch name (ex: "develop-local").</param>
         /// <param name="versionName">The package suffix (ex: "local").</param>
-        void EnsureBranchMapping( IActivityMonitor m, string branchName, string versionName )
+        /// <param name="isZeroTimed">True for SimpleGitVersion ci version mode for "ZeroTimed" instead of "LastReleaseBased".</param>
+        void EnsureBranchMapping( IActivityMonitor m, string branchName, string versionName, bool isZeroTimed = false )
         {
             var branches = EnsureBranches();
 
@@ -94,7 +95,7 @@ namespace CK.Env.MSBuild.SolutionFiles
                                             new XAttribute( "Name", branchName ) ) );
             }
             branch.SetAttributeValue( "VersionName", versionName );
-            branch.SetAttributeValue( "CIVersionMode", "LastReleaseBased" );
+            branch.SetAttributeValue( "CIVersionMode", isZeroTimed ? "ZeroTimed" : "LastReleaseBased" );
         }
 
         /// <summary>
@@ -115,7 +116,7 @@ namespace CK.Env.MSBuild.SolutionFiles
         /// <see cref="IWorldName.LocalBranchName"/> is mapped to "local".
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        void EnsureLocalBranch( IActivityMonitor m ) => EnsureBranchMapping( m, Folder.World.LocalBranchName, "local" );
+        void EnsureLocalBranch( IActivityMonitor m ) => EnsureBranchMapping( m, Folder.World.LocalBranchName, "local", true );
 
         /// <summary>
         /// Removes the <see cref="IWorldName.LocalBranchName"/> branch mapping if it exists.

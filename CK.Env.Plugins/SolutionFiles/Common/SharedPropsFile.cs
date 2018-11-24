@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace CK.Env.MSBuild.SolutionFiles
+namespace CK.Env.Plugins.SolutionFiles
 {
     public class SharedPropsFile : GitFolderXmlFile, IGitBranchPlugin, ICommandMethodsProvider
     {

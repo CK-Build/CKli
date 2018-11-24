@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
 
-namespace CK.Env.MSBuild.SolutionFiles
+namespace CK.Env.Plugins.SolutionFiles
 {
     public class CodeCakeBuilderKeyVaultFile : GitFolderTextFileBase, IGitBranchPlugin, ICommandMethodsProvider
     {

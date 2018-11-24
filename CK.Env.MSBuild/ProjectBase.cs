@@ -61,5 +61,12 @@ namespace CK.Env.MSBuild
             Type = type;
         }
 
+        internal string ToSlnDeclaration()
+        {
+            return
+$@"Project(""{Type}"") = ""{Name}"", ""{Path.RemovePrefix(Solution.SolutionFolderPath)}"", ""{ProjectGuid}""
+EndProject";
+        }
+
     }
 }

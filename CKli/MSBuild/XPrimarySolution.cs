@@ -9,14 +9,12 @@ using CK.Env.Analysis;
 using CK.Text;
 using System.Linq;
 using System.Xml.Linq;
-using CK.Env.MSBuild.SolutionFiles;
 
 namespace CKli
 {
     /// <summary>
     /// A primary solution is the one at the root of the repository whose name
-    /// must be the same as the working directory.
-    /// It is available for the next siblings.
+    /// must be the same as the working directory. It is available for the next siblings.
     /// </summary>
     public class XPrimarySolution : XSolutionBase
     {
@@ -58,6 +56,14 @@ namespace CKli
         /// </summary>
         public string NotPublishedProjects { get; private set; }
 
+        /// <summary>
+        /// Overridden to load the primary solution with the current <see cref="XSolutionSettings.SolutionSettings"/>
+        /// and applies <see cref="TestProjectsArePublished"/> and <see cref="NotPublishedProjects"/> attributes.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="reload">True to reload the solution.</param>
+        /// <param name="projectToBranchName">Optional other branch for which the solution must be loaded.</param>
+        /// <returns>The primary solution or null if not found.</returns>
         public override Solution GetSolution( IActivityMonitor m, bool reload, string projectToBranchName = null )
         {
             var (s, loaded) = SolutionCentral.MSBuildContext.FindOrLoadSolution(
@@ -89,6 +95,7 @@ namespace CKli
             }
             return s;
         }
+
 
     }
 }

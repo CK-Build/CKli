@@ -181,7 +181,6 @@ namespace CK.Env.MSBuild
             /// </summary>
             /// <param name="m">The monitor to use.</param>
             /// <param name="localPackageFinder">The local package version resolver.</param>
-            /// <param name="fileSystem">The file system.</param>
             /// <param name="allowDowngrade">Optional allow downgrade. Necessary when cancelling a release.</param>
             /// <param name="allowMissing">Defaults to true to be able to start with empty local feeds.</param>
             /// <param name="buildProjects">Whether build projects (and not normal ones) must be considered.</param>
@@ -189,7 +188,6 @@ namespace CK.Env.MSBuild
             public bool UpdatePackageDependencies(
                 IActivityMonitor m,
                 Func<IActivityMonitor,string,SVersion> localPackageFinder,
-                FileSystem fileSystem,
                 bool allowDowngrade = false,
                 bool allowMissing = true,
                 bool buildProjects = false )
@@ -226,7 +224,7 @@ namespace CK.Env.MSBuild
                     {
                         u.Row.SourceProject.Project.SetPackageReferenceVersion( m, u.Row.SourceProject.Project.TargetFrameworks, u.Row.PackageId, u.LocalVersion );
                     }
-                    return Solution.Save( m, fileSystem );
+                    return Solution.Save( m );
                 }
             }
 

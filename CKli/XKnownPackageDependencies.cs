@@ -101,7 +101,7 @@ namespace CKli
                     foreach( var r in toRemove )
                     {
                         r.Project.RemoveDependencies( m, r.ToRemove );
-                        if( !r.Project.Save( m, _solutions.MSBuildContext.FileSystem ) ) return false;
+                        if( !r.Project.Save( m ) ) return false;
                     }
                     return true;
                 } );

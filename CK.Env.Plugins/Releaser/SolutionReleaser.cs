@@ -128,7 +128,7 @@ namespace CK.Env
 
             if( requirements.Level == ReleaseLevel.None )
             {
-                // There are no reasons to release becasue of the dependencies.
+                // There are no reasons to release because of the dependencies.
                 // The new code that is contained in this commit:
                 // - MAY have no actual changes: the previous version could be used.
                 // - or MUST be released at least as a fix.
