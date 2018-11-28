@@ -14,13 +14,18 @@ namespace CK.Env.MSBuild
 {
     /// <summary>
     /// Encapsulates the result of the dependencies analysis at the solution level.
-    /// This is produced by <see cref="DependencyContext.AnalyzeDependencies(Core.IActivityMonitor, SolutionSortStrategy)"/>.
+    /// This is produced by <see cref="DependencyAnalyser.CreateDependencyContext(Core.IActivityMonitor, SolutionSortStrategy)"/>.
     /// </summary>
-    public class SolutionDependencyResult
+    public class SolutionDependencyContext : IDependentSolutionContext
     {
+        readonly Dictionary<string, DependentSolution> _indexByName;
+
         /// <summary>
         /// Expanded data that captures for each solution, all referenced projects (<see cref="Target"/>) to
         /// other solutions from its own projects (<see cref="Origin)"/>.
+        /// Note that this relation does not support per framework dependencies: a locally produced package can not
+        /// have different versions at the same time in a World. An <see cref="InvalidOperationException"/> is thrown
+        /// if more than one version exist in <see cref="Origin"/> dependencies that reference the <see cref="Target"/>.
         /// </summary>
         public class DependencyRow
         {
@@ -30,7 +35,7 @@ namespace CK.Env.MSBuild
             public int Index { get; }
 
             /// <summary>
-            /// Gets the solution file.
+            /// Gets the solution of the <see cref="Origin"/> project.
             /// </summary>
             public Solution Solution { get; }
 
@@ -46,12 +51,26 @@ namespace CK.Env.MSBuild
             /// </summary>
             public Project Target { get; }
 
+            /// <summary>
+            /// Gets the single version refrence from <see cref="Origin"/> to <see cref="Target"/>.
+            /// Null if <see cref="Solution"/> does not require any other solution.
+            /// Note that this relation does not support per framework dependencies: a locally produced package can not
+            /// have different versions at the same time in a World. An <see cref="InvalidOperationException"/> is thrown
+            /// if more than one version exist in <see cref="Origin"/> dependencies that reference the <see cref="Target"/>.
+            /// </summary>
+            public SVersion Version { get; }
+
             internal DependencyRow( int idx, Solution s, Project o, Project t )
             {
+                Debug.Assert( (o == null) == (t == null) );
                 Index = idx;
                 Solution = s;
                 Origin = o;
                 Target = t;
+                if( o != null )
+                {
+                    Version = Origin.Deps.Packages.Single( d => d.PackageId == Target.Name ).Version;
+                }
             }
 
             public override string ToString()
@@ -60,10 +79,36 @@ namespace CK.Env.MSBuild
             }
         }
 
+        class LocalDep : ILocalPackageDependency
+        {
+            readonly DependencyRow _row;
+
+            public LocalDep( DependencyRow row, Dictionary<string, DependentSolution> indexByName )
+            {
+                _row = row;
+                Origin = indexByName[row.Origin.PrimarySolution.UniqueSolutionName];
+                Target = indexByName[row.Target.PrimarySolution.UniqueSolutionName];
+            }
+
+            public IDependentSolution Origin { get; }
+
+            public string OriginSecondarySolutionName => _row.Origin.Solution.PrimarySolution == null ? null : _row.Origin.Solution.UniqueSolutionName;
+
+            public string OriginProjectName => _row.Origin.Name;
+
+            public SVersion Version => _row.Version;
+
+            public IDependentSolution Target { get; }
+
+            public string TargetSecondarySolutionName => _row.Target.Solution.PrimarySolution == null ? null : _row.Target.Solution.UniqueSolutionName;
+
+            public string TargetProjectName => _row.Target.Name;
+        }
+
         /// <summary>
         /// Simple model for a dependent solution with its direct, minimal and transitive requirements and impacts.
         /// </summary>
-        public class DependentSolution
+        public class DependentSolution : IDependentSolution
         {
             internal DependentSolution(
                 Solution s,
@@ -74,12 +119,6 @@ namespace CK.Env.MSBuild
             {
                 Solution = s;
                 Index = index;
-                Requirements = dependencyTable.Where( r => r.Solution == s && r.Target != null )
-                                .Select( r => r.Target.Solution )
-                                .Distinct()
-                                .Select( others )
-                                .ToList();
-
                 Requirements = dependencyTable.Where( r => r.Solution == s && r.Target != null )
                                 .Select( r => r.Target.Solution )
                                 .Distinct()
@@ -99,6 +138,11 @@ namespace CK.Env.MSBuild
 
                 Debug.Assert( PublishedRequirements.All( d => Requirements.Contains( d ) ) );
             }
+
+            /// <summary>
+            /// Gets the solution name. This should be unique across any possible world.
+            /// </summary>
+            public string UniqueSolutionName => Solution.UniqueSolutionName;
 
             /// <summary>
             /// Gets the rank of this solution.
@@ -123,7 +167,7 @@ namespace CK.Env.MSBuild
 
             /// <summary>
             /// Gets the direct required solutions for the published packages of this solution:
-            /// this corresponds to the solutions that generate a package used ba a published package in
+            /// this corresponds to the solutions that generate a package used by a published package in
             /// this <see cref="Solution"/>.
             /// </summary>
             public IReadOnlyList<DependentSolution> PublishedRequirements { get; }
@@ -140,7 +184,7 @@ namespace CK.Env.MSBuild
             public IReadOnlyList<DependentSolution> TransitiveRequirements { get; }
 
             /// <summary>
-            /// Gets the direct impacts of this solution: these are all the solutions use at least one package
+            /// Gets the direct impacts of this solution: these are all the solutions that use at least one package
             /// generated by this <see cref="Solution"/>.
             /// </summary>
             public IReadOnlyList<DependentSolution> Impacts { get; private set; }
@@ -157,11 +201,43 @@ namespace CK.Env.MSBuild
             public IReadOnlyCollection<DependentSolution> TransitiveImpacts { get; private set; }
 
             /// <summary>
-            /// Gets the global <see cref="SolutionDependencyResult"/> to which this <see cref="DependentSolution"/> belongs.
+            /// Gets the locally produced packages that are consumed by this solution.
+            /// Only packages that are produced by <see cref="Requirements"/> are considered.
             /// </summary>
-            public SolutionDependencyResult GlobalResult { get; private set; }
+            public IReadOnlyCollection<ImportedLocalPackage> ImportedPackages { get; private set; }
 
-            internal void Initialize( SolutionDependencyResult global )
+            /// <summary>
+            /// Gets the packages produced by this solution that are consumed by other solutions.
+            /// </summary>
+            public IReadOnlyCollection<ExportedLocalPackage> ExportedPackages { get; private set; }
+
+            /// <summary>
+            /// Gets the global <see cref="SolutionDependencyContext"/> to which this <see cref="DependentSolution"/> belongs.
+            /// </summary>
+            public SolutionDependencyContext GlobalResult { get; private set; }
+
+            #region IDependentSolution explicit implementation.
+
+            IGitRepository IDependentSolution.GitRepository => Solution.GitFolder;
+
+            string IDependentSolution.BranchName => Solution.BranchName;
+
+            IReadOnlyList <IDependentSolution> IDependentSolution.Requirements => Requirements;
+
+            IReadOnlyList<IDependentSolution> IDependentSolution.PublishedRequirements => PublishedRequirements;
+
+            IReadOnlyList<IDependentSolution> IDependentSolution.MinimalRequirements => MinimalRequirements;
+
+            IReadOnlyList<IDependentSolution> IDependentSolution.TransitiveRequirements => TransitiveRequirements;
+
+            IReadOnlyList<IDependentSolution> IDependentSolution.Impacts => Impacts;
+
+            IReadOnlyList<IDependentSolution> IDependentSolution.MinimalImpacts => MinimalImpacts;
+
+            IReadOnlyCollection<IDependentSolution> IDependentSolution.TransitiveImpacts => TransitiveImpacts;
+            #endregion
+
+            internal void Initialize( SolutionDependencyContext global )
             {
                 GlobalResult = global;
                 Impacts = global.DependencyTable.Where( r => r.Target != null && r.Target.PrimarySolution == Solution )
@@ -173,6 +249,16 @@ namespace CK.Env.MSBuild
                 var transitive = new HashSet<DependentSolution>( Impacts );
                 foreach( var i in Impacts.SelectMany( r => r.TransitiveImpacts ) ) transitive.Add( i );
                 TransitiveImpacts = transitive;
+
+                ImportedPackages = global.PackageDependencies
+                                         .Where( d => d.Origin == this )
+                                         .Select( d => new ImportedLocalPackage( d ) )
+                                         .ToArray();
+
+                ExportedPackages = global.PackageDependencies
+                                         .Where( d => d.Target == this )
+                                         .Select( d => new ExportedLocalPackage( d ) )
+                                         .ToArray();
             }
 
             /// <summary>
@@ -275,7 +361,7 @@ namespace CK.Env.MSBuild
         /// </summary>
         /// <param name="c">The content strategy.</param>
         /// <param name="rSolution">The dependency sorter result.</param>
-        internal SolutionDependencyResult(
+        internal SolutionDependencyContext(
             SolutionSortStrategy c,
             IDependencySorterResult rSolution,
             ProjectDependencyResult projectDeps,
@@ -291,7 +377,8 @@ namespace CK.Env.MSBuild
             Solutions = Array.Empty<DependentSolution>();
         }
 
-        internal SolutionDependencyResult(
+        internal SolutionDependencyContext(
+            Dictionary<string, DependentSolution> indexByName,
             SolutionSortStrategy c,
             IDependencySorterResult r,
             ProjectDependencyResult projectDeps,
@@ -300,12 +387,16 @@ namespace CK.Env.MSBuild
             BuildProjectsInfo buildProjectsInfo )
         {
             Debug.Assert( r != null && r.IsComplete && t != null && solutions != null );
+            _indexByName = indexByName;
             Content = c;
             RawSolutionSorterResult = r;
             ProjectDependencies = projectDeps;
             BuildProjectsInfo = buildProjectsInfo;
             DependencyTable = t;
             Solutions = solutions;
+            PackageDependencies = t.Where( row => row.Origin != null )
+                                   .Select( row => new LocalDep( row, _indexByName ) )
+                                   .ToArray();
             for( int i = solutions.Count - 1; i >= 0; --i ) solutions[i].Initialize( this );
         }
 
@@ -322,6 +413,9 @@ namespace CK.Env.MSBuild
 
         /// <summary>
         /// Gets the details of the dependencies between solutions.
+        /// Solutions that have no dependencies appear once with null <see cref="DependencyRow.Origin"/>
+        /// and <see cref="DependencyRow.Target"/>.
+        /// The <see cref="PackageDependencies"/> is a more abstract view of this.
         /// </summary>
         public IReadOnlyList<DependencyRow> DependencyTable { get; }
 
@@ -347,6 +441,16 @@ namespace CK.Env.MSBuild
         /// Never null.
         /// </summary>
         public BuildProjectsInfo BuildProjectsInfo { get; }
+
+        IReadOnlyList<IDependentSolution> IDependentSolutionContext.Solutions => Solutions;
+
+        /// <summary>
+        /// Gets the package dependencies between solutions.
+        /// This is a more abstract view of the <see cref="DependencyTable"/> that does not
+        /// contain any row for a solution that has no dependency.
+        /// </summary>
+        public IReadOnlyCollection<ILocalPackageDependency> PackageDependencies { get; }
+
 
     }
 

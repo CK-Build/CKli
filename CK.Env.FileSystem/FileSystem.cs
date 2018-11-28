@@ -16,6 +16,8 @@ namespace CK.Env
 
     /// <summary>
     /// <see cref="IFileProvider"/> implementation that handles Git repositories.
+    /// Exposes its <see cref="ServiceContainer"/> that is the root of services
+    /// available to <see cref="IGitPlugin"/> and <see cref="IGitBranchPlugin"/>.
     /// </summary>
     public class FileSystem : IFileProvider, IDisposable
     {

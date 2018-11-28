@@ -22,7 +22,7 @@ namespace CK.Env
     /// Implements Git repository mapping.
     /// GitFolder are internally created (and disposed) by <see cref="FileSystem"/>.
     /// </summary>
-    public class GitFolder : ICommandMethodsProvider
+    public class GitFolder : IGitRepository, ICommandMethodsProvider
     {
         static internal readonly CredentialsHandler DefaultCredentialHandler;
 
@@ -311,13 +311,32 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Gets the version information from a branch.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="branchName">Defaults to <see cref="CurrentBranchName"/>.</param>
+        /// <returns>The commit version info or null if it it cannot be obtained.</returns>
+        public CommitVersionInfo GetCommitVersionInfo( IActivityMonitor m, string branchName = null )
+        {
+            var info = ReadRepositoryVersionInfo( m, branchName );
+            return info != null
+                    ? new CommitVersionInfo(
+                            info.ValidReleaseTag,
+                            info.BetterExistingVersion?.ThisTag,
+                            info.CommitInfo.BasicInfo?.BestCommitBelow.ThisTag,
+                            info.NextPossibleVersions,
+                            info.PossibleVersions )
+                    : null;
+        }
+
+        /// <summary>
         /// Gets the simple git version <see cref="RepositoryInfo"/> from a branch.
         /// Returns null if an error occurred or if RepositoryInfo.xml has not been successfully read.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">Defaults to <see cref="CurrentBranchName"/>.</param>
-        /// <returns>True on success, false on error.</returns>
-        public RepositoryInfo ReadVersionInfo( IActivityMonitor m, string branchName = null )
+        /// <returns>The RepositoryInfo or null if it it cannot be obtained.</returns>
+        public RepositoryInfo ReadRepositoryVersionInfo( IActivityMonitor m, string branchName = null )
         {
             if( branchName == null ) branchName = CurrentBranchName;
             try
@@ -476,10 +495,35 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="commitMessage">Required commit message.</param>
-        /// <param name="amendPreviousCommit">True to amend the previous commit.</param>
-        /// <returns>A commit result with success/error and whether a commit has actually been created..</returns>
+        /// <returns>A commit result with success/error and whether a commit has actually been created.</returns>
         [CommandMethod]
-        public CommitResult Commit( IActivityMonitor m, string commitMessage, bool amendPreviousCommit = false )
+        public CommitResult Commit( IActivityMonitor m, string commitMessage ) => DoCommit( m, commitMessage, false );
+
+        /// <summary>
+        /// Amends the current commit, optionaly changing its message.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="editMessage">
+        /// Allows message change. By returning null, the operation is canceled and a failed
+        /// commit result is returned.
+        /// </param>
+        /// <returns>A commit result with success/error and whether the commit has actually been amended.</returns>
+        public CommitResult CommitAmend( IActivityMonitor m, Func<string,string> editMessage = null )
+        {
+            using( m.OpenInfo( $"Amending Commit." ) )
+            {
+                var message = _git.Head.Tip.Message;
+                if( editMessage != null ) message = editMessage( message );
+                if( editMessage == null )
+                {
+                    m.Info( "Canceled by empty message." );
+                    return new CommitResult( false, false );
+                }
+                return DoCommit( m, message, true );
+            }
+        }
+
+        CommitResult DoCommit( IActivityMonitor m, string commitMessage, bool amendPreviousCommit )
         {
             if( String.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
             using( m.OpenInfo( $"Committing changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
@@ -582,7 +626,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool SwitchFromDevelopToLocal( IActivityMonitor m, bool autoCommit = true, bool commitLocalChanges = true )
+        public bool SwitchFromDevelopToLocal( IActivityMonitor m, bool autoCommit = true )
         {
             using( m.OpenInfo( $"Switching '{SubPath}' to branch '{World.LocalBranchName}')." ) )
             {
@@ -634,8 +678,7 @@ namespace CK.Env
 
                     if( !RaiseEnteredLocalBranch( m, true ) ) return false;
 
-                    if( commitLocalChanges
-                        && !Commit( m, "Updated Repository.xml and NuGet.config for 'local' branch." ).Success ) return false;
+                    if( !CommitAmend( m ).Success ) return false;
                     if( r.Status != MergeStatus.UpToDate )
                     {
                         m.CloseGroup( $"Success (with merge from '{World.DevelopBranchName}')." );

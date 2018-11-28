@@ -106,26 +106,26 @@ namespace CK.Env.Plugins.SolutionFiles
         }
 
         /// <summary>
-        /// Updates the NuGet config file with LocalFeed/Release, LocalFeed/CI and/or LocalFeed/Local
+        /// Updates the NuGet config file with LocalFeed/Local, LocalFeed/CI and/or LocalFeed/Release
         /// sources.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="ensureRelease">True to add the LocalFeed/Release.</param>
-        /// <param name="ensureCI">True to add the LocalFeed/CI.</param>
         /// <param name="ensureLocal">True to add the LocalFeed/Local.</param>
-        public void EnsureLocalFeeds( IActivityMonitor m, bool ensureRelease = true, bool ensureCI = true, bool ensureLocal = true )
+        /// <param name="ensureCI">True to add the LocalFeed/CI.</param>
+        /// <param name="ensureRelease">True to add the LocalFeed/Release.</param>
+        public void EnsureLocalFeeds( IActivityMonitor m, bool ensureLocal = true, bool ensureCI = true, bool ensureRelease = true )
         {
-            if( ensureRelease )
+            if( ensureLocal )
             {
-                EnsureFeed( m, "LocalFeed-Release", _localFeedProvider.GetReleaseFeedFolder( m ).PhysicalPath );
+                EnsureFeed( m, "LocalFeed-Local", _localFeedProvider.GetLocalFeedFolder( m ).PhysicalPath );
             }
             if( ensureCI )
             {
                 EnsureFeed( m, "LocalFeed-CI", _localFeedProvider.GetCIFeedFolder( m ).PhysicalPath );
             }
-            if( ensureLocal )
+            if( ensureRelease )
             {
-                EnsureFeed( m, "LocalFeed-Local", _localFeedProvider.GetLocalFeedFolder( m ).PhysicalPath );
+                EnsureFeed( m, "LocalFeed-Release", _localFeedProvider.GetReleaseFeedFolder( m ).PhysicalPath );
             }
         }
 

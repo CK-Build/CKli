@@ -16,7 +16,7 @@ namespace CK.Env.MSBuild
 {
     class GlobalBuilder
     {
-        readonly SolutionDependencyResult _dependencyResult;
+        readonly SolutionDependencyContext _dependencyResult;
         readonly FileSystem _fileSystem;
         readonly ILocalFeedProvider _feeds;
         readonly INuGetClient _nugetClient;
@@ -24,7 +24,7 @@ namespace CK.Env.MSBuild
         readonly GlobalBuilderInfo _buildInfo;
 
         public GlobalBuilder(
-            SolutionDependencyResult r,
+            SolutionDependencyContext r,
             FileSystem fileSystem,
             ILocalFeedProvider feeds,
             INuGetClient nugetClient,
@@ -170,12 +170,12 @@ namespace CK.Env.MSBuild
                                 : _feeds.GetReleaseFeedFolder( m ).PhysicalPath);
         }
 
-        protected virtual IReadOnlyList<SolutionDependencyResult.DependentSolution> FilterSolutions( IReadOnlyList<SolutionDependencyResult.DependentSolution> solutions )
+        protected virtual IReadOnlyList<SolutionDependencyContext.DependentSolution> FilterSolutions( IReadOnlyList<SolutionDependencyContext.DependentSolution> solutions )
         {
             return solutions;
         }
 
-        protected virtual bool StartBuilding( IActivityMonitor m, IReadOnlyList<SolutionDependencyResult.DependentSolution> solutions, SolutionDependencyResult.DependentSolution s )
+        protected virtual bool StartBuilding( IActivityMonitor m, IReadOnlyList<SolutionDependencyContext.DependentSolution> solutions, SolutionDependencyContext.DependentSolution s )
         {
             DisplaySolutionList( m, solutions, s );
             return true;
@@ -186,13 +186,13 @@ namespace CK.Env.MSBuild
             return _feeds.GetBestAnyLocalVersion( m, packageId );
         }
 
-        protected virtual SVersion GetTargetVersion( IActivityMonitor m, SolutionDependencyResult.DependentSolution s )
+        protected virtual SVersion GetTargetVersion( IActivityMonitor m, SolutionDependencyContext.DependentSolution s )
         {
-            var info = s.Solution.GitFolder.ReadVersionInfo( m );
+            var info = s.Solution.GitFolder.ReadRepositoryVersionInfo( m );
             return info.BetterExistingVersion?.ThisTag ?? info.FinalNuGetVersion;
         }
 
-        protected virtual bool OnBuildStart( IActivityMonitor m, SolutionDependencyResult.DependentSolution s, SVersion v )
+        protected virtual bool OnBuildStart( IActivityMonitor m, SolutionDependencyContext.DependentSolution s, SVersion v )
         {
             if( BuildInfo.WorkStatus == GlobalWorkStatus.SwitchingToDevelop )
             {
@@ -206,7 +206,7 @@ namespace CK.Env.MSBuild
                 bool success = rfile.Save( m );
 
                 var fNuget = s.Solution.GetPlugin<CK.Env.Plugins.SolutionFiles.NugetConfigFile>();
-                fNuget.EnsureLocalFeeds( m );
+                fNuget.EnsureLocalFeeds(m);
                 success &= fNuget.Save( m );
                 if( !success ) return false;
             }
@@ -219,7 +219,7 @@ namespace CK.Env.MSBuild
                 bool success = fCKSetupStore.EnsureStorePath( m, storePath );
 
                 var fNuGet = s.Solution.GetPlugin<CK.Env.Plugins.SolutionFiles.NugetConfigFile>();
-                fNuGet.EnsureLocalFeeds( m, ensureRelease: true, ensureCI: true );
+                fNuGet.EnsureLocalFeeds(m, ensureCI: true, ensureRelease: true);
                 success &= fNuGet.Save( m );
 
                 var rfile = s.Solution.GetPlugin<CK.Env.Plugins.SolutionFiles.RepositoryXmlFile>();
@@ -237,7 +237,7 @@ namespace CK.Env.MSBuild
             return true;
         }
 
-        protected virtual bool OnBuildSucceed( IActivityMonitor m, SolutionDependencyResult.DependentSolution s, SVersion v )
+        protected virtual bool OnBuildSucceed( IActivityMonitor m, SolutionDependencyContext.DependentSolution s, SVersion v )
         {
             if( BuildInfo.WorkStatus == GlobalWorkStatus.SwitchingToDevelop && !s.Solution.GitFolder.ResetHard( m ) ) return false;
             else if( _buildInfo.TargetDevelop && _buildInfo.IsRemotesRequired == false )
@@ -249,7 +249,7 @@ namespace CK.Env.MSBuild
             return true;
         }
 
-        protected virtual void OnBuildFailed( IActivityMonitor m, SolutionDependencyResult.DependentSolution s, SVersion v )
+        protected virtual void OnBuildFailed( IActivityMonitor m, SolutionDependencyContext.DependentSolution s, SVersion v )
         {
             if( BuildInfo.WorkStatus == GlobalWorkStatus.SwitchingToDevelop ) s.Solution.GitFolder.ResetHard( m );
             else
@@ -260,7 +260,7 @@ namespace CK.Env.MSBuild
             }
         }
 
-        static void DisplaySolutionList( IActivityMonitor m, IReadOnlyList<SolutionDependencyResult.DependentSolution> all, SolutionDependencyResult.DependentSolution current = null )
+        static void DisplaySolutionList( IActivityMonitor m, IReadOnlyList<SolutionDependencyContext.DependentSolution> all, SolutionDependencyContext.DependentSolution current = null )
         {
             using( m.OpenInfo( "Solutions to build:" ) )
             {
@@ -277,7 +277,8 @@ namespace CK.Env.MSBuild
             }
         }
 
-        internal static bool Run( IActivityMonitor m,
+        internal static bool Run(
+                 IActivityMonitor m,
                  string workingDir,
                  string fileName,
                  string arguments,

@@ -23,7 +23,7 @@ namespace CK.Env
         bool _releaseInfoAvailable;
 
         internal SolutionReleaser(
-            SolutionDependencyResult.DependentSolution solution,
+            SolutionDependencyContext.DependentSolution solution,
             RepositoryInfo info )
         {
             Debug.Assert( info != null && info.PossibleVersions != null );
@@ -33,9 +33,9 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the global <see cref="SolutionDependencyResult"/> of the <see cref="DependentSolution"/>.
+        /// Gets the global <see cref="SolutionDependencyContext"/> of the <see cref="DependentSolution"/>.
         /// </summary>
-        public SolutionDependencyResult GlobalResult => Solution.GlobalResult;
+        public SolutionDependencyContext GlobalResult => Solution.GlobalResult;
 
         /// <summary>
         /// Gets the current <see cref="ReleaseInfo"/>: the result of the last <see cref="EnsureReleaseInfo"/> call.
@@ -59,7 +59,7 @@ namespace CK.Env
 
         ReleaseInfo UpdateReleaseInfo( IActivityMonitor m, IReleaseVersionSelector versionSelector )
         {
-            _packageVersionUpdate.Clear();
+            ClearPackageVersionUpdates();
             ReleaseInfo requirements = new ReleaseInfo();
             // Here we could have processed only the MinimalRequirements (so that the global process ordering
             // matches the dependency order).
@@ -73,14 +73,7 @@ namespace CK.Env
                 {
                     requirements = requirements.CombineRequirement( sInfo );
                 }
-                var updates = GlobalResult.ProjectDependencies.DependencyTable
-                                .Where( r => !r.IsExternalDependency
-                                             && r.SourceProject.Project.PrimarySolution == Solution.Solution
-                                             && r.TargetPackage.Project.PrimarySolution == s.Solution
-                                             && r.Version != sInfo.Version )
-                                .Select( p => (p.RawPackageDependency, (SVersion)sInfo.Version) );
-
-                _packageVersionUpdate.AddRange( updates );
+                HandlePackageVersionUpdates( s, sInfo );
             }
             // Handle package references updates.
             //  - if none and a Release tag already exists on the commit point, there
@@ -187,6 +180,40 @@ namespace CK.Env
             return _releaseInfo = requirements.WithVersion( finalVersion );
         }
 
+        /// <summary>
+        /// Clears any exisiting information that <see cref="HandlePackageVersionUpdates(IDependentSolution, ReleaseInfo)"/>
+        /// may have changed.
+        /// </summary>
+        void ClearPackageVersionUpdates()
+        {
+            _packageVersionUpdate.Clear();
+        }
+
+        /// <summary>
+        /// Captures any required package updates (or any other related impacts) due to an upgrade
+        /// of a dependent solution version.
+        /// </summary>
+        /// <param name="required">The required solution that has been upgraded.</param>
+        /// <param name="requiredInfo">The <see cref="ReleaseInfo"/> of the dependent solution.</param>
+        void HandlePackageVersionUpdates( SolutionDependencyContext.DependentSolution s, ReleaseInfo requiredInfo )
+        {
+            var updates = GlobalResult.ProjectDependencies.DependencyTable
+                            .Where( r => !r.IsExternalDependency
+                                         && r.SourceProject.Project.PrimarySolution == Solution.Solution
+                                         && r.TargetPackage.Project.PrimarySolution == s.Solution
+                                         && r.Version != requiredInfo.Version )
+                            .Select( p => (p.RawPackageDependency, (SVersion)requiredInfo.Version) );
+
+            _packageVersionUpdate.AddRange( updates );
+        }
+
+        /// <summary>
+        /// Gets whether this solution requires package updates.
+        /// This is updated by <see cref="HandlePackageVersionUpdates(IDependentSolution, ReleaseInfo)"/>.
+        /// This is always false until <see cref="EnsureReleaseInfo"/> has been called.
+        /// </summary>
+        public bool HasPackageVersionUpdates => _packageVersionUpdate.Count > 0;
+
         ReleaseInfo HandleSingleVersion( IActivityMonitor m, IReleaseVersionSelector versionSelector, ReleaseInfo requirements, CSVersion v )
         {
             if( requirements.Level == ReleaseLevel.BreakingChange )
@@ -239,7 +266,7 @@ namespace CK.Env
         /// <param name="possibleVersions">Set of versions to filter.</param>
         /// <param name="c">The release constraint.</param>
         /// <returns>Filtered set of versions.</returns>
-        public static IEnumerable<CSVersion> FilterVersions( IEnumerable<CSVersion> possibleVersions, ReleaseConstraint c, bool finalLevelIsKnown )
+        static IEnumerable<CSVersion> FilterVersions( IEnumerable<CSVersion> possibleVersions, ReleaseConstraint c, bool finalLevelIsKnown )
         {
             IEnumerable<CSVersion> filtered = possibleVersions;
 
@@ -270,12 +297,6 @@ namespace CK.Env
             }
             return filtered;
         }
-
-        /// <summary>
-        /// Gets whether this solution requires package updates.
-        /// This is always false until <see cref="EnsureReleaseInfo"/> has been called.
-        /// </summary>
-        public bool NeedPackageReferenceUpdates => _packageVersionUpdate.Count > 0;
 
         internal XElement ToXml( bool addBuild )
         {
@@ -322,7 +343,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the solution.
         /// </summary>
-        public SolutionDependencyResult.DependentSolution Solution { get; }
+        public SolutionDependencyContext.DependentSolution Solution { get; }
 
         /// <summary>
         /// Gets the SimplegitVersion <see cref="RepositoryInfo"/>.

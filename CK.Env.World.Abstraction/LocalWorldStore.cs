@@ -8,6 +8,11 @@ using CK.Text;
 
 namespace CK.Env
 {
+    /// <summary>
+    /// Implementation of a local <see cref="IWorldStore"/> in a directory on the file system.
+    /// Worlds are stored as simple xml document that contains their description.
+    /// Their state are stored nearby them (suffixed by "-State").
+    /// </summary>
     public class LocalWorldStore : IWorldStore
     {
         readonly NormalizedPath _directoryPath;
@@ -60,19 +65,19 @@ namespace CK.Env
                                 .ToList();
         }
 
-        public WorldState GetOrCreateLocalState( IActivityMonitor m, IWorldName w )
+        public RawXmlWorldState GetOrCreateLocalState( IActivityMonitor m, IWorldName w )
         {
             if( w == null ) throw new ArgumentNullException( nameof( w ) );
             var path = ToStateFilePath( w );
-            if( File.Exists( path ) ) return new WorldState( w, XDocument.Load( path ) );
-            return new WorldState( w );
+            if( File.Exists( path ) ) return new RawXmlWorldState( w, XDocument.Load( path ) );
+            return new RawXmlWorldState( w );
         }
 
-        public bool SetLocalState( IActivityMonitor m, WorldState state )
+        public bool SetLocalState( IActivityMonitor m, RawXmlWorldState state )
         {
             if( state == null ) throw new ArgumentNullException( nameof( state ) );
             var path = ToStateFilePath( state.World );
-            state.GetXDocument().Save( path );
+            state.Document.Save( path );
             return true;
         }
 

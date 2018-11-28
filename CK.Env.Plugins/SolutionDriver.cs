@@ -52,6 +52,14 @@ namespace CK.Env.Plugins
         /// </summary>
         public Solution PrimarySolution => _solution;
 
+        public bool CanBuildDevelop => BranchPath.LastPart == Folder.World.DevelopBranchName
+                                                              && Folder.StandardGitStatus == StandardGitStatus.DevelopBranch;
+
+        public bool BuildDevelop( IActivityMonitor m, bool pushToRemotes )
+        {
+
+        }
+
 
     }
 }

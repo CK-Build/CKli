@@ -10,9 +10,9 @@ namespace CK.Env.MSBuild
     internal class SortableSolutionFile : IDependentItemContainer
     {
         readonly Solution _solution;
-        IEnumerable<DependencyContext.ProjectItem> _projects;
+        IEnumerable<DependencyAnalyser.ProjectItem> _projects;
 
-        internal SortableSolutionFile( Solution f, IEnumerable<DependencyContext.ProjectItem> projects )
+        internal SortableSolutionFile( Solution f, IEnumerable<DependencyAnalyser.ProjectItem> projects )
         {
             _solution = f;
             _projects = projects;
@@ -22,7 +22,7 @@ namespace CK.Env.MSBuild
 
         public IEnumerable<Project> Projects => _projects.Select( p => p.Project );
 
-        internal void AddSecondaryProjects( IEnumerable<DependencyContext.ProjectItem> secondaryProjects )
+        internal void AddSecondaryProjects( IEnumerable<DependencyAnalyser.ProjectItem> secondaryProjects )
         {
             _projects = _projects.Concat( secondaryProjects );
         }

@@ -108,7 +108,6 @@ namespace CK.Env.MSBuild
             }
         }
 
-        readonly FileSystem _fileSystem;
         readonly Dictionary<NormalizedPath, File> _files;
         readonly Dictionary<NormalizedPath, Solution> _solutions;
 
@@ -118,7 +117,7 @@ namespace CK.Env.MSBuild
         /// <param name="fileSystem">The file system provider.</param>
         public MSBuildContext( FileSystem fileSystem )
         {
-            _fileSystem = fileSystem;
+            FileSystem = fileSystem;
             _files = new Dictionary<NormalizedPath, File>();
             _solutions = new Dictionary<NormalizedPath, Solution>();
         }
@@ -126,7 +125,7 @@ namespace CK.Env.MSBuild
         /// <summary>
         /// Gets the file system.
         /// </summary>
-        public FileSystem FileSystem => _fileSystem;
+        public FileSystem FileSystem { get; }
 
         /// <summary>
         /// Returns a newly loaded <see cref="Solution"/> or retrieves it from the cache.
@@ -205,7 +204,7 @@ namespace CK.Env.MSBuild
             {
                 try
                 {
-                    XDocument content = _fileSystem.GetFileInfo( path ).ReadAsXDocument();
+                    XDocument content = FileSystem.GetFileInfo( path ).ReadAsXDocument();
                     var imports = new List<Import>();
                     f = new File( path, content, imports );
                     _files[path] = f;

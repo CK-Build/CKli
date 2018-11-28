@@ -28,7 +28,7 @@ namespace CK.Env
 
         public SolutionReleaser FindBySolution( Solution s ) => _releasers.FirstOrDefault( r => r.Solution.Solution == s );
 
-        public SolutionReleaser FindBySolution( SolutionDependencyResult.DependentSolution s ) => _releasers.FirstOrDefault( r => r.Solution == s );
+        public SolutionReleaser FindBySolution( SolutionDependencyContext.DependentSolution s ) => _releasers.FirstOrDefault( r => r.Solution == s );
 
         /// <summary>
         /// Computes a partial road map up to a given solution.

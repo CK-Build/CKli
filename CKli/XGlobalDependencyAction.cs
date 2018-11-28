@@ -61,21 +61,21 @@ namespace CKli
         {
             var all = _solutions.AllDevelopSolutions.Select( s => s.GetSolution( m, true ) );
             if( all.Any( s => s == null ) ) return false;
-            var deps = DependencyContext.Create( m, all );
+            var deps = DependencyAnalyser.Create( m, all );
             if( deps == null ) return false;
             switch( _choice.Value )
             {
                 case 0:
-                    DisplaySolutionsResult( m, deps.AnalyzeDependencies( m, SolutionSortStrategy.EverythingExceptBuildProjects ) );
+                    DisplaySolutionsResult( m, deps.CreateDependencyContext( m, SolutionSortStrategy.EverythingExceptBuildProjects ) );
                     break;
                 case 1:
-                    DisplayDetailedResult( m, deps.AnalyzeDependencies( m, SolutionSortStrategy.PublishedProjects ) );
+                    DisplayDetailedResult( m, deps.CreateDependencyContext( m, SolutionSortStrategy.PublishedProjects ) );
                     break;
                 case 2:
-                    DisplayDetailedResult( m, deps.AnalyzeDependencies( m, SolutionSortStrategy.PublishedAndTestsProjects ) );
+                    DisplayDetailedResult( m, deps.CreateDependencyContext( m, SolutionSortStrategy.PublishedAndTestsProjects ) );
                     break;
                 case 3:
-                    DisplayDetailedResult( m, deps.AnalyzeDependencies( m, SolutionSortStrategy.EverythingExceptBuildProjects ) );
+                    DisplayDetailedResult( m, deps.CreateDependencyContext( m, SolutionSortStrategy.EverythingExceptBuildProjects ) );
                     break;
                 case 4:
                     DisplayProjectDependencies( m, "Dumping all project dependencies.", deps.ProjectDependencies.PerFrameworkDependencies );
@@ -90,7 +90,7 @@ namespace CKli
             return true;
         }
 
-        void CreateIssues( IActivityMonitor m, DependencyContext deps )
+        void CreateIssues( IActivityMonitor m, DependencyAnalyser deps )
         {
             _issueCollector.ClearIssues( m, i => i.Identifier?.StartsWith( "ProjectVersionDeps:" ) ?? false );
 
@@ -153,7 +153,7 @@ namespace CKli
             }
         }
 
-        void DisplaySolutionsResult( IActivityMonitor m, SolutionDependencyResult result )
+        void DisplaySolutionsResult( IActivityMonitor m, SolutionDependencyContext result )
         {
             using( m.OpenInfo( $"Solutions sorted ({result.Content}): " ) )
             {
@@ -179,7 +179,7 @@ namespace CKli
             }
         }
 
-        internal static void DisplayDetailedResult( IActivityMonitor m, SolutionDependencyResult result )
+        internal static void DisplayDetailedResult( IActivityMonitor m, SolutionDependencyContext result )
         {
             using( m.OpenInfo( $"Solutions sorted ({result.Content}): " ) )
             {

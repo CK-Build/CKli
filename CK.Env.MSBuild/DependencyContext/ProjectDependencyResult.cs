@@ -9,7 +9,7 @@ using System.Text;
 namespace CK.Env.MSBuild
 {
     /// <summary>
-    /// Encapsulates the set of dependencies that exist in a <see cref="DependencyContext"/>.
+    /// Encapsulates the set of dependencies that exist in a <see cref="DependencyAnalyser"/>.
     /// </summary>
     public class ProjectDependencyResult
     {

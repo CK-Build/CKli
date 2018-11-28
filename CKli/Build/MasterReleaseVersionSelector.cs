@@ -22,7 +22,7 @@ namespace CKli
         /// <param name="solution">The solution.</param>
         /// <param name="prevVersion">The previous released version.</param>
         /// <returns>True to use the previous version, false to release at least a fix and null to cancel the process.</returns>
-        public bool? CanUsePreviousVersion( IActivityMonitor m, SolutionDependencyResult.DependentSolution solution, CSVersion prevVersion )
+        public bool? CanUsePreviousVersion( IActivityMonitor m, IDependentSolution solution, CSVersion prevVersion )
         {
             return false;
         }
@@ -42,7 +42,7 @@ namespace CKli
         /// <returns>The level to consider for the release.</returns>
         public ReleaseLevel GetPreReleaseSingleVersionFixActualLevel(
             IActivityMonitor m,
-            SolutionDependencyResult.DependentSolution solution,
+            IDependentSolution solution,
             CSVersion v,
             bool mustAnswerBetweenFeatureAndBreakingChange )
         {
@@ -60,7 +60,7 @@ namespace CKli
         /// <param name="solution">The current solution for which the version has a zero major.</param>
         /// <param name="v">The version (with a zero major).</param>
         /// <returns>The level.</returns>
-        public ReleaseLevel GetZeroMajorSingleVersionFeatureActualLevel( IActivityMonitor m, SolutionDependencyResult.DependentSolution solution, CSVersion v )
+        public ReleaseLevel GetZeroMajorSingleVersionFeatureActualLevel( IActivityMonitor m, IDependentSolution solution, CSVersion v )
         {
             return ReleaseLevel.BreakingChange;
         }
@@ -75,7 +75,7 @@ namespace CKli
         /// <param name="solution">The solution.</param>
         /// <param name="currentLevel">The current release level.</param>
         /// <returns>The selected level.</returns>
-        public ReleaseLevel ChooseReleaseLevel( IActivityMonitor m, SolutionDependencyResult.DependentSolution solution, ReleaseLevel currentLevel )
+        public ReleaseLevel ChooseReleaseLevel( IActivityMonitor m, IDependentSolution solution, ReleaseLevel currentLevel )
         {
             return ReleaseLevel.BreakingChange;
         }
@@ -89,9 +89,9 @@ namespace CKli
         /// <param name="possibleVersions">Possible versions.</param>
         /// <param name="current">Current release information.</param>
         /// <returns>The version to release or null to cancel the process.</returns>
-        public CSVersion ChooseFinalVersion( IActivityMonitor m, SolutionDependencyResult.DependentSolution solution, IReadOnlyList<CSVersion> possibleVersions, ReleaseInfo current )
+        public CSVersion ChooseFinalVersion( IActivityMonitor m, IDependentSolution solution, IReadOnlyList<CSVersion> possibleVersions, ReleaseInfo current )
         {
-            Console.WriteLine( $"Solution {solution.Solution.UniqueSolutionName}, release information: {current} " );
+            Console.WriteLine( $"Solution {solution.UniqueSolutionName}, release information: {current} " );
             var releases = possibleVersions.Where( v => !v.IsPrerelease ).ToList();
             if( releases.Count == 0 )
             {

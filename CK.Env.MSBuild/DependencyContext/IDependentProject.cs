@@ -5,7 +5,7 @@ using System.Text;
 namespace CK.Env.MSBuild
 {
     /// <summary>
-    /// Describes a project in a <see cref="DependencyContext"/> context.
+    /// Describes a project in a <see cref="DependencyAnalyser"/> context.
     /// </summary>
     public interface IDependentProject
     {

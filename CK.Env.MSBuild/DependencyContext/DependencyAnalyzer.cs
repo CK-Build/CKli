@@ -11,10 +11,10 @@ namespace CK.Env.MSBuild
 {
     /// <summary>
     /// Root class of dependency analysis.
-    /// A DependencyContext can be created on any set of <see cref="Solution"/> thanks to the
+    /// A DependencyAnalyzer can be created on any set of <see cref="Solution"/> thanks to the
     /// factory method <see cref="Create(IActivityMonitor, IEnumerable{Solution})"/>.
     /// </summary>
-    public class DependencyContext
+    public class DependencyAnalyser
     {
         readonly Solution[] _solutions;
         readonly Dictionary<string, Package> _packages;
@@ -52,7 +52,7 @@ namespace CK.Env.MSBuild
 
             /// <summary>
             /// Gets the local project that produces this package.
-            /// For such package this <see cref="FullName"/> is the <see cref="ProjectBase.Name"/>
+            /// This is null for external packages: for external package this <see cref="FullName"/> is the <see cref="ProjectBase.Name"/>
             /// and this <see cref="Version"/> is null.
             /// </summary>
             public Project Project { get; }
@@ -199,7 +199,7 @@ namespace CK.Env.MSBuild
             object IDependentItem.StartDependencySort( IActivityMonitor m ) => _p;
         }
 
-        DependencyContext(
+        DependencyAnalyser(
             Solution[] solutions,
             Dictionary<string, Package> packages,
             ProjectItem.Cache projects,
@@ -308,7 +308,13 @@ namespace CK.Env.MSBuild
             }
         }
 
-        public SolutionDependencyResult AnalyzeDependencies( IActivityMonitor m, SolutionSortStrategy content )
+        /// <summary>
+        /// Creates a new <see cref="SolutionDependencyContext"/>.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="content">The strategy.</param>
+        /// <returns>The context or null on error.</returns>
+        public SolutionDependencyContext CreateDependencyContext( IActivityMonitor m, SolutionSortStrategy content = SolutionSortStrategy.EverythingExceptBuildProjects )
         {
             var sortables = new Dictionary<Solution, SortableSolutionFile>();
             // Handles Primary solutions first.
@@ -335,7 +341,7 @@ namespace CK.Env.MSBuild
             IDependencySorterResult result = DependencySorter.OrderItems( m, sortables.Values, null );
             if( !result.IsComplete )
             {
-                return new SolutionDependencyResult( content, result, ProjectDependencies, GetBuildProjectInfo( m ) );
+                return new SolutionDependencyContext( content, result, ProjectDependencies, GetBuildProjectInfo( m ) );
             }
             // Building the list of SolutionDependencyResult.DependencyRow.
             var table = result.SortedItems
@@ -360,31 +366,35 @@ namespace CK.Env.MSBuild
                                         )) )
                            // 3 - Second Map: Expands the LocalRefs.
                            .SelectMany( s => s.LocalRefs.Any()
-                                                ? s.LocalRefs.Select( r => new SolutionDependencyResult.DependencyRow
+                                                ? s.LocalRefs.Select( r => new SolutionDependencyContext.DependencyRow
                                                                 (
                                                                     s.Index,
                                                                     s.Solution,
                                                                     r.Origin,
                                                                     r.Target.Project
                                                                 ) )
-                                                : new[] { new SolutionDependencyResult.DependencyRow( s.Index, s.Solution, null, null ) }
+                                                : new[] { new SolutionDependencyContext.DependencyRow( s.Index, s.Solution, null, null ) }
                                       )
                             .ToList();
             Debug.Assert( table.Select( r => r.Index ).IsSortedLarge() );
 
             // Now that the table of SolutionDependencyResult.DependencyRow is built, use it to compute the
             // pure solution dependency graph.
+            //
+            var indexByName = new Dictionary<string, SolutionDependencyContext.DependentSolution>();
             Solution current = null;
-            var depSolutions = new SolutionDependencyResult.DependentSolution[sortables.Count];
+            var depSolutions = new SolutionDependencyContext.DependentSolution[sortables.Count];
             foreach( var r in table )
             {
                 if( current != r.Solution )
                 {
                     current = r.Solution;
-                    depSolutions[r.Index] = new SolutionDependencyResult.DependentSolution( current, r.Index, ProjectDependencies, table, s => depSolutions.First( x => x.Solution == s ) );
+                    var newDependent = new SolutionDependencyContext.DependentSolution( current, r.Index, ProjectDependencies, table, s => indexByName[ s.UniqueSolutionName ] );
+                    depSolutions[r.Index] = newDependent;
+                    indexByName.Add( current.UniqueSolutionName, newDependent );
                 }
             }
-            return new SolutionDependencyResult( content, result, ProjectDependencies, table, depSolutions, GetBuildProjectInfo( m ) );
+            return new SolutionDependencyContext( indexByName, content, result, ProjectDependencies, table, depSolutions, GetBuildProjectInfo( m ) );
         }
 
         IEnumerable<ProjectItem> GetProjectItems( Solution s, SolutionSortStrategy content )
@@ -401,12 +411,12 @@ namespace CK.Env.MSBuild
         }
 
         /// <summary>
-        /// Factory method for a <see cref="DependencyContext"/>.
+        /// Factory method for a <see cref="DependencyAnalyser"/>.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="solutionFiles">The set of <see cref="Solution"/> to consider.</param>
         /// <returns>A new depednency context.</returns>
-        static public DependencyContext Create( IActivityMonitor m, IEnumerable<Solution> solutionFiles )
+        static public DependencyAnalyser Create( IActivityMonitor m, IEnumerable<Solution> solutionFiles )
         {
             var packages = new Dictionary<string, Package>();
             var solutions = solutionFiles.ToArray();
@@ -482,7 +492,7 @@ namespace CK.Env.MSBuild
                 }
 
             }
-            return new DependencyContext( solutions, packages, projectItems, frameworks );
+            return new DependencyAnalyser( solutions, packages, projectItems, frameworks );
         }
 
         static Package RegisterExternal( Dictionary<string, Package> externals, DeclaredPackageDependency dep )

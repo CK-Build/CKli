@@ -109,7 +109,7 @@ namespace CK.Env.MSBuild
         }
 
         /// <summary>
-        /// Gets the solution name. This should be unique accross any possible world.
+        /// Gets the solution name. This should be unique across any possible world.
         /// For primary solution, this is the folder name (same as the .sln file name without the .sln extension).
         /// For secondary solutions, this is the "name of the primary solution"/"solution file name" (including
         /// the .sln extension) in order for the secondary solution to be scoped by the primary name and, with
@@ -129,9 +129,9 @@ namespace CK.Env.MSBuild
         }
 
         /// <summary>
-        /// Gets the file format version.
+        /// Gets the .sln file format version.
         /// </summary>
-        public string Version { get; }
+        public string FileFormatVersion { get; }
 
         /// <summary>
         /// Gets the version of Visual Studio that created the file.
@@ -289,7 +289,7 @@ namespace CK.Env.MSBuild
             FilePath = filePath;
             SolutionFolderPath = folderPath;
             Settings = settings;
-            Version = version;
+            FileFormatVersion = version;
             VisualStudioVersion = visualStudioVersion;
             MinimumVisualStudioVersion = minimumVisualStudioVersion;
             _allProjects = projects;

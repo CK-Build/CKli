@@ -21,10 +21,10 @@ namespace CKli
         /// <param name="solution">The solution.</param>
         /// <param name="prevVersion">The previous released version.</param>
         /// <returns>True to use the previous version, false to release at least a fix and null to cancel the process.</returns>
-        public bool? CanUsePreviousVersion( IActivityMonitor m, SolutionDependencyResult.DependentSolution solution, CSVersion prevVersion )
+        public bool? CanUsePreviousVersion( IActivityMonitor m, IDependentSolution solution, CSVersion prevVersion )
         {
             Console.WriteLine( "=========" );
-            Console.WriteLine( $"Should '{solution.Solution.UniqueSolutionName}' be released or previous version '{prevVersion}' be used?" );
+            Console.WriteLine( $"Should '{solution.UniqueSolutionName}' be released or previous version '{prevVersion}' be used?" );
             Console.WriteLine( $" 1 - Skip this and use the previous version." );
             Console.WriteLine( $" 2 - Release this solution." );
             Console.WriteLine( $" X - Cancel." );
@@ -53,12 +53,12 @@ namespace CKli
         /// <returns>The level to consider for the release.</returns>
         public ReleaseLevel GetPreReleaseSingleVersionFixActualLevel(
             IActivityMonitor m,
-            SolutionDependencyResult.DependentSolution solution,
+            IDependentSolution solution,
             CSVersion v,
             bool mustAnswerBetweenFeatureAndBreakingChange )
         {
             Console.WriteLine( "=========" );
-            Console.WriteLine( $"Only one version is available for '{solution.Solution.UniqueSolutionName}': {v}" );
+            Console.WriteLine( $"Only one version is available for '{solution.UniqueSolutionName}': {v}" );
             Console.WriteLine( $" 1 - This version only fixes bugs." );
             if( !mustAnswerBetweenFeatureAndBreakingChange )
             {
@@ -90,10 +90,10 @@ namespace CKli
         /// <param name="solution">The current solution for which the version has a zero major.</param>
         /// <param name="v">The version (with a zero major).</param>
         /// <returns>The level.</returns>
-        public ReleaseLevel GetZeroMajorSingleVersionFeatureActualLevel( IActivityMonitor m, SolutionDependencyResult.DependentSolution solution, CSVersion v )
+        public ReleaseLevel GetZeroMajorSingleVersionFeatureActualLevel( IActivityMonitor m, IDependentSolution solution, CSVersion v )
         {
             Console.WriteLine( "=========" );
-            Console.WriteLine( $"Solution '{solution.Solution.UniqueSolutionName}' will be released with version {v} that has 0 as its Major." );
+            Console.WriteLine( $"Solution '{solution.UniqueSolutionName}' will be released with version {v} that has 0 as its Major." );
             Console.WriteLine( $"We need to know whether this release introduces a breaking change:" );
             Console.WriteLine( $" 1 - Yes, this release introduces a breaking change:" );
             Console.WriteLine( $" 2 - No, this is only a feature release." );
@@ -114,10 +114,10 @@ namespace CKli
         /// <param name="solution">The solution.</param>
         /// <param name="currentLevel">The current release level.</param>
         /// <returns>The selected level.</returns>
-        public ReleaseLevel ChooseReleaseLevel( IActivityMonitor m, SolutionDependencyResult.DependentSolution solution, ReleaseLevel currentLevel )
+        public ReleaseLevel ChooseReleaseLevel( IActivityMonitor m, IDependentSolution solution, ReleaseLevel currentLevel )
         {
             Console.WriteLine( "=========" );
-            Console.WriteLine( $"Solution {solution.Solution.UniqueSolutionName}:" );
+            Console.WriteLine( $"Solution {solution.UniqueSolutionName}:" );
             if( currentLevel == ReleaseLevel.Fix )
             {
                 Console.WriteLine( $" 1 - This release only fixes bugs." );
@@ -155,9 +155,9 @@ namespace CKli
         /// <param name="possibleVersions">Possible versions.</param>
         /// <param name="current">Current release information.</param>
         /// <returns>The version to release or null to cancel the process.</returns>
-        public CSVersion ChooseFinalVersion( IActivityMonitor m, SolutionDependencyResult.DependentSolution solution, IReadOnlyList<CSVersion> possibleVersions, ReleaseInfo current )
+        public CSVersion ChooseFinalVersion( IActivityMonitor m, IDependentSolution solution, IReadOnlyList<CSVersion> possibleVersions, ReleaseInfo current )
         {
-            Console.WriteLine( $"Solution {solution.Solution.UniqueSolutionName}, release information: {current} " );
+            Console.WriteLine( $"Solution {solution.UniqueSolutionName}, release information: {current} " );
             for( int i = 0; i < possibleVersions.Count; ++i )
             {
                 Console.WriteLine( $" {i} - {possibleVersions[i]}" );

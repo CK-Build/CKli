@@ -48,12 +48,12 @@ namespace CK.Env
         bool WriteWorldDescription( IActivityMonitor m, IWorldName w, XDocument content );
 
         /// <summary>
-        /// Gets or creates the local <see cref="WorldState"/>.
+        /// Gets or creates the local <see cref="RawXmlWorldState"/>.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="w">The world name. It must exist in this store.</param>
         /// <returns>The existing or new world state</returns>
-        WorldState GetOrCreateLocalState( IActivityMonitor m, IWorldName w );
+        RawXmlWorldState GetOrCreateLocalState( IActivityMonitor m, IWorldName w );
 
         /// <summary>
         /// Upddates the world state of an existing world.
@@ -61,7 +61,7 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="state">The updated world state.</param>
         /// <returns>True on success, false on error.</returns>
-        bool SetLocalState( IActivityMonitor m, WorldState state );
+        bool SetLocalState( IActivityMonitor m, RawXmlWorldState state );
 
     }
 }
