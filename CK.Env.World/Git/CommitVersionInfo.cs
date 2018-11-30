@@ -14,24 +14,32 @@ namespace CK.Env
         /// <summary>
         /// Initializes a new <see cref="CommitVersionInfo"/>.
         /// </summary>
+        /// <param name="commitSHA1">The commit SHA1.</param>
         /// <param name="releaseVersion">See <see cref="ReleaseVersion"/>.</param>
         /// <param name="releaseContentVersion">See <see cref="ReleaseContentVersion"/>.</param>
         /// <param name="previousVersion">See <see cref="PreviousVersion"/>.</param>
         /// <param name="nextPossibleVersions">See <see cref="NextPossibleVersions"/>.</param>
         /// <param name="possibleVersions">See <see cref="PossibleVersions"/>.</param>
         public CommitVersionInfo(
+            string commitSha,
             CSVersion releaseVersion,
             CSVersion releaseContentVersion,
             CSVersion previousVersion,
             IReadOnlyList<CSVersion> nextPossibleVersions,
             IReadOnlyList<CSVersion> possibleVersions )
         {
+            CommitSha = commitSha ?? throw new ArgumentNullException( nameof( commitSha ) );
             ReleaseVersion = releaseVersion;
             ReleaseContentVersion = releaseContentVersion;
             PreviousVersion = previousVersion;
-            NextPossibleVersions = nextPossibleVersions;
-            PossibleVersions = possibleVersions;
+            NextPossibleVersions = nextPossibleVersions ?? throw new ArgumentNullException( nameof( nextPossibleVersions ) );
+            PossibleVersions = possibleVersions ?? throw new ArgumentNullException( nameof( possibleVersions ) );
         }
+
+        /// <summary>
+        /// Gets this commit's SHA1.
+        /// </summary>
+        public string CommitSha { get; }
 
         /// <summary>
         /// Gets the version directly associated to this commit.

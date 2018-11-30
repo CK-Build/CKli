@@ -249,13 +249,14 @@ namespace CK.Env.MSBuild
 
         /// <summary>
         /// Gets the list of secondary solutions if any of them has been loaded.
+        /// Never null.
         /// </summary>
-        internal IEnumerable<Solution> LoadedSecondarySolutions => _secondarySolutions;
+        public IEnumerable<Solution> LoadedSecondarySolutions => (IEnumerable<Solution>)_secondarySolutions ?? Array.Empty<Solution>();
 
         /// <summary>
         /// Declares this solution as a secondary solution of an existing one.
         /// <see cref="PublishedProjects"/> is cleared when this method is called since a secondary solution
-        /// is not aimed at producing packages.
+        /// is not aimed (by default) at producing packages.
         /// </summary>
         /// <param name="primarySolution">The required primary solution.</param>
         /// <param name="type">The solution type.</param>

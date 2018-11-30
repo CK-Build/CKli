@@ -6,7 +6,7 @@ namespace CK.Env
 {
     /// <summary>
     /// Defines the view of a locally produced package exported by a solution into
-    /// other solutions. 
+    /// the other solutions. 
     /// </summary>
     public struct ExportedLocalPackage
     {
@@ -33,8 +33,13 @@ namespace CK.Env
         public string TargetSecondarySolutionName => _dep.OriginSecondarySolutionName;
 
         /// <summary>
+        /// Gets the name that reference this package.
+        /// </summary>
+        public string TargetProjectName => _dep.OriginProjectName;
+
+        /// <summary>
         /// Gets the package name.
         /// </summary>
-        public string TargetProjectName => _dep.TargetProjectName;
+        public string PackageName => _dep.TargetProjectName;
     }
 }

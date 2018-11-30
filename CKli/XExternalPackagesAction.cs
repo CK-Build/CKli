@@ -31,12 +31,12 @@ namespace CKli
         {
             var ctx = _solutions.InitializeWorldContext( m );
             if( ctx == null ) return false;
-            if( !ctx.CanCreateSolutionDependencyResult )
+            if( !ctx.CanCreateSolutionDependencyContext )
             {
                 m.Error( $"Context status is '{ctx.WorkStatus}'. It must be 'Idle'." );
                 return false;
             }
-            var deps = ctx.CreateSolutionDependencyResult( m );
+            var deps = ctx.CreateSolutionDependencyContext( m );
             if( deps == null ) return false;
             var allDeps = deps.ProjectDependencies.ExternalPackageDependencies;
             foreach( var p in allDeps.MonoVersions )

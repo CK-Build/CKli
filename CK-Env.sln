@@ -43,7 +43,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.SimpleKeyVault", "CK.Sim
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.SimpleKeyVault.Tests", "Tests\CK.SimpleKeyVault.Tests\CK.SimpleKeyVault.Tests.csproj", "{4F976531-326D-4458-8727-F6ACB7CCB9FD}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.World.Abstraction", "CK.Env.World.Abstraction\CK.Env.World.Abstraction.csproj", "{69F5FC76-F45F-45EB-AA4A-199435D5453D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.World", "CK.Env.World\CK.Env.World.csproj", "{69F5FC76-F45F-45EB-AA4A-199435D5453D}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Command", "CK.Env.Command\CK.Env.Command.csproj", "{3D6459DB-218B-46C6-9D19-550E62D87A4D}"
 EndProject

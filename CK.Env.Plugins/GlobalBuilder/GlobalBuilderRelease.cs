@@ -80,7 +80,7 @@ namespace CK.Env.MSBuild
             {
                 if( v.Prerelease.Length == 0 )
                 {
-                    if( !s.Solution.GitFolder.SwitchFromDevelopToMaster( m ) ) return false;
+                    if( !s.Solution.GitFolder.SwitchDevelopToMaster( m ) ) return false;
                 }
 
                 if( !s.Solution.GitFolder.SetVersionTag( m, v ).Success ) return false;
@@ -117,7 +117,7 @@ namespace CK.Env.MSBuild
             if( !s.Solution.GitFolder.ResetHard( m ) ) return false; 
             if( v.Prerelease.Length == 0 )
             {
-                return s.Solution.GitFolder.SwitchFromMasterToDevelop( m );
+                return s.Solution.GitFolder.SwitchMasterToDevelop( m );
             }
             return true;
         }
@@ -131,7 +131,7 @@ namespace CK.Env.MSBuild
             s.Solution.GitFolder.ResetHard( m ); 
             if( v.Prerelease.Length == 0 )
             {
-                s.Solution.GitFolder.SwitchFromMasterToDevelop( m );
+                s.Solution.GitFolder.SwitchMasterToDevelop( m );
             }
         }
 

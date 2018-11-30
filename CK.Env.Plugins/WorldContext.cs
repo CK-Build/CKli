@@ -24,7 +24,7 @@ namespace CK.Env.MSBuild
         readonly INuGetClient _nugetClient;
         readonly ISecretKeyStore _secretKeyStore;
         readonly Func<IActivityMonitor, string, IReadOnlyList<Solution>> _branchSolutionsLoader;
-        readonly WorldState _worldState;
+        readonly RawXmlWorldState _worldState;
         readonly TestedCommitMemory _testedCommits;
         readonly GlobalBuilderInfo _buildInfo;
 
@@ -37,16 +37,16 @@ namespace CK.Env.MSBuild
             {
                 _ctx = ctx;
                 _testedCommitMemory = new HashSet<string>();
-                string[] id = _ctx._worldState.XmlState.Element( "TestedCommitMemory" )?.Value.Split( '|' );
+                string[] id = _ctx._worldState.GeneralState.Element( "TestedCommitMemory" )?.Value.Split( '|' );
                 if( id != null ) _testedCommitMemory.AddRangeArray( id );
-                else _ctx._worldState.XmlState.Add( new XElement( "TestedCommitMemory" ) );
+                else _ctx._worldState.GeneralState.Add( new XElement( "TestedCommitMemory" ) );
             }
 
             bool UpdateXmlState( IActivityMonitor m )
             {
                 if( HasChanged )
                 {
-                    _ctx.SetState( m, state => state.XmlState.Element( "TestedCommitMemory" ).Value = _testedCommitMemory.Concatenate( "|" ) );
+                    _ctx.SetState( m, state => state.GeneralState.Element( "TestedCommitMemory" ).Value = _testedCommitMemory.Concatenate( "|" ) );
                     HasChanged = false;
                     return true;
                 }
@@ -73,7 +73,7 @@ namespace CK.Env.MSBuild
             ILocalFeedProvider feeds,
             INuGetClient nuGetClient,
             ISecretKeyStore secretKeyStore,
-            WorldState worldState,
+            RawXmlWorldState worldState,
             Func<IActivityMonitor, string, IReadOnlyList<Solution>> branchSolutionsLoader )
         {
             _globalGitContext = git;
@@ -90,25 +90,25 @@ namespace CK.Env.MSBuild
 
         public NormalizedPath CommandProviderName { get; }
 
-        bool SetState( IActivityMonitor m, Action<WorldState> a ) => _worldStore.SetState( m, _worldState, a );
+        bool SetState( IActivityMonitor m, Action<RawXmlWorldState> a ) => _worldStore.SetState( m, _worldState, a );
 
-        bool SetState( IActivityMonitor m, GlobalWorkStatus workStatus, Action<WorldState> a = null )
+        bool SetState( IActivityMonitor m, GlobalWorkStatus workStatus, Action<RawXmlWorldState> a = null )
         {
-            Action<WorldState> aW = state =>
+            Action<RawXmlWorldState> aW = state =>
             {
-                state.WorkStatus = workStatus;
+                //state.WorkStatus = workStatus;
                 a?.Invoke( state );
             };
             if( !_worldStore.SetState( m, _worldState, aW ) ) return false;
             return true;
         }
 
-        bool SetState( IActivityMonitor m, GlobalWorkStatus workStatus, StandardGitStatus gitStatus, Action<WorldState> a = null )
+        bool SetState( IActivityMonitor m, GlobalWorkStatus workStatus, StandardGitStatus gitStatus, Action<RawXmlWorldState> a = null )
         {
-            Action<WorldState> aW = state =>
+            Action<RawXmlWorldState> aW = state =>
             {
-                state.GlobalGitStatus = gitStatus;
-                state.WorkStatus = workStatus;
+                //state.GlobalGitStatus = gitStatus;
+                //state.WorkStatus = workStatus;
                 a?.Invoke( state );
             };
             if( !_worldStore.SetState( m, _worldState, aW ) ) return false;
@@ -119,18 +119,18 @@ namespace CK.Env.MSBuild
 
         public FileSystem FileSystem => _globalGitContext.FileSystem;
 
-        public StandardGitStatus GlobalGitStatus => _worldState.GlobalGitStatus;
+        public StandardGitStatus GlobalGitStatus => throw new NotImplementedException(); // _worldState.GlobalGitStatus;
 
         public GlobalWorkStatus WorkStatus => _worldState.WorkStatus;
 
-        /// <summary>
-        /// Gets the current, stable, branch name. This is null when <see cref="IsTransitioning"/> is true.
-        /// </summary>
-        public string CurrentBranchName => _worldState.GlobalGitStatus == StandardGitStatus.DevelopBranch
-                                                ? World.DevelopBranchName
-                                                : (_worldState.GlobalGitStatus == StandardGitStatus.LocalBranch
-                                                      ? World.LocalBranchName
-                                                      : null);
+        ///// <summary>
+        ///// Gets the current, stable, branch name. This is null when <see cref="IsTransitioning"/> is true.
+        ///// </summary>
+        //public string CurrentBranchName => _worldState.GlobalGitStatus == StandardGitStatus.DevelopBranch
+        //                                        ? World.DevelopBranchName
+        //                                        : (_worldState.GlobalGitStatus == StandardGitStatus.LocalBranch
+        //                                              ? World.LocalBranchName
+        //                                              : null);
 
         public bool IsTransitioning => WorkStatus == GlobalWorkStatus.SwitchingToLocal || WorkStatus == GlobalWorkStatus.SwitchingToDevelop;
 
@@ -148,7 +148,7 @@ namespace CK.Env.MSBuild
                 {
                     if( !g.SwitchFromLocalToDevelop( m ) ) return false;
                 }
-                var r = GetSolutionDependencyResult( m, World.DevelopBranchName );
+                var r = GetSolutionDependencyContext( m, World.DevelopBranchName );
                 if( r == null ) return false;
 
                 _buildInfo.SetStatus( WorkStatus, GlobalGitStatus );
@@ -171,13 +171,13 @@ namespace CK.Env.MSBuild
             {
                 foreach( var g in _globalGitContext.GitFolders )
                 {
-                    if( !g.SwitchFromDevelopToLocal( m, autoCommit:true, commitLocalChanges:false ) ) return false;
+                    if( !g.SwitchDevelopToLocal( m, autoCommit:true ) ) return false;
                 }
-                var r = GetSolutionDependencyResult( m, World.LocalBranchName );
+                var r = GetSolutionDependencyContext( m, World.LocalBranchName );
                 if( r == null ) return false;
                 if( !DoLocalZeroBuildProjects( m, r, true ) ) return false;
 
-                var rZeroBuildDeps = GetSolutionDependencyResult( m, World.LocalBranchName );
+                var rZeroBuildDeps = GetSolutionDependencyContext( m, World.LocalBranchName );
                 if( rZeroBuildDeps == null ) return false;
                 _buildInfo.SetStatus( WorkStatus, GlobalGitStatus );
                 var b = new GlobalBuilder( rZeroBuildDeps, FileSystem, _feeds, _nugetClient, _testedCommits, _buildInfo );
@@ -188,9 +188,9 @@ namespace CK.Env.MSBuild
             {
                 foreach( var g in _globalGitContext.GitFolders )
                 {
-                    if( !g.SwitchFromMasterToDevelop( m ) ) return false;
+                    if( !g.SwitchMasterToDevelop( m ) ) return false;
                 }
-                var r = GetSolutionDependencyResult( m, World.DevelopBranchName );
+                var r = GetSolutionDependencyContext( m, World.DevelopBranchName );
                 if( r == null ) return false;
                 var roadMap = GetSimpleRoadmap( m );
                 if( roadMap == null ) return false;
@@ -202,10 +202,10 @@ namespace CK.Env.MSBuild
                 if( roadmap == null ) return false;
                 foreach( var g in _globalGitContext.GitFolders )
                 {
-                    if( !g.SwitchFromMasterToDevelop( m ) ) return false;
+                    if( !g.SwitchMasterToDevelop( m ) ) return false;
                 }
                 // CI Build (clearing version tags).
-                var r = GetSolutionDependencyResult( m, World.DevelopBranchName );
+                var r = GetSolutionDependencyContext( m, World.DevelopBranchName );
                 if( r == null ) return false;
                 _buildInfo.SetStatus( WorkStatus, GlobalGitStatus );
                 var b = new GlobalBuilderRelease( r, FileSystem, _feeds, _nugetClient, _testedCommits, _buildInfo, roadmap );
@@ -260,13 +260,13 @@ namespace CK.Env.MSBuild
 
         SimpleRoadmap GetSimpleRoadmap( IActivityMonitor m )
         {
-            var roadmap = _worldState.XmlState.Element( "RoadMap" );
+            var roadmap = _worldState.GeneralState.Element( "RoadMap" );
             if( roadmap == null )
             {
                 m.Error( "Unable to find the RoadMap element in WorldState XmlState." );
                 return null;
             }
-            int count = _worldState.XmlState.Elements( "RoadMap" ).Count();
+            int count = _worldState.GeneralState.Elements( "RoadMap" ).Count();
             if( count > 1 )
             {
                 m.Error( $"Found {count} RoadMap elements in WorldState XmlState. Only one must exist." );
@@ -275,7 +275,7 @@ namespace CK.Env.MSBuild
             return new SimpleRoadmap( roadmap );
         }
 
-        bool DoRelease( IActivityMonitor m, SolutionDependencyResult r, SimpleRoadmap roadmap )
+        bool DoRelease( IActivityMonitor m, SolutionDependencyContext r, SimpleRoadmap roadmap )
         {
             Debug.Assert( WorkStatus == GlobalWorkStatus.Releasing );
             _buildInfo.SetStatus( WorkStatus, GlobalGitStatus );
@@ -292,7 +292,7 @@ namespace CK.Env.MSBuild
             if( !IsOrderedPushDevelopEnabled ) throw new InvalidOperationException( nameof( IsOrderedPushDevelopEnabled ) );
             if( String.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
             // Secondary solutions are in the set. Handle GitGolder only once. 
-            var r = GetSolutionDependencyResult( m, World.DevelopBranchName );
+            var r = GetSolutionDependencyContext( m, World.DevelopBranchName );
             if( r == null ) return false;
             foreach( var g in r.Solutions.Select( s => s.Solution.GitFolder ).Distinct() )
             {
@@ -340,7 +340,7 @@ namespace CK.Env.MSBuild
         {
             if( !CanRunCIBuild ) throw new InvalidOperationException( nameof( CanRunCIBuild ) );
             _buildInfo.SetStatus( WorkStatus, GlobalGitStatus );
-            var r = GetSolutionDependencyResult( m, GlobalGitStatus == StandardGitStatus.LocalBranch
+            var r = GetSolutionDependencyContext( m, GlobalGitStatus == StandardGitStatus.LocalBranch
                                                         ? World.LocalBranchName
                                                         : World.DevelopBranchName );
             if( r == null ) return false;
@@ -349,34 +349,35 @@ namespace CK.Env.MSBuild
         }
 
         /// <summary>
-        /// Gets whether <see cref="CreateSolutionDependencyResult"/> can be called.
+        /// Gets whether <see cref="CreateSolutionDependencyContext"/> can be called.
         /// <see cref="WorkStatus"/> must be <see cref="GlobalWorkStatus.Idle"/>.
         /// </summary>
-        public bool CanCreateSolutionDependencyResult => WorkStatus == GlobalWorkStatus.Idle;
+        public bool CanCreateSolutionDependencyContext => WorkStatus == GlobalWorkStatus.Idle;
 
         /// <summary>
-        /// Creates a new <see cref="SolutionDependencyResult"/> based on <see cref="CurrentBranchName"/>.
+        /// Creates a new <see cref="SolutionDependencyContext"/> based on <see cref="CurrentBranchName"/>.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The solution result. Can be null on error.</returns>
-        public SolutionDependencyResult CreateSolutionDependencyResult( IActivityMonitor m )
+        public SolutionDependencyContext CreateSolutionDependencyContext( IActivityMonitor m )
         {
-            if( !CanCreateSolutionDependencyResult ) throw new InvalidOperationException( nameof( CanCreateSolutionDependencyResult ) );
-            return GetSolutionDependencyResult( m, CurrentBranchName );
+            if( !CanCreateSolutionDependencyContext ) throw new InvalidOperationException( nameof( CanCreateSolutionDependencyContext ) );
+            return null;// GetSolutionDependencyContext( m, CurrentBranchName );
         }
 
-        public bool CanLocalFixToZeroBuildProjects => WorkStatus == GlobalWorkStatus.Idle && GlobalGitStatus == StandardGitStatus.LocalBranch;
+        public bool CanLocalFixToZeroBuildProjects => WorkStatus == GlobalWorkStatus.Idle
+                                                      && GlobalGitStatus == StandardGitStatus.LocalBranch;
 
         [CommandMethod]
         public bool LocalFixToZeroBuildProjects( IActivityMonitor m )
         {
             if( !CanLocalFixToZeroBuildProjects ) throw new InvalidOperationException( nameof( CanLocalFixToZeroBuildProjects ) );
-            var r = GetSolutionDependencyResult( m, World.LocalBranchName );
+            var r = GetSolutionDependencyContext( m, World.LocalBranchName );
             if( r == null ) return false;
             return DoLocalZeroBuildProjects( m, r, false );
         }
 
-        bool DoLocalZeroBuildProjects( IActivityMonitor m, SolutionDependencyResult r, bool commitChanges )
+        bool DoLocalZeroBuildProjects( IActivityMonitor m, SolutionDependencyContext r, bool commitChanges )
         {
             var buildDepNames = r.BuildProjectsInfo.DependenciesToBuild.Select( p => p.Project.Project.Name );
             var buildDepNamesText = buildDepNames.Concatenate();
@@ -386,7 +387,7 @@ namespace CK.Env.MSBuild
                                                          .Select( rp => rp.Project.Project.Solution.GitFolder.HeadCommitSHA1 )
                                                          .Concatenate( "|" );
 
-            if( buildProjectsZeroVersionSHA1Signature == _worldState.XmlState.Element( "BuildProjectsZeroVersionSHA1Signature" )?.Value )
+            if( buildProjectsZeroVersionSHA1Signature == _worldState.GeneralState.Element( "BuildProjectsZeroVersionSHA1Signature" )?.Value )
             {
                 m.Info( $"Build project signature match. ZeroVersion Packages are already built and propagated (Build Projects: {buildDepNames})." );
                 return true;
@@ -449,13 +450,13 @@ namespace CK.Env.MSBuild
                 }
             }
 
-            return SetState( m, state => state.XmlState.SetElementValue( "BuildProjectsZeroVersionSHA1Signature", buildProjectsZeroVersionSHA1Signature ) );
+            return SetState( m, state => state.GeneralState.SetElementValue( "BuildProjectsZeroVersionSHA1Signature", buildProjectsZeroVersionSHA1Signature ) );
        }
 
         public bool CanRelease => WorkStatus == GlobalWorkStatus.Idle && GlobalGitStatus == StandardGitStatus.DevelopBranch;
 
         /// <summary>
-        /// Starts a release after an optional <see cref="GitFolder.PullAll"/>.
+        /// Starts a release after an optional <see cref="GitFolder.PullAllBranches"/>.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="pull">Pull all branches first.</param>
@@ -471,11 +472,11 @@ namespace CK.Env.MSBuild
                 {
                     if( !g.CheckoutAndPull( m, World.DevelopBranchName, true ).Success ) return false;
                 }
-                var info = g.ReadVersionInfo( m, World.DevelopBranchName );
+                var info = g.ReadRepositoryVersionInfo( m, World.DevelopBranchName );
                 if( info == null ) return false;
                 gitInfos.Add( g, info );
             }
-            var r = GetSolutionDependencyResult( m, World.DevelopBranchName );
+            var r = GetSolutionDependencyContext( m, World.DevelopBranchName );
             if( r == null ) return false;
             var releasers = r.Solutions.Select( s => new SolutionReleaser( s, gitInfos[s.Solution.GitFolder] ) ).ToList();
             var releaser = new GlobalReleaser( releasers );
@@ -483,8 +484,8 @@ namespace CK.Env.MSBuild
             if( roadmap == null ) return false;
             if( !SetState( m, GlobalWorkStatus.Releasing, state =>
             {
-                state.XmlState.Element( "RoadMap" )?.Remove();
-                state.XmlState.Add( roadmap );
+                state.GeneralState.Element( "RoadMap" )?.Remove();
+                state.GeneralState.Add( roadmap );
             } ) )
             {
                 return false;
@@ -629,17 +630,17 @@ namespace CK.Env.MSBuild
             return SetState( m, GlobalWorkStatus.Idle );
         }
 
-        SolutionDependencyResult GetSolutionDependencyResult( IActivityMonitor m, string branchName )
+        SolutionDependencyContext GetSolutionDependencyContext( IActivityMonitor m, string branchName )
         {
-            using( m.OpenInfo( $"Computing SolutionDependencyResult for branch {branchName}." ) )
+            using( m.OpenInfo( $"Computing SolutionDependencyContext for branch {branchName}." ) )
             {
                 m.MinimalFilter = LogFilter.Terse;
                 IReadOnlyList<Solution> solutions = _branchSolutionsLoader( m, branchName );
                 if( solutions.Any( s => s == null ) ) return null;
 
-                var deps = DependencyContext.Create( m, solutions );
+                var deps = DependencyAnalyser.Create( m, solutions );
                 if( deps == null ) return null;
-                SolutionDependencyResult r = deps.AnalyzeDependencies( m, SolutionSortStrategy.EverythingExceptBuildProjects );
+                SolutionDependencyContext r = deps.CreateDependencyContext( m, SolutionSortStrategy.EverythingExceptBuildProjects );
                 if( r.HasError )
                 {
                     r.RawSolutionSorterResult.LogError( m );
@@ -665,14 +666,13 @@ namespace CK.Env.MSBuild
             }
             var gitContext = new GlobalGitContext( world, gitFolders );
             var worldState = worldStore.GetOrCreateLocalState( m, world );
-            var gitStatus = worldState.GlobalGitStatus;
+            StandardGitStatus gitStatus = StandardGitStatus.Unknwon;
             if( !gitContext.CheckStatus( m, ref gitStatus, worldState.WorkStatus == GlobalWorkStatus.SwitchingToDevelop
                                                            || worldState.WorkStatus == GlobalWorkStatus.SwitchingToLocal ) )
             {
                 return null;
             }
             Debug.Assert( gitStatus != StandardGitStatus.Unknwon );
-            worldState.GlobalGitStatus = gitStatus;
             return new WorldContext( gitContext, worldStore, feeds, nugetClient, secretKeyStore, worldState, branchSolutionsLoader );
         }
 

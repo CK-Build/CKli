@@ -25,9 +25,9 @@ namespace CK.Env.Plugins
         /// This list is empty if there is no primary solution defined otherwise the first path is the primary solution one.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="projectToBranchName">Optional other branch for which the solution should exist.</param>
+        /// <param name="actualBranchName">Optional other branch for which the solution should exist.</param>
         /// <returns>The paths. Empty if no primary solution is defined for the <see cref="BranchPathDefiner"/>.</returns>
-        IReadOnlyList<NormalizedPath> GetAllSolutionFilePaths( IActivityMonitor m, string projectToBranchName = null );
+        IReadOnlyList<NormalizedPath> GetAllSolutionFilePaths( IActivityMonitor m, string actualBranchName = null );
 
         /// <summary>
         /// Obtains the primary solution from this branch (or from another branch) with all its existing secondary solutions
@@ -36,9 +36,9 @@ namespace CK.Env.Plugins
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="reload">True to reload the solution.</param>
-        /// <param name="projectToBranchName">Optional other branch for which the solution must be loaded.</param>
+        /// <param name="actualBranchName">Optional other branch for which the solution must be loaded.</param>
         /// <returns>The primary solution or null.</returns>
-        Solution GetPrimarySolution( IActivityMonitor m, bool reload, string projectToBranchName = null );
+        Solution GetPrimarySolution( IActivityMonitor m, bool reload, string actualBranchName = null );
 
     }
 }

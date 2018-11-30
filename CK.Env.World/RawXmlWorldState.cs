@@ -9,7 +9,6 @@ namespace CK.Env
     /// </summary>
     public class RawXmlWorldState
     {
-        static readonly XName xGlobalGitStatusName = XNamespace.None + "GlobalGitStatus";
         static readonly XName xWorkStatusName = XNamespace.None + "WorkStatus";
         static readonly XName xOtherOperationName = XNamespace.None + "OperationName";
         static readonly XName xGeneralStateName = XNamespace.None + "GeneralState";
@@ -36,8 +35,7 @@ namespace CK.Env
             if( w == null ) throw new ArgumentNullException( nameof( w ) );
             _world = w;
             _doc = new XDocument( new XElement( w.FullName+"-State",
-                                    new XAttribute( xWorkStatusName, WorkStatus.ToString() ),
-                                    new XAttribute( xGlobalGitStatusName, GlobalGitStatus.ToString() ) ) );
+                                    new XAttribute( xWorkStatusName, GlobalWorkStatus.Idle.ToString() ) ) );
             _generalState = new XElement( xGeneralStateName );
             _doc.Root.Add( _generalState );
         }
@@ -46,15 +44,6 @@ namespace CK.Env
         /// Gets the world.
         /// </summary>
         public IWorldName World => _world;
-
-        /// <summary>
-        /// Gets or sets the current git status that applies to the whole world.
-        /// </summary>
-        public StandardGitStatus GlobalGitStatus
-        {
-            get => _doc.Root.AttributeEnum( xGlobalGitStatusName, StandardGitStatus.Unknwon );
-            set => _doc.Root.SetAttributeValue( xGlobalGitStatusName, value.ToString() );
-        }
 
         /// <summary>
         /// Gets or sets the current global status.

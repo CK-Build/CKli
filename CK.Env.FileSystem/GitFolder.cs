@@ -189,23 +189,36 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor.</param>
         /// <param name="branchName">The local name of the branch.</param>
-        /// <param name="alwaysPullAll">True to always call <see cref="PullAll"/>.</param>
+        /// <param name="alwaysPullAllBranches">
+        /// True to always call <see cref="PullAllBranches"/> even if the local branch already exists.
+        /// When false, all the remote branches are pulled only if the local branch does not already exist.
+        /// </param>
         /// <returns>
         /// Success is true on success, false on error (such as merge conflicts) and in case of success,
         /// the result states whether a reload should be required or if nothing changed.
         /// </returns>
-        public (bool Success, bool ReloadNeeded) CheckoutAndPull( IActivityMonitor m, string branchName, bool alwaysPullAll = false )
+        public (bool Success, bool ReloadNeeded) CheckoutAndPull( IActivityMonitor m, string branchName, bool alwaysPullAllBranches = false )
         {
             using( m.OpenInfo( $"Checking out branch '{branchName}' in '{SubPath}'." ) )
             {
                 try
                 {
-                    if( alwaysPullAll && !PullAll( m ) ) return (false,false);
+                    bool success = false;
+                    bool reloadNeeded = false;
+                    if( alwaysPullAllBranches )
+                    {
+                        (success, reloadNeeded) = PullAllBranches( m );
+                        if( !success ) return (success, reloadNeeded);
+                    }
                     Branch b = _git.Branches[branchName];
                     if( b == null )
                     {
                         m.Info( $"No local branch '{branchName}' in '{SubPath}'." );
-                        if( !alwaysPullAll && !PullAll( m ) ) return (false,false);
+                        if( !alwaysPullAllBranches )
+                        {
+                            (success, reloadNeeded) = PullAllBranches( m );
+                            if( !success ) return (success, reloadNeeded);
+                        }
                         string remoteName = "origin/" + branchName;
                         var remote = _git.Branches[remoteName];
                         if( remote == null )
@@ -220,7 +233,6 @@ namespace CK.Env
                         Commands.Checkout( _git, b );
                         return (true,true);
                     }
-                    bool reloadNeeded = false;
                     if( b.IsCurrentRepositoryHead )
                     {
                         m.Trace( $"Already on {branchName}." );
@@ -258,24 +270,27 @@ namespace CK.Env
                 catch( Exception ex )
                 {
                     m.Error( ex );
-                    return (false, false);
+                    return (false, true);
                 }
             }
         }
 
         /// <summary>
-        /// Fetches 'origin' (or all remotes) and merge changes into this repository.
-        /// There current head must be clean.
+        /// Fetches 'origin' (or all remotes) branches and merge changes into this repository.
+        /// The current head must be clean.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <returns>True on success, false on error.</returns>
-        public bool PullAll( IActivityMonitor m, bool originOnly = true )
+        /// <returns>
+        /// Success is true on success, false on error (such as merge conflicts) and in case of success,
+        /// the result states whether a reload should be required or if nothing changed.
+        /// </returns>
+        public (bool Success, bool ReloadNeeded) PullAllBranches( IActivityMonitor m, bool originOnly = true )
         {
             using( m.OpenInfo( $"Pulling {(originOnly ? "origin" : "all remotes")} in repository '{FullPath}'" ) )
             {
                 try
                 {
-                    if( !CheckCleanCommit( m ) ) return false;
+                    if( !CheckCleanCommit( m ) ) return (false,false);
                     var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
                     var mOpt = new MergeOptions
                     {
@@ -284,6 +299,7 @@ namespace CK.Env
                         FastForwardStrategy = FastForwardStrategy.Default,
                         SkipReuc = true
                     };
+                    bool reloadNeeded = false;
                     foreach( Remote remote in _git.Network.Remotes.Where( r => !originOnly || r.Name == "origin" ) )
                     {
                         m.Info( $"Fetching remote '{remote.Name}'." );
@@ -296,16 +312,17 @@ namespace CK.Env
                         MergeResult r = _git.MergeFetchedRefs( merger, mOpt );
                         if( r.Status == MergeStatus.Conflicts )
                         {
-                            m.Error( "Merge conflicts occurred. Unable to merge changes from the remote." );
-                            return false;
+                            m.Error( $"Merge conflicts occurred. Unable to merge changes from the remote." );
+                            return (false,false);
                         }
+                        reloadNeeded |= r.Status != MergeStatus.UpToDate;
                     }
-                    return true;
+                    return (true,reloadNeeded);
                 }
                 catch( Exception ex )
                 {
                     m.Error( ex );
-                    return false;
+                    return (false,true);
                 }
             }
         }
@@ -321,6 +338,7 @@ namespace CK.Env
             var info = ReadRepositoryVersionInfo( m, branchName );
             return info != null
                     ? new CommitVersionInfo(
+                            info.CommitSha,
                             info.ValidReleaseTag,
                             info.BetterExistingVersion?.ThisTag,
                             info.CommitInfo.BasicInfo?.BestCommitBelow.ThisTag,
@@ -626,7 +644,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool SwitchFromDevelopToLocal( IActivityMonitor m, bool autoCommit = true )
+        public bool SwitchDevelopToLocal( IActivityMonitor m, bool autoCommit = true )
         {
             using( m.OpenInfo( $"Switching '{SubPath}' to branch '{World.LocalBranchName}')." ) )
             {
@@ -731,7 +749,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool SwitchFromDevelopToMaster( IActivityMonitor m )
+        public bool SwitchDevelopToMaster( IActivityMonitor m )
         {
             using( m.OpenInfo( $"Switching '{SubPath}' to branch '{World.MasterBranchName}')." ) )
             {
@@ -861,7 +879,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool SwitchFromMasterToDevelop( IActivityMonitor m )
+        public bool SwitchMasterToDevelop( IActivityMonitor m )
         {
             using( m.OpenInfo( $"Switching '{SubPath}' to branch '{World.DevelopBranchName}'." ) )
             {

@@ -343,7 +343,7 @@ namespace CK.Env.MSBuild
             {
                 return new SolutionDependencyContext( content, result, ProjectDependencies, GetBuildProjectInfo( m ) );
             }
-            // Building the list of SolutionDependencyResult.DependencyRow.
+            // Building the list of SolutionDependencyContext.DependencyRow.
             var table = result.SortedItems
                           // 1 - Selects solutions along with their ordered index.
                           .Where( sorted => sorted.GroupForHead == null && sorted.Item is SortableSolutionFile )
@@ -378,7 +378,7 @@ namespace CK.Env.MSBuild
                             .ToList();
             Debug.Assert( table.Select( r => r.Index ).IsSortedLarge() );
 
-            // Now that the table of SolutionDependencyResult.DependencyRow is built, use it to compute the
+            // Now that the table of SolutionDependencyContext.DependencyRow is built, use it to compute the
             // pure solution dependency graph.
             //
             var indexByName = new Dictionary<string, SolutionDependencyContext.DependentSolution>();

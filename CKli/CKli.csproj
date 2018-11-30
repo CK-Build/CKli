@@ -27,5 +27,9 @@
   <ItemGroup>
     <Compile Remove="Referential/**/*.cs" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="XExternalPackagesAction.cs" />
+  </ItemGroup>
   
 </Project>
