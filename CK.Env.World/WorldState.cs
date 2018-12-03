@@ -338,13 +338,26 @@ namespace CK.Env
                 {
                     if( !g.SwitchDevelopToLocal( m, autoCommit: true ) ) return;
                 }
-                var depContext = _solutionContextLoader.Load( m, _gitRepositories, WorldName.LocalBranchName, NoCache );
-                if( depContext == null ) return;
-
-                if( !_buildProjectZeroBuilder.LocalZeroBuildProjects( m, depContext ) ) return;
 
                 if( !error() ) SwitchedToLocal?.Invoke( this, ev );
                 SetWorkStatusAndSave( m, GlobalWorkStatus.Idle );
+            } );
+        }
+
+        public bool CanLocalFixToZeroBuildProjects => IsInitialized
+                                                      && WorkStatus == GlobalWorkStatus.Idle
+                                                      && CachedGlobalGitStatus == StandardGitStatus.LocalBranch;
+
+        [CommandMethod]
+        public bool LocalFixToZeroBuildProjects( IActivityMonitor monitor )
+        {
+            Debug.Assert( WorkStatus == GlobalWorkStatus.Idle );
+            if( !CheckGlobalGitStatus( monitor, StandardGitStatus.LocalBranch ) ) return false;
+            return RunSafe( monitor, $"Fixing Build projects, using ZeroVersion in {WorldName.LocalBranchName}.", ( m, error ) =>
+            {
+                var depContext = _solutionContextLoader.Load( m, _gitRepositories, WorldName.LocalBranchName, NoCache );
+                if( depContext == null ) return;
+                if( !_buildProjectZeroBuilder.LocalZeroBuildProjects( m, depContext ) ) return;
             } );
         }
 

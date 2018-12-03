@@ -135,6 +135,18 @@ namespace CKli
             return File.Exists( f ) ? new LocalNuGetPackageFile( f, packageId, v, false ) : null;
         }
 
+
+        public SVersion GetBestLocalVersion( IActivityMonitor m, string packageId )
+        {
+            return GetMaxVersionFromFeed( GetLocalFeedFolder( m ).PhysicalPath, packageId );
+        }
+
+        public LocalNuGetPackageFile GetLocalPackage( IActivityMonitor m, string packageId, SVersion v )
+        {
+            var f = GetPackagePath( GetLocalFeedFolder( m ).PhysicalPath, packageId, v );
+            return File.Exists( f ) ? new LocalNuGetPackageFile( f, packageId, v, false ) : null;
+        }
+
         static string GetPackagePath( string path, string packageId, SVersion v )
         {
             return Path.Combine( path, packageId + '.' + (v.AsCSVersion?.ToString(CSVersionFormat.NuGetPackage) ?? v.ToString()) + ".nupkg" );

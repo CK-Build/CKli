@@ -236,7 +236,7 @@ namespace CKli
 
             foreach( var s in r.Solutions )
             {
-                if( !s.Solution.GitFolder.CommitAmend( m ).Success )
+                if( !s.Solution.GitFolder.AmendCommit( m ).Success )
                 {
                     return false;
                 }

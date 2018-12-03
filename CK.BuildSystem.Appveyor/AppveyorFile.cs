@@ -31,6 +31,8 @@ namespace CK.BuildSystem.Appveyor
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
+        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
         {

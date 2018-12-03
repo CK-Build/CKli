@@ -16,6 +16,7 @@ namespace CK.Env.Plugins
         readonly ISecretKeyStore _keyStore;
         readonly WorldState _worldState;
         readonly IBranchSolutionLoader _solutionLoader;
+        readonly ILocalFeedProvider _localFeedProvider;
         Solution _solution;
 
         public SolutionDriver(
@@ -23,7 +24,8 @@ namespace CK.Env.Plugins
             WorldState w,
             GitFolder f,
             NormalizedPath branchPath,
-            IBranchSolutionLoader solutionLoader )
+            IBranchSolutionLoader solutionLoader,
+            ILocalFeedProvider localFeedProvider )
         {
             _worldState = w;
             _keyStore = keyStore;
@@ -31,6 +33,7 @@ namespace CK.Env.Plugins
             BranchPath = branchPath;
             Folder = f;
             _solutionLoader = solutionLoader;
+            _localFeedProvider = localFeedProvider;
         }
 
         void OnWorldInitializing( object sender, WorldState.InitializingEventArgs e )
@@ -115,22 +118,63 @@ namespace CK.Env.Plugins
 
         public bool IsOnLocalBranch => BranchPath.LastPart == Folder.World.LocalBranchName;
 
+        public IEnumerable<UpdatePackageInfo> GetLocalUpgradePackages( IActivityMonitor monitor, bool withBuildProject )
+        {
+            var primary = EnsureLoaded( monitor );
+            if( primary == null ) return null;
+            return primary
+                    .LoadedSecondarySolutions.Append( primary )
+                    .SelectMany( s => s.AllProjects )
+                    .Where( p => withBuildProject || !p.IsBuildProject )
+                    .SelectMany( p => p.Deps.Packages )
+                    .Select( dep => (Dep: dep, LocalVersion: _localFeedProvider.GetBestLocalVersion( monitor, dep.PackageId )) )
+                    .Where( pv => pv.LocalVersion != null )
+                    .Select( pv => new UpdatePackageInfo( pv.Dep.Owner.Solution.UniqueSolutionName, pv.Dep.Owner.Name, pv.Dep.PackageId, pv.LocalVersion ) );
+        }
+
+        public bool IsUpgradeLocalPackagesEnabled => IsOnLocalBranch && Folder.StandardGitStatus == StandardGitStatus.LocalBranch;
+
+        [CommandMethod]
+        public bool UpgradeLocalPackages( IActivityMonitor monitor, bool upgradeBuildProjects )
+        {
+            var toUpgrade = GetLocalUpgradePackages( monitor, upgradeBuildProjects );
+            if( toUpgrade == null ) return false;
+            if( !UpdatePackageDependencies( monitor, toUpgrade ) ) return false;
+            return Folder.AmendCommit( monitor ).Success;
+        }
+
         public bool IsCILocalBuildEnabled => IsOnLocalBranch && Folder.StandardGitStatus == StandardGitStatus.LocalBranch;
 
         [CommandMethod]
-        public bool CILocalBuild( IActivityMonitor monitor, bool withUnitTest = true )
+        public bool CILocalBuild( IActivityMonitor monitor, bool upgradeLocalDependencies = true, bool withUnitTest = true )
         {
-            var versionInfo = Folder.ReadRepositoryVersionInfo( monitor );
-            if( versionInfo == null ) return false;
-            return DoBuild( monitor, withUnitTest, versionInfo.FinalNuGetVersion, true );
-        }
-
-        bool DoBuild( IActivityMonitor monitor, bool withUnitTest, SVersion v, bool buildRequired )
-        {
-            Debug.Assert( buildRequired || withUnitTest );
             var primary = EnsureLoaded( monitor );
             if( primary == null ) return false;
 
+            if( upgradeLocalDependencies )
+            {
+                if( !UpgradeLocalPackages( monitor, false ) ) return false;
+            }
+            else if( !Folder.AmendCommit( monitor ).Success ) return false;
+
+            var v = Folder.ReadRepositoryVersionInfo( monitor )?.FinalNuGetVersion;
+            if( v == null ) return false;
+
+            var publishedNames = primary.LoadedSecondarySolutions.Append( primary )
+                                            .SelectMany( s => s.PublishedProjects )
+                                            .Select( p => p.Name );
+            bool buildRequired = publishedNames.Any( p => _localFeedProvider.GetLocalPackage( monitor, p, v ) == null );
+            if( !buildRequired )
+            {
+                monitor.Info( $"All {publishedNames.Count()} packages are already published in version {v}: {publishedNames.Concatenate()}." );
+                if( !withUnitTest ) return true;
+            }
+            return DoBuild( primary, monitor, withUnitTest, v, buildRequired );
+        }
+
+        bool DoBuild( Solution primary, IActivityMonitor monitor, bool withUnitTest, SVersion v, bool buildRequired )
+        {
+            Debug.Assert( buildRequired || withUnitTest );
             string key = _keyStore.GetSecretKey( monitor, "CODECAKEBUILDER_SECRET_KEY", false, "Required to execute CodeCakeBuilder." );
             if( key == null ) return false;
             var environmentVariables = new[] { ("CODECAKEBUILDER_SECRET_KEY", key) };

@@ -58,6 +58,23 @@ namespace CK.Env
         SVersion GetBestLocalCIVersion( IActivityMonitor m, string packageId );
 
         /// <summary>
+        /// Gets the best version for a package in LocalFeed/Local.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="packageId">The package name.</param>
+        /// <returns>The version or null if not found.</returns>
+        SVersion GetBestLocalVersion( IActivityMonitor m, string packageId );
+
+        /// <summary>
+        /// Gets a package file from LocalFeed/Local feed or null if not found.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="packageId">The package name.</param>
+        /// <param name="v">The package version.</param>
+        /// <returns>The local package file or null if not found.</returns>
+        LocalNuGetPackageFile GetLocalPackage( IActivityMonitor m, string packageId, SVersion v );
+
+        /// <summary>
         /// Gets a package file from CI feed.
         /// </summary>
         /// <param name="m">The monitor to use.</param>

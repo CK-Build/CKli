@@ -515,7 +515,21 @@ namespace CK.Env
         /// <param name="commitMessage">Required commit message.</param>
         /// <returns>A commit result with success/error and whether a commit has actually been created.</returns>
         [CommandMethod]
-        public CommitResult Commit( IActivityMonitor m, string commitMessage ) => DoCommit( m, commitMessage, false );
+        public CommitResult Commit( IActivityMonitor m, string commitMessage )
+        {
+            if( String.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
+            using( m.OpenInfo( $"Committing changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
+            {
+                Commands.Stage( _git, "*" );
+                var s = _git.RetrieveStatus();
+                if( !s.IsDirty )
+                {
+                    m.CloseGroup( "Working folder is up-to-date." );
+                    return new CommitResult( true, false );
+                }
+                else return DoCommit( m, commitMessage, false, true );
+            }
+        }
 
         /// <summary>
         /// Amends the current commit, optionaly changing its message.
@@ -526,48 +540,49 @@ namespace CK.Env
         /// commit result is returned.
         /// </param>
         /// <returns>A commit result with success/error and whether the commit has actually been amended.</returns>
-        public CommitResult CommitAmend( IActivityMonitor m, Func<string,string> editMessage = null )
+        public CommitResult AmendCommit( IActivityMonitor m, Func<string,string> editMessage = null )
         {
-            using( m.OpenInfo( $"Amending Commit." ) )
+            using( m.OpenInfo( $"Amending Commit in '{SubPath}' (branch '{CurrentBranchName}')." ) )
             {
                 var message = _git.Head.Tip.Message;
                 if( editMessage != null ) message = editMessage( message );
-                if( message == null )
+                if( String.IsNullOrWhiteSpace( message ) )
                 {
-                    m.Info( "Canceled by empty message." );
+                    m.CloseGroup( "Canceled by empty message." );
                     return new CommitResult( false, false );
                 }
-                return DoCommit( m, message, true );
+                bool messageUpdate = message != _git.Head.Tip.Message;
+                Commands.Stage( _git, "*" );
+                var s = _git.RetrieveStatus();
+                bool hasChange = s.IsDirty;
+                if( !hasChange )
+                {
+                    if( messageUpdate ) m.Info( "Only updating message." );
+                    else
+                    {
+                        m.CloseGroup( "Working folder is up-to-date." );
+                        return new CommitResult( true, false );
+                    }
+                }
+                return DoCommit( m, message, true, hasChange );
             }
         }
 
-        CommitResult DoCommit( IActivityMonitor m, string commitMessage, bool amendPreviousCommit )
+        CommitResult DoCommit( IActivityMonitor m, string commitMessage, bool amendPreviousCommit, bool isDirty )
         {
-            if( String.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
-            using( m.OpenInfo( $"Committing changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
+            try
             {
-                try
-                {
-                    bool createdCommit = false;
-                    Commands.Stage( _git, "*" );
-                    var s = _git.RetrieveStatus();
-                    if( s.IsDirty )
-                    {
-                        m.Info( "Working Folder is dirty. Committing changes." );
-                        var now = DateTimeOffset.Now;
-                        var author = _git.Config.BuildSignature( now );
-                        var options = new CommitOptions { AmendPreviousCommit = amendPreviousCommit };
-                        _git.Commit( commitMessage, author, new Signature( "CKli", "none", now), options );
-                        createdCommit = true;
-                    }
-                    else m.CloseGroup( "Working folder is up-to-date." );
-                    return new CommitResult( true, createdCommit );
-                }
-                catch( Exception ex )
-                {
-                    m.Error( ex );
-                    return new CommitResult( false, false );
-                }
+                if( isDirty ) m.Info( "Working Folder is dirty. Committing changes." );
+                var now = DateTimeOffset.Now;
+                var author = _git.Config.BuildSignature( now );
+                var options = new CommitOptions { AmendPreviousCommit = amendPreviousCommit };
+                _git.Commit( commitMessage, author, new Signature( "CKli", "none", now ), options );
+                return new CommitResult( true, true );
+            }
+            catch( Exception ex )
+            {
+                m.Error( ex );
+                return new CommitResult( false, false );
             }
         }
 
@@ -702,7 +717,7 @@ namespace CK.Env
 
                     if( !RaiseEnteredLocalBranch( m, true ) ) return false;
 
-                    if( !CommitAmend( m ).Success ) return false;
+                    if( !AmendCommit( m ).Success ) return false;
                     if( r.Status != MergeStatus.UpToDate )
                     {
                         m.CloseGroup( $"Success (with merge from '{World.DevelopBranchName}')." );
