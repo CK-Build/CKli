@@ -1,23 +1,32 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using CK.Core;
 using CK.Env.MSBuild;
 using CK.Text;
+using CSemVer;
 
 namespace CK.Env.Plugins
 {
     public class SolutionDriver : IGitBranchPlugin, ISolutionDriver, IDisposable, ICommandMethodsProvider
     {
+        readonly ISecretKeyStore _keyStore;
         readonly WorldState _worldState;
         readonly IBranchSolutionLoader _solutionLoader;
         Solution _solution;
 
-        public SolutionDriver( WorldState w, GitFolder f, NormalizedPath branchPath, IBranchSolutionLoader solutionLoader )
+        public SolutionDriver(
+            ISecretKeyStore keyStore,
+            WorldState w,
+            GitFolder f,
+            NormalizedPath branchPath,
+            IBranchSolutionLoader solutionLoader )
         {
             _worldState = w;
+            _keyStore = keyStore;
             w.Initializing += OnWorldInitializing;
             BranchPath = branchPath;
             Folder = f;
@@ -104,15 +113,48 @@ namespace CK.Env.Plugins
             return true;
         }
 
+        public bool IsOnLocalBranch => BranchPath.LastPart == Folder.World.LocalBranchName;
 
-        //public bool CanBuildDevelop => BranchPath.LastPart == Folder.World.DevelopBranchName
-        //                                                      && Folder.StandardGitStatus == StandardGitStatus.DevelopBranch;
+        public bool IsCILocalBuildEnabled => IsOnLocalBranch && Folder.StandardGitStatus == StandardGitStatus.LocalBranch;
 
-        //public bool BuildDevelop( IActivityMonitor m, bool pushToRemotes )
-        //{
+        [CommandMethod]
+        public bool CILocalBuild( IActivityMonitor monitor, bool withUnitTest = true )
+        {
+            var versionInfo = Folder.ReadRepositoryVersionInfo( monitor );
+            if( versionInfo == null ) return false;
+            return DoBuild( monitor, withUnitTest, versionInfo.FinalNuGetVersion, true );
+        }
 
-        //}
+        bool DoBuild( IActivityMonitor monitor, bool withUnitTest, SVersion v, bool buildRequired )
+        {
+            Debug.Assert( buildRequired || withUnitTest );
+            var primary = EnsureLoaded( monitor );
+            if( primary == null ) return false;
 
+            string key = _keyStore.GetSecretKey( monitor, "CODECAKEBUILDER_SECRET_KEY", false, "Required to execute CodeCakeBuilder." );
+            if( key == null ) return false;
+            var environmentVariables = new[] { ("CODECAKEBUILDER_SECRET_KEY", key) };
 
+            using( monitor.OpenInfo( $"Target Version = {v}" ) )
+            {
+                var path = Folder.FileSystem.GetFileInfo( primary.SolutionFolderPath ).PhysicalPath;
+                var args = "run --project CodeCakeBuilder -autointeraction";
+                if( !buildRequired ) args += " -target=\"Unit-Testing\" -exclusiveOptional -IgnoreNoPackagesToProduce=Y";
+                if( !withUnitTest ) args += " -RunUnitTests=N";
+                try
+                {
+                    if( !ProcessRunner.Run( monitor, path, "dotnet", args, environmentVariables ) )
+                    {
+                        return false;
+                    }
+                }
+                catch( Exception ex )
+                {
+                    monitor.Error( $"Build failed.", ex );
+                    return false;
+                }
+                return true;
+            }
+        }
     }
 }

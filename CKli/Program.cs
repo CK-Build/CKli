@@ -148,9 +148,14 @@ namespace CKli
                 {
                     f.SetValue( f.IsPassword ? ReadSecret() : ReadNullableString() );
                 }
-                else if( f.Type == typeof( bool ) )
+                else if( f.Type == typeof( bool ) || f.Type == typeof( bool? ) )
                 {
-                    f.SetValue( ReadBoolean() );
+                    bool? a = ReadNullableBoolean();
+                    if( !a.HasValue )
+                    {
+                        if( f.IsRequired ) return false;
+                    }
+                    else f.SetValue( a.Value );
                 }
                 else if( f.Type == typeof( int ) )
                 {
@@ -212,10 +217,16 @@ namespace CKli
             return s;
         }
 
-        static bool ReadBoolean()
+        static bool? ReadNullableBoolean()
         {
-            string s = ReadNullableString();
-            return StringComparer.OrdinalIgnoreCase.Equals( s, "true" );
+            for( ; ;)
+            {
+                string s = ReadNullableString();
+                if( s == null ) return null;
+                if( StringComparer.OrdinalIgnoreCase.Equals( s, "true" ) ) return true;
+                if( StringComparer.OrdinalIgnoreCase.Equals( s, "false" ) ) return false;
+                Console.WriteLine( "Required 'true', 'false' or enter." );
+            }
         }
 
         static int? ReadPositiveNumber()

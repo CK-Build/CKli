@@ -21,13 +21,23 @@ namespace CK.Env
         NormalizedPath BranchPath { get; }
     }
 
+    /// <summary>
+    /// Offers helpers of <see cref="IGitBranchPlugin"/>.
+    /// </summary>
     public static class GitBranchPluginExtension
     {
-        public static bool CheckCurrentBranch( this IGitBranchPlugin @this, IActivityMonitor m )
+        /// <summary>
+        /// Checks that the <see cref="GitFolder.CurrentBranchName"/> name is the same as the plugin <see cref="IGitBranchPlugin.BranchPath"/>.
+        /// </summary>
+        /// <param name="this">This branch plugin.</param>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="traceError">False to not trace an error and simply returning false.</param>
+        /// <returns>True if this plugin is on the same branch as the Git folder, false otherwise.</returns>
+        public static bool CheckCurrentBranch( this IGitBranchPlugin @this, IActivityMonitor m, bool traceError = true )
         {
             if( @this.BranchPath.LastPart != @this.Folder.CurrentBranchName )
             {
-                m.Error( $"[{@this.GetType().Name}] Current branch is {@this.Folder.CurrentBranchName}. Must be in {@this.BranchPath.LastPart}." );
+                if( traceError ) m.Error( $"[{@this.GetType().Name}] Current branch is {@this.Folder.CurrentBranchName}. Must be in {@this.BranchPath.LastPart}." );
                 return false;
             }
             return true;

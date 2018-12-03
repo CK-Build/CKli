@@ -35,9 +35,14 @@ namespace CK.Env.Plugins.SolutionFiles
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
+        public bool IsOnLocalBranch => BranchPath.LastPart == Folder.World.LocalBranchName;
+
+        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
         {
+            if( !this.CheckCurrentBranch( m ) ) return;
             if( IsOnLocalBranch && _settings.ProduceCKSetupComponents )
             {
                 EnsureLocalStorePath( m );
@@ -47,8 +52,6 @@ namespace CK.Env.Plugins.SolutionFiles
                 Delete( m );
             }
         }
-
-        public bool IsOnLocalBranch => BranchPath.LastPart == Folder.World.LocalBranchName;
 
         public void Dispose()
         {

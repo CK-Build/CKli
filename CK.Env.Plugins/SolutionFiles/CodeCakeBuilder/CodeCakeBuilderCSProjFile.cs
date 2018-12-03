@@ -30,6 +30,8 @@ namespace CK.Env.Plugins.SolutionFiles
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
+        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
         {
@@ -77,7 +79,7 @@ namespace CK.Env.Plugins.SolutionFiles
             {
                 EnsureProjectReference( "CK.Text", "7.1.1--0008-develop" );
             }
-            ccbProject.Save( m );
+            solution.Save( m );
         }
     }
 }

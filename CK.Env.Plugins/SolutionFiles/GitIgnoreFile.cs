@@ -24,6 +24,8 @@ namespace CK.Env.Plugins.SolutionFiles
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
+        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
         {

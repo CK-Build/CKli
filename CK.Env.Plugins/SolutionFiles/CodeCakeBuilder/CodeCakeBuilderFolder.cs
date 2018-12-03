@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.NuGetClient;
 using CK.Text;
 using System;
 using System.Collections.Generic;
@@ -28,7 +29,7 @@ namespace CK.Env.Plugins.SolutionFiles
             CopyTextResource( m, "Program.cs" );
             CopyTextResource( m, "Build.cs", AdaptBuild );
             CopyTextResource( m, "Build.NuGetHelper.cs" );
-            CopyTextResource( m, "Build.StandardCheckRepository.cs" );
+            CopyTextResource( m, "Build.StandardCheckRepository.cs", AdaptStandardCheckRepositoryForPushFeeds );
             CopyTextResource( m, "Build.StandardSolutionBuild.cs" );
             if( _settings.NoUnitTests )
             {
@@ -40,6 +41,37 @@ namespace CK.Env.Plugins.SolutionFiles
             }
             CopyTextResource( m, "Build.StandardCreateNuGetPackages.cs" );
             CopyTextResource( m, "Build.StandardPushNuGetPackages.cs" );
+        }
+
+        string AdaptStandardCheckRepositoryForPushFeeds( string text )
+        {
+            Match m = Regex.Match( text, @"return new NuGetHelper\.Feed\[\]{.*?};", RegexOptions.Singleline|RegexOptions.CultureInvariant );
+            if( !m.Success )
+            {
+                throw new Exception( "Expected pattern return new NuGetHelper.Feed[]{...} in Build.StandardCheckRepository.cs." );
+            }
+            StringBuilder b = new StringBuilder( );
+            b.AppendLine( "return new NuGetHelper.Feed[]{" );
+            bool atLeastOne = false;
+            foreach( var info in _settings.NuGetPushFeeds )
+            {
+                b.AppendLine( atLeastOne ? "," : "" );
+                atLeastOne = true;
+                switch( info )
+                {
+                    case NuGetAzureFeedInfo a:
+                        b.Append( "new SignatureVSTSFeed( \"" ).Append( a.Organization ).Append( "\", \"" ).Append( a.FeedName ).Append( "\" )" );
+                        break;
+                    case NuGetStandardFeedInfo n:
+                        b.Append( "new RemoteFeed( \"" ).Append( n.Name).Append( "\", \"" )
+                                                        .Append( n.Url ).Append( "\", \"" )
+                                                        .Append( n.SecretKeyName ).Append( "\" )" );
+                        break;
+                }
+            }
+            b.AppendLine().Append( "};" );
+            text = text.Replace( m.Value, b.ToString() );
+            return text;
         }
 
         string AdaptBuild( string text )

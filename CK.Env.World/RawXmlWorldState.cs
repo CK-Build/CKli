@@ -31,13 +31,8 @@ namespace CK.Env
         }
 
         public RawXmlWorldState( IWorldName w )
+            : this( w, new XDocument( new XElement( w.FullName + "-World-State", new XAttribute( xWorkStatusName, GlobalWorkStatus.Idle.ToString() ) ) ) )
         {
-            if( w == null ) throw new ArgumentNullException( nameof( w ) );
-            _world = w;
-            _doc = new XDocument( new XElement( w.FullName+"-State",
-                                    new XAttribute( xWorkStatusName, GlobalWorkStatus.Idle.ToString() ) ) );
-            _generalState = new XElement( xGeneralStateName );
-            _doc.Root.Add( _generalState );
         }
 
         /// <summary>

@@ -18,9 +18,49 @@ namespace CKli
         readonly XTypedFactory _factory;
         readonly string _rootPath;
         readonly IWorldStore _worldStore;
+        readonly LocalWorldRootPathMapping _localWorldRootPathMapping;
         FileSystem _fs;
         IWorldName _currentWorld;
         XTypedObject _root;
+
+        class LocalWorldRootPathMapping : ILocalWorldRootPathMapping
+        {
+            readonly string _rootPath;
+            Dictionary<string, string> _map;
+
+            public LocalWorldRootPathMapping( string rootPath )
+            {
+                _rootPath = rootPath;
+                Load();
+            }
+
+            public void Load()
+            {
+                var mapFile = Path.Combine( _rootPath, "CK-Env", "LocalWorldRootPathMapping.txt" );
+                _map = File.Exists( mapFile )
+                        ? File.ReadAllLines( mapFile )
+                        .Select( line => line.Split( '>' ) )
+                        .Where( p => p.Length == 2 )
+                        .Select( p => (p[0].Trim(), p[1].Trim()) )
+                        .Where( p => p.Item1.Length > 0 && p.Item2.Length > 0 )
+                        .ToDictionary( p => p.Item1, p => p.Item2 )
+                        : new Dictionary<string, string>();
+                if( !_map.ContainsKey( "CK" ) )
+                {
+                    _map.Add( "CK", _rootPath );
+                }
+            }
+
+            public string GetRootPath( IWorldName w )
+            {
+                if( _map.TryGetValue( w.FullName, out string p ) )
+                {
+                    Directory.CreateDirectory( p );
+                    File.WriteAllText( Path.Combine( p, "CK-World" ), "" );
+                }
+                return p;
+            }
+        }
 
         public GlobalContext( IActivityMonitor monitor, XTypedFactory factory, string rootPath )
         {
@@ -28,7 +68,8 @@ namespace CKli
             _factory = factory;
             _rootPath = rootPath;
             CommandRegister = new CommandRegister();
-            _worldStore = new LocalWorldStore( Path.Combine( _rootPath, "CK-Env" ) );
+            _localWorldRootPathMapping = new LocalWorldRootPathMapping( rootPath );
+            _worldStore = new LocalWorldStore( Path.Combine( _rootPath, "CK-Env" ), _localWorldRootPathMapping );
         }
 
         public CommandRegister CommandRegister { get; }
@@ -40,19 +81,20 @@ namespace CKli
         public bool Open()
         {
             Close();
+            _localWorldRootPathMapping.Load();
             var w = ChooseWorld( _monitor );
-            if( w == null ) return false;
+            if( w.LocalPath == null ) return false;
 
             _currentWorld = null;
-            _fs = new FileSystem( _rootPath, CommandRegister );
+            _fs = new FileSystem( w.LocalPath, CommandRegister );
             var baseProvider = new SimpleServiceContainer();
             baseProvider.Add<ISimpleObjectActivator>( new SimpleObjectActivator() );
             baseProvider.Add( CommandRegister );
             baseProvider.Add( _fs );
-            baseProvider.Add( w );
+            baseProvider.Add( w.World );
             baseProvider.Add( _worldStore );
 
-            var original = _worldStore.ReadWorldDescription( _monitor, w ).Root;
+            var original = _worldStore.ReadWorldDescription( _monitor, w.World ).Root;
             var expanded = XTypedFactory.PreProcess( _monitor, original );
             if( expanded.Errors.Count > 0 )
             {
@@ -60,31 +102,34 @@ namespace CKli
             }
             _root = _factory.CreateInstance<XTypedObject>( _monitor, expanded.Result, baseProvider );
             if( _root == null ) return false;
-            _currentWorld = w;
+            _currentWorld = w.World;
             CurrentWorldChanged?.Invoke( this, EventArgs.Empty );
             return true;
         }
 
-        IWorldName ChooseWorld(IActivityMonitor m)
+        (string LocalPath, IWorldName World) ChooseWorld( IActivityMonitor m )
         {
-            var worlds = _worldStore.ReadWorlds( m ).Select( (w,idx) => (Idx:idx, World:w) ).ToList();
-            for(; ;)
+            var map = new LocalWorldRootPathMapping( _rootPath );
+            var worlds = _worldStore.ReadWorlds( m ).Select( ( w, idx ) => (Idx: idx, World: w, LocalPath: map.GetRootPath( w )) ).ToList();
+            for(; ; )
             {
                 foreach( var g in worlds.GroupBy( f => f.World.Name ) )
                 {
                     Console.WriteLine( $"- {g.Key}" );
                     foreach( var lts in g )
                     {
-                        Console.WriteLine( $"   > {lts.Idx+1} - {lts.World.LTSKey ?? "<Current>"}" );
+                        Console.WriteLine( $"   > {lts.Idx + 1} - {lts.World.LTSKey ?? "<Current>"} => { lts.LocalPath ?? "(No local mapping)"}" );
                     }
                 }
                 Console.WriteLine( "   > x - Exit" );
                 string r = Console.ReadLine();
-                if( Int32.TryParse( r, out int result ) && result >= 1 && result <= worlds.Count )
+                if( Int32.TryParse( r, out int result )
+                    && result >= 1 && result <= worlds.Count )
                 {
-                    return worlds[result-1].World;
+                    var c = worlds[result - 1];
+                    return (c.LocalPath, c.World);
                 }
-                if( r == "x" ) return null;
+                if( r == "x" ) return (null,null);
             }
         }
 

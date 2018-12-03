@@ -9,7 +9,7 @@ using System.Xml.Linq;
 
 namespace CK.Env.Plugins.SolutionFiles
 {
-    public class NugetConfigFile : GitFolderXmlFile, IGitBranchPlugin, ICommandMethodsProvider
+    public class NugetConfigFile : GitFolderXmlFile, IDisposable, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly ISolutionSettings _settings;
         readonly ILocalFeedProvider _localFeedProvider;
@@ -21,11 +21,40 @@ namespace CK.Env.Plugins.SolutionFiles
             _localFeedProvider = localFeedProvider;
             _settings = s;
             BranchPath = branchPath;
+            if( IsOnLocalBranch )
+            {
+                f.OnLocalBranchEntered += OnLocalBranchEntered;
+                f.OnLocalBranchLeaving += OnLocalBranchLeaving;
+            }
+        }
+
+
+        void OnLocalBranchEntered( object sender, EventMonitoredArgs e )
+        {
+            EnsureLocalFeeds( e.Monitor );
+            Save( e.Monitor );
+        }
+
+
+        void OnLocalBranchLeaving( object sender, EventMonitoredArgs e )
+        {
+            RemoveLocalFeeds( e.Monitor );
+            Save( e.Monitor );
+        }
+
+        void IDisposable.Dispose()
+        {
+            Folder.OnLocalBranchEntered -= OnLocalBranchEntered;
+            Folder.OnLocalBranchLeaving -= OnLocalBranchLeaving;
         }
 
         public NormalizedPath BranchPath { get; }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
+
+        public bool IsOnLocalBranch => BranchPath.LastPart == Folder.World.LocalBranchName;
+
+        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
@@ -44,6 +73,14 @@ namespace CK.Env.Plugins.SolutionFiles
             foreach( var name in _settings.ExcludedNuGetSourceNames )
             {
                 RemoveFeed( m, name, withCredentials: true );
+            }
+            if( IsOnLocalBranch )
+            {
+                EnsureLocalFeeds( m );
+            }
+            else
+            {
+                RemoveLocalFeeds( m );
             }
             Save( m );
         }

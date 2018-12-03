@@ -26,7 +26,7 @@ namespace CK.Env.Plugins.SolutionFiles
         {
             if( _settings.NoStrongNameSigning )
             {
-                DeleteFile( m, "" );
+                DeleteFile( m, "SharedKey.snk" );
             }
             else
             {

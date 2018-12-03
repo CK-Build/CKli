@@ -115,9 +115,22 @@ namespace CK.Env
             {
                 _manager = manager;
                 BranchName = branchName;
-                ServiceContainer = branchName == null
-                                    ? manager.ServiceContainer
-                                    : new SimpleServiceContainer( manager._plugins );
+                if( branchName == null )
+                {
+                    ServiceContainer = manager.ServiceContainer;
+                }
+                else
+                {
+                    if( branchName == manager._defaultBranchName )
+                    {
+                        ServiceContainer = new SimpleServiceContainer( manager._plugins );
+                    }
+                    else
+                    {
+                        var baseProvider = manager._branches.FindOrCreateWithoutInitialization( manager._defaultBranchName );
+                        ServiceContainer = new SimpleServiceContainer( baseProvider );
+                    }
+                }
                 _mappings = new Dictionary<Type, object>();
             }
 

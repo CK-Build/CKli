@@ -15,16 +15,22 @@ namespace CK.Env
         /// <summary>
         /// Gets the local file full path.
         /// </summary>
-        public string FilePath { get; }
+        public string XmlDescriptionFilePath { get; }
 
-        internal LocalWorldName( string path, string worldName, string ltsKey )
+        /// <summary>
+        /// Gets the local worl root directory path.
+        /// </summary>
+        public string RootDirectoryPath { get; }
+
+        internal LocalWorldName( string xmlDescriptionFilePath, string worldName, string ltsKey, ILocalWorldRootPathMapping localMap )
             : base( worldName, ltsKey )
         {
-            if( String.IsNullOrWhiteSpace( path ) ) throw new ArgumentNullException( nameof( path ) );
-            FilePath = path;
+            if( String.IsNullOrWhiteSpace( xmlDescriptionFilePath ) ) throw new ArgumentNullException( nameof( xmlDescriptionFilePath ) );
+            XmlDescriptionFilePath = xmlDescriptionFilePath;
+            RootDirectoryPath = localMap.GetRootPath( this );
         }
 
-        internal static LocalWorldName Parse( IActivityMonitor m, string filePath )
+        internal static LocalWorldName Parse( IActivityMonitor m, string filePath, ILocalWorldRootPathMapping localMap )
         {
             Debug.Assert( filePath.EndsWith( "-World.xml" ) );
             try
@@ -34,9 +40,9 @@ namespace CK.Env
                 int idx = fName.IndexOf( '-' );
                 if( idx < 0 )
                 {
-                    return new LocalWorldName( filePath, fName, null );
+                    return new LocalWorldName( filePath, fName, null, localMap );
                 }
-                return new LocalWorldName( filePath, fName.Substring( 0, idx ), fName.Substring( idx + 1 ) );
+                return new LocalWorldName( filePath, fName.Substring( 0, idx ), fName.Substring( idx + 1 ), localMap );
             }
             catch( Exception ex )
             {

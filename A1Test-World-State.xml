@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<A1Test-World-State WorkStatus="Idle">
+  <GeneralState />
+  <WorkStates>
+    <Idle />
+    <SwitchingToLocal CompactCommitMode="true" />
+    <SwitchingToDevelop />
+    <Releasing />
+    <WaitingReleaseConfirmation />
+    <CancellingRelease />
+    <PublishingRelease />
+    <OtherOperation />
+  </WorkStates>
+</A1Test-World-State>

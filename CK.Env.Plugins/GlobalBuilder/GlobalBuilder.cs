@@ -39,7 +39,7 @@ namespace CK.Env.MSBuild
             _buildInfo = buildInfo;
         }
 
-        public bool Build( IActivityMonitor m  )
+        public bool Build( IActivityMonitor m )
         {
             var environmentVariables = new List<(string, string)>();
             if( _buildInfo.IsRemotesRequired == null )
@@ -84,7 +84,7 @@ namespace CK.Env.MSBuild
             var filteredSolutions = FilterSolutions( _dependencyResult.Solutions );
             foreach( var s in filteredSolutions )
             {
-                if( !StartBuilding( m, filteredSolutions,s ) ) return false;
+                if( !StartBuilding( m, filteredSolutions, s ) ) return false;
                 var gitFolder = s.Solution.GitFolder;
                 if( !_buildInfo.AutoCommit && !gitFolder.CheckCleanCommit( m ) )
                 {

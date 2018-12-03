@@ -57,7 +57,9 @@ namespace CKli
             _allGitFoldersWithDevelopBranchName = new List<XGitFolder>();
 
             _worldState = new WorldState( commandRegister, worldStore, world, this, this );
+            _worldState.Initializing += ( o, e ) => DumpGitFolderStatus( e.Monitor );
             fileSystem.ServiceContainer.Add( _worldState );
+
 
             CommandProviderName = "Solutions";
             commandRegister.Register( this );
@@ -176,6 +178,12 @@ namespace CKli
 
             var buildDepNames = r.BuildProjectsInfo.DependenciesToBuild.Select( p => p.Project.Project.Name );
             var buildDepNamesText = buildDepNames.Concatenate();
+
+            if( buildDepNamesText.Length == 0 )
+            {
+                m.Info( "There is no Build Project Auto Dependency Issue in this world." );
+                return true;
+            }
 
             using( m.OpenInfo( $"Removing {buildDepNamesText} packages ZeroVersion from local NuGet cache if they exist." ) )
             {

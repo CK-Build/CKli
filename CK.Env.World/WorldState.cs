@@ -44,8 +44,8 @@ namespace CK.Env
             WorldName = worldName;
             _solutionContextLoader = solutionContextLoader;
             _buildProjectZeroBuilder = buildProjectZeroBuilder;
-            Debug.Assert( ((int[])Enum.GetValues( typeof( GlobalWorkStatus ) )).SequenceEqual( Enumerable.Range( 0, 7 ) ) );
-            _roWorkState = new XElement[7];
+            Debug.Assert( ((int[])Enum.GetValues( typeof( GlobalWorkStatus ) )).SequenceEqual( Enumerable.Range( 0, 8 ) ) );
+            _roWorkState = new XElement[8];
             _solutionDrivers = new List<ISolutionDriver>();
             _gitRepositories = new List<IGitRepository>();
 
@@ -94,16 +94,24 @@ namespace CK.Env
         /// </summary>
         public bool NoCache { get; set; }
 
+
+        bool IsInitialized => _solutionDrivers.Count > 0;
+
+        public bool IsInitializeEnabled => !IsInitialized;
+
+        [CommandMethod]
+        public bool Initialize( IActivityMonitor m ) => Initialize( m, NoCache );
+
         /// <summary>
         /// Initializes or reinitializes this world state.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="force">
         /// True to force a reinitialization, false to avoid any reinitialization (if already initialized).
-        /// and null (the default) to rely on <see cref="NoCache"/> setting.
+        /// and null to rely on <see cref="NoCache"/> setting.
         /// </param>
         /// <returns>True on success, false on error.</returns>
-        public bool Initialize( IActivityMonitor monitor, bool? force = null )
+        public bool Initialize( IActivityMonitor monitor, bool? force )
         {
             if( _rawState == null )
             {
@@ -113,15 +121,35 @@ namespace CK.Env
             }
             if( !force.HasValue ) force = NoCache;
             if( _solutionDrivers.Count > 0 && !force.Value ) return false;
-            return RunSafe( monitor, "Initializing World.", (m,error) =>
+            return RunSafe( monitor, "Initializing World.", ( m, error ) =>
             {
                 var ev = new InitializingEventArgs( monitor );
-                Initializing?.Invoke( this, ev );
+
+                var called = new HashSet<object>();
+                bool again;
+                do
+                {
+                    again = false;
+                    var handlers = Initializing?.GetInvocationList();
+                    if( handlers != null )
+                    {
+                        foreach( var h in handlers )
+                        {
+                            if( called.Add( h ) )
+                            {
+                                h.DynamicInvoke( this, ev );
+                                again = true;
+                            }
+                        }
+                    }
+                }
+                while( again );
                 _solutionDrivers.Clear();
                 _solutionDrivers.AddRange( ev.SolutionsDrivers );
                 _gitRepositories.Clear();
                 _gitRepositories.AddRange( _solutionDrivers.Select( s => s.GitRepository ).Distinct() );
                 if( !error() ) Initialized?.Invoke( this, ev );
+                GetGlobalGitStatus( monitor, false );
             } );
         }
 
@@ -131,7 +159,7 @@ namespace CK.Env
         /// </summary>
         public IReadOnlyList<ISolutionDriver> SolutionDrivers => _solutionDrivers;
 
-        bool RunSafe( IActivityMonitor m, string message, Action<IActivityMonitor,Func<bool>> action )
+        bool RunSafe( IActivityMonitor m, string message, Action<IActivityMonitor, Func<bool>> action )
         {
             bool result = true;
             using( m.OnError( () => result = false ) )
@@ -198,25 +226,25 @@ namespace CK.Env
         /// <summary>
         /// Gets the global work status.
         /// </summary>
-        public GlobalWorkStatus WorkStatus => _rawState.WorkStatus;
+        public GlobalWorkStatus? WorkStatus => _rawState?.WorkStatus;
 
         /// <summary>
         /// Gets the operation name (when <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.OtherOperation"/>).
         /// </summary>
-        public string OtherOperationName => _rawState.OtherOperationName;
+        public string OtherOperationName => _rawState?.OtherOperationName;
 
         /// <summary>
         /// Gets the mutable <see cref="XElement"/> general state.
         /// This is where state information that are not specific to an operation are stored.
         /// </summary>
-        public XElement GeneralState => _rawState.GeneralState;
+        public XElement GeneralState => _rawState?.GeneralState;
 
         /// <summary>
         /// Gets the mutable <see cref="XElement"/> state for an operation.
         /// </summary>
         /// <param name="status">The work status.</param>
         /// <returns>The state element.</returns>
-        public XElement GetWorkState( GlobalWorkStatus status ) => _rawState.GetWorkState( status );
+        public XElement GetWorkState( GlobalWorkStatus status ) => _rawState?.GetWorkState( status );
 
         /// <summary>
         /// Sets the <see cref="WorkStatus"/>.
@@ -243,10 +271,10 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets whether the <see cref="WorkStatus"/> is not <see cref="GlobalWorkStatus.Idle"/> nor <see cref="GlobalWorkStatus.WaitingReleaseConfirmation"/>
-        /// and <see cref="CachedGlobalGitStatus"/> is not <see cref="StandardGitStatus.Unknwon"/>.
+        /// Gets whether the <see cref="WorkStatus"/> is not <see cref="GlobalWorkStatus.Idle"/> nor <see cref="GlobalWorkStatus.WaitingReleaseConfirmation"/>.
         /// </summary>
-        public bool IsConcludeCurrentWorkEnabled => WorkStatus != GlobalWorkStatus.Idle
+        public bool IsConcludeCurrentWorkEnabled => IsInitialized
+                                                    && WorkStatus != GlobalWorkStatus.Idle
                                                     && WorkStatus != GlobalWorkStatus.WaitingReleaseConfirmation;
 
         /// <summary>
@@ -254,6 +282,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
+        [CommandMethod]
         public bool ConcludeCurrentWork( IActivityMonitor m )
         {
             if( !IsConcludeCurrentWorkEnabled ) throw new InvalidOperationException( nameof( IsConcludeCurrentWorkEnabled ) );
@@ -274,7 +303,8 @@ namespace CK.Env
         /// Gets whether <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/> and <see cref="CachedGlobalGitStatus"/>
         /// is not already on <see cref="StandardGitStatus.LocalBranch"/>.
         /// </summary>
-        public bool CanSwitchToLocal => WorkStatus == GlobalWorkStatus.Idle
+        public bool CanSwitchToLocal => IsInitialized
+                                        && WorkStatus == GlobalWorkStatus.Idle
                                         && CachedGlobalGitStatus != StandardGitStatus.LocalBranch;
 
         /// <summary>
@@ -322,7 +352,8 @@ namespace CK.Env
         /// Gets whether <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/> and <see cref="CachedGlobalGitStatus"/>
         /// is not on <see cref="StandardGitStatus.DevelopBranch"/>.
         /// </summary>
-        public bool CanSwitchToDevelop => WorkStatus == GlobalWorkStatus.Idle
+        public bool CanSwitchToDevelop => IsInitialized
+                                          && WorkStatus == GlobalWorkStatus.Idle
                                           && CachedGlobalGitStatus != StandardGitStatus.DevelopBranch;
 
         /// <summary>
@@ -359,7 +390,8 @@ namespace CK.Env
         /// Gets whether <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/> and <see cref="CachedGlobalGitStatus"/>
         /// is on <see cref="StandardGitStatus.DevelopBranch"/>.
         /// </summary>
-        public bool CanRelease => WorkStatus == GlobalWorkStatus.Idle
+        public bool CanRelease => IsInitialized
+                                  && WorkStatus == GlobalWorkStatus.Idle
                                   && CachedGlobalGitStatus == StandardGitStatus.DevelopBranch;
 
         /// <summary>
@@ -457,7 +489,9 @@ namespace CK.Env
         /// <summary>
         /// Gets whether <see cref="CancelRelease"/> can be called.
         /// </summary>
-        public bool CanCancelRelease => WorkStatus == GlobalWorkStatus.Releasing || WorkStatus == GlobalWorkStatus.WaitingReleaseConfirmation;
+        public bool CanCancelRelease => IsInitialized
+                                        && (WorkStatus == GlobalWorkStatus.Releasing || WorkStatus == GlobalWorkStatus.WaitingReleaseConfirmation);
+
 
         /// <summary>
         /// Cancel the current release.
@@ -473,7 +507,7 @@ namespace CK.Env
         /// <summary>
         /// Release can be published when <see cref="GlobalWorkStatus.WaitingReleaseConfirmation"/>.
         /// </summary>
-        public bool CanPublishRelease => WorkStatus == GlobalWorkStatus.WaitingReleaseConfirmation;
+        public bool CanPublishRelease => IsInitialized && WorkStatus == GlobalWorkStatus.WaitingReleaseConfirmation;
 
         public bool PublishRelease( IActivityMonitor m )
         {
@@ -496,7 +530,7 @@ namespace CK.Env
             _roOtherOperationName = _rawState.OtherOperationName;
             _roGeneralState = new XElement( _rawState.GeneralState );
             _roGeneralState.Changing += PreventChanges;
-            for( int i = 0; i < 7; i++ )
+            for( int i = 0; i < _roWorkState.Length; i++ )
             {
                 _roWorkState[i] = new XElement( _rawState.GetWorkState( (GlobalWorkStatus)i ) );
                 _roWorkState[i].Changing += PreventChanges;

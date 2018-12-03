@@ -44,6 +44,8 @@ namespace CK.Env.Plugins
             return this.CheckCurrentBranch( m ) && Folder.FileSystem.EnsureDirectory( m, FolderPath );
         }
 
+        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
         {

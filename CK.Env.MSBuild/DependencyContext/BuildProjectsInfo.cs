@@ -21,7 +21,6 @@ namespace CK.Env.MSBuild
             IReadOnlyList<(IDependentProject Project, IReadOnlyList<IDependentPackage> Packages)> projectsToUpgrade )
         {
             Debug.Assert( sortResult != null );
-            Debug.Assert( sortResult.IsComplete == (dependenciesToBuild != null && projectsToUpgrade != null) );
             RawBuildProjectsInfoSorterResult = sortResult;
             DependenciesToBuild = dependenciesToBuild ?? Array.Empty<(int Rank, IDependentProject Project)>();
             ProjectsToUpgrade = projectsToUpgrade ?? Array.Empty<(IDependentProject Project, IReadOnlyList<IDependentPackage> Packages)>();

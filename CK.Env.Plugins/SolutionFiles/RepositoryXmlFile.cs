@@ -6,7 +6,7 @@ using System.Xml.Linq;
 
 namespace CK.Env.Plugins.SolutionFiles
 {
-    public class RepositoryXmlFile : GitFolderXmlFile, IGitBranchPlugin, ICommandMethodsProvider
+    public class RepositoryXmlFile : GitFolderXmlFile, IDisposable, IGitBranchPlugin, ICommandMethodsProvider
     {
         static readonly XNamespace SVGNS = XNamespace.Get( "http://csemver.org/schemas/2015" );
         static readonly XName XRootName = SVGNS + "RepositoryInfo";
@@ -20,18 +20,45 @@ namespace CK.Env.Plugins.SolutionFiles
             : base( f, branchPath.AppendPart( "RepositoryInfo.xml" ) )
         {
             BranchPath = branchPath;
+            if( IsOnLocalBranch )
+            {
+                f.OnLocalBranchEntered += OnLocalBranchEntered;
+                f.OnLocalBranchLeaving += OnLocalBranchLeaving;
+            }
         }
 
         public NormalizedPath BranchPath { get; }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
+        public bool IsOnLocalBranch => BranchPath.LastPart == Folder.World.LocalBranchName;
+
+        void OnLocalBranchEntered( object sender, EventMonitoredArgs e )
+        {
+            EnsureLocalBranch( e.Monitor );
+            Save( e.Monitor );
+        }
+
+        void OnLocalBranchLeaving( object sender, EventMonitoredArgs e )
+        {
+            RemoveLocalBranch( e.Monitor );
+            Save( e.Monitor );
+        }
+
+        void IDisposable.Dispose()
+        {
+            Folder.OnLocalBranchEntered -= OnLocalBranchEntered;
+            Folder.OnLocalBranchLeaving -= OnLocalBranchLeaving;
+        }
+
+        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
             EnsureBranchMapping( m, Folder.World.DevelopBranchName, "develop" );
-            if( Folder.StandardGitStatus == StandardGitStatus.LocalBranch )
+            if( IsOnLocalBranch )
             {
                 EnsureLocalBranch( m );
             }

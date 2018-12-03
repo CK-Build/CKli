@@ -286,10 +286,14 @@ namespace CK.Env.MSBuild
                     var localDepsToBuild = rankedProjects
                                                 .Where( p => p.Project.IsPublished )
                                                 .ToArray();
+                    if( localDepsToBuild.Length == 0 )
+                    {
+                        return new BuildProjectsInfo( rBuildProjects, null, null );
+                    }
                     var localDepsName = new HashSet<string>( localDepsToBuild.Select( d => d.Project.Project.Name ) );
 
                     var projectsToUpgrade = rankedProjects.Where( p => p.Project.Project.Deps.Packages.Any() )
-                                                          .Select( p => (
+                                                            .Select( p => (
                                                                     Project: p.Project,
                                                                     Packages: (IReadOnlyList<IDependentPackage>)p.Project.Project
                                                                                 .Deps.Packages
@@ -297,8 +301,7 @@ namespace CK.Env.MSBuild
                                                                                 .Select( a => _packages[a.PackageId] )
                                                                                 .ToArray()
                                                                         ) )
-                                                          .ToArray();
-
+                                                            .ToArray();
                     return new BuildProjectsInfo( rBuildProjects, localDepsToBuild, projectsToUpgrade );
                 }
             }

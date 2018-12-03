@@ -11,15 +11,19 @@ namespace CK.Env
     /// <summary>
     /// Implementation of a local <see cref="IWorldStore"/> in a directory on the file system.
     /// Worlds are stored as simple xml document that contains their description.
-    /// Their state are stored nearby them (suffixed by "-State").
+    /// Their state are stored (suffixed by "-State") in the world directory mapped ny a <see cref="ILocalWorldRootPathMapping"/>.
     /// </summary>
     public class LocalWorldStore : IWorldStore
     {
         readonly NormalizedPath _directoryPath;
+        readonly ILocalWorldRootPathMapping _localWorldRootPathMapping;
 
-        public LocalWorldStore( string directoryPath )
+        public LocalWorldStore( string directoryPath, ILocalWorldRootPathMapping localWorldRootPathMapping )
         {
+            if( String.IsNullOrWhiteSpace( directoryPath ) ) throw new ArgumentNullException( nameof( directoryPath ) );
+            if( localWorldRootPathMapping == null ) throw new ArgumentNullException( nameof( localWorldRootPathMapping ) );
             _directoryPath = Path.GetFullPath( Environment.ExpandEnvironmentVariables( directoryPath ) );
+            _localWorldRootPathMapping = localWorldRootPathMapping;
         }
 
         LocalWorldName ToLocal( IWorldName w )
@@ -30,7 +34,7 @@ namespace CK.Env
 
         string ToStateFilePath( IWorldName w )
         {
-            var p = ToLocal( w ).FilePath;
+            var p = ToLocal( w ).XmlDescriptionFilePath;
             p = p.Substring( 0, p.Length - 4 );
             return p + "-State.xml";
         }
@@ -45,7 +49,7 @@ namespace CK.Env
             var path = _directoryPath.AppendPart( wName + "-World.xml" );
             if( !File.Exists( path ) ) 
             {
-                var w = new LocalWorldName( path, name, ltsKey );
+                var w = new LocalWorldName( path, name, ltsKey, _localWorldRootPathMapping );
                 if( !WriteWorldDescription( m, w, content ) )
                 {
                     m.Error( $"Unable to create {wName} world." );
@@ -60,7 +64,7 @@ namespace CK.Env
         public IReadOnlyList<IWorldName> ReadWorlds( IActivityMonitor m )
         {
             return Directory.GetFiles( _directoryPath, "*-World.xml" )
-                                .Select( p => LocalWorldName.Parse( m, p ) )
+                                .Select( p => LocalWorldName.Parse( m, p, _localWorldRootPathMapping ) )
                                 .Where( w => w != null )
                                 .ToList();
         }
@@ -83,13 +87,13 @@ namespace CK.Env
 
         public XDocument ReadWorldDescription( IActivityMonitor m, IWorldName w )
         {
-            return XDocument.Load( ToLocal( w ).FilePath );
+            return XDocument.Load( ToLocal( w ).XmlDescriptionFilePath );
         }
 
         public bool WriteWorldDescription( IActivityMonitor m, IWorldName w, XDocument content )
         {
             if( content == null ) throw new ArgumentNullException( nameof( content ) );
-            content.Save( ToLocal( w ).FilePath );
+            content.Save( ToLocal( w ).XmlDescriptionFilePath );
             return true;
         }
     }

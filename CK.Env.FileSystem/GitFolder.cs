@@ -532,7 +532,7 @@ namespace CK.Env
             {
                 var message = _git.Head.Tip.Message;
                 if( editMessage != null ) message = editMessage( message );
-                if( editMessage == null )
+                if( message == null )
                 {
                     m.Info( "Canceled by empty message." );
                     return new CommitResult( false, false );
@@ -656,6 +656,7 @@ namespace CK.Env
                         m.Error( $"Unable to find branch '{World.DevelopBranchName}'." );
                         return false;
                     }
+                    MergeFileFavor mergeFileFavor;
                     Branch local = _git.Branches[World.LocalBranchName];
                     if( local == null || !local.IsCurrentRepositoryHead )
                     {
@@ -678,12 +679,17 @@ namespace CK.Env
                             local = _git.CreateBranch( World.LocalBranchName );
                         }
                         Commands.Checkout( _git, local );
+                        mergeFileFavor = MergeFileFavor.Theirs;
                     }
-                    else m.Trace( $"Already on {World.LocalBranchName}." );
-
+                    else
+                    {
+                        m.Trace( $"Already on {World.LocalBranchName}. Privilegiating 'Ours' files when merging." );
+                        mergeFileFavor = MergeFileFavor.Ours;
+                    }
                     var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
                     var r = _git.Merge( develop, merger, new MergeOptions
                     {
+                        MergeFileFavor = mergeFileFavor,
                         FastForwardStrategy = FastForwardStrategy.NoFastForward,
                         CommitOnSuccess = true,
                         FailOnConflict = true
