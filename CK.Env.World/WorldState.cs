@@ -18,7 +18,6 @@ namespace CK.Env
         readonly IWorldStore _store;
         readonly IDependentSolutionContextLoader _solutionContextLoader;
         readonly ILocalFeedProvider _localFeedProvider;
-        readonly ILocalBuildProjectZeroBuilder _buildProjectZeroBuilder;
         readonly List<ISolutionDriver> _solutionDrivers;
         readonly Dictionary<string,ISolutionDriver> _cacheBySolutionName;
         readonly List<IGitRepository> _gitRepositories;
@@ -32,23 +31,21 @@ namespace CK.Env
         /// </summary>
         /// <param name="store">The store. Can not be null.</param>
         /// <param name="solutionContextLoader">Loader of solution dependency context.</param>
+        /// <param name="localFeedProvider">Local feed provider.</param>
         public WorldState(
             CommandRegister commandRegister,
             IWorldStore store,
             IWorldName worldName,
             IDependentSolutionContextLoader solutionContextLoader,
-            ILocalFeedProvider localFeedProvider,
-            ILocalBuildProjectZeroBuilder buildProjectZeroBuilder )
+            ILocalFeedProvider localFeedProvider )
         {
             if( store == null ) throw new ArgumentNullException( nameof( store ) );
             if( worldName == null ) throw new ArgumentNullException( nameof( worldName ) );
             if( solutionContextLoader == null ) throw new ArgumentNullException( nameof( solutionContextLoader ) );
-            if( buildProjectZeroBuilder == null ) throw new ArgumentNullException( nameof( buildProjectZeroBuilder ) );
             _store = store;
             WorldName = worldName;
             _solutionContextLoader = solutionContextLoader;
             _localFeedProvider = localFeedProvider;
-            _buildProjectZeroBuilder = buildProjectZeroBuilder;
             Debug.Assert( ((int[])Enum.GetValues( typeof( GlobalWorkStatus ) )).SequenceEqual( Enumerable.Range( 0, 8 ) ) );
             _roWorkState = new XElement[8];
             _solutionDrivers = new List<ISolutionDriver>();

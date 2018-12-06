@@ -331,33 +331,6 @@ namespace CK.Env
             return true;
         }
 
-        /// <summary>
-        /// Applies a diff to this file system.
-        /// </summary>
-        /// <param name="m">The monitor.</param>
-        /// <param name="diff">The computed diff.</param>
-        /// <returns>True on success, false on error (error is logged into the monitor).</returns>
-        public bool ApplyDiff( IActivityMonitor m, FileProviderContentInfo.DiffResult diff )
-        {
-            if( diff.Origin.FileProvider != this ) throw new ArgumentException( "Originated from another file provider.", nameof( diff ) );
-            if( diff.HasCaseConflicts ) throw new ArgumentException( "Case conflicts must be resolved first.", nameof( diff ) );
-            foreach( var d in diff.Differences )
-            {
-                switch( d.Status )
-                {
-                    case FileProviderContentInfo.FileDiffStatus.ShouldCreate:
-                    case FileProviderContentInfo.FileDiffStatus.ShouldUpdate:
-                        if( !CopyTo( m, d.Other, diff.Origin.Root.Combine( d.Path ) ) ) return false;
-                        break;
-                    default:
-                        Debug.Assert( d.Status == FileProviderContentInfo.FileDiffStatus.ShouldDelete );
-                        if( !Delete( m, diff.Origin.Root.Combine( d.Path ) ) ) return false;
-                        break;
-                }
-            }
-            return true;
-        }
-
 
         /// <summary>
         /// Helper that deletes a local directory (with linear timed retries).

@@ -7,17 +7,15 @@ using System.Text;
 using CK.Env;
 using Microsoft.Extensions.FileProviders;
 using CK.Text;
-using CK.Env.Analysis;
 
 namespace CKli
 {
     [XName( "File" )]
     [XName( "Folder" )]
-    public class XPathItem : XRunnable
+    public class XPathItem : XTypedObject
     {
         IFileInfo _fileInfo;
         IDirectoryContents _contents;
-        FileProviderContentInfo _contentInfo;
 
         public XPathItem(
             Initializer initializer,
@@ -96,18 +94,6 @@ namespace CKli
         /// Gets the <see cref="IDirectoryContents"/> or null if <see cref="IsFolder"/> is false.
         /// </summary>
         public IDirectoryContents DirectoryContents => _contents ?? (_contents = FileInfo.IsDirectory ? FileSystem.GetDirectoryContents( FullPath ) : null);
-
-        /// <summary>
-        /// Gets the full <see cref="FileProviderContentInfo"/> of this item in <see cref="FileSystem"/>.
-        /// </summary>
-        public FileProviderContentInfo ContentInfo => _contentInfo ?? (_contentInfo = new FileProviderContentInfo( FileSystem, FullPath ));
-
-        protected override void Reset( IRunContext ctx )
-        {
-            _fileInfo = null;
-            _contents = null;
-            _contentInfo = null;
-        }
 
         public override string ToString() => FullPath;
     }

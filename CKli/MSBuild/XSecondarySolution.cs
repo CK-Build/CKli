@@ -5,7 +5,6 @@ using System.IO;
 using System.Text;
 using CK.Core;
 using CK.Env.MSBuild;
-using CK.Env.Analysis;
 using CK.Text;
 using System.Linq;
 

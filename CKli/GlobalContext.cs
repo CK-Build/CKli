@@ -1,6 +1,5 @@
 using CK.Core;
 using CK.Env;
-using CK.Env.Analysis;
 using CK.Text;
 using System;
 using System.Collections.Generic;

@@ -1,6 +1,5 @@
 using CK.Core;
 using CK.Env;
-using CK.Env.Analysis;
 using LibGit2Sharp;
 using LibGit2Sharp.Handlers;
 using System;

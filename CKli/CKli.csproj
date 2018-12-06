@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net461</TargetFramework>
@@ -30,6 +30,9 @@
 
   <ItemGroup>
     <Compile Remove="XExternalPackagesAction.cs" />
+    <Compile Remove="XGlobalDependencyAction.cs" />
+    <Compile Remove="XKnownPackageDependencies.cs" />
+    <Compile Remove="XKnownPackageVersions.cs" />
   </ItemGroup>
   
 </Project>

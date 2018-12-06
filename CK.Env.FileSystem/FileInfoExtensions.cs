@@ -57,36 +57,6 @@ namespace CK.Env
             }
         }
 
-        /// <summary>
-        /// Checks content equality. This <see cref="IFileInfo"/> and <paramref name="file"/>
-        /// must both be actual files, not directories.
-        /// </summary>
-        /// <param name="this">This file info.</param>
-        /// <param name="file">The file to check.</param>
-        /// <returns>True of the files have exactly the same content, false otherwise.</returns>
-        public static bool ContentEquals( this IFileInfo @this, IFileInfo file )
-        {
-            if( @this.IsDirectory ) throw new ArgumentException( "Must be a file.", nameof( @this ) );
-            if( file == null ) throw new ArgumentNullException( nameof( file ) );
-            if( file.IsDirectory ) throw new ArgumentException( "Must be a file.", nameof( file ) );
-            if( @this.Length != file.Length ) return false;
-            using( var s = @this.CreateReadStream() )
-            using( var d = file.CreateReadStream() )
-            {
-                return ContentEquals( s, d );
-            }
-        }
-
-        public static bool ContentEquals( Stream s1, Stream s2 )
-        {
-            int read;
-            for(; ; )
-            {
-                if( s1.ReadByte() != (read = s2.ReadByte()) ) return false;
-                if( read == -1 ) return true;
-            }
-        }
-
         static string[] _textExtensions = new string[]
         {
             ".txt",
