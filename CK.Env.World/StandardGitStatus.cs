@@ -13,23 +13,28 @@ namespace CK.Env
     /// Any other configurations results in a <see cref="Unknwon"/> status and when a world or a repository
     /// is in this unknown status some operations cannot be done.
     /// </summary>
+    [Flags]
     public enum StandardGitStatus
     {
         /// <summary>
         /// Unknow status.
         /// </summary>
-        Unknwon,
+        Unknwon = 0,
 
         /// <summary>
         /// On <see cref="IWorldName.LocalBranchName"/>.
         /// </summary>
-        LocalBranch,
+        LocalBranch = 1,
 
         /// <summary>
         /// On <see cref="IWorldName.DevelopBranchName"/>.
         /// </summary>
-        DevelopBranch
+        DevelopBranch = 2,
 
+        /// <summary>
+        /// On local or develop branch.
+        /// </summary>
+        DevelopOrLocalBranch = LocalBranch|DevelopBranch
     }
 
 }

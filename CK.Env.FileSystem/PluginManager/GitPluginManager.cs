@@ -151,12 +151,16 @@ namespace CK.Env
             public void Reload()
             {
                 if( _pluginCount != 0 ) Reset();
+                // Collects the settings.
+                var updatedMappings = new Dictionary<Type, object>( _mappings ); 
                 _pluginCount = _manager._registry.FillMappings(
-                                                    _mappings,
+                                                    updatedMappings,
                                                     ServiceContainer,
                                                     _manager._commandRegister,
                                                     BranchName,
                                                     BranchName != null ? _manager._defaultBranchName : null );
+                _mappings.Clear();
+                _mappings.AddRange( updatedMappings );
             }
 
             public void Dispose() => Reset();

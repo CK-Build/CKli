@@ -197,6 +197,8 @@ namespace CK.Env.MSBuild
             bool IDependentItemRef.Optional => false;
 
             object IDependentItem.StartDependencySort( IActivityMonitor m ) => _p;
+
+            public override string ToString() => _p.ToString();
         }
 
         DependencyAnalyser(
@@ -275,34 +277,49 @@ namespace CK.Env.MSBuild
                 if( !rBuildProjects.IsComplete )
                 {
                     rBuildProjects.LogError( m );
-                    return new BuildProjectsInfo( rBuildProjects, null, null );
+                    return new BuildProjectsInfo( rBuildProjects, null, null, null );
                 }
                 else
                 {
                     var rankedProjects = rBuildProjects.SortedItems
                                                 .Where( i => i.Item is IDependentProject )
-                                                .Select( i => (Rank: i.Rank, Project: (IDependentProject)i.Item) );
+                                                .Select( i => (i.Rank, Project: (IDependentProject)i.Item) );
 
                     var localDepsToBuild = rankedProjects
                                                 .Where( p => p.Project.IsPublished )
                                                 .ToArray();
                     if( localDepsToBuild.Length == 0 )
                     {
-                        return new BuildProjectsInfo( rBuildProjects, null, null );
+                        return new BuildProjectsInfo( rBuildProjects, null, null, null );
                     }
                     var localDepsName = new HashSet<string>( localDepsToBuild.Select( d => d.Project.Project.Name ) );
 
-                    var projectsToUpgrade = rankedProjects.Where( p => p.Project.Project.Deps.Packages.Any() )
-                                                            .Select( p => (
-                                                                    Project: p.Project,
+                    var projectsToUpgrade = rankedProjects.Select( p => (
+                                                                    p.Project,
                                                                     Packages: (IReadOnlyList<IDependentPackage>)p.Project.Project
                                                                                 .Deps.Packages
                                                                                 .Where( a => localDepsName.Contains( a.PackageId ) )
                                                                                 .Select( a => _packages[a.PackageId] )
                                                                                 .ToArray()
                                                                         ) )
+                                                            .Where( pU => pU.Packages.Count > 0 )
                                                             .ToArray();
-                    return new BuildProjectsInfo( rBuildProjects, localDepsToBuild, projectsToUpgrade );
+
+                    var zeroBuildProjects = rankedProjects.Select( p => new ZeroBuildProjectInfo(
+                                                                        p.Rank,   
+                                                                        p.Project.Project.Solution.UniqueSolutionName,
+                                                                        p.Project.Project.Name,
+                                                                        p.Project.IsPublished,
+                                                                        p.Project.Project.Deps.Packages
+                                                                                .Select( a => a.PackageId )
+                                                                                .Where( name => localDepsName.Contains( name ) )
+                                                                                .ToArray()
+                                                                        ) )
+                                                            .ToArray();
+
+                    Debug.Assert( zeroBuildProjects.Select( z => z.Rank ).IsSortedLarge() );
+
+                    return new BuildProjectsInfo( rBuildProjects, localDepsToBuild, projectsToUpgrade, zeroBuildProjects );
                 }
             }
             finally

@@ -23,7 +23,7 @@ namespace CK.Env.Tests
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister ) )
             {
                 fs.GetDirectoryContents( "" ).Select( f => $"{f.Name} - {f.IsDirectory}" )
-                .Should().Contain( "KnownWorld.xml - False" )
+                .Should().Contain( "Test.xml - False" )
                         .And.Contain( "TestGitRepository - True" )
                         .And.Contain( "SubDir - True" )
                         .And.Contain( "EmptyDir - True" );
@@ -143,6 +143,127 @@ namespace CK.Env.Tests
         }
 
         [Test]
+        public void GitFolder_CheckCleanCommit_detects_new_deleted_and_modified_files()
+        {
+            var w = new World();
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister ) )
+            {
+                var git = fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository" );
+                git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
+                git.CurrentBranchName.Should().Be( "master" );
+
+                var gitRoot = git.SubPath.AppendPart( "branches" ).AppendPart( "master" );
+
+                // Detecting New file.
+                fs.CopyTo( TestHelper.Monitor, "newFile", gitRoot.AppendPart( "new.txt" ) );
+                git.CheckCleanCommit( TestHelper.Monitor ).Should().BeFalse();
+                // Restoring 
+                fs.Delete( TestHelper.Monitor, gitRoot.AppendPart( "new.txt" ) );
+                git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
+
+                var savedMasterContent = fs.GetFileInfo( gitRoot.AppendPart( "master.txt" ) ).AsTextFileInfo().TextContent;
+                // Detecting Deleted file.
+                fs.Delete( TestHelper.Monitor, gitRoot.AppendPart( "master.txt" ) );
+                git.CheckCleanCommit( TestHelper.Monitor ).Should().BeFalse();
+                // Restoring 
+                fs.CopyTo( TestHelper.Monitor, savedMasterContent, gitRoot.AppendPart( "master.txt" ) );
+                git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
+
+                // Detecting Modified file.
+                fs.CopyTo( TestHelper.Monitor, "paf!", gitRoot.AppendPart( "master.txt" ) );
+                git.CheckCleanCommit( TestHelper.Monitor ).Should().BeFalse();
+                // Restoring 
+                fs.CopyTo( TestHelper.Monitor, savedMasterContent, gitRoot.AppendPart( "master.txt" ) );
+                git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
+            }
+        }
+
+
+        [Test]
+        public void GitFolder_OpenProtectedScope_recursively_protects_working_directory()
+        {
+            var w = new World();
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister ) )
+            {
+                var git = fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository" );
+                var gitRoot = git.SubPath.AppendPart( "branches" ).AppendPart( "master" );
+
+                // From a clean working directory.
+                void FromACleanWorkingDirectory()
+                {
+                    git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
+
+                    using( git.OpenProtectedScope( TestHelper.Monitor ) )
+                    {
+                        // Adds a New file.
+                        fs.CopyTo( TestHelper.Monitor, "stuff...", gitRoot.AppendPart( "newFile.txt" ) );
+
+                        // Removes an existing file.
+                        fs.Delete( TestHelper.Monitor, gitRoot.AppendPart( "master.txt" ) );
+
+                        // Modifies an existing file.
+                        // Use a Guid since when reusing this test (in depth) we may reach the same content as
+                        // a parent.
+                        fs.CopyTo( TestHelper.Monitor, Guid.NewGuid().ToString(), gitRoot.Combine( "c/c2.txt" ) );
+
+                        git.CheckCleanCommit( TestHelper.Monitor ).Should().BeFalse();
+                    }
+
+                    git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
+                }
+
+                FromACleanWorkingDirectory();
+
+                // From a working directory with a modified file that is temporarily removed.
+                void WithAModifiedFileThatIsTemporarilyRemoved( Action subTest )
+                {
+                    git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
+
+                    var savedMasterContent = fs.GetFileInfo( gitRoot.AppendPart( "master.txt" ) ).AsTextFileInfo()?.TextContent;
+                    fs.CopyTo( TestHelper.Monitor, $"master is dirty. {Guid.NewGuid().ToString()}", gitRoot.AppendPart( "master.txt" ) );
+
+                    using( git.OpenProtectedScope( TestHelper.Monitor ) )
+                    {
+                        git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
+
+                        subTest?.Invoke();
+
+                        // Adds a New file.
+                        fs.CopyTo( TestHelper.Monitor, "stuff...", gitRoot.AppendPart( "newFile.txt" ) );
+
+                        // Removes the existing master.txt file.
+                        fs.Delete( TestHelper.Monitor, gitRoot.AppendPart( "master.txt" ) );
+
+                        // Modifies an existing file.
+                        fs.CopyTo( TestHelper.Monitor, Guid.NewGuid().ToString(), gitRoot.Combine( "c/c2.txt" ) );
+
+                        git.CheckCleanCommit( TestHelper.Monitor ).Should().BeFalse();
+
+                        using( git.OpenProtectedScope( TestHelper.Monitor ) )
+                        {
+                            subTest?.Invoke();
+                        }
+                    }
+                    git.CheckCleanCommit( TestHelper.Monitor ).Should().BeFalse();
+
+                    if( savedMasterContent != null ) fs.CopyTo( TestHelper.Monitor, savedMasterContent, gitRoot.AppendPart( "master.txt" ) );
+                    else fs.Delete( TestHelper.Monitor, gitRoot.AppendPart( "master.txt" ) );
+
+                    git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
+                }
+
+                WithAModifiedFileThatIsTemporarilyRemoved( null );
+                WithAModifiedFileThatIsTemporarilyRemoved( FromACleanWorkingDirectory );
+
+                git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
+                WithAModifiedFileThatIsTemporarilyRemoved( () => WithAModifiedFileThatIsTemporarilyRemoved( FromACleanWorkingDirectory ) );
+                git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
+
+            }
+        }
+
+
+        [Test]
         public void FileSystem_remotes_contains_the_remote_branches()
         {
             var w = new World();
@@ -173,6 +294,9 @@ namespace CK.Env.Tests
             }
         }
 
+        /// <summary>
+        /// Issue; https://github.com/aspnet/AspNetCore/issues/2891
+        /// </summary>
         [Test]
         public void standard_physical_file_provider_is_full_of_surprises()
         {
@@ -190,7 +314,7 @@ namespace CK.Env.Tests
 
 
         [Test]
-        public void when_the_branch_is_thecurrent_one_we_have_access_to_the_physical_files()
+        public void when_the_branch_is_the_current_one_we_have_access_to_the_physical_files()
         {
             var w = new World();
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister ) )

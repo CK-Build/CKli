@@ -27,8 +27,8 @@ namespace CK.Env.Tests
         }
 
         /// <summary>
-        /// Gets a small world: that contains one Git repository (), a copy of the
-        /// solution KnownWorld.xml a directory with a copy of this file int it and
+        /// Gets a small world: that contains one Git repository (https://github.com/SimpleGitVersion/TestGitRepository.git)
+        /// in the folder "TestGitRepository", a "Test.xml" file and directory with a copy of this file in it and
         /// an empty directory.
         /// </summary>
         public static NormalizedPath WorldFolder
@@ -59,7 +59,7 @@ namespace CK.Env.Tests
                         // Fetch fails. We don't care.
                         Console.WriteLine( "Warning: Fetching the TestGitRepository (https://github.com/SimpleGitVersion/TestGitRepository.git) failed. Check the internet connection. Error: {0}.", ex.Message );
                     }
-                    File.Copy( TestHelper.SolutionFolder.AppendPart( "KnownWorld.xml" ), WorldFolder.AppendPart( "KnownWorld.xml" ), true );
+                    File.WriteAllText( _worldFolder + "/Test.xml", "<Content>Test.xml</Content>" );
                     Directory.CreateDirectory( _worldFolder + "/SubDir" );
                     File.Copy( ThisFile(), _worldFolder + "/SubDir/Text.txt", true );
                     Directory.CreateDirectory( _worldFolder + "/EmptyDir" );

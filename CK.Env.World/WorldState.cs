@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Text;
+using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -16,8 +17,10 @@ namespace CK.Env
     {
         readonly IWorldStore _store;
         readonly IDependentSolutionContextLoader _solutionContextLoader;
+        readonly ILocalFeedProvider _localFeedProvider;
         readonly ILocalBuildProjectZeroBuilder _buildProjectZeroBuilder;
         readonly List<ISolutionDriver> _solutionDrivers;
+        readonly Dictionary<string,ISolutionDriver> _cacheBySolutionName;
         readonly List<IGitRepository> _gitRepositories;
         RawXmlWorldState _rawState;
         Roadmap _roadMap;
@@ -28,12 +31,13 @@ namespace CK.Env
         /// Initializes a new WorldState.
         /// </summary>
         /// <param name="store">The store. Can not be null.</param>
-        /// <param name="solutionContextLoader">Loader of solution dependecy context.</param>
+        /// <param name="solutionContextLoader">Loader of solution dependency context.</param>
         public WorldState(
             CommandRegister commandRegister,
             IWorldStore store,
             IWorldName worldName,
             IDependentSolutionContextLoader solutionContextLoader,
+            ILocalFeedProvider localFeedProvider,
             ILocalBuildProjectZeroBuilder buildProjectZeroBuilder )
         {
             if( store == null ) throw new ArgumentNullException( nameof( store ) );
@@ -43,13 +47,15 @@ namespace CK.Env
             _store = store;
             WorldName = worldName;
             _solutionContextLoader = solutionContextLoader;
+            _localFeedProvider = localFeedProvider;
             _buildProjectZeroBuilder = buildProjectZeroBuilder;
             Debug.Assert( ((int[])Enum.GetValues( typeof( GlobalWorkStatus ) )).SequenceEqual( Enumerable.Range( 0, 8 ) ) );
             _roWorkState = new XElement[8];
             _solutionDrivers = new List<ISolutionDriver>();
+            _cacheBySolutionName = new Dictionary<string, ISolutionDriver>();
             _gitRepositories = new List<IGitRepository>();
 
-            CommandProviderName = "Solutions";
+            CommandProviderName = "World";
             commandRegister.Register( this );
         }
 
@@ -120,7 +126,7 @@ namespace CK.Env
                 _rawState.Document.Changed += RawStateChanged;
             }
             if( !force.HasValue ) force = NoCache;
-            if( _solutionDrivers.Count > 0 && !force.Value ) return false;
+            if( _solutionDrivers.Count > 0 && !force.Value ) return true;
             return RunSafe( monitor, "Initializing World.", ( m, error ) =>
             {
                 var ev = new InitializingEventArgs( monitor );
@@ -144,6 +150,7 @@ namespace CK.Env
                     }
                 }
                 while( again );
+                _cacheBySolutionName.Clear();
                 _solutionDrivers.Clear();
                 _solutionDrivers.AddRange( ev.SolutionsDrivers );
                 _gitRepositories.Clear();
@@ -159,6 +166,42 @@ namespace CK.Env
         /// </summary>
         public IReadOnlyList<ISolutionDriver> SolutionDrivers => _solutionDrivers;
 
+        /// <summary>
+        /// Finds the <see cref="ISolutionDriver"/> given a branch and a solution name that can be
+        /// a primary or a secondary solution.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="uniqueSolutionName">Solution name.</param>
+        /// <param name="branchName">Branch name.</param>
+        /// <param name="throwOnNotFound">True to throw an InvalidOperatioException instead of returning null.</param>
+        /// <returns>The driver or null if not found.</returns>
+        public ISolutionDriver FindSolutionDriver( IActivityMonitor monitor, string uniqueSolutionName, string branchName, bool throwOnNotFound = false )
+        {
+            if( String.IsNullOrWhiteSpace( uniqueSolutionName ) ) throw new ArgumentNullException( nameof( uniqueSolutionName ) );
+            if( String.IsNullOrWhiteSpace( branchName)) throw new ArgumentNullException( nameof( branchName ) );
+            if( !_cacheBySolutionName.TryGetValue( uniqueSolutionName, out var driver ) )
+            {
+                string primary = uniqueSolutionName;
+                int idx = uniqueSolutionName.IndexOf( '/' );
+                if( idx == 0 ) throw new ArgumentException( "Invalid solution name.", nameof( uniqueSolutionName ) );
+                if( idx > 0 ) primary = uniqueSolutionName.Substring( 0, idx );
+                driver = _solutionDrivers.FirstOrDefault( d => d.BranchName == branchName && d.GitRepository.PrimarySolutionName == primary );
+                if( driver != null )
+                {
+                    Debug.Assert( driver.GetSolutionNames( monitor ).Contains( primary ) );
+                    foreach( var n in driver.GetSolutionNames( monitor ) )
+                    {
+                        _cacheBySolutionName.Add( n, driver );
+                    }
+                }
+                else if( throwOnNotFound )
+                {
+                    throw new InvalidOperationException( $"Unable to find driver for '{uniqueSolutionName}' in branch {branchName}." );
+                }
+            }
+            return driver;
+        }
+
         bool RunSafe( IActivityMonitor m, string message, Action<IActivityMonitor, Func<bool>> action )
         {
             bool result = true;
@@ -171,9 +214,10 @@ namespace CK.Env
                 }
                 catch( Exception ex )
                 {
-                    m.Error( $"Executing: {message}", ex );
+                    m.Error( $"Executing: {message}", ex is System.Reflection.TargetInvocationException t ? t.InnerException : ex );
                 }
                 if( !result ) m.CloseGroup( "Failed." );
+                GetGlobalGitStatus( m, false );
             }
             return result;
         }
@@ -188,12 +232,13 @@ namespace CK.Env
         public StandardGitStatus GetGlobalGitStatus( IActivityMonitor monitor, bool? forceInitialize = null )
         {
             _cachedGlobalGitStatus = StandardGitStatus.Unknwon;
-            if( !Initialize( monitor, forceInitialize ) || _gitRepositories.Count == 0 ) return _cachedGlobalGitStatus;
-            foreach( var r in _gitRepositories )
+            if( Initialize( monitor, forceInitialize ) && _gitRepositories.Count > 0 )
             {
-                if( r.StandardGitStatus == StandardGitStatus.Unknwon ) return _cachedGlobalGitStatus = StandardGitStatus.Unknwon;
-                if( _cachedGlobalGitStatus == StandardGitStatus.Unknwon ) _cachedGlobalGitStatus = r.StandardGitStatus;
-                else if( _cachedGlobalGitStatus != r.StandardGitStatus ) return _cachedGlobalGitStatus = StandardGitStatus.Unknwon;
+                foreach( var r in _gitRepositories )
+                {
+                    if( r.StandardGitStatus == StandardGitStatus.Unknwon ) return _cachedGlobalGitStatus = StandardGitStatus.Unknwon;
+                    _cachedGlobalGitStatus |= r.StandardGitStatus;
+                }
             }
             return _cachedGlobalGitStatus;
         }
@@ -217,6 +262,7 @@ namespace CK.Env
             }
             return true;
         }
+
 
         /// <summary>
         /// Gets the global status previously computed by <see cref="GetGlobalGitStatus(IActivityMonitor)"/>.
@@ -271,7 +317,8 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets whether the <see cref="WorkStatus"/> is not <see cref="GlobalWorkStatus.Idle"/> nor <see cref="GlobalWorkStatus.WaitingReleaseConfirmation"/>.
+        /// Gets whether the <see cref="WorkStatus"/> is not <see cref="GlobalWorkStatus.Idle"/>
+        /// nor <see cref="GlobalWorkStatus.WaitingReleaseConfirmation"/>.
         /// </summary>
         public bool IsConcludeCurrentWorkEnabled => IsInitialized
                                                     && WorkStatus != GlobalWorkStatus.Idle
@@ -301,27 +348,24 @@ namespace CK.Env
 
         /// <summary>
         /// Gets whether <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/> and <see cref="CachedGlobalGitStatus"/>
-        /// is not already on <see cref="StandardGitStatus.LocalBranch"/>.
+        /// is not <see cref="StandardGitStatus.Unknwon"/> (ie. all branches are either 'local' or 'develop').
         /// </summary>
         public bool CanSwitchToLocal => IsInitialized
                                         && WorkStatus == GlobalWorkStatus.Idle
-                                        && CachedGlobalGitStatus != StandardGitStatus.LocalBranch;
+                                        && CachedGlobalGitStatus != StandardGitStatus.Unknwon;
 
         /// <summary>
         /// Switches from develop to local branch.
         /// Must throw an <see cref="InvalidOperationException"/> if <see cref="CanSwitchToLocal"/> is false.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="compactCommitMode">Compact commit mode.</param>
         /// <returns>True on success, false on error.</returns>
         [CommandMethod]
-        public bool SwitchToLocal( IActivityMonitor monitor, bool compactCommitMode = true )
+        public bool SwitchToLocal( IActivityMonitor monitor )
         {
             if( !CanSwitchToLocal ) throw new InvalidOperationException( nameof( CanSwitchToLocal ) );
-            if( GetGlobalGitStatus( monitor ) == StandardGitStatus.LocalBranch ) return true;
-            SetWorkStatus( GlobalWorkStatus.SwitchingToLocal );
-            GetWorkState( GlobalWorkStatus.SwitchingToLocal ).SetAttributeValue( "CompactCommitMode", compactCommitMode );
-            if( !Save( monitor ) ) return false;
+            if( !CheckGlobalGitStatus( monitor, StandardGitStatus.Unknwon, not: true ) ) return false;
+            if( !SetWorkStatusAndSave( monitor, GlobalWorkStatus.SwitchingToLocal ) ) return false;
             return DoSwitchToLocal( monitor );
         }
 
@@ -344,30 +388,100 @@ namespace CK.Env
             } );
         }
 
+        /// <summary>
+        /// Gets whether <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/> and <see cref="CachedGlobalGitStatus"/>
+        /// is on <see cref="StandardGitStatus.LocalBranch"/>.
+        /// </summary>
         public bool CanLocalFixToZeroBuildProjects => IsInitialized
                                                       && WorkStatus == GlobalWorkStatus.Idle
-                                                      && CachedGlobalGitStatus == StandardGitStatus.LocalBranch;
+                                                      && (CachedGlobalGitStatus == StandardGitStatus.LocalBranch
+                                                          || CachedGlobalGitStatus == StandardGitStatus.DevelopBranch);
 
+        /// <summary>
+        /// Fix dependency issues among build projects.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <returns>True on success, false on error.</returns>
         [CommandMethod]
         public bool LocalFixToZeroBuildProjects( IActivityMonitor monitor )
         {
             Debug.Assert( WorkStatus == GlobalWorkStatus.Idle );
-            if( !CheckGlobalGitStatus( monitor, StandardGitStatus.LocalBranch ) ) return false;
-            return RunSafe( monitor, $"Fixing Build projects, using ZeroVersion in {WorldName.LocalBranchName}.", ( m, error ) =>
+            var s = GetGlobalGitStatus( monitor, NoCache );
+            string branchName;
+            if( s == StandardGitStatus.LocalBranch ) branchName = WorldName.LocalBranchName;
+            else if( s == StandardGitStatus.DevelopBranch ) branchName = WorldName.DevelopBranchName;
+            else
             {
-                var depContext = _solutionContextLoader.Load( m, _gitRepositories, WorldName.LocalBranchName, NoCache );
+                monitor.Error( $"Repositories must all be on '{WorldName.LocalBranchName}' or '{WorldName.DevelopBranchName}'." );
+                return false;
+            }
+            return RunSafe( monitor, $"Fixing Build projects, using ZeroVersion in {branchName}.", ( m, error ) =>
+            {
+                var depContext = _solutionContextLoader.Load( m, _gitRepositories, branchName, NoCache );
                 if( depContext == null ) return;
-                if( !_buildProjectZeroBuilder.LocalZeroBuildProjects( m, depContext ) ) return;
+
+                if( depContext.ZeroBuildProjects.Count == 0 )
+                {
+                    m.Info( "There is no Build Project dependency issue in this world." );
+                    return;
+                }
+
+                var packageNames = depContext.ZeroBuildProjects.Where( p => p.MustPack ).Select( p => p.ProjectName );
+                var packageNamesText = packageNames.Concatenate();
+
+                using( m.OpenInfo( $"Removing {packageNamesText} packages ZeroVersion from local NuGet cache if they exist." ) )
+                {
+                    foreach( var pName in packageNames )
+                    {
+                        _localFeedProvider.RemoveFromNuGetCache( m, pName, SVersion.ZeroVersion );
+                    }
+                }
+
+                using( m.OpenInfo( $"Building ZeroVersion projects." ) )
+                {
+                    foreach( var p in depContext.ZeroBuildProjects )
+                    {
+                        var driver = FindSolutionDriver( monitor, p.SolutionName, branchName, throwOnNotFound: true );
+                        if( !driver.ZeroBuildProject( m, p ) ) return;
+                    }
+                }
             } );
         }
 
         /// <summary>
         /// Gets whether <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/> and <see cref="CachedGlobalGitStatus"/>
-        /// is not on <see cref="StandardGitStatus.DevelopBranch"/>.
+        /// is on <see cref="StandardGitStatus.LocalBranch"/>.
+        /// </summary>
+        public bool CanBuildAllLocal => WorkStatus == GlobalWorkStatus.Idle
+                                        && CachedGlobalGitStatus == StandardGitStatus.LocalBranch;
+
+        [CommandMethod]
+        public bool BuildAllLocal( IActivityMonitor monitor, bool withUnitTest = true )
+        {
+            if( !CanBuildAllLocal ) throw new InvalidOperationException( nameof( CanBuildAllLocal ) );
+            if( !CheckGlobalGitStatus( monitor, StandardGitStatus.LocalBranch ) ) return false;
+            return RunSafe( monitor, $"Local build.", ( m, error ) =>
+            {
+                var depContext = _solutionContextLoader.Load( m, _gitRepositories, WorldName.LocalBranchName, NoCache );
+                if( depContext == null ) return;
+                foreach( var s in depContext.Solutions )
+                {
+                    depContext.LogSolutions( m, s );
+                    var d = s.GetSolutionDriver( m );
+                    if( d == null ) return;
+
+                    if( !d.LocalBuild( m, true, withUnitTest ) ) return;
+                }
+            } );
+        }
+
+        /// <summary>
+        /// Gets whether <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/> and <see cref="CachedGlobalGitStatus"/>
+        /// is on <see cref="StandardGitStatus.LocalBranch"/> or on a mix of 'develop' and 'local' (<see cref="StandardGitStatus.DevelopOrLocalBranch"/>).
         /// </summary>
         public bool CanSwitchToDevelop => IsInitialized
                                           && WorkStatus == GlobalWorkStatus.Idle
-                                          && CachedGlobalGitStatus != StandardGitStatus.DevelopBranch;
+                                          && (CachedGlobalGitStatus&StandardGitStatus.LocalBranch) != 0;
 
         /// <summary>
         /// Switches back from local to develop branch.
@@ -375,12 +489,17 @@ namespace CK.Env
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
+        [CommandMethod]
         public bool SwitchToDevelop( IActivityMonitor monitor )
         {
             if( !CanSwitchToDevelop ) throw new InvalidOperationException( nameof( CanSwitchToDevelop ) );
-            if( GetGlobalGitStatus( monitor ) == StandardGitStatus.DevelopBranch ) return true;
-            SetWorkStatus( GlobalWorkStatus.SwitchingToDevelop );
-            if( !Save( monitor ) ) return false;
+            var s = GetGlobalGitStatus( monitor, NoCache );
+            if( (s&StandardGitStatus.LocalBranch) == 0 )
+            {
+                monitor.Error( $"At least one repository must be on '{WorldName.LocalBranchName}', some may be on '{WorldName.DevelopBranchName}'." );
+                return false;
+            }
+            if( !SetWorkStatusAndSave( monitor, GlobalWorkStatus.SwitchingToDevelop ) ) return false;
             return DoSwitchToDevelop( monitor );
         }
 
@@ -393,6 +512,20 @@ namespace CK.Env
                 SwitchingToDevelop?.Invoke( this, ev );
                 if( error() ) return;
 
+                foreach( var g in _gitRepositories )
+                {
+                    if( !g.SwitchLocalToDevelop( m ) ) return;
+                }
+                var depContext = _solutionContextLoader.Load( m, _gitRepositories, WorldName.LocalBranchName, NoCache );
+                if( depContext == null ) return;
+                foreach( var s in depContext.Solutions )
+                {
+                    depContext.LogSolutions( m, s );
+                    var d = s.GetSolutionDriver( m );
+                    if( d == null ) return;
+
+                    throw new NotImplementedException();
+                }
 
                 if( !error() ) SwitchedToDevelop?.Invoke( this, ev );
                 SetWorkStatusAndSave( m, GlobalWorkStatus.Idle );

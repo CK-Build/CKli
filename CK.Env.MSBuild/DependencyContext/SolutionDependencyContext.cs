@@ -216,6 +216,7 @@ namespace CK.Env.MSBuild
             /// </summary>
             public SolutionDependencyContext GlobalResult { get; private set; }
 
+
             #region IDependentSolution explicit implementation.
 
             IGitRepository IDependentSolution.GitRepository => Solution.GitFolder;
@@ -235,6 +236,19 @@ namespace CK.Env.MSBuild
             IReadOnlyList<IDependentSolution> IDependentSolution.MinimalImpacts => MinimalImpacts;
 
             IReadOnlyCollection<IDependentSolution> IDependentSolution.TransitiveImpacts => TransitiveImpacts;
+
+            ISolutionDriver IDependentSolution.GetSolutionDriver( IActivityMonitor m )
+            {
+                if( Solution.BranchName == null )
+                {
+                    m.Error( "Solution is not in a branch." );
+                    return null;
+                }
+                var d = Solution.GitFolder.PluginManager.BranchPlugins[Solution.BranchName].OfType<ISolutionDriver>().FirstOrDefault();
+                if( d == null ) m.Error( "Unable to find a Solution driver fore the solution." );
+                return d;
+            }
+
             #endregion
 
             internal void Initialize( SolutionDependencyContext global )
@@ -260,6 +274,8 @@ namespace CK.Env.MSBuild
                                          .Select( d => new ExportedLocalPackage( d ) )
                                          .ToArray();
             }
+
+            public override string ToString() => Solution.ToString();
 
             /// <summary>
             /// Updates all projects (except Build projects by default or only Build projects) with versions that are
@@ -443,6 +459,8 @@ namespace CK.Env.MSBuild
         public BuildProjectsInfo BuildProjectsInfo { get; }
 
         IReadOnlyList<IDependentSolution> IDependentSolutionContext.Solutions => Solutions;
+
+        IReadOnlyList<ZeroBuildProjectInfo> IDependentSolutionContext.ZeroBuildProjects => BuildProjectsInfo.ZeroBuildProjects;
 
         /// <summary>
         /// Gets the package dependencies between solutions.

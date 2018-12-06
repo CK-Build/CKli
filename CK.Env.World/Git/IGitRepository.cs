@@ -8,6 +8,11 @@ namespace CK.Env
     public interface IGitRepository
     {
         /// <summary>
+        /// Gets the name of the Git folder that is the name of the primary solution (by convention and by design).
+        /// </summary>
+        string PrimarySolutionName { get; }
+
+        /// <summary>
         /// Gets the version information from a branch.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -84,16 +89,24 @@ namespace CK.Env
 
         /// <summary>
         /// Checkouts the <see cref="IWorldName.LocalBranchName"/>, always merging <see cref="IWorldName.DevelopBranchName"/> into it.
-        /// If the repository is not on the 'local' branch, it must be on 'develop': a <see cref="Commit"/> is done to save any
-        /// current work, the 'local' branch is created if needed and checked out.
-        /// 'develop' branch is always merged into it.
+        /// If the repository is not on the 'local' branch, it must be on 'develop' (a <see cref="Commit"/> is done to save any
+        /// current work if <paramref name="autoCommit"/> is true), the 'local' branch is created if needed and checked out.
+        /// 'develop' branch is always merged into it, privilegiating file modifications from the 'develop' branch.
         /// If the the merge fails, a manual operation is required.
         /// On success, the solution inside should be purely local: there should not be any possible remote interactions (except
-        /// possibly importing packages).
+        /// possibly importing fully external packages).
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="autoCommit">False to require the working folder to be clean and not automatically creating a commit.</param>
+        /// <returns>True on success, false on error.</returns>
+        bool SwitchDevelopToLocal( IActivityMonitor m, bool autoCommit = true );
+
+        /// <summary>
+        /// Checkouts '<see cref="IWorldName.DevelopBranchName"/>' branch and merges current 'local' in it.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
-        bool SwitchDevelopToLocal( IActivityMonitor m, bool autoCommit = true );
+        bool SwitchLocalToDevelop( IActivityMonitor m );
 
     }
 }

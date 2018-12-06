@@ -177,7 +177,7 @@ namespace System.Xml.Linq
             return e;
         }
 
-        public static XElement RemoveCommentsBefore( this XElement @this )
+        public static XElement ClearCommentsBefore( this XElement @this )
         {
             bool hasNewLine = false;
             @this.NodesBeforeSelf()
@@ -189,6 +189,38 @@ namespace System.Xml.Linq
             if( hasNewLine ) @this.AddBeforeSelf( Environment.NewLine );
             return @this;
         }
+
+        public static XElement ClearNewLineAfter( this XElement @this )
+        {
+            var textElements = @this.NodesAfterSelf().TakeWhile( n => n is XText ).Cast<XText>().ToList();
+            if( textElements.Count == 0 ) return @this;
+            string text = null;
+            bool found = false;
+            foreach( var x in textElements )
+            {
+                text += x.Value;
+                if( found ) x.Remove();
+                else found = true;
+            }
+            found = false;
+            int i = 0;
+            while( i < text.Length )
+            {
+                var c = text[i];
+                if( c == ' ' || c == '\t' ) continue;
+                if( c == '\n' )
+                {
+                    found = true;
+                    break;
+                }
+                ++i;
+            }
+            if( found ) text = text.Substring( i + 1 );
+            textElements[0].Value = text;
+            return @this;
+        }
+
+        public static XElement ClearCommentsBeforeAndNewLineAfter( this XElement @this ) => @this.ClearCommentsBefore().ClearNewLineAfter();
 
         /// <summary>
         /// Ensures that a &lt;add key="..." value="..." /&gt; element exists

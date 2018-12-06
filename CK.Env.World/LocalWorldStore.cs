@@ -34,9 +34,8 @@ namespace CK.Env
 
         string ToStateFilePath( IWorldName w )
         {
-            var p = ToLocal( w ).XmlDescriptionFilePath;
-            p = p.Substring( 0, p.Length - 4 );
-            return p + "-State.xml";
+            var p = _localWorldRootPathMapping.GetRootPath( w );
+            return Path.Combine( p, w.FullName + "-World-State.xml" );
         }
 
         public IWorldName CreateNew( IActivityMonitor m, string name, string ltsKey, XDocument content )

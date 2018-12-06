@@ -46,7 +46,7 @@ namespace CK.Env.Plugins.SolutionFiles
 
             Document.Root.Elements( "PropertyGroup" )
                          .Where( e => !e.HasElements )
-                         .Select( e => e.RemoveCommentsBefore() )
+                         .Select( e => e.ClearCommentsBeforeAndNewLineAfter() )
                          .Remove();
 
             Save( m );
@@ -61,7 +61,7 @@ namespace CK.Env.Plugins.SolutionFiles
                 // Removes previously non sectioned property group.
                 Document.Root.Elements( "PropertyGroup" )
                         .Where( e => e.Element( "Copyright" ) != null || e.Element( "PublicSign" ) != null )
-                        .Select( x => x.RemoveCommentsBefore() )
+                        .Select( x => x.ClearCommentsBeforeAndNewLineAfter() )
                         .Remove();
                 section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
             }
@@ -93,8 +93,8 @@ namespace CK.Env.Plugins.SolutionFiles
                 // Removes previously non sectioned property group.
                 Document.Root.Elements( "PropertyGroup" )
                         .Where( e => e.Element( "GenerateDocumentationFile" ) != null )
-                         .Select( x => x.RemoveCommentsBefore() )
-                       .Remove();
+                        .Select( x => x.ClearCommentsBeforeAndNewLineAfter() )
+                        .Remove();
                 section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
             }
             section.StartComment = ": Default is in Release or during Cake builds (except for projects below Tests/). Each project can override GenerateDocumentationFile property.";
@@ -117,7 +117,7 @@ namespace CK.Env.Plugins.SolutionFiles
                                         || e.Element( "SharedDir" ) != null
                                         || e.Element( "SolutionDir" ) != null
                                         || e.Element( "IsInTestsFolder" ) != null )
-                        .Select( e => e.RemoveCommentsBefore() )
+                        .Select( e => e.ClearCommentsBeforeAndNewLineAfter() )
                         .Remove();
                 section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
             }
@@ -141,7 +141,7 @@ namespace CK.Env.Plugins.SolutionFiles
             {
                 // Removes previously non sectioned property group.
                 Document.Root.Elements( "PropertyGroup" ).Where( e => e.Element( "CKWorldPath" ) != null )
-                    .Select( e => e.RemoveCommentsBefore() )
+                    .Select( e => e.ClearCommentsBeforeAndNewLineAfter() )
                     .Remove();
                 section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
             }
@@ -160,7 +160,7 @@ namespace CK.Env.Plugins.SolutionFiles
         {
             // Removes any GenerateAssemblyInfo elements.
             Document.Root.Elements( "PropertyGroup" ).Elements( "GenerateAssemblyInfo" )
-                .Select( e => e.RemoveCommentsBefore() )
+                .Select( e => e.ClearCommentsBeforeAndNewLineAfter() )
                 .Remove();
 
             var section = XCommentSection.FindOrCreate( Document.Root, "ZeroVersion", true );

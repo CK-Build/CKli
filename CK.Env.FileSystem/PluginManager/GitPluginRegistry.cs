@@ -34,6 +34,8 @@ namespace CK.Env
             public override bool Equals( object obj ) => obj is EntryKey k && Equals( k );
 
             public override int GetHashCode() => Type.GetHashCode() ^ (BranchName?.GetHashCode() ?? 0);
+
+            public override string ToString() => $"'{BranchName}'/{Type.FullName}";
         }
 
         class Descriptor
@@ -81,6 +83,8 @@ namespace CK.Env
                 Key = k;
                 Settings = instance;
             }
+
+            public override string ToString() => $"{Key} - {(Settings != null ? "Settings" : "Plugin")})";
 
         }
 

@@ -146,7 +146,7 @@ namespace CK.Env.MSBuild
             {
                 foreach( var g in _globalGitContext.GitFolders )
                 {
-                    if( !g.SwitchFromLocalToDevelop( m ) ) return false;
+                    if( !g.SwitchLocalToDevelop( m ) ) return false;
                 }
                 var r = GetSolutionDependencyContext( m, World.DevelopBranchName );
                 if( r == null ) return false;

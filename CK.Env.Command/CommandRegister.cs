@@ -147,7 +147,7 @@ namespace CK.Env
 
         public void Unregister( ICommandMethodsProvider provider )
         {
-            var r = Select( provider.CommandProviderName.AppendPart( "*" ) );
+            var r = Select( provider.CommandProviderName.AppendPart( "*" ) ).ToList();
             foreach( var p in r )
             {
                 _commands.Remove( p.UniqueName );

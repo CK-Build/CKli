@@ -14,16 +14,17 @@ namespace CK.Env.MSBuild
     /// </summary>
     public class BuildProjectsInfo
     {
-
         internal BuildProjectsInfo(
             IDependencySorterResult sortResult,
             IReadOnlyList<(int Rank, IDependentProject Project)> dependenciesToBuild,
-            IReadOnlyList<(IDependentProject Project, IReadOnlyList<IDependentPackage> Packages)> projectsToUpgrade )
+            IReadOnlyList<(IDependentProject Project, IReadOnlyList<IDependentPackage> Packages)> projectsToUpgrade,
+            IReadOnlyList<ZeroBuildProjectInfo> zeroBuildProjects )
         {
             Debug.Assert( sortResult != null );
             RawBuildProjectsInfoSorterResult = sortResult;
-            DependenciesToBuild = dependenciesToBuild ?? Array.Empty<(int Rank, IDependentProject Project)>();
-            ProjectsToUpgrade = projectsToUpgrade ?? Array.Empty<(IDependentProject Project, IReadOnlyList<IDependentPackage> Packages)>();
+            DependenciesToBuild = dependenciesToBuild ?? Array.Empty<(int, IDependentProject)>();
+            ProjectsToUpgrade = projectsToUpgrade ?? Array.Empty<(IDependentProject, IReadOnlyList<IDependentPackage>)>();
+            ZeroBuildProjects = zeroBuildProjects ?? Array.Empty<ZeroBuildProjectInfo>();
         }
 
         /// <summary>
@@ -51,5 +52,10 @@ namespace CK.Env.MSBuild
         /// </summary>
         public IReadOnlyList<(IDependentProject Project, IReadOnlyList<IDependentPackage> Packages)> ProjectsToUpgrade { get; }
 
+        /// <summary>
+        /// Gets the ordered list of <see cref="ZeroBuildProjectInfo"/>.
+        /// Never null. Empty if <see cref="HasError"/> is true.
+        /// </summary>
+        public IReadOnlyList<ZeroBuildProjectInfo> ZeroBuildProjects { get; }
     }
 }

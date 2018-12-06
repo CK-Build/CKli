@@ -274,7 +274,7 @@ namespace CK.Env
                 m.Error( $"Cannot replace a folder '{destination}' by a file content." );
                 fDest = null;
             }
-            if( fDest.Exists && fDest.PhysicalPath == null )
+            if( fDest.PhysicalPath == null )
             {
                 m.Error( $"Destination file '{destination}' is not writable." );
                 fDest = null;

@@ -2,6 +2,7 @@ using CK.Core;
 using CK.Text;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -13,28 +14,55 @@ namespace CK.Env.Plugins.SolutionFiles
     {
         readonly ISolutionSettings _settings;
         readonly ILocalFeedProvider _localFeedProvider;
+        readonly SolutionDriver _solutionDriver;
         XElement _packageSources;
 
-        public NugetConfigFile( GitFolder f, ILocalFeedProvider localFeedProvider, ISolutionSettings s, NormalizedPath branchPath )
+        public NugetConfigFile( GitFolder f, SolutionDriver driver, ILocalFeedProvider localFeedProvider, ISolutionSettings s, NormalizedPath branchPath )
             : base( f, branchPath.AppendPart( "NuGet.config" ) )
         {
             _localFeedProvider = localFeedProvider;
             _settings = s;
+            _solutionDriver = driver;
             BranchPath = branchPath;
             if( IsOnLocalBranch )
             {
                 f.OnLocalBranchEntered += OnLocalBranchEntered;
                 f.OnLocalBranchLeaving += OnLocalBranchLeaving;
             }
+            // On local branch, the NuGet.config already has the LocalFeed/Local source.
+            if( !IsOnLocalBranch )
+            {
+                _solutionDriver.OnZeroBuildProject += OnZeroBuildProject;
+            }
+            _solutionDriver.OnStartBuild += OnStartBuild;
         }
 
+        void OnZeroBuildProject( object sender, EventMonitoredArgs e )
+        {
+            Debug.Assert( !IsOnLocalBranch );
+            EnsureLocalFeeds( e.Monitor, false, ensureDevelop: true );
+            Save( e.Monitor );
+        }
+
+        void OnStartBuild( object sender, BuildStartEventArgs e )
+        {
+            // Building on 'local' and 'remote develop' uses the CodeCakeBuilder as-is.
+            if( e.BuildType == BuildType.Local || e.BuildType != BuildType.RemoteDevelop ) return;
+
+            Debug.Assert( (e.BuildType & BuildType.IsTargetLocal) == 0 );
+            Debug.Assert( e.IsUsingDirtyFolder );
+
+            if( (e.BuildType & BuildType.IsTargetDevelop) != 0 ) EnsureLocalFeeds( e.Monitor, false, true );
+            else if( (e.BuildType & BuildType.IsTargetRelease) != 0 ) EnsureLocalFeeds( e.Monitor, true );
+            else throw new ArgumentException( nameof( BuildType ) );
+            Save( e.Monitor );
+        }
 
         void OnLocalBranchEntered( object sender, EventMonitoredArgs e )
         {
             EnsureLocalFeeds( e.Monitor );
             Save( e.Monitor );
         }
-
 
         void OnLocalBranchLeaving( object sender, EventMonitoredArgs e )
         {
@@ -148,17 +176,17 @@ namespace CK.Env.Plugins.SolutionFiles
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="ensureLocal">True to add the LocalFeed/Local.</param>
-        /// <param name="ensureCI">True to add the LocalFeed/CI.</param>
+        /// <param name="ensureDevelop">True to add the LocalFeed/Develop.</param>
         /// <param name="ensureRelease">True to add the LocalFeed/Release.</param>
-        public void EnsureLocalFeeds( IActivityMonitor m, bool ensureLocal = true, bool ensureCI = true, bool ensureRelease = true )
+        public void EnsureLocalFeeds( IActivityMonitor m, bool ensureLocal = true, bool ensureDevelop = true, bool ensureRelease = true )
         {
             if( ensureLocal )
             {
                 EnsureFeed( m, "LocalFeed-Local", _localFeedProvider.GetLocalFeedFolder( m ).PhysicalPath );
             }
-            if( ensureCI )
+            if( ensureDevelop )
             {
-                EnsureFeed( m, "LocalFeed-CI", _localFeedProvider.GetCIFeedFolder( m ).PhysicalPath );
+                EnsureFeed( m, "LocalFeed-Develop", _localFeedProvider.GetCIFeedFolder( m ).PhysicalPath );
             }
             if( ensureRelease )
             {
@@ -179,7 +207,7 @@ namespace CK.Env.Plugins.SolutionFiles
                 _packageSources
                         .Elements( "add" )
                         .FirstOrDefault( b => (string)b.Attribute( "key" ) == feedName )
-                        ?.RemoveCommentsBefore().Remove();
+                        ?.ClearCommentsBeforeAndNewLineAfter().Remove();
                 if( withCredentials ) RemoveFeedCredential( m, feedName );
             }
         }
@@ -193,7 +221,7 @@ namespace CK.Env.Plugins.SolutionFiles
         {
             Document?.Root.Element( "packageSourceCredentials" )
                          ?.Element( feedName.Replace( " ", "_x0020_" ) )
-                         ?.RemoveCommentsBefore().Remove();
+                         ?.ClearCommentsBeforeAndNewLineAfter().Remove();
         }
 
 
@@ -204,7 +232,7 @@ namespace CK.Env.Plugins.SolutionFiles
         public void RemoveLocalFeeds( IActivityMonitor m )
         {
             RemoveFeed( m, "LocalFeed-Local", false );
-            RemoveFeed( m, "LocalFeed-CI", false );
+            RemoveFeed( m, "LocalFeed-Develop", false );
             RemoveFeed( m, "LocalFeed-Release", false );
         }
     }

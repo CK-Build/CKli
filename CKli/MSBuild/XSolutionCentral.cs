@@ -56,12 +56,12 @@ namespace CKli
             _allDevelopSolutions = new List<XSolutionBase>();
             _allGitFoldersWithDevelopBranchName = new List<XGitFolder>();
 
-            _worldState = new WorldState( commandRegister, worldStore, world, this, this );
+            _worldState = new WorldState( commandRegister, worldStore, world, this, _packageFeeds, this );
             _worldState.Initializing += ( o, e ) => DumpGitFolderStatus( e.Monitor );
             fileSystem.ServiceContainer.Add( _worldState );
 
-
-            CommandProviderName = "Solutions";
+            // Extends the 'World' commands.
+            CommandProviderName = _worldState.CommandProviderName;
             commandRegister.Register( this );
         }
 
@@ -116,12 +116,18 @@ namespace CKli
                 hasPluginInitError |= !git.EnsureCurrentBranchPlugins( m );
                 using( m.OpenInfo( $"{git.SubPath} - branch: {git.CurrentBranchName}." ) )
                 {
-                    var pluginCount = $"({git.PluginManager.BranchPlugins[git.CurrentBranchName].Count} plugins)";
-                    if( git.CheckCleanCommit( m ) ) m.CloseGroup( "Up-to-date. " + pluginCount );
+                    string pluginInfo;
+                    if( !git.EnsureCurrentBranchPlugins( m ) )
+                    {
+                        hasPluginInitError = true;
+                        pluginInfo = "Plugin initialization error.";
+                    }
+                    else pluginInfo = $"({git.PluginManager.BranchPlugins[git.CurrentBranchName].Count} plugins)";
+                    if( git.CheckCleanCommit( m ) ) m.CloseGroup( "Up-to-date. " + pluginInfo );
                     else
                     {
                         dirty.Add( git.SubPath );
-                        m.CloseGroup( "Dirty. "+ pluginCount );
+                        m.CloseGroup( "Dirty. " + pluginInfo );
                     }
                 }
             }
@@ -168,6 +174,80 @@ namespace CKli
         /// appear before any of their secondary solutions (this is to avoid loading twice the secondary solutions).
         /// </summary>
         public IReadOnlyList<XSolutionBase> AllDevelopSolutions => _allDevelopSolutions;
+
+
+        //bool ILocalBuildProjectZeroBuilder.LocalZeroBuildProjects( IActivityMonitor m, IDependentSolutionContext depContext )
+        //{
+        //    var feeds = (ILocalFeedProvider)_packageFeeds;
+        //    var fileSystem = _msBuildContext.FileSystem;
+
+        //    if( depContext.ZeroBuildProjects.Count == 0 )
+        //    {
+        //        m.Info( "There is no Build Project dependency issue in this world." );
+        //        return true;
+        //    }
+
+        //    var packageNames = depContext.ZeroBuildProjects.Where( p => p.MustPack ).Select( p => p.ProjectName );
+        //    var packageNamesText = packageNames.Concatenate();
+
+        //    using( m.OpenInfo( $"Removing {packageNamesText} packages ZeroVersion from local NuGet cache if they exist." ) )
+        //    {
+        //        foreach( var pName in packageNames )
+        //        {
+        //            feeds.RemoveFromNuGetCache( m, pName, SVersion.ZeroVersion );
+        //        }
+        //    }
+
+        //    var touchedSolutions = new List<Solution>();
+        //    using( m.OpenInfo( $"Updating package references to ZeroVersion." ) )
+        //    {
+        //        foreach( var sp in r.BuildProjectsInfo.ProjectsToUpgrade.GroupBy( p => p.Project.Project.PrimarySolution ) )
+        //        {
+        //            touchedSolutions.Add( sp.Key );
+        //            foreach( var projectAndDeps in sp )
+        //            {
+        //                var project = projectAndDeps.Project.Project;
+        //                foreach( var dep in projectAndDeps.Packages )
+        //                {
+        //                    project.SetPackageReferenceVersion( m, project.TargetFrameworks, dep.PackageId, SVersion.ZeroVersion );
+        //                }
+        //            }
+        //            if( !sp.Key.Save( m ) ) return false;
+        //        }
+        //    }
+
+        //    using( m.OpenInfo( $"Generating ZeroVersion in LocalFeed/Local feed for packages: {buildDepNamesText}" ) )
+        //    {
+        //        var args = $@"pack --output ""{feeds.GetLocalFeedFolder( m ).PhysicalPath}"" --include-symbols --configuration Debug /p:Version=""{SVersion.ZeroVersion}"" /p:AssemblyVersion=""{InformationalVersion.ZeroAssemblyVersion}"" /p:FileVersion=""{InformationalVersion.ZeroFileVersion}"" /p:InformationalVersion=""{InformationalVersion.ZeroInformationalVersion}"" ";
+        //        foreach( var p in r.BuildProjectsInfo.DependenciesToBuild )
+        //        {
+        //            var path = fileSystem.GetFileInfo( p.Project.Project.Path.RemoveLastPart() ).PhysicalPath;
+        //            fileSystem.RawDeleteLocalDirectory( m, Path.Combine( path, "bin" ) );
+        //            fileSystem.RawDeleteLocalDirectory( m, Path.Combine( path, "obj" ) );
+        //            if( !ProcessRunner.Run( m, path, "dotnet", args ) ) return false;
+        //        }
+        //    }
+
+        //    // This appeared to be required once the ZeroVersions are avalaible otherwise
+        //    // updated dependencies are ignored.
+        //    using( m.OpenInfo( "Forcing a dotnet restore --force on all touched solutions." ) )
+        //    {
+        //        foreach( var s in touchedSolutions )
+        //        {
+        //            var path = fileSystem.GetFileInfo( s.SolutionFolderPath ).PhysicalPath;
+        //            if( !ProcessRunner.Run( m, path, "dotnet", "restore --force" ) ) return false;
+        //        }
+        //    }
+
+        //    foreach( var s in r.Solutions )
+        //    {
+        //        if( !s.Solution.GitFolder.AmendCommit( m ).Success )
+        //        {
+        //            return false;
+        //        }
+        //    }
+        //    return true;
+        //}
 
 
         bool ILocalBuildProjectZeroBuilder.LocalZeroBuildProjects( IActivityMonitor m, IDependentSolutionContext rA )
@@ -243,6 +323,7 @@ namespace CKli
             }
             return true;
         }
+
 
         IDependentSolutionContext IDependentSolutionContextLoader.Load( IActivityMonitor m, IEnumerable<IGitRepository> repositories, string branchName, bool forceReload )
         {

@@ -77,7 +77,7 @@ namespace CK.Env
                 if( origin.IndexOf( "github.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.GitHub;
                 else if( origin.IndexOf( "gitlab.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.GitLab;
                 else if( origin.IndexOf( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.Vsts;
-                else if( origin.IndexOf( "bitbucket.org", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.Bitbucket;               
+                else if( origin.IndexOf( "bitbucket.org", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.Bitbucket;
             }
             OriginUrl = origin;
             commandRegister.Register( this );
@@ -109,11 +109,16 @@ namespace CK.Env
         {
             if( CurrentBranchName != null )
             {
-                PluginManager.BranchPlugins.EnsurePlugins( m, CurrentBranchName, SubPath );
-                return true;
+                return PluginManager.BranchPlugins.EnsurePlugins( m, CurrentBranchName, SubPath );
             }
             m.Error( $"No plugins since '{ToString()}' is not on a branch." );
             return false;
+        }
+
+        void CheckoutWithPlugins( IActivityMonitor m, Branch branch )
+        {
+            Commands.Checkout( _git, branch );
+            EnsureCurrentBranchPlugins( m );
         }
 
         /// <summary>
@@ -135,6 +140,12 @@ namespace CK.Env
         /// Get the path relative to the <see cref="FileSystem"/>.
         /// </summary>
         public NormalizedPath SubPath { get; }
+
+        /// <summary>
+        /// Gets the name of the Git folder that is the name of the primary solution (by convention and by design).
+        /// </summary>
+        public string PrimarySolutionName => SubPath.LastPart;
+
 
         /// <summary>
         /// Gets the file system.
@@ -224,14 +235,14 @@ namespace CK.Env
                         if( remote == null )
                         {
                             m.Error( $"Repository '{SubPath}': Both local '{branchName}' and remote '{remoteName}' not found." );
-                            return (false,false);
+                            return (false, false);
                         }
-                        if( !CheckCleanCommit( m ) ) return (false,false);
+                        if( !CheckCleanCommit( m ) ) return (false, false);
                         m.Info( $"Creating local branch on remote '{remoteName}'." );
                         b = _git.Branches.Add( branchName, remote.Tip );
                         b = _git.Branches.Update( b, u => u.TrackedBranch = remote.CanonicalName );
-                        Commands.Checkout( _git, b );
-                        return (true,true);
+                        CheckoutWithPlugins( m, b );
+                        return (true, true);
                     }
                     if( b.IsCurrentRepositoryHead )
                     {
@@ -239,9 +250,9 @@ namespace CK.Env
                     }
                     else
                     {
-                        if( !CheckCleanCommit( m ) ) return (false,false);
+                        if( !CheckCleanCommit( m ) ) return (false, false);
                         m.Info( $"Checking out {branchName} (leaving {CurrentBranchName})." );
-                        Commands.Checkout( _git, b );
+                        CheckoutWithPlugins( m, b );
                         reloadNeeded = true;
                     }
                     var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
@@ -263,7 +274,7 @@ namespace CK.Env
                     if( result.Status == MergeStatus.Conflicts )
                     {
                         m.Error( "Merge conflicts occurred. Unable to merge changes from the remote." );
-                        return (false,false);
+                        return (false, false);
                     }
                     return (true, reloadNeeded || result.Status != MergeStatus.UpToDate);
                 }
@@ -273,6 +284,83 @@ namespace CK.Env
                     return (false, true);
                 }
             }
+        }
+
+        class RootTempBranch : IDisposable
+        {
+            readonly GitFolder _f;
+            readonly RootTempBranch _parent;
+            readonly Branch _temp;
+            readonly Commit _commit;
+            readonly IDisposableGroup _group;
+            public readonly Branch OrginalHead;
+            bool _closed;
+
+            public RootTempBranch( GitFolder f, IDisposableGroup group )
+            {
+                _f = f;
+                _group = group;
+                var s = new Signature( "CKli", "none", DateTimeOffset.Now );
+                if( f._tempBranch == null )
+                {
+                    OrginalHead = f._git.Head;
+                    _temp = f._git.CreateBranch( $"TEMP_{Guid.NewGuid()}" );
+                    Commands.Checkout( f._git, _temp );
+                }
+                else
+                {
+                    _parent = f._tempBranch;
+                    OrginalHead = _parent.OrginalHead;
+                    _temp = _parent._temp;
+                }
+                f._tempBranch = this;
+                Commands.Stage( f._git, "*", new StageOptions() { IncludeIgnored = true } );
+                _commit = f._git.Commit( "Temp", s, s, new CommitOptions() { AllowEmptyCommit = true, PrettifyMessage = false } );
+            }
+
+            void Close()
+            {
+                Debug.Assert( !_closed && _f._tempBranch == this );
+                _f._git.Reset( ResetMode.Hard, _commit, new CheckoutOptions() { CheckoutModifiers = CheckoutModifiers.Force } );
+                _f._git.RemoveUntrackedFiles();
+
+                if( _parent == null )
+                {
+                    _f._git.Reset( ResetMode.Mixed, OrginalHead.Tip );
+                    Commands.Checkout( _f._git, OrginalHead );
+                    _f._git.Branches.Remove( _temp );
+                }
+                else
+                {
+                    _f._git.Reset( ResetMode.Mixed, _parent._commit );
+                }
+                _f._tempBranch = _parent;
+                _closed = true;
+                _group?.Dispose();
+            }
+
+            public void Dispose()
+            {
+                if( !_closed )
+                {
+                    while( _f._tempBranch != this && _f._tempBranch != null ) _f._tempBranch.Dispose();
+                    if( _f._tempBranch != null ) Close();
+                }
+            }
+        }
+
+        RootTempBranch _tempBranch;
+
+        /// <summary>
+        /// Opens a temporary branch that protects all changes.
+        /// This can be called recursively.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="message">Message of the group information. Null to not open a group.</param>
+        /// <returns>A disposable that must be disposed to restore the state of the working directory.</returns>
+        public IDisposable OpenProtectedScope( IActivityMonitor monitor, string message = "Opening protected scope: any file modification will be reverted." )
+        {
+            return new RootTempBranch( this, message != null ? monitor.OpenInfo( message ) : null );
         }
 
         /// <summary>
@@ -290,7 +378,7 @@ namespace CK.Env
             {
                 try
                 {
-                    if( !CheckCleanCommit( m ) ) return (false,false);
+                    if( !CheckCleanCommit( m ) ) return (false, false);
                     var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
                     var mOpt = new MergeOptions
                     {
@@ -313,16 +401,16 @@ namespace CK.Env
                         if( r.Status == MergeStatus.Conflicts )
                         {
                             m.Error( $"Merge conflicts occurred. Unable to merge changes from the remote." );
-                            return (false,false);
+                            return (false, false);
                         }
                         reloadNeeded |= r.Status != MergeStatus.UpToDate;
                     }
-                    return (true,reloadNeeded);
+                    return (true, reloadNeeded);
                 }
                 catch( Exception ex )
                 {
                     m.Error( ex );
-                    return (false,true);
+                    return (false, true);
                 }
             }
         }
@@ -501,7 +589,7 @@ namespace CK.Env
             /// </summary>
             public readonly bool CommitCreated;
 
-            internal CommitResult(bool success, bool commit)
+            internal CommitResult( bool success, bool commit )
             {
                 Success = success;
                 CommitCreated = commit;
@@ -540,7 +628,7 @@ namespace CK.Env
         /// commit result is returned.
         /// </param>
         /// <returns>A commit result with success/error and whether the commit has actually been amended.</returns>
-        public CommitResult AmendCommit( IActivityMonitor m, Func<string,string> editMessage = null )
+        public CommitResult AmendCommit( IActivityMonitor m, Func<string, string> editMessage = null )
         {
             using( m.OpenInfo( $"Amending Commit in '{SubPath}' (branch '{CurrentBranchName}')." ) )
             {
@@ -651,13 +739,15 @@ namespace CK.Env
 
         /// <summary>
         /// Checkouts the <see cref="IWorldName.LocalBranchName"/>, always merging <see cref="IWorldName.DevelopBranchName"/> into it.
-        /// If the repository is not on the 'local' branch, it must be on 'develop': a <see cref="Commit"/> is done to save any
-        /// current work, the 'local' branch is created if needed and checked out.
-        /// 'develop' branch is always merged into it.
+        /// If the repository is not on the 'local' branch, it must be on 'develop' (a <see cref="Commit"/> is done to save any
+        /// current work if <paramref name="autoCommit"/> is true), the 'local' branch is created if needed and checked out.
+        /// 'develop' branch is always merged into it, privilegiating file modifications from the 'develop' branch.
         /// If the the merge fails, a manual operation is required.
-        /// On success, RepositoryInfo.xml and nuget.config are modified to work on LocalFeed/Blank.
+        /// On success, the solution inside should be purely local: there should not be any possible remote interactions (except
+        /// possibly importing fully external packages).
         /// </summary>
         /// <param name="m">The monitor to use.</param>
+        /// <param name="autoCommit">False to require the working folder to be clean and not automatically creating a commit.</param>
         /// <returns>True on success, false on error.</returns>
         public bool SwitchDevelopToLocal( IActivityMonitor m, bool autoCommit = true )
         {
@@ -671,7 +761,8 @@ namespace CK.Env
                         m.Error( $"Unable to find branch '{World.DevelopBranchName}'." );
                         return false;
                     }
-                    MergeFileFavor mergeFileFavor;
+                    // Keep it safe for the moment: no auto merge from Ours or Theirs.
+                    MergeFileFavor mergeFileFavor = MergeFileFavor.Normal;
                     Branch local = _git.Branches[World.LocalBranchName];
                     if( local == null || !local.IsCurrentRepositoryHead )
                     {
@@ -693,13 +784,11 @@ namespace CK.Env
                             m.Info( $"Creating the {World.LocalBranchName}." );
                             local = _git.CreateBranch( World.LocalBranchName );
                         }
-                        Commands.Checkout( _git, local );
-                        mergeFileFavor = MergeFileFavor.Theirs;
+                        CheckoutWithPlugins( m, local );
                     }
                     else
                     {
-                        m.Trace( $"Already on {World.LocalBranchName}. Privilegiating 'Ours' files when merging." );
-                        mergeFileFavor = MergeFileFavor.Ours;
+                        m.Trace( $"Already on {World.LocalBranchName}." );
                     }
                     var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
                     var r = _git.Merge( develop, merger, new MergeOptions
@@ -734,7 +823,7 @@ namespace CK.Env
 
         bool RaiseEnteredLocalBranch( IActivityMonitor m, bool enter )
         {
-            PluginManager.BranchPlugins.EnsurePlugins( m, World.LocalBranchName, SubPath ); 
+            PluginManager.BranchPlugins.EnsurePlugins( m, World.LocalBranchName, SubPath );
             using( m.OpenTrace( $"{ToString()}: Raising {(enter ? "OnLocalBranchEntered" : "OnLocalBranchLeaving")} event." ) )
             {
                 try
@@ -796,7 +885,7 @@ namespace CK.Env
                             m.Info( $"Creating the {World.MasterBranchName }." );
                             master = _git.CreateBranch( World.MasterBranchName );
                         }
-                        Commands.Checkout( _git, master );
+                        CheckoutWithPlugins( m, master );
                     }
                     else m.Trace( $"Already on {World.MasterBranchName}." );
 
@@ -833,7 +922,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool SwitchFromLocalToDevelop( IActivityMonitor m )
+        public bool SwitchLocalToDevelop( IActivityMonitor m )
         {
             using( m.OpenInfo( $"Switching '{SubPath}' to branch '{World.DevelopBranchName}'." ) )
             {
@@ -860,8 +949,8 @@ namespace CK.Env
 
                     if( bLocal.IsCurrentRepositoryHead )
                     {
-                        if( !Commit( m, $"Switching to '{World.DevelopBranchName}' branch." ).Success ) return false;
-                        Commands.Checkout( _git, bDevelop );
+                        if( !AmendCommit( m ).Success ) return false;
+                        CheckoutWithPlugins( m, bDevelop );
                     }
                     else
                     {
@@ -921,7 +1010,7 @@ namespace CK.Env
                     if( master != null && master.IsCurrentRepositoryHead )
                     {
                         if( !CheckCleanCommit( m ) ) return false;
-                        Commands.Checkout( _git, develop );
+                        CheckoutWithPlugins( m, develop );
                     }
                     return true;
                 }
@@ -1269,7 +1358,8 @@ namespace CK.Env
                 sub = sub.RemoveFirstPart();
                 return true;
             }
-            if( sub.Parts.Count > 1 && _git.Head.FriendlyName == sub.Parts[1] )
+            if( sub.Parts.Count > 1
+                && (_tempBranch?.OrginalHead ?? _git.Head).FriendlyName == sub.Parts[1] )
             {
                 sub = sub.RemoveParts( 0, 2 );
                 return true;

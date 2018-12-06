@@ -2,6 +2,7 @@ using CK.Core;
 using CK.Text;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,23 +13,71 @@ namespace CK.Env.Plugins.SolutionFiles
     public class CKSetupStoreTestHelperConfigFile : GitFolderTextFileBase, IGitBranchPlugin, ICommandMethodsProvider, IDisposable
     {
         readonly ISolutionSettings _settings;
+        readonly SolutionDriver _solutionDriver;
         readonly ILocalFeedProvider _localFeedProvider;
 
         public CKSetupStoreTestHelperConfigFile(
             GitFolder f,
+            SolutionDriver solutionDriver,
             ISolutionSettings settings,
             ILocalFeedProvider localFeedProvider,
             NormalizedPath branchPath )
             : base( f, branchPath.AppendPart( "RemoteStore.TestHelper.config" ) )
         {
             _settings = settings;
+            _solutionDriver = solutionDriver;
             _localFeedProvider = localFeedProvider;
             BranchPath = branchPath;
+            // Always monitor branch change even if _settings.ProduceCKSetupComponents is false
+            // so that we delete the test file on leaving local if it happens to exist.
             if( IsOnLocalBranch )
             {
                 f.OnLocalBranchEntered += OnLocalBranchEntered;
                 f.OnLocalBranchLeaving += OnLocalBranchLeaving;
             }
+            // If the settings states that CKSetup is not used, there is no need to react to builds.
+            if( _settings.ProduceCKSetupComponents )
+            {
+                _solutionDriver.OnStartBuild += OnStartBuild;
+                _solutionDriver.OnBuildSucceed += OnBuildEnd;
+                _solutionDriver.OnBuildFailed += OnBuildEnd;
+            }
+        }
+
+        void OnStartBuild( object sender, BuildStartEventArgs e )
+        {
+            Debug.Assert( _settings.ProduceCKSetupComponents );
+
+            // The CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL environment variable is always required
+            // except when building in 'remote develop' and 'local'.
+            // The Build script must handle these two cases (so that CodeCakebuilder can be run
+            // directly): on 'develop', the actual remote is used normally and in local, the script
+            // MUST map the local store. Typically:
+            //
+            //    if( globalInfo.IsLocalCIRelease )
+            //    {
+            //        storeConf.TargetStoreUrl = System.IO.Path.Combine( globalInfo.LocalFeedPath, "CKSetupStore" );
+            //    }
+            //
+            if( e.BuildType == BuildType.Local || e.BuildType != BuildType.RemoteDevelop ) return;
+            Debug.Assert( e.IsUsingDirtyFolder );
+
+            // Ensures that the local stores exist.
+            if( !_localFeedProvider.EnsureCKSetupStores( e.Monitor ) ) return;
+
+            var targetStore = _localFeedProvider.GetCKSetupStorePath( e.Monitor, e.BuildType );
+            if( !_settings.NoUnitTests )
+            {
+                EnsureStorePath( e.Monitor, targetStore );
+            }
+            e.EnvironmentVariables.Add( ("CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL", targetStore) );
+        }
+
+        void OnBuildEnd( object sender, EventMonitoredArgs e )
+        {
+            // This is an untracked file. It has to be removed, even with BuildType.IsUsingDirtyFolder
+            // (except of course on the local branch).
+            if( !IsOnLocalBranch ) Delete( e.Monitor );
         }
 
         public NormalizedPath BranchPath { get; }
@@ -43,7 +92,7 @@ namespace CK.Env.Plugins.SolutionFiles
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
-            if( IsOnLocalBranch && _settings.ProduceCKSetupComponents )
+            if( IsOnLocalBranch && _settings.ProduceCKSetupComponents && !_settings.NoUnitTests )
             {
                 EnsureLocalStorePath( m );
             }
@@ -68,15 +117,17 @@ namespace CK.Env.Plugins.SolutionFiles
         {
             if( _settings.ProduceCKSetupComponents ) EnsureLocalStorePath( e.Monitor );
         }
-        public bool EnsureLocalStorePath( IActivityMonitor m )
+
+        bool EnsureLocalStorePath( IActivityMonitor m )
         {
             return EnsureStorePath( m, _localFeedProvider.GetLocalCKSetupStorePath( m ) );
         }
 
         public bool EnsureStorePath( IActivityMonitor m, string storePath )
         {
+            if( !_localFeedProvider.EnsureCKSetupStores( m ) ) return false;
             var text = "<configuration><appSettings>" + Environment.NewLine;
-            text += "  -- This forces the Solutions that generate components to use the LocalFeed/Local/CKSetupStore" + Environment.NewLine; ;
+            text += "  -- This forces the Solutions that generate components to use the LocalFeed CKSetupStore" + Environment.NewLine; ;
             text += $@"  <add key=""CKSetup/DefaultStoreUrl"" value=""{storePath}"" />" + Environment.NewLine;
             text += $@"  <add key=""CKSetup/DefaultStorePath"" value=""{storePath}"" />" + Environment.NewLine;
             text += "</appSettings></configuration>";

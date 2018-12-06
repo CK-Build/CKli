@@ -214,12 +214,12 @@ namespace CK.Env.MSBuild
             {
                 // Building in Develop without Remote pushes: we need to access LocalFeed/CI
                 // and CKSetup test helper config file (just like the GlobalBuilderRelease).
-                var storePath = Path.Combine( GetTargetFeedFolderPath( m ), LocalFeedProviderExtension.CKSetupStoreName );
+                var storePath = Path.Combine( GetTargetFeedFolderPath( m ), CKSetupLocalFeedProviderExtension.CKSetupStoreName );
                 var fCKSetupStore = s.Solution.GetPlugin<CK.Env.Plugins.SolutionFiles.CKSetupStoreTestHelperConfigFile>();
                 bool success = fCKSetupStore.EnsureStorePath( m, storePath );
 
                 var fNuGet = s.Solution.GetPlugin<CK.Env.Plugins.SolutionFiles.NugetConfigFile>();
-                fNuGet.EnsureLocalFeeds(m, ensureCI: true, ensureRelease: true);
+                fNuGet.EnsureLocalFeeds(m, ensureDevelop: true, ensureRelease: true);
                 success &= fNuGet.Save( m );
 
                 var rfile = s.Solution.GetPlugin<CK.Env.Plugins.SolutionFiles.RepositoryXmlFile>();

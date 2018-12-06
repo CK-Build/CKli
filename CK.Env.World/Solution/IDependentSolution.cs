@@ -1,3 +1,4 @@
+using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -16,6 +17,12 @@ namespace CK.Env
         /// Null if <see cref="GitRepository"/> is null or if the solution is not in "branches" or "remotes".
         /// </summary>
         string BranchName { get; }
+
+        /// <summary>
+        /// Gets the solution driver.
+        /// If no driver can be found, an error should be logged.
+        /// </summary>
+        ISolutionDriver GetSolutionDriver( IActivityMonitor m );
 
         /// <summary>
         /// Gets the rank of this solution.

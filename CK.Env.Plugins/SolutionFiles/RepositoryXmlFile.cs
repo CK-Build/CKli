@@ -14,9 +14,10 @@ namespace CK.Env.Plugins.SolutionFiles
         static readonly XName XDebugName = SVGNS + "Debug";
         static readonly XName XBranchName = SVGNS + "Branch";
 
+        public readonly SolutionDriver _driver;
         XElement _branches;
 
-        public RepositoryXmlFile( GitFolder f, NormalizedPath branchPath )
+        public RepositoryXmlFile( GitFolder f, NormalizedPath branchPath, SolutionDriver driver )
             : base( f, branchPath.AppendPart( "RepositoryInfo.xml" ) )
         {
             BranchPath = branchPath;
@@ -24,6 +25,17 @@ namespace CK.Env.Plugins.SolutionFiles
             {
                 f.OnLocalBranchEntered += OnLocalBranchEntered;
                 f.OnLocalBranchLeaving += OnLocalBranchLeaving;
+            }
+            _driver = driver;
+            _driver.OnStartBuild += OnStartBuild;
+        }
+
+        void OnStartBuild( object sender, BuildStartEventArgs e )
+        {
+            if( e.IsUsingDirtyFolder )
+            {
+                SetIgnoreDirtyFolders();
+                Save( e.Monitor );
             }
         }
 
