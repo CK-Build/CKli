@@ -3,6 +3,7 @@ using CK.Text;
 using Microsoft.Extensions.FileProviders;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Xml.Linq;
@@ -108,8 +109,51 @@ namespace CK.Env.MSBuild
             }
         }
 
+        // Private interface
+        interface ISolutionTracker
+        {
+            Solution LastVersion { get; }
+            bool IsLoaded { get; }
+            Solution OnUnload();
+            void OnLoad( Solution newOne );
+        }
+
+        internal class SolutionTracker : ISolutionTracker
+        {
+            Solution _last;
+            bool _loaded;
+
+            public SolutionTracker( Solution s )
+            {
+                Debug.Assert( s != null );
+                s.SetTracker( this );
+                _last = s;
+                _loaded = true;
+            }
+
+            public bool IsLoaded => _loaded;
+
+            public Solution CurrentVersion => _loaded ? _last : null;
+
+            public Solution LastVersion => _last;
+
+            Solution ISolutionTracker.OnUnload()
+            {
+                Debug.Assert( _loaded );
+                _loaded = false;
+                return _last;
+            }
+
+            void ISolutionTracker.OnLoad( Solution newOne )
+            {
+                Debug.Assert( !_loaded && newOne != null && _last != null );
+                _last = newOne;
+                _loaded = true;
+            }
+        }
+
         readonly Dictionary<NormalizedPath, File> _files;
-        readonly Dictionary<NormalizedPath, Solution> _solutions;
+        readonly Dictionary<NormalizedPath, ISolutionTracker> _solutions;
 
         /// <summary>
         /// Initializes a new project file context.
@@ -119,7 +163,7 @@ namespace CK.Env.MSBuild
         {
             FileSystem = fileSystem;
             _files = new Dictionary<NormalizedPath, File>();
-            _solutions = new Dictionary<NormalizedPath, Solution>();
+            _solutions = new Dictionary<NormalizedPath, ISolutionTracker>();
         }
 
         /// <summary>
@@ -147,15 +191,24 @@ namespace CK.Env.MSBuild
         {
             if( primary == null && type != SolutionSpecialType.None ) throw new ArgumentException( $"Primary solution, type must be None." );
             if( primary != null && type == SolutionSpecialType.None ) throw new ArgumentException( $"Secondary solution, type must be IncludedSecondarySolution or IndependantSecondarySolution." );
-            if( !force && _solutions.TryGetValue( path, out Solution s ) )
+            if( primary != null && primary.Current != primary ) throw new ArgumentException( $"Primary solution is not the current one." );
+
+            ISolutionTracker tracker = null;
+            Solution s;
+            if( !force
+                && _solutions.TryGetValue( path, out tracker )
+                && tracker.IsLoaded )
             {
+                s = tracker.LastVersion;
+                // Check that it is the same kind of solution.
+                // If not, reloads it.
                 if( (primary == null && s.PrimarySolution == null)
                     || (primary != null && s.PrimarySolution == primary && type == s.SpecialType) )
                 {
                     return (s, false);
                 }
             }
-            s = DoLoad( m, path );
+            s = DoLoad( m, path, tracker );
             if( s != null )
             {
                 if( primary != null ) s.SetAsSecondarySolution( primary, type );
@@ -164,25 +217,27 @@ namespace CK.Env.MSBuild
             return (null, false);
         }
 
-        Solution DoLoad( IActivityMonitor m, NormalizedPath path )
+        Solution DoLoad( IActivityMonitor m, NormalizedPath path, ISolutionTracker tracker )
         {
             using( m.OpenTrace( $"Loading solution {path}." ) )
             {
-                if( _solutions.TryGetValue( path, out Solution previous ) )
+                if( tracker != null && tracker.IsLoaded )
                 {
-                    _solutions.Remove( path );
-                    if( previous.LoadedSecondarySolutions != null )
+                    var previous = tracker.OnUnload();
+                    foreach( var secondary in previous.LoadedSecondarySolutions )
                     {
-                        foreach( var secondary in previous.LoadedSecondarySolutions )
-                        {
-                            _solutions.Remove( secondary.FilePath );
-                        }
+                        _solutions[secondary.FilePath].OnUnload();
                     }
                 }
                 try
                 {
                     Solution s = Solution.Load( m, this, path );
-                    if( s != null ) _solutions.Add( path, s );
+                    if( s != null )
+                    {
+                        if( tracker == null ) tracker = new SolutionTracker( s );
+                        else tracker.OnLoad( s );
+                        _solutions.Add( path, tracker );
+                    }
                     return s;
                 }
                 catch( Exception ex )

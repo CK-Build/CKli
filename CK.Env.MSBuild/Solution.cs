@@ -20,12 +20,34 @@ namespace CK.Env.MSBuild
         SolutionSpecialType _specialType;
         List<Solution> _secondarySolutions;
         List<ProjectBase> _allProjects;
+        MSBuildContext.SolutionTracker _tracker;
+
         bool _isDirty;
 
         /// <summary>
         /// Gets the <see cref="MSBuildContext"/> from which this solution has been loaded.
         /// </summary>
         public MSBuildContext BuildContext { get; }
+
+        /// <summary>
+        /// Always gets the latest version of this solution that has been successfully loaded so far.
+        /// When this is the latest one, this is returned.
+        /// </summary>
+        public Solution LastVersion => _tracker.LastVersion;
+
+        /// <summary>
+        /// Gets the latest version of this solution that has been loaded so far or null
+        /// if a reload has failed.
+        /// When this is the latest one, this is returned.
+        /// </summary>
+        public Solution Current => _tracker.CurrentVersion;
+
+        /// <summary>
+        /// Gets whether a new solution for this <see cref="FilePath"/> has been loaded
+        /// or a reload has failed.
+        /// When this is true, <see cref="Save"/> always fails with an error logged.
+        /// </summary>
+        public bool SyncLost => _tracker.CurrentVersion != this;
 
         /// <summary>
         /// Gets the .sln path (relative to the <see cref="FileSystem"/>).
@@ -42,18 +64,6 @@ namespace CK.Env.MSBuild
         /// or null if the solution was not in a Git repository.
         /// </summary>
         public GitFolder GitFolder { get; }
-
-        /// <summary>
-        /// Gets a <see cref="IGitBranchPlugin"/> in the current <see cref="BranchName"/>.
-        /// </summary>
-        /// <typeparam name="T">Plugin type.</typeparam>
-        /// <returns>The plugin or null.</returns>
-        public T GetPlugin<T>() where T : class, IGitBranchPlugin
-        {
-            return BranchName != null
-                    ? GitFolder.PluginManager.BranchPlugins[BranchName].GetPlugin<T>()
-                    : null;
-        }
 
         /// <summary>
         /// Gets the branch name.
@@ -79,6 +89,19 @@ namespace CK.Env.MSBuild
         /// <returns>True on success, false on error.</returns>
         public bool Save( IActivityMonitor m )
         {
+            if( SyncLost )
+            {
+                var msg = $"Cannot save the Solution {FilePath} since ";
+                if( Current != null )
+                {
+                    m.Error( msg + "a newer version has been loaded for it." );
+                }
+                else
+                {
+                    m.Error( msg + "a reload of this solution has failed." );
+                }
+                return false;
+            }
             if( _isDirty )
             {
                 foreach( var p in AllProjects )
@@ -265,6 +288,11 @@ namespace CK.Env.MSBuild
             PublishedProjects.Clear();
             if( primarySolution._secondarySolutions == null ) primarySolution._secondarySolutions = new List<Solution>();
             primarySolution._secondarySolutions.Add( this );
+        }
+
+        internal void SetTracker( MSBuildContext.SolutionTracker t )
+        {
+            _tracker = t;
         }
 
         Solution(

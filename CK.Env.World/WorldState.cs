@@ -173,9 +173,11 @@ namespace CK.Env
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="uniqueSolutionName">Solution name.</param>
         /// <param name="branchName">Branch name.</param>
-        /// <param name="throwOnNotFound">True to throw an InvalidOperatioException instead of returning null.</param>
+        /// <param name="throwOnNotFound">
+        /// False to return null and log an error instead of throwing an InvalidOperatioException.
+        /// </param>
         /// <returns>The driver or null if not found.</returns>
-        public ISolutionDriver FindSolutionDriver( IActivityMonitor monitor, string uniqueSolutionName, string branchName, bool throwOnNotFound = false )
+        public ISolutionDriver FindSolutionDriver( IActivityMonitor monitor, string uniqueSolutionName, string branchName, bool throwOnNotFound = true )
         {
             if( String.IsNullOrWhiteSpace( uniqueSolutionName ) ) throw new ArgumentNullException( nameof( uniqueSolutionName ) );
             if( String.IsNullOrWhiteSpace( branchName)) throw new ArgumentNullException( nameof( branchName ) );
@@ -207,9 +209,11 @@ namespace CK.Env
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="solution">Solution.</param>
-        /// <param name="throwOnNotFound">True to throw an InvalidOperatioException instead of returning null.</param>
+        /// <param name="throwOnNotFound">
+        /// False to return null and log an error instead of throwing an InvalidOperatioException.
+        /// </param>
         /// <returns>The driver or null if not found.</returns>
-        public ISolutionDriver FindSolutionDriver( IActivityMonitor monitor, IDependentSolution solution, bool throwOnNotFound = false )
+        public ISolutionDriver FindSolutionDriver( IActivityMonitor monitor, IDependentSolution solution, bool throwOnNotFound = true )
         {
             if( solution == null ) throw new ArgumentNullException( nameof( solution ) );
             return FindSolutionDriver( monitor, solution.UniqueSolutionName, solution.BranchName, throwOnNotFound );
@@ -342,8 +346,9 @@ namespace CK.Env
         /// <see cref="CachedGlobalGitStatus"/> is up-to-date after this call.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
+        /// <param name="reloadSolutions">True to force a reload of the solutions.</param>
         /// <returns>The dependency context or null on error.</returns>
-        IDependentSolutionContext GetSolutionDependentContext( IActivityMonitor monitor )
+        IDependentSolutionContext GetSolutionDependentContext( IActivityMonitor monitor, bool reloadSolutions = false )
         {
             var s = GetGlobalGitStatus( monitor, NoCache );
             string branchName;
@@ -354,7 +359,7 @@ namespace CK.Env
                 monitor.Error( $"Repositories must all be on '{WorldName.LocalBranchName}' or '{WorldName.DevelopBranchName}'." );
                 return null;
             }
-            return _solutionContextLoader.Load( monitor, _gitRepositories, branchName, NoCache );
+            return _solutionContextLoader.Load( monitor, _gitRepositories, branchName, NoCache | reloadSolutions );
         }
 
         /// <summary>
@@ -500,7 +505,7 @@ namespace CK.Env
                     {
                         using( m.OpenInfo( $"{p} <= { (p.Dependencies.Count > 0 ? p.Dependencies.Concatenate() : "(no dependency)") }." ) )
                         {
-                            var driver = FindSolutionDriver( monitor, p.SolutionName, depContext.UniqueBranchName, throwOnNotFound: true );
+                            var driver = FindSolutionDriver( monitor, p.SolutionName, depContext.UniqueBranchName );
                             var currentCommitSha = driver.GitRepository.HeadCommitSHA1;
                             if( sha1Cache.TryGetValue( p.FullName, out var sha )
                                 && sha == currentCommitSha
@@ -537,12 +542,12 @@ namespace CK.Env
             if( !CheckGlobalGitStatus( monitor, StandardGitStatus.Local ) ) return false;
             return RunSafe( monitor, $"Local build.", ( m, error ) =>
             {
-                var depContext = _solutionContextLoader.Load( m, _gitRepositories, WorldName.LocalBranchName, NoCache );
+                var depContext = GetSolutionDependentContext( m );
                 if( depContext == null ) return;
                 foreach( var s in depContext.Solutions )
                 {
                     depContext.LogSolutions( m, s );
-                    var d = FindSolutionDriver( m, s, true );
+                    var d = FindSolutionDriver( m, s );
                     
                     if( !d.Build( m, true, withUnitTest ) ) return;
                 }
@@ -591,8 +596,9 @@ namespace CK.Env
                 {
                     if( !g.SwitchLocalToDevelop( m ) ) return;
                 }
-                var depContext = _solutionContextLoader.Load( m, _gitRepositories, WorldName.LocalBranchName, NoCache );
+                var depContext = GetSolutionDependentContext( m );
                 if( depContext == null ) return;
+
                 if( !DoZeroBuildProjects( monitor, depContext ) ) return;
 
                 foreach( var s in depContext.Solutions )
@@ -634,7 +640,7 @@ namespace CK.Env
         Roadmap DoEnsureRoadmap( IActivityMonitor monitor, bool reload )
         {
             if( _roadMap != null && !reload ) return _roadMap;
-            var depContext = _solutionContextLoader.Load( monitor, _gitRepositories, WorldName.DevelopBranchName, NoCache || reload );
+            var depContext = GetSolutionDependentContext( monitor, reload );
             if( depContext == null ) return null;
             var previous = _roadMap != null ? _roadMap.ToXml() : GetWorkState( GlobalWorkStatus.Releasing ).Element( "RoadMap" );
             return _roadMap = Roadmap.Create( monitor, depContext, previous );

@@ -56,8 +56,8 @@ namespace CKli
         public string NotPublishedProjects { get; private set; }
 
         /// <summary>
-        /// Overridden to load the primary solution with the current <see cref="XSolutionSettings.SolutionSettings"/>
-        /// and applies <see cref="TestProjectsArePublished"/> and <see cref="NotPublishedProjects"/> attributes.
+        /// Overridden to load the primary solution and applies <see cref="TestProjectsArePublished"/>
+        /// and <see cref="NotPublishedProjects"/> attributes.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="reload">True to reload the solution.</param>

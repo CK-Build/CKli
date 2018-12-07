@@ -64,6 +64,9 @@ namespace CK.Env.Plugins
 
         /// <summary>
         /// Loads or reloads the <see cref="PrimarySolution"/> and its secondary solutions.
+        /// If the solution has been reloaded, the <see cref="Solution.LastVersion"/> is returned:
+        /// this ensures that the plugins always work with an up-to-date version of the solution.
+        /// Use <paramref name="reload"/> with true only to actually reload the solution.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="reload">True to force the reload of the solutions.</param>
@@ -78,14 +81,14 @@ namespace CK.Env.Plugins
                     m.Error( $"Unable to load primary solution '{BranchPath}/{BranchPath.LastPart}.sln'." );
                 }
             }
-            return _solution;
+            return _solution = _solution.LastVersion;
         }
 
         /// <summary>
         /// Gets the already loaded (see <see cref="EnsureLoaded(IActivityMonitor, bool)"/>) primary solution
         /// and its secondary solutions.
         /// </summary>
-        public Solution PrimarySolution => _solution;
+        public Solution PrimarySolution => _solution.LastVersion;
 
         IEnumerable<Solution> GetAllSolutions( IActivityMonitor monitor )
         {
