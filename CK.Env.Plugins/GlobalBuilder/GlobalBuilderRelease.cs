@@ -22,7 +22,7 @@ namespace CK.Env.MSBuild
         public GlobalBuilderRelease(
             SolutionDependencyContext r,
             FileSystem fileSystem,
-            ILocalFeedProvider feeds,
+            IEnvLocalFeedProvider feeds,
             INuGetClient nuGetClient,
             ITestRunMemory testRunMemory,
             GlobalBuilderInfo buildInfo,

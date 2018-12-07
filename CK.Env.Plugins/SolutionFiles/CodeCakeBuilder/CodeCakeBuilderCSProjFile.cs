@@ -11,22 +11,19 @@ using System.Xml.Linq;
 
 namespace CK.Env.Plugins.SolutionFiles
 {
-    public class CodeCakeBuilderCSProjFile : GitFolderXmlFile, IGitBranchPlugin, ICommandMethodsProvider
+    public class CodeCakeBuilderCSProjFile : XmlFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly CodeCakeBuilderFolder _f;
         readonly ISolutionSettings _settings;
         readonly SolutionDriver _solutionDriver;
 
         public CodeCakeBuilderCSProjFile( CodeCakeBuilderFolder f, ISolutionSettings settings, NormalizedPath branchPath, SolutionDriver solutionDriver )
-            : base( f.Folder, f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" ) )
+            : base( f.Folder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" ) )
         {
             _f = f;
             _settings = settings;
             _solutionDriver = solutionDriver;
-            BranchPath = branchPath;
         }
-
-        public NormalizedPath BranchPath { get; }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 

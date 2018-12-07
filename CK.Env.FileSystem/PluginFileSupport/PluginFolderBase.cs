@@ -12,7 +12,7 @@ using System.Xml.Linq;
 
 namespace CK.Env.Plugins
 {
-    public abstract class PluginFolderBase : IGitBranchPlugin, ICommandMethodsProvider
+    public abstract class PluginFolderBase : GitBranchPluginBase, ICommandMethodsProvider
     {
         const string _csProtocol = @"cs\";
         readonly Assembly _resourceAssembly;
@@ -21,19 +21,14 @@ namespace CK.Env.Plugins
         readonly Dictionary<string, string> _textResources = new Dictionary<string, string>();
 
         public PluginFolderBase( GitFolder f, NormalizedPath branchPath, string folderPath, Type resourceHolder = null )
+            : base( f, branchPath )
         {
-            Folder = f;
-            BranchPath = branchPath;
             FolderPath = branchPath.Combine( folderPath ).ResolveDots( branchPath.Parts.Count );
             if( resourceHolder == null ) resourceHolder = GetType();
             _resourceAssembly = resourceHolder.Assembly;
             _resourcePrefix = resourceHolder.Namespace + ".Res.";
             _csResourcePrefix = _csProtocol + _resourcePrefix;
         }
-
-        public GitFolder Folder { get; }
-
-        public NormalizedPath BranchPath { get; }
 
         public NormalizedPath FolderPath { get; }
 

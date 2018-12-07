@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,12 +12,12 @@ using CSemVer;
 
 namespace CK.Env.Plugins
 {
-    public class SolutionDriver : IGitBranchPlugin, ISolutionDriver, IDisposable, ICommandMethodsProvider
+    public class SolutionDriver : GitBranchPluginBase, ISolutionDriver, IDisposable, ICommandMethodsProvider
     {
         readonly ISecretKeyStore _keyStore;
         readonly WorldState _worldState;
         readonly IBranchSolutionLoader _solutionLoader;
-        readonly ILocalFeedProvider _localFeedProvider;
+        readonly IEnvLocalFeedProvider _localFeedProvider;
         readonly ISolutionSettings _settings;
         Solution _solution;
 
@@ -27,16 +28,16 @@ namespace CK.Env.Plugins
             NormalizedPath branchPath,
             ISolutionSettings settings,
             IBranchSolutionLoader solutionLoader,
-            ILocalFeedProvider localFeedProvider )
+            IEnvLocalFeedProvider localFeedProvider )
+            : base( f, branchPath )
         {
             w.Initializing += OnWorldInitializing;
             _worldState = w;
             _keyStore = keyStore;
-            BranchPath = branchPath;
-            Folder = f;
             _solutionLoader = solutionLoader;
             _settings = settings;
             _localFeedProvider = localFeedProvider;
+            LocalFeed = localFeedProvider.GetFeed( PluginBranch );
         }
 
         void OnWorldInitializing( object sender, WorldState.InitializingEventArgs e )
@@ -49,15 +50,17 @@ namespace CK.Env.Plugins
             _worldState.Initializing -= OnWorldInitializing;
         }
 
-        public NormalizedPath BranchPath { get; }
-
         NormalizedPath ICommandMethodsProvider.CommandProviderName => BranchPath.AppendPart( "SolutionDriver" );
 
         IGitRepository ISolutionDriver.GitRepository => Folder;
 
         string ISolutionDriver.BranchName => BranchPath.LastPart;
 
-        public GitFolder Folder { get; }
+        /// <summary>
+        /// Gets the local feed if the <see cref="GitBranchPluginBase.PluginBranch"/> is one of
+        /// the 3 standard branches. Null otherwise.
+        /// </summary>
+        public IEnvLocalFeed LocalFeed { get; }
 
         /// <summary>
         /// Loads or reloads the <see cref="PrimarySolution"/> and its secondary solutions.
@@ -83,10 +86,6 @@ namespace CK.Env.Plugins
         /// and its secondary solutions.
         /// </summary>
         public Solution PrimarySolution => _solution;
-
-        public bool IsOnLocalBranch => BranchPath.LastPart == Folder.World.LocalBranchName;
-
-        public bool IsOnDevelopBranch => BranchPath.LastPart == Folder.World.DevelopBranchName;
 
         IEnumerable<Solution> GetAllSolutions( IActivityMonitor monitor )
         {
@@ -138,22 +137,17 @@ namespace CK.Env.Plugins
         public bool ZeroBuildProject( IActivityMonitor monitor, ZeroBuildProjectInfo info )
         {
             if( info == null ) throw new ArgumentNullException( nameof( info ) );
+            if( !IsActive ) throw new InvalidOperationException( nameof( IsActive ) );
+
             var primary = EnsureLoaded( monitor );
             if( primary == null ) return false;
 
             var p = FindProject( monitor, primary, info.SolutionName, info.ProjectName, true );
 
-            bool onLocal = IsOnLocalBranch && Folder.StandardGitStatus == StandardGitStatus.LocalBranch;
-            Debug.Assert( onLocal || (IsOnDevelopBranch && Folder.StandardGitStatus == StandardGitStatus.DevelopBranch) );
-
-            var targetFolder = onLocal
-                                ? _localFeedProvider.GetLocalFeedFolder( monitor )
-                                : _localFeedProvider.GetCIFeedFolder( monitor );
-
             using( Folder.OpenProtectedScope( monitor ) )
             {
                 int changes = 0;
-                foreach( var packageName in info.BuildPackageDependencies )
+                foreach( var packageName in info.UpgradePackages )
                 {
                     changes += p.SetPackageReferenceVersion( monitor, p.TargetFrameworks, packageName, SVersion.ZeroVersion );
                 }
@@ -161,7 +155,7 @@ namespace CK.Env.Plugins
 
                 var zeroVersionArgs = $@" --configuration Debug /p:Version=""{SVersion.ZeroVersion}"" /p:AssemblyVersion=""{InformationalVersion.ZeroAssemblyVersion}"" /p:FileVersion=""{InformationalVersion.ZeroFileVersion}"" /p:InformationalVersion=""{InformationalVersion.ZeroInformationalVersion}"" ";
                 var args = info.MustPack
-                            ? $@"pack --output ""{targetFolder.PhysicalPath}""" + zeroVersionArgs
+                            ? $@"pack --output ""{LocalFeed.PhysicalPath}""" + zeroVersionArgs
                             : $@"build" + zeroVersionArgs;
 
                 var path = Folder.FileSystem.GetFileInfo( p.Path.RemoveLastPart() ).PhysicalPath;
@@ -174,7 +168,6 @@ namespace CK.Env.Plugins
             }
 
         }
-
 
         Project FindProject( IActivityMonitor monitor, Solution primary, string solutionName, string projectName, bool throwOnNotFound )
         {
@@ -226,30 +219,31 @@ namespace CK.Env.Plugins
         {
             var allSolutions = GetAllSolutions( monitor );
             if( allSolutions == null ) return null;
-            bool onLocal = IsOnLocalBranch && Folder.StandardGitStatus == StandardGitStatus.LocalBranch;
-            Debug.Assert( onLocal || (IsOnDevelopBranch && Folder.StandardGitStatus == StandardGitStatus.DevelopBranch) );
+
             return allSolutions
                     .SelectMany( s => s.AllProjects )
                     .Where( p => withBuildProject || !p.IsBuildProject )
                     .SelectMany( p => p.Deps.Packages )
-                    .Select( dep => (Dep: dep, LocalVersion: onLocal
-                                                            ? _localFeedProvider.GetBestLocalVersion( monitor, dep.PackageId )
-                                                            : _localFeedProvider.GetBestLocalCIVersion( monitor, dep.PackageId )) )
+                    .Select( dep => (Dep: dep, LocalVersion: LocalFeed.GetBestVersion( monitor, dep.PackageId )) )
                     .Where( pv => pv.LocalVersion != null )
                     .Select( pv => new UpdatePackageInfo( pv.Dep.Owner.Solution.UniqueSolutionName, pv.Dep.Owner.Name, pv.Dep.PackageId, pv.LocalVersion ) );
         }
 
         bool LocalCommit( IActivityMonitor m )
         {
-            bool onLocal = IsOnLocalBranch && Folder.StandardGitStatus == StandardGitStatus.LocalBranch;
-            Debug.Assert( onLocal || (IsOnDevelopBranch && Folder.StandardGitStatus == StandardGitStatus.DevelopBranch) );
-            return onLocal
+            Debug.Assert( IsActive );
+            return PluginBranch == StandardGitStatus.Local
                     ? Folder.AmendCommit( m ).Success
                     : Folder.Commit( m, "Local build auto commit." ).Success;
         }
 
-        bool IsActive => (IsOnLocalBranch && Folder.StandardGitStatus == StandardGitStatus.LocalBranch)
-                         || (IsOnDevelopBranch && Folder.StandardGitStatus == StandardGitStatus.DevelopBranch);
+        /// <summary>
+        /// Gets whether this plugin is able to work.
+        /// It provides services only on local or develop and if the <see cref="GitFolder.StandardGitStatus"/>
+        /// is the same as <see cref="GitBranchPluginBase.PluginBranch"/>.
+        /// </summary>
+        bool IsActive => Folder.StandardGitStatus == PluginBranch
+                         && (PluginBranch == StandardGitStatus.Local || PluginBranch != StandardGitStatus.Develop);
 
         public bool IsUpgradeLocalPackagesEnabled => _worldState.WorkStatus == GlobalWorkStatus.Idle && IsActive;
 
@@ -276,21 +270,21 @@ namespace CK.Env.Plugins
         public bool LocalBuild( IActivityMonitor monitor, bool upgradeLocalDependencies = true, bool withUnitTest = true )
         {
             if( !IsLocalBuildEnabled ) throw new InvalidOperationException( nameof( IsLocalBuildEnabled ) );
-            var buildType = IsOnLocalBranch ? BuildType.Local : BuildType.LocalDevelop;
-            return DoLocalBuild( monitor, upgradeLocalDependencies, withUnitTest, buildType );
+            var buildType = PluginBranch == StandardGitStatus.Local ? BuildType.Local : BuildType.Develop;
+            return DoBuild( monitor, upgradeLocalDependencies, withUnitTest, buildType );
         }
 
-        bool ISolutionDriver.LocalBuild(IActivityMonitor monitor, bool upgradeLocalDependencies, bool withUnitTest)
+        bool ISolutionDriver.Build( IActivityMonitor monitor, bool upgradeLocalDependencies, bool withUnitTest )
         {
             var buildType = _worldState.WorkStatus == GlobalWorkStatus.SwitchingToDevelop
                             ? BuildType.SwitchToDevelop
-                            : (IsOnLocalBranch
+                            : (PluginBranch == StandardGitStatus.Local
                                 ? BuildType.Local
-                                : BuildType.LocalDevelop);
-            return DoLocalBuild( monitor, upgradeLocalDependencies, withUnitTest, buildType );
+                                : BuildType.Develop);
+            return DoBuild( monitor, upgradeLocalDependencies, withUnitTest, buildType );
         }
 
-        bool DoLocalBuild( IActivityMonitor monitor, bool upgradeLocalDependencies, bool withUnitTest, BuildType buildType )
+        bool DoBuild( IActivityMonitor monitor, bool upgradeLocalDependencies, bool withUnitTest, BuildType buildType )
         {
             var primary = EnsureLoaded( monitor );
             if( primary == null ) return false;
@@ -307,7 +301,7 @@ namespace CK.Env.Plugins
             var publishedNames = primary.LoadedSecondarySolutions.Append( primary )
                                             .SelectMany( s => s.PublishedProjects )
                                             .Select( p => p.Name );
-            bool buildRequired = publishedNames.Any( p => _localFeedProvider.GetLocalPackage( monitor, p, v ) == null );
+            bool buildRequired = publishedNames.Any( p => _localFeedProvider.Local.GetPackageFile( monitor, p, v ) == null );
             if( !buildRequired )
             {
                 monitor.Info( $"All {publishedNames.Count()} packages are already published in version {v}: {publishedNames.Concatenate()}." );

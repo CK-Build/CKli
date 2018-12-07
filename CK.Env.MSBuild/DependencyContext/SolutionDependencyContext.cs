@@ -237,18 +237,6 @@ namespace CK.Env.MSBuild
 
             IReadOnlyCollection<IDependentSolution> IDependentSolution.TransitiveImpacts => TransitiveImpacts;
 
-            ISolutionDriver IDependentSolution.GetSolutionDriver( IActivityMonitor m )
-            {
-                if( Solution.BranchName == null )
-                {
-                    m.Error( "Solution is not in a branch." );
-                    return null;
-                }
-                var d = Solution.GitFolder.PluginManager.BranchPlugins[Solution.BranchName].OfType<ISolutionDriver>().FirstOrDefault();
-                if( d == null ) m.Error( "Unable to find a Solution driver fore the solution." );
-                return d;
-            }
-
             #endregion
 
             internal void Initialize( SolutionDependencyContext global )
@@ -378,6 +366,7 @@ namespace CK.Env.MSBuild
         /// <param name="c">The content strategy.</param>
         /// <param name="rSolution">The dependency sorter result.</param>
         internal SolutionDependencyContext(
+            string uniqueBranchName,
             SolutionSortStrategy c,
             IDependencySorterResult rSolution,
             ProjectDependencyResult projectDeps,
@@ -385,7 +374,8 @@ namespace CK.Env.MSBuild
         {
             Debug.Assert( projectDeps != null );
             Debug.Assert( buildProjectsInfo != null && rSolution != null && !rSolution.IsComplete );
-            Content = c;
+            UniqueBranchName = uniqueBranchName;
+            SolutionSortStrategy = c;
             RawSolutionSorterResult = rSolution;
             BuildProjectsInfo = buildProjectsInfo;
             ProjectDependencies = projectDeps;
@@ -394,8 +384,9 @@ namespace CK.Env.MSBuild
         }
 
         internal SolutionDependencyContext(
+            string uniqueBranchName,
             Dictionary<string, DependentSolution> indexByName,
-            SolutionSortStrategy c,
+            SolutionSortStrategy strategy,
             IDependencySorterResult r,
             ProjectDependencyResult projectDeps,
             IReadOnlyList<DependencyRow> t,
@@ -403,8 +394,9 @@ namespace CK.Env.MSBuild
             BuildProjectsInfo buildProjectsInfo )
         {
             Debug.Assert( r != null && r.IsComplete && t != null && solutions != null );
+            UniqueBranchName = uniqueBranchName;
             _indexByName = indexByName;
-            Content = c;
+            SolutionSortStrategy = strategy;
             RawSolutionSorterResult = r;
             ProjectDependencies = projectDeps;
             BuildProjectsInfo = buildProjectsInfo;
@@ -417,9 +409,15 @@ namespace CK.Env.MSBuild
         }
 
         /// <summary>
+        /// Gets the unique branch name from which all solutions have been analyzed.
+        /// If solutions were in more than one branch, this is null.
+        /// </summary>
+        public string UniqueBranchName { get; }
+
+        /// <summary>
         /// Gets the kind of projects that have been considered to sort solutions.
         /// </summary>
-        public SolutionSortStrategy Content { get; }
+        public SolutionSortStrategy SolutionSortStrategy { get; }
 
         /// <summary>
         /// Gets the project dependency result.
@@ -434,6 +432,13 @@ namespace CK.Env.MSBuild
         /// The <see cref="PackageDependencies"/> is a more abstract view of this.
         /// </summary>
         public IReadOnlyList<DependencyRow> DependencyTable { get; }
+
+        /// <summary>
+        /// Gets the package dependencies between solutions.
+        /// This is a more abstract view of the <see cref="DependencyTable"/> that does not
+        /// contain any row for a solution that has no dependency.
+        /// </summary>
+        public IReadOnlyCollection<ILocalPackageDependency> PackageDependencies { get; }
 
         /// <summary>
         /// Gets the global, sorted, dependencies informations between solutions.
@@ -453,21 +458,13 @@ namespace CK.Env.MSBuild
         public bool HasError => !RawSolutionSorterResult.IsComplete || BuildProjectsInfo.HasError;
 
         /// <summary>
-        /// Gets the build info.
-        /// Never null.
+        /// Gets the build info. Never null.
         /// </summary>
         public BuildProjectsInfo BuildProjectsInfo { get; }
 
         IReadOnlyList<IDependentSolution> IDependentSolutionContext.Solutions => Solutions;
 
         IReadOnlyList<ZeroBuildProjectInfo> IDependentSolutionContext.ZeroBuildProjects => BuildProjectsInfo.ZeroBuildProjects;
-
-        /// <summary>
-        /// Gets the package dependencies between solutions.
-        /// This is a more abstract view of the <see cref="DependencyTable"/> that does not
-        /// contain any row for a solution that has no dependency.
-        /// </summary>
-        public IReadOnlyCollection<ILocalPackageDependency> PackageDependencies { get; }
 
 
     }

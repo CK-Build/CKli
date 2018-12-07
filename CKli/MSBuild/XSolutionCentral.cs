@@ -113,7 +113,6 @@ namespace CKli
             foreach( var git in gitFolders )
             {
                 ++gitFoldersCount;
-                hasPluginInitError |= !git.EnsureCurrentBranchPlugins( m );
                 using( m.OpenInfo( $"{git.SubPath} - branch: {git.CurrentBranchName}." ) )
                 {
                     string pluginInfo;

@@ -10,27 +10,26 @@ using System.Xml.Linq;
 
 namespace CK.Env.Plugins.SolutionFiles
 {
-    public class CKSetupStoreTestHelperConfigFile : GitFolderTextFileBase, IGitBranchPlugin, ICommandMethodsProvider, IDisposable
+    public class CKSetupStoreTestHelperConfigFile : TextFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider, IDisposable
     {
         readonly ISolutionSettings _settings;
         readonly SolutionDriver _solutionDriver;
-        readonly ILocalFeedProvider _localFeedProvider;
+        readonly IEnvLocalFeedProvider _localFeedProvider;
 
         public CKSetupStoreTestHelperConfigFile(
             GitFolder f,
             SolutionDriver solutionDriver,
             ISolutionSettings settings,
-            ILocalFeedProvider localFeedProvider,
+            IEnvLocalFeedProvider localFeedProvider,
             NormalizedPath branchPath )
-            : base( f, branchPath.AppendPart( "RemoteStore.TestHelper.config" ) )
+            : base( f, branchPath, branchPath.AppendPart( "RemoteStore.TestHelper.config" ) )
         {
             _settings = settings;
             _solutionDriver = solutionDriver;
             _localFeedProvider = localFeedProvider;
-            BranchPath = branchPath;
             // Always monitor branch change even if _settings.ProduceCKSetupComponents is false
             // so that we delete the test file on leaving local if it happens to exist.
-            if( IsOnLocalBranch )
+            if( PluginBranch == StandardGitStatus.Local )
             {
                 f.OnLocalBranchEntered += OnLocalBranchEntered;
                 f.OnLocalBranchLeaving += OnLocalBranchLeaving;
@@ -59,7 +58,7 @@ namespace CK.Env.Plugins.SolutionFiles
             //        storeConf.TargetStoreUrl = System.IO.Path.Combine( globalInfo.LocalFeedPath, "CKSetupStore" );
             //    }
             //
-            if( e.BuildType == BuildType.Local || e.BuildType != BuildType.RemoteDevelop ) return;
+            if( e.BuildType == BuildType.Local || e.BuildType != BuildType.DevelopWithRemotes ) return;
             Debug.Assert( e.IsUsingDirtyFolder );
 
             // Ensures that the local stores exist.
@@ -77,14 +76,10 @@ namespace CK.Env.Plugins.SolutionFiles
         {
             // This is an untracked file. It has to be removed, even with BuildType.IsUsingDirtyFolder
             // (except of course on the local branch).
-            if( !IsOnLocalBranch ) Delete( e.Monitor );
+            if( PluginBranch != StandardGitStatus.Local ) Delete( e.Monitor );
         }
 
-        public NormalizedPath BranchPath { get; }
-
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
-
-        public bool IsOnLocalBranch => BranchPath.LastPart == Folder.World.LocalBranchName;
 
         public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
 
@@ -92,9 +87,9 @@ namespace CK.Env.Plugins.SolutionFiles
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
-            if( IsOnLocalBranch && _settings.ProduceCKSetupComponents && !_settings.NoUnitTests )
+            if( PluginBranch == StandardGitStatus.Local && _settings.ProduceCKSetupComponents && !_settings.NoUnitTests )
             {
-                EnsureLocalStorePath( m );
+                EnsureStorePath( m, _localFeedProvider.Local.PhysicalPath );
             }
             else
             {
@@ -104,7 +99,7 @@ namespace CK.Env.Plugins.SolutionFiles
 
         public void Dispose()
         {
-            if( IsOnLocalBranch )
+            if( PluginBranch == StandardGitStatus.Local )
             {
                 Folder.OnLocalBranchEntered -= OnLocalBranchEntered;
                 Folder.OnLocalBranchLeaving -= OnLocalBranchLeaving;
@@ -115,12 +110,7 @@ namespace CK.Env.Plugins.SolutionFiles
 
         void OnLocalBranchEntered( object sender, EventMonitoredArgs e )
         {
-            if( _settings.ProduceCKSetupComponents ) EnsureLocalStorePath( e.Monitor );
-        }
-
-        bool EnsureLocalStorePath( IActivityMonitor m )
-        {
-            return EnsureStorePath( m, _localFeedProvider.GetLocalCKSetupStorePath( m ) );
+            if( _settings.ProduceCKSetupComponents ) EnsureStorePath( e.Monitor, _localFeedProvider.Local.PhysicalPath );
         }
 
         public bool EnsureStorePath( IActivityMonitor m, string storePath )

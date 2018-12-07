@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Setup;
+using CK.Text;
 using CSemVer;
 using System;
 using System.Collections.Generic;
@@ -202,17 +203,33 @@ namespace CK.Env.MSBuild
         }
 
         DependencyAnalyser(
+            string uniqueBranchName,
             Solution[] solutions,
             Dictionary<string, Package> packages,
             ProjectItem.Cache projects,
             CKTrait frameworks )
         {
+            UniqueBranchName = uniqueBranchName;
             _solutions = solutions;
             _packages = packages;
             _projects = projects;
             _frameworks = frameworks;
         }
 
+        /// <summary>
+        /// Gets the unique branch name from which all solutions have been analyzed.
+        /// If solutions were in more than one branch, this is null.
+        /// </summary>
+        public string UniqueBranchName { get; }
+
+        /// <summary>
+        /// Gets the set of solutions.
+        /// </summary>
+        public IReadOnlyCollection<Solution> Solutions => _solutions;
+
+        /// <summary>
+        /// Gets project dependency information.
+        /// </summary>
         public ProjectDependencyResult ProjectDependencies
         {
             get
@@ -277,49 +294,47 @@ namespace CK.Env.MSBuild
                 if( !rBuildProjects.IsComplete )
                 {
                     rBuildProjects.LogError( m );
-                    return new BuildProjectsInfo( rBuildProjects, null, null, null );
+                    return new BuildProjectsInfo( rBuildProjects, null );
                 }
                 else
                 {
                     var rankedProjects = rBuildProjects.SortedItems
                                                 .Where( i => i.Item is IDependentProject )
-                                                .Select( i => (i.Rank, Project: (IDependentProject)i.Item) );
-
-                    var localDepsToBuild = rankedProjects
-                                                .Where( p => p.Project.IsPublished )
-                                                .ToArray();
-                    if( localDepsToBuild.Length == 0 )
-                    {
-                        return new BuildProjectsInfo( rBuildProjects, null, null, null );
-                    }
-                    var localDepsName = new HashSet<string>( localDepsToBuild.Select( d => d.Project.Project.Name ) );
-
-                    var projectsToUpgrade = rankedProjects.Select( p => (
-                                                                    p.Project,
-                                                                    Packages: (IReadOnlyList<IDependentPackage>)p.Project.Project
-                                                                                .Deps.Packages
-                                                                                .Where( a => localDepsName.Contains( a.PackageId ) )
-                                                                                .Select( a => _packages[a.PackageId] )
-                                                                                .ToArray()
-                                                                        ) )
-                                                            .Where( pU => pU.Packages.Count > 0 )
-                                                            .ToArray();
+                                                .Select( i => (i.Rank,
+                                                               Project: (IDependentProject)i.Item,
+                                                               DirectDeps: i.Requires
+                                                                            .Select( s => s.Item )
+                                                                            .OfType<IDependentProject>(),
+                                                               AllDeps: i.GetAllRequires()
+                                                                         .Select( s => s.Item )
+                                                                         .OfType<IDependentProject>() ) );
 
                     var zeroBuildProjects = rankedProjects.Select( p => new ZeroBuildProjectInfo(
-                                                                        p.Rank,   
-                                                                        p.Project.Project.Solution.UniqueSolutionName,
-                                                                        p.Project.Project.Name,
-                                                                        p.Project.IsPublished,
-                                                                        p.Project.Project.Deps.Packages
-                                                                                .Select( a => a.PackageId )
-                                                                                .Where( name => localDepsName.Contains( name ) )
-                                                                                .ToArray()
-                                                                        ) )
-                                                            .ToArray();
+                                    p.Rank,
+                                    p.Project.Project.Solution.UniqueSolutionName,
+                                    p.Project.Project.Name,
+                                    p.Project.IsPublished,
+                                    // UpgradePackages: Among direct dependencies, consider only the
+                                    //                  packages and the ones who are actually referenced
+                                    //                  as a package (ignores ProjectReference).
+                                    p.DirectDeps
+                                        .Where( d => d.IsPublished
+                                                     && p.Project.Project
+                                                         .Deps.Packages.Any( dep => dep.PackageId == d.Project.Name ) )
+                                        .Select( d => d.Project.Name )
+                                        .ToArray(),
+                                    // Dependencies: Considers all the projects and computes their ZeroBuildProjectInfo.FullName. 
+                                    p.AllDeps
+                                            .Select( d => d.IsPublished
+                                                            ? d.Project.Name
+                                                            : d.Project.Solution.UniqueSolutionName + '/' + d.Project.Name )
+                                            .ToArray()
+                                    ) )
+                        .ToArray();
 
                     Debug.Assert( zeroBuildProjects.Select( z => z.Rank ).IsSortedLarge() );
 
-                    return new BuildProjectsInfo( rBuildProjects, localDepsToBuild, projectsToUpgrade, zeroBuildProjects );
+                    return new BuildProjectsInfo( rBuildProjects, zeroBuildProjects );
                 }
             }
             finally
@@ -332,18 +347,18 @@ namespace CK.Env.MSBuild
         /// Creates a new <see cref="SolutionDependencyContext"/>.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="content">The strategy.</param>
+        /// <param name="strategy">The strategy.</param>
         /// <returns>The context or null on error.</returns>
-        public SolutionDependencyContext CreateDependencyContext( IActivityMonitor m, SolutionSortStrategy content = SolutionSortStrategy.EverythingExceptBuildProjects )
+        public SolutionDependencyContext CreateDependencyContext( IActivityMonitor m, SolutionSortStrategy strategy = SolutionSortStrategy.EverythingExceptBuildProjects )
         {
             var sortables = new Dictionary<Solution, SortableSolutionFile>();
             // Handles Primary solutions first.
             foreach( var s in _solutions )
             {
                 if( s.PrimarySolution != null ) continue;
-                sortables.Add( s, new SortableSolutionFile( s, GetProjectItems( s, content ) ) );
+                sortables.Add( s, new SortableSolutionFile( s, GetProjectItems( s, strategy ) ) );
             }
-            if( content == SolutionSortStrategy.EverythingExceptBuildProjects )
+            if( strategy == SolutionSortStrategy.EverythingExceptBuildProjects )
             {
                 // Handles Secondary solutions.
                 foreach( var s in _solutions )
@@ -352,16 +367,16 @@ namespace CK.Env.MSBuild
                     if( s.SpecialType == SolutionSpecialType.IncludedSecondarySolution )
                     {
                         var primary = sortables[s.PrimarySolution];
-                        primary.AddSecondaryProjects( GetProjectItems( s, content ) );
+                        primary.AddSecondaryProjects( GetProjectItems( s, strategy ) );
                     }
-                    else sortables.Add( s, new SortableSolutionFile( s, GetProjectItems( s, content ) ) );
+                    else sortables.Add( s, new SortableSolutionFile( s, GetProjectItems( s, strategy ) ) );
                 }
             }
 
             IDependencySorterResult result = DependencySorter.OrderItems( m, sortables.Values, null );
             if( !result.IsComplete )
             {
-                return new SolutionDependencyContext( content, result, ProjectDependencies, GetBuildProjectInfo( m ) );
+                return new SolutionDependencyContext( UniqueBranchName, strategy, result, ProjectDependencies, GetBuildProjectInfo( m ) );
             }
             // Building the list of SolutionDependencyContext.DependencyRow.
             var table = result.SortedItems
@@ -414,7 +429,7 @@ namespace CK.Env.MSBuild
                     indexByName.Add( current.UniqueSolutionName, newDependent );
                 }
             }
-            return new SolutionDependencyContext( indexByName, content, result, ProjectDependencies, table, depSolutions, GetBuildProjectInfo( m ) );
+            return new SolutionDependencyContext( UniqueBranchName, indexByName, strategy, result, ProjectDependencies, table, depSolutions, GetBuildProjectInfo( m ) );
         }
 
         IEnumerable<ProjectItem> GetProjectItems( Solution s, SolutionSortStrategy content )
@@ -435,7 +450,7 @@ namespace CK.Env.MSBuild
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="solutionFiles">The set of <see cref="Solution"/> to consider.</param>
-        /// <returns>A new depednency context.</returns>
+        /// <returns>A new dependency context.</returns>
         static public DependencyAnalyser Create( IActivityMonitor m, IEnumerable<Solution> solutionFiles )
         {
             var packages = new Dictionary<string, Package>();
@@ -446,10 +461,15 @@ namespace CK.Env.MSBuild
             //       in the ProjectItem constructor.
             //       After having built the ProjectItem, we handle here the Packages (and PackageReferences between
             //       projects).
+            string uniqueBranchName = null;
+            int solutionCount = 0;
+            var branchNames = new List<string>();
             using( m.OpenDebug( "Creating all the ProjectItem for all projects in all solutions." ) )
             {
                 foreach( var s in solutions )
                 {
+                    ++solutionCount;
+                    if( !branchNames.Contains( s.BranchName ) ) branchNames.Add( s.BranchName );
                     using( m.OpenDebug( $"Solution {s.UniqueSolutionName}." ) )
                     {
                         foreach( var project in s.AllProjects )
@@ -459,6 +479,11 @@ namespace CK.Env.MSBuild
                         }
                     }
                 }
+                if( branchNames.Count > 1 )
+                {
+                    m.Warn( $"Dependency analyzer created on {solutionCount} solutions from more than one branch: {branchNames.Concatenate()}" );
+                }
+                else if( branchNames.Count > 0 ) uniqueBranchName = branchNames[0];
             }
             using( m.OpenDebug( "Creating Package for all Published projects in all solutions." ) )
             {
@@ -512,7 +537,7 @@ namespace CK.Env.MSBuild
                 }
 
             }
-            return new DependencyAnalyser( solutions, packages, projectItems, frameworks );
+            return new DependencyAnalyser( uniqueBranchName, solutions, packages, projectItems, frameworks );
         }
 
         static Package RegisterExternal( Dictionary<string, Package> externals, DeclaredPackageDependency dep )

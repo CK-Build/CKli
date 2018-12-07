@@ -9,18 +9,15 @@ using System.Xml.Linq;
 
 namespace CK.Env.Plugins.SolutionFiles
 {
-    public class GitIgnoreFile : GitFolderTextFileBase, IGitBranchPlugin, ICommandMethodsProvider
+    public class GitIgnoreFile : TextFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly ISolutionSettings _settings;
 
         public GitIgnoreFile( GitFolder f, ISolutionSettings settings, NormalizedPath branchPath )
-            : base( f, branchPath.AppendPart( ".gitignore" ) )
+            : base( f, branchPath, branchPath.AppendPart( ".gitignore" ) )
         {
             _settings = settings;
-            BranchPath = branchPath;
         }
-
-        public NormalizedPath BranchPath { get; }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 

@@ -6,7 +6,7 @@ using System.Xml.Linq;
 
 namespace CK.Env.Plugins.SolutionFiles
 {
-    public class RepositoryXmlFile : GitFolderXmlFile, IDisposable, IGitBranchPlugin, ICommandMethodsProvider
+    public class RepositoryXmlFile : XmlFilePluginBase, IDisposable, IGitBranchPlugin, ICommandMethodsProvider
     {
         static readonly XNamespace SVGNS = XNamespace.Get( "http://csemver.org/schemas/2015" );
         static readonly XName XRootName = SVGNS + "RepositoryInfo";
@@ -18,10 +18,9 @@ namespace CK.Env.Plugins.SolutionFiles
         XElement _branches;
 
         public RepositoryXmlFile( GitFolder f, NormalizedPath branchPath, SolutionDriver driver )
-            : base( f, branchPath.AppendPart( "RepositoryInfo.xml" ) )
+            : base( f, branchPath, branchPath.AppendPart( "RepositoryInfo.xml" ) )
         {
-            BranchPath = branchPath;
-            if( IsOnLocalBranch )
+            if( PluginBranch == StandardGitStatus.Local )
             {
                 f.OnLocalBranchEntered += OnLocalBranchEntered;
                 f.OnLocalBranchLeaving += OnLocalBranchLeaving;
@@ -39,11 +38,7 @@ namespace CK.Env.Plugins.SolutionFiles
             }
         }
 
-        public NormalizedPath BranchPath { get; }
-
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
-
-        public bool IsOnLocalBranch => BranchPath.LastPart == Folder.World.LocalBranchName;
 
         void OnLocalBranchEntered( object sender, EventMonitoredArgs e )
         {
@@ -70,7 +65,7 @@ namespace CK.Env.Plugins.SolutionFiles
         {
             if( !this.CheckCurrentBranch( m ) ) return;
             EnsureBranchMapping( m, Folder.World.DevelopBranchName, "develop" );
-            if( IsOnLocalBranch )
+            if( PluginBranch == StandardGitStatus.Local )
             {
                 EnsureLocalBranch( m );
             }
@@ -85,13 +80,13 @@ namespace CK.Env.Plugins.SolutionFiles
         }
 
         /// <summary>
-        /// Ensures that the <see cref="GitFolderXmlFile.Document"/> exists.
+        /// Ensures that the <see cref="XmlFilePluginBase.Document"/> exists.
         /// </summary>
         /// <returns>The xml document.</returns>
         public XDocument EnsureDocument() => Document ?? (Document = new XDocument( new XElement( XRootName ) ));
 
         /// <summary>
-        /// Ensures that Branches element exists in the non null <see cref="GitFolderXmlFile.Document"/>.
+        /// Ensures that Branches element exists in the non null <see cref="XmlFilePluginBase.Document"/>.
         /// If the Document is null, this is null.
         /// </summary>
         public XElement Branches => _branches ?? (_branches = Document?.Root.EnsureElement( XBranchesName ) );

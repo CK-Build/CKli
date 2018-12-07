@@ -56,11 +56,6 @@ namespace CK.Env.MSBuild
         }
 
         /// <summary>
-        /// Gets the solution settings that applies to this solution.
-        /// </summary>
-        public ISolutionSettings Settings { get; }
-
-        /// <summary>
         /// Gets the branch name.
         /// Null if <see cref="GitFolder"/> is null or if the solution
         /// is not in "branches" or "remotes".
@@ -278,7 +273,6 @@ namespace CK.Env.MSBuild
             string branchName,
             NormalizedPath filePath,
             NormalizedPath folderPath,
-            ISolutionSettings settings,
             string version,
             string visualStudioVersion,
             string minimumVisualStudioVersion,
@@ -289,7 +283,6 @@ namespace CK.Env.MSBuild
             BranchName = branchName;
             FilePath = filePath;
             SolutionFolderPath = folderPath;
-            Settings = settings;
             FileFormatVersion = version;
             VisualStudioVersion = visualStudioVersion;
             MinimumVisualStudioVersion = minimumVisualStudioVersion;
@@ -306,8 +299,7 @@ namespace CK.Env.MSBuild
         static internal Solution Load(
             IActivityMonitor m,
             MSBuildContext ctx,
-            NormalizedPath filePath,
-            ISolutionSettings settings )
+            NormalizedPath filePath )
         {
             if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
             var file = ctx.FileSystem.GetFileInfo( filePath ).AsTextFileInfo();
@@ -380,7 +372,6 @@ namespace CK.Env.MSBuild
                     branchName,
                     filePath,
                     folderPath,
-                    settings,
                     version,
                     visualStudioVersion,
                     minimumVisualStudioVersion,

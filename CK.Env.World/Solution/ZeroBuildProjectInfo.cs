@@ -18,18 +18,28 @@ namespace CK.Env
         /// <param name="solutionName">The solution name. Can not be empty.</param>
         /// <param name="projectName">The project name. Can not be empty.</param>
         /// <param name="mustPack">True if this is a published project.</param>
-        /// <param name="buildPackageDependencies">List of pacakeg dependencies.</param>
-        public ZeroBuildProjectInfo( int rank, string solutionName, string projectName, bool mustPack, IReadOnlyCollection<string> buildPackageDependencies )
+        /// <param name="upgradePackages">Set of packages reference to upgrade.</param>
+        /// <param name="dependencies">List of package dependencies' <see cref="FullName"/> projects.</param>
+        public ZeroBuildProjectInfo(
+            int rank,
+            string solutionName,
+            string projectName,
+            bool mustPack,
+            IReadOnlyCollection<string> upgradePackages,
+            IReadOnlyCollection<string> dependencies )
         {
             if( Rank < 0 ) throw new ArgumentException();
             if( String.IsNullOrWhiteSpace( solutionName ) ) throw new ArgumentNullException( nameof( solutionName ) );
             if( String.IsNullOrWhiteSpace( projectName ) ) throw new ArgumentNullException( nameof( projectName ) );
-            if( buildPackageDependencies == null ) throw new ArgumentNullException( nameof( buildPackageDependencies ) );
+            if( upgradePackages == null ) throw new ArgumentNullException( nameof( upgradePackages ) );
+            if( dependencies == null ) throw new ArgumentNullException( nameof( dependencies ) );
             Rank = rank;
             SolutionName = solutionName;
             ProjectName = projectName;
             MustPack = mustPack;
-            BuildPackageDependencies = buildPackageDependencies;
+            UpgradePackages = upgradePackages;
+            Dependencies = dependencies;
+            FullName = mustPack ? projectName : solutionName + '/' + projectName;
         }
 
         /// <summary>
@@ -56,7 +66,25 @@ namespace CK.Env
         /// <summary>
         /// Gets the name of the packages that must be updated to the Zero Version.
         /// </summary>
-        public IReadOnlyCollection<string> BuildPackageDependencies { get; }
+        public IReadOnlyCollection<string> UpgradePackages { get; }
+
+        /// <summary>
+        /// Gets the <see cref="FullName"/> of the projects that are (transitively) used by this project.
+        /// </summary>
+        public IReadOnlyCollection<string> Dependencies { get; }
+
+        /// <summary>
+        /// Gets the name that identifies this project.
+        /// It is the <see cref="ProjectName"/> if <see cref="MustPack"/> is true
+        /// (name of the package) and <see cref="SolutionName"/>/<see cref="ProjectName"/> otherwise.
+        /// </summary>
+        public string FullName { get; }
+
+        /// <summary>
+        /// Returns the <see cref="FullName"/>.
+        /// </summary>
+        /// <returns>A readable string.</returns>
+        public override string ToString() => FullName;
     }
 
 

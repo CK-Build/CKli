@@ -56,7 +56,6 @@ namespace CKli
             return SolutionCentral.MSBuildContext.FindOrLoadSolution(
                         m,
                         GetSolutionFilePath( projectToBranchName ),
-                        SolutionSettings.SolutionSettings,
                         primary,
                         SpecialType,
                         reload ).Solution;

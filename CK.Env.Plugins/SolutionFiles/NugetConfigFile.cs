@@ -10,27 +10,26 @@ using System.Xml.Linq;
 
 namespace CK.Env.Plugins.SolutionFiles
 {
-    public class NugetConfigFile : GitFolderXmlFile, IDisposable, IGitBranchPlugin, ICommandMethodsProvider
+    public class NugetConfigFile : XmlFilePluginBase, IDisposable, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly ISolutionSettings _settings;
-        readonly ILocalFeedProvider _localFeedProvider;
+        readonly IEnvLocalFeedProvider _localFeedProvider;
         readonly SolutionDriver _solutionDriver;
         XElement _packageSources;
 
-        public NugetConfigFile( GitFolder f, SolutionDriver driver, ILocalFeedProvider localFeedProvider, ISolutionSettings s, NormalizedPath branchPath )
-            : base( f, branchPath.AppendPart( "NuGet.config" ) )
+        public NugetConfigFile( GitFolder f, SolutionDriver driver, IEnvLocalFeedProvider localFeedProvider, ISolutionSettings s, NormalizedPath branchPath )
+            : base( f, branchPath, branchPath.AppendPart( "NuGet.config" ) )
         {
             _localFeedProvider = localFeedProvider;
             _settings = s;
             _solutionDriver = driver;
-            BranchPath = branchPath;
             if( IsOnLocalBranch )
             {
                 f.OnLocalBranchEntered += OnLocalBranchEntered;
                 f.OnLocalBranchLeaving += OnLocalBranchLeaving;
             }
             // On local branch, the NuGet.config already has the LocalFeed/Local source.
-            if( !IsOnLocalBranch )
+            if( PluginBranch != StandardGitStatus.Local )
             {
                 _solutionDriver.OnZeroBuildProject += OnZeroBuildProject;
             }
@@ -39,7 +38,7 @@ namespace CK.Env.Plugins.SolutionFiles
 
         void OnZeroBuildProject( object sender, EventMonitoredArgs e )
         {
-            Debug.Assert( !IsOnLocalBranch );
+            Debug.Assert( PluginBranch != StandardGitStatus.Local );
             EnsureLocalFeeds( e.Monitor, false, ensureDevelop: true );
             Save( e.Monitor );
         }
@@ -47,7 +46,7 @@ namespace CK.Env.Plugins.SolutionFiles
         void OnStartBuild( object sender, BuildStartEventArgs e )
         {
             // Building on 'local' and 'remote develop' uses the CodeCakeBuilder as-is.
-            if( e.BuildType == BuildType.Local || e.BuildType != BuildType.RemoteDevelop ) return;
+            if( e.BuildType == BuildType.Local || e.BuildType != BuildType.DevelopWithRemotes ) return;
 
             Debug.Assert( (e.BuildType & BuildType.IsTargetLocal) == 0 );
             Debug.Assert( e.IsUsingDirtyFolder );
@@ -75,8 +74,6 @@ namespace CK.Env.Plugins.SolutionFiles
             Folder.OnLocalBranchEntered -= OnLocalBranchEntered;
             Folder.OnLocalBranchLeaving -= OnLocalBranchLeaving;
         }
-
-        public NormalizedPath BranchPath { get; }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
@@ -114,19 +111,19 @@ namespace CK.Env.Plugins.SolutionFiles
         }
 
         /// <summary>
-        /// Ensures that the <see cref="GitFolderXmlFile.Document"/> exists.
+        /// Ensures that the <see cref="XmlFilePluginBase.Document"/> exists.
         /// </summary>
         /// <returns>The xml document.</returns>
         public XDocument EnsureDocument() => Document ?? (Document = new XDocument( new XElement( "configuration" ) ));
 
         /// <summary>
-        /// Ensures that packageSources element is the first element of the non null <see cref="GitFolderXmlFile.Document"/>.
+        /// Ensures that packageSources element is the first element of the non null <see cref="XmlFilePluginBase.Document"/>.
         /// If the Document is null, this is null.
         /// </summary>
         public XElement PackageSources => _packageSources ?? (_packageSources = Document?.Root.EnsureFirstElement( "packageSources" ));
 
         /// <summary>
-        /// Ensures that packageSources element is the first element of the <see cref="GitFolderXmlFile.Document"/>.
+        /// Ensures that packageSources element is the first element of the <see cref="XmlFilePluginBase.Document"/>.
         /// <see cref="EnsureDocument()"/> is called.
         /// </summary>
         public XElement EnsurePackageSources()
@@ -182,15 +179,15 @@ namespace CK.Env.Plugins.SolutionFiles
         {
             if( ensureLocal )
             {
-                EnsureFeed( m, "LocalFeed-Local", _localFeedProvider.GetLocalFeedFolder( m ).PhysicalPath );
+                EnsureFeed( m, "LocalFeed-Local", _localFeedProvider.Local.PhysicalPath );
             }
             if( ensureDevelop )
             {
-                EnsureFeed( m, "LocalFeed-Develop", _localFeedProvider.GetCIFeedFolder( m ).PhysicalPath );
+                EnsureFeed( m, "LocalFeed-Develop", _localFeedProvider.Develop.PhysicalPath );
             }
             if( ensureRelease )
             {
-                EnsureFeed( m, "LocalFeed-Release", _localFeedProvider.GetReleaseFeedFolder( m ).PhysicalPath );
+                EnsureFeed( m, "LocalFeed-Master", _localFeedProvider.Master.PhysicalPath );
             }
         }
 
@@ -233,7 +230,7 @@ namespace CK.Env.Plugins.SolutionFiles
         {
             RemoveFeed( m, "LocalFeed-Local", false );
             RemoveFeed( m, "LocalFeed-Develop", false );
-            RemoveFeed( m, "LocalFeed-Release", false );
+            RemoveFeed( m, "LocalFeed-Master", false );
         }
     }
 }

@@ -16,15 +16,11 @@ namespace CK.Env.MSBuild
     {
         internal BuildProjectsInfo(
             IDependencySorterResult sortResult,
-            IReadOnlyList<(int Rank, IDependentProject Project)> dependenciesToBuild,
-            IReadOnlyList<(IDependentProject Project, IReadOnlyList<IDependentPackage> Packages)> projectsToUpgrade,
             IReadOnlyList<ZeroBuildProjectInfo> zeroBuildProjects )
         {
-            Debug.Assert( sortResult != null );
+            Debug.Assert( sortResult != null && sortResult.IsComplete == (zeroBuildProjects != null) );
             RawBuildProjectsInfoSorterResult = sortResult;
-            DependenciesToBuild = dependenciesToBuild ?? Array.Empty<(int, IDependentProject)>();
-            ProjectsToUpgrade = projectsToUpgrade ?? Array.Empty<(IDependentProject, IReadOnlyList<IDependentPackage>)>();
-            ZeroBuildProjects = zeroBuildProjects ?? Array.Empty<ZeroBuildProjectInfo>();
+            ZeroBuildProjects = zeroBuildProjects;
         }
 
         /// <summary>
@@ -39,22 +35,8 @@ namespace CK.Env.MSBuild
         public bool HasError => !RawBuildProjectsInfoSorterResult.IsComplete;
 
         /// <summary>
-        /// Gets the projects that must be built: these are all projects that are referenced by
-        /// at least one build project and that generate a package.
-        /// Never null. Empty if <see cref="HasError"/> is true.
-        /// </summary>
-        public IReadOnlyList<(int Rank, IDependentProject Project)> DependenciesToBuild { get; }
-
-        /// <summary>
-        /// Gets the projects that references at least one of the <see cref="DependenciesToBuild"/> as
-        /// a package reference with their respective referenced packages.
-        /// Never null. Empty if <see cref="HasError"/> is true.
-        /// </summary>
-        public IReadOnlyList<(IDependentProject Project, IReadOnlyList<IDependentPackage> Packages)> ProjectsToUpgrade { get; }
-
-        /// <summary>
         /// Gets the ordered list of <see cref="ZeroBuildProjectInfo"/>.
-        /// Never null. Empty if <see cref="HasError"/> is true.
+        /// Null if <see cref="HasError"/> is true.
         /// </summary>
         public IReadOnlyList<ZeroBuildProjectInfo> ZeroBuildProjects { get; }
     }

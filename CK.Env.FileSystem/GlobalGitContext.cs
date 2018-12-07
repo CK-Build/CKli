@@ -86,27 +86,27 @@ namespace CK.Env
             m.Info( $"All Git folders are on {current}." );
             if( current == World.DevelopBranchName )
             {
-                if( !isTransitioning && gitStatus == StandardGitStatus.LocalBranch )
+                if( !isTransitioning && gitStatus == StandardGitStatus.Local )
                 {
                     m.Error( $"All Git folders are on {World.DevelopBranchName} but Status is '{gitStatus}'." );
                     return false;
                 }
                 if( gitStatus == StandardGitStatus.Unknwon )
                 {
-                    gitStatus = StandardGitStatus.DevelopBranch;
+                    gitStatus = StandardGitStatus.Develop;
                     m.Info( $"Initializing status on {gitStatus}." );
                 }
                 return true;
             }
             Debug.Assert( current == World.LocalBranchName );
-            if( !isTransitioning && gitStatus == StandardGitStatus.DevelopBranch )
+            if( !isTransitioning && gitStatus == StandardGitStatus.Develop )
             {
                 m.Error( $"All Git folders are on {World.LocalBranchName} but Status is '{gitStatus}'." );
                 return false;
             }
             if( gitStatus == StandardGitStatus.Unknwon )
             {
-                gitStatus = StandardGitStatus.LocalBranch;
+                gitStatus = StandardGitStatus.Local;
                 m.Info( $"Initializing status on {gitStatus}." );
             }
             return true;

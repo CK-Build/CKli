@@ -46,12 +46,12 @@ namespace CK.Env
         /// <summary>
         /// Local only CI build on 'develop' branch. Artefacts are kept locally.
         /// </summary>
-        LocalDevelop = IsTargetDevelop | IsUsingDirtyFolder | 128,
+        Develop = IsTargetDevelop | IsUsingDirtyFolder | 128,
 
         /// <summary>
         /// CI build on 'develop'. Artefacts are published to remotes.
         /// </summary>
-        RemoteDevelop = IsTargetDevelop,
+        DevelopWithRemotes = IsTargetDevelop,
 
 
     }

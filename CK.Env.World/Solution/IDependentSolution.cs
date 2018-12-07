@@ -19,12 +19,6 @@ namespace CK.Env
         string BranchName { get; }
 
         /// <summary>
-        /// Gets the solution driver.
-        /// If no driver can be found, an error should be logged.
-        /// </summary>
-        ISolutionDriver GetSolutionDriver( IActivityMonitor m );
-
-        /// <summary>
         /// Gets the rank of this solution.
         /// </summary>
         int Rank { get; }

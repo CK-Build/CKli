@@ -9,20 +9,17 @@ using System.Xml.Linq;
 
 namespace CK.Env.Plugins.SolutionFiles
 {
-    public class SharedPropsFile : GitFolderXmlFile, IGitBranchPlugin, ICommandMethodsProvider
+    public class SharedPropsFile : XmlFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly CommonFolder _commonFolder;
         readonly ISolutionSettings _settings;
 
         public SharedPropsFile( CommonFolder f, ISolutionSettings settings, NormalizedPath branchPath )
-            : base( f.Folder, f.FolderPath.AppendPart( "Shared.props" ) )
+            : base( f.Folder, branchPath, f.FolderPath.AppendPart( "Shared.props" ) )
         {
             _commonFolder = f;
             _settings = settings;
-            BranchPath = branchPath;
         }
-
-        public NormalizedPath BranchPath { get; }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => BranchPath;
 

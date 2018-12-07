@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Text;
 using CKSetup;
 using Microsoft.Extensions.FileProviders;
 using System;
@@ -14,36 +15,26 @@ namespace CK.Env
     {
         public const string CKSetupStoreName = "CKSetupStore";
 
-        public static string GetReleaseCKSetupStorePath( this ILocalFeedProvider @this, IActivityMonitor m )
+        public static string GetCKSetupStorePath( this IEnvLocalFeed @this )
         {
-            return Path.Combine( @this.GetReleaseFeedFolder( m ).PhysicalPath, CKSetupStoreName );
+            return @this.PhysicalPath.AppendPart( CKSetupStoreName );
         }
 
-        public static string GetDevelopCKSetupStorePath( this ILocalFeedProvider @this, IActivityMonitor m )
+        public static string GetCKSetupStorePath( this IEnvLocalFeedProvider @this, IActivityMonitor m, BuildType buildType )
         {
-            return Path.Combine( @this.GetCIFeedFolder( m ).PhysicalPath, CKSetupStoreName );
-        }
-
-        public static string GetLocalCKSetupStorePath( this ILocalFeedProvider @this, IActivityMonitor m )
-        {
-            return Path.Combine( @this.GetLocalFeedFolder( m ).PhysicalPath, CKSetupStoreName );
-        }
-
-        public static string GetCKSetupStorePath( this ILocalFeedProvider @this, IActivityMonitor m, BuildType buildType )
-        {
-            if( (buildType & BuildType.IsTargetLocal) != 0 ) return @this.GetLocalCKSetupStorePath( m );
-            if( (buildType & BuildType.IsTargetDevelop) != 0 ) return @this.GetDevelopCKSetupStorePath( m );
-            if( (buildType & BuildType.IsTargetRelease) != 0 ) return @this.GetReleaseCKSetupStorePath( m );
+            if( (buildType & BuildType.IsTargetLocal) != 0 ) return @this.Local.GetCKSetupStorePath();
+            if( (buildType & BuildType.IsTargetDevelop) != 0 ) return @this.Develop.GetCKSetupStorePath();
+            if( (buildType & BuildType.IsTargetRelease) != 0 ) return @this.Master.GetCKSetupStorePath();
             throw new ArgumentException( nameof( BuildType ) );
         }
 
-        public static bool EnsureCKSetupStores( this ILocalFeedProvider @this, IActivityMonitor m )
+        public static bool EnsureCKSetupStores( this IEnvLocalFeedProvider @this, IActivityMonitor m )
         {
             try
             {
-                string EnsureStore( IFileInfo folder, Uri prototypeUrl )
+                string EnsureStore( IEnvLocalFeed feed, Uri prototypeUrl )
                 {
-                    string path = Path.Combine( folder.PhysicalPath, "CKSetupStore" );
+                    string path = feed.PhysicalPath.AppendPart( "CKSetupStore" );
                     if( !Directory.Exists( path ) ) Directory.CreateDirectory( path );
                     using( var s = LocalStore.OpenOrCreate( m, path ) )
                     {
@@ -51,9 +42,9 @@ namespace CK.Env
                     }
                     return path;
                 }
-                string releaseStore = EnsureStore( @this.GetReleaseFeedFolder( m ), Facade.DefaultStoreUrl );
-                string ciStore = EnsureStore( @this.GetCIFeedFolder( m ), new Uri( releaseStore ) );
-                string localStore = EnsureStore( @this.GetLocalFeedFolder( m ), new Uri( ciStore ) );
+                string masterStore = EnsureStore( @this.Master, Facade.DefaultStoreUrl );
+                string developStore = EnsureStore( @this.Develop, new Uri( masterStore ) );
+                string localStore = EnsureStore( @this.Local, new Uri( developStore ) );
                 return true;
             }
             catch( Exception ex )

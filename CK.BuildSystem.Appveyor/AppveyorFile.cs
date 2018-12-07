@@ -11,7 +11,7 @@ using System.Text;
 
 namespace CK.BuildSystem.Appveyor
 {
-    public class AppveyorFile : GitFolderTextFileBase, IGitBranchPlugin, ICommandMethodsProvider
+    public class AppveyorFile : TextFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly ISolutionSettings _settings;
         readonly ISecretKeyStore _secretStore;
@@ -20,14 +20,11 @@ namespace CK.BuildSystem.Appveyor
         YamlMapping _firstMapping;
 
         public AppveyorFile( GitFolder f, ISolutionSettings settings, ISecretKeyStore secretStore, NormalizedPath branchPath )
-            : base( f, branchPath.AppendPart( "Appveyor.yml" ) )
+            : base( f, branchPath, branchPath.AppendPart( "Appveyor.yml" ) )
         {
             _settings = settings;
             _secretStore = secretStore;
-            BranchPath = branchPath;
         }
-
-        public NormalizedPath BranchPath { get; }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 

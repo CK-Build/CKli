@@ -13,6 +13,11 @@ namespace CK.Env
         string PrimarySolutionName { get; }
 
         /// <summary>
+        /// Gets the current commit SHA1.
+        /// </summary>
+        string HeadCommitSHA1 { get; }
+
+        /// <summary>
         /// Gets the version information from a branch.
         /// </summary>
         /// <param name="m">The monitor to use.</param>

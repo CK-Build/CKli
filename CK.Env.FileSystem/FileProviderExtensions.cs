@@ -18,13 +18,5 @@ namespace CK.Env
             return @this.GetDirectoryContents( path.ToString() );
         }
 
-        /// <summary>
-        /// Gets a <see cref="FileProviderContentInfo"/> for a given <paramref name="root"/>.
-        /// </summary>
-        /// <param name="this">This file provider.</param>
-        /// <param name="root">Root path.</param>
-        /// <returns>A new <see cref="FileProviderContentInfo"/>.</returns>
-        public static FileProviderContentInfo GetContentInfo( this IFileProvider @this, NormalizedPath root ) => new FileProviderContentInfo( @this, root );
-
     }
 }

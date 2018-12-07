@@ -40,14 +40,14 @@ namespace CK.Env
         bool UpdatePackageDependencies( IActivityMonitor monitor, IEnumerable<UpdatePackageInfo> packageInfos );
 
         /// <summary>
-        /// Builds the solution in 'local' branch or build in 'develop' without remotes.
+        /// Builds the solution in 'local' or 'develop' branch without pushing to remotes.
         /// This also handles the build switching from 'local' to 'develop' (<see cref="GlobalWorkStatus.SwitchingToDevelop"/>).
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="upgradeLocalDependencies">False to not upgrade the available local dependencies.</param>
         /// <param name="withUnitTest">False to skip unit tests.</param>
         /// <returns>True on success, false on error.</returns>
-        bool LocalBuild( IActivityMonitor monitor, bool upgradeLocalDependencies = true, bool withUnitTest = true );
+        bool Build( IActivityMonitor monitor, bool upgradeLocalDependencies = true, bool withUnitTest = true );
 
         /// <summary>
         /// Builds the given project (that must be handled by this driver otherwise an exception is thrown)

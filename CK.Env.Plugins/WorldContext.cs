@@ -20,7 +20,7 @@ namespace CK.Env.MSBuild
     {
         readonly GlobalGitContext _globalGitContext;
         readonly IWorldStore _worldStore;
-        readonly ILocalFeedProvider _feeds;
+        readonly IEnvLocalFeedProvider _feeds;
         readonly INuGetClient _nugetClient;
         readonly ISecretKeyStore _secretKeyStore;
         readonly Func<IActivityMonitor, string, IReadOnlyList<Solution>> _branchSolutionsLoader;
@@ -70,7 +70,7 @@ namespace CK.Env.MSBuild
         WorldContext(
             GlobalGitContext git,
             IWorldStore store,
-            ILocalFeedProvider feeds,
+            IEnvLocalFeedProvider feeds,
             INuGetClient nuGetClient,
             ISecretKeyStore secretKeyStore,
             RawXmlWorldState worldState,
@@ -654,7 +654,7 @@ namespace CK.Env.MSBuild
             IActivityMonitor m,
             IWorldName world,
             IWorldStore worldStore,
-            ILocalFeedProvider feeds,
+            IEnvLocalFeedProvider feeds,
             INuGetClient nugetClient,
             ISecretKeyStore secretKeyStore,
             IEnumerable<GitFolder> gitFolders,

@@ -46,7 +46,7 @@ namespace CK.Env.MSBuild
             bool _hasChanged;
 
             /// <summary>
-            /// Gets the file path.
+            /// Gets the file path in the <see cref="FileSystem"/>.
             /// </summary>
             public NormalizedPath Path { get; }
 
@@ -141,7 +141,6 @@ namespace CK.Env.MSBuild
         public (Solution Solution, bool Loaded) FindOrLoadSolution(
             IActivityMonitor m,
             NormalizedPath path,
-            ISolutionSettings settings,
             Solution primary = null,
             SolutionSpecialType type = SolutionSpecialType.None,
             bool force = false )
@@ -156,7 +155,7 @@ namespace CK.Env.MSBuild
                     return (s, false);
                 }
             }
-            s = DoLoad( m, path, settings );
+            s = DoLoad( m, path );
             if( s != null )
             {
                 if( primary != null ) s.SetAsSecondarySolution( primary, type );
@@ -165,7 +164,7 @@ namespace CK.Env.MSBuild
             return (null, false);
         }
 
-        Solution DoLoad( IActivityMonitor m, NormalizedPath path, ISolutionSettings settings )
+        Solution DoLoad( IActivityMonitor m, NormalizedPath path )
         {
             using( m.OpenTrace( $"Loading solution {path}." ) )
             {
@@ -182,7 +181,7 @@ namespace CK.Env.MSBuild
                 }
                 try
                 {
-                    Solution s = Solution.Load( m, this, path, settings );
+                    Solution s = Solution.Load( m, this, path );
                     if( s != null ) _solutions.Add( path, s );
                     return s;
                 }

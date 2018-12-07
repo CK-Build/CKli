@@ -9,7 +9,7 @@ using System.Xml.Linq;
 
 namespace CK.Env.Plugins.SolutionFiles
 {
-    public class CodeCakeBuilderKeyVaultFile : GitFolderTextFileBase, IGitBranchPlugin, ICommandMethodsProvider
+    public class CodeCakeBuilderKeyVaultFile : TextFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly CodeCakeBuilderFolder _f;
         readonly ISolutionSettings _settings;
@@ -22,16 +22,13 @@ namespace CK.Env.Plugins.SolutionFiles
             ISecretKeyStore secretStore,
             INuGetClient nugetClient,
             NormalizedPath branchPath )
-            : base( f.Folder, f.FolderPath.AppendPart( "CodeCakeBuilderKeyVault.txt" ) )
+            : base( f.Folder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilderKeyVault.txt" ) )
         {
             _f = f;
             _settings = settings;
             _secretStore = secretStore;
             _nugetClient = nugetClient;
-            BranchPath = branchPath;
-        }
-
-        public NormalizedPath BranchPath { get; }
+       }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 

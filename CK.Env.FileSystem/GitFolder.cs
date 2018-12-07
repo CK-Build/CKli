@@ -171,9 +171,9 @@ namespace CK.Env
         /// Gets the standard git status, based on the <see cref="CurrentBranchName"/>.
         /// </summary>
         public StandardGitStatus StandardGitStatus => CurrentBranchName == World.LocalBranchName
-                                                        ? StandardGitStatus.LocalBranch
+                                                        ? StandardGitStatus.Local
                                                         : (CurrentBranchName == World.DevelopBranchName
-                                                            ? StandardGitStatus.DevelopBranch
+                                                            ? StandardGitStatus.Develop
                                                             : StandardGitStatus.Unknwon);
 
         /// <summary>

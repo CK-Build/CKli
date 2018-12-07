@@ -17,8 +17,16 @@ namespace CK.Env
         /// <summary>
         /// Gets the branch path (relative to the <see cref="FileSystem"/>) into
         /// which this plugin is registered.
+        /// The <see cref="NormalizedPath.LastPart"/> is the actual branch name.
         /// </summary>
         NormalizedPath BranchPath { get; }
+
+        /// <summary>
+        /// Gets the standard plugin branch name into which this plugin is registered.
+        /// It is <see cref="StandardGitStatus.Unknwon"/> if the actual branch is not one
+        /// the 3 standard ones.
+        /// </summary>
+        StandardGitStatus PluginBranch { get; }
     }
 
     /// <summary>

@@ -13,13 +13,13 @@ namespace CK.Env.Plugins
     /// <summary>
     /// Exposes a <see cref="XDocument"/> from a file.
     /// </summary>
-    public class GitFolderXmlFile : GitFolderTextFileBase
+    public abstract class XmlFilePluginBase : TextFilePluginBase
     {
         XDocument _doc;
         string _currentText;
 
-        public GitFolderXmlFile( GitFolder f, NormalizedPath filePath )
-            : base( f, filePath )
+        public XmlFilePluginBase( GitFolder f, NormalizedPath branchPath, NormalizedPath filePath )
+            : base( f, branchPath, filePath )
         {
         }
 

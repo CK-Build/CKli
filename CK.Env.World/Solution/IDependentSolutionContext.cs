@@ -12,6 +12,12 @@ namespace CK.Env
     public interface IDependentSolutionContext
     {
         /// <summary>
+        /// Gets the unique branch name from which all solutions have been analyzed.
+        /// If solutions were in more than one branch, this is null.
+        /// </summary>
+        string UniqueBranchName { get; }
+
+        /// <summary>
         /// Gets the global, sorted, dependencies informations between solutions.
         /// Note that <see cref="IDependentSolution.Index"/> is the index in this list.
         /// </summary>
@@ -24,6 +30,7 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the ordered list of <see cref="ZeroBuildProjectInfo"/>.
+        /// Null if an error occurred during its computation.
         /// </summary>
         IReadOnlyList<ZeroBuildProjectInfo> ZeroBuildProjects { get; }
     }

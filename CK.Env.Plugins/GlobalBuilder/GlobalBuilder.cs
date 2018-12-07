@@ -18,7 +18,7 @@ namespace CK.Env.MSBuild
     {
         readonly SolutionDependencyContext _dependencyResult;
         readonly FileSystem _fileSystem;
-        readonly ILocalFeedProvider _feeds;
+        readonly IEnvLocalFeedProvider _feeds;
         readonly INuGetClient _nugetClient;
         readonly ITestRunMemory _testRunMemory;
         readonly GlobalBuilderInfo _buildInfo;
@@ -26,7 +26,7 @@ namespace CK.Env.MSBuild
         public GlobalBuilder(
             SolutionDependencyContext r,
             FileSystem fileSystem,
-            ILocalFeedProvider feeds,
+            IEnvLocalFeedProvider feeds,
             INuGetClient nugetClient,
             ITestRunMemory testRunMemory,
             GlobalBuilderInfo buildInfo )
@@ -159,7 +159,7 @@ namespace CK.Env.MSBuild
 
         protected GlobalBuilderInfo BuildInfo => _buildInfo;
 
-        protected ILocalFeedProvider Feeds => _feeds;
+        protected IEnvLocalFeedProvider Feeds => _feeds;
 
         protected string GetTargetFeedFolderPath( IActivityMonitor m )
         {

@@ -11,23 +11,18 @@ namespace CK.Env.Plugins
     /// <summary>
     /// Basic base class for text files.
     /// </summary>
-    public abstract class GitFolderTextFileBase
+    public abstract class TextFilePluginBase : GitBranchPluginBase
     {
         ITextFileInfo _file;
 
-        protected GitFolderTextFileBase( GitFolder f, NormalizedPath filePath )
+        protected TextFilePluginBase( GitFolder f, NormalizedPath branchPath, NormalizedPath filePath )
+            : base( f, branchPath )
         {
-            if( !filePath.StartsWith( f.SubPath ) ) throw new ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
-            Folder = f;
+            if( !filePath.StartsWith( branchPath ) ) throw new ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
             FilePath = filePath;
         }
 
         ITextFileInfo GetFile() => _file ?? (_file = Folder.FileSystem.GetFileInfo( FilePath ).AsTextFileInfo( ignoreExtension: true ));
-
-        /// <summary>
-        /// Gets the Git folder.
-        /// </summary>
-        public GitFolder Folder { get; }
 
         /// <summary>
         /// Gets the path in the <see cref="GitFolder.FileSystem"/> root.
