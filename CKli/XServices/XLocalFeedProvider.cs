@@ -99,7 +99,17 @@ namespace CKli
         {
             var packageVersion = version.AsCSVersion?.ToString( CSVersionFormat.NuGetPackage ) ?? version.NormalizedText;
             var dirPath = _localNuGetCache.AppendPart( packageId ).AppendPart( packageVersion );
-            _fs.RawDeleteLocalDirectory( m, dirPath );
+            if( _fs.RawDeleteLocalDirectory( m, dirPath ) )
+            {
+                m.Info( $"Removed {packageId} package in version {version} from local NuGet cache." );
+            }
+        }
+
+        public bool ExistsInNuGetCache( IActivityMonitor m, string packageId, SVersion version )
+        {
+            var packageVersion = version.AsCSVersion?.ToString( CSVersionFormat.NuGetPackage ) ?? version.NormalizedText;
+            var dirPath = _localNuGetCache.AppendPart( packageId ).AppendPart( packageVersion );
+            return Directory.Exists( dirPath );
         }
 
         static string GetPackagePath( string path, string packageId, SVersion v )

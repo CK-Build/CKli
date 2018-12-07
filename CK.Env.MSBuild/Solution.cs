@@ -20,7 +20,7 @@ namespace CK.Env.MSBuild
         SolutionSpecialType _specialType;
         List<Solution> _secondarySolutions;
         List<ProjectBase> _allProjects;
-        MSBuildContext.SolutionTracker _tracker;
+        MSBuildContext.ISolutionTracker _tracker;
 
         bool _isDirty;
 
@@ -290,7 +290,7 @@ namespace CK.Env.MSBuild
             primarySolution._secondarySolutions.Add( this );
         }
 
-        internal void SetTracker( MSBuildContext.SolutionTracker t )
+        internal void SetTracker( MSBuildContext.ISolutionTracker t )
         {
             _tracker = t;
         }

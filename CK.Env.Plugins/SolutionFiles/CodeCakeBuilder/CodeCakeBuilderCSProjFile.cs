@@ -33,7 +33,7 @@ namespace CK.Env.Plugins.SolutionFiles
         public void ApplySettings( IActivityMonitor m )
         {
             if( !_f.EnsureDirectory( m ) ) return;
-            var solution = _solutionDriver.EnsureLoaded( m );
+            var solution = _solutionDriver.GetPrimarySolution( m );
             if( solution == null ) return;
 
             var framework = MSBuildContext.Traits.FindOrCreate( "netcoreapp2.1" );

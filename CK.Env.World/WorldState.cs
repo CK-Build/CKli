@@ -511,9 +511,16 @@ namespace CK.Env
                                 && sha == currentCommitSha
                                 && !p.Dependencies.Any( depName => mustBuild.Contains( depName ) ) )
                             {
-                                mustBuild.Remove( p.FullName );
-                                m.Info( $"Project '{p}' is up to date. Build skipped." );
-                                continue;
+                                if( p.MustPack && !_localFeedProvider.ExistsInNuGetCache( m, p.ProjectName, SVersion.ZeroVersion ) )
+                                {
+                                    m.Info( "NuGet package with ZeroVersion does not exist in NuGet cache." );
+                                }
+                                else
+                                {
+                                    mustBuild.Remove( p.FullName );
+                                    m.CloseGroup( $"Project '{p}' is up to date. Build skipped." );
+                                    continue;
+                                }
                             }
                             if( !driver.ZeroBuildProject( m, p ) )
                             {
@@ -521,6 +528,7 @@ namespace CK.Env
                                 return;
                             }
                             sha1Cache[p.FullName] = currentCommitSha;
+                            m.CloseGroup( "Success." );
                         }
                     }
                     SaveSha1Cache();

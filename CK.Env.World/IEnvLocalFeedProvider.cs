@@ -43,5 +43,14 @@ namespace CK.Env
         /// <param name="version">The package's version.</param>
         void RemoveFromNuGetCache( IActivityMonitor m, string packageId, SVersion version );
 
+        /// <summary>
+        /// Checks whether a package exists in the NuGet cache folder.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="packageId">The package identifier.</param>
+        /// <param name="version">The package's version.</param>
+        /// <returns>True if found, false otherwise.</returns>
+        bool ExistsInNuGetCache( IActivityMonitor m, string packageId, SVersion version );
+
     }
 }

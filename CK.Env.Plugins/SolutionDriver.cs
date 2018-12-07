@@ -63,15 +63,15 @@ namespace CK.Env.Plugins
         public IEnvLocalFeed LocalFeed { get; }
 
         /// <summary>
-        /// Loads or reloads the <see cref="PrimarySolution"/> and its secondary solutions.
-        /// If the solution has been reloaded, the <see cref="Solution.LastVersion"/> is returned:
+        /// Loads or reloads the primary solution and its secondary solutions.
+        /// If the solution has been reloaded (under the hood), the <see cref="Solution.Current"/> is returned:
         /// this ensures that the plugins always work with an up-to-date version of the solution.
-        /// Use <paramref name="reload"/> with true only to actually reload the solution.
+        /// Use <paramref name="reload"/> sets to true only to actually reload the solution.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="reload">True to force the reload of the solutions.</param>
         /// <returns>The primary solution or null.</returns>
-        public Solution EnsureLoaded( IActivityMonitor m, bool reload = false )
+        public Solution GetPrimarySolution( IActivityMonitor m, bool reload = false )
         {
             if( _solution == null )
             {
@@ -81,24 +81,32 @@ namespace CK.Env.Plugins
                     m.Error( $"Unable to load primary solution '{BranchPath}/{BranchPath.LastPart}.sln'." );
                 }
             }
-            return _solution = _solution.LastVersion;
+            else 
+            {
+                var c = _solution.Current;
+                if( c == null )
+                {
+                    m.Error( $"Unable to obtain primary solution '{BranchPath}/{BranchPath.LastPart}.sln' object since a reload of it has failed." );
+                    return null;
+                }
+                if( c != _solution )
+                {
+                    m.Trace( $"Primary solution '{BranchPath}/{BranchPath.LastPart}.sln' refreshed due to successful reload." );
+                    _solution = c;
+                }
+            }
+            return _solution;
         }
-
-        /// <summary>
-        /// Gets the already loaded (see <see cref="EnsureLoaded(IActivityMonitor, bool)"/>) primary solution
-        /// and its secondary solutions.
-        /// </summary>
-        public Solution PrimarySolution => _solution.LastVersion;
 
         IEnumerable<Solution> GetAllSolutions( IActivityMonitor monitor )
         {
-            var primary = EnsureLoaded( monitor );
+            var primary = GetPrimarySolution( monitor );
             if( primary == null ) return null;
             return new[] { primary }.Concat( primary.LoadedSecondarySolutions );
         }
 
         /// <summary>
-        /// Gets the set of soltion names that this driver handles with the first one being the primary solution,
+        /// Gets the set of solution names that this driver handles with the first one being the primary solution,
         /// followed by the secondary solutions if any.
         /// Returns null on any error that prevented the solutions to be loaded.
         /// </summary>
@@ -142,11 +150,14 @@ namespace CK.Env.Plugins
             if( info == null ) throw new ArgumentNullException( nameof( info ) );
             if( !IsActive ) throw new InvalidOperationException( nameof( IsActive ) );
 
-            var primary = EnsureLoaded( monitor );
+            var primary = GetPrimarySolution( monitor );
             if( primary == null ) return false;
 
             var p = FindProject( monitor, primary, info.SolutionName, info.ProjectName, true );
-
+            if( info.MustPack )
+            {
+                _localFeedProvider.RemoveFromNuGetCache( monitor, info.ProjectName, SVersion.ZeroVersion );
+            }
             using( Folder.OpenProtectedScope( monitor ) )
             {
                 int changes = 0;
@@ -202,7 +213,7 @@ namespace CK.Env.Plugins
         /// <returns>True on success, false on error.</returns>
         public bool UpdatePackageDependencies( IActivityMonitor monitor, IEnumerable<UpdatePackageInfo> packageInfos )
         {
-            var primary = EnsureLoaded( monitor );
+            var primary = GetPrimarySolution( monitor );
             if( primary == null ) return false;
             var toSave = new List<Solution>();
             foreach( var update in packageInfos )
@@ -289,7 +300,7 @@ namespace CK.Env.Plugins
 
         bool DoBuild( IActivityMonitor monitor, bool upgradeLocalDependencies, bool withUnitTest, BuildType buildType )
         {
-            var primary = EnsureLoaded( monitor );
+            var primary = GetPrimarySolution( monitor );
             if( primary == null ) return false;
 
             if( upgradeLocalDependencies )

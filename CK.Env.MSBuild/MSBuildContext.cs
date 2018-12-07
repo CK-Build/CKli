@@ -109,16 +109,13 @@ namespace CK.Env.MSBuild
             }
         }
 
-        // Private interface
-        interface ISolutionTracker
+        internal interface ISolutionTracker
         {
+            Solution CurrentVersion { get; }
             Solution LastVersion { get; }
-            bool IsLoaded { get; }
-            Solution OnUnload();
-            void OnLoad( Solution newOne );
         }
 
-        internal class SolutionTracker : ISolutionTracker
+        class SolutionTracker : ISolutionTracker
         {
             Solution _last;
             bool _loaded;
@@ -137,14 +134,14 @@ namespace CK.Env.MSBuild
 
             public Solution LastVersion => _last;
 
-            Solution ISolutionTracker.OnUnload()
+            public Solution OnUnload()
             {
                 Debug.Assert( _loaded );
                 _loaded = false;
                 return _last;
             }
 
-            void ISolutionTracker.OnLoad( Solution newOne )
+            public void OnLoad( Solution newOne )
             {
                 Debug.Assert( !_loaded && newOne != null && _last != null );
                 _last = newOne;
@@ -153,7 +150,7 @@ namespace CK.Env.MSBuild
         }
 
         readonly Dictionary<NormalizedPath, File> _files;
-        readonly Dictionary<NormalizedPath, ISolutionTracker> _solutions;
+        readonly Dictionary<NormalizedPath, SolutionTracker> _solutions;
 
         /// <summary>
         /// Initializes a new project file context.
@@ -163,7 +160,7 @@ namespace CK.Env.MSBuild
         {
             FileSystem = fileSystem;
             _files = new Dictionary<NormalizedPath, File>();
-            _solutions = new Dictionary<NormalizedPath, ISolutionTracker>();
+            _solutions = new Dictionary<NormalizedPath, SolutionTracker>();
         }
 
         /// <summary>
@@ -193,7 +190,7 @@ namespace CK.Env.MSBuild
             if( primary != null && type == SolutionSpecialType.None ) throw new ArgumentException( $"Secondary solution, type must be IncludedSecondarySolution or IndependantSecondarySolution." );
             if( primary != null && primary.Current != primary ) throw new ArgumentException( $"Primary solution is not the current one." );
 
-            ISolutionTracker tracker = null;
+            SolutionTracker tracker = null;
             Solution s;
             if( !force
                 && _solutions.TryGetValue( path, out tracker )
@@ -217,7 +214,7 @@ namespace CK.Env.MSBuild
             return (null, false);
         }
 
-        Solution DoLoad( IActivityMonitor m, NormalizedPath path, ISolutionTracker tracker )
+        Solution DoLoad( IActivityMonitor m, NormalizedPath path, SolutionTracker tracker )
         {
             using( m.OpenTrace( $"Loading solution {path}." ) )
             {
