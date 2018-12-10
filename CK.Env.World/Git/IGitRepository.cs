@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -13,9 +14,48 @@ namespace CK.Env
         string PrimarySolutionName { get; }
 
         /// <summary>
-        /// Gets the current commit SHA1.
+        /// Get the path relative to the FileSystem.
         /// </summary>
-        string HeadCommitSHA1 { get; }
+        NormalizedPath SubPath { get; }
+
+        /// <summary>
+        /// Gets the head information.
+        /// </summary>
+        IGitHeadInfo Head { get; }
+
+        /// <summary>
+        /// Gets whether the head can be amended: the current branch
+        /// is not tracked or the current commit is ahead of the remote branch.
+        /// </summary>
+        bool CanAmendCommit { get; }
+
+        /// <summary>
+        /// Commits any pending changes.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="commitMessage">
+        /// Required commit message.
+        /// This is ignored when <paramref name="amendIfPossible"/> and <see cref="CanAmendCommit"/> are both true.
+        /// </param>
+        /// <param name="amendIfPossible">
+        /// True to call <see cref="AmendCommit"/> if <see cref="CanAmendCommit"/>. is true.
+        /// </param>
+        /// <returns>True on success, false on error.</returns>
+        bool Commit( IActivityMonitor m, string commitMessage, bool amendIfPossible = false );
+
+        /// <summary>
+        /// Amends the current commit, optionaly changing its message and/or its date.
+        /// <see cref="CanAmendCommit"/> must be true otherwise an <see cref="InvalidOperationException"/> is thrown.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="editMessage">
+        /// Optional message transformer. By returning null, the operation is canceled and false is returned.
+        /// </param>
+        /// <param name="editDate">
+        /// Optional date transformer. By returning null, the operation is canceled and false is returned.
+        /// </param>
+        /// <returns>True on success, false on error.</returns>
+        bool AmendCommit( IActivityMonitor m, Func<string, string> editMessage = null, Func<DateTimeOffset, DateTimeOffset?> editDate = null );
 
         /// <summary>
         /// Gets the version information from a branch.
@@ -24,6 +64,15 @@ namespace CK.Env
         /// <param name="branchName">Defaults to <see cref="CurrentBranchName"/>.</param>
         /// <returns>The commit version info or null if it it cannot be obtained.</returns>
         CommitVersionInfo GetCommitVersionInfo( IActivityMonitor m, string branchName = null );
+
+        /// <summary>
+        /// Opens a temporary branch that protects all changes.
+        /// This can be called recursively.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="message">Message of the group information. Null to not open a group.</param>
+        /// <returns>A disposable that must be disposed to restore the state of the working directory.</returns>
+        IDisposable OpenProtectedScope( IActivityMonitor m, string message = "Opening protected scope: any file modification will be reverted." );
 
         /// <summary>
         /// Gets the current branch name (name of the repository's HEAD).

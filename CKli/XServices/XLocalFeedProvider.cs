@@ -34,14 +34,20 @@ namespace CKli
             Local = new LocalFeed( feedRoot, StandardGitStatus.Local );
             Develop = new LocalFeed( feedRoot, StandardGitStatus.Develop );
             Master = new LocalFeed( feedRoot, StandardGitStatus.Master );
+            ZeroBuildFeed = new LocalFeed( feedRoot, "ZeroBuildFeed", StandardGitStatus.Unknwon );
         }
 
         class LocalFeed : IEnvLocalFeed
         {
             internal LocalFeed( NormalizedPath localFeedFolder, StandardGitStatus b )
+                : this( localFeedFolder, b.ToString(), b )
+            {
+            }
+
+            internal LocalFeed( NormalizedPath localFeedFolder, string part, StandardGitStatus b )
             {
                 LogicalBranchName = b;
-                PhysicalPath = localFeedFolder.AppendPart( b.ToString() );
+                PhysicalPath = localFeedFolder.AppendPart( part );
                 Directory.CreateDirectory( PhysicalPath );
             }
 
@@ -94,6 +100,8 @@ namespace CKli
         public IEnvLocalFeed Develop { get; }
 
         public IEnvLocalFeed Master { get; }
+
+        public IEnvLocalFeed ZeroBuildFeed { get; }
 
         public void RemoveFromNuGetCache( IActivityMonitor m, string packageId, SVersion version )
         {

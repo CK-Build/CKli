@@ -5,9 +5,11 @@ using System.Text;
 namespace CK.Env
 {
     /// <summary>
-    /// Defines the view of a reference from a project to a package produced by another local solution. 
+    /// Defines the view of a reference from a project to a package produced by another local solution.
+    /// This is a wrapper on <see cref="ILocalPackageDependency"/> that helps to resolve the Origin vs. Target
+    /// ambiguity.
     /// </summary>
-    public struct ImportedLocalPackage
+    public readonly struct ImportedLocalPackage
     {
         readonly ILocalPackageDependency _dep;
 

@@ -32,7 +32,7 @@ namespace CK.Env
         /// Gets the ordered list of <see cref="ZeroBuildProjectInfo"/>.
         /// Null if an error occurred during its computation.
         /// </summary>
-        IReadOnlyList<ZeroBuildProjectInfo> ZeroBuildProjects { get; }
+        IReadOnlyList<ZeroBuildProjectInfo> BuildProjectsInfo { get; }
     }
 
     public static class DependentSolutionContextExtension

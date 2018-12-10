@@ -44,17 +44,17 @@ namespace CK.Env
         /// This also handles the build switching from 'local' to 'develop' (<see cref="GlobalWorkStatus.SwitchingToDevelop"/>).
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="upgradeLocalDependencies">False to not upgrade the available local dependencies.</param>
         /// <param name="withUnitTest">False to skip unit tests.</param>
         /// <returns>True on success, false on error.</returns>
-        bool Build( IActivityMonitor monitor, bool upgradeLocalDependencies = true, bool withUnitTest = true );
+        bool Build( IActivityMonitor monitor, bool withUnitTest = true );
 
         /// <summary>
         /// Builds the given project (that must be handled by this driver otherwise an exception is thrown)
         /// with a zero version.
+        /// This uses "dotnet pack" or "dotnet build" depending on <see cref="ZeroBuildProjectInfo.MustPack"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="packageInfos">The packages to update.</param>
+        /// <param name="info">The <see cref="ZeroBuildProjectInfo"/>.</param>
         /// <returns>True on success, false on error.</returns>
         bool ZeroBuildProject( IActivityMonitor monitor, ZeroBuildProjectInfo info );
 

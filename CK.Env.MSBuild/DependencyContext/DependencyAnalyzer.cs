@@ -154,8 +154,8 @@ namespace CK.Env.MSBuild
 
             /// <summary>
             /// Whether this project belongs to the Published ones.
-            /// When a project is published, its name is the one of the associated DependencyContext.Package
-            /// and is necessarily unique: we can use its file name as the item's FullName (with the .csproj
+            /// When a project is published, to distinguish it from the associated necessarily
+            /// unique DependencyContext.Package we use its file name as the item's FullName (with the .csproj
             /// extension: the naked project name is used for its Package's FullName).
             /// But when a project is not published, we scope its name to its solution name to compute the
             /// FullName so that utility projects can have the same name in different solutions.
@@ -168,6 +168,14 @@ namespace CK.Env.MSBuild
             public string FullName => IsPublished
                                         ? _p.Path.LastPart
                                         : _p.Solution.UniqueSolutionName + '/' + _p.Path.LastPart;
+
+            /// <summary>
+            /// Gets the name of the package produced by this project or null when <see cref="IsPublished"/> is false.
+            /// When not null, this is the nameof the project folder.
+            /// </summary>
+            public string PublishedName => IsPublished
+                                        ? _p.Path.Parts[_p.Path.Parts.Count-2]
+                                        : null;
 
             internal void AddRequires( IDependentItemRef p ) => _requires.Add( p );
 
@@ -307,15 +315,17 @@ namespace CK.Env.MSBuild
                                                                             .OfType<IDependentProject>(),
                                                                AllDeps: i.GetAllRequires()
                                                                          .Select( s => s.Item )
-                                                                         .OfType<IDependentProject>() ) );
+                                                                         .OfType<IDependentProject>()) );
 
-                    var zeroBuildProjects = rankedProjects.Select( p => new ZeroBuildProjectInfo(
+                    var zeroBuildProjects = rankedProjects.Select( (p,idx) => new ZeroBuildProjectInfo(
+                                    idx,
                                     p.Rank,
                                     p.Project.Project.Solution.UniqueSolutionName,
                                     p.Project.Project.Name,
+                                    p.Project.Project.PrimarySolutionRelativeFolderPath,
                                     p.Project.IsPublished,
                                     // UpgradePackages: Among direct dependencies, consider only the
-                                    //                  packages and the ones who are actually referenced
+                                    //                  published projects and the ones who are actually referenced
                                     //                  as a package (ignores ProjectReference).
                                     p.DirectDeps
                                         .Where( d => d.IsPublished
@@ -329,6 +339,7 @@ namespace CK.Env.MSBuild
                                                             ? d.Project.Name
                                                             : d.Project.Solution.UniqueSolutionName + '/' + d.Project.Name )
                                             .ToArray()
+
                                     ) )
                         .ToArray();
 

@@ -28,19 +28,7 @@ namespace CK.Env.Plugins.SolutionFiles
                 f.OnLocalBranchEntered += OnLocalBranchEntered;
                 f.OnLocalBranchLeaving += OnLocalBranchLeaving;
             }
-            // On local branch, the NuGet.config already has the LocalFeed/Local source.
-            if( PluginBranch != StandardGitStatus.Local )
-            {
-                _solutionDriver.OnZeroBuildProject += OnZeroBuildProject;
-            }
             _solutionDriver.OnStartBuild += OnStartBuild;
-        }
-
-        void OnZeroBuildProject( object sender, EventMonitoredArgs e )
-        {
-            Debug.Assert( PluginBranch != StandardGitStatus.Local );
-            EnsureLocalFeeds( e.Monitor, false, ensureDevelop: true );
-            Save( e.Monitor );
         }
 
         void OnStartBuild( object sender, BuildStartEventArgs e )

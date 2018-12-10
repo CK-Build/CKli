@@ -37,12 +37,22 @@ namespace CK.Env
         /// Gets the locally produced packages that are consumed by this solution.
         /// Only packages that are produced by <see cref="Requirements"/> are considered.
         /// </summary>
-        IReadOnlyCollection<ImportedLocalPackage> ImportedPackages { get; }
+        IReadOnlyCollection<ImportedLocalPackage> ImportedLocalPackages { get; }
 
         /// <summary>
         /// Gets the packages produced by this solution that are consumed by other solutions.
+        /// Only packages that are used by another solution in the current context are in this set.
+        /// To get the set of packages produced, use <see cref="GeneratedPackages"/>.
         /// </summary>
-        IReadOnlyCollection<ExportedLocalPackage> ExportedPackages { get; }
+        IReadOnlyCollection<ExportedLocalPackage> ExportedLocalPackages { get; }
+
+        /// <summary>
+        /// Gets the set of package names that this solution produces, regardless of whether they are used
+        /// or not by other solution in the context.
+        /// See <see cref="ExportedLocalPackages"/> to know the solutions and projects in the context that
+        /// use/consume some or all these packages.
+        /// </summary>
+        IReadOnlyCollection<string> GeneratedPackages { get; }
 
         /// <summary>
         /// Gets the direct required solutions: this corresponds to the solutions that generate a package

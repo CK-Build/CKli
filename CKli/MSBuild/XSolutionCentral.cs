@@ -59,6 +59,7 @@ namespace CKli
             _worldState = new WorldState( commandRegister, worldStore, world, this, _packageFeeds );
             _worldState.Initializing += ( o, e ) => DumpGitFolderStatus( e.Monitor );
             fileSystem.ServiceContainer.Add( _worldState );
+            fileSystem.ServiceContainer.Add<ISolutionDriverWorld>( _worldState );
 
             // Extends the 'World' commands.
             CommandProviderName = _worldState.CommandProviderName;

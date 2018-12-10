@@ -204,12 +204,22 @@ namespace CK.Env.MSBuild
             /// Gets the locally produced packages that are consumed by this solution.
             /// Only packages that are produced by <see cref="Requirements"/> are considered.
             /// </summary>
-            public IReadOnlyCollection<ImportedLocalPackage> ImportedPackages { get; private set; }
+            public IReadOnlyCollection<ImportedLocalPackage> ImportedLocalPackages { get; private set; }
 
             /// <summary>
             /// Gets the packages produced by this solution that are consumed by other solutions.
+            /// Only packages that are used by another solution in the current context are in this set.
+            /// To get the set of packages produced, use <see cref="GeneratedPackages"/>.
             /// </summary>
-            public IReadOnlyCollection<ExportedLocalPackage> ExportedPackages { get; private set; }
+            public IReadOnlyCollection<ExportedLocalPackage> ExportedLocalPackages { get; private set; }
+
+            /// <summary>
+            /// Gets the set of package names that this solution produces, regardless of whether they are used
+            /// or not by other solution in the context.
+            /// See <see cref="ExportedLocalPackages"/> to know the solutions and projects in the context that
+            /// use/consume some or all these packages.
+            /// </summary>
+            public IReadOnlyCollection<string> GeneratedPackages { get; private set; }
 
             /// <summary>
             /// Gets the global <see cref="SolutionDependencyContext"/> to which this <see cref="DependentSolution"/> belongs.
@@ -252,15 +262,17 @@ namespace CK.Env.MSBuild
                 foreach( var i in Impacts.SelectMany( r => r.TransitiveImpacts ) ) transitive.Add( i );
                 TransitiveImpacts = transitive;
 
-                ImportedPackages = global.PackageDependencies
+                ImportedLocalPackages = global.PackageDependencies
                                          .Where( d => d.Origin == this )
                                          .Select( d => new ImportedLocalPackage( d ) )
                                          .ToArray();
 
-                ExportedPackages = global.PackageDependencies
+                ExportedLocalPackages = global.PackageDependencies
                                          .Where( d => d.Target == this )
                                          .Select( d => new ExportedLocalPackage( d ) )
                                          .ToArray();
+
+                GeneratedPackages = Solution.PublishedProjects.Select( p => p.Name ).ToArray();
             }
 
             public override string ToString() => Solution.ToString();
@@ -464,7 +476,7 @@ namespace CK.Env.MSBuild
 
         IReadOnlyList<IDependentSolution> IDependentSolutionContext.Solutions => Solutions;
 
-        IReadOnlyList<ZeroBuildProjectInfo> IDependentSolutionContext.ZeroBuildProjects => BuildProjectsInfo.ZeroBuildProjects;
+        IReadOnlyList<ZeroBuildProjectInfo> IDependentSolutionContext.BuildProjectsInfo => BuildProjectsInfo.ZeroBuildProjects;
 
 
     }

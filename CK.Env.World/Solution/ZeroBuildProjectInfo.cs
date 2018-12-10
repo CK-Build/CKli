@@ -1,3 +1,4 @@
+using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -14,33 +15,44 @@ namespace CK.Env
         /// <summary>
         /// Initializes a new <see cref="ZeroBuildProjectInfo"/>.
         /// </summary>
+        /// <param name="index">The project index in <see cref="IDependentSolutionContext.BuildProjectsInfo"/> ordered list.</param>
         /// <param name="rank">The project rank.</param>
         /// <param name="solutionName">The solution name. Can not be empty.</param>
         /// <param name="projectName">The project name. Can not be empty.</param>
         /// <param name="mustPack">True if this is a published project.</param>
-        /// <param name="upgradePackages">Set of packages reference to upgrade.</param>
+        /// <param name="upgradePackages">Set of packages name reference to upgrade.</param>
         /// <param name="dependencies">List of package dependencies' <see cref="FullName"/> projects.</param>
         public ZeroBuildProjectInfo(
+            int index,
             int rank,
             string solutionName,
             string projectName,
+            string primarySolutionRelativeFolderPath,
             bool mustPack,
             IReadOnlyCollection<string> upgradePackages,
             IReadOnlyCollection<string> dependencies )
         {
-            if( Rank < 0 ) throw new ArgumentException();
+            if( Index < 0 ) throw new ArgumentOutOfRangeException( nameof( index ) );
+            if( Rank < 0 ) throw new ArgumentOutOfRangeException( nameof( rank ) );
             if( String.IsNullOrWhiteSpace( solutionName ) ) throw new ArgumentNullException( nameof( solutionName ) );
             if( String.IsNullOrWhiteSpace( projectName ) ) throw new ArgumentNullException( nameof( projectName ) );
+            if( String.IsNullOrWhiteSpace( primarySolutionRelativeFolderPath ) ) throw new ArgumentNullException( nameof( primarySolutionRelativeFolderPath ) );
             if( upgradePackages == null ) throw new ArgumentNullException( nameof( upgradePackages ) );
             if( dependencies == null ) throw new ArgumentNullException( nameof( dependencies ) );
             Rank = rank;
             SolutionName = solutionName;
             ProjectName = projectName;
+            PrimarySolutionRelativeFolderPath = primarySolutionRelativeFolderPath;
             MustPack = mustPack;
             UpgradePackages = upgradePackages;
             Dependencies = dependencies;
             FullName = mustPack ? projectName : solutionName + '/' + projectName;
         }
+
+        /// <summary>
+        /// Gets the project index in <see cref="IDependentSolutionContext.BuildProjectsInfo"/> ordered list.
+        /// </summary>
+        public int Index { get; }
 
         /// <summary>
         /// Gets the rank of this build project in the pure build projects dependency graph.
@@ -56,6 +68,11 @@ namespace CK.Env
         /// Gets the project name.
         /// </summary>
         public string ProjectName { get; }
+
+        /// <summary>
+        /// Gets the project path.
+        /// </summary>
+        public string PrimarySolutionRelativeFolderPath { get; }
 
         /// <summary>
         /// Gets whether this project must be published in Zero Version.

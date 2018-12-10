@@ -81,11 +81,13 @@ namespace CK.Env.MSBuild
         readonly MSBuildContext _ctx;
         MSBuildContext.File _file;
         Dependencies _dependencies;
+        NormalizedPath _primarySolutionRelativeFolderPath;
 
         internal Project( MSBuildContext ctx, string id, string name, NormalizedPath projectFilePath, string typeIdentifier )
             : base( id, name, projectFilePath, typeIdentifier )
         {
             _ctx = ctx;
+            FolderPath = projectFilePath.RemoveLastPart();
         }
 
         /// <summary>
@@ -94,6 +96,26 @@ namespace CK.Env.MSBuild
         /// This is null if an error occurred while loading.
         /// </summary>
         public MSBuildContext.File ProjectFile => _file;
+
+        /// <summary>
+        /// Gets the folder path of this project. 
+        /// </summary>
+        public NormalizedPath FolderPath { get; }
+
+        /// <summary>
+        /// Gets the <see cref="FolderPath"/> of this project relative to the <see cref="PrimarySolution"/> folder.
+        /// </summary>
+        public NormalizedPath PrimarySolutionRelativeFolderPath
+        {
+            get
+            {
+                if( _primarySolutionRelativeFolderPath.IsEmpty )
+                {
+                    _primarySolutionRelativeFolderPath = FolderPath.RemovePrefix( PrimarySolution.SolutionFolderPath );
+                }
+                return _primarySolutionRelativeFolderPath;
+            }
+        }
 
         internal MSBuildContext.File ReloadProjectFile( IActivityMonitor m )
         {

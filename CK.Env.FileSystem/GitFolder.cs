@@ -22,7 +22,7 @@ namespace CK.Env
     /// Implements Git repository mapping.
     /// GitFolder are internally created (and disposed) by <see cref="FileSystem"/>.
     /// </summary>
-    public class GitFolder : IGitRepository, ICommandMethodsProvider
+    public class GitFolder : IGitRepository, IGitHeadInfo, ICommandMethodsProvider
     {
         static internal readonly CredentialsHandler DefaultCredentialHandler;
 
@@ -175,6 +175,26 @@ namespace CK.Env
                                                         : (CurrentBranchName == World.DevelopBranchName
                                                             ? StandardGitStatus.Develop
                                                             : StandardGitStatus.Unknwon);
+
+        /// <summary>
+        /// Gets the head information.
+        /// </summary>
+        public IGitHeadInfo Head => this;
+
+        string IGitHeadInfo.CommitSha => _git.Head.Tip.Sha;
+
+        string IGitHeadInfo.Message => _git.Head.Tip.Message;
+
+        DateTimeOffset IGitHeadInfo.CommitDate => _git.Head.Tip.Committer.When;
+
+        string IGitHeadInfo.GetSha( string path )
+        {
+            if( path == null ) return _git.Head.Tip.Sha;
+            if( path.Length == 0 ) return _git.Head.Tip.Tree.Sha;
+            var e = _git.Head.Tip.Tree[path];
+            return e?.Target.Sha;
+        }
+
 
         /// <summary>
         /// Checks that the current head is a clean commit (working directory is clean and no staging files exists).
@@ -355,13 +375,18 @@ namespace CK.Env
         /// Opens a temporary branch that protects all changes.
         /// This can be called recursively.
         /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="m">The monitor to use.</param>
         /// <param name="message">Message of the group information. Null to not open a group.</param>
         /// <returns>A disposable that must be disposed to restore the state of the working directory.</returns>
-        public IDisposable OpenProtectedScope( IActivityMonitor monitor, string message = "Opening protected scope: any file modification will be reverted." )
+        public IDisposable OpenProtectedScope( IActivityMonitor m, string message = "Opening protected scope: any file modification will be reverted." )
         {
-            return new RootTempBranch( this, message != null ? monitor.OpenInfo( message ) : null );
+            return new RootTempBranch( this, message != null ? m.OpenInfo( message ) : null );
         }
+
+        /// <summary>
+        /// Gets whether at least one scope is currently opened (see <see cref="OpenProtectedScope"/>).
+        /// </summary>
+        public bool IsProtectedScopeOpened => _tempBranch != null;
 
         /// <summary>
         /// Fetches 'origin' (or all remotes) branches and merge changes into this repository.
@@ -400,7 +425,7 @@ namespace CK.Env
                         MergeResult r = _git.MergeFetchedRefs( merger, mOpt );
                         if( r.Status == MergeStatus.Conflicts )
                         {
-                            m.Error( $"Merge conflicts occurred. Unable to merge changes from the remote." );
+                            m.Error( $"Merge conflicts occurred. Unable to merge changes from the remote '{remote.Name}'." );
                             return (false, false);
                         }
                         reloadNeeded |= r.Status != MergeStatus.UpToDate;
@@ -416,7 +441,7 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the version information from a branch.
+        /// Gets the valid version information from a branch or null.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">Defaults to <see cref="CurrentBranchName"/>.</param>
@@ -431,7 +456,8 @@ namespace CK.Env
                             info.BetterExistingVersion?.ThisTag,
                             info.CommitInfo.BasicInfo?.BestCommitBelow.ThisTag,
                             info.NextPossibleVersions,
-                            info.PossibleVersions )
+                            info.PossibleVersions,
+                            new CommitAssemblyBuildInfoFromRepo( info ) )
                     : null;
         }
 
@@ -570,42 +596,31 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the current commit SHA1.
+        /// Gets whether the head can be amended: the current branch
+        /// is not tracked or the current commit is ahead of the remote branch.
         /// </summary>
-        public string HeadCommitSHA1 => _git.Head.Tip.Sha;
-
-        /// <summary>
-        /// Captures <see cref="GitFolder.Commit(IActivityMonitor, string)"/> result.
-        /// </summary>
-        public struct CommitResult
-        {
-            /// <summary>
-            /// True on success.
-            /// </summary>
-            public readonly bool Success;
-
-            /// <summary>
-            /// True if an actual commit has been created.
-            /// </summary>
-            public readonly bool CommitCreated;
-
-            internal CommitResult( bool success, bool commit )
-            {
-                Success = success;
-                CommitCreated = commit;
-            }
-        }
+        public bool CanAmendCommit => _git.Head.TrackingDetails.AheadBy > 0;
 
         /// <summary>
         /// Commits any pending changes.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="commitMessage">Required commit message.</param>
-        /// <returns>A commit result with success/error and whether a commit has actually been created.</returns>
+        /// <param name="commitMessage">
+        /// Required commit message.
+        /// This is ignored when <paramref name="amendIfPossible"/> and <see cref="CanAmendCommit"/> are both true.
+        /// </param>
+        /// <param name="amendIfPossible">
+        /// True to call <see cref="AmendCommit"/> if <see cref="CanAmendCommit"/>. is true.
+        /// </param>
+        /// <returns>True on success, false on error.</returns>
         [CommandMethod]
-        public CommitResult Commit( IActivityMonitor m, string commitMessage )
+        public bool Commit( IActivityMonitor m, string commitMessage, bool amendIfPossible = false )
         {
             if( String.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
+            if( amendIfPossible && CanAmendCommit )
+            {
+                return AmendCommit( m );
+            }
             using( m.OpenInfo( $"Committing changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
             {
                 Commands.Stage( _git, "*" );
@@ -613,23 +628,27 @@ namespace CK.Env
                 if( !s.IsDirty )
                 {
                     m.CloseGroup( "Working folder is up-to-date." );
-                    return new CommitResult( true, false );
+                    return true;
                 }
-                else return DoCommit( m, commitMessage, false, true );
+                return DoCommit( m, commitMessage, DateTimeOffset.Now, false, true );
             }
         }
 
         /// <summary>
-        /// Amends the current commit, optionaly changing its message.
+        /// Amends the current commit, optionaly changing its message and/or its date.
+        /// <see cref="CanAmendCommit"/> must be true otherwise an <see cref="InvalidOperationException"/> is thrown.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="editMessage">
-        /// Allows message change. By returning null, the operation is canceled and a failed
-        /// commit result is returned.
+        /// Optional message transformer. By returning null, the operation is canceled and false is returned.
         /// </param>
-        /// <returns>A commit result with success/error and whether the commit has actually been amended.</returns>
-        public CommitResult AmendCommit( IActivityMonitor m, Func<string, string> editMessage = null )
+        /// <param name="editDate">
+        /// Optional date transformer. By returning null, the operation is canceled and false is returned.
+        /// </param>
+        /// <returns>True on success, false on error.</returns>
+        public bool AmendCommit( IActivityMonitor m, Func<string, string> editMessage = null, Func<DateTimeOffset,DateTimeOffset?> editDate = null )
         {
+            if( !CanAmendCommit ) throw new InvalidOperationException( nameof( CanAmendCommit ) );
             using( m.OpenInfo( $"Amending Commit in '{SubPath}' (branch '{CurrentBranchName}')." ) )
             {
                 var message = _git.Head.Tip.Message;
@@ -637,40 +656,62 @@ namespace CK.Env
                 if( String.IsNullOrWhiteSpace( message ) )
                 {
                     m.CloseGroup( "Canceled by empty message." );
-                    return new CommitResult( false, false );
+                    return false;
+                }
+                DateTimeOffset? date = _git.Head.Tip.Committer.When;
+                if( editDate != null ) date = editDate( date.Value );
+                if( date == null )
+                {
+                    m.CloseGroup( "Canceled by null date." );
+                    return false;
                 }
                 bool messageUpdate = message != _git.Head.Tip.Message;
+                bool dateUpdate = date.Value != _git.Head.Tip.Committer.When;
                 Commands.Stage( _git, "*" );
                 var s = _git.RetrieveStatus();
                 bool hasChange = s.IsDirty;
                 if( !hasChange )
                 {
-                    if( messageUpdate ) m.Info( "Only updating message." );
+                    if( messageUpdate && dateUpdate ) m.Info( "Updating message and date." );
+                    else if( dateUpdate ) m.Info( "Updating commit date." );
+                    else if( messageUpdate ) m.Info( "Only updating message." );
                     else
                     {
                         m.CloseGroup( "Working folder is up-to-date." );
-                        return new CommitResult( true, false );
+                        return true;
                     }
                 }
-                return DoCommit( m, message, true, hasChange );
+                return DoCommit( m, message, date.Value, true, hasChange );
             }
         }
 
-        CommitResult DoCommit( IActivityMonitor m, string commitMessage, bool amendPreviousCommit, bool isDirty )
+        bool DoCommit( IActivityMonitor m, string commitMessage, DateTimeOffset date, bool amendPreviousCommit, bool isDirty )
         {
             try
             {
                 if( isDirty ) m.Info( "Working Folder is dirty. Committing changes." );
-                var now = DateTimeOffset.Now;
-                var author = _git.Config.BuildSignature( now );
+                var author = _git.Config.BuildSignature( date );
+                // Let AllowEmptyCommit even when amending: this avoids creating an empty commit.
+                // If we are not amending, this is an error and we let the EmptyCommitException pops.
                 var options = new CommitOptions { AmendPreviousCommit = amendPreviousCommit };
-                _git.Commit( commitMessage, author, new Signature( "CKli", "none", now ), options );
-                return new CommitResult( true, true );
+                try
+                {
+                    _git.Commit( commitMessage, author, new Signature( "CKli", "none", date ), options );
+                }
+                catch( EmptyCommitException ) 
+                {
+                    if( !amendPreviousCommit ) throw;
+                    Debug.Assert( _git.Head.Tip.Parents.Count() == 1, "This check on merge commit is already done by LibGit2Sharp." );
+                    m.Trace( "No actual changes. Reseting branch to parent commit." );
+                    _git.Reset( ResetMode.Hard, _git.Head.Tip.Parents.Single() );
+                    return true;
+                }
+                return true;
             }
             catch( Exception ex )
             {
                 m.Error( ex );
-                return new CommitResult( false, false );
+                return false;
             }
         }
 
@@ -773,7 +814,7 @@ namespace CK.Env
                         }
                         if( autoCommit )
                         {
-                            if( !Commit( m, $"Switching to {World.LocalBranchName} branch." ).Success ) return false;
+                            if( !Commit( m, $"Switching to {World.LocalBranchName} branch." ) ) return false;
                         }
                         else
                         {
@@ -784,11 +825,18 @@ namespace CK.Env
                             m.Info( $"Creating the {World.LocalBranchName}." );
                             local = _git.CreateBranch( World.LocalBranchName );
                         }
+                        else
+                        {
+                            m.Info( "Coming from develop: privilegiates 'develop' file changes during merge." );
+                            mergeFileFavor = MergeFileFavor.Theirs;
+                        }
                         CheckoutWithPlugins( m, local );
                     }
                     else
                     {
-                        m.Trace( $"Already on {World.LocalBranchName}." );
+                        m.Trace( $"Already on {World.LocalBranchName}: privilegiates 'local' file changes during merge." );
+                        mergeFileFavor = MergeFileFavor.Ours;
+                        EnsureCurrentBranchPlugins( m );
                     }
                     var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
                     var r = _git.Merge( develop, merger, new MergeOptions
@@ -806,7 +854,7 @@ namespace CK.Env
 
                     if( !RaiseEnteredLocalBranch( m, true ) ) return false;
 
-                    if( !AmendCommit( m ).Success ) return false;
+                    if( !AmendCommit( m ) ) return false;
                     if( r.Status != MergeStatus.UpToDate )
                     {
                         m.CloseGroup( $"Success (with merge from '{World.DevelopBranchName}')." );
@@ -916,9 +964,8 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Checkouts '<see cref="IWorldName.DevelopBranchName"/>' branch and merges current 'local' in it.
-        /// A CI-Build of the whole stack should be executed with the nuget.config file containing the 'LocalFeed' source. 
-        /// followed by an update of BuildProjects package references.
+        /// Checkouts '<see cref="IWorldName.DevelopBranchName"/>' branch (that must be clean)
+        /// and merges current 'local' in it.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
@@ -949,12 +996,13 @@ namespace CK.Env
 
                     if( bLocal.IsCurrentRepositoryHead )
                     {
-                        if( !AmendCommit( m ).Success ) return false;
+                        if( !AmendCommit( m ) ) return false;
                         CheckoutWithPlugins( m, bDevelop );
                     }
                     else
                     {
-                        if( !Commit( m, $"Auto commit on '{World.DevelopBranchName}' branch." ).Success ) return false;
+                        if( !CheckCleanCommit( m ) ) return false;
+                        EnsureCurrentBranchPlugins( m );
                     }
 
                     var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
@@ -1366,5 +1414,6 @@ namespace CK.Env
             }
             return false;
         }
+
     }
 }

@@ -7,24 +7,7 @@ namespace CK.Env
     public partial class WorldState : IWorldState
     {
 
-        public event EventHandler<InitializingEventArgs> Initializing;
-
-        public class InitializingEventArgs : EventMonitoredArgs
-        {
-            internal readonly List<ISolutionDriver> SolutionsDrivers;
-
-            public InitializingEventArgs( IActivityMonitor m )
-                : base( m )
-            {
-                SolutionsDrivers = new List<ISolutionDriver>();
-            }
-
-            public void Register( ISolutionDriver d )
-            {
-                SolutionsDrivers.Add( d );
-            }
-
-        }
+        public event EventHandler<EventMonitoredArgs> Initializing;
 
         public event EventHandler<EventMonitoredArgs> Initialized;
 

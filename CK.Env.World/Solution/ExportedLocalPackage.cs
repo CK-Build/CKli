@@ -7,8 +7,10 @@ namespace CK.Env
     /// <summary>
     /// Defines the view of a locally produced package exported by a solution into
     /// the other solutions. 
+    /// This is a wrapper on <see cref="ILocalPackageDependency"/> that helps to resolve the Origin vs. Target
+    /// ambiguity.
     /// </summary>
-    public struct ExportedLocalPackage
+    public readonly struct ExportedLocalPackage
     {
         readonly ILocalPackageDependency _dep;
 

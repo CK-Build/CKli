@@ -16,6 +16,7 @@ namespace CK.Env
     {
         /// <summary>
         /// Gets the logical branch name that corresponds to this folder.
+        /// It can perfectly be <see cref="StandardGitStatus.Unknwon"/>.
         /// </summary>
         StandardGitStatus LogicalBranchName { get; }
 

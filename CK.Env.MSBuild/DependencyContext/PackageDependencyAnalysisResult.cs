@@ -6,6 +6,12 @@ using System.Threading.Tasks;
 
 namespace CK.Env.MSBuild
 {
+    /// <summary>
+    /// Summarizes all the <see cref="VersionedPackage"/> in the context associated to the <see cref="IDependentProject"/> that
+    /// consume them or <see cref="IProjectFramework"/> if more than one version are referenced.
+    /// This is exposed by <see cref="ProjectDependencyResult.AllPackageDependencies"/>, <see cref="ProjectDependencyResult.ExternalPackageDependencies"/>
+    /// and <see cref="ProjectDependencyResult.LocalPackageDependencies"/>.
+    /// </summary>
     public class PackageDependencyAnalysisResult
     {
         internal PackageDependencyAnalysisResult(
@@ -37,13 +43,10 @@ namespace CK.Env.MSBuild
         public IReadOnlyList<(VersionedPackage Package, IReadOnlyList<IDependentProject> Projects)> MonoVersions { get; }
 
         /// <summary>
-        /// Gets the <see cref="VersionedPackage"/> that are referenced by more than one version across all projects.
+        /// Gets the <see cref="VersionedPackage"/> that are referenced with more than one version across all projects.
         /// Each versioned package is associated to the list of the <see cref="IProjectFramework"/> that reference it.
         /// </summary>
         public IReadOnlyList<(VersionedPackage Package, IReadOnlyList<IProjectFramework> Projects)> MultiVersions { get; }
-
-
-
 
     }
 }

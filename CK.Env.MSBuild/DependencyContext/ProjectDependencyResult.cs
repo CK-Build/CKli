@@ -42,9 +42,9 @@ namespace CK.Env.MSBuild
 
             /// <summary>
             /// Gets the target package.
-            /// Note that if is is a locally published package, this <see cref="IDependentPackage"/>
-            /// will have a null version. This <see cref="Version"/> property should be used
-            /// since it is the one of the <see cref="RawPackageDependency"/>.
+            /// Note that if is is a locally published package, this TargetPackage
+            /// will have a null <see cref="IDependentPackage.Version"/>.
+            /// The <see cref="Version"/> property should be used since it is the one of the <see cref="RawPackageDependency"/>.
             /// </summary>
             public IDependentPackage TargetPackage { get; }
 

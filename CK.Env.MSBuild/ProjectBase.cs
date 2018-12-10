@@ -33,7 +33,7 @@ namespace CK.Env.MSBuild
 
         /// <summary>
         /// Gets the project path: it is the .proj (.csproj etc.) for an actual project
-        /// and the folder path of a <see cref="SolutionFolder"/>.
+        /// and the folder path of a <see cref="SolutionFolder"/> (relative to the <see cref="FileSystem"/>).
         /// </summary>
         public NormalizedPath Path { get; }
 
@@ -49,7 +49,7 @@ namespace CK.Env.MSBuild
 
         /// <summary>
         /// Gets the <see cref="SolutionFolder"/> to which this project belongs. Null for a project that is
-        /// not inside a folder.
+        /// not inside a Solution folder.
         /// </summary>
         public SolutionFolder Parent { get; internal set; }
 

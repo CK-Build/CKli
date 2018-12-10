@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.NuGetClient;
+using CK.Text;
 using CSemVer;
 using Microsoft.Extensions.FileProviders;
 using System;
@@ -34,6 +35,11 @@ namespace CK.Env
         /// Gets the master feed.
         /// </summary>
         IEnvLocalFeed Master { get; }
+
+        /// <summary>
+        /// Gets the Zero builds feed.
+        /// </summary>
+        IEnvLocalFeed ZeroBuildFeed { get; }
 
         /// <summary>
         /// Removes a specific version of a package from the local NuGet cache.

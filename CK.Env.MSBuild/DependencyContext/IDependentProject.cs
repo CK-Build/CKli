@@ -16,10 +16,10 @@ namespace CK.Env.MSBuild
 
         /// <summary>
         /// Whether this project belongs to the Published ones.
-        /// When a project is published, its name is the one of the associated DependencyContext.Package
-        /// and is necessarily unique: we can use its file name as the item's FullName (with the .csproj
+        /// When a project is published, to distinguish it from the associated necessarily
+        /// unique DependencyContext.Package we use its file name as the item's FullName (with the .csproj
         /// extension: the naked project name is used for its Package's FullName).
-        /// But when a project is not published, we scope its name to its solution name to compute the
+        /// But when a project is not published, we scope its file name to its solution name to compute the
         /// FullName so that utility projects can have the same name in different solutions.
         /// </summary>
         bool IsPublished { get; }
@@ -28,6 +28,12 @@ namespace CK.Env.MSBuild
         /// Gets the full name of this project item (see <see cref="IsPublished"/>).
         /// </summary>
         string FullName { get; }
+
+        /// <summary>
+        /// Gets the name of the package produced by this project or null when <see cref="IsPublished"/> is false.
+        /// When not null, this is the name of the project folder.
+        /// </summary>
+        string PublishedName { get; }
 
     }
 }

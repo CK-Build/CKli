@@ -15,7 +15,7 @@ namespace CK.Env.Plugins
     public class SolutionDriver : GitBranchPluginBase, ISolutionDriver, IDisposable, ICommandMethodsProvider
     {
         readonly ISecretKeyStore _keyStore;
-        readonly WorldState _worldState;
+        readonly ISolutionDriverWorld _world;
         readonly IBranchSolutionLoader _solutionLoader;
         readonly IEnvLocalFeedProvider _localFeedProvider;
         readonly ISolutionSettings _settings;
@@ -23,7 +23,7 @@ namespace CK.Env.Plugins
 
         public SolutionDriver(
             ISecretKeyStore keyStore,
-            WorldState w,
+            ISolutionDriverWorld w,
             GitFolder f,
             NormalizedPath branchPath,
             ISolutionSettings settings,
@@ -31,8 +31,8 @@ namespace CK.Env.Plugins
             IEnvLocalFeedProvider localFeedProvider )
             : base( f, branchPath )
         {
-            w.Initializing += OnWorldInitializing;
-            _worldState = w;
+            w.Register( this );
+            _world = w;
             _keyStore = keyStore;
             _solutionLoader = solutionLoader;
             _settings = settings;
@@ -40,14 +40,9 @@ namespace CK.Env.Plugins
             LocalFeed = localFeedProvider.GetFeed( PluginBranch );
         }
 
-        void OnWorldInitializing( object sender, WorldState.InitializingEventArgs e )
-        {
-            e.Register( this );
-        }
-
         void IDisposable.Dispose()
         {
-            _worldState.Initializing -= OnWorldInitializing;
+            _world.Unregister( this );
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => BranchPath.AppendPart( "SolutionDriver" );
@@ -134,53 +129,40 @@ namespace CK.Env.Plugins
         public event EventHandler<EventMonitoredArgs> OnBuildFailed;
 
         /// <summary>
-        /// Fires before <see cref="ZeroBuildProject"/> actually builds a build project in ZeroVersion.
+        /// Fires before <see cref="BuildOrPackBuildProject"/> actually builds a build project in ZeroVersion.
         /// </summary>
         public event EventHandler<EventMonitoredArgs> OnZeroBuildProject;
 
         /// <summary>
-        /// Builds the given project (that must be handled by this driver otherwise an exception is thrown)
-        /// with a zero version.
+        /// Builds the given project (that must be handled by this driver otherwise an exception is thrown).
+        /// This uses "dotnet pack" or "dotnet build" depending on <see cref="ZeroBuildProjectInfo.MustPack"/>.
+        /// No package updates are done by this method. Project is build as it is on the file system.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="packageInfos">The packages to update.</param>
+        /// <param name="info">The <see cref="ZeroBuildProjectInfo"/>.</param>
         /// <returns>True on success, false on error.</returns>
         public bool ZeroBuildProject( IActivityMonitor monitor, ZeroBuildProjectInfo info )
         {
             if( info == null ) throw new ArgumentNullException( nameof( info ) );
-            if( !IsActive ) throw new InvalidOperationException( nameof( IsActive ) );
 
             var primary = GetPrimarySolution( monitor );
             if( primary == null ) return false;
 
             var p = FindProject( monitor, primary, info.SolutionName, info.ProjectName, true );
-            if( info.MustPack )
-            {
-                _localFeedProvider.RemoveFromNuGetCache( monitor, info.ProjectName, SVersion.ZeroVersion );
-            }
-            using( Folder.OpenProtectedScope( monitor ) )
-            {
-                int changes = 0;
-                foreach( var packageName in info.UpgradePackages )
-                {
-                    changes += p.SetPackageReferenceVersion( monitor, p.TargetFrameworks, packageName, SVersion.ZeroVersion );
-                }
-                if( changes != 0 ) p.Solution.Save( monitor );
 
-                var zeroVersionArgs = $@" --configuration Debug /p:Version=""{SVersion.ZeroVersion}"" /p:AssemblyVersion=""{InformationalVersion.ZeroAssemblyVersion}"" /p:FileVersion=""{InformationalVersion.ZeroFileVersion}"" /p:InformationalVersion=""{InformationalVersion.ZeroInformationalVersion}"" ";
-                var args = info.MustPack
-                            ? $@"pack --output ""{LocalFeed.PhysicalPath}""" + zeroVersionArgs
-                            : $@"build" + zeroVersionArgs;
+            ICommitAssemblyBuildInfo b = CommitAssemblyBuildInfo.ZeroBuildInfo;
+            string commonArgs = $@" --no-dependencies --source ""{_localFeedProvider.ZeroBuildFeed.PhysicalPath}""";
+            string versionArgs = $@" --configuration {b.BuildConfiguration} /p:Version=""{b.NuGetVersion}"" /p:AssemblyVersion=""{b.AssemblyVersion}"" /p:FileVersion=""{b.FileVersion}"" /p:InformationalVersion=""{b.InformationalVersion}"" ";
+            var args = info.MustPack
+                        ? $@"pack --output ""{_localFeedProvider.ZeroBuildFeed.PhysicalPath}""" +  commonArgs + versionArgs
+                        : $@"build" + commonArgs + versionArgs;
 
-                var path = Folder.FileSystem.GetFileInfo( p.Path.RemoveLastPart() ).PhysicalPath;
-                Folder.FileSystem.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "bin" ) );
-                Folder.FileSystem.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "obj" ) );
+            var path = Folder.FileSystem.GetFileInfo( p.Path.RemoveLastPart() ).PhysicalPath;
+            Folder.FileSystem.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "bin" ) );
+            Folder.FileSystem.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "obj" ) );
 
-                OnZeroBuildProject?.Invoke( this, new EventMonitoredArgs( monitor ) );
-
-                return ProcessRunner.Run( monitor, path, "dotnet", args );
-            }
-
+            OnZeroBuildProject?.Invoke( this, new EventMonitoredArgs( monitor ) );
+            return ProcessRunner.Run( monitor, path, "dotnet", args );
         }
 
         Project FindProject( IActivityMonitor monitor, Solution primary, string solutionName, string projectName, bool throwOnNotFound )
@@ -246,9 +228,8 @@ namespace CK.Env.Plugins
         bool LocalCommit( IActivityMonitor m )
         {
             Debug.Assert( IsActive );
-            return PluginBranch == StandardGitStatus.Local
-                    ? Folder.AmendCommit( m ).Success
-                    : Folder.Commit( m, "Local build auto commit." ).Success;
+            bool amend = PluginBranch == StandardGitStatus.Local || Folder.Head.Message == "Local build auto commit.";
+            return Folder.Commit( m, "Local build auto commit.", amend );
         }
 
         /// <summary>
@@ -257,9 +238,9 @@ namespace CK.Env.Plugins
         /// is the same as <see cref="GitBranchPluginBase.PluginBranch"/>.
         /// </summary>
         bool IsActive => Folder.StandardGitStatus == PluginBranch
-                         && (PluginBranch == StandardGitStatus.Local || PluginBranch != StandardGitStatus.Develop);
+                         && (PluginBranch == StandardGitStatus.Local || PluginBranch == StandardGitStatus.Develop);
 
-        public bool IsUpgradeLocalPackagesEnabled => _worldState.WorkStatus == GlobalWorkStatus.Idle && IsActive;
+        public bool IsUpgradeLocalPackagesEnabled => _world.WorkStatus == GlobalWorkStatus.Idle && IsActive;
 
         [CommandMethod]
         public bool UpgradeLocalPackages( IActivityMonitor monitor, bool upgradeBuildProjects )
@@ -271,7 +252,7 @@ namespace CK.Env.Plugins
             return LocalCommit( monitor );
         }
 
-        public bool IsLocalBuildEnabled => _worldState.WorkStatus == GlobalWorkStatus.Idle && IsActive;
+        public bool IsLocalBuildEnabled => _world.WorkStatus == GlobalWorkStatus.Idle && IsActive;
 
         /// <summary>
         /// Builds the solution in 'local' branch or build in 'develop' without remotes.
@@ -284,24 +265,6 @@ namespace CK.Env.Plugins
         public bool LocalBuild( IActivityMonitor monitor, bool upgradeLocalDependencies = true, bool withUnitTest = true )
         {
             if( !IsLocalBuildEnabled ) throw new InvalidOperationException( nameof( IsLocalBuildEnabled ) );
-            var buildType = PluginBranch == StandardGitStatus.Local ? BuildType.Local : BuildType.Develop;
-            return DoBuild( monitor, upgradeLocalDependencies, withUnitTest, buildType );
-        }
-
-        bool ISolutionDriver.Build( IActivityMonitor monitor, bool upgradeLocalDependencies, bool withUnitTest )
-        {
-            var buildType = _worldState.WorkStatus == GlobalWorkStatus.SwitchingToDevelop
-                            ? BuildType.SwitchToDevelop
-                            : (PluginBranch == StandardGitStatus.Local
-                                ? BuildType.Local
-                                : BuildType.Develop);
-            return DoBuild( monitor, upgradeLocalDependencies, withUnitTest, buildType );
-        }
-
-        bool DoBuild( IActivityMonitor monitor, bool upgradeLocalDependencies, bool withUnitTest, BuildType buildType )
-        {
-            var primary = GetPrimarySolution( monitor );
-            if( primary == null ) return false;
 
             if( upgradeLocalDependencies )
             {
@@ -309,13 +272,32 @@ namespace CK.Env.Plugins
             }
             else if( !LocalCommit( monitor ) ) return false;
 
+            var buildType = PluginBranch == StandardGitStatus.Local ? BuildType.Local : BuildType.Develop;
+            return DoBuild( monitor, withUnitTest, buildType );
+        }
+
+        bool ISolutionDriver.Build( IActivityMonitor monitor, bool withUnitTest )
+        {
+            var buildType = _world.WorkStatus == GlobalWorkStatus.SwitchingToDevelop
+                            ? BuildType.SwitchToDevelop
+                            : (PluginBranch == StandardGitStatus.Local
+                                ? BuildType.Local
+                                : BuildType.Develop);
+            return DoBuild( monitor, withUnitTest, buildType );
+        }
+
+        bool DoBuild( IActivityMonitor monitor, bool withUnitTest, BuildType buildType )
+        {
+            var primary = GetPrimarySolution( monitor );
+            if( primary == null ) return false;
+
             var v = Folder.ReadRepositoryVersionInfo( monitor )?.FinalNuGetVersion;
             if( v == null ) return false;
 
             var publishedNames = primary.LoadedSecondarySolutions.Append( primary )
                                             .SelectMany( s => s.PublishedProjects )
                                             .Select( p => p.Name );
-            bool buildRequired = publishedNames.Any( p => _localFeedProvider.Local.GetPackageFile( monitor, p, v ) == null );
+            bool buildRequired = publishedNames.Any( p => LocalFeed.GetPackageFile( monitor, p, v ) == null );
             if( !buildRequired )
             {
                 monitor.Info( $"All {publishedNames.Count()} packages are already published in version {v}: {publishedNames.Concatenate()}." );

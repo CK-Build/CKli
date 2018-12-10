@@ -1,0 +1,35 @@
+using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace CK.Env
+{
+    /// <summary>
+    /// Exposes all we need to know about the head of a <see cref="IGitRepository"/>
+    /// </summary>
+    public interface IGitHeadInfo
+    {
+        /// <summary>
+        /// Gets the head's commit sha.
+        /// </summary>
+        string CommitSha { get; }
+
+        /// <summary>
+        /// Gets the SHA1 signature of the <see cref="CommitSha"/> (by default) or
+        /// the one of any tree or blob inside.
+        /// </summary>
+        /// <param name="path">The object's path. When empty, it is the SHA of the Tree (the "content SHA")) that is retrieved.</param>
+        /// <returns>The SHA or null if not found.</returns>
+        string GetSha( string path = null );
+
+        /// <summary>
+        /// Gets the current commit's message.
+        /// </summary>
+        string Message { get; }
+
+        /// <summary>
+        /// Gets the commit message.
+        /// </summary>
+        DateTimeOffset CommitDate { get; }
+    }
+}
