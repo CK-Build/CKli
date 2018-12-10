@@ -31,7 +31,7 @@ namespace CK.Env
             Debug.Assert( driver.GitRepository.CurrentBranchName == s.BranchName );
             if( !driver.UpdatePackageDependencies( m, buildProjectsUpgrade ) ) return false;
             if( !driver.GitRepository.AmendCommit( m, null, date => _commitTimes[s.Index] ) ) return false;
-            return driver.Build( m, false );
+            return driver.BuildByBuilder( m, false );
         }
 
     }

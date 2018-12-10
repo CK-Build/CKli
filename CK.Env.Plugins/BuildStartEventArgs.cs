@@ -10,13 +10,11 @@ using System.Threading.Tasks;
 namespace CK.Env
 {
     /// <summary>
-    /// Defines build context.
+    /// Defines build context: it contains everything that is required to actually build a solution.
     /// The only mutable information here is the <see cref="EnvironmentVariables"/>.
     /// </summary>
     public class BuildStartEventArgs : EventMonitoredArgs
     {
-        public static readonly string CodeCakeBuilderRelativePath = "CodeCakeBuilder/bin/Debug/netcoreapp2.1/CodeCakeBuilder.dll";
-
         /// <summary>
         /// Gets the version that must be generated.
         /// </summary>
@@ -51,20 +49,25 @@ namespace CK.Env
         /// <summary>
         /// Gets whether the build uses a dirty folder.
         /// </summary>
-        public bool IsUsingDirtyFolder => (BuildType & CK.Env.BuildType.IsUsingDirtyFolder) != 0;
+        public bool IsUsingDirtyFolder => (BuildType & BuildType.IsUsingDirtyFolder) != 0;
+
+        /// <summary>
+        /// Gets whether the build uses a Zero builder.
+        /// </summary>
+        public bool WithZeroBuilder => (BuildType & BuildType.WithZeroBuilder) == BuildType.WithZeroBuilder;
 
         /// <summary>
         /// Gets the physical path to the solution folder.
         /// </summary>
-        public string SolutionFolderPhysicalPath { get; }
+        public string SolutionPhysicalPath { get; }
 
         /// <summary>
-        /// Gets the physical path to the solution's Code Cake Builder executable.
+        /// Gets the physical path CodeCakeBuilder executable file path.
         /// </summary>
-        public string CodeCakeBuilderExecutablePhysicalPath { get; }
+        public string CodeCakeBuilderExecutableFile { get; }
 
         /// <summary>
-        /// Gets whether the Code Cake Builder should be compiled first or the existing <see cref="CodeCakeBuilderExecutablePhysicalPath"/>
+        /// Gets whether the Code Cake Builder should be compiled first or the existing <see cref="CodeCakeBuilderExecutableFile"/>
         /// be directly called.
         /// </summary>
         public bool BuildCodeCakeBuilderIsRequired { get; }
@@ -76,6 +79,8 @@ namespace CK.Env
             bool withUnitTest,
             SVersion version,
             BuildType buildType,
+            string solutionPhysicalPath,
+            string codeCakeBuilderExecutableFile,
             bool buildCodeCakeBuilder )
             : base( m )
         {
@@ -89,12 +94,9 @@ namespace CK.Env
             WithUnitTest = withUnitTest;
             EnvironmentVariables = new List<(string KeyName, string Value)>();
             BuildType = buildType;
-
-            SolutionFolderPhysicalPath = primary.GitFolder.FileSystem.GetFileInfo( primary.SolutionFolderPath ).PhysicalPath;
-            CodeCakeBuilderExecutablePhysicalPath = System.IO.Path.Combine( SolutionFolderPhysicalPath, CodeCakeBuilderRelativePath );
-
-            BuildCodeCakeBuilderIsRequired = buildCodeCakeBuilder || !System.IO.File.Exists( CodeCakeBuilderExecutablePhysicalPath );
-
+            SolutionPhysicalPath = solutionPhysicalPath;
+            BuildCodeCakeBuilderIsRequired = buildCodeCakeBuilder;
+            CodeCakeBuilderExecutableFile = codeCakeBuilderExecutableFile;
         }
     }
 }

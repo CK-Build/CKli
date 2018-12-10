@@ -58,7 +58,7 @@ namespace CK.Env.Plugins.SolutionFiles
             //        storeConf.TargetStoreUrl = System.IO.Path.Combine( globalInfo.LocalFeedPath, "CKSetupStore" );
             //    }
             //
-            if( e.BuildType == BuildType.Local || e.BuildType != BuildType.DevelopWithRemotes ) return;
+            if( e.BuildType == BuildType.Local || e.BuildType == BuildType.DevelopWithRemotes ) return;
             Debug.Assert( e.IsUsingDirtyFolder );
 
             // Ensures that the local stores exist.

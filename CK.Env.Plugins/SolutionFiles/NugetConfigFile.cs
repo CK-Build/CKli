@@ -31,17 +31,20 @@ namespace CK.Env.Plugins.SolutionFiles
             _solutionDriver.OnStartBuild += OnStartBuild;
         }
 
+
         void OnStartBuild( object sender, BuildStartEventArgs e )
         {
             // Building on 'local' and 'remote develop' uses the CodeCakeBuilder as-is.
-            if( e.BuildType == BuildType.Local || e.BuildType != BuildType.DevelopWithRemotes ) return;
+            // 'local' must already have the /Local feed.
+            // 'remote develop' must not need it.
+            if( e.BuildType == BuildType.Local || e.BuildType == BuildType.DevelopWithRemotes ) return;
 
-            Debug.Assert( (e.BuildType & BuildType.IsTargetLocal) == 0 );
+            Debug.Assert( (e.BuildType & BuildType.IsTargetLocal) == 0 || e.BuildType == BuildType.LocalWithZeroBuilder );
             Debug.Assert( e.IsUsingDirtyFolder );
 
-            if( (e.BuildType & BuildType.IsTargetDevelop) != 0 ) EnsureLocalFeeds( e.Monitor, false, true );
-            else if( (e.BuildType & BuildType.IsTargetRelease) != 0 ) EnsureLocalFeeds( e.Monitor, true );
-            else throw new ArgumentException( nameof( BuildType ) );
+            if( (e.BuildType & BuildType.IsTargetDevelop) != 0 ) EnsureLocalFeeds( e.Monitor, ensureLocal: false, ensureDevelop: true );
+            else if( (e.BuildType & BuildType.IsTargetRelease) != 0 ) EnsureLocalFeeds( e.Monitor, ensureLocal: true );
+            else if( (e.BuildType & BuildType.IsTargetLocal) == 0 ) throw new ArgumentException( nameof( BuildType ) );
             Save( e.Monitor );
         }
 

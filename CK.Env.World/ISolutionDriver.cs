@@ -46,7 +46,7 @@ namespace CK.Env
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="withUnitTest">False to skip unit tests.</param>
         /// <returns>True on success, false on error.</returns>
-        bool Build( IActivityMonitor monitor, bool withUnitTest = true );
+        bool BuildByBuilder( IActivityMonitor monitor, bool withUnitTest = true );
 
         /// <summary>
         /// Builds the given project (that must be handled by this driver otherwise an exception is thrown)

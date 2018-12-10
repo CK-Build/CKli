@@ -37,7 +37,7 @@ namespace CK.Env.Plugins
             _solutionLoader = solutionLoader;
             _settings = settings;
             _localFeedProvider = localFeedProvider;
-            LocalFeed = localFeedProvider.GetFeed( PluginBranch );
+            TargetLocalFeed = localFeedProvider.GetFeed( PluginBranch );
         }
 
         void IDisposable.Dispose()
@@ -55,7 +55,7 @@ namespace CK.Env.Plugins
         /// Gets the local feed if the <see cref="GitBranchPluginBase.PluginBranch"/> is one of
         /// the 3 standard branches. Null otherwise.
         /// </summary>
-        public IEnvLocalFeed LocalFeed { get; }
+        public IEnvLocalFeed TargetLocalFeed { get; }
 
         /// <summary>
         /// Loads or reloads the primary solution and its secondary solutions.
@@ -155,7 +155,7 @@ namespace CK.Env.Plugins
             string versionArgs = $@" --configuration {b.BuildConfiguration} /p:Version=""{b.NuGetVersion}"" /p:AssemblyVersion=""{b.AssemblyVersion}"" /p:FileVersion=""{b.FileVersion}"" /p:InformationalVersion=""{b.InformationalVersion}"" ";
             var args = info.MustPack
                         ? $@"pack --output ""{_localFeedProvider.ZeroBuildFeed.PhysicalPath}""" +  commonArgs + versionArgs
-                        : $@"build" + commonArgs + versionArgs;
+                        : $@"publish" + commonArgs + versionArgs;
 
             var path = Folder.FileSystem.GetFileInfo( p.Path.RemoveLastPart() ).PhysicalPath;
             Folder.FileSystem.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "bin" ) );
@@ -220,7 +220,7 @@ namespace CK.Env.Plugins
                     .SelectMany( s => s.AllProjects )
                     .Where( p => withBuildProject || !p.IsBuildProject )
                     .SelectMany( p => p.Deps.Packages )
-                    .Select( dep => (Dep: dep, LocalVersion: LocalFeed.GetBestVersion( monitor, dep.PackageId )) )
+                    .Select( dep => (Dep: dep, LocalVersion: TargetLocalFeed.GetBestVersion( monitor, dep.PackageId )) )
                     .Where( pv => pv.LocalVersion != null )
                     .Select( pv => new UpdatePackageInfo( pv.Dep.Owner.Solution.UniqueSolutionName, pv.Dep.Owner.Name, pv.Dep.PackageId, pv.LocalVersion ) );
         }
@@ -273,20 +273,18 @@ namespace CK.Env.Plugins
             else if( !LocalCommit( monitor ) ) return false;
 
             var buildType = PluginBranch == StandardGitStatus.Local ? BuildType.Local : BuildType.Develop;
-            return DoBuild( monitor, withUnitTest, buildType );
+            return DoBuild( monitor, withUnitTest, buildType, withZeroBuilder: null );
         }
 
-        bool ISolutionDriver.Build( IActivityMonitor monitor, bool withUnitTest )
+        bool ISolutionDriver.BuildByBuilder( IActivityMonitor monitor, bool withUnitTest )
         {
-            var buildType = _world.WorkStatus == GlobalWorkStatus.SwitchingToDevelop
-                            ? BuildType.SwitchToDevelop
-                            : (PluginBranch == StandardGitStatus.Local
+            var buildType = (PluginBranch == StandardGitStatus.Local
                                 ? BuildType.Local
                                 : BuildType.Develop);
-            return DoBuild( monitor, withUnitTest, buildType );
+            return DoBuild( monitor, withUnitTest, buildType, withZeroBuilder: true );
         }
 
-        bool DoBuild( IActivityMonitor monitor, bool withUnitTest, BuildType buildType )
+        bool DoBuild( IActivityMonitor monitor, bool withUnitTest, BuildType buildType, bool? withZeroBuilder )
         {
             var primary = GetPrimarySolution( monitor );
             if( primary == null ) return false;
@@ -294,10 +292,13 @@ namespace CK.Env.Plugins
             var v = Folder.ReadRepositoryVersionInfo( monitor )?.FinalNuGetVersion;
             if( v == null ) return false;
 
+            string solutionPath = primary.GitFolder.FullPath;
+            Debug.Assert( solutionPath == primary.GitFolder.FileSystem.GetFileInfo( primary.SolutionFolderPath ).PhysicalPath );
+
             var publishedNames = primary.LoadedSecondarySolutions.Append( primary )
                                             .SelectMany( s => s.PublishedProjects )
                                             .Select( p => p.Name );
-            bool buildRequired = publishedNames.Any( p => LocalFeed.GetPackageFile( monitor, p, v ) == null );
+            bool buildRequired = publishedNames.Any( p => TargetLocalFeed.GetPackageFile( monitor, p, v ) == null );
             if( !buildRequired )
             {
                 monitor.Info( $"All {publishedNames.Count()} packages are already published in version {v}: {publishedNames.Concatenate()}." );
@@ -312,6 +313,33 @@ namespace CK.Env.Plugins
                     return true;
                 }
             }
+            var ccbPath = CodeCakeBuilderHelper.GetExecutablePath( solutionPath );
+            var ccbVersion = File.Exists( ccbPath ) ? CodeCakeBuilderHelper.GetVersion( ccbPath ) : null;
+            if( ccbVersion == null )
+            {
+                monitor.Warn( $"CodeCakeBuilder executable file not found. " + ccbPath );
+            }
+            else monitor.Trace( $"CodeCakeBuilder version is {ccbVersion}." );
+
+            if( ccbVersion == SVersion.ZeroVersion )
+            {
+                if( withZeroBuilder == false )
+                {
+                    monitor.Error( $"Invalid 'withZeroBuilder = false' constraint: CodeCakeBuilder is actually in ZeroVersion." );
+                    return false;
+                }
+                buildType |= BuildType.WithZeroBuilder;
+            }
+            else
+            {
+                if( withZeroBuilder == true )
+                {
+                    monitor.Error( $"Invalid 'withZeroBuilder' constraint (current version is '{ccbVersion}'). Zero Build versions must first be built." );
+                    return false;
+                }
+                buildType &= ~BuildType.WithZeroBuilder;
+            }
+
             var ev = new BuildStartEventArgs(
                             monitor,
                             buildRequired,
@@ -319,7 +347,9 @@ namespace CK.Env.Plugins
                             withUnitTest,
                             v,
                             buildType,
-                            false );
+                            solutionPath,
+                            ccbPath,
+                            ccbVersion == null );
             return RunBuild( ev );
         }
 
@@ -351,12 +381,12 @@ namespace CK.Env.Plugins
                     if( key == null ) return false;
                     ev.EnvironmentVariables.Add( ("CODECAKEBUILDER_SECRET_KEY", key) );
 
-                    var args = ev.BuildCodeCakeBuilderIsRequired ? "run --project CodeCakeBuilder" : ev.CodeCakeBuilderExecutablePhysicalPath;
+                    var args = ev.BuildCodeCakeBuilderIsRequired ? "run --project CodeCakeBuilder" : ev.CodeCakeBuilderExecutableFile;
                     args += " -autointeraction";
                     args += " -PublishDirtyRepo=" + (ev.IsUsingDirtyFolder ? 'Y' : 'N');
                     if( !ev.BuildIsRequired ) args += " -target=\"Unit-Testing\" -exclusiveOptional -IgnoreNoPackagesToProduce=Y";
                     if( !ev.WithUnitTest ) args += " -RunUnitTests=N";
-                    if( !ProcessRunner.Run( m, ev.SolutionFolderPhysicalPath, "dotnet", args, ev.EnvironmentVariables ) )
+                    if( !ProcessRunner.Run( m, ev.SolutionPhysicalPath, "dotnet", args, ev.EnvironmentVariables ) )
                     {
                         return false;
                     }

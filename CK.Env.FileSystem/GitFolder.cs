@@ -599,7 +599,7 @@ namespace CK.Env
         /// Gets whether the head can be amended: the current branch
         /// is not tracked or the current commit is ahead of the remote branch.
         /// </summary>
-        public bool CanAmendCommit => _git.Head.TrackingDetails.AheadBy > 0;
+        public bool CanAmendCommit => (_git.Head.TrackingDetails.AheadBy ?? 1) > 0;
 
         /// <summary>
         /// Commits any pending changes.

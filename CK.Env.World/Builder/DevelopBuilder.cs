@@ -38,7 +38,7 @@ namespace CK.Env
             }
             if( !driver.UpdatePackageDependencies( m, buildProjectsUpgrade ) ) return false;
             if( !driver.GitRepository.AmendCommit( m ) ) return false;
-            return driver.Build( m, false );
+            return driver.BuildByBuilder( m, false );
         }
 
     }

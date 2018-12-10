@@ -33,25 +33,37 @@ namespace CK.Env
         IsUsingDirtyFolder = 8,
 
         /// <summary>
+        /// Whether the ZeroVersion is used. This requires an access to the <see cref="IEnvLocalFeedProvider.ZeroBuildFeed"/>.
+        /// </summary>
+        WithZeroBuilder = IsUsingDirtyFolder | 16,
+
+        /// <summary>
         /// Purely local build on 'local' branch.
+        /// This necessarily use the builder without any local modifications (<see cref="IsUsingDirtyFolder"/> is not set).
         /// </summary>
         Local = IsTargetLocal,
 
         /// <summary>
-        /// Switching from 'local' to 'develop' branch.
-        /// The working folder is on 'develop'.
-        /// </summary>
-        SwitchToDevelop = IsTargetDevelop | IsUsingDirtyFolder,
-
-        /// <summary>
         /// Local only CI build on 'develop' branch. Artefacts are kept locally.
         /// </summary>
-        Develop = IsTargetDevelop | IsUsingDirtyFolder | 128,
+        Develop = IsTargetDevelop | IsUsingDirtyFolder,
+
+        /// <summary>
+        /// Local build with the Zero builder.
+        /// </summary>
+        LocalWithZeroBuilder = Local | WithZeroBuilder,
+
+        /// <summary>
+        /// Local only CI build on 'develop' branch with the Zero builder. Artefacts are kept locally.
+        /// </summary>
+        DevelopWithZeroBuilder = Develop | WithZeroBuilder,
 
         /// <summary>
         /// CI build on 'develop'. Artefacts are published to remotes.
+        /// This necessarily use the builder without any local modifications (<see cref="IsUsingDirtyFolder"/> is not set).
         /// </summary>
-        DevelopWithRemotes = IsTargetDevelop,
+        DevelopWithRemotes = IsTargetDevelop | 128,
+
 
 
     }

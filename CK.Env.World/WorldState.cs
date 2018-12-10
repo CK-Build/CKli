@@ -485,29 +485,29 @@ namespace CK.Env
                 m.Info( $"File '{memPath}' contains {sha1Cache.Count} entries." );
 
                 var currentShas = new string[depContext.BuildProjectsInfo.Count];
-                var context = new Dictionary<string,(ISolutionDriver Driver, IDisposable Scope)>();
+                var driverMap = new Dictionary<string, ISolutionDriver>();
+                var scopeMap = new Dictionary<ISolutionDriver, IDisposable>();
                 try
                 {
-                    using( m.OpenTrace( "Resolving drivers and opening protected scopes." ) )
+                    using( m.OpenTrace( "Resolving drivers and reading Sha signatures." ) )
                     {
                         foreach( var p in depContext.BuildProjectsInfo )
                         {
-                            if( !context.TryGetValue( p.SolutionName, out var ctx ) )
+                            if( !driverMap.TryGetValue( p.SolutionName, out var d ) )
                             {
-                                var d = FindSolutionDriver( m, p.SolutionName, depContext.UniqueBranchName );
-                                ctx = (d, d.GitRepository.OpenProtectedScope( m, null ));
-                                context.Add( p.SolutionName, ctx );
+                                d = FindSolutionDriver( m, p.SolutionName, depContext.UniqueBranchName );
+                                driverMap.Add( p.SolutionName, d );
                             }
-                            currentShas[p.Index] = ctx.Driver.GitRepository.Head.GetSha( p.PrimarySolutionRelativeFolderPath );
+                            currentShas[p.Index] = d.GitRepository.Head.GetSha( p.PrimarySolutionRelativeFolderPath );
                         }
                     }
-                    using( m.OpenTrace( "Analysing dependencies and preparing execution." ) )
+                    using( m.OpenTrace( "Analysing dependencies." ) )
                     {
                         foreach( var p in depContext.BuildProjectsInfo )
                         {
                             using( m.OpenInfo( $"{p} <= {(p.Dependencies.Any() ? p.Dependencies.Concatenate() : "(no dependency)")}." ) )
                             {
-                                var driver = context[p.SolutionName].Driver;
+                                var driver = driverMap[p.SolutionName];
 
                                 // Always sets Zero version dependencies even if we don't build it so that
                                 // dependent project see homogeneous Zero versions for all its dependencies
@@ -553,11 +553,64 @@ namespace CK.Env
                     if( mustBuild.Count == 0 ) m.Info( "Nothing to build. Build projects are up-to-date." );
                     else
                     {
+                        using( m.OpenTrace( "Creating protected scopes and applying zero dependencies." ) )
+                        {
+                            foreach( var p in depContext.BuildProjectsInfo )
+                            {
+                                using( m.OpenInfo( $"Configuriog {p}." ) )
+                                {
+                                    var driver = driverMap[p.SolutionName];
+                                    if( !scopeMap.ContainsKey( driver ) )
+                                    {
+                                        scopeMap.Add( driver, driver.GitRepository.OpenProtectedScope( m, null ) );
+                                    }
+                                    // Always sets Zero version dependencies even if we don't build it so that
+                                    // dependent project see homogeneous Zero versions for all its dependencies
+                                    // (this is quite efficient so it's safer to do this).
+                                    var zeroDeps = p.UpgradePackages.Select( dep => new UpdatePackageInfo( p.SolutionName, p.ProjectName, dep, SVersion.ZeroVersion ) );
+                                    if( !driver.UpdatePackageDependencies( m, zeroDeps ) ) return false;
+
+                                    // Always clear the NuGet cache with the Zero version.
+                                    _localFeedProvider.RemoveFromNuGetCache( m, p.ProjectName, SVersion.ZeroVersion );
+
+                                    // Check cache.
+                                    var currentTreeSha = currentShas[p.Index];
+                                    if( currentTreeSha == null )
+                                    {
+                                        throw new Exception( $"Unable to get Sha for {p.PrimarySolutionRelativeFolderPath}." );
+                                    }
+                                    if( !sha1Cache.TryGetValue( p.FullName, out var sha ) )
+                                    {
+                                        m.Info( $"ReasonToBuild#1: No cached Sha signature found for {p.FullName}." );
+                                    }
+                                    else if( sha != currentTreeSha )
+                                    {
+                                        m.Info( $"ReasonToBuild#2: Current Sha signature differs from the cached one." );
+                                    }
+                                    else if( p.Dependencies.Any( depName => mustBuild.Contains( depName ) ) )
+                                    {
+                                        m.Info( $"ReasonToBuild#3: Rebuild dependencies {mustBuild.Intersect( p.Dependencies ).Concatenate()}." );
+                                    }
+                                    else if( p.MustPack
+                                             && _localFeedProvider.ZeroBuildFeed.GetPackageFile( m, p.ProjectName, SVersion.ZeroVersion ) == null )
+                                    {
+                                        m.Info( $"ReasonToBuild#4: {p.ProjectName}.0.0.0-0 does not exist in in Zero build feed." );
+                                    }
+                                    else
+                                    {
+                                        mustBuild.Remove( p.FullName );
+                                        m.CloseGroup( $"Project '{p}' is up to date. Build skipped." );
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+
                         foreach( var p in depContext.BuildProjectsInfo.Where( p => mustBuild.Contains( p.FullName ) ) )
                         {
                             using( m.OpenInfo( $"Building {p}." ) )
                             {
-                                var driver = context[p.SolutionName].Driver;
+                                var driver = driverMap[p.SolutionName];
                                 if( !driver.ZeroBuildProject( m, p ) )
                                 {
                                     sha1Cache.Remove( p.FullName );
@@ -573,7 +626,7 @@ namespace CK.Env
                 }
                 finally
                 {
-                    foreach( var ctx in context.Values ) ctx.Scope?.Dispose();
+                    foreach( var scope in scopeMap.Values ) scope.Dispose();
 
                     m.Info( $"Saving {sha1Cache.Count} entries in file '{memPath}'." );
                     System.IO.File.WriteAllLines( memPath, sha1Cache.Select( kv => kv.Key + ' ' + kv.Value ) );
@@ -650,13 +703,8 @@ namespace CK.Env
 
                 if( !EnsureZeroBuildProjects( m, depContext ) ) return;
 
-                foreach( var s in depContext.Solutions )
-                {
-                    depContext.LogSolutions( m, s );
-                    var d = FindSolutionDriver( m, s );
-
-                    throw new NotImplementedException();
-                }
+                var builder = new DevelopBuilder( depContext, ( mon, s ) => FindSolutionDriver( mon, s ) );
+                if( !builder.Run( m ) ) return;
 
                 if( !error() )
                 {
