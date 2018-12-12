@@ -43,7 +43,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="s">The solution.</param>
         /// <returns>The release info or null if not found.</returns>
-        public ReleaseSolutionInfo FindBySolution( IDependentSolution s ) => _infos.FirstOrDefault( r => r.Solution == s );
+        public ReleaseSolutionInfo FindBySolution( IDependentSolution s ) => _infos[s.Index];
 
         /// <summary>
         /// Gets the list (in the same order as the <see cref="IDependentSolutionContext.Solutions"/>) of

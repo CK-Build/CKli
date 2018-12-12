@@ -14,13 +14,13 @@ namespace CK.Env
     /// </summary>
     public abstract class Builder
     {
-        readonly Func<IActivityMonitor, IDependentSolution, ISolutionDriver> _driverFinder;
+        readonly Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> _driverFinder;
         readonly ISolutionDriver[] _drivers;
         readonly Dictionary<string, SVersion> _packagesVersion;
         readonly List<UpdatePackageInfo>[] _upgrades;
         readonly SVersion[] _targetVersions;
 
-        protected Builder( IDependentSolutionContext ctx, Func<IActivityMonitor, IDependentSolution, ISolutionDriver> driverFinder )
+        protected Builder( IDependentSolutionContext ctx, Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
         {
             if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
             if( driverFinder == null ) throw new ArgumentNullException( nameof( driverFinder ) );
@@ -50,7 +50,7 @@ namespace CK.Env
             for( int i = 0; i < solutions.Count; ++i )
             {
                 var s = solutions[i];
-                var driver = _drivers[i] = _driverFinder( m, s );
+                var driver = _drivers[i] = _driverFinder( m, DependentSolutionContext, s.UniqueSolutionName );
                 var upgrades = s.ImportedLocalPackages
                                 .Select( p => new UpdatePackageInfo(
                                                     s.UniqueSolutionName,

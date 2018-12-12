@@ -14,7 +14,7 @@ namespace CK.Env
 
         public DevelopBuilder(
             IDependentSolutionContext ctx,
-            Func<IActivityMonitor,IDependentSolution,ISolutionDriver> driverFinder,
+            Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder,
             bool withUnitTest )
             : base( ctx, driverFinder )
         {

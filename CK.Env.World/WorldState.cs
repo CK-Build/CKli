@@ -218,6 +218,19 @@ namespace CK.Env
             return FindSolutionDriver( monitor, solution.UniqueSolutionName, solution.BranchName, throwOnNotFound );
         }
 
+        /// <summary>
+        /// Helper for external components.
+        /// This throws an exception if the driver is not found.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="depContext">The current dependency context.</param>
+        /// <param name="solutionName">Solution name.</param>
+        /// <returns>The driver.</returns>
+        public ISolutionDriver DriverFinder( IActivityMonitor monitor, IDependentSolutionContext depContext, string solutionName )
+        {
+            return FindSolutionDriver( monitor, solutionName, depContext.UniqueBranchName, true );
+        }
+
         bool RunSafe( IActivityMonitor m, string message, Action<IActivityMonitor, Func<bool>> action )
         {
             bool result = true;
@@ -435,10 +448,13 @@ namespace CK.Env
                 {
                     if( !g.SwitchDevelopToLocal( m, autoCommit: true ) ) return;
                 }
+                UpdateGlobalGitStatus();
+                Debug.Assert( CachedGlobalGitStatus == StandardGitStatus.Local );
 
                 var depContext = GetSolutionDependentContext( m, true );
                 if( depContext == null ) return;
-                if( !EnsureZeroBuildProjects( m, depContext ) ) return;
+                if( ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, DriverFinder ) == null ) return;
+
                 if( !error() )
                 {
                     SwitchedToLocal?.Invoke( this, ev );
@@ -470,147 +486,8 @@ namespace CK.Env
             {
                 var depContext = GetSolutionDependentContext( m, true );
                 if( depContext == null ) return;
-                EnsureZeroBuildProjects( m, depContext );
+                ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, DriverFinder );
             } );
-        }
-
-        bool EnsureZeroBuildProjects( IActivityMonitor m, IDependentSolutionContext depContext )
-        {
-            Debug.Assert( CachedGlobalGitStatus == StandardGitStatus.Local || CachedGlobalGitStatus == StandardGitStatus.Develop );
-            Debug.Assert( depContext.UniqueBranchName == WorldName.DevelopBranchName || depContext.UniqueBranchName == WorldName.LocalBranchName );
-            if( depContext.BuildProjectsInfo == null )
-            {
-                m.Error( "Build Projects dependencies failed to be computed." );
-                return false;
-            }
-            if( depContext.BuildProjectsInfo.Count == 0 )
-            {
-                m.Info( "No Build Project exist." );
-                return true;
-            }
-
-            using( m.OpenInfo( $"Building ZeroVersion projects." ) )
-            {
-                var mustBuild = new HashSet<string>();
-                mustBuild.AddRange( depContext.BuildProjectsInfo.Select( z => z.FullName ) );
-
-                var memPath = _localFeedProvider.ZeroBuild.PhysicalPath.AppendPart( "CacheZeroVersion.txt" );
-                var sha1Cache = System.IO.File.Exists( memPath )
-                                ? System.IO.File.ReadAllLines( memPath )
-                                                .Select( l => l.Split() )
-                                                .Where( l => mustBuild.Contains( l[0] ) )
-                                                .ToDictionary( l => l[0], l => l[1] )
-                                : new Dictionary<string, string>();
-                m.Info( $"File '{memPath}' contains {sha1Cache.Count} entries." );
-
-                var currentShas = new string[depContext.BuildProjectsInfo.Count];
-                var driverMap = new Dictionary<string, ISolutionDriver>();
-                var scopeMap = new Dictionary<ISolutionDriver, IDisposable>();
-                try
-                {
-                    using( m.OpenTrace( "Resolving drivers and reading Sha signatures." ) )
-                    {
-                        foreach( var p in depContext.BuildProjectsInfo )
-                        {
-                            if( !driverMap.TryGetValue( p.SolutionName, out var d ) )
-                            {
-                                d = FindSolutionDriver( m, p.SolutionName, depContext.UniqueBranchName );
-                                driverMap.Add( p.SolutionName, d );
-                            }
-                            currentShas[p.Index] = d.GitRepository.Head.GetSha( p.PrimarySolutionRelativeFolderPath );
-                        }
-                    }
-                    using( m.OpenTrace( "Analysing dependencies." ) )
-                    {
-                        foreach( var p in depContext.BuildProjectsInfo )
-                        {
-                            using( m.OpenInfo( $"{p} <= {(p.Dependencies.Any() ? p.Dependencies.Concatenate() : "(no dependency)")}." ) )
-                            {
-                                var driver = driverMap[p.SolutionName];
-
-                                // Check cache.
-                                var currentTreeSha = currentShas[p.Index];
-                                if( currentTreeSha == null )
-                                {
-                                    throw new Exception( $"Unable to get Sha for {p.PrimarySolutionRelativeFolderPath}." );
-                                }
-                                if( !sha1Cache.TryGetValue( p.FullName, out var sha ) )
-                                {
-                                    m.Info( $"ReasonToBuild#1: No cached Sha signature found for {p.FullName}." );
-                                }
-                                else if( sha != currentTreeSha )
-                                {
-                                    m.Info( $"ReasonToBuild#2: Current Sha signature differs from the cached one." );
-                                }
-                                else if( p.Dependencies.Any( depName => mustBuild.Contains( depName ) ) )
-                                {
-                                    m.Info( $"ReasonToBuild#3: Rebuild dependencies {mustBuild.Intersect( p.Dependencies ).Concatenate()}." );
-                                }
-                                else if( p.MustPack
-                                         && _localFeedProvider.ZeroBuild.GetPackageFile( m, p.ProjectName, SVersion.ZeroVersion ) == null )
-                                {
-                                    m.Info( $"ReasonToBuild#4: {p.ProjectName}.0.0.0-0 does not exist in in Zero build feed." );
-                                }
-                                else
-                                {
-                                    mustBuild.Remove( p.FullName );
-                                    m.CloseGroup( $"Project '{p}' is up to date. Build skipped." );
-                                    continue;
-                                }
-                            }
-                        }
-                    }
-                    if( mustBuild.Count == 0 ) m.Info( "Nothing to build. Build projects are up-to-date." );
-                    else
-                    {
-                        using( m.OpenTrace( "Creating protected scopes and applying zero dependencies." ) )
-                        {
-                            foreach( var p in depContext.BuildProjectsInfo )
-                            {
-                                using( m.OpenInfo( $"Configuring {p}." ) )
-                                {
-                                    var driver = driverMap[p.SolutionName];
-                                    if( !scopeMap.ContainsKey( driver ) )
-                                    {
-                                        scopeMap.Add( driver, driver.GitRepository.OpenProtectedScope( m, null ) );
-                                    }
-                                    // Always sets Zero version dependencies even if we don't build it so that
-                                    // dependent project see homogeneous Zero versions for all its dependencies.
-                                    var zeroDeps = p.UpgradePackages.Select( dep => new UpdatePackageInfo( p.SolutionName, p.ProjectName, dep, SVersion.ZeroVersion ) );
-                                    if( !driver.UpdatePackageDependencies( m, zeroDeps ) ) return false;
-                                }
-                            }
-                        }
-
-                        using( m.OpenTrace( $"Build/Publish {mustBuild.Count} build projects: {mustBuild.Concatenate()}" ) )
-                        {
-                            foreach( var p in depContext.BuildProjectsInfo.Where( p => mustBuild.Contains( p.FullName ) ) )
-                            {
-                                var action = p.MustPack ? "Publishing" : "Building";
-                                using( m.OpenInfo( $"{action} {p}." ) )
-                                {
-                                    var driver = driverMap[p.SolutionName];
-                                    if( !driver.ZeroBuildProject( m, p ) )
-                                    {
-                                        sha1Cache.Remove( p.FullName );
-                                        m.CloseGroup( "Failed." );
-                                        return false;
-                                    }
-                                    sha1Cache[p.FullName] = currentShas[p.Index];
-                                    m.CloseGroup( "Success." );
-                                }
-                            }
-                        }
-                    }
-                    return true;
-                }
-                finally
-                {
-                    foreach( var scope in scopeMap.Values ) scope.Dispose();
-                    m.Info( $"Saving {sha1Cache.Count} entries in file '{memPath}'." );
-                    System.IO.File.WriteAllLines( memPath, sha1Cache.Select( kv => kv.Key + ' ' + kv.Value ) );
-                }
-            }
         }
 
         /// <summary>
@@ -631,12 +508,15 @@ namespace CK.Env
                 var depContext = GetSolutionDependentContext( m, true );
                 if( depContext == null ) return;
 
-                if( !EnsureZeroBuildProjects( m, depContext ) ) return;
+                ZeroBuilder zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, DriverFinder );
+                if( zBuilder == null ) return;
 
                 Builder builder = CachedGlobalGitStatus == StandardGitStatus.Local
-                                ? (Builder)new LocalBuilder( depContext, ( mon, s ) => FindSolutionDriver( mon, s, true ), withUnitTest )
-                                : new DevelopBuilder( depContext, ( mon, s ) => FindSolutionDriver( mon, s, true ), withUnitTest );
-                builder.Run( m );
+                                ? (Builder)new LocalBuilder( depContext, DriverFinder, withUnitTest )
+                                : new DevelopBuilder( depContext, DriverFinder, withUnitTest );
+                if( !builder.Run( m ) ) return;
+
+                zBuilder.RegisterSHAlias( m );
             } );
         }
 
@@ -685,10 +565,13 @@ namespace CK.Env
                 var depContext = GetSolutionDependentContext( m, true );
                 if( depContext == null ) return;
 
-                if( !EnsureZeroBuildProjects( m, depContext ) ) return;
+                var zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, DriverFinder );
+                if( zBuilder == null ) return;
 
-                var builder = new DevelopBuilder( depContext, ( mon, s ) => FindSolutionDriver( mon, s ), false );
+                var builder = new DevelopBuilder( depContext, DriverFinder, false );
                 if( !builder.Run( m ) ) return;
+
+                zBuilder.RegisterSHAlias( m );
 
                 if( !error() )
                 {
@@ -774,8 +657,13 @@ namespace CK.Env
             }
             return RunSafe( monitor, $"Starting Release.", ( m, error ) =>
             {
+                var zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, roadmap.DependentSolutionContext, DriverFinder );
+                if( zBuilder == null ) return;
+
                 var ev = new EventMonitoredArgs( m );
                 ReleaseBuildStarting?.Invoke( this, ev );
+
+
 
                 if( !error() ) ReleaseBuildDone?.Invoke( this, ev );
                 SetWorkStatusAndSave( m, GlobalWorkStatus.WaitingReleaseConfirmation );

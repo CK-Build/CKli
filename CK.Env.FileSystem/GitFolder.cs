@@ -518,7 +518,7 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="v">The version to set.</param>
         /// <returns>Success and whether the tag has been created or was already defined.</returns>
-        public (bool Success, bool Created) SetVersionTag( IActivityMonitor m, SVersion v )
+        public bool SetVersionTag( IActivityMonitor m, SVersion v )
         {
             var sv = 'v' + v.ToString();
             try
@@ -527,16 +527,16 @@ namespace CK.Env
                 if( exists != null && exists.PeeledTarget == _git.Head.Tip )
                 {
                     m.Info( $"Version Tag {sv} is already set." );
-                    return (true, false);
+                    return true;
                 }
                 _git.ApplyTag( sv );
                 m.Info( $"Set Version tag {sv} on {CurrentBranchName}." );
-                return (true, true);
+                return true;
             }
             catch( Exception ex )
             {
                 m.Error( $"SetVersionTag {sv} on {CurrentBranchName} failed.", ex );
-                return (false, false);
+                return false;
             }
         }
 

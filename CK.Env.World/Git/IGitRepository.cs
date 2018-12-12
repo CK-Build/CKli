@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Text;
+using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -90,6 +91,14 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <returns>True if the current head is clean, false otherwise.</returns>
         bool CheckCleanCommit( IActivityMonitor m );
+
+        /// <summary>
+        /// Sets a version lightweight tag on the current head.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="v">The version to set.</param>
+        /// <returns>True on success, false on error.</returns>
+        bool SetVersionTag( IActivityMonitor m, SVersion v );
 
         /// <summary>
         /// Attempts to check out a branch and pull any 'origin' changes.
