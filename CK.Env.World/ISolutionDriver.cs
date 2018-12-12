@@ -40,18 +40,26 @@ namespace CK.Env
         bool UpdatePackageDependencies( IActivityMonitor monitor, IEnumerable<UpdatePackageInfo> packageInfos );
 
         /// <summary>
-        /// Builds the solution in 'local' or 'develop' branch without pushing to remotes.
-        /// This also handles the build switching from 'local' to 'develop' (<see cref="GlobalWorkStatus.SwitchingToDevelop"/>).
+        /// Builds the solution from its file state.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="withUnitTest">False to skip unit tests.</param>
+        /// <param name="withUnitTest">True to execute the unit tests, false to skip unit tests.</param>
+        /// <param name="withZeroBuilder">
+        /// True to use the Zero Version published build project executable (an error is raised if it has not been already built),
+        /// false to compile and run the CodeCakeBuilder project and null to use the Zero Version published build project
+        /// if it exists instead of the more costly 'dotnet run'.
+        /// </param>
+        /// <param name="withPushToRemote">
+        /// True to ask the builder to push artifacts to remotes.
+        /// This is possible only when building a CI version and applies only to CI versions.
+        /// </param>
         /// <returns>True on success, false on error.</returns>
-        bool BuildByBuilder( IActivityMonitor monitor, bool withUnitTest = true );
+        bool Build( IActivityMonitor monitor, bool withUnitTest, bool? withZeroBuilder, bool withPushToRemote );
 
         /// <summary>
-        /// Builds the given project (that must be handled by this driver otherwise an exception is thrown)
+        /// Builds or publishes the given project (that must be handled by this driver otherwise an exception is thrown)
         /// with a zero version.
-        /// This uses "dotnet pack" or "dotnet build" depending on <see cref="ZeroBuildProjectInfo.MustPack"/>.
+        /// This uses "dotnet pack" or "dotnet publish" depending on <see cref="ZeroBuildProjectInfo.MustPack"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="info">The <see cref="ZeroBuildProjectInfo"/>.</param>

@@ -344,6 +344,7 @@ namespace CK.Env.MSBuild
                         .ToArray();
 
                     Debug.Assert( zeroBuildProjects.Select( z => z.Rank ).IsSortedLarge() );
+                    Debug.Assert( zeroBuildProjects.Select( z => z.Index ).IsSortedStrict() );
 
                     return new BuildProjectsInfo( rBuildProjects, zeroBuildProjects );
                 }

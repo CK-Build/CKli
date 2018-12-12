@@ -10,13 +10,16 @@ namespace CK.Env
     class DevelopBuilder : Builder
     {
         readonly string[] _commits;
+        readonly bool _withUnitTest;
 
         public DevelopBuilder(
             IDependentSolutionContext ctx,
-            Func<IActivityMonitor,IDependentSolution,ISolutionDriver> driverFinder )
+            Func<IActivityMonitor,IDependentSolution,ISolutionDriver> driverFinder,
+            bool withUnitTest )
             : base( ctx, driverFinder )
         {
             _commits = new string[ctx.Solutions.Count];
+            _withUnitTest = withUnitTest;
         }
 
         protected override SVersion PrepareBuild( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades )
@@ -38,7 +41,7 @@ namespace CK.Env
             }
             if( !driver.UpdatePackageDependencies( m, buildProjectsUpgrade ) ) return false;
             if( !driver.GitRepository.AmendCommit( m ) ) return false;
-            return driver.BuildByBuilder( m, false );
+            return driver.Build( m, _withUnitTest, withZeroBuilder: true, withPushToRemote:false );
         }
 
     }

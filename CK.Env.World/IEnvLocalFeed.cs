@@ -15,12 +15,6 @@ namespace CK.Env
     public interface IEnvLocalFeed
     {
         /// <summary>
-        /// Gets the logical branch name that corresponds to this folder.
-        /// It can perfectly be <see cref="StandardGitStatus.Unknwon"/>.
-        /// </summary>
-        StandardGitStatus LogicalBranchName { get; }
-
-        /// <summary>
         /// Gets the physical path of this local feed.
         /// </summary>
         NormalizedPath PhysicalPath { get; }

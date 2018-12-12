@@ -34,16 +34,10 @@ namespace CK.Env.Plugins.SolutionFiles
 
         void OnStartBuild( object sender, BuildStartEventArgs e )
         {
-            // Building on 'local' and 'remote develop' uses the CodeCakeBuilder as-is.
-            // 'local' must already have the /Local feed.
-            // 'remote develop' must not need it.
-            if( e.BuildType == BuildType.Local || e.BuildType == BuildType.DevelopWithRemotes ) return;
+            if( !e.IsUsingDirtyFolder ) return;
 
-            Debug.Assert( (e.BuildType & BuildType.IsTargetLocal) == 0 || e.BuildType == BuildType.LocalWithZeroBuilder );
-            Debug.Assert( e.IsUsingDirtyFolder );
-
-            if( (e.BuildType & BuildType.IsTargetDevelop) != 0 ) EnsureLocalFeeds( e.Monitor, ensureLocal: false, ensureDevelop: true );
-            else if( (e.BuildType & BuildType.IsTargetRelease) != 0 ) EnsureLocalFeeds( e.Monitor, ensureLocal: true );
+            if( (e.BuildType & BuildType.IsTargetCI) != 0 ) EnsureLocalFeeds( e.Monitor, ensureDevelop: true );
+            else if( (e.BuildType & BuildType.IsTargetRelease) != 0 ) EnsureLocalFeeds( e.Monitor, ensureRelease: true );
             else if( (e.BuildType & BuildType.IsTargetLocal) == 0 ) throw new ArgumentException( nameof( BuildType ) );
             Save( e.Monitor );
         }
@@ -174,11 +168,11 @@ namespace CK.Env.Plugins.SolutionFiles
             }
             if( ensureDevelop )
             {
-                EnsureFeed( m, "LocalFeed-Develop", _localFeedProvider.Develop.PhysicalPath );
+                EnsureFeed( m, "LocalFeed-Develop", _localFeedProvider.CI.PhysicalPath );
             }
             if( ensureRelease )
             {
-                EnsureFeed( m, "LocalFeed-Master", _localFeedProvider.Master.PhysicalPath );
+                EnsureFeed( m, "LocalFeed-Master", _localFeedProvider.Release.PhysicalPath );
             }
         }
 

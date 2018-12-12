@@ -275,6 +275,22 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Calls <see cref="UpdateGlobalGitStatus"/> and checks the curent Git status.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <returns>True if the Git status is on 'local' or 'develop' branch.</returns>
+        public bool CheckGlobalGitStatusLocalXorDevelop( IActivityMonitor monitor )
+        {
+            var s = UpdateGlobalGitStatus();
+            if( s != StandardGitStatus.Local && s != StandardGitStatus.Develop )
+            {
+                monitor.Error( $"Repositories must all be on '{WorldName.LocalBranchName}' or '{WorldName.DevelopBranchName}' (current status: {s})." );
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>
         /// Gets the global status previously computed by <see cref="GetGlobalGitStatus(IActivityMonitor)"/>.
         /// </summary>
         public StandardGitStatus CachedGlobalGitStatus => _cachedGlobalGitStatus;
@@ -343,17 +359,21 @@ namespace CK.Env
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="reloadSolutions">True to force a reload of the solutions.</param>
         /// <returns>The dependency context or null on error.</returns>
-        IDependentSolutionContext GetSolutionDependentContext( IActivityMonitor monitor, bool reloadSolutions = false )
+        IDependentSolutionContext GetSolutionDependentContext( IActivityMonitor monitor, bool checkCleanCommits, bool reloadSolutions = false )
         {
-            var s = UpdateGlobalGitStatus();
-            string branchName;
-            if( s == StandardGitStatus.Local ) branchName = WorldName.LocalBranchName;
-            else if( s == StandardGitStatus.Develop ) branchName = WorldName.DevelopBranchName;
-            else
+            if( !CheckGlobalGitStatusLocalXorDevelop( monitor ) ) return null;
+            if( checkCleanCommits )
             {
-                monitor.Error( $"Repositories must all be on '{WorldName.LocalBranchName}' or '{WorldName.DevelopBranchName}'." );
-                return null;
+                bool allClean = true;
+                foreach( var g in _gitRepositories )
+                {
+                    allClean &= g.CheckCleanCommit( monitor ); 
+                }
+                if( !allClean ) return null;
             }
+            var branchName = CachedGlobalGitStatus == StandardGitStatus.Local
+                                ? WorldName.LocalBranchName
+                                : WorldName.DevelopBranchName;
             return _solutionContextLoader.Load( monitor, _gitRepositories, branchName, reloadSolutions );
         }
 
@@ -416,7 +436,7 @@ namespace CK.Env
                     if( !g.SwitchDevelopToLocal( m, autoCommit: true ) ) return;
                 }
 
-                var depContext = GetSolutionDependentContext( m );
+                var depContext = GetSolutionDependentContext( m, true );
                 if( depContext == null ) return;
                 if( !EnsureZeroBuildProjects( m, depContext ) ) return;
                 if( !error() )
@@ -445,9 +465,10 @@ namespace CK.Env
         public bool ZeroBuildProjects( IActivityMonitor monitor )
         {
             if( !CanZeroBuildProjects ) throw new InvalidOperationException( nameof( CanZeroBuildProjects ) );
+            if( !CheckGlobalGitStatusLocalXorDevelop( monitor ) ) return false;
             return RunSafe( monitor, "Fixing Build projects.", ( m, error ) =>
             {
-                var depContext = GetSolutionDependentContext( m );
+                var depContext = GetSolutionDependentContext( m, true );
                 if( depContext == null ) return;
                 EnsureZeroBuildProjects( m, depContext );
             } );
@@ -467,15 +488,13 @@ namespace CK.Env
                 m.Info( "No Build Project exist." );
                 return true;
             }
-            var packageNames = depContext.BuildProjectsInfo.Where( p => p.MustPack ).Select( p => p.ProjectName );
-            var packageNamesText = packageNames.Concatenate();
 
             using( m.OpenInfo( $"Building ZeroVersion projects." ) )
             {
                 var mustBuild = new HashSet<string>();
                 mustBuild.AddRange( depContext.BuildProjectsInfo.Select( z => z.FullName ) );
 
-                var memPath = _localFeedProvider.ZeroBuildFeed.PhysicalPath.AppendPart( "CacheZeroVersion.txt" );
+                var memPath = _localFeedProvider.ZeroBuild.PhysicalPath.AppendPart( "CacheZeroVersion.txt" );
                 var sha1Cache = System.IO.File.Exists( memPath )
                                 ? System.IO.File.ReadAllLines( memPath )
                                                 .Select( l => l.Split() )
@@ -509,15 +528,6 @@ namespace CK.Env
                             {
                                 var driver = driverMap[p.SolutionName];
 
-                                // Always sets Zero version dependencies even if we don't build it so that
-                                // dependent project see homogeneous Zero versions for all its dependencies
-                                // (this is quite efficient so it's safer to do this).
-                                var zeroDeps = p.UpgradePackages.Select( dep => new UpdatePackageInfo( p.SolutionName, p.ProjectName, dep, SVersion.ZeroVersion ) );
-                                if( !driver.UpdatePackageDependencies( m, zeroDeps ) ) return false;
-
-                                // Always clear the NuGet cache with the Zero version.
-                                _localFeedProvider.RemoveFromNuGetCache( m, p.ProjectName, SVersion.ZeroVersion );
-
                                 // Check cache.
                                 var currentTreeSha = currentShas[p.Index];
                                 if( currentTreeSha == null )
@@ -537,7 +547,7 @@ namespace CK.Env
                                     m.Info( $"ReasonToBuild#3: Rebuild dependencies {mustBuild.Intersect( p.Dependencies ).Concatenate()}." );
                                 }
                                 else if( p.MustPack
-                                         && _localFeedProvider.ZeroBuildFeed.GetPackageFile( m, p.ProjectName, SVersion.ZeroVersion ) == null )
+                                         && _localFeedProvider.ZeroBuild.GetPackageFile( m, p.ProjectName, SVersion.ZeroVersion ) == null )
                                 {
                                     m.Info( $"ReasonToBuild#4: {p.ProjectName}.0.0.0-0 does not exist in in Zero build feed." );
                                 }
@@ -557,7 +567,7 @@ namespace CK.Env
                         {
                             foreach( var p in depContext.BuildProjectsInfo )
                             {
-                                using( m.OpenInfo( $"Configuriog {p}." ) )
+                                using( m.OpenInfo( $"Configuring {p}." ) )
                                 {
                                     var driver = driverMap[p.SolutionName];
                                     if( !scopeMap.ContainsKey( driver ) )
@@ -565,60 +575,30 @@ namespace CK.Env
                                         scopeMap.Add( driver, driver.GitRepository.OpenProtectedScope( m, null ) );
                                     }
                                     // Always sets Zero version dependencies even if we don't build it so that
-                                    // dependent project see homogeneous Zero versions for all its dependencies
-                                    // (this is quite efficient so it's safer to do this).
+                                    // dependent project see homogeneous Zero versions for all its dependencies.
                                     var zeroDeps = p.UpgradePackages.Select( dep => new UpdatePackageInfo( p.SolutionName, p.ProjectName, dep, SVersion.ZeroVersion ) );
                                     if( !driver.UpdatePackageDependencies( m, zeroDeps ) ) return false;
-
-                                    // Always clear the NuGet cache with the Zero version.
-                                    _localFeedProvider.RemoveFromNuGetCache( m, p.ProjectName, SVersion.ZeroVersion );
-
-                                    // Check cache.
-                                    var currentTreeSha = currentShas[p.Index];
-                                    if( currentTreeSha == null )
-                                    {
-                                        throw new Exception( $"Unable to get Sha for {p.PrimarySolutionRelativeFolderPath}." );
-                                    }
-                                    if( !sha1Cache.TryGetValue( p.FullName, out var sha ) )
-                                    {
-                                        m.Info( $"ReasonToBuild#1: No cached Sha signature found for {p.FullName}." );
-                                    }
-                                    else if( sha != currentTreeSha )
-                                    {
-                                        m.Info( $"ReasonToBuild#2: Current Sha signature differs from the cached one." );
-                                    }
-                                    else if( p.Dependencies.Any( depName => mustBuild.Contains( depName ) ) )
-                                    {
-                                        m.Info( $"ReasonToBuild#3: Rebuild dependencies {mustBuild.Intersect( p.Dependencies ).Concatenate()}." );
-                                    }
-                                    else if( p.MustPack
-                                             && _localFeedProvider.ZeroBuildFeed.GetPackageFile( m, p.ProjectName, SVersion.ZeroVersion ) == null )
-                                    {
-                                        m.Info( $"ReasonToBuild#4: {p.ProjectName}.0.0.0-0 does not exist in in Zero build feed." );
-                                    }
-                                    else
-                                    {
-                                        mustBuild.Remove( p.FullName );
-                                        m.CloseGroup( $"Project '{p}' is up to date. Build skipped." );
-                                        continue;
-                                    }
                                 }
                             }
                         }
 
-                        foreach( var p in depContext.BuildProjectsInfo.Where( p => mustBuild.Contains( p.FullName ) ) )
+                        using( m.OpenTrace( $"Build/Publish {mustBuild.Count} build projects: {mustBuild.Concatenate()}" ) )
                         {
-                            using( m.OpenInfo( $"Building {p}." ) )
+                            foreach( var p in depContext.BuildProjectsInfo.Where( p => mustBuild.Contains( p.FullName ) ) )
                             {
-                                var driver = driverMap[p.SolutionName];
-                                if( !driver.ZeroBuildProject( m, p ) )
+                                var action = p.MustPack ? "Publishing" : "Building";
+                                using( m.OpenInfo( $"{action} {p}." ) )
                                 {
-                                    sha1Cache.Remove( p.FullName );
-                                    m.CloseGroup( "Failed." );
-                                    return false;
+                                    var driver = driverMap[p.SolutionName];
+                                    if( !driver.ZeroBuildProject( m, p ) )
+                                    {
+                                        sha1Cache.Remove( p.FullName );
+                                        m.CloseGroup( "Failed." );
+                                        return false;
+                                    }
+                                    sha1Cache[p.FullName] = currentShas[p.Index];
+                                    m.CloseGroup( "Success." );
                                 }
-                                sha1Cache[p.FullName] = currentShas[p.Index];
-                                m.CloseGroup( "Success." );
                             }
                         }
                     }
@@ -627,7 +607,6 @@ namespace CK.Env
                 finally
                 {
                     foreach( var scope in scopeMap.Values ) scope.Dispose();
-
                     m.Info( $"Saving {sha1Cache.Count} entries in file '{memPath}'." );
                     System.IO.File.WriteAllLines( memPath, sha1Cache.Select( kv => kv.Key + ' ' + kv.Value ) );
                 }
@@ -636,22 +615,27 @@ namespace CK.Env
 
         /// <summary>
         /// Gets whether <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/> and <see cref="CachedGlobalGitStatus"/>
-        /// is on <see cref="StandardGitStatus.Local"/>.
+        /// is on <see cref="StandardGitStatus.Local"/> or <see cref="StandardGitStatus.Develop"/>.
         /// </summary>
-        public bool CanBuildAllLocal => WorkStatus == GlobalWorkStatus.Idle
-                                        && CachedGlobalGitStatus == StandardGitStatus.Local;
+        public bool CanAllBuild => WorkStatus == GlobalWorkStatus.Idle
+                                   && (CachedGlobalGitStatus == StandardGitStatus.Local
+                                       || CachedGlobalGitStatus == StandardGitStatus.Develop);
 
         [CommandMethod]
-        public bool BuildAllLocal( IActivityMonitor monitor, bool withUnitTest = true )
+        public bool AllBuild( IActivityMonitor monitor, bool withUnitTest = true )
         {
-            if( !CanBuildAllLocal ) throw new InvalidOperationException( nameof( CanBuildAllLocal ) );
-            if( !CheckGlobalGitStatus( monitor, StandardGitStatus.Local ) ) return false;
+            if( !CanAllBuild ) throw new InvalidOperationException( nameof( CanAllBuild ) );
+            if( !CheckGlobalGitStatusLocalXorDevelop( monitor ) ) return false;
             return RunSafe( monitor, $"Local build.", ( m, error ) =>
             {
-                var depContext = GetSolutionDependentContext( m );
+                var depContext = GetSolutionDependentContext( m, true );
                 if( depContext == null ) return;
 
-                var builder = new LocalBuilder( depContext, ( mon, s ) => FindSolutionDriver( mon, s, true ) );
+                if( !EnsureZeroBuildProjects( m, depContext ) ) return;
+
+                Builder builder = CachedGlobalGitStatus == StandardGitStatus.Local
+                                ? (Builder)new LocalBuilder( depContext, ( mon, s ) => FindSolutionDriver( mon, s, true ), withUnitTest )
+                                : new DevelopBuilder( depContext, ( mon, s ) => FindSolutionDriver( mon, s, true ), withUnitTest );
                 builder.Run( m );
             } );
         }
@@ -698,12 +682,12 @@ namespace CK.Env
                 {
                     if( !g.SwitchLocalToDevelop( m ) ) return;
                 }
-                var depContext = GetSolutionDependentContext( m );
+                var depContext = GetSolutionDependentContext( m, true );
                 if( depContext == null ) return;
 
                 if( !EnsureZeroBuildProjects( m, depContext ) ) return;
 
-                var builder = new DevelopBuilder( depContext, ( mon, s ) => FindSolutionDriver( mon, s ) );
+                var builder = new DevelopBuilder( depContext, ( mon, s ) => FindSolutionDriver( mon, s ), false );
                 if( !builder.Run( m ) ) return;
 
                 if( !error() )
@@ -737,7 +721,7 @@ namespace CK.Env
         ReleaseRoadmap DoEnsureRoadmap( IActivityMonitor monitor, bool reload )
         {
             if( _roadMap != null && !reload ) return _roadMap;
-            var depContext = GetSolutionDependentContext( monitor, reload );
+            var depContext = GetSolutionDependentContext( monitor, true, reload );
             if( depContext == null ) return null;
             var previous = _roadMap != null ? _roadMap.ToXml() : GetWorkState( GlobalWorkStatus.Releasing ).Element( "RoadMap" );
             return _roadMap = ReleaseRoadmap.Create( monitor, depContext, previous );

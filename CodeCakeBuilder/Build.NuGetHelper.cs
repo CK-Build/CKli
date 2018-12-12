@@ -349,6 +349,7 @@ namespace CodeCake
                             return;
                         }
                     }
+                    ctx.Information( $"Pushing packages to '{Name}' => '{Url}'." );
                     var logger = InitializeAndGetLogger( ctx );
                     var updater = await _updater;
                     foreach( var package in packages )

@@ -10,10 +10,15 @@ namespace CK.Env
     class LocalBuilder : Builder
     {
         readonly DateTimeOffset[] _commitTimes;
+        readonly bool _withUnitTest;
 
-        public LocalBuilder( IDependentSolutionContext ctx, Func<IActivityMonitor,IDependentSolution,ISolutionDriver> driverFinder )
+        public LocalBuilder(
+            IDependentSolutionContext ctx,
+            Func<IActivityMonitor,IDependentSolution,ISolutionDriver> driverFinder,
+            bool withUnitTest )
             : base( ctx, driverFinder )
         {
+            _withUnitTest = withUnitTest;
             _commitTimes = new DateTimeOffset[ ctx.Solutions.Count ];
         }
 
@@ -31,7 +36,7 @@ namespace CK.Env
             Debug.Assert( driver.GitRepository.CurrentBranchName == s.BranchName );
             if( !driver.UpdatePackageDependencies( m, buildProjectsUpgrade ) ) return false;
             if( !driver.GitRepository.AmendCommit( m, null, date => _commitTimes[s.Index] ) ) return false;
-            return driver.BuildByBuilder( m, false );
+            return driver.Build( m, withUnitTest: _withUnitTest, withZeroBuilder: true, withPushToRemote: false );
         }
 
     }

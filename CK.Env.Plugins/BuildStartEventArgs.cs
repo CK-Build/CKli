@@ -34,7 +34,7 @@ namespace CK.Env
         /// <summary>
         /// Gets whether tests must be executed.
         /// </summary>
-        public bool WithUnitTest { get; }
+        public bool WithUnitTest => (BuildType & BuildType.WithUnitTests) != 0;
 
         /// <summary>
         /// Gets a mutable list of environment variables.
@@ -52,9 +52,15 @@ namespace CK.Env
         public bool IsUsingDirtyFolder => (BuildType & BuildType.IsUsingDirtyFolder) != 0;
 
         /// <summary>
-        /// Gets whether the build uses a Zero builder.
+        /// Gets whether the build uses the Zero builder (direct call of the existing <see cref="CodeCakeBuilderExecutableFile"/>).
+        /// When false, CodeCakeBuilder project is compiled and run (with 'dotnet run').
         /// </summary>
         public bool WithZeroBuilder => (BuildType & BuildType.WithZeroBuilder) == BuildType.WithZeroBuilder;
+
+        /// <summary>
+        /// Gets whether the builder must push the artifacts to the remotes.
+        /// </summary>
+        public bool WithPushToRemote => (BuildType & BuildType.WithPushToRemote) != 0;
 
         /// <summary>
         /// Gets the physical path to the solution folder.
@@ -76,26 +82,22 @@ namespace CK.Env
             IActivityMonitor m,
             bool buildRequired,
             Solution primary,
-            bool withUnitTest,
             SVersion version,
             BuildType buildType,
             string solutionPhysicalPath,
-            string codeCakeBuilderExecutableFile,
-            bool buildCodeCakeBuilder )
+            string codeCakeBuilderExecutableFile )
             : base( m )
         {
             if( primary == null ) throw new ArgumentNullException( nameof( primary ) );
             if( version == null ) throw new ArgumentNullException( nameof( version ) );
-            if( !buildRequired && !withUnitTest ) throw new ArgumentException( "No build nor tests." );
+            if( !buildRequired && (buildType&(BuildType.WithUnitTests|BuildType.WithPushToRemote)) == 0 ) throw new ArgumentException( "No build, tests or push." );
 
             BuildIsRequired = buildRequired;
             PrimarySolution = primary;
             Version = version;
-            WithUnitTest = withUnitTest;
             EnvironmentVariables = new List<(string KeyName, string Value)>();
             BuildType = buildType;
             SolutionPhysicalPath = solutionPhysicalPath;
-            BuildCodeCakeBuilderIsRequired = buildCodeCakeBuilder;
             CodeCakeBuilderExecutableFile = codeCakeBuilderExecutableFile;
         }
     }

@@ -46,6 +46,7 @@ namespace CK.Env.Plugins.SolutionFiles
         void OnStartBuild( object sender, BuildStartEventArgs e )
         {
             Debug.Assert( _settings.ProduceCKSetupComponents );
+            if( !e.IsUsingDirtyFolder ) return;
 
             // The CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL environment variable is always required
             // except when building in 'remote develop' and 'local'.
@@ -58,8 +59,6 @@ namespace CK.Env.Plugins.SolutionFiles
             //        storeConf.TargetStoreUrl = System.IO.Path.Combine( globalInfo.LocalFeedPath, "CKSetupStore" );
             //    }
             //
-            if( e.BuildType == BuildType.Local || e.BuildType == BuildType.DevelopWithRemotes ) return;
-            Debug.Assert( e.IsUsingDirtyFolder );
 
             // Ensures that the local stores exist.
             if( !_localFeedProvider.EnsureCKSetupStores( e.Monitor ) ) return;

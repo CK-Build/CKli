@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace CK.Env
 {
     /// <summary>
-    /// Characterize a build.
+    /// Characterizes a build.
     /// </summary>
     public enum BuildType
     {
@@ -17,9 +17,9 @@ namespace CK.Env
         IsTargetLocal = 1,
 
         /// <summary>
-        /// Whether the build targets the Develop environment.
+        /// Whether the build targets the CI environment.
         /// </summary>
-        IsTargetDevelop = 2,
+        IsTargetCI = 2,
 
         /// <summary>
         /// Whether the build targets the Release environment.
@@ -33,38 +33,34 @@ namespace CK.Env
         IsUsingDirtyFolder = 8,
 
         /// <summary>
-        /// Whether the ZeroVersion is used. This requires an access to the <see cref="IEnvLocalFeedProvider.ZeroBuildFeed"/>.
+        /// Whether the ZeroVersion must be used. This requires an access to the <see cref="IEnvLocalFeedProvider.ZeroBuild"/>.
+        /// When not set, the CodeCakeBuilder project is "dotnet run" (ie, compiled and run).
         /// </summary>
         WithZeroBuilder = IsUsingDirtyFolder | 16,
 
         /// <summary>
-        /// Purely local build on 'local' branch.
-        /// This necessarily use the builder without any local modifications (<see cref="IsUsingDirtyFolder"/> is not set).
+        /// Whether the builder must push the artifacts to the remotes.
+        /// </summary>
+        WithPushToRemote = 32,
+
+        /// <summary>
+        /// Whether the builder must execute unit tests.
+        /// </summary>
+        WithUnitTests = 64,
+
+        /// <summary>
+        /// Local build on 'local' branch.
         /// </summary>
         Local = IsTargetLocal,
 
         /// <summary>
         /// Local only CI build on 'develop' branch. Artefacts are kept locally.
         /// </summary>
-        Develop = IsTargetDevelop | IsUsingDirtyFolder,
+        CI = IsTargetCI | IsUsingDirtyFolder,
 
         /// <summary>
-        /// Local build with the Zero builder.
+        /// Release build. Artefacts are kept locally and always use the ZeroBuilder.
         /// </summary>
-        LocalWithZeroBuilder = Local | WithZeroBuilder,
-
-        /// <summary>
-        /// Local only CI build on 'develop' branch with the Zero builder. Artefacts are kept locally.
-        /// </summary>
-        DevelopWithZeroBuilder = Develop | WithZeroBuilder,
-
-        /// <summary>
-        /// CI build on 'develop'. Artefacts are published to remotes.
-        /// This necessarily use the builder without any local modifications (<see cref="IsUsingDirtyFolder"/> is not set).
-        /// </summary>
-        DevelopWithRemotes = IsTargetDevelop | 128,
-
-
-
+        Release = IsTargetRelease | IsUsingDirtyFolder | WithZeroBuilder
     }
 }

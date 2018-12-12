@@ -10,36 +10,31 @@ using System.Text;
 namespace CK.Env
 {
     /// <summary>
-    /// Handles the local feeds for master, develop and local branches.
+    /// Handles the local feeds for ci builds (from 'develop' branch), releases (from 'master' and 'develop' branches),
+    /// local builds (from 'local' branch) and Zero version builds.
     /// </summary>
     public interface IEnvLocalFeedProvider
     {
-        /// <summary>
-        /// Gets the local environment feed for the 3 standard branches.
-        /// </summary>
-        /// <param name="branch">The branch status.</param>
-        /// <returns>The local feed info or null if it is not one of the 3 standard ones.</returns>
-        IEnvLocalFeed GetFeed( StandardGitStatus branch );
-
         /// <summary>
         /// Gets the local feed.
         /// </summary>
         IEnvLocalFeed Local { get; }
 
         /// <summary>
-        /// Gets the develop feed.
+        /// Gets the CI feed.
+        /// CI builds packages come here.
         /// </summary>
-        IEnvLocalFeed Develop { get; }
+        IEnvLocalFeed CI { get; }
 
         /// <summary>
-        /// Gets the master feed.
+        /// Gets the Release feed.
         /// </summary>
-        IEnvLocalFeed Master { get; }
+        IEnvLocalFeed Release { get; }
 
         /// <summary>
         /// Gets the Zero builds feed.
         /// </summary>
-        IEnvLocalFeed ZeroBuildFeed { get; }
+        IEnvLocalFeed ZeroBuild { get; }
 
         /// <summary>
         /// Removes a specific version of a package from the local NuGet cache.

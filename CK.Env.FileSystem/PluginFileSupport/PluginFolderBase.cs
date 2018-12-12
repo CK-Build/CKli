@@ -82,13 +82,11 @@ namespace CK.Env.Plugins
         {
             var fs = Folder.FileSystem;
             var target = FolderPath.AppendPart( name );
-            if( transformer == null )
-            {
-                return fs.CopyTo( m, _textResources[name], target );
-            }
-            string text = fs.GetFileInfo( target ).AsTextFileInfo()?.TextContent ?? _textResources[name];
-            var transformed = transformer( text );
-            return transformed != text ? fs.CopyTo( m, transformed, target ) : true;
+            var currentText = fs.GetFileInfo( target ).AsTextFileInfo()?.TextContent;
+
+            string text = _textResources[name];
+            var final = transformer != null ? transformer( text ) : text;
+            return final != currentText ? fs.CopyTo( m, final, target ) : true;
         }
 
         /// <summary>

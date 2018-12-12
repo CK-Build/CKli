@@ -31,22 +31,16 @@ namespace CKli
             initializer.Services.Add( this );
             _http = http;
             var feedRoot = fs.Root.AppendPart( "LocalFeed" );
-            Local = new LocalFeed( feedRoot, StandardGitStatus.Local );
-            Develop = new LocalFeed( feedRoot, StandardGitStatus.Develop );
-            Master = new LocalFeed( feedRoot, StandardGitStatus.Master );
-            ZeroBuildFeed = new LocalFeed( feedRoot, "ZeroBuildFeed", StandardGitStatus.Unknwon );
+            Local = new LocalFeed( feedRoot, "Local" );
+            CI = new LocalFeed( feedRoot, "CI" );
+            Release = new LocalFeed( feedRoot, "Release" );
+            ZeroBuild = new LocalFeed( feedRoot, "ZeroBuild" );
         }
 
         class LocalFeed : IEnvLocalFeed
         {
-            internal LocalFeed( NormalizedPath localFeedFolder, StandardGitStatus b )
-                : this( localFeedFolder, b.ToString(), b )
+            internal LocalFeed( NormalizedPath localFeedFolder, string part )
             {
-            }
-
-            internal LocalFeed( NormalizedPath localFeedFolder, string part, StandardGitStatus b )
-            {
-                LogicalBranchName = b;
                 PhysicalPath = localFeedFolder.AppendPart( part );
                 Directory.CreateDirectory( PhysicalPath );
             }
@@ -79,29 +73,13 @@ namespace CKli
 
         }
 
-        /// <summary>
-        /// Gets the local environment feed for the 3 standard branches.
-        /// </summary>
-        /// <param name="branch">The branch status.</param>
-        /// <returns>The local feed info or null if it is not one of the 3 standard ones.</returns>
-        public IEnvLocalFeed GetFeed( StandardGitStatus branch )
-        {
-            switch( branch )
-            {
-                case StandardGitStatus.Local: return Local;
-                case StandardGitStatus.Develop: return Develop;
-                case StandardGitStatus.Master: return Master;
-                default: return null;
-            }
-        }
-
         public IEnvLocalFeed Local { get; }
 
-        public IEnvLocalFeed Develop { get; }
+        public IEnvLocalFeed CI { get; }
 
-        public IEnvLocalFeed Master { get; }
+        public IEnvLocalFeed Release { get; }
 
-        public IEnvLocalFeed ZeroBuildFeed { get; }
+        public IEnvLocalFeed ZeroBuild { get; }
 
         public void RemoveFromNuGetCache( IActivityMonitor m, string packageId, SVersion version )
         {
@@ -122,7 +100,7 @@ namespace CKli
 
         static string GetPackagePath( string path, string packageId, SVersion v )
         {
-            return Path.Combine( path, packageId + '.' + (v.AsCSVersion?.ToString( CSVersionFormat.NuGetPackage ) ?? v.ToString()) + ".nupkg" );
+            return Path.Combine( path, packageId + '.' + v.ToNuGetPackageString() + ".nupkg" );
         }
 
         static IEnumerable<SVersion> GetAllVersionsFromFeed( string path, string packageId )

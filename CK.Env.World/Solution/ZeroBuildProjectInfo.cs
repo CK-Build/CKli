@@ -39,6 +39,7 @@ namespace CK.Env
             if( String.IsNullOrWhiteSpace( primarySolutionRelativeFolderPath ) ) throw new ArgumentNullException( nameof( primarySolutionRelativeFolderPath ) );
             if( upgradePackages == null ) throw new ArgumentNullException( nameof( upgradePackages ) );
             if( dependencies == null ) throw new ArgumentNullException( nameof( dependencies ) );
+            Index = index;
             Rank = rank;
             SolutionName = solutionName;
             ProjectName = projectName;

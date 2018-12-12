@@ -23,8 +23,8 @@ namespace CK.Env
         public static string GetCKSetupStorePath( this IEnvLocalFeedProvider @this, IActivityMonitor m, BuildType buildType )
         {
             if( (buildType & BuildType.IsTargetLocal) != 0 ) return @this.Local.GetCKSetupStorePath();
-            if( (buildType & BuildType.IsTargetDevelop) != 0 ) return @this.Develop.GetCKSetupStorePath();
-            if( (buildType & BuildType.IsTargetRelease) != 0 ) return @this.Master.GetCKSetupStorePath();
+            if( (buildType & BuildType.IsTargetCI) != 0 ) return @this.CI.GetCKSetupStorePath();
+            if( (buildType & BuildType.IsTargetRelease) != 0 ) return @this.Release.GetCKSetupStorePath();
             throw new ArgumentException( nameof( BuildType ) );
         }
 
@@ -42,8 +42,8 @@ namespace CK.Env
                     }
                     return path;
                 }
-                string masterStore = EnsureStore( @this.Master, Facade.DefaultStoreUrl );
-                string developStore = EnsureStore( @this.Develop, new Uri( masterStore ) );
+                string masterStore = EnsureStore( @this.Release, Facade.DefaultStoreUrl );
+                string developStore = EnsureStore( @this.CI, new Uri( masterStore ) );
                 string localStore = EnsureStore( @this.Local, new Uri( developStore ) );
                 return true;
             }
