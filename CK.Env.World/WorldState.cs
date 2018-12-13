@@ -453,6 +453,7 @@ namespace CK.Env
 
                 var depContext = GetSolutionDependentContext( m, true );
                 if( depContext == null ) return;
+
                 if( ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, DriverFinder ) == null ) return;
 
                 if( !error() )
@@ -657,16 +658,16 @@ namespace CK.Env
             }
             return RunSafe( monitor, $"Starting Release.", ( m, error ) =>
             {
-                var zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, roadmap.DependentSolutionContext, DriverFinder );
-                if( zBuilder == null ) return;
-
                 var ev = new EventMonitoredArgs( m );
                 ReleaseBuildStarting?.Invoke( this, ev );
 
-
-
-                if( !error() ) ReleaseBuildDone?.Invoke( this, ev );
-                SetWorkStatusAndSave( m, GlobalWorkStatus.WaitingReleaseConfirmation );
+                var b = new ReleaseBuilder( roadmap, _localFeedProvider, DriverFinder );
+                if( !b.Run( m ) ) return;
+                if( !error() )
+                {
+                    ReleaseBuildDone?.Invoke( this, ev );
+                    SetWorkStatusAndSave( m, GlobalWorkStatus.WaitingReleaseConfirmation );
+                }
             } );
 
         }

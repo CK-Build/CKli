@@ -12,6 +12,7 @@ namespace CK.Env
     class ZeroBuilder
     {
         readonly IEnvLocalFeedProvider _localFeedProvider;
+        readonly Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> _driverFinder;
         readonly NormalizedPath _memPath;
         readonly Dictionary<string, HashSet<string>> _sha1Cache;
         readonly HashSet<string> _mustBuild;
@@ -21,67 +22,41 @@ namespace CK.Env
         readonly HashSet<string> _allShas;
 
         /// <summary>
-        /// Gets whether this builder is empty.
-        /// When empty, nothing should be called on it.
-        /// </summary>
-        public bool IsEmpty => _sha1Cache == null;
-
-        /// <summary>
-        /// Gets whether <see cref="ReadCurrentSha"/> has been called at least once.
-        /// </summary>
-        public bool IsInitialized => _driverMap?.Count > 0;
-
-        /// <summary>
-        /// Initializes this builder: resolves and cache drivers (during the first call only)
-        /// and reads current Sha signatures.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="driverFinder">The driver finder by solution name.</param>
-        public void ReadCurrentSha( IActivityMonitor m, Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
-        {
-            if( IsEmpty ) throw new InvalidOperationException( nameof( IsEmpty ) );
-            using( m.OpenTrace( IsInitialized ? "Reading current Sha signatures." : "Resolving drivers and reading Sha signatures." ) )
-            {
-                foreach( var p in _depContext.BuildProjectsInfo )
-                {
-                    if( !_driverMap.TryGetValue( p.SolutionName, out var d ) )
-                    {
-                        d = driverFinder( m, _depContext, p.SolutionName );
-                        Debug.Assert( d != null );
-                        _driverMap.Add( p.SolutionName, d );
-                    }
-                    _currentShas[p.Index] = d.GitRepository.Head.GetSha( p.PrimarySolutionRelativeFolderPath );
-                }
-            }
-        }
-
-        /// <summary>
         /// Reads the current Sha and updates the cache with them.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         public void RegisterSHAlias( IActivityMonitor m )
         {
-            if( IsEmpty ) throw new InvalidOperationException( nameof( IsEmpty ) );
-            if( !IsInitialized ) throw new InvalidOperationException( nameof( IsInitialized ) );
+            bool mustReadSha = true;
+            if( !IsInitialized )
+            {
+                ReadCurrentSha( m );
+                mustReadSha = false;
+            }
             using( m.OpenInfo( "Registering Sha signatures aliases." ) )
             {
                 foreach( var p in _depContext.BuildProjectsInfo )
                 {
-                    _currentShas[p.Index] = _driverMap[p.SolutionName].GitRepository.Head.GetSha( p.PrimarySolutionRelativeFolderPath );
-                    AddCurrentShaToCache( p );
+                    if( mustReadSha ) _currentShas[p.Index] = _driverMap[p.SolutionName].GitRepository.Head.GetSha( p.PrimarySolutionRelativeFolderPath );
+                    AddCurrentShaToCache( m, p );
                 }
                 SaveShaCache( m );
             }
         }
 
         /// <summary>
-        /// Runs the builder: publishes the build projects.
+        /// Runs the builder: publishes the build projects that needs to be.
+        /// This can be called multiple times (internal state is refreshed as needed).
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
         public bool Run( IActivityMonitor m )
         {
-            if( !IsInitialized ) throw new InvalidOperationException( nameof(IsInitialized) );
+            ReadCurrentSha( m );
+            if( _mustBuild.Count != _depContext.BuildProjectsInfo.Count )
+            {
+                _mustBuild.AddRange( _depContext.BuildProjectsInfo.Select( z => z.FullName ) );
+            }
             var scopeMap = new Dictionary<ISolutionDriver, IDisposable>();
             try
             {
@@ -161,7 +136,8 @@ namespace CK.Env
                                     m.CloseGroup( "Failed." );
                                     return false;
                                 }
-                                AddCurrentShaToCache( p );
+                                _mustBuild.Remove( p.FullName );
+                                AddCurrentShaToCache( m, p );
                                 m.CloseGroup( "Success." );
                             }
                         }
@@ -176,13 +152,35 @@ namespace CK.Env
             }
         }
 
-        void AddCurrentShaToCache( ZeroBuildProjectInfo p )
+        bool IsInitialized => _driverMap?.Count > 0;
+
+        void ReadCurrentSha( IActivityMonitor m )
+        {
+            using( m.OpenTrace( IsInitialized ? "Reading current Sha signatures." : "Resolving drivers and reading Sha signatures." ) )
+            {
+                foreach( var p in _depContext.BuildProjectsInfo )
+                {
+                    if( !_driverMap.TryGetValue( p.SolutionName, out var d ) )
+                    {
+                        d = _driverFinder( m, _depContext, p.SolutionName );
+                        Debug.Assert( d != null );
+                        _driverMap.Add( p.SolutionName, d );
+                    }
+                    _currentShas[p.Index] = d.GitRepository.Head.GetSha( p.PrimarySolutionRelativeFolderPath );
+                }
+            }
+        }
+
+        void AddCurrentShaToCache( IActivityMonitor m, ZeroBuildProjectInfo p )
         {
             if( !_sha1Cache.TryGetValue( p.FullName, out var shaList ) )
             {
                 _sha1Cache.Add( p.FullName, shaList = new HashSet<string>() );
             }
-            shaList.Add( _currentShas[p.Index] );
+            if( shaList.Count > 0 && shaList.Add( _currentShas[p.Index] ) )
+            {
+                m.Trace( $"Added new Shalias for {p.FullName}." );
+            }
         }
 
         void SaveShaCache( IActivityMonitor m )
@@ -207,25 +205,25 @@ namespace CK.Env
         {
             using( m.OpenInfo( $"Building ZeroVersion projects." ) )
             {
-                var builder = ZeroBuilder.Create( m, feeds, depContext );
+                var builder = ZeroBuilder.Create( m, feeds, depContext, driverFinder );
                 if( builder == null ) return null;
-                if( builder.IsEmpty ) return builder;
-                builder.ReadCurrentSha( m, driverFinder );
                 return builder.Run( m ) ? builder : null;
             }
         }
 
-
-        ZeroBuilder()
-        {
-        }
-
-        ZeroBuilder( IEnvLocalFeedProvider localFeedProvider, NormalizedPath memPath, Dictionary<string, HashSet<string>> sha1Cache, HashSet<string> mustBuild, IDependentSolutionContext depContext )
+        ZeroBuilder(
+            IEnvLocalFeedProvider localFeedProvider,
+            Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder,
+            NormalizedPath memPath,
+            Dictionary<string, HashSet<string>> sha1Cache,
+            HashSet<string> initialMustBuild,
+            IDependentSolutionContext depContext )
         {
             _localFeedProvider = localFeedProvider;
+            _driverFinder = driverFinder;
             _memPath = memPath;
             _sha1Cache = sha1Cache;
-            _mustBuild = mustBuild;
+            _mustBuild = initialMustBuild;
             _depContext = depContext;
             _currentShas = new string[depContext.BuildProjectsInfo.Count];
             _driverMap = new Dictionary<string, ISolutionDriver>();
@@ -233,15 +231,19 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Creates an unitialized ZeroBuilder.
+        /// Creates a ZeroBuilder.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="feeds">The local feeds.</param>
         /// <param name="depContext">The dependency context to consider.</param>
+        /// <param name="driverFinder">The driver finder by solution name.</param>
         /// <returns>The ZeroBuilder on success, null on error.</returns>
-        public static ZeroBuilder Create( IActivityMonitor m, IEnvLocalFeedProvider feeds, IDependentSolutionContext depContext )
+        public static ZeroBuilder Create(
+            IActivityMonitor m,
+            IEnvLocalFeedProvider feeds,
+            IDependentSolutionContext depContext,
+            Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
         {
-            var mustBuild = new HashSet<string>( depContext.BuildProjectsInfo.Select( z => z.FullName ) );
             if( depContext.BuildProjectsInfo == null )
             {
                 m.Error( "Build Projects dependencies failed to be computed." );
@@ -249,10 +251,10 @@ namespace CK.Env
             }
             if( depContext.BuildProjectsInfo.Count == 0 )
             {
-                m.Info( "No Build Project exist." );
-                return new ZeroBuilder();
+                m.Error( "No Build Project exist." );
+                return null;
             }
-
+            var mustBuild = new HashSet<string>( depContext.BuildProjectsInfo.Select( z => z.FullName ) );
             var memPath = feeds.ZeroBuild.PhysicalPath.AppendPart( "CacheZeroVersion.txt" );
             var sha1Cache = System.IO.File.Exists( memPath )
                             ? System.IO.File.ReadAllLines( memPath )
@@ -261,7 +263,9 @@ namespace CK.Env
                                             .ToDictionary( l => l[0], l => new HashSet<string>( l[1].Split( '|' ) ) )
                             : new Dictionary<string, HashSet<string>>();
             m.Info( $"File '{memPath}' contains {sha1Cache.Count} entries." );
-            return new ZeroBuilder( feeds, memPath, sha1Cache, mustBuild, depContext );
+            var currentShas = new string[depContext.BuildProjectsInfo.Count];
+
+            return new ZeroBuilder( feeds, driverFinder, memPath, sha1Cache, mustBuild, depContext );
         }
 
     }

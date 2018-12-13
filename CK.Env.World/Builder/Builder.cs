@@ -12,9 +12,9 @@ namespace CK.Env
     /// <summary>
     /// Template method pattern to handle whole stack build.
     /// </summary>
-    public abstract class Builder
+    abstract class Builder
     {
-        readonly Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> _driverFinder;
+        protected readonly Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> DriverFinder;
         readonly ISolutionDriver[] _drivers;
         readonly Dictionary<string, SVersion> _packagesVersion;
         readonly List<UpdatePackageInfo>[] _upgrades;
@@ -25,7 +25,7 @@ namespace CK.Env
             if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
             if( driverFinder == null ) throw new ArgumentNullException( nameof( driverFinder ) );
             DependentSolutionContext = ctx;
-            _driverFinder = driverFinder;
+            DriverFinder = driverFinder;
             _packagesVersion = new Dictionary<string, SVersion>();
             _upgrades = new List<UpdatePackageInfo>[ctx.Solutions.Count];
             _targetVersions = new SVersion[ctx.Solutions.Count];
@@ -46,24 +46,48 @@ namespace CK.Env
         {
             if( _packagesVersion.Count > 0 ) throw new InvalidOperationException();
 
-            var solutions = DependentSolutionContext.Solutions;
-            for( int i = 0; i < solutions.Count; ++i )
+            if( !OnBeforePrepareBuild( m ) ) return false;
+            if( !RunPrepareBuild( m ) )
             {
-                var s = solutions[i];
-                var driver = _drivers[i] = _driverFinder( m, DependentSolutionContext, s.UniqueSolutionName );
-                var upgrades = s.ImportedLocalPackages
-                                .Select( p => new UpdatePackageInfo(
-                                                    s.UniqueSolutionName,
-                                                    p.ProjectName,
-                                                    p.Package.PackageId,
-                                                    _packagesVersion[p.Package.PackageId] ) )
-                                .ToList();
-                _upgrades[i] = upgrades;
-                var targetVersion = PrepareBuild( m, s, driver, upgrades );
-                if( targetVersion == null ) return false;
-                _targetVersions[i] = targetVersion;
-                _packagesVersion.AddRange( s.GeneratedPackages.Select( p => new KeyValuePair<string, SVersion>( p, targetVersion ) ) );
+                OnPrepareBuildFailed( m );
+                return false;
             }
+            if( !OnBeforeBuild( m ) ) return false;
+            if( !RunBuild( m ) )
+            {
+                OnBuildFailed( m );
+                return false;
+            }
+            return OnBuildSuccess( m );
+        }
+
+
+        protected virtual bool OnBeforePrepareBuild( IActivityMonitor m )
+        {
+            return true;
+        }
+
+        protected virtual bool OnBeforeBuild( IActivityMonitor m )
+        {
+            return true;
+        }
+
+        protected virtual void OnPrepareBuildFailed( IActivityMonitor m )
+        {
+        }
+
+        protected virtual void OnBuildFailed( IActivityMonitor m )
+        {
+        }
+
+        protected virtual bool OnBuildSuccess( IActivityMonitor m )
+        {
+            return true;
+        }
+
+        bool RunBuild( IActivityMonitor m )
+        {
+            var solutions = DependentSolutionContext.Solutions;
             for( int i = 0; i < solutions.Count; ++i )
             {
                 var s = solutions[i];
@@ -76,6 +100,29 @@ namespace CK.Env
                                                        packageName,
                                                        _packagesVersion[packageName] ) ) );
                 if( !Build( m, solutions[i], _drivers[i], _upgrades[i], _targetVersions[i], buildProjectsUpgrade ) ) return false;
+            }
+            return true;
+        }
+
+        bool RunPrepareBuild( IActivityMonitor m )
+        {
+            var solutions = DependentSolutionContext.Solutions;
+            for( int i = 0; i < solutions.Count; ++i )
+            {
+                var s = solutions[i];
+                var driver = _drivers[i] = DriverFinder( m, DependentSolutionContext, s.UniqueSolutionName );
+                var upgrades = s.ImportedLocalPackages
+                                .Select( p => new UpdatePackageInfo(
+                                                    s.UniqueSolutionName,
+                                                    p.ProjectName,
+                                                    p.Package.PackageId,
+                                                    _packagesVersion[p.Package.PackageId] ) )
+                                .ToList();
+                _upgrades[i] = upgrades;
+                var targetVersion = PrepareBuild( m, s, driver, upgrades );
+                if( targetVersion == null ) return false;
+                _targetVersions[i] = targetVersion;
+                _packagesVersion.AddRange( s.GeneratedPackages.Select( p => new KeyValuePair<string, SVersion>( p, targetVersion ) ) );
             }
             return true;
         }

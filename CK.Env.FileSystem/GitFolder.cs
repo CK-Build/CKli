@@ -455,6 +455,7 @@ namespace CK.Env
                             info.ValidReleaseTag,
                             info.BetterExistingVersion?.ThisTag,
                             info.CommitInfo.BasicInfo?.BestCommitBelow.ThisTag,
+                            info.CommitInfo.BasicInfo?.BestCommitBelow.CommitSha,
                             info.NextPossibleVersions,
                             info.PossibleVersions,
                             new CommitAssemblyBuildInfoFromRepo( info ) )

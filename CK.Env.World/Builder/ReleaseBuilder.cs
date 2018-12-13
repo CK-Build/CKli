@@ -11,13 +11,17 @@ namespace CK.Env
     {
         readonly string[] _commits;
         readonly ReleaseRoadmap _roadmap;
+        readonly IEnvLocalFeedProvider _localFeedProvider;
+        ZeroBuilder _zBuilder;
 
         public ReleaseBuilder(
             ReleaseRoadmap roadmap,
+            IEnvLocalFeedProvider localFeedProvider,
             Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
             : base( roadmap.DependentSolutionContext, driverFinder )
         {
             _commits = new string[roadmap.DependentSolutionContext.Solutions.Count];
+            _localFeedProvider = localFeedProvider;
             _roadmap = roadmap;
         }
 
@@ -41,6 +45,12 @@ namespace CK.Env
             return targetVersion;
         }
 
+        protected override bool OnBeforeBuild( IActivityMonitor m )
+        {
+            _zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, DependentSolutionContext, DriverFinder );
+            return _zBuilder != null;
+        }
+
         protected override bool Build( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IEnumerable<UpdatePackageInfo> buildProjectsUpgrade )
         {
             ReleaseSolutionInfo info = _roadmap.FindBySolution( s );
@@ -59,6 +69,12 @@ namespace CK.Env
             if( !driver.UpdatePackageDependencies( m, buildProjectsUpgrade ) ) return false;
             if( !driver.GitRepository.AmendCommit( m ) ) return false;
             return driver.Build( m, withUnitTest: true, withZeroBuilder: true, withPushToRemote:false );
+        }
+
+        protected override bool OnBuildSuccess( IActivityMonitor m )
+        {
+            _zBuilder.RegisterSHAlias( m );
+            return true;
         }
 
     }

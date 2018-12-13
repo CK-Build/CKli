@@ -26,6 +26,7 @@ namespace CK.Env
             CSVersion releaseVersion,
             CSVersion releaseContentVersion,
             CSVersion previousVersion,
+            string previousVersionCommitSha,
             IReadOnlyList<CSVersion> nextPossibleVersions,
             IReadOnlyList<CSVersion> possibleVersions,
             ICommitAssemblyBuildInfo assemblyBuildInfo )
@@ -33,7 +34,16 @@ namespace CK.Env
             CommitSha = commitSha ?? throw new ArgumentNullException( nameof( commitSha ) );
             ReleaseVersion = releaseVersion;
             ReleaseContentVersion = releaseContentVersion;
+            if( (previousVersion == null) != (previousVersionCommitSha == null) )
+            {
+                if( previousVersion == null )
+                {
+                    throw new ArgumentException( "Must be null.", nameof( previousVersionCommitSha ) );
+                }
+                throw new ArgumentNullException( nameof( previousVersionCommitSha ) );
+            }
             PreviousVersion = previousVersion;
+            PreviousVersionCommitSha = previousVersionCommitSha;
             NextPossibleVersions = nextPossibleVersions ?? throw new ArgumentNullException( nameof( nextPossibleVersions ) );
             PossibleVersions = possibleVersions ?? throw new ArgumentNullException( nameof( possibleVersions ) );
             AssemblyBuildInfo = assemblyBuildInfo ?? throw new ArgumentNullException( nameof( assemblyBuildInfo ) );
@@ -74,9 +84,17 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the previous version, associated to a commit below the current one.
+        /// This is null if no previous version has been found.
         /// (This is the RepositoryInfo.CommitInfo.BasicInfo?.BestCommitBelow.ThisTag from SimpleGitVersion.RepositoryInfo.)
         /// </summary>
         public CSVersion PreviousVersion { get; }
+
+        /// <summary>
+        /// Gets the previous version commit Sha, associated to a commit below the current one.
+        /// This is null if no previous version has been found.
+        /// (This is the RepositoryInfo.CommitInfo.BasicInfo?.BestCommitBelow.CommitSha from SimpleGitVersion.RepositoryInfo.)
+        /// </summary>
+        public string PreviousVersionCommitSha { get; }
 
         /// <summary>
         /// Get the versions that may be available to any commit above the current one.
