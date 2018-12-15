@@ -586,7 +586,7 @@ namespace CK.Env
         {
             var depContext = GetSolutionDependentContext( monitor, true );
             if( depContext == null ) return null;
-            var previous = GetWorkState( GlobalWorkStatus.Releasing ).Element( "RoadMap" );
+            var previous = GetWorkState( GlobalWorkStatus.Releasing ).Element( "Roadmap" );
             return ReleaseRoadmap.Create( monitor, depContext, previous );
         }
 
@@ -617,9 +617,9 @@ namespace CK.Env
         {
             var roadmap = LoadRoadmap( monitor );
             if( roadmap == null ) return null;
-            bool editSucceed = roadmap.UpdateRoadMap( monitor, VersionSelector, skipPreviouslyResolved );
+            bool editSucceed = roadmap.UpdateRoadmap( monitor, VersionSelector, skipPreviouslyResolved );
             // Always saves state to preserve any change in the roadmap, even on error.
-            GetWorkState( GlobalWorkStatus.Releasing ).EnsureElementByName( roadmap.ToXml() );
+            GetWorkState( GlobalWorkStatus.Releasing ).ReplaceElementByName( roadmap.ToXml() );
             Save( monitor );
             if( !Save( monitor ) || !editSucceed ) return null;
             return roadmap;
@@ -638,14 +638,15 @@ namespace CK.Env
         /// Starts a release after an optional pull, using the current <see cref="VersionSelector"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="skipPreviouslyResolved">
+        /// <param name="checkRoadmap">
         /// True to silently skip any already set versions.
-        /// When false (the default), any version that is set and for which the commit has not changed are left as-is.
+        /// When false (the default), if the road map is valid and <see cref="pull"/> did not change anything, the
+        /// release is started immediately.
         /// </param>
         /// <param name="pull">Pull all branches first.</param>
         /// <returns>True on success, false on error.</returns>
         [CommandMethod]
-        public bool Release( IActivityMonitor monitor, bool skipPreviouslyResolved = false, bool pull = true )
+        public bool Release( IActivityMonitor monitor, bool checkRoadmap = false, bool pull = true )
         {
             if( !CanRelease ) throw new InvalidOperationException( nameof( CanRelease ) );
             if( !CheckGlobalGitStatus( monitor, StandardGitStatus.Develop ) ) return false;
@@ -662,7 +663,7 @@ namespace CK.Env
                 }
             }
 
-            var roadmap = DoEditRoadmap( monitor, true );
+            var roadmap = DoEditRoadmap( monitor, !checkRoadmap && !reloadNeeded );
             if( roadmap == null ) return false;
 
             SetWorkStatus( GlobalWorkStatus.Releasing );
@@ -678,8 +679,6 @@ namespace CK.Env
                 if( roadmap == null || !roadmap.IsValid )
                 {
                     monitor.Error( $"Road map is invalid. Current release should be cancelled." );
-                    if( roadmap != null ) GetWorkState( GlobalWorkStatus.Releasing ).SetElementValue( "RoadMap", roadmap.ToXml() );
-                    Save( monitor );
                     return false;
                 }
             }
@@ -697,16 +696,6 @@ namespace CK.Env
                 }
             } );
 
-        }
-
-        bool DoCancellingRelease( IActivityMonitor m )
-        {
-            throw new NotImplementedException();
-        }
-
-        bool DoPublishingRelease( IActivityMonitor m )
-        {
-            throw new NotImplementedException();
         }
 
         bool DoOtherOperation( IActivityMonitor m )
@@ -732,6 +721,11 @@ namespace CK.Env
             return SetWorkStatusAndSave( m, GlobalWorkStatus.CancellingRelease ) && ConcludeCurrentWork( m );
         }
 
+        bool DoCancellingRelease( IActivityMonitor m )
+        {
+            throw new NotImplementedException();
+        }
+
         /// <summary>
         /// Release can be published when <see cref="GlobalWorkStatus.WaitingReleaseConfirmation"/>.
         /// </summary>
@@ -742,6 +736,12 @@ namespace CK.Env
             if( !CanPublishRelease ) throw new InvalidOperationException( nameof( CanPublishRelease ) );
             return DoPublishingRelease( m );
         }
+
+        bool DoPublishingRelease( IActivityMonitor m )
+        {
+            throw new NotImplementedException();
+        }
+
 
         #region Read only State
 

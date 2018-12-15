@@ -46,17 +46,33 @@ namespace CK.Env
         {
             if( _packagesVersion.Count > 0 ) throw new InvalidOperationException();
 
-            if( !OnBeforePrepareBuild( m ) ) return false;
-            if( !RunPrepareBuild( m ) )
+            using( m.OpenDebug( "Before preparing builds." ) )
             {
-                OnPrepareBuildFailed( m );
-                return false;
+                if( !OnBeforePrepareBuild( m ) ) return false;
             }
-            if( !OnBeforeBuild( m ) ) return false;
-            if( !RunBuild( m ) )
+            using( m.OpenInfo( "Preparing builds." ) )
             {
-                OnBuildFailed( m );
-                return false;
+                if( !RunPrepareBuild( m ) )
+                {
+                    m.CloseGroup( "Failed." );
+                    OnPrepareBuildFailed( m );
+                    return false;
+                }
+                m.CloseGroup( "Success." );
+            }
+            using( m.OpenDebug( "Before running builds." ) )
+            {
+                if( !OnBeforeBuild( m ) ) return false;
+            }
+            using( m.OpenInfo( "Running builds." ) )
+            {
+                if( !RunBuild( m ) )
+                {
+                    m.CloseGroup( "Failed." );
+                    OnBuildFailed( m );
+                    return false;
+                }
+                m.CloseGroup( "Success." );
             }
             return OnBuildSuccess( m );
         }
@@ -100,10 +116,14 @@ namespace CK.Env
                                                     _packagesVersion[p.Package.PackageId] ) )
                                 .ToList();
                 _upgrades[i] = upgrades;
-                var targetVersion = PrepareBuild( m, s, driver, upgrades );
-                if( targetVersion == null ) return false;
-                _targetVersions[i] = targetVersion;
-                _packagesVersion.AddRange( s.GeneratedPackages.Select( p => new KeyValuePair<string, SVersion>( p.Name, targetVersion ) ) );
+                using( m.OpenInfo( $"Preparing {s} build." ) )
+                {
+                    var targetVersion = PrepareBuild( m, s, driver, upgrades );
+                    if( targetVersion == null ) return false;
+                    m.CloseGroup( $"Target version: {targetVersion}" );
+                    _targetVersions[i] = targetVersion;
+                    _packagesVersion.AddRange( s.GeneratedPackages.Select( p => new KeyValuePair<string, SVersion>( p.Name, targetVersion ) ) );
+                }
             }
             return true;
         }
@@ -122,7 +142,10 @@ namespace CK.Env
                                                        z.ProjectName,
                                                        packageName,
                                                        _packagesVersion[packageName] ) ) );
-                if( !Build( m, solutions[i], _drivers[i], _upgrades[i], _targetVersions[i], buildProjectsUpgrade ) ) return false;
+                using( m.OpenInfo( $"Running {s} build. Target version: {_targetVersions[i]}" ) )
+                {
+                    if( !Build( m, solutions[i], _drivers[i], _upgrades[i], _targetVersions[i], buildProjectsUpgrade ) ) return false;
+                }
             }
             return true;
         }

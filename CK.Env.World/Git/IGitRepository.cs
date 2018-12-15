@@ -110,6 +110,14 @@ namespace CK.Env
         bool SetVersionTag( IActivityMonitor m, SVersion v );
 
         /// <summary>
+        /// Removes a version lightweight tag from the repository.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="v">The version to remove.</param>
+        /// <returns>True on success, false on error.</returns>
+        bool ClearVersionTag( IActivityMonitor m, SVersion v );
+
+        /// <summary>
         /// Attempts to check out a branch and pull any 'origin' changes.
         /// There must not be any uncommitted changes on the current head.
         /// The branch must exist locally or on the 'origin' remote.

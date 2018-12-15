@@ -17,7 +17,7 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the <see cref="ReleaseInfo"/> that has already been choosen: <see cref="ReleaseInfo.IsValid"/>
-        /// is true only if this information has already been determined by a previous <see cref="ReleaseRoadmap.UpdateRoadMap"/>,
+        /// is true only if this information has already been determined by a previous <see cref="ReleaseRoadmap.UpdateRoadmap"/>,
         /// however it may be invalid in the new update context: see <see cref="CanUsePreviouslyResolvedInfo"/>.
         /// </summary>
         ReleaseInfo PreviouslyResolvedInfo { get; }

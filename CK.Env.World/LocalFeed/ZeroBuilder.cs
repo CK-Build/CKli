@@ -23,6 +23,8 @@ namespace CK.Env
 
         /// <summary>
         /// Reads the current Sha and updates the cache with them.
+        /// This must be called only when file changes are, by design, not changing anything to
+        /// the build projects' executable.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         public void RegisterSHAlias( IActivityMonitor m )
@@ -177,7 +179,7 @@ namespace CK.Env
             {
                 _sha1Cache.Add( p.FullName, shaList = new HashSet<string>() );
             }
-            if( shaList.Count > 0 && shaList.Add( _currentShas[p.Index] ) )
+            if( shaList.Add( _currentShas[p.Index] ) && shaList.Count > 1 )
             {
                 m.Trace( $"Added new Shalias for {p.FullName}." );
             }

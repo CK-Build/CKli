@@ -25,6 +25,12 @@ namespace CK.Env
             _roadmap = roadmap;
         }
 
+        protected override bool OnBeforePrepareBuild( IActivityMonitor m )
+        {
+            _zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, DependentSolutionContext, DriverFinder );
+            return _zBuilder != null;
+        }
+
         protected override SVersion PrepareBuild( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades )
         {
             Debug.Assert( driver.GitRepository.CurrentBranchName == s.BranchName );
@@ -35,25 +41,20 @@ namespace CK.Env
             {
                 if( !driver.UpdatePackageDependencies( m, upgrades ) ) return null;
                 if( !driver.GitRepository.Commit( m, "Global Release commit." ) ) return null;
-                if( targetVersion.PackageQuality == PackageQuality.Release )
-                {
-                    if( !driver.GitRepository.SwitchDevelopToMaster( m ) ) return null;
-                }
-                if( !driver.GitRepository.SetVersionTag( m, targetVersion ) ) return null;
+                _commits[s.Index] = driver.GitRepository.Head.CommitSha;
             }
-            _commits[s.Index] = driver.GitRepository.Head.CommitSha;
             return targetVersion;
         }
 
         protected override bool OnBeforeBuild( IActivityMonitor m )
         {
-            _zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, DependentSolutionContext, DriverFinder );
-            return _zBuilder != null;
+            _zBuilder.RegisterSHAlias( m );
+            return true;
         }
 
         protected override bool Build( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IEnumerable<UpdatePackageInfo> buildProjectsUpgrade )
         {
-            IReleaseSolutionInfo info = _roadmap.ReleaseInfos[ s.Index ];
+            IReleaseSolutionInfo info = _roadmap.ReleaseInfos[s.Index];
             var targetVersion = info.CurrentReleaseInfo.Version;
             if( info.CurrentReleaseInfo.Level == ReleaseLevel.None )
             {
@@ -66,9 +67,38 @@ namespace CK.Env
                 m.Error( $"Commit changed between PrepareBuild call and this Build. Build canceled." );
                 return false;
             }
-            if( !driver.UpdatePackageDependencies( m, buildProjectsUpgrade ) ) return false;
-            if( !driver.GitRepository.AmendCommit( m ) ) return false;
-            return driver.Build( m, withUnitTest: true, withZeroBuilder: true, withPushToRemote:false );
+            bool buildResult = DoBuild( m, driver, buildProjectsUpgrade, targetVersion );
+            if( !buildResult )
+            {
+                driver.GitRepository.ClearVersionTag( m, targetVersion );
+            }
+            if( targetVersion.PackageQuality == PackageQuality.Release )
+            {
+                buildResult &= driver.GitRepository.SwitchMasterToDevelop( m );
+            }
+            return buildResult;
+        }
+
+        private static bool DoBuild( IActivityMonitor m, ISolutionDriver driver, IEnumerable<UpdatePackageInfo> buildProjectsUpgrade, CSVersion targetVersion )
+        {
+            try
+            {
+                if( !driver.UpdatePackageDependencies( m, buildProjectsUpgrade ) ) return false;
+                if( !driver.GitRepository.AmendCommit( m ) ) return false;
+                if( targetVersion.PackageQuality == PackageQuality.Release )
+                {
+                    if( !driver.GitRepository.SwitchDevelopToMaster( m ) ) return false;
+                }
+                if( !driver.GitRepository.SetVersionTag( m, targetVersion ) ) return false;
+                if( !driver.Build( m, withUnitTest: true, withZeroBuilder: true, withPushToRemote: false ) ) return false;
+                return true;
+
+            }
+            catch( Exception ex )
+            {
+                m.Error( "Build failed.", ex );
+                return false;
+            }
         }
 
         protected override bool OnBuildSuccess( IActivityMonitor m )

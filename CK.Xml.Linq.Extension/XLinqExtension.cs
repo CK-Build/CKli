@@ -168,7 +168,7 @@ namespace System.Xml.Linq
             return e;
         }
 
-        public static XElement EnsureElementByName( this XElement @this, XElement e )
+        public static XElement ReplaceElementByName( this XElement @this, XElement e )
         {
             XElement c = @this.Element( e.Name );
             if( c == null ) @this.Add( e );

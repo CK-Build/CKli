@@ -30,7 +30,7 @@ namespace CK.Env
 
         /// <summary>
         /// Gets whether this roadmap is valid: all versions have been determined
-        /// by at least one successful <see cref="UpdateRoadMap"/>.
+        /// by at least one successful <see cref="UpdateRoadmap"/>.
         /// </summary>
         public bool IsValid => _infos.All( r => r.CurrentReleaseInfo.IsValid );
 
@@ -50,7 +50,7 @@ namespace CK.Env
         /// <paramref name="versionSelector"/> will not see them.
         /// </param>
         /// <returns>True on success, false on error or cancellation..</returns>
-        public bool UpdateRoadMap( IActivityMonitor m, IReleaseVersionSelector versionSelector, bool skipPreviouslyResolved )
+        public bool UpdateRoadmap( IActivityMonitor m, IReleaseVersionSelector versionSelector, bool skipPreviouslyResolved )
         {
             if( !skipPreviouslyResolved )
             {
@@ -70,7 +70,7 @@ namespace CK.Env
         /// Exports this Roadmap in xml format.
         /// </summary>
         /// <returns>The Xml roadmap.</returns>
-        public XElement ToXml() => new XElement( "RoadMap", _infos.Select( i => i.ToXml() ) );
+        public XElement ToXml() => new XElement( "Roadmap", _infos.Select( i => i.ToXml() ) );
 
         /// <summary>
         /// Creates a new <see cref="ReleaseRoadmap"/> for a <see cref="IDependentSolutionContext"/>.
