@@ -24,7 +24,6 @@ namespace CK.Env
         readonly HashSet<IGitRepository> _gitRepositories;
 
         RawXmlWorldState _rawState;
-        ReleaseRoadmap _roadMap;
         StandardGitStatus _cachedGlobalGitStatus;
         bool _isStateDirty;
 
@@ -59,6 +58,8 @@ namespace CK.Env
         }
 
         public NormalizedPath CommandProviderName { get; }
+
+        bool IsInitialized => _rawState != null;
 
         void ISolutionDriverWorld.Register( ISolutionDriver driver )
         {
@@ -113,7 +114,6 @@ namespace CK.Env
         /// </summary>
         public IWorldName WorldName { get; }
 
-        bool IsInitialized => _rawState != null;
 
         /// <summary>
         /// Initializes or reinitializes this world state.
@@ -292,7 +292,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True if the Git status is on 'local' or 'develop' branch.</returns>
-        public bool CheckGlobalGitStatusLocalXorDevelop( IActivityMonitor monitor )
+        bool CheckGlobalGitStatusLocalXorDevelop( IActivityMonitor monitor )
         {
             var s = UpdateGlobalGitStatus();
             if( s != StandardGitStatus.Local && s != StandardGitStatus.Develop )
@@ -582,42 +582,70 @@ namespace CK.Env
             } );
         }
 
+        ReleaseRoadmap LoadRoadmap( IActivityMonitor monitor )
+        {
+            var depContext = GetSolutionDependentContext( monitor, true );
+            if( depContext == null ) return null;
+            var previous = GetWorkState( GlobalWorkStatus.Releasing ).Element( "RoadMap" );
+            return ReleaseRoadmap.Create( monitor, depContext, previous );
+        }
+
         /// <summary>
-        /// Gets whether <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/> and <see cref="CachedGlobalGitStatus"/>
-        /// is on <see cref="StandardGitStatus.Develop"/>.
+        /// Gets or sets the version selector that <see cref="Release"/> will use.
+        /// </summary>
+        public IReleaseVersionSelector VersionSelector { get; set; }
+
+        /// <summary>
+        /// Same as <see cref="CanRelease"/>.
+        /// </summary>
+        public bool CanEditRoadmap => CanRelease;
+
+        /// <summary>
+        /// Edits the current roadmap or creates one.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <returns>The roadmap.</returns>
+        [CommandMethod]
+        public bool EditRoadmap( IActivityMonitor monitor )
+        {
+            if( !CanEditRoadmap ) throw new InvalidOperationException( nameof( CanEditRoadmap ) );
+            if( !CheckGlobalGitStatus( monitor, StandardGitStatus.Develop ) ) return false;
+            return DoEditRoadmap( monitor, false ) != null;
+        }
+
+        ReleaseRoadmap DoEditRoadmap( IActivityMonitor monitor, bool skipPreviouslyResolved )
+        {
+            var roadmap = LoadRoadmap( monitor );
+            if( roadmap == null ) return null;
+            bool editSucceed = roadmap.UpdateRoadMap( monitor, VersionSelector, skipPreviouslyResolved );
+            // Always saves state to preserve any change in the roadmap, even on error.
+            GetWorkState( GlobalWorkStatus.Releasing ).EnsureElementByName( roadmap.ToXml() );
+            Save( monitor );
+            if( !Save( monitor ) || !editSucceed ) return null;
+            return roadmap;
+        }
+
+        /// <summary>
+        /// Gets whether <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/>, <see cref="VersionSelector"/>
+        /// and <see cref="CachedGlobalGitStatus"/> is on <see cref="StandardGitStatus.Develop"/>.
         /// </summary>
         public bool CanRelease => IsInitialized
+                                  && VersionSelector != null
                                   && WorkStatus == GlobalWorkStatus.Idle
                                   && CachedGlobalGitStatus == StandardGitStatus.Develop;
 
         /// <summary>
-        /// Gets or creates the current roadmap that can be modified.
+        /// Starts a release after an optional pull, using the current <see cref="VersionSelector"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <returns>The roadmap.</returns>
-        public ReleaseRoadmap EnsureRoadmap( IActivityMonitor monitor, bool reload = false )
-        {
-            if( !CanRelease ) throw new InvalidOperationException( nameof( CanRelease ) );
-            if( !CheckGlobalGitStatus( monitor, StandardGitStatus.Develop ) ) return null;
-            return DoEnsureRoadmap( monitor, reload );
-        }
-
-        ReleaseRoadmap DoEnsureRoadmap( IActivityMonitor monitor, bool reload )
-        {
-            if( _roadMap != null && !reload ) return _roadMap;
-            var depContext = GetSolutionDependentContext( monitor, true, reload );
-            if( depContext == null ) return null;
-            var previous = _roadMap != null ? _roadMap.ToXml() : GetWorkState( GlobalWorkStatus.Releasing ).Element( "RoadMap" );
-            return _roadMap = ReleaseRoadmap.Create( monitor, depContext, previous );
-        }
-
-        /// <summary>
-        /// Starts a release after an optional pull.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="skipPreviouslyResolved">
+        /// True to silently skip any already set versions.
+        /// When false (the default), any version that is set and for which the commit has not changed are left as-is.
+        /// </param>
         /// <param name="pull">Pull all branches first.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool Release( IActivityMonitor monitor, IReleaseVersionSelector versionSelector, bool pull = true )
+        [CommandMethod]
+        public bool Release( IActivityMonitor monitor, bool skipPreviouslyResolved = false, bool pull = true )
         {
             if( !CanRelease ) throw new InvalidOperationException( nameof( CanRelease ) );
             if( !CheckGlobalGitStatus( monitor, StandardGitStatus.Develop ) ) return false;
@@ -634,11 +662,10 @@ namespace CK.Env
                 }
             }
 
-            var roadmap = DoEnsureRoadmap( monitor, reloadNeeded );
-            if( roadmap == null || !roadmap.UpdateRoadMap( monitor, versionSelector ) ) return false;
+            var roadmap = DoEditRoadmap( monitor, true );
+            if( roadmap == null ) return false;
 
             SetWorkStatus( GlobalWorkStatus.Releasing );
-            GetWorkState( GlobalWorkStatus.Releasing ).SetElementValue( "RoadMap", roadmap.ToXml() );
             if( !Save( monitor ) ) return false;
             return DoReleasing( monitor, roadmap );
         }
@@ -647,7 +674,7 @@ namespace CK.Env
         {
             if( roadmap == null )
             {
-                roadmap = DoEnsureRoadmap( monitor, false );
+                roadmap = LoadRoadmap( monitor );
                 if( roadmap == null || !roadmap.IsValid )
                 {
                     monitor.Error( $"Road map is invalid. Current release should be cancelled." );

@@ -11,7 +11,7 @@ namespace CK.Env
     {
         /// <summary>
         /// Get the local root directory path for a world.
-        /// This root contains the world state, the "CK-World" file marker and
+        /// This root contains the world state, the "CK-World.htm" file marker and
         /// the Git repositories.
         /// </summary>
         /// <param name="w">The world name.</param>

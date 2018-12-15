@@ -195,6 +195,53 @@ namespace CK.Env
             return e?.Target.Sha;
         }
 
+        /// <summary>
+        /// Gets the set of <see cref="PackageReleaseDiff"/> for packages from the current head.
+        /// </summary>
+        /// <param name="m">The minitor to use.</param>
+        /// <param name="previousVersionCommitSha">Previous commit.</param>
+        /// <param name="packages">Generated packages of a solution.</param>
+        /// <returns>The set of diff or null on error.</returns>
+        public IReadOnlyCollection<PackageReleaseDiff> GetReleaseDiff( IActivityMonitor m, string previousVersionCommitSha, IReadOnlyCollection<GeneratedPackage> packages )
+        {
+            if( packages.Count == 0 ) return Array.Empty<PackageReleaseDiff>();
+            var r = new List<PackageReleaseDiff>();
+            Commit commit = _git.Lookup<Commit>( previousVersionCommitSha );
+            foreach( var p in packages )
+            {
+                var d = CreateDiff( m, commit, p );
+                if( d == null ) return null;
+                r.Add( d );
+            }
+            return r;
+        }
+
+        PackageReleaseDiff CreateDiff( IActivityMonitor m, Commit commit, GeneratedPackage p )
+        {
+            TreeEntry newTreeEntry = _git.Head.Tip.Tree[p.PrimarySolutionRelativeFolderPath];
+            if( newTreeEntry == null || newTreeEntry.TargetType != TreeEntryTargetType.Tree )
+            {
+                m.Error( $"Unable to find {p.PrimarySolutionRelativeFolderPath}." );
+                return null;
+            }
+            TreeEntry oldTreeEntry = commit.Tree[p.PrimarySolutionRelativeFolderPath];
+            if( oldTreeEntry == null || oldTreeEntry.TargetType != TreeEntryTargetType.Tree )
+            {
+                m.Info( $"Previously {p.Name} did not exist." );
+                return new PackageReleaseDiff( p, PackageReleaseDiffType.NewPackage );
+            }
+            Tree oldTree = (Tree)oldTreeEntry.Target;
+            Tree newTree = (Tree)newTreeEntry.Target;
+            if( oldTree.Sha == newTree.Sha )
+            {
+                return new PackageReleaseDiff( p, PackageReleaseDiffType.None );
+            }
+            using( TreeChanges changes = _git.Diff.Compare<TreeChanges>( oldTree, newTree ) )
+            {
+                var allChanges = changes.Select( gC => new FileReleaseDiff( gC.Path, (FileReleaseDiffType)gC.Status ) ).ToList();
+                return new PackageReleaseDiff( p, allChanges );
+            }
+        }
 
         /// <summary>
         /// Checks that the current head is a clean commit (working directory is clean and no staging files exists).

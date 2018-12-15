@@ -57,6 +57,7 @@ namespace CKli
             _allGitFoldersWithDevelopBranchName = new List<XGitFolder>();
 
             _worldState = new WorldState( commandRegister, worldStore, world, this, _packageFeeds );
+            _worldState.VersionSelector = new ReleaseVersionSelector();
             _worldState.Initializing += ( o, e ) => DumpGitFolderStatus( e.Monitor );
             fileSystem.ServiceContainer.Add( _worldState );
             fileSystem.ServiceContainer.Add<ISolutionDriverWorld>( _worldState );

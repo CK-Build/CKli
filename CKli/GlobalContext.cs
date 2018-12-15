@@ -55,7 +55,7 @@ namespace CKli
                 if( _map.TryGetValue( w.FullName, out string p ) )
                 {
                     Directory.CreateDirectory( p );
-                    File.WriteAllText( Path.Combine( p, "CK-World" ), "" );
+                    File.WriteAllText( Path.Combine( p, "CK-World.htm" ), "<html></html>" );
                 }
                 return p;
             }

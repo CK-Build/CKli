@@ -219,7 +219,7 @@ namespace CK.Env.MSBuild
             /// See <see cref="ExportedLocalPackages"/> to know the solutions and projects in the context that
             /// use/consume some or all these packages.
             /// </summary>
-            public IReadOnlyCollection<string> GeneratedPackages { get; private set; }
+            public IReadOnlyCollection<GeneratedPackage> GeneratedPackages { get; private set; }
 
             /// <summary>
             /// Gets the global <see cref="SolutionDependencyContext"/> to which this <see cref="DependentSolution"/> belongs.
@@ -272,7 +272,9 @@ namespace CK.Env.MSBuild
                                          .Select( d => new ExportedLocalPackage( d ) )
                                          .ToArray();
 
-                GeneratedPackages = Solution.PublishedProjects.Select( p => p.Name ).ToArray();
+                GeneratedPackages = Solution.PublishedProjects
+                                            .Select( p => new GeneratedPackage( p.Name, p.PrimarySolutionRelativeFolderPath ) )
+                                            .ToArray();
             }
 
             public override string ToString() => Solution.ToString();

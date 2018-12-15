@@ -47,12 +47,12 @@ namespace CK.Env
         IReadOnlyCollection<ExportedLocalPackage> ExportedLocalPackages { get; }
 
         /// <summary>
-        /// Gets the set of package names that this solution produces, regardless of whether they are used
+        /// Gets the set of package names and path that this solution produces, regardless of whether they are used
         /// or not by other solution in the context.
         /// See <see cref="ExportedLocalPackages"/> to know the solutions and projects in the context that
         /// use/consume some or all these packages.
         /// </summary>
-        IReadOnlyCollection<string> GeneratedPackages { get; }
+        IReadOnlyCollection<GeneratedPackage> GeneratedPackages { get; }
 
         /// <summary>
         /// Gets the direct required solutions: this corresponds to the solutions that generate a package

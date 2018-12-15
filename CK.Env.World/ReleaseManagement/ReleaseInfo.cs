@@ -12,6 +12,7 @@ namespace CK.Env
     /// <summary>
     /// Immutable value type that encapsulates logic to build a <see cref="ReleaseLevel"/>
     /// and <see cref="ReleaseConstraint"/> with the final <see cref="Version"/> to use.
+    /// A ReleaseInfo <see cref="IsValid"/> if and only if the <see cref="Version"/> has been set.
     /// </summary>
     public readonly struct ReleaseInfo
     {
@@ -57,7 +58,7 @@ namespace CK.Env
 
         /// <summary>
         /// Creates an xml element from this <see cref="ReleaseInfo"/>.
-        /// When <see cref="IsValid"/> is false, the Version attribute will be empty.
+        /// When <see cref="IsValid"/> is false, there will be no Version attribute.
         /// </summary>
         /// <returns>A new XElement.</returns>
         public XElement ToXml()
@@ -81,6 +82,18 @@ namespace CK.Env
             var l = Level > other.Level ? Level : other.Level;
             var c = Constraint | other.Constraint;
             return new ReleaseInfo( l, c, null );
+        }
+
+        /// <summary>
+        /// Tests whether this <see cref="ReleaseInfo"/> is compatible with a given <see cref="ReleaseLevel"/>
+        /// and <see cref="ReleaseConstraint"/>.
+        /// </summary>
+        /// <param name="l">The minimal level.</param>
+        /// <param name="c">Constraints that must be satisfied.</param>
+        /// <returns>True if this ReleaseInfo can be used with this level and constraint.</returns>
+        public bool IsCompatibleWith( ReleaseLevel l, ReleaseConstraint c )
+        {
+            return Level >= l && (Constraint&c) == c;
         }
 
         /// <summary>

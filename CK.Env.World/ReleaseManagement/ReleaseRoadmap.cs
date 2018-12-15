@@ -21,44 +21,44 @@ namespace CK.Env
             foreach( var i in infos ) i.Initialize( this );
         }
 
+        internal ReleaseSolutionInfo GetReleaseInfo( int idx ) => _infos[idx];
+
         /// <summary>
         /// Gets the dependent solution context.
         /// </summary>
         public IDependentSolutionContext DependentSolutionContext { get; }
 
         /// <summary>
-        /// Gets whether all <see cref="ReleaseSolutionInfo"/> are valid.
+        /// Gets whether this roadmap is valid: all versions have been determined
+        /// by at least one successful <see cref="UpdateRoadMap"/>.
         /// </summary>
         public bool IsValid => _infos.All( r => r.CurrentReleaseInfo.IsValid );
-
-        /// <summary>
-        /// Helper to find a <see cref="ReleaseSolutionInfo"/> by name.
-        /// </summary>
-        /// <param name="uniqueSolutionName">The solution name.</param>
-        /// <returns>The release info or null if not found.</returns>
-        public ReleaseSolutionInfo FindByName( string uniqueSolutionName ) => _infos.FirstOrDefault( r => r.Solution.UniqueSolutionName == uniqueSolutionName );
-
-        /// <summary>
-        /// Helper to find the <see cref="ReleaseSolutionInfo"/> for a given solution.
-        /// </summary>
-        /// <param name="s">The solution.</param>
-        /// <returns>The release info or null if not found.</returns>
-        public ReleaseSolutionInfo FindBySolution( IDependentSolution s ) => _infos[s.Index];
 
         /// <summary>
         /// Gets the list (in the same order as the <see cref="IDependentSolutionContext.Solutions"/>) of
         /// the associated <see cref="ReleaseSolutionInfo"/>.
         /// </summary>
-        public IReadOnlyList<ReleaseSolutionInfo> ReleaseInfos => _infos;
+        public IReadOnlyList<IReleaseSolutionInfo> ReleaseInfos => _infos;
 
         /// <summary>
-        /// Computes the road map for all the solutions (ignoring any current configuration).
+        /// Computes the road map for all the solutions.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="versionSelector">The version selector to use.</param>
+        /// <param name="skipPreviouslyResolved">
+        /// True to automatically skip any previously reolved versions.
+        /// <paramref name="versionSelector"/> will not see them.
+        /// </param>
         /// <returns>True on success, false on error or cancellation..</returns>
-        public bool UpdateRoadMap( IActivityMonitor m, IReleaseVersionSelector versionSelector )
+        public bool UpdateRoadMap( IActivityMonitor m, IReleaseVersionSelector versionSelector, bool skipPreviouslyResolved )
         {
+            if( !skipPreviouslyResolved )
+            {
+                foreach( var info in _infos )
+                {
+                    info.ClearReleaseInfo();
+                }
+            }
             foreach( var info in _infos )
             {
                 if( !info.EnsureReleaseInfo( m, versionSelector ).IsValid ) return false;
@@ -78,7 +78,11 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="ctx">The context.</param>
         /// <returns>Null on error.</returns>
-        public static ReleaseRoadmap Create( IActivityMonitor m, IDependentSolutionContext ctx, XElement previous = null )
+        public static ReleaseRoadmap Create(
+            IActivityMonitor m,
+            IDependentSolutionContext ctx,
+            XElement previous = null,
+            bool restorePreviousState = true )
         {
             if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
             ReleaseSolutionInfo[] infos = new ReleaseSolutionInfo[ctx.Solutions.Count];

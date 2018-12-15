@@ -23,16 +23,16 @@ namespace CK.Env
         MustBePreRelease = 1,
 
         /// <summary>
-        /// The version must indicate a breaking change.
-        /// This does not apply if <see cref="MustBePreRelease"/> is set.
-        /// </summary>
-        HasBreakingChanges = 2,
-
-        /// <summary>
         /// The version must indicate new features.
         /// This does not apply if <see cref="MustBePreRelease"/> is set.
         /// </summary>
-        HasFeatures = 4
+        HasFeatures = 2,
+
+        /// <summary>
+        /// The version must indicate a breaking change.
+        /// This does not apply if <see cref="MustBePreRelease"/> is set.
+        /// </summary>
+        HasBreakingChanges = 4 | HasFeatures
 
     }
 }

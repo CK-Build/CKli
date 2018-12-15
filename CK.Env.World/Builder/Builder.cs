@@ -85,25 +85,6 @@ namespace CK.Env
             return true;
         }
 
-        bool RunBuild( IActivityMonitor m )
-        {
-            var solutions = DependentSolutionContext.Solutions;
-            for( int i = 0; i < solutions.Count; ++i )
-            {
-                var s = solutions[i];
-                var buildProjectsUpgrade = DependentSolutionContext.BuildProjectsInfo
-                                             .Where( z => z.SolutionName == s.UniqueSolutionName )
-                                             .SelectMany( z => z.UpgradePackages
-                                                   .Select( packageName => new UpdatePackageInfo(
-                                                       s.UniqueSolutionName,
-                                                       z.ProjectName,
-                                                       packageName,
-                                                       _packagesVersion[packageName] ) ) );
-                if( !Build( m, solutions[i], _drivers[i], _upgrades[i], _targetVersions[i], buildProjectsUpgrade ) ) return false;
-            }
-            return true;
-        }
-
         bool RunPrepareBuild( IActivityMonitor m )
         {
             var solutions = DependentSolutionContext.Solutions;
@@ -122,7 +103,26 @@ namespace CK.Env
                 var targetVersion = PrepareBuild( m, s, driver, upgrades );
                 if( targetVersion == null ) return false;
                 _targetVersions[i] = targetVersion;
-                _packagesVersion.AddRange( s.GeneratedPackages.Select( p => new KeyValuePair<string, SVersion>( p, targetVersion ) ) );
+                _packagesVersion.AddRange( s.GeneratedPackages.Select( p => new KeyValuePair<string, SVersion>( p.Name, targetVersion ) ) );
+            }
+            return true;
+        }
+
+        bool RunBuild( IActivityMonitor m )
+        {
+            var solutions = DependentSolutionContext.Solutions;
+            for( int i = 0; i < solutions.Count; ++i )
+            {
+                var s = solutions[i];
+                var buildProjectsUpgrade = DependentSolutionContext.BuildProjectsInfo
+                                             .Where( z => z.SolutionName == s.UniqueSolutionName )
+                                             .SelectMany( z => z.UpgradePackages
+                                                   .Select( packageName => new UpdatePackageInfo(
+                                                       s.UniqueSolutionName,
+                                                       z.ProjectName,
+                                                       packageName,
+                                                       _packagesVersion[packageName] ) ) );
+                if( !Build( m, solutions[i], _drivers[i], _upgrades[i], _targetVersions[i], buildProjectsUpgrade ) ) return false;
             }
             return true;
         }

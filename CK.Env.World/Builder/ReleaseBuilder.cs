@@ -29,7 +29,7 @@ namespace CK.Env
         {
             Debug.Assert( driver.GitRepository.CurrentBranchName == s.BranchName );
 
-            ReleaseSolutionInfo info = _roadmap.FindBySolution( s );
+            IReleaseSolutionInfo info = _roadmap.ReleaseInfos[ s.Index ];
             var targetVersion = info.CurrentReleaseInfo.Version;
             if( info.CurrentReleaseInfo.Level != ReleaseLevel.None )
             {
@@ -53,7 +53,7 @@ namespace CK.Env
 
         protected override bool Build( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IEnumerable<UpdatePackageInfo> buildProjectsUpgrade )
         {
-            ReleaseSolutionInfo info = _roadmap.FindBySolution( s );
+            IReleaseSolutionInfo info = _roadmap.ReleaseInfos[ s.Index ];
             var targetVersion = info.CurrentReleaseInfo.Version;
             if( info.CurrentReleaseInfo.Level == ReleaseLevel.None )
             {

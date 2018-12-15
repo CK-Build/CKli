@@ -147,8 +147,8 @@ namespace CK.Env.Plugins.SolutionFiles
                 XElement.Parse(
 @"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
   <Deterministic>true</Deterministic>
-  <!-- Finds the CK-World (empty file) that must exist at the root of the development directory. This is path to map to C:\CK-World. -->
-  <CKWorldPath>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), CK-World))</CKWorldPath>
+  <!-- Finds the CK-World.htm that must exist at the root of the development directory. This is path to map to C:\CK-World. -->
+  <CKWorldPath>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), CK-World.htm))</CKWorldPath>
   <PathMap Condition="" '$(CKWorldPath)' != '' "">$(CKWorldPath)=C:\CK-World</PathMap>
 </PropertyGroup>" ) );
         }

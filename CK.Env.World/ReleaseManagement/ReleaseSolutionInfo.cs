@@ -3,6 +3,7 @@ using CK.Env;
 using CK.Text;
 using CSemVer;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -12,35 +13,30 @@ using System.Xml.Linq;
 
 namespace CK.Env
 {
-    public class ReleaseSolutionInfo
+    class ReleaseSolutionInfo : IReleaseSolutionInfo
     {
-        readonly List<UpdatePackageInfo> _updatePackageInfos;
         readonly CommitVersionInfo _commitVersionInfo;
         ReleaseRoadmap _releaser;
-        ReleaseInfo _previousReleaseInfo;
+        ReleaseInfo _previouslyResolvedInfo;
         ReleaseInfo _releaseInfo;
 
-        internal ReleaseSolutionInfo( IDependentSolution solution, CommitVersionInfo versionInfo, XElement previous = null )
+        internal ReleaseSolutionInfo(
+            IDependentSolution solution,
+            CommitVersionInfo versionInfo,
+            XElement previous = null )
         {
             Debug.Assert( solution != null && versionInfo != null );
             Solution = solution;
             _commitVersionInfo = versionInfo;
-            _updatePackageInfos = new List<UpdatePackageInfo>();
             if( previous != null )
             {
                 ReleaseNote = previous.Element( "ReleaseNote" ).Value;
                 var releaseInfoXml = previous.Element( "ReleaseInfo" );
-                if( releaseInfoXml != null ) _previousReleaseInfo = new ReleaseInfo( releaseInfoXml );
-                 
+                if( releaseInfoXml != null ) _previouslyResolvedInfo = new ReleaseInfo( releaseInfoXml );
                 bool isSame = (string)previous.Attribute( "CommitSha" ) == versionInfo.CommitSha;
                 if( isSame )
                 {
-                    _releaseInfo = _previousReleaseInfo;
-                    var updatesXml = previous.Element( "UpdatePackageInfos" );
-                    if( updatesXml != null )
-                    {
-                        _updatePackageInfos.AddRange( updatesXml.Elements().Select( u => new UpdatePackageInfo( u, solution.UniqueSolutionName ) ) );
-                    }
+                    _releaseInfo = _previouslyResolvedInfo;
                 }
             }
         }
@@ -62,31 +58,9 @@ namespace CK.Env
         public ReleaseInfo CurrentReleaseInfo => _releaseInfo;
 
         /// <summary>
-        /// Gets the previous <see cref="ReleaseInfo"/>. May not be valid.
-        /// </summary>
-        public ReleaseInfo PreviousReleaseInfo => _previousReleaseInfo;
-
-        /// <summary>
         /// Gets or sets the release note.
         /// </summary>
         public string ReleaseNote { get; set; }
-
-        /// <summary>
-        /// Gets all possible versions. 
-        /// </summary>
-        public IReadOnlyList<CSVersion> AllPossibleVersions { get; private set; }
-
-        /// <summary>
-        /// Gets the  required packages updates.
-        /// </summary>
-        public IReadOnlyList<UpdatePackageInfo> UpdatePackageInfos => _updatePackageInfos;
-
-        /// <summary>
-        /// Gets the assembly build info to use.
-        /// Null when <see cref="ReleaseInfo.IsValid"/> is false.
-        /// </summary>
-        public ICommitAssemblyBuildInfo AssemblyBuildInfo { get; private set; }
-
 
         /// <summary>
         /// This is the heart of the global releaser system.
@@ -100,46 +74,173 @@ namespace CK.Env
             var newR = ComputeReleaseInfo( m, versionSelector );
             if( newR.IsValid )
             {
-                _previousReleaseInfo = _releaseInfo;
-                AssemblyBuildInfo = _commitVersionInfo.AssemblyBuildInfo.WithReleaseVersion( newR.Version );
+                _previouslyResolvedInfo = _releaseInfo;
             }
             return _releaseInfo = newR;
         }
 
+        /// <summary>
+        /// Resets the current release info to an invalid one.
+        /// </summary>
+        public void ClearReleaseInfo()
+        {
+            if( _releaseInfo.IsValid )
+            {
+                _previouslyResolvedInfo = _releaseInfo;
+            }
+            _releaseInfo = new ReleaseInfo();
+        }
+
+        class PossibleVersions : IReadOnlyDictionary<ReleaseLevel, IReadOnlyList<CSVersion>>
+        {
+            static readonly ReleaseLevel[] _levels = new[] { ReleaseLevel.None, ReleaseLevel.Fix, ReleaseLevel.Feature, ReleaseLevel.BreakingChange };
+
+            IReadOnlyList<CSVersion>[] _versionList;
+
+            public PossibleVersions( ReleaseInfo requirement, CSVersion lastRelease, IReadOnlyList<CSVersion> possibles )
+            {
+                // For None level, we may choose to not release at all: use the last release.
+                bool hasLastRelease = requirement.Level == ReleaseLevel.None && lastRelease != null;
+                _versionList = new IReadOnlyList<CSVersion>[]
+                {
+                    hasLastRelease
+                            ? new CSVersion[]{ lastRelease }
+                            : Array.Empty<CSVersion>(),
+                    // For Fix level, possible versions are filtered by the original constraint.
+                    requirement.Level <= ReleaseLevel.Fix
+                            ? FilterVersions( possibles, requirement.Constraint ).ToArray()
+                            : Array.Empty<CSVersion>(),
+                    // For Feature level, possible versions must satisfy the HasFeatures constraint.
+                    requirement.Level <= ReleaseLevel.Feature
+                            ? FilterVersions( possibles, requirement.Constraint | ReleaseConstraint.HasFeatures ).ToArray()
+                            : Array.Empty<CSVersion>(),
+                    // For Feature level, possible versions must satisfy the HasBreakingChanges constraint.
+                    FilterVersions( possibles, requirement.Constraint | ReleaseConstraint.HasBreakingChanges ).ToArray()
+                };
+                AllPossibleVersions = new HashSet<CSVersion>( _versionList.SelectMany( l => l ) );
+            }
+
+            public IReadOnlyCollection<CSVersion> AllPossibleVersions { get; }
+
+            public IReadOnlyList<CSVersion> this[ReleaseLevel key] => _versionList[(int)key];
+
+            public IEnumerable<ReleaseLevel> Keys => _levels;
+
+            public IEnumerable<IReadOnlyList<CSVersion>> Values => _versionList;
+
+            public int Count => 4;
+
+            public bool ContainsKey( ReleaseLevel key ) => true;
+
+            public IEnumerator<KeyValuePair<ReleaseLevel, IReadOnlyList<CSVersion>>> GetEnumerator()
+            {
+                return _versionList.Select( ( list, idx ) => new KeyValuePair<ReleaseLevel, IReadOnlyList<CSVersion>>( (ReleaseLevel)idx, list ) ).GetEnumerator();
+            }
+
+            public bool TryGetValue( ReleaseLevel key, out IReadOnlyList<CSVersion> value )
+            {
+                value = _versionList[(int)key];
+                return true;
+            }
+
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        }
+
+        class SelectorContext : IReleaseVersionSelectorContext
+        {
+            readonly ReleaseSolutionInfo _info;
+            readonly PossibleVersions _possible;
+
+            public SelectorContext(
+                    ReleaseSolutionInfo info,
+                    ReleaseInfo requirements,
+                    IReadOnlyList<CSVersion> possibles )
+            {
+                _info = info;
+                Requirements = requirements;
+                CanUsePreviouslyResolvedInfo = info._previouslyResolvedInfo.IsValid
+                                               && info._previouslyResolvedInfo.IsCompatibleWith( requirements.Level, requirements.Constraint );
+                _possible = new PossibleVersions( requirements, info._commitVersionInfo.PreviousVersion, possibles );
+                Debug.Assert( !CanUsePreviouslyResolvedInfo || _possible.AllPossibleVersions.Contains( info._previouslyResolvedInfo.Version ) );
+            }
+
+            public IDependentSolution Solution => _info.Solution;
+
+            public ReleaseInfo PreviouslyResolvedInfo => _info._previouslyResolvedInfo;
+
+            public bool CanUsePreviouslyResolvedInfo { get; }
+
+            public IReadOnlyDictionary<ReleaseLevel, IReadOnlyList<CSVersion>> PossibleVersions => _possible;
+
+            public IReadOnlyCollection<CSVersion> AllPossibleVersions => _possible.AllPossibleVersions;
+
+            public ReleaseInfo Requirements { get; }
+
+            public CSVersion PreviousVersion => _info._commitVersionInfo.PreviousVersion;
+
+            public string PreviousVersionCommitSha => _info._commitVersionInfo.PreviousVersionCommitSha;
+
+            public string ReleaseNote { get => _info.ReleaseNote; set => _info.ReleaseNote = value; }
+
+            internal ReleaseLevel FinalLevel;
+            internal CSVersion FinalVersion;
+
+            public bool IsCanceled { get; private set; }
+
+            public bool HasChoice => FinalVersion != null;
+
+            public bool IsAnswered => IsCanceled || HasChoice;
+
+            public void Cancel()
+            {
+                if( HasChoice ) throw new InvalidOperationException( nameof( HasChoice ) );
+                if( IsCanceled ) throw new InvalidOperationException( nameof( IsCanceled ) );
+                IsCanceled = true;
+            }
+
+            public void SetChoice( ReleaseLevel level, CSVersion version )
+            {
+                if( HasChoice ) throw new InvalidOperationException( nameof( HasChoice ) );
+                if( IsCanceled ) throw new InvalidOperationException( nameof( IsCanceled ) );
+                if( !PossibleVersions[level].Contains( version ) ) throw new ArgumentException( "Not a version for level.", nameof(version) );
+                FinalLevel = level;
+                FinalVersion = version;
+            }
+        }
+
         ReleaseInfo ComputeReleaseInfo( IActivityMonitor m, IReleaseVersionSelector versionSelector )
         {
-            AssemblyBuildInfo = null;
-            _updatePackageInfos.Clear();
             ReleaseInfo requirements = new ReleaseInfo();
             // Here we could have processed only the MinimalRequirements (so that the global process ordering
             // matches the dependency order).
             // But, we need to iterate though all Requirements in order to not miss a version
             // package upgrade.
+            bool hasUpdates = false;
             foreach( var s in Solution.Requirements )
             {
-                var sInfo = _releaser.FindBySolution( s ).EnsureReleaseInfo( m, versionSelector );
+                var sInfo = _releaser.GetReleaseInfo( s.Index ).EnsureReleaseInfo( m, versionSelector );
                 if( !sInfo.IsValid ) return new ReleaseInfo();
                 if( Solution.PublishedRequirements.Contains( s ) )
                 {
                     requirements = requirements.CombineRequirement( sInfo );
                 }
-                var updates = Solution.ImportedLocalPackages
-                                      .Where( p => p.Solution == s && p.Package.Version != sInfo.Version )
-                                      .Select( p => new UpdatePackageInfo(
-                                                         solutionName: p.SecondarySolutionName ?? p.Solution.UniqueSolutionName,
-                                                         projectName: p.ProjectName,
-                                                         package: new VersionedPackage( p.Package.PackageId, sInfo.Version ) ) );
-                _updatePackageInfos.AddRange( updates );
+                // Ignores build project dependencies here.
+                // They will be upgraded by the ReleaseBuilder but don't participate in
+                // impact propagation.
+                hasUpdates |= Solution.ImportedLocalPackages
+                                      .Any( p => p.Solution == s && p.Package.Version != sInfo.Version );
             }
+
             // Handle package references updates.
             //  - if none and a Release tag already exists on the commit point, there
             //    is nothing to do (we exit directly with the only ReleaseLevel.None possible).
             //  - For all other cases, we compute the correct AllPossibleVersions and adjust the Release
             //    level of the requirements.
-            if( _updatePackageInfos.Count > 0 )
+            IReadOnlyList<CSVersion> possibleVersions;
+            if( hasUpdates )
             {
                 // Since we'll need a commit to upgrade the package versions, we consider the NextPossibleVersions.
-                AllPossibleVersions = _commitVersionInfo.NextPossibleVersions;
+                possibleVersions = _commitVersionInfo.NextPossibleVersions;
             }
             else
             {
@@ -160,126 +261,32 @@ namespace CK.Env
                 // and here we must keep the ReleaseLevel.None.
                 if( _commitVersionInfo.ReleaseVersion != null )
                 {
-                    m.Info( $"This commit has already a version tag: {_commitVersionInfo.ReleaseVersion}. We use it." );
-                    AllPossibleVersions = new[] { _commitVersionInfo.ReleaseVersion };
+                    m.Warn( $"This commit has already a version tag: {_commitVersionInfo.ReleaseVersion}." );
+                    if( !versionSelector.OnAlreadyReleased( m, Solution, _commitVersionInfo.ReleaseVersion, false ) )
+                    {
+                        return new ReleaseInfo();
+                    }
                     return requirements.WithVersion( _commitVersionInfo.ReleaseVersion );
                 }
-                var vContent = _commitVersionInfo.ReleaseContentVersion;
-                if( vContent != null )
+                if( _commitVersionInfo.ReleaseContentVersion != null )
                 {
                     // TODO: ensure that this is the tag of the commit point merged into master branch.
-                    m.Info( $"This commit has a content version tag: {vContent}. We use it." );
-                    AllPossibleVersions = new[] { vContent };
-                    return requirements.WithVersion( vContent );
-                }
-                AllPossibleVersions = _commitVersionInfo.PossibleVersions;
-            }
-
-            if( requirements.Level == ReleaseLevel.None )
-            {
-                // There are no reasons to release because of the dependencies.
-                // The new code that is contained in this commit:
-                // - MAY have no actual changes: the previous version could be used.
-                // - or MUST be released at least as a fix.
-                var prevVersion = _commitVersionInfo.PreviousVersion;
-                if( prevVersion != null )
-                {
-                    bool? usePrevious = versionSelector.CanUsePreviousVersion( m, Solution, prevVersion );
-                    if( !usePrevious.HasValue ) return new ReleaseInfo();
-                    if( usePrevious.Value == true )
+                    m.Info( $"This commit has a content version tag: {_commitVersionInfo.ReleaseContentVersion}. We use it." );
+                    if( !versionSelector.OnAlreadyReleased( m, Solution, _commitVersionInfo.ReleaseContentVersion, true ) )
                     {
-                        AllPossibleVersions = new[] { prevVersion };
-                        return requirements.WithVersion( prevVersion );
+                        return new ReleaseInfo();
                     }
+                    return requirements.WithVersion( _commitVersionInfo.ReleaseContentVersion );
                 }
-                requirements = requirements.WithLevel( ReleaseLevel.Fix );
+                possibleVersions = _commitVersionInfo.PossibleVersions;
             }
-
-            Debug.Assert( requirements.Level >= ReleaseLevel.Fix );
-
-            // Handles the versions now.
-            if( AllPossibleVersions.Count == 0 )
-            {
-                m.Error( "No PossibleVersions exist for this commit point according to SimpleGitVersion." );
-                return new ReleaseInfo();
-            }
-
-            var filteredVersions = FilterVersions( AllPossibleVersions, requirements.Constraint, false ).ToList();
-            if( filteredVersions.Count == 0 )
-            {
-                m.Error( $"No PossibleVersions exist for this commit point with Constraint = {requirements.Constraint}." );
-                return new ReleaseInfo();
-            }
-
-            if( filteredVersions.Count == 1 )
-            {
-                return HandleSingleVersion( m, versionSelector, requirements, filteredVersions[0] );
-            }
-            // Decide the release level.
-            if( requirements.Level != ReleaseLevel.BreakingChange )
-            {
-                var level = versionSelector.ChooseReleaseLevel( m, Solution, requirements.Level );
-                if( level == ReleaseLevel.None ) return _releaseInfo;
-                if( level < requirements.Level ) throw new InvalidOperationException( "ChooseReleaseLevel can not decrease the current level." );
-                requirements = requirements.WithLevel( level );
-                filteredVersions = FilterVersions( filteredVersions, requirements.Constraint, true ).ToList();
-                if( filteredVersions.Count == 1 )
-                {
-                    return HandleSingleVersion( m, versionSelector, requirements, filteredVersions[0] );
-                }
-            }
-            // Multiple versions are possible.
-            Debug.Assert( filteredVersions.Count > 1, "There are still multiple versions." );
-            var finalVersion = versionSelector.ChooseFinalVersion( m, Solution, filteredVersions, requirements );
-            if( finalVersion == null ) return _releaseInfo;
-            if( !filteredVersions.Contains( finalVersion ) ) throw new InvalidOperationException( "ChooseFinalVersion must return one of the possible versions." );
-            return requirements.WithVersion( finalVersion );
-        }
-
-        ReleaseInfo HandleSingleVersion( IActivityMonitor m, IReleaseVersionSelector versionSelector, ReleaseInfo requirements, CSVersion v )
-        {
-            if( requirements.Level == ReleaseLevel.BreakingChange )
-            {
-                // The version is a breaking change and the requirements.Level is actually
-                // a breaking change, this is fine.
-                m.Info( $"Version automatically inferred: {v}." );
-                return requirements.WithVersion( v );
-            }
-            // There is only one version and we are not on a breaking change propagation.
-            // The risk here is to release a version that does not indicate the correct type of change to dependent
-            // solutions.
-            // If the version is a pre release then all dependent versions will also be prereleases, 
-            // pre-releases don't care about breaking changes however they care about
-            // fixes vs. features or breaking changes for automatic computation.
-            if( v.IsPrerelease || v.Major == 0 )
-            {
-                ReleaseLevel level;
-                if( requirements.Level == ReleaseLevel.Fix )
-                {
-                    level = versionSelector.GetPreReleaseSingleVersionFixActualLevel( m, Solution, v, v.Major == 0 );
-                    if( level == ReleaseLevel.None ) return new ReleaseInfo();
-                    return requirements.WithVersion( v ).WithLevel( level );
-                }
-                Debug.Assert( requirements.Level == ReleaseLevel.Feature );
-                // It is already a feature. For true pre-release, the feature/breaking changes is
-                // not relevant so we let it go. However for the 0 Major this is important.
-                if( v.IsPrerelease )
-                {
-                    m.Info( $"Version automatically infered: {v}." );
-                    return requirements.WithVersion( v );
-                }
-                // Edge case of the 0 Major.
-                level = versionSelector.GetZeroMajorSingleVersionFeatureActualLevel( m, Solution, v );
-                if( level == ReleaseLevel.None ) return _releaseInfo;
-                if( level == ReleaseLevel.Fix ) throw new InvalidOperationException( "GetZeroMajorSingleVersionFeatureActualLevel can not return Fix level." );
-                return requirements.WithVersion( v ).WithLevel( level );
-            }
-            // We are on an Official (non pre-release version) and on a fix or a feature.
-            // We can automatically infer the release level from this only version.
-            if( v.Minor == 0 && v.Patch == 0 ) requirements = requirements.WithLevel( ReleaseLevel.BreakingChange );
-            else if( v.Patch == 0 ) requirements = requirements.WithLevel( ReleaseLevel.Feature );
-            m.Info( $"Version automatically inferred: {v}." );
-            return requirements.WithVersion( v );
+            var ctx = new SelectorContext( this, requirements, possibleVersions );
+            versionSelector.ChooseFinalVersion( m, ctx );
+            return ctx.IsCanceled
+                    ? new ReleaseInfo()
+                    : (ctx.HasChoice
+                        ? requirements.WithLevel( ctx.FinalLevel ).WithVersion( ctx.FinalVersion )
+                        : throw new InvalidOperationException( "At least Canel or SetChoice must have been called." ));
         }
 
         /// <summary>
@@ -288,7 +295,7 @@ namespace CK.Env
         /// <param name="possibleVersions">Set of versions to filter.</param>
         /// <param name="c">The release constraint.</param>
         /// <returns>Filtered set of versions.</returns>
-        public static IEnumerable<CSVersion> FilterVersions( IEnumerable<CSVersion> possibleVersions, ReleaseConstraint c, bool finalLevelIsKnown )
+        public static IEnumerable<CSVersion> FilterVersions( IEnumerable<CSVersion> possibleVersions, ReleaseConstraint c )
         {
             IEnumerable<CSVersion> filtered = possibleVersions;
 
@@ -305,7 +312,7 @@ namespace CK.Env
             {
                 filtered = filtered.Where( v => !v.IsPatch );
             }
-            else if( finalLevelIsKnown )
+            else 
             {
                 // When there is no breaking change nor feature, this is necessarily a Patch.
                 filtered = filtered.Where( v => v.IsPatch );
@@ -313,7 +320,7 @@ namespace CK.Env
 
             // 3 - On a breaking change, Official version must have their Major bumped (ie. their Minor and Patch must be 0).
             //     The 0 major is excluded from this filter.
-            if( (c & ReleaseConstraint.HasBreakingChanges) != 0 )
+            if( (c & ReleaseConstraint.HasBreakingChanges) == ReleaseConstraint.HasBreakingChanges )
             {
                 filtered = filtered.Where( v => v.Major == 0 || v.IsPrerelease || (v.Minor == 0 && v.Patch == 0) );
             }
@@ -326,11 +333,7 @@ namespace CK.Env
                         new XAttribute( "Name", Solution.UniqueSolutionName ),
                         new XAttribute( "CommitSha", _commitVersionInfo.CommitSha ),
                         _releaseInfo.ToXml(),
-                        new XElement( "UpdatePackageInfos",
-                               _updatePackageInfos.Where( p => p.SolutionName == Solution.UniqueSolutionName ).Select( p => p.ToXml( false ) ),
-                               new XElement( "SecondarySolution",
-                                    _updatePackageInfos.Where( p => p.SolutionName != Solution.UniqueSolutionName ).Select( p => p.ToXml( true ) ) ) ),
-                        new XElement( "ReleaseNote", new XCData( ReleaseNote ) ));
+                        new XElement( "ReleaseNote", new XCData( ReleaseNote ?? String.Empty ) ));
         }
     }
 }

@@ -168,6 +168,14 @@ namespace System.Xml.Linq
             return e;
         }
 
+        public static XElement EnsureElementByName( this XElement @this, XElement e )
+        {
+            XElement c = @this.Element( e.Name );
+            if( c == null ) @this.Add( e );
+            else c.ReplaceWith( e );
+            return e;
+        }
+
         public static XElement EnsureFirstElement( this XElement @this, XName name )
         {
             XElement e = @this.Element( name );
