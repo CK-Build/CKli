@@ -55,6 +55,11 @@ namespace CK.Env
         IReadOnlyCollection<GeneratedPackage> GeneratedPackages { get; }
 
         /// <summary>
+        /// Gets the set of final artifacts that this solution produces.
+        /// </summary>
+        IReadOnlyCollection<GeneratedArtifact> GeneratedArtifacts { get; }
+
+        /// <summary>
         /// Gets the direct required solutions: this corresponds to the solutions that generate a package
         /// used in this <see cref="IDependentSolution"/> (every projects are considered except build projects).
         /// </summary>

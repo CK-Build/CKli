@@ -41,14 +41,14 @@ namespace CK.Env
         /// Runs the build. Orchestrates calls to <see cref="PrepareBuild"/> and <see cref="Build"/>.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <returns>True on success, false on error.</returns>
-        public bool Run( IActivityMonitor m )
+        /// <returns>The BuildResult on success, null on error.</returns>
+        public BuildResult Run( IActivityMonitor m )
         {
             if( _packagesVersion.Count > 0 ) throw new InvalidOperationException();
 
             using( m.OpenDebug( "Before preparing builds." ) )
             {
-                if( !OnBeforePrepareBuild( m ) ) return false;
+                if( !OnBeforePrepareBuild( m ) ) return null;
             }
             using( m.OpenInfo( "Preparing builds." ) )
             {
@@ -56,13 +56,13 @@ namespace CK.Env
                 {
                     m.CloseGroup( "Failed." );
                     OnPrepareBuildFailed( m );
-                    return false;
+                    return null;
                 }
                 m.CloseGroup( "Success." );
             }
             using( m.OpenDebug( "Before running builds." ) )
             {
-                if( !OnBeforeBuild( m ) ) return false;
+                if( !OnBeforeBuild( m ) ) return null;
             }
             using( m.OpenInfo( "Running builds." ) )
             {
@@ -70,11 +70,11 @@ namespace CK.Env
                 {
                     m.CloseGroup( "Failed." );
                     OnBuildFailed( m );
-                    return false;
+                    return null;
                 }
                 m.CloseGroup( "Success." );
             }
-            return OnBuildSuccess( m );
+            return OnBuildSuccess( m, new BuildResult( DependentSolutionContext.Solutions, _targetVersions ) );
         }
 
 
@@ -96,9 +96,9 @@ namespace CK.Env
         {
         }
 
-        protected virtual bool OnBuildSuccess( IActivityMonitor m )
+        protected virtual BuildResult OnBuildSuccess( IActivityMonitor m, BuildResult result )
         {
-            return true;
+            return result;
         }
 
         bool RunPrepareBuild( IActivityMonitor m )

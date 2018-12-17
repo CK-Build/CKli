@@ -5,7 +5,7 @@ using System.Text;
 namespace CK.Env
 {
     /// <summary>
-    /// Captures basic ingormation related to package produced by a solution.
+    /// Captures basic ingormation related to NuGet package produced by a solution.
     /// </summary>
     public readonly struct GeneratedPackage
     {

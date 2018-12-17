@@ -515,10 +515,25 @@ namespace CK.Env
                 Builder builder = CachedGlobalGitStatus == StandardGitStatus.Local
                                 ? (Builder)new LocalBuilder( depContext, DriverFinder, withUnitTest )
                                 : new DevelopBuilder( depContext, DriverFinder, withUnitTest );
-                if( !builder.Run( m ) ) return;
+                if( !RunBuild( m, builder ) ) return;
 
                 zBuilder.RegisterSHAlias( m );
             } );
+        }
+
+        bool RunBuild( IActivityMonitor m, Builder b )
+        {
+            var result = b.Run( m );
+            if( result == null ) return false;
+            using( m.OpenInfo( $"Updating LastBuild with { result.GeneratedArtifacts.Count} artifacts." ) )
+            {
+                foreach( var a in result.GeneratedArtifacts.GroupBy( a => a.Artifact.Type ) )
+                {
+                    m.Info( $"{a.Key} => {a.Select( p => p.Artifact.Name + '/' + p.Version ).Concatenate()}" );
+                }
+            }
+            GeneralState.ReplaceElementByName( new XElement( "LastBuild", result.ToXml() ) );
+            return Save( m );
         }
 
         /// <summary>
@@ -570,7 +585,7 @@ namespace CK.Env
                 if( zBuilder == null ) return;
 
                 var builder = new DevelopBuilder( depContext, DriverFinder, false );
-                if( !builder.Run( m ) ) return;
+                if( !RunBuild( m, builder ) ) return;
 
                 zBuilder.RegisterSHAlias( m );
 
@@ -688,7 +703,7 @@ namespace CK.Env
                 ReleaseBuildStarting?.Invoke( this, ev );
 
                 var b = new ReleaseBuilder( roadmap, _localFeedProvider, DriverFinder );
-                if( !b.Run( m ) ) return;
+                if( !RunBuild( m, b ) ) return;
                 if( !error() )
                 {
                     ReleaseBuildDone?.Invoke( this, ev );

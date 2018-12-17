@@ -101,10 +101,10 @@ namespace CK.Env
             }
         }
 
-        protected override bool OnBuildSuccess( IActivityMonitor m )
+        protected override BuildResult OnBuildSuccess( IActivityMonitor m, BuildResult result )
         {
             _zBuilder.RegisterSHAlias( m );
-            return true;
+            return result;
         }
 
     }
