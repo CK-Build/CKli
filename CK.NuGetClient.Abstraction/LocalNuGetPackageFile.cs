@@ -1,3 +1,4 @@
+using CK.Env;
 using CSemVer;
 using System;
 using System.Collections.Generic;
@@ -12,18 +13,21 @@ namespace CK.NuGetClient
     /// <summary>
     /// Simple local package description.
     /// </summary>
-    public class LocalNuGetPackageFile
+    public class LocalNuGetPackageFile : IArtifactLocator
     {
-        public readonly string FullPath;
-        public readonly string PackageId;
-        public readonly SVersion Version;
-
         public LocalNuGetPackageFile( string fullPath, string id, SVersion v )
         {
             FullPath = fullPath;
-            PackageId = id;
-            Version = v;
+            Instance = new ArtifactInstance( "NuGet", id, v );
         }
+
+        public string FullPath { get; }
+
+        public string PackageId => Instance.Artifact.Name;
+
+        public SVersion Version => Instance.Version;
+
+        public ArtifactInstance Instance { get; }
 
         public static LocalNuGetPackageFile Parse( string fullPath )
         {

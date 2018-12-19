@@ -14,20 +14,20 @@ namespace CK.Env.Plugins.SolutionFiles
         readonly CodeCakeBuilderFolder _f;
         readonly ISolutionSettings _settings;
         readonly ISecretKeyStore _secretStore;
-        readonly INuGetClient _nugetClient;
+        readonly ArtifactCenter _artfifacts;
 
         public CodeCakeBuilderKeyVaultFile(
             CodeCakeBuilderFolder f,
             ISolutionSettings settings,
             ISecretKeyStore secretStore,
-            INuGetClient nugetClient,
+            ArtifactCenter artifacts,
             NormalizedPath branchPath )
             : base( f.Folder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilderKeyVault.txt" ) )
         {
             _f = f;
             _settings = settings;
             _secretStore = secretStore;
-            _nugetClient = nugetClient;
+            _artfifacts = artifacts;
        }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
@@ -46,17 +46,18 @@ namespace CK.Env.Plugins.SolutionFiles
                 var s = _secretStore.GetSecretKey( m, "CKSETUPREMOTESTORE_PUSH_API_KEY", true, "Required to push components to https://cksetup.invenietis.net/." );
                 required.Add( "CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL", s + "|https://cksetup.invenietis.net/" );
             }
-            var nuGetSecrets = _nugetClient.ResolveSecrets( m, _settings.NuGetPushFeeds );
-            if( nuGetSecrets.Any( r => r.Secret == null ) )
+            var repositorySecrets = _artfifacts.ResolveSecrets( m, _settings.ArtifactRepositoryInfos );
+            if( repositorySecrets.Any( r => r.Secret == null ) )
             {
-                m.Error( "A required secret is missing." );
+                m.Error( "A required repository secret is missing." );
                 return;
             }
-            foreach( var s in nuGetSecrets )
+            foreach( var s in repositorySecrets )
             {
                 required.Add( s.SecretKeyName, s.Secret );
             }
-            string result = KeyVault.EncryptValuesToString( required, _secretStore.GetSecretKey( m, "CODECAKEBUILDER_SECRET_KEY", true ) );
+            var passPhrase = _secretStore.GetSecretKey( m, "CODECAKEBUILDER_SECRET_KEY", true );
+            string result = KeyVault.EncryptValuesToString( required, passPhrase );
             CreateOrUpdate( m, result );
         }
 

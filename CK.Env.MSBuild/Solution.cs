@@ -192,6 +192,13 @@ namespace CK.Env.MSBuild
         public IList<Project> PublishedProjects { get; }
 
         /// <summary>
+        /// Gets the projects that must be in <see cref="PublishedProjects"/> and
+        /// are CKSetup components.
+        /// This is empty by default: this must be filled explicitly.
+        /// </summary>
+        public IList<Project> CKSetupComponentProjects { get; }
+
+        /// <summary>
         /// Gets the test projects. These projetcs are by default
         /// all projects whose name ends with ".Tests".
         /// They should be located in a "Tests" directory.
@@ -322,6 +329,7 @@ namespace CK.Env.MSBuild
                                                                         && !p.Name.EndsWith( ".Tests" )
                                                                         && p.Path.Parts.Count == FilePath.Parts.Count + 1 )
                                                           .ToList();
+            CKSetupComponentProjects = new List<Project>();
         }
 
         static internal Solution Load(

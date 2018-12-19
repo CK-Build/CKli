@@ -222,6 +222,12 @@ namespace CK.Env.MSBuild
             public IReadOnlyCollection<GeneratedPackage> GeneratedPackages { get; private set; }
 
             /// <summary>
+            /// Gets the set of final artifacts that this solution produces.
+            /// </summary>
+            public IReadOnlyCollection<Artifact> GeneratedArtifacts { get; private set; }
+
+
+            /// <summary>
             /// Gets the global <see cref="SolutionDependencyContext"/> to which this <see cref="DependentSolution"/> belongs.
             /// </summary>
             public SolutionDependencyContext GlobalResult { get; private set; }
@@ -275,6 +281,18 @@ namespace CK.Env.MSBuild
                 GeneratedPackages = Solution.PublishedProjects
                                             .Select( p => new GeneratedPackage( p.Name, p.PrimarySolutionRelativeFolderPath ) )
                                             .ToArray();
+
+                var artifacts = Solution.PublishedProjects
+                                            .Select( p => new Artifact( "NuGet", p.Name ) );
+
+                var ckSetupComps = Solution.CKSetupComponentProjects
+                                           .SelectMany( p => p.TargetFrameworks
+                                                              .AtomicTraits
+                                                              .Select( t => new CKSetupComponent( p.PrimarySolutionRelativeFolderPath, t ) ) );
+
+                GeneratedArtifacts = artifacts
+                                    .Concat( ckSetupComps.Select( c => c.GeneratedArtifact ) )
+                                    .ToArray();
             }
 
             public override string ToString() => Solution.ToString();

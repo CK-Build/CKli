@@ -10,8 +10,15 @@ using System.Xml.Linq;
 
 namespace CK.Env
 {
+    /// <summary>
+    /// Concrete and immutable implementation of <see cref="INuGetSource"/>.
+    /// </summary>
     public class NuGetSource : INuGetSource
     {
+        /// <summary>
+        /// Initializes a new <see cref="NuGetSource"/> from its xml representation.
+        /// </summary>
+        /// <param name="e">The xml element.</param>
         public NuGetSource( XElement e )
         {
             Name = (string)e.AttributeRequired( "Name" );
@@ -21,6 +28,10 @@ namespace CK.Env
                             .FirstOrDefault();
         }
 
+        /// <summary>
+        /// Compy constructor.
+        /// </summary>
+        /// <param name="other">The other source information.</param>
         public NuGetSource( INuGetSource other )
         {
             Name = other.Name;

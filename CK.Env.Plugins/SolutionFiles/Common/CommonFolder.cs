@@ -30,7 +30,7 @@ namespace CK.Env.Plugins.SolutionFiles
             }
             else
             {
-                CopyBinaryResource( m, "SharedKey.snk" );
+                SetBinaryResource( m, "SharedKey.snk" );
             }
         }
     }

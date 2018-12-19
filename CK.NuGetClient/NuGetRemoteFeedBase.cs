@@ -1,4 +1,6 @@
 using CK.Core;
+using CK.Env;
+using CK.Text;
 using CSemVer;
 using NuGet.Common;
 using NuGet.Configuration;
@@ -42,6 +44,8 @@ namespace CK.NuGetClient
             collector.Add( _packageSource );
         }
 
+        IArtifactRepositoryInfo IArtifactRepository.Info => Info;
+
         /// <summary>
         /// Gets the info of this feed.
         /// </summary>
@@ -67,7 +71,7 @@ namespace CK.NuGetClient
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="throwOnEmpty">
-        /// True to throw if SecretKeyName is not null or empty and the secret xan not be resolved.
+        /// True to throw if SecretKeyName is not null or empty and the secret can not be resolved.
         /// </param>
         /// <returns>The non empty secret or null.</returns>
         public virtual string ResolveSecret( IActivityMonitor m, bool throwOnEmpty = false )
@@ -88,11 +92,13 @@ namespace CK.NuGetClient
         /// </summary>
         /// <param name="m">The activity monitor.</param>
         /// <param name="packageId">The package identifier.</param>
-        /// <param name="v">The version.</param>
+        /// <param name="version">The version.</param>
         /// <returns>True if found, false otherwise.</returns>
-        public virtual async Task<bool> ExistsAsync( IActivityMonitor m, string packageId, SVersion v )
+        public virtual async Task<bool> ExistsAsync( IActivityMonitor m, string packageId, SVersion version )
         {
-            var p = new PackageIdentity( packageId, NuGetVersion.Parse( v.ToString() ) );
+            if( packageId == null ) throw new ArgumentNullException( nameof( packageId ) );
+            if( version == null ) throw new ArgumentNullException( nameof( version ) );
+            var p = new PackageIdentity( packageId, NuGetVersion.Parse( version.ToString() ) );
             var meta = await _meta;
             return await meta.Exists( p, Client.SourceCache, new NuGetLoggerAdapter( m ), CancellationToken.None ); 
         }
@@ -147,5 +153,33 @@ namespace CK.NuGetClient
             return Task.CompletedTask;
         }
 
+        public async Task<IArtifactLocator> FindAsync( IActivityMonitor m, string type, string name, SVersion version )
+        {
+            if( type == null ) throw new ArgumentNullException( nameof( type ) );
+            if( name == null ) throw new ArgumentNullException( nameof( name ) );
+            if( version == null ) throw new ArgumentNullException( nameof( version ) );
+
+            if( type != "NuGet" ) return null;
+            if( await ExistsAsync( m, name, version ) )
+            {
+                return new RemoteNuGetLocator( new ArtifactInstance( type, name, version ), this );
+            }
+            return null;
+        }
+
+        public async Task<bool> PushAsync( IActivityMonitor m, IEnumerable<IArtifactLocator> artifacts )
+        {
+            bool success = true;
+            using( m.OnError( () => success = false ) )
+            {
+                var unmanaged = artifacts.Where( a => !(a is LocalNuGetPackageFile) ).ToList();
+                if( unmanaged.Count > 0 )
+                {
+                    m.Error( $"Invalid artifact type for: {unmanaged.Select( a => a.Instance.ToString()).Concatenate()}." );
+                }
+                await PushPackagesAsync( m, artifacts.OfType<LocalNuGetPackageFile>() );
+            }
+            return success;
+        }
     }
 }

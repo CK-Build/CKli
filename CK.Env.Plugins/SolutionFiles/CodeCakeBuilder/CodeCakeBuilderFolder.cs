@@ -15,32 +15,73 @@ namespace CK.Env.Plugins.SolutionFiles
 {
     public class CodeCakeBuilderFolder : PluginFolderBase
     {
+        readonly SolutionDriver _driver;
         readonly ISolutionSettings _settings;
 
-        public CodeCakeBuilderFolder( GitFolder f, ISolutionSettings settings, NormalizedPath branchPath )
+        public CodeCakeBuilderFolder( GitFolder f, SolutionDriver driver, ISolutionSettings settings, NormalizedPath branchPath )
             : base( f, branchPath, "CodecakeBuilder" )
         {
+            _driver = driver;
             _settings = settings;
         }
 
         protected override void DoApplySettings( IActivityMonitor m )
         {
-            CopyTextResource( m, "InstallCredentialProvider.ps1" );
-            CopyTextResource( m, "Program.cs" );
-            CopyTextResource( m, "Build.cs", AdaptBuild );
-            CopyTextResource( m, "Build.NuGetHelper.cs" );
-            CopyTextResource( m, "Build.StandardCheckRepository.cs", AdaptStandardCheckRepositoryForPushFeeds );
-            CopyTextResource( m, "Build.StandardSolutionBuild.cs" );
+            SetTextResource( m, "InstallCredentialProvider.ps1" );
+            SetTextResource( m, "Program.cs" );
+            UpdateTextResource( m, "Build.cs", AdaptBuild );
+            SetTextResource( m, "Build.NuGetHelper.cs" );
+            SetTextResource( m, "Build.StandardCheckRepository.cs", AdaptStandardCheckRepositoryForPushFeeds );
+            SetTextResource( m, "Build.StandardSolutionBuild.cs" );
+            if( _settings.ProduceCKSetupComponents )
+            {
+                SetTextResource( m, "Build.StandardPushCKSetupComponents.cs", text => AdaptStandardStandardPushCKSetupComponents( m, text ) );
+            }
+            else
+            {
+                DeleteFile( m, "Build.StandardPushCKSetupComponents.cs" );
+            }
             if( _settings.NoUnitTests )
             {
                 DeleteFile( m, "Build.StandardUnitTests.cs" );
             }
             else
             {
-                CopyTextResource( m, "Build.StandardUnitTests.cs" );
+                SetTextResource( m, "Build.StandardUnitTests.cs" );
             }
-            CopyTextResource( m, "Build.StandardCreateNuGetPackages.cs" );
-            CopyTextResource( m, "Build.StandardPushNuGetPackages.cs" );
+            SetTextResource( m, "Build.StandardCreateNuGetPackages.cs" );
+            SetTextResource( m, "Build.StandardPushNuGetPackages.cs" );
+        }
+
+        string AdaptStandardStandardPushCKSetupComponents( IActivityMonitor monitor, string text )
+        {
+            Match m = Regex.Match( text, @"return new CKSetupComponent\[\]{.*?};", RegexOptions.Singleline | RegexOptions.CultureInvariant );
+            if( !m.Success )
+            {
+                throw new Exception( "Expected pattern return new CKSetupComponent[]{...} in Build.StandardPushCKSetupComponents.cs." );
+            }
+            var allSolutions = _driver.GetAllSolutions( monitor );
+            if( allSolutions == null ) return null;
+            var comps = allSolutions.SelectMany( s => s.CKSetupComponentProjects )
+                                    .SelectMany( p => p.TargetFrameworks.AtomicTraits
+                                           .Select( t => new CKSetupComponent( p.PrimarySolutionRelativeFolderPath, t ) ) );
+            if( !comps.Any() )
+            {
+                monitor.Warn( "SolutionSettings.ProduceCKSetupComponents is true but no projects are in CKSetupComponentProjects." );
+            }
+            StringBuilder b = new StringBuilder();
+            b.AppendLine( "return new CKSetupComponent[]{" );
+            bool atLeastOne = false;
+            foreach( var c in comps )
+            {
+                b.AppendLine( atLeastOne ? "," : "" );
+                atLeastOne = true;
+                b.Append( "new CKSetupComponent( \"" ).Append( c.ProjectPath ).Append( "\", \"" ).Append( c.TargetFramework ).Append( "\" )" );
+            }
+            b.AppendLine().Append( "};" );
+            text = text.Replace( m.Value, b.ToString() );
+            return text;
+
         }
 
         string AdaptStandardCheckRepositoryForPushFeeds( string text )
@@ -53,7 +94,7 @@ namespace CK.Env.Plugins.SolutionFiles
             StringBuilder b = new StringBuilder( );
             b.AppendLine( "return new NuGetHelper.Feed[]{" );
             bool atLeastOne = false;
-            foreach( var info in _settings.NuGetPushFeeds )
+            foreach( var info in _settings.ArtifactRepositoryInfos.OfType<INuGetFeedInfo>() )
             {
                 b.AppendLine( atLeastOne ? "," : "" );
                 atLeastOne = true;

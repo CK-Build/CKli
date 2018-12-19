@@ -86,7 +86,12 @@ namespace CK.Env.Plugins
             return _solution;
         }
 
-        IEnumerable<Solution> GetAllSolutions( IActivityMonitor monitor )
+        /// <summary>
+        /// Gets all the solutions: first is the primary and then all the secondary's solutions.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <returns>All the solutions or null on error.</returns>
+        public IEnumerable<Solution> GetAllSolutions( IActivityMonitor monitor )
         {
             var primary = GetPrimarySolution( monitor );
             if( primary == null ) return null;

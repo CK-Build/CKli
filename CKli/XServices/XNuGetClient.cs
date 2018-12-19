@@ -18,6 +18,7 @@ namespace CKli
         public XNuGetClient(
             XSharedHttpClient sharedHttpClient,
             XSecretKeyStore secretKeyStore,
+            XArtifactCenter artifact,
             FileSystem fs,
             Initializer initializer )
             : base( initializer )
@@ -26,6 +27,7 @@ namespace CKli
             _secretKeyStore = secretKeyStore;
             _nuGetClient = new NuGetClient( _sharedHttpClient.Shared, _secretKeyStore );
             fs.ServiceContainer.Add<INuGetClient>( _nuGetClient );
+            artifact.ArtifactCenter.Add( _nuGetClient );
             initializer.Services.Add( this );
         }
 

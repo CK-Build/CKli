@@ -51,9 +51,16 @@ namespace CKli
         public bool TestProjectsArePublished { get; private set; }
 
         /// <summary>
-        /// Gets a semicolon separated list of project names that must be removed from <see cref="CK.Env.MSBuild.Solution.PublishedProjects"/>.
+        /// Gets a semicolon separated list of project names that must be removed
+        /// from <see cref="Solution.PublishedProjects"/>.
         /// </summary>
         public string NotPublishedProjects { get; private set; }
+
+        /// <summary>
+        /// Gets a semicolon separated list of project names that are CKSetup components.
+        /// These names must be projects in <see cref="Solution.PublishedProjects"/>.
+        /// </summary>
+        public string CKSetupComponentProjects { get; private set; }
 
         /// <summary>
         /// Overridden to load the primary solution and applies <see cref="TestProjectsArePublished"/>
@@ -90,10 +97,27 @@ namespace CKli
                         else s.PublishedProjects.RemoveAt( idxU );
                     }
                 }
+                HandleCKSetupComponentProjects( m, s );
             }
             return s;
         }
 
+        void HandleCKSetupComponentProjects( IActivityMonitor m, Solution s )
+        {
+            string[] ckSetupComponents = CKSetupComponentProjects?.Split( ';' );
+            if( ckSetupComponents != null )
+            {
+                foreach( var c in ckSetupComponents )
+                {
+                    var idxU = s.PublishedProjects.IndexOf( p => p.Name == c );
+                    if( idxU < 0 )
+                    {
+                        m.Warn( $"CKSetupComponentProjects '{c}' not found in solution PublishedProjects: {s.PublishedProjects.Select( p => p.Name ).Concatenate()}." );
+                    }
+                    else s.CKSetupComponentProjects.Add( s.PublishedProjects[idxU] );
+                }
+            }
+        }
 
     }
 }

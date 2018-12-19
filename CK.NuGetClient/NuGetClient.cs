@@ -1,3 +1,5 @@
+using CK.Core;
+using CK.Env;
 using CK.Text;
 using NuGet.Configuration;
 using NuGet.Protocol;
@@ -8,6 +10,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace CK.NuGetClient
 {
@@ -135,6 +138,19 @@ namespace CK.NuGetClient
         public void Dispose()
         {
             SourceCache.Dispose();
+        }
+
+        IArtifactRepositoryInfo IArtifactTypeFactory.CreateInfo( XElement e )
+        {
+            return NuGetFeedInfo.Create( e, skipMissingType: true );
+        }
+
+        IArtifactRepository IArtifactTypeFactory.FindOrCreate( IActivityMonitor m, IArtifactRepositoryInfo info )
+        {
+            if( info == null ) throw new ArgumentNullException( nameof( info ) );
+            var fInfo = info as INuGetFeedInfo;
+            if( fInfo == null ) return null;
+            return FindOrCreate( fInfo );
         }
     }
 }

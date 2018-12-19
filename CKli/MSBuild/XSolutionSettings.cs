@@ -15,14 +15,15 @@ namespace CKli
     {
         public XSolutionSettings(
             Initializer initializer,
+            XArtifactCenter artifactHandler,
             XSolutionSettings previous = null )
             : base( initializer )
         {
             if( previous != null )
             {
-                SolutionSettings = new SolutionSettings( previous.SolutionSettings, initializer.Element );
+                SolutionSettings = new SolutionSettings( previous.SolutionSettings, artifactHandler.ArtifactCenter, initializer.Element );
             }
-            else SolutionSettings = new SolutionSettings( initializer.Element );
+            else SolutionSettings = new SolutionSettings( initializer.Element, artifactHandler.ArtifactCenter );
             initializer.Services.Add( this );
         }
 

@@ -69,12 +69,12 @@ namespace CK.Env.Plugins.SolutionFiles
 
                 // CKSetup.Cake transitively implies CK.Text.
                 // We must not have transitive references for build projects: this breaks the
-                // ZeroVersion fix!
+                // ZeroVersion build projects!
                 ccbProject.RemoveDependency( m, "CK.Text" );
             }
             else
             {
-                EnsureProjectReference( "CK.Text", "7.1.1--0008-develop" );
+                EnsureProjectReference( "CK.Text", "7.1.1--0033-develop" );
             }
             solution.Save( m );
         }

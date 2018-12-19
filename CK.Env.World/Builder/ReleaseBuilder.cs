@@ -46,7 +46,7 @@ namespace CK.Env
             return targetVersion;
         }
 
-        protected override bool OnBeforeBuild( IActivityMonitor m )
+        protected override bool OnBeforeBuild( IActivityMonitor m, BuildResult result )
         {
             _zBuilder.RegisterSHAlias( m );
             return true;

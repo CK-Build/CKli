@@ -52,8 +52,8 @@ namespace CK.Env.Plugins
         }
 
         /// <summary>
-        /// Must <see cref="CopyBinaryResource"/>, <see cref="CopyTextResource"/> or <see cref="DeleteFile"/> as
-        /// needed.
+        /// Must <see cref="SetBinaryResource"/>, <see cref="SetTextResource"/>, <see cref="UpdateTextResource"/>
+        /// or <see cref="DeleteFile"/> as needed.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         protected abstract void DoApplySettings( IActivityMonitor m );
@@ -71,22 +71,45 @@ namespace CK.Env.Plugins
         }
 
         /// <summary>
-        /// Copies the content of a textual embedded resource into this folder.
+        /// Ensures that a text file exists and initializes its content: exisitng content is preserved.
         /// The embedded resource name must have a ".txt" suffix appended.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="name">The name of the text file (without ".txt" suffix).</param>
         /// <param name="transformer">Optional transformer.</param>
         /// <returns>True on success, false on error.</returns>
-        protected bool CopyTextResource( IActivityMonitor m, string name, Func<string, string> transformer = null )
+        protected bool UpdateTextResource( IActivityMonitor m, string name, Func<string, string> transformer = null )
         {
             var fs = Folder.FileSystem;
             var target = FolderPath.AppendPart( name );
             var currentText = fs.GetFileInfo( target ).AsTextFileInfo()?.TextContent;
-
-            string text = _textResources[name];
-            var final = transformer != null ? transformer( text ) : text;
+            var final = transformer != null ? transformer( currentText ?? _textResources[name] ) : _textResources[name];
             return final != currentText ? fs.CopyTo( m, final, target ) : true;
+        }
+
+        /// <summary>
+        /// Ensures that a text file exists and that its content is the one of the embedded resource.
+        /// This does not preserve exisiting content.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="name">The name of the text file (without ".txt" suffix).</param>
+        /// <param name="transformer">
+        /// Optional transformer.
+        /// When this function returns null, this is considered as an error.
+        /// </param>
+        /// <returns>True on success, false on error.</returns>
+        protected bool SetTextResource( IActivityMonitor m, string name, Func<string, string> transformer = null )
+        {
+            var fs = Folder.FileSystem;
+            var target = FolderPath.AppendPart( name );
+            var text = _textResources[name];
+            var final = transformer != null ? transformer( text ) : text;
+            if( final == null )
+            {
+                m.Error( "Transform function returned null." );
+                return false;
+            }
+            return final != text ? fs.CopyTo( m, final, target ) : true;
         }
 
         /// <summary>
@@ -96,7 +119,7 @@ namespace CK.Env.Plugins
         /// <param name="m">The monitor to use.</param>
         /// <param name="name">The name of the binary file (without ".bin" suffix).</param>
         /// <returns>True on success, false on error.</returns>
-        protected bool CopyBinaryResource( IActivityMonitor m, string name )
+        protected bool SetBinaryResource( IActivityMonitor m, string name )
         {
             var fs = Folder.FileSystem;
             var target = FolderPath.AppendPart( name );

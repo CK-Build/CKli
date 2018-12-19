@@ -146,7 +146,6 @@ namespace CK.Env
         /// </summary>
         public string PrimarySolutionName => SubPath.LastPart;
 
-
         /// <summary>
         /// Gets the file system.
         /// </summary>
@@ -981,7 +980,8 @@ namespace CK.Env
                             m.Info( $"Creating the {World.MasterBranchName }." );
                             master = _git.CreateBranch( World.MasterBranchName );
                         }
-                        CheckoutWithPlugins( m, master );
+                        // Don't instanciate plugins here.
+                        Commands.Checkout( _git, master );
                     }
                     else m.Trace( $"Already on {World.MasterBranchName}." );
 

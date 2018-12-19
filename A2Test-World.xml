@@ -1,16 +1,10 @@
 <A1Test>
 
   <SharedHttpClient />
-  <ArtifactCenter />
   <LocalFeedProvider />
   <SecretKeyStore />
   <NuGetClient />
   <SolutionCentral />
-
-  <ArtifactRepositories>
-    <add Type="NuGetAzure" Organization="Signature-OpenSource" FeedName="CKEnvTest" CheckName="NuGet:Signature-OpenSource-CKEnvTest" />
-    <add Type="CKSetup" CheckName="CKSetup:Public" />
-  </ArtifactRepositories>
 
   <SolutionSettings>
     <NuGetSources>
@@ -45,27 +39,7 @@
   </SolutionSettings>
 
   <Folder Name="Projects">
-
-    <GitFolder Name="CK-UnitsOfMeasure" Url="https://github.com/Invenietis/CK-UnitsOfMeasure.git">
-      <Branch Name="develop">
-        <PrimarySolution />
-      </Branch>
-    </GitFolder>
     
-    <GitFolder Name="CodeCake" Url="https://github.com/SimpleGitVersion/CodeCake.git">
-      <SolutionSettings NoUnitTests="true" NoStrongNameSigning="true" />
-      <Branch Name="develop">
-        <PrimarySolution />
-      </Branch>
-    </GitFolder>
-    
-    <GitFolder Name="SGV-Net" Url="https://github.com/SimpleGitVersion/SGV-Net.git">
-      <SolutionSettings DisableSourceLink="true" />
-      <Branch Name="develop">
-        <PrimarySolution />
-      </Branch>
-    </GitFolder>
-
     <GitFolder Name="CK-Setup" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-setup.git">
       <SolutionSettings ProduceCKSetupComponents="true" />
       <Branch Name="develop">

@@ -57,7 +57,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the set of final artifacts that this solution produces.
         /// </summary>
-        IReadOnlyCollection<GeneratedArtifact> GeneratedArtifacts { get; }
+        IReadOnlyCollection<Artifact> GeneratedArtifacts { get; }
 
         /// <summary>
         /// Gets the direct required solutions: this corresponds to the solutions that generate a package

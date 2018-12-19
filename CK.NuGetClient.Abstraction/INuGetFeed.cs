@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Env;
 using CSemVer;
 using System;
 using System.Collections.Generic;
@@ -9,29 +10,14 @@ using System.Threading.Tasks;
 namespace CK.NuGetClient
 {
     /// <summary>
-    /// 
+    /// Defines a NuGet feed, either remote or local.
     /// </summary>
-    public interface INuGetFeed
+    public interface INuGetFeed : IArtifactRepository
     {
         /// <summary>
         /// Gets the info of this feed.
         /// </summary>
-        INuGetFeedInfo Info { get; }
-
-        /// <summary>
-        /// Must provide the secret key name.
-        /// A null or empty SecretKeyName means that the feed does not require any protection.
-        /// </summary>
-        string SecretKeyName { get; }
-
-        /// <summary>
-        /// Ensures that the secret behind the <see cref="SecretKeyName"/> is available.
-        /// The implementation must ensure that the secret only depends from the <see cref="SecretKeyName"/>:
-        /// if two feeds share the same SecretKeyName, the resolved secret must be the same.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <returns>The non empty secret or null.</returns>
-        string ResolveSecret( IActivityMonitor m, bool throwOnEmpty = false );
+        new INuGetFeedInfo Info { get; }
 
         /// <summary>
         /// Cheks whether a versioned package exists in this feed.

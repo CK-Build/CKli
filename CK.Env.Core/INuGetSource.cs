@@ -9,6 +9,9 @@ using System.Threading.Tasks;
 
 namespace CK.Env
 {
+    /// <summary>
+    /// Defines a NuGet source.
+    /// </summary>
     public interface INuGetSource
     {
         /// <summary>

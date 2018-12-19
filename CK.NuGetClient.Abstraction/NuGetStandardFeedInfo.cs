@@ -10,7 +10,7 @@ namespace CK.NuGetClient
     /// Immutable implementation of <see cref="INuGetFeedInfo"/> for standard feeds
     /// where a secret push API key is required.
     /// </summary>
-    public class NuGetStandardFeedInfo : INuGetFeedInfo
+    public class NuGetStandardFeedInfo : NuGetFeedInfo
     {
         public NuGetStandardFeedInfo( XElement e )
         {
@@ -19,15 +19,13 @@ namespace CK.NuGetClient
             SecretKeyName = (string)e.AttributeRequired( "SecretKeyName" );
         }
 
-        public NuGetFeedType Type => NuGetFeedType.Standard;
+        public override NuGetFeedType Type => NuGetFeedType.NuGetStandard;
 
-        public string Name { get; }
+        public override string Name { get; }
 
         public string Url { get; }
 
         public string SecretKeyName { get; }
-
-        public override string ToString() => $"{Type}: {Name} -> {Url}";
 
     }
 }

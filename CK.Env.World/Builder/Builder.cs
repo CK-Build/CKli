@@ -60,9 +60,10 @@ namespace CK.Env
                 }
                 m.CloseGroup( "Success." );
             }
+            var result = new BuildResult( DependentSolutionContext.Solutions, _targetVersions );
             using( m.OpenDebug( "Before running builds." ) )
             {
-                if( !OnBeforeBuild( m ) ) return null;
+                if( !OnBeforeBuild( m, result ) ) return null;
             }
             using( m.OpenInfo( "Running builds." ) )
             {
@@ -74,7 +75,7 @@ namespace CK.Env
                 }
                 m.CloseGroup( "Success." );
             }
-            return OnBuildSuccess( m, new BuildResult( DependentSolutionContext.Solutions, _targetVersions ) );
+            return OnBuildSuccess( m, result );
         }
 
 
@@ -83,7 +84,7 @@ namespace CK.Env
             return true;
         }
 
-        protected virtual bool OnBeforeBuild( IActivityMonitor m )
+        protected virtual bool OnBeforeBuild( IActivityMonitor m, BuildResult result )
         {
             return true;
         }

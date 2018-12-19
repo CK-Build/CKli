@@ -67,6 +67,7 @@ namespace CKli
         /// <param name="projectToBranchName">Optional other branch for which the solution must be loaded.</param>
         /// <returns>The solution or null if not found.</returns>
         public abstract Solution GetSolution( IActivityMonitor m, bool reload, string projectToBranchName = null );
+
     }
 }
 

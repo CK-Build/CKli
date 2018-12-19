@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Env;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -9,7 +10,7 @@ namespace CK.NuGetClient
     /// <summary>
     /// Immutable implementation of <see cref="INuGetFeedInfo"/> for Azure feeds.
     /// </summary>
-    public class NuGetAzureFeedInfo : INuGetFeedInfo
+    public class NuGetAzureFeedInfo : NuGetFeedInfo
     {
         readonly string _name;
 
@@ -24,10 +25,17 @@ namespace CK.NuGetClient
             Label = label;
         }
 
-        public NuGetFeedType Type => NuGetFeedType.Azure;
+        public override NuGetFeedType Type => NuGetFeedType.NugetAzure;
 
-        public string Name => _name;
+        /// <summary>
+        /// Gets the name of this feed:
+        /// <see cref="Organization"/>-<see cref="FeedName"/>[-<see cref="Label"/>(without the '@' label prefix)].
+        /// </summary>
+        public override string Name => _name;
 
+        /// <summary>
+        /// Gets the organization name.
+        /// </summary>
         public string Organization { get; }
 
         /// <summary>
@@ -41,7 +49,5 @@ namespace CK.NuGetClient
         public string Label { get; }
 
         public string Url => $"https://pkgs.dev.azure.com/{Organization}/_packaging/{FeedName}{Label}/nuget/v3/index.json";
-
-        public override string ToString() => $"{Type}: {_name}";
     }
 }

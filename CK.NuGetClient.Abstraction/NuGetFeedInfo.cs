@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Env;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -15,10 +16,12 @@ namespace CK.NuGetClient
 
         /// <summary>
         /// Gets the name of this feed.
-        /// Name is used as the feed identifier: it must be unique accross a set of feeds.
+        /// Name is used as the feed identifier: it must be unique accross a set of NuGet feeds.
         /// (See <see cref="NuGetFeedInfoComparer"/>.)
         /// </summary>
         public abstract string Name { get; }
+
+        string IArtifactRepositoryInfo.UniqueArtifactRepositoryName => $"NuGet:{Name}";
 
         /// <summary>
         /// Overridden to return the <see cref="Type"/> and <see cref="Name"/>.
@@ -30,14 +33,18 @@ namespace CK.NuGetClient
         /// Creates a <see cref="INuGetFeedInfo"/> from a <see cref="XElement"/>.
         /// </summary>
         /// <param name="e">The xml element.</param>
-        /// <param name="skipMissingType">True to throw an exception if the element doesn't have a Type attribute.</param>
+        /// <param name="skipMissingType">
+        /// True to silently ignore an element that doesn't have a Type attribute whose value is one of <see cref="NuGetFeedType"/>
+        /// and returns null.
+        /// When false (the default), an exception is thrown.
+        /// </param>
         /// <returns>The info or null.</returns>
         public static INuGetFeedInfo Create( XElement e, bool skipMissingType = false )
         {
             switch( e.AttributeEnum( "Type", NuGetFeedType.None ) )
             {
-                case NuGetFeedType.Azure: return new NuGetAzureFeedInfo( e );
-                case NuGetFeedType.Standard: return new NuGetStandardFeedInfo( e );
+                case NuGetFeedType.NugetAzure: return new NuGetAzureFeedInfo( e );
+                case NuGetFeedType.NuGetStandard: return new NuGetStandardFeedInfo( e );
                 default:
                     if( !skipMissingType ) throw new Exception( $"Not a NuGetFeedInfo element: {e}." );
                     return null;
