@@ -17,7 +17,6 @@ namespace CKli
         readonly IWorldName _world;
         readonly IWorldStore _worldStore;
         readonly XLocalFeedProvider _packageFeeds;
-        readonly XNuGetClient _nuGetClient;
         readonly MSBuildContext _msBuildContext;
         readonly WorldState _worldState;
         readonly XSecretKeyStore _publishKeyStore;
@@ -34,7 +33,7 @@ namespace CKli
             IWorldStore worldStore,
             XSecretKeyStore publishKeyStore,
             XLocalFeedProvider packageFeeds,
-            XNuGetClient nuGetClient,
+            XArtifactCenter artifacts,
             CommandRegister commandRegister,
             Initializer initializer )
             : base( initializer )
@@ -42,7 +41,6 @@ namespace CKli
             _world = world;
             _worldStore = worldStore;
             _packageFeeds = packageFeeds;
-            _nuGetClient = nuGetClient;
             _publishKeyStore = publishKeyStore;
             _commandRegister = commandRegister;
 
@@ -56,7 +54,7 @@ namespace CKli
             _allDevelopSolutions = new List<XSolutionBase>();
             _allGitFoldersWithDevelopBranchName = new List<XGitFolder>();
 
-            _worldState = new WorldState( commandRegister, worldStore, world, this, _packageFeeds );
+            _worldState = new WorldState( commandRegister, artifacts.ArtifactCenter, worldStore, world, this, _packageFeeds );
             _worldState.VersionSelector = new ReleaseVersionSelector();
             _worldState.Initializing += ( o, e ) => DumpGitFolderStatus( e.Monitor );
             fileSystem.ServiceContainer.Add( _worldState );

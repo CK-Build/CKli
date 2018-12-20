@@ -60,6 +60,11 @@ namespace CK.Env
         IReadOnlyCollection<Artifact> GeneratedArtifacts { get; }
 
         /// <summary>
+        /// Gets the set of artifacts repository names that this solution targets.
+        /// </summary>
+        IReadOnlyCollection<string> ArtifactTargetNames { get; }
+
+        /// <summary>
         /// Gets the direct required solutions: this corresponds to the solutions that generate a package
         /// used in this <see cref="IDependentSolution"/> (every projects are considered except build projects).
         /// </summary>

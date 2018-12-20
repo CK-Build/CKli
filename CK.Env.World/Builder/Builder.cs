@@ -15,15 +15,24 @@ namespace CK.Env
     abstract class Builder
     {
         protected readonly Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> DriverFinder;
+        readonly BuildResultType _type;
         readonly ISolutionDriver[] _drivers;
         readonly Dictionary<string, SVersion> _packagesVersion;
         readonly List<UpdatePackageInfo>[] _upgrades;
         readonly SVersion[] _targetVersions;
+        readonly ArtifactCenter _artifacts;
 
-        protected Builder( IDependentSolutionContext ctx, Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
+        protected Builder(
+            BuildResultType type,
+            ArtifactCenter artifacts,
+            IDependentSolutionContext ctx,
+            Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
         {
             if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
             if( driverFinder == null ) throw new ArgumentNullException( nameof( driverFinder ) );
+            if( artifacts == null ) throw new ArgumentNullException( nameof( artifacts ) );
+            _type = type;
+            _artifacts = artifacts;
             DependentSolutionContext = ctx;
             DriverFinder = driverFinder;
             _packagesVersion = new Dictionary<string, SVersion>();
@@ -50,6 +59,7 @@ namespace CK.Env
             {
                 if( !OnBeforePrepareBuild( m ) ) return null;
             }
+            BuildResult result = null;
             using( m.OpenInfo( "Preparing builds." ) )
             {
                 if( !RunPrepareBuild( m ) )
@@ -58,9 +68,10 @@ namespace CK.Env
                     OnPrepareBuildFailed( m );
                     return null;
                 }
+                result = BuildResult.Create( m, _type, _artifacts, DependentSolutionContext.Solutions, _targetVersions, GetReleaseNotes() );
+                if( result == null ) return null;
                 m.CloseGroup( "Success." );
             }
-            var result = new BuildResult( DependentSolutionContext.Solutions, _targetVersions );
             using( m.OpenDebug( "Before running builds." ) )
             {
                 if( !OnBeforeBuild( m, result ) ) return null;
@@ -78,6 +89,10 @@ namespace CK.Env
             return OnBuildSuccess( m, result );
         }
 
+        protected virtual IReadOnlyList<ReleaseNoteInfo> GetReleaseNotes()
+        {
+            return null;
+        }
 
         protected virtual bool OnBeforePrepareBuild( IActivityMonitor m )
         {
@@ -135,6 +150,7 @@ namespace CK.Env
             for( int i = 0; i < solutions.Count; ++i )
             {
                 var s = solutions[i];
+                DependentSolutionContext.LogSolutions( m, s );
                 var buildProjectsUpgrade = DependentSolutionContext.BuildProjectsInfo
                                              .Where( z => z.SolutionName == s.UniqueSolutionName )
                                              .SelectMany( z => z.UpgradePackages

@@ -25,13 +25,24 @@ namespace CK.NuGetClient
             Label = label;
         }
 
-        public override NuGetFeedType Type => NuGetFeedType.NugetAzure;
+        public override NuGetFeedType Type => NuGetFeedType.NuGetAzure;
 
         /// <summary>
         /// Gets the name of this feed:
         /// <see cref="Organization"/>-<see cref="FeedName"/>[-<see cref="Label"/>(without the '@' label prefix)].
         /// </summary>
         public override string Name => _name;
+
+        /// <summary>
+        /// The secret key name is:
+        /// "AZURE_FEED_" + Organization.ToUpperInvariant().Replace( '-', '_' ).Replace( ' ', '_' ) + "_PAT".
+        /// </summary>
+        public override string SecretKeyName => "AZURE_FEED_"
+                                                + Organization
+                                                      .ToUpperInvariant()
+                                                      .Replace( '-', '_' )
+                                                      .Replace( ' ', '_' )
+                                                + "_PAT";
 
         /// <summary>
         /// Gets the organization name.

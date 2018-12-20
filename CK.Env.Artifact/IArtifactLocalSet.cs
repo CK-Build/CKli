@@ -1,18 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace CK.Env
 {
     /// <summary>
-    /// Encapsulates any information that enables concrete access to artifacts.
+    /// Encapsulates any information that enables access to local artifacts.
     /// Actual implementation depends on the type of the artifact and/or its repository.
     /// </summary>
-    public interface IArtifactLocator
+    public interface IArtifactLocalSet
     {
         /// <summary>
-        /// Gets the artifact instance.
+        /// Gets the artifact instances.
         /// </summary>
-        ArtifactInstance Instance { get; }
+        IEnumerable<ArtifactInstance> Instances { get; }
     }
 }

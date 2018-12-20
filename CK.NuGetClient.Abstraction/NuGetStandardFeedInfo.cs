@@ -25,7 +25,7 @@ namespace CK.NuGetClient
 
         public string Url { get; }
 
-        public string SecretKeyName { get; }
+        public override string SecretKeyName { get; }
 
     }
 }

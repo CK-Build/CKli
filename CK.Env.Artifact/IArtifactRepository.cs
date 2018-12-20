@@ -18,13 +18,7 @@ namespace CK.Env
         IArtifactRepositoryInfo Info { get; }
 
         /// <summary>
-        /// Must provide the secret key name.
-        /// A null or empty SecretKeyName means that the repository does not require any protection.
-        /// </summary>
-        string SecretKeyName { get; }
-
-        /// <summary>
-        /// Ensures that the secret behind the <see cref="SecretKeyName"/> is available.
+        /// Ensures that the secret behind the <see cref="IArtifactRepositoryInfo.SecretKeyName"/> is available.
         /// The implementation must ensure that the secret only depends from the <see cref="SecretKeyName"/>:
         /// if two repositories share the same SecretKeyName, the resolved secret must be the same.
         /// </summary>
@@ -33,24 +27,20 @@ namespace CK.Env
         string ResolveSecret( IActivityMonitor m, bool throwOnEmpty = false );
 
         /// <summary>
-        /// Finds an artifact instance in this repository and returns a locator or null.
-        /// When found, this locator is not necessarily tied to this repository (but it can be).
+        /// Checks whether this artifact repository handles the artifact type.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="type">The artifact type.</param>
-        /// <param name="name">The artifact name.</param>
-        /// <param name="version">The artifact version.</param>
-        /// <returns>A locator or null if not found.</returns>
-        Task<IArtifactLocator> FindAsync( IActivityMonitor m, string type, string name, SVersion version );
+        /// <param name="artifactType">Type of the artifact.</param>
+        /// <returns>True if this repository can handle artifacts of this type, false otherwise.</returns>
+        bool HandleArtifactType( string artifactType );
 
         /// <summary>
-        /// Pushes/transfers one or more existing artifacts into this repository.
-        /// The artifact locators must be understandable by this repository otherwise an error must be logged
+        /// Pushes/transfers one or more existing local artifacts into this repository.
+        /// The concrete artifact set must be understandable by this repository otherwise an error must be logged
         /// and false must be returned.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="artifacts">The artifacts to push.</param>
         /// <returns>True on success, false on error.</returns>
-        Task<bool> PushAsync( IActivityMonitor m, IEnumerable<IArtifactLocator> artifacts );
+        Task<bool> PushAsync( IActivityMonitor m, IArtifactLocalSet artifacts );
     }
 }

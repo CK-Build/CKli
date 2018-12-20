@@ -11,6 +11,7 @@
   
   <ItemGroup>
     <ProjectReference Include="..\CK.Env.FileSystem\CK.Env.FileSystem.csproj" />
+    <ProjectReference Include="../CK.Env.Core/CK.Env.Core.csproj" />
   </ItemGroup>
 
 </Project>

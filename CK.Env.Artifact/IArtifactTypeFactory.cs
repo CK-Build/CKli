@@ -22,12 +22,21 @@ namespace CK.Env
 
         /// <summary>
         /// Finds or creates a feed from a feed information if actual information type is handled or null.
-        /// Repository unicity (ie. find vs. create) depends on each repository implementation.
+        /// Repository unicity (ie. find vs. create) depends on each repository implementation
+        /// (see <see cref="IArtifactRepositoryInfo.UniqueArtifactRepositoryName"/>).
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="info">The repository information.</param>
         /// <returns>The repository or null.</returns>
         IArtifactRepository FindOrCreate( IActivityMonitor m, IArtifactRepositoryInfo info );
+
+        /// <summary>
+        /// Finds a repository by its <see cref="IArtifactRepositoryInfo.UniqueArtifactRepositoryName"/>.
+        /// Null when not found.
+        /// </summary>
+        /// <param name="uniqueRepositoryName">The unique repository name.</param>
+        /// <returns>The repository or null.</returns>
+        IArtifactRepository Find( string uniqueRepositoryName );
 
     }
 }

@@ -11,7 +11,7 @@ namespace CK.Env
 {
     public class SolutionSettings : ISolutionSettings
     {
-        public SolutionSettings( XElement e, ArtifactCenter artifactTypeFactory )
+        public SolutionSettings( XElement e, ArtifactCenter artifacts )
         {
             NoUnitTests = (bool?)e.Attribute( nameof( NoUnitTests ) ) ?? false;
             NoStrongNameSigning = (bool?)e.Attribute( nameof( NoStrongNameSigning ) ) ?? false;
@@ -25,20 +25,15 @@ namespace CK.Env
             ExcludedNuGetSourceNames = e.Elements( nameof( ExcludedNuGetSourceNames ) )
                                         .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Name" ) );
 
-            NuGetPushFeeds = e.Elements( nameof( NuGetPushFeeds ) )
-                             .ApplyAddRemoveClear( eF => NuGetFeedInfo.Create( eF ), f => f.Name )
-                             .Values;
-
-            ArtifactRepositoryInfos = e.Elements( nameof( ArtifactRepositoryInfos ) )
-                             .ApplyAddRemoveClear( eF => artifactTypeFactory.CreateInfo( eF ), f => f.UniqueArtifactRepositoryName )
-                             .Values;
+            ArtifactTargets = e.Elements( nameof( ArtifactTargets ) )
+                             .ApplyAddRemoveClear( s => artifacts.Find( (string)s.AttributeRequired( "Name" ) ) );
 
             Plugins = e.Elements( nameof( Plugins ) )
                              .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Type" ), s => SimpleTypeFinder.WeakResolver( (string)s.Attribute( "Type" ), true ) )
                              .Values;
         }
 
-        public SolutionSettings( ISolutionSettings other, ArtifactCenter artifactTypeFactory, XElement applyConfig = null )
+        public SolutionSettings( ISolutionSettings other, ArtifactCenter artifacts, XElement applyConfig = null )
         {
             NoUnitTests = other.NoUnitTests;
             NoStrongNameSigning = other.NoStrongNameSigning;
@@ -49,14 +44,13 @@ namespace CK.Env
             {
                 ExcludedNuGetSourceNames = other.ExcludedNuGetSourceNames;
                 NuGetSources = other.NuGetSources;
-                NuGetPushFeeds = other.NuGetPushFeeds;
+                ArtifactTargets = other.ArtifactTargets;
             }
             else
             {
                 var excludedNuGetSourceNames = new HashSet<string>( other.ExcludedNuGetSourceNames );
                 var nuGetSources = other.NuGetSources.ToDictionary( s => s.Name );
-                var nuGetPushFeeds = other.NuGetPushFeeds.ToDictionary( f => f.Name );
-                var artifactRepositoryInfos = other.ArtifactRepositoryInfos.ToDictionary( f => f.UniqueArtifactRepositoryName );
+                var artifactTargets = new HashSet<IArtifactRepository>( other.ArtifactTargets );
 
                 var disableSourceLink = (bool?)applyConfig.Attribute( nameof( DisableSourceLink ) );
                 if( disableSourceLink.HasValue ) DisableSourceLink = disableSourceLink.Value;
@@ -80,13 +74,8 @@ namespace CK.Env
                 ExcludedNuGetSourceNames = applyConfig.Elements( nameof( ExcludedNuGetSourceNames ) )
                                             .ApplyAddRemoveClear( excludedNuGetSourceNames, s => (string)s.AttributeRequired( "Name" ) );
 
-                NuGetPushFeeds = applyConfig.Elements( nameof( NuGetPushFeeds ) )
-                                    .ApplyAddRemoveClear( nuGetPushFeeds, eF => NuGetFeedInfo.Create( eF ), f => f.Name )
-                                    .Values;
-
-                ArtifactRepositoryInfos = applyConfig.Elements( nameof( ArtifactRepositoryInfos ) )
-                                    .ApplyAddRemoveClear( artifactRepositoryInfos, eF => artifactTypeFactory.CreateInfo( eF ), f => f.UniqueArtifactRepositoryName )
-                                    .Values;
+                ArtifactTargets = applyConfig.Elements( nameof( ArtifactTargets ) )
+                                    .ApplyAddRemoveClear( artifactTargets, eF => artifacts.Find( (string)eF.AttributeRequired( "Name" ) ) );
 
                 Plugins = applyConfig.Elements( nameof( Plugins ) )
                      .ApplyAddRemoveClear( new HashSet<Type>( other.Plugins ), e => SimpleTypeFinder.WeakResolver( (string)e.AttributeRequired( "Type" ), true ) );
@@ -107,9 +96,7 @@ namespace CK.Env
 
         public IReadOnlyCollection<string> ExcludedNuGetSourceNames { get; }
 
-        public IReadOnlyCollection<INuGetFeedInfo> NuGetPushFeeds { get; }
-
-        public IReadOnlyCollection<IArtifactRepositoryInfo> ArtifactRepositoryInfos { get; }
+        public IReadOnlyCollection<IArtifactRepository> ArtifactTargets { get; }
 
         public IReadOnlyCollection<Type> Plugins { get; }
     }

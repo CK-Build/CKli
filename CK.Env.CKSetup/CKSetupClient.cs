@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
@@ -8,8 +9,19 @@ using CKSetup;
 
 namespace CK.Env
 {
-    public class CKSetupStoreTypeFactory : IArtifactTypeFactory
+    public class CKSetupClient : IArtifactTypeFactory
     {
+        readonly HttpClient _sharedHttpClient;
+        readonly ISecretKeyStore _keyStore;
+        readonly Dictionary<string, Store> _stores;
+
+        public CKSetupClient( ISecretKeyStore keyStore, HttpClient sharedHttpClient )
+        {
+            _keyStore = keyStore;
+            _sharedHttpClient = sharedHttpClient;
+            _stores = new Dictionary<string, Store>();
+        }
+
         public IArtifactRepositoryInfo CreateInfo( XElement e )
         {
             string type = (string)e.Attribute( "Type" );
@@ -24,14 +36,29 @@ namespace CK.Env
                     throw new ArgumentException( $"Invalid name. Must be an identifier ('^\\w+$' regex)." );
                 }
                 if( name == "Public" ) throw new ArgumentException( $"'Public' name is reserved for the default public store." );
-                return new CKSetupStoreRepositoryInfo( url, name );
+                return new StoreInfo( url, name );
             }
             return null;
         }
 
+        public IArtifactRepository Find( string uniqueRepositoryName )
+        {
+            _stores.TryGetValue( uniqueRepositoryName, out var store );
+            return store;
+        }
+
         public IArtifactRepository FindOrCreate( IActivityMonitor m, IArtifactRepositoryInfo info )
         {
-            throw new NotImplementedException();
+            if( info is ICKSetupStoreInfo s )
+            {
+                if( !_stores.TryGetValue( s.UniqueArtifactRepositoryName, out var store ) )
+                {
+                    store = new Store( s, _keyStore, _sharedHttpClient );
+                    _stores.Add( s.UniqueArtifactRepositoryName, store );
+                }
+                return store;
+            }
+            return null;
         }
     }
 }

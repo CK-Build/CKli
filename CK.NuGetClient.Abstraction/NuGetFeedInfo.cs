@@ -21,13 +21,19 @@ namespace CK.NuGetClient
         /// </summary>
         public abstract string Name { get; }
 
-        string IArtifactRepositoryInfo.UniqueArtifactRepositoryName => $"NuGet:{Name}";
+        string IArtifactRepositoryInfo.UniqueArtifactRepositoryName => ToString();
+
+        /// <summary>
+        /// Gets the secret key name.
+        /// </summary>
+        public abstract string SecretKeyName { get; }
 
         /// <summary>
         /// Overridden to return the <see cref="Type"/> and <see cref="Name"/>.
+        /// This is the <see cref="IArtifactRepositoryInfo.UniqueArtifactRepositoryName"/>.
         /// </summary>
         /// <returns>A readble string.</returns>
-        public override string ToString() => $"{Type}: {Name}";
+        public override string ToString() => $"{Type}:{Name}";
 
         /// <summary>
         /// Creates a <see cref="INuGetFeedInfo"/> from a <see cref="XElement"/>.
@@ -43,7 +49,7 @@ namespace CK.NuGetClient
         {
             switch( e.AttributeEnum( "Type", NuGetFeedType.None ) )
             {
-                case NuGetFeedType.NugetAzure: return new NuGetAzureFeedInfo( e );
+                case NuGetFeedType.NuGetAzure: return new NuGetAzureFeedInfo( e );
                 case NuGetFeedType.NuGetStandard: return new NuGetStandardFeedInfo( e );
                 default:
                     if( !skipMissingType ) throw new Exception( $"Not a NuGetFeedInfo element: {e}." );

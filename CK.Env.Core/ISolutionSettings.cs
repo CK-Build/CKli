@@ -52,14 +52,9 @@ namespace CK.Env
         IReadOnlyCollection<string> ExcludedNuGetSourceNames { get; }
 
         /// <summary>
-        /// Gets the NuGet feeds where produced packages must be pushed.
+        /// Gets the repository where produced artifacts must be pushed.
         /// </summary>
-        IReadOnlyCollection<INuGetFeedInfo> NuGetPushFeeds { get; }
-
-        /// <summary>
-        /// Gets the repository infos where produced artifacts must be pushed.
-        /// </summary>
-        IReadOnlyCollection<IArtifactRepositoryInfo> ArtifactRepositoryInfos { get; }
+        IReadOnlyCollection<IArtifactRepository> ArtifactTargets { get; }
 
         /// <summary>
         /// Defines the set of plugins that must apply.

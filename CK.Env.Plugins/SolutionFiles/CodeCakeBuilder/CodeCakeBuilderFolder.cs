@@ -94,7 +94,7 @@ namespace CK.Env.Plugins.SolutionFiles
             StringBuilder b = new StringBuilder( );
             b.AppendLine( "return new NuGetHelper.Feed[]{" );
             bool atLeastOne = false;
-            foreach( var info in _settings.ArtifactRepositoryInfos.OfType<INuGetFeedInfo>() )
+            foreach( var info in _settings.ArtifactTargets.Select( a => a.Info ).OfType<INuGetFeedInfo>() )
             {
                 b.AppendLine( atLeastOne ? "," : "" );
                 atLeastOne = true;

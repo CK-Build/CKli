@@ -135,8 +135,9 @@ namespace CK.Env.MSBuild
                                         && r.TargetPackage.Project != null )
                             .Select( r => others( r.TargetPackage.Project.PrimarySolution ) )
                             .ToList();
-
                 Debug.Assert( PublishedRequirements.All( d => Requirements.Contains( d ) ) );
+
+                ArtifactTargetNames = s.ArtifactTargetNames.ToArray();
             }
 
             /// <summary>
@@ -226,6 +227,10 @@ namespace CK.Env.MSBuild
             /// </summary>
             public IReadOnlyCollection<Artifact> GeneratedArtifacts { get; private set; }
 
+            /// <summary>
+            /// Gets the set of artifacts repository names that this solution targets.
+            /// </summary>
+            public IReadOnlyCollection<string> ArtifactTargetNames { get; }
 
             /// <summary>
             /// Gets the global <see cref="SolutionDependencyContext"/> to which this <see cref="DependentSolution"/> belongs.

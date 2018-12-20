@@ -6,6 +6,7 @@ using System.Text;
 using CK.Core;
 using CK.Env.MSBuild;
 using CK.Text;
+using System.Linq;
 
 namespace CKli
 {
@@ -68,6 +69,10 @@ namespace CKli
         /// <returns>The solution or null if not found.</returns>
         public abstract Solution GetSolution( IActivityMonitor m, bool reload, string projectToBranchName = null );
 
+        private protected void HandleArtifactTargetNames( IActivityMonitor m, Solution s )
+        {
+            s.ArtifactTargetNames.AddRange( SolutionSettings.SolutionSettings.ArtifactTargets.Select( t => t.Info.UniqueArtifactRepositoryName ) );
+        }
     }
 }
 

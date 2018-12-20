@@ -13,7 +13,7 @@ namespace CK.NuGetClient
     /// <summary>
     /// Simple local package description.
     /// </summary>
-    public class LocalNuGetPackageFile : IArtifactLocator
+    public class LocalNuGetPackageFile
     {
         public LocalNuGetPackageFile( string fullPath, string id, SVersion v )
         {

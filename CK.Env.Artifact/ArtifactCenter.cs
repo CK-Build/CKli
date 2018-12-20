@@ -46,7 +46,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="e">The xml element.</param>
         /// <returns>The mapped repository info.</returns>
-        public IArtifactRepositoryInfo CreateInfo( XElement e )
+        IArtifactRepositoryInfo CreateInfo( XElement e )
         {
             if( e == null ) throw new ArgumentNullException( nameof( e ) );
             foreach( var f in _factories )
@@ -60,10 +60,29 @@ namespace CK.Env
                     {
                         throw new ArgumentException( $"Invalid check for name: CheckName is '{checkName}' but the actual repository name is '{info.UniqueArtifactRepositoryName}'." );
                     }
+                    var checkSecretKeyName = (string)e.Attribute( "CheckSecretKeyName" );
+                    if( checkSecretKeyName != null
+                        && checkSecretKeyName != info.SecretKeyName )
+                    {
+                        throw new ArgumentException( $"Invalid check for secret key name: CheckSecretKeyName is '{checkSecretKeyName}' but the actual repository secret key name is '{info.SecretKeyName}'." );
+                    }
                     return info;
                 }
             }
             throw new ArgumentException( "Unable to map Xml element to an ArtifactRepositoryInfo: " + e.ToString() );
+        }
+
+        /// <summary>
+        /// Ensure that repositories are created from a set of xml info elements.
+        /// </summary>
+        /// <param name="xmlInfos">The info elements.</param>
+        public void InstanciateRepositories( IActivityMonitor m, IEnumerable<XElement> xmlInfos )
+        {
+            foreach( var xInfo in xmlInfos )
+            {
+                var info = CreateInfo( xInfo );
+                FindOrCreate( m, info );
+            }
         }
 
         /// <summary>
@@ -74,7 +93,7 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="info">The info that describes the repository.</param>
         /// <returns>A new or existing repository.</returns>
-        public IArtifactRepository FindOrCreate( IActivityMonitor m, IArtifactRepositoryInfo info )
+        IArtifactRepository FindOrCreate( IActivityMonitor m, IArtifactRepositoryInfo info )
         {
             if( info == null ) throw new ArgumentNullException( nameof( info ) );
             foreach( var f in _factories )
@@ -86,23 +105,38 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Attempts to resolve required secrets for a set of <see cref="IArtifactRepositoryInfo"/>.
+        /// Finds a <see cref="IArtifactRepository"/> from its <see cref="IArtifactRepositoryInfo.UniqueArtifactRepositoryName"/>.
+        /// If no repository can be found, an <see cref="ArgumentException"/> is thrown.
+        /// </summary>
+        /// <param name="uniqueRepositoryName">Repository name.</param>
+        /// <returns>The repository.</returns>
+        public IArtifactRepository Find( string uniqueRepositoryName )
+        {
+            if( uniqueRepositoryName == null ) throw new ArgumentNullException( nameof( uniqueRepositoryName ) );
+            foreach( var f in _factories )
+            {
+                var r = f.Find( uniqueRepositoryName );
+                if( r != null ) return r;
+            }
+            throw new ArgumentException( $"Unable to find a repository named '{uniqueRepositoryName}'." );
+        }
+
+        /// <summary>
+        /// Attempts to resolve required secrets for a set of <see cref="IArtifactRepository"/>.
         /// If a secret can not be resolved, it will appear as null in the result list.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="repositoryInfos">The set of repository infos for which secrets must be resolved.</param>
+        /// <param name="repositories">The set of repository for which secrets must be resolved.</param>
         /// <returns>
         /// The list of resolved secrets: a null secret means that the secret has not been successfully obtained
-        /// for the corresponding <see cref="IArtifactRepository.SecretKeyName"/>.
+        /// for the corresponding <see cref="IArtifactRepositoryInfo.SecretKeyName"/>.
         /// </returns>
-        public IReadOnlyList<(string SecretKeyName, string Secret)> ResolveSecrets( IActivityMonitor m, IEnumerable<IArtifactRepositoryInfo> repositoryInfos )
+        public IReadOnlyList<(string SecretKeyName, string Secret)> ResolveSecrets( IActivityMonitor m, IEnumerable<IArtifactRepository> repositories )
         {
-            return repositoryInfos.Select( info => FindOrCreate( m, info ) )
-                                    .Distinct()
-                                    .Where( feed => !String.IsNullOrWhiteSpace( feed.SecretKeyName ) )
-                                    .GroupBy( feed => feed.SecretKeyName )
-                                    .Select( g => (g.Key, Secret: g.First().ResolveSecret( m )) )
-                                    .ToList();
+            return repositories.Where( feed => !String.IsNullOrWhiteSpace( feed.Info.SecretKeyName ) )
+                               .GroupBy( feed => feed.Info.SecretKeyName )
+                               .Select( g => (g.Key, Secret: g.First().ResolveSecret( m )) )
+                               .ToList();
         }
     }
 }

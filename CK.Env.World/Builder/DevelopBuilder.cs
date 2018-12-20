@@ -13,10 +13,11 @@ namespace CK.Env
         readonly bool _withUnitTest;
 
         public DevelopBuilder(
+            ArtifactCenter artifacts,
             IDependentSolutionContext ctx,
             Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder,
             bool withUnitTest )
-            : base( ctx, driverFinder )
+            : base( BuildResultType.CI, artifacts, ctx, driverFinder )
         {
             _commits = new string[ctx.Solutions.Count];
             _withUnitTest = withUnitTest;

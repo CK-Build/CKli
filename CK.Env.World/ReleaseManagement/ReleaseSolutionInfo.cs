@@ -58,6 +58,12 @@ namespace CK.Env
         public ReleaseInfo CurrentReleaseInfo => _releaseInfo;
 
         /// <summary>
+        /// Gets the previous version, associated to a commit below the current one.
+        /// This is null if no previous version has been found.
+        /// </summary>
+        public CSVersion PreviousVersion => _commitVersionInfo.PreviousVersion;
+
+        /// <summary>
         /// Gets or sets the release note.
         /// </summary>
         public string ReleaseNote { get; set; }

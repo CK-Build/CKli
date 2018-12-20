@@ -5,11 +5,23 @@
   <LocalFeedProvider />
   <SecretKeyStore />
   <NuGetClient />
+  <CKSetupClient />
   <SolutionCentral />
 
   <ArtifactRepositories>
-    <add Type="NuGetAzure" Organization="Signature-OpenSource" FeedName="CKEnvTest" CheckName="NuGet:Signature-OpenSource-CKEnvTest" />
-    <add Type="CKSetup" CheckName="CKSetup:Public" />
+    <Repository Type="NuGetAzure"
+                Organization="Signature-OpenSource"
+                FeedName="CKEnvTest"
+                CheckName="NuGetAzure:Signature-OpenSource-CKEnvTest"
+                CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
+    <Repository Type="CKSetup"
+                CheckName="CKSetup:Public"
+                CheckSecretKeyName="CKSETUPREMOTESTORE_PUSH_API_KEY" />
+    <Repository Type="CKSetup"
+                Name="CKEnvTest"
+                Url="https://ckenvtest.cksetup.invenietis.net"
+                CheckName="CKSetup:CKEnvTest"
+                CheckSecretKeyName="CKSETUPREMOTESTORE_CKENVTEST_PUSH_API_KEY" />
   </ArtifactRepositories>
 
   <SolutionSettings>
@@ -26,9 +38,10 @@
       <add Name="Invenietis - Preview" />
       <add Name="Invenietis - CI" />
     </ExcludedNuGetSourceNames>
-    <NuGetPushFeeds>
-      <add Type="Azure" Organization="Signature-OpenSource" FeedName="CKEnvTest" />
-    </NuGetPushFeeds>
+    <ArtifactTargets>
+      <add Name="NuGetAzure:Signature-OpenSource-CKEnvTest" />
+      <add Name="CKSetup:CKEnvTest" />
+    </ArtifactTargets>
     <Plugins>
       <add Type="CK.Env.Plugins.SolutionDriver, CK.Env.Plugins" />
       <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderFolder, CK.Env.Plugins" />

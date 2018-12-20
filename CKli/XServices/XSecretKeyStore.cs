@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace CKli
 {
-    public class XSecretKeyStore : XTypedObject, ISecretKeyStore, CK.NuGetClient.ISecretKeyStore, IDisposable
+    public class XSecretKeyStore : XTypedObject, ISecretKeyStore, IDisposable
     {
         readonly FileSystem _fs;
         readonly Dictionary<string, string> _keys;
@@ -27,7 +27,6 @@ namespace CKli
             _keys = new Dictionary<string, string>();
             _fs = fs;
             _fs.ServiceContainer.Add<ISecretKeyStore>( this );
-            _fs.ServiceContainer.Add<CK.NuGetClient.ISecretKeyStore>( this );
             _worldName = worldName;
             initializer.Services.Add( this );
             KeyVaultPath = _fs.Root.AppendPart( $"CKEnv-{_worldName.Name}-KeyVault.txt" );

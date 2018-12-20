@@ -24,6 +24,6 @@ namespace CK.Env
 
         public string Name => "Public";
 
-        public string Url => Facade.DefaultStoreUrl.ToString();
+        public Uri Url => Facade.DefaultStoreUrl;
     }
 }

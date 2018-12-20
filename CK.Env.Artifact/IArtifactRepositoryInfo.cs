@@ -6,8 +6,7 @@ namespace CK.Env
 {
     /// <summary>
     /// Defines common repository information.
-    /// Only the name of the repository is required, all other properties depend on
-    /// the actual repository type. 
+    /// Name of the repository and the secret key name depend on the actual repository type. 
     /// </summary>
     public interface IArtifactRepositoryInfo
     {
@@ -21,5 +20,11 @@ namespace CK.Env
         /// </para>
         /// </summary>
         string UniqueArtifactRepositoryName { get; }
+
+        /// <summary>
+        /// Must provide the secret key name.
+        /// A null or empty SecretKeyName means that the repository does not require any protection.
+        /// </summary>
+        string SecretKeyName { get; }
     }
 }

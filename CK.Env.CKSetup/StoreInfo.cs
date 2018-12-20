@@ -3,12 +3,12 @@ using System.Xml.Linq;
 
 namespace CK.Env
 {
-    class CKSetupStoreRepositoryInfo : ICKSetupStoreInfo
+    class StoreInfo : ICKSetupStoreInfo
     {
-        public CKSetupStoreRepositoryInfo( string url, string name )
+        public StoreInfo( string url, string name )
         {
             Name = name;
-            Url = url;
+            Url = new Uri( url );
         }
 
         public bool IsDefaultPublic => false;
@@ -17,7 +17,7 @@ namespace CK.Env
 
         public string Name { get; }
 
-        public string Url { get; }
+        public Uri Url { get; }
 
         string IArtifactRepositoryInfo.UniqueArtifactRepositoryName => $"CKSetup:{Name}";
     }

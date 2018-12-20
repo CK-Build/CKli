@@ -2,6 +2,7 @@ using CK.Core;
 using CK.Env;
 using CK.NuGetClient;
 using CK.Text;
+using CKSetup;
 using CSemVer;
 using Microsoft.Extensions.FileProviders;
 using System;
@@ -63,6 +64,31 @@ namespace CKli
             {
                 var f = GetPackagePath( PhysicalPath, packageId, v );
                 return File.Exists( f ) ? new LocalNuGetPackageFile( f, packageId, v ) : null;
+            }
+
+            public bool PushLocalArtifacts( IActivityMonitor m, IArtifactRepository target, IEnumerable<ArtifactInstance> artifacts )
+            {
+                if( target.HandleArtifactType( "NuGet" ) )
+                {
+                    var locals = new List<LocalNuGetPackageFile>();
+                    foreach( var a in artifacts )
+                    {
+                        var local = GetPackageFile( m, a.Artifact.Name, a.Version );
+                        if( local == null )
+                        {
+                            m.Error( $"Unable to find local package {a} in {PhysicalPath}." );
+                            return false;
+                        }
+                        locals.Add( local );
+                    }
+                    return target.PushAsync( m, new NuGetArtifactLocalSet( locals ) ).GetAwaiter().GetResult();
+                }
+                else if( target.HandleArtifactType( "CKSetup" ) )
+                {
+                    string localStore = this.GetCKSetupStorePath();
+                    return target.PushAsync( m, new CKSetupArtifactLocalSet( artifacts, localStore ) ).GetAwaiter().GetResult();
+                }
+                else throw new InvalidOperationException( $"Unhandled repository type: {target.Info.UniqueArtifactRepositoryName}" );
             }
 
             public void Remove( IActivityMonitor m, string packageId, SVersion version )

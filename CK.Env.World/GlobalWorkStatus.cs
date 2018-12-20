@@ -43,11 +43,5 @@ namespace CK.Env
         /// Release is being published.
         /// </summary>
         PublishingRelease,
-
-        /// <summary>
-        /// Any other operation that puts the build system in a non <see cref="Idle"/> state.
-        /// Specific detailed status must be handled specifically. 
-        /// </summary>
-        OtherOperation
     }
 }

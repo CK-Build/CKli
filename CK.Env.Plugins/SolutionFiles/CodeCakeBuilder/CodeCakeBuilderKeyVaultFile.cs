@@ -41,12 +41,9 @@ namespace CK.Env.Plugins.SolutionFiles
 
             var required = new Dictionary<string, string>();
 
-            if( _settings.ProduceCKSetupComponents )
-            {
-                var s = _secretStore.GetSecretKey( m, "CKSETUPREMOTESTORE_PUSH_API_KEY", true, "Required to push components to https://cksetup.invenietis.net/." );
-                required.Add( "CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL", s + "|https://cksetup.invenietis.net/" );
-            }
-            var repositorySecrets = _artfifacts.ResolveSecrets( m, _settings.ArtifactRepositoryInfos );
+            // Skips CKSetup store.
+            var artifactTargets = _settings.ArtifactTargets.Where( t => !(t.Info is ICKSetupStoreInfo) );
+            var repositorySecrets = _artfifacts.ResolveSecrets( m, artifactTargets );
             if( repositorySecrets.Any( r => r.Secret == null ) )
             {
                 m.Error( "A required repository secret is missing." );
@@ -55,6 +52,18 @@ namespace CK.Env.Plugins.SolutionFiles
             foreach( var s in repositorySecrets )
             {
                 required.Add( s.SecretKeyName, s.Secret );
+            }
+
+            if( _settings.ProduceCKSetupComponents )
+            {
+                var storeInfo = _settings.ArtifactTargets.Select( t => t.Info ).OfType<ICKSetupStoreInfo>().SingleOrDefault();
+                if( storeInfo == null )
+                {
+                    m.Error( $"Single CKSetup Artifact target not found. Since ProduceCKSetupComponents is true, one and only one CKSetup store target must be available." );
+                    return;
+                }
+                var s = _secretStore.GetSecretKey( m, storeInfo.SecretKeyName, true, $"Required to push components to {storeInfo}." );
+                required.Add( "CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL", s + '|' + storeInfo.Url );
             }
             var passPhrase = _secretStore.GetSecretKey( m, "CODECAKEBUILDER_SECRET_KEY", true );
             string result = KeyVault.EncryptValuesToString( required, passPhrase );

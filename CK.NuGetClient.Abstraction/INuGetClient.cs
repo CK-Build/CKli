@@ -18,21 +18,6 @@ namespace CK.NuGetClient
         /// Gets the key store.
         /// </summary>
         ISecretKeyStore SecretKeyStore { get; }
-
-        /// <summary>
-        /// Finds an existing feed.
-        /// </summary>
-        /// <param name="name">The feed name.</param>
-        /// <returns>The feed or null if not found.</returns>
-        INuGetFeed Find( string name );
-
-        /// <summary>
-        /// Creates a NuGet feed from its description.
-        /// If this feed already exists, an <see cref="InvalidOperationException"/> is thrown.
-        /// </summary>
-        /// <param name="info">The feed description.</param>
-        /// <returns>The feed.</returns>
-        INuGetFeed Create( INuGetFeedInfo info );
  
         /// <summary>
         /// Finds or creates a feed.

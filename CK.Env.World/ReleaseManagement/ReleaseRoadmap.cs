@@ -67,6 +67,15 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Gets the release notes infos.
+        /// </summary>
+        /// <returns>The release notes.</returns>
+        public IReadOnlyList<ReleaseNoteInfo> GetReleaseNotes()
+        {
+            return _infos.Select( i => new ReleaseNoteInfo( i ) ).ToList();
+        }
+
+        /// <summary>
         /// Exports this Roadmap in xml format.
         /// </summary>
         /// <returns>The Xml roadmap.</returns>

@@ -15,10 +15,11 @@ namespace CK.Env
         ZeroBuilder _zBuilder;
 
         public ReleaseBuilder(
-            ReleaseRoadmap roadmap,
-            IEnvLocalFeedProvider localFeedProvider,
-            Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
-            : base( roadmap.DependentSolutionContext, driverFinder )
+                ArtifactCenter artifacts,
+                ReleaseRoadmap roadmap,
+                IEnvLocalFeedProvider localFeedProvider,
+                Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
+            : base( BuildResultType.Release, artifacts, roadmap.DependentSolutionContext, driverFinder )
         {
             _commits = new string[roadmap.DependentSolutionContext.Solutions.Count];
             _localFeedProvider = localFeedProvider;
@@ -45,6 +46,8 @@ namespace CK.Env
             }
             return targetVersion;
         }
+
+        protected override IReadOnlyList<ReleaseNoteInfo> GetReleaseNotes() => _roadmap.GetReleaseNotes();
 
         protected override bool OnBeforeBuild( IActivityMonitor m, BuildResult result )
         {

@@ -18,6 +18,7 @@ namespace CK.Env
         readonly IWorldStore _store;
         readonly IDependentSolutionContextLoader _solutionContextLoader;
         readonly IEnvLocalFeedProvider _localFeedProvider;
+        readonly ArtifactCenter _artifacts;
 
         readonly HashSet<ISolutionDriver> _solutionDrivers;
         readonly Dictionary<string,ISolutionDriver> _cacheBySolutionName;
@@ -30,11 +31,16 @@ namespace CK.Env
         /// <summary>
         /// Initializes a new WorldState.
         /// </summary>
+        /// <param name="commandRegister">The command register.</param>
+        /// <param name="artifacts">The artifact center.</param>
+        /// <param name="worldName">The world name.</param>
         /// <param name="store">The store. Can not be null.</param>
         /// <param name="solutionContextLoader">Loader of solution dependency context.</param>
-        /// <param name="localFeedProvider">Local feed provider.</param>
+        /// <param name="localFeedProvider">Local feed provider. Can not be null. (Required for the Zro builder.)</param>
+        /// <param name="publisher">Artifacts publisher.</param>
         public WorldState(
             CommandRegister commandRegister,
+            ArtifactCenter artifacts,
             IWorldStore store,
             IWorldName worldName,
             IDependentSolutionContextLoader solutionContextLoader,
@@ -43,12 +49,15 @@ namespace CK.Env
             if( store == null ) throw new ArgumentNullException( nameof( store ) );
             if( worldName == null ) throw new ArgumentNullException( nameof( worldName ) );
             if( solutionContextLoader == null ) throw new ArgumentNullException( nameof( solutionContextLoader ) );
+            if( artifacts == null ) throw new ArgumentNullException( nameof( artifacts ) );
+            if( localFeedProvider == null ) throw new ArgumentNullException( nameof( localFeedProvider ) );
+            _artifacts = artifacts;
             _store = store;
             WorldName = worldName;
             _solutionContextLoader = solutionContextLoader;
             _localFeedProvider = localFeedProvider;
-            Debug.Assert( ((int[])Enum.GetValues( typeof( GlobalWorkStatus ) )).SequenceEqual( Enumerable.Range( 0, 8 ) ) );
-            _roWorkState = new XElement[8];
+            Debug.Assert( ((int[])Enum.GetValues( typeof( GlobalWorkStatus ) )).SequenceEqual( Enumerable.Range( 0, 7 ) ) );
+            _roWorkState = new XElement[7];
             _solutionDrivers = new HashSet<ISolutionDriver>();
             _cacheBySolutionName = new Dictionary<string, ISolutionDriver>();
             _gitRepositories = new HashSet<IGitRepository>();
@@ -336,23 +345,14 @@ namespace CK.Env
         /// Sets the <see cref="WorkStatus"/>.
         /// </summary>
         /// <param name="s">The work status.</param>
-        /// <param name="otherOperationName">Operation name for <see cref="GlobalWorkStatus.OtherOperation"/>.</param>
-        public void SetWorkStatus( GlobalWorkStatus s, string otherOperationName = null )
+        public void SetWorkStatus( GlobalWorkStatus s )
         {
-            if( s == GlobalWorkStatus.OtherOperation == String.IsNullOrWhiteSpace( otherOperationName ) )
-            {
-                throw new ArgumentException( $"Incompatible operation name.", nameof( otherOperationName ) );
-            }
-            if( WorkStatus != s || OtherOperationName != otherOperationName )
-            {
-                _rawState.WorkStatus = s;
-                _rawState.OtherOperationName = otherOperationName;
-            }
+            if( WorkStatus != s ) _rawState.WorkStatus = s;
         }
 
-        bool SetWorkStatusAndSave( IActivityMonitor m, GlobalWorkStatus s, string otherOperationName = null )
+        bool SetWorkStatusAndSave( IActivityMonitor m, GlobalWorkStatus s )
         {
-            SetWorkStatus( s, otherOperationName );
+            SetWorkStatus( s );
             return Save( m );
         }
 
@@ -406,7 +406,6 @@ namespace CK.Env
                 case GlobalWorkStatus.Releasing: if( !DoReleasing( m ) ) return false; break;
                 case GlobalWorkStatus.CancellingRelease: if( !DoCancellingRelease( m ) ) return false; break;
                 case GlobalWorkStatus.PublishingRelease: if( !DoPublishingRelease( m ) ) return false; break;
-                case GlobalWorkStatus.OtherOperation: if( !DoOtherOperation( m ) ) return false; break;
                 default: Debug.Fail( "Unreachable code." ); break;
             }
             return true;
@@ -513,8 +512,8 @@ namespace CK.Env
                 if( zBuilder == null ) return;
 
                 Builder builder = CachedGlobalGitStatus == StandardGitStatus.Local
-                                ? (Builder)new LocalBuilder( depContext, DriverFinder, withUnitTest )
-                                : new DevelopBuilder( depContext, DriverFinder, withUnitTest );
+                                ? (Builder)new LocalBuilder( _artifacts, depContext, DriverFinder, withUnitTest )
+                                : new DevelopBuilder( _artifacts, depContext, DriverFinder, withUnitTest );
                 if( !RunBuild( m, builder ) ) return;
 
                 zBuilder.RegisterSHAlias( m );
@@ -527,9 +526,9 @@ namespace CK.Env
             if( result == null ) return false;
             using( m.OpenInfo( $"Updating LastBuild with { result.GeneratedArtifacts.Count} artifacts." ) )
             {
-                foreach( var a in result.GeneratedArtifacts.GroupBy( a => a.Artifact.Type ) )
+                foreach( var a in result.GeneratedArtifacts.GroupBy( a => a.Artifact.Artifact.Type ) )
                 {
-                    m.Info( $"{a.Key} => {a.Select( p => p.Artifact.Name + '/' + p.Version ).Concatenate()}" );
+                    m.Info( $"{a.Key} => {a.Select( p => p.Artifact.Artifact.Name + '/' + p.Artifact.Version + " -> " + p.TargetName ).Concatenate()}" );
                 }
             }
             GeneralState.ReplaceElementByName( new XElement( "LastBuild", result.ToXml() ) );
@@ -584,7 +583,7 @@ namespace CK.Env
                 var zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, DriverFinder );
                 if( zBuilder == null ) return;
 
-                var builder = new DevelopBuilder( depContext, DriverFinder, false );
+                var builder = new DevelopBuilder( _artifacts, depContext, DriverFinder, false );
                 if( !RunBuild( m, builder ) ) return;
 
                 zBuilder.RegisterSHAlias( m );
@@ -702,7 +701,7 @@ namespace CK.Env
                 var ev = new EventMonitoredArgs( m );
                 ReleaseBuildStarting?.Invoke( this, ev );
 
-                var b = new ReleaseBuilder( roadmap, _localFeedProvider, DriverFinder );
+                var b = new ReleaseBuilder( _artifacts, roadmap, _localFeedProvider, DriverFinder );
                 if( !RunBuild( m, b ) ) return;
                 if( !error() )
                 {
@@ -711,11 +710,6 @@ namespace CK.Env
                 }
             } );
 
-        }
-
-        bool DoOtherOperation( IActivityMonitor m )
-        {
-            throw new NotImplementedException();
         }
 
         /// <summary>
@@ -746,15 +740,45 @@ namespace CK.Env
         /// </summary>
         public bool CanPublishRelease => IsInitialized && WorkStatus == GlobalWorkStatus.WaitingReleaseConfirmation;
 
+        [CommandMethod]
         public bool PublishRelease( IActivityMonitor m )
         {
             if( !CanPublishRelease ) throw new InvalidOperationException( nameof( CanPublishRelease ) );
             return DoPublishingRelease( m );
         }
 
-        bool DoPublishingRelease( IActivityMonitor m )
+        bool DoPublishingRelease( IActivityMonitor monitor )
         {
-            throw new NotImplementedException();
+            return RunSafe( monitor, $"Publishing Release.", ( m, error ) =>
+            {
+                var buildResults = new BuildResult( GeneralState.Element( "LastBuild" )?.Element( "BuildResult" ) );
+                if( buildResults.BuildResultType != BuildResultType.Release )
+                {
+                    m.Error( "LastBuild is not a release." );
+                    return;
+                }
+                if( !DoPublish( m, buildResults, _localFeedProvider.Release ) ) return;
+                if( !error() )
+                {
+                    SetWorkStatusAndSave( m, GlobalWorkStatus.Idle );
+                }
+            } );
+        }
+
+        bool DoPublish( IActivityMonitor monitor, BuildResult buildResults, IEnvLocalFeed local )
+        {
+            return RunSafe( monitor, $"Publishing Artifacts.", ( m, error ) =>
+            {
+                foreach( var a in buildResults.GeneratedArtifacts.GroupBy( a => a.TargetName ) )
+                {
+                    var h = _artifacts.Find( a.Key );
+                    if( !local.PushLocalArtifacts( m, h, a.Select( p => p.Artifact ) ) ) return;
+                }
+                if( !error() )
+                {
+                    SetWorkStatusAndSave( m, GlobalWorkStatus.Idle );
+                }
+            } );
         }
 
 

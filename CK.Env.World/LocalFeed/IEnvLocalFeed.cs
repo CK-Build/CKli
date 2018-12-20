@@ -51,5 +51,13 @@ namespace CK.Env
         /// <param name="version">The package's version.</param>
         void Remove( IActivityMonitor m, string packageId, SVersion version );
 
+        /// <summary>
+        /// Locates all instances of the required artifacts and pushes them to the given target.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="target">The repository target.</param>
+        /// <param name="artifacts">Set of artifact instances.</param>
+        /// <returns>Any object </returns>
+        bool PushLocalArtifacts( IActivityMonitor m, IArtifactRepository target, IEnumerable<ArtifactInstance> artifacts );
     }
 }

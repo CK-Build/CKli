@@ -98,9 +98,11 @@ namespace CKli
                     }
                 }
                 HandleCKSetupComponentProjects( m, s );
+                HandleArtifactTargetNames( m, s );
             }
             return s;
         }
+
 
         void HandleCKSetupComponentProjects( IActivityMonitor m, Solution s )
         {

@@ -44,18 +44,19 @@ namespace CK.NuGetClient
             collector.Add( _packageSource );
         }
 
+        /// <summary>
+        /// This repository handles "NuGet" artifact type.
+        /// </summary>
+        /// <param name="artifactType">Type of the artifact.</param>
+        /// <returns>True if this repository artifact type is "NuGet", false otherwise.</returns>
+        public bool HandleArtifactType( string artifactType ) => artifactType == "NuGet";
+
         IArtifactRepositoryInfo IArtifactRepository.Info => Info;
 
         /// <summary>
         /// Gets the info of this feed.
         /// </summary>
         public INuGetFeedInfo Info { get; }
-
-        /// <summary>
-        /// Must provide the secret key name.
-        /// When null or empty, <see cref="ResolveSecret"/> always return null.
-        /// </summary>
-        public abstract string SecretKeyName { get; }
 
         /// <summary>
         /// Must resolve the push API key.
@@ -78,7 +79,7 @@ namespace CK.NuGetClient
         {
             if( _secret == null )
             {
-                var s = SecretKeyName;
+                var s = Info.SecretKeyName;
                 if( !String.IsNullOrWhiteSpace( s ) )
                 {
                     _secret = Client.SecretKeyStore.GetSecretKey( m, s, throwOnEmpty, $"Needed for feed '{Info}'." );
@@ -153,31 +154,17 @@ namespace CK.NuGetClient
             return Task.CompletedTask;
         }
 
-        public async Task<IArtifactLocator> FindAsync( IActivityMonitor m, string type, string name, SVersion version )
-        {
-            if( type == null ) throw new ArgumentNullException( nameof( type ) );
-            if( name == null ) throw new ArgumentNullException( nameof( name ) );
-            if( version == null ) throw new ArgumentNullException( nameof( version ) );
-
-            if( type != "NuGet" ) return null;
-            if( await ExistsAsync( m, name, version ) )
-            {
-                return new RemoteNuGetLocator( new ArtifactInstance( type, name, version ), this );
-            }
-            return null;
-        }
-
-        public async Task<bool> PushAsync( IActivityMonitor m, IEnumerable<IArtifactLocator> artifacts )
+        public async Task<bool> PushAsync( IActivityMonitor m, IArtifactLocalSet artifacts )
         {
             bool success = true;
             using( m.OnError( () => success = false ) )
             {
-                var unmanaged = artifacts.Where( a => !(a is LocalNuGetPackageFile) ).ToList();
-                if( unmanaged.Count > 0 )
+                if( !(artifacts is IEnumerable<LocalNuGetPackageFile> locals) )
                 {
-                    m.Error( $"Invalid artifact type for: {unmanaged.Select( a => a.Instance.ToString()).Concatenate()}." );
+                    m.Error( $"Invalid artifact local set for NuGet feed." );
+                    return false;
                 }
-                await PushPackagesAsync( m, artifacts.OfType<LocalNuGetPackageFile>() );
+                await PushPackagesAsync( m, locals );
             }
             return success;
         }

@@ -8,10 +8,8 @@ namespace CK.Env
     {
         bool IsDefaultPublic { get; }
 
-        string SecretKeyName { get; }
-
         string Name { get; }
 
-        string Url { get; }
+        Uri Url { get; }
     }
 }

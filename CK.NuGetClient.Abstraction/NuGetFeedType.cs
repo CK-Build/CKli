@@ -22,6 +22,6 @@ namespace CK.NuGetClient
         /// <summary>
         /// Azure DevOps feed.
         /// </summary>
-        NugetAzure
+        NuGetAzure
     }
 }

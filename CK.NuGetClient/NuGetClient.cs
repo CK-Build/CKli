@@ -93,46 +93,26 @@ namespace CK.NuGetClient
 
         public HttpClient HttpClient { get; }
 
-        public INuGetFeed Find( string name )
+        public IArtifactRepository Find( string uniqueRepositoryName )
         {
-            _feeds.TryGetValue( name, out var f );
+            _feeds.TryGetValue( uniqueRepositoryName, out var f );
             return f;
         }
 
-        public INuGetFeed Create( INuGetFeedInfo info ) => DoCreate( info );
-
         public INuGetFeed FindOrCreate( INuGetFeedInfo info )
         {
-            if( _feeds.TryGetValue( info.Name, out var exists ) ) return exists;
-            return DoAdd( info );
-        }
-
-       IInternalFeed DoCreate( INuGetFeedInfo info )
-        {
-            if( info == null ) throw new ArgumentNullException( nameof( info ) );
-            if( _feeds.TryGetValue( info.Name, out var exists ) )
+            if( !_feeds.TryGetValue( info.UniqueArtifactRepositoryName, out var feed ) )
             {
-                throw new Exception( $"Feed {info.Name} already exists." );
-            }
-            return DoAdd( info );
-        }
-
-        IInternalFeed DoAdd( INuGetFeedInfo info )
-        {
-            IInternalFeed Instanciate( INuGetFeedInfo i )
-            {
-                switch( i )
+                switch( info )
                 {
-                    case NuGetAzureFeedInfo a: return new NuGetClientAzureFeed( this, a );
-                    case NuGetStandardFeedInfo s: return new NuGetClientStandardFeed( this, s );
+                    case NuGetAzureFeedInfo a: feed = new NuGetClientAzureFeed( this, a ); break;
+                    case NuGetStandardFeedInfo s: feed = new NuGetClientStandardFeed( this, s ); break;
                     default: throw new ArgumentException( $"Unhandled type: {info}", nameof( info ) );
                 }
+                _feeds.Add( info.UniqueArtifactRepositoryName, feed );
+                _sourcePackageProvider.RaisePackageSourcesChanged();
             }
-
-            var newOne = Instanciate( info );
-            _feeds.Add( info.Name, newOne );
-            _sourcePackageProvider.RaisePackageSourcesChanged();
-            return newOne;
+            return feed;
         }
 
         public void Dispose()

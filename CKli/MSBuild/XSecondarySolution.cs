@@ -53,12 +53,17 @@ namespace CKli
         public override Solution GetSolution( IActivityMonitor m, bool reload, string projectToBranchName = null )
         {
             var primary = PrimarySolution.GetSolution( m, false, projectToBranchName );
-            return SolutionCentral.MSBuildContext.FindOrLoadSolution(
+            var r = SolutionCentral.MSBuildContext.FindOrLoadSolution(
                         m,
                         GetSolutionFilePath( projectToBranchName ),
                         primary,
                         SpecialType,
-                        reload ).Solution;
+                        reload );
+            if( r.Loaded )
+            {
+                HandleArtifactTargetNames( m, r.Solution );
+            }
+            return r.Solution;
         }
     }
 }

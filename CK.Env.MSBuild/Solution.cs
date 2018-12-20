@@ -199,11 +199,19 @@ namespace CK.Env.MSBuild
         public IList<Project> CKSetupComponentProjects { get; }
 
         /// <summary>
+        /// Gets the target names where generated artifacts should be pushed.
+        /// This is empty by default: this must be filled explicitly.
+        /// </summary>
+        public IList<string> ArtifactTargetNames { get; }
+
+        /// <summary>
         /// Gets the test projects. These projetcs are by default
         /// all projects whose name ends with ".Tests".
         /// They should be located in a "Tests" directory.
         /// </summary>
         public IList<Project> TestProjects { get; }
+
+
 
         /// <summary>
         /// Gets the build projects. By default, this contains the "CodeCakeBuilder" project
@@ -330,6 +338,7 @@ namespace CK.Env.MSBuild
                                                                         && p.Path.Parts.Count == FilePath.Parts.Count + 1 )
                                                           .ToList();
             CKSetupComponentProjects = new List<Project>();
+            ArtifactTargetNames = new List<string>();
         }
 
         static internal Solution Load(
