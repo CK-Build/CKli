@@ -37,6 +37,11 @@ namespace CK.NuGetClient
         /// <returns>The API key or null.</returns>
         protected override string ResolvePushAPIKey( IActivityMonitor m ) => ResolveSecret( m ) != null ? "VSTS" : null;
 
+        protected override void OnSecretResolved( IActivityMonitor m, string secret )
+        {
+            NuGetClient.EnsureVSSFeedEndPointCredentials( m, Info.Url, secret );
+        }
+
         /// <summary>
         /// Gets the url api.
         /// </summary>
@@ -52,13 +57,14 @@ namespace CK.NuGetClient
         /// Implements Package promotion in @CI, @Preview, @Latest and @Stable views.
         /// </summary>
         /// <param name="logger">The logger.</param>
-        /// <param name="files">The set of packages to push.</param>
+        /// <param name="skipped">The set of packages skipped because they already exist in the feed.</param>
+        /// <param name="pushed">The set of packages pushed.</param>
         /// <returns>The awaitable.</returns>
-        protected override async Task OnAllPackagesPushed( NuGetLoggerAdapter logger, IEnumerable<LocalNuGetPackageFile> files )
+        protected override async Task OnAllPackagesPushed( NuGetLoggerAdapter logger, IReadOnlyList<LocalNuGetPackageFile> skipped, IReadOnlyList<LocalNuGetPackageFile> pushed )
         {
             string personalAccessToken = ResolveSecret( logger.Monitor );
             var basicAuth = Convert.ToBase64String( Encoding.ASCII.GetBytes( ":" + personalAccessToken ) );
-            foreach( var p in files )
+            foreach( var p in pushed )
             {
                 foreach( var view in p.Version.PackageQuality.GetLabels() )
                 {

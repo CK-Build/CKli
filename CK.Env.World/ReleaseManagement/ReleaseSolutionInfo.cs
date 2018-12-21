@@ -251,20 +251,12 @@ namespace CK.Env
             else
             {
                 // No need to upgrade this Solution to update its packages references.
-                if( requirements.Level != ReleaseLevel.None )
-                {
-                    // This is odd... A dependency is a fix (or more). Its own version must have been bumped
-                    // and so there should have been an impact on our package versions.
-                    // (Otherwise this would mean that the solution dependency is wrong!)
-                    throw new Exception( $"{Solution.UniqueSolutionName}: A dependent solution implied a ReleaseLevel of {requirements.Level} but none of our packages had to be updated." );
-                }
-                Debug.Assert( requirements.Level == ReleaseLevel.None );
                 // If a tag exists on the commit point:
                 //   1 - We must use it.
                 //   2 - There is nothing more to do since it has already been published.
-                // We must exit here directly since the code below does not cover this edge case:
-                // when there is only one possible version, the code below will handle/ask release level
-                // and here we must keep the ReleaseLevel.None.
+                // In both cases, we must keep the ReleaseLevel.None, however, the requirements may
+                // not be None if we are processing an existing roadmap and updates have been
+                // already applied to the files.
                 if( _commitVersionInfo.ReleaseVersion != null )
                 {
                     m.Warn( $"This commit has already a version tag: {_commitVersionInfo.ReleaseVersion}." );
@@ -272,7 +264,7 @@ namespace CK.Env
                     {
                         return new ReleaseInfo();
                     }
-                    return requirements.WithVersion( _commitVersionInfo.ReleaseVersion );
+                    return new ReleaseInfo().WithVersion( _commitVersionInfo.ReleaseVersion );
                 }
                 if( _commitVersionInfo.ReleaseContentVersion != null )
                 {
@@ -282,7 +274,7 @@ namespace CK.Env
                     {
                         return new ReleaseInfo();
                     }
-                    return requirements.WithVersion( _commitVersionInfo.ReleaseContentVersion );
+                    return new ReleaseInfo().WithVersion( _commitVersionInfo.ReleaseContentVersion );
                 }
                 possibleVersions = _commitVersionInfo.PossibleVersions;
             }

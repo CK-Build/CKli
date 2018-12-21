@@ -202,7 +202,7 @@ namespace CodeCake
                     }
                     InitializeVSTSEnvironment( ctx );
                     _logger = new Logger( ctx );
-                    var credProviders = new AsyncLazy<IEnumerable<ICredentialProvider>>( async () => await GetCredentialProvidersAsync( _sourceProvider, _logger ) );
+                    var credProviders = new AsyncLazy<IEnumerable<ICredentialProvider>>( async () => await GetCredentialProvidersAsync( _logger ) );
                     HttpHandlerResourceV3.CredentialService = new Lazy<ICredentialService>(
                         () => new CredentialService(
                             providers: credProviders,
@@ -243,7 +243,7 @@ namespace CodeCake
                 Environment.SetEnvironmentVariable( "VSS_NUGET_EXTERNAL_FEED_ENDPOINTS", b.ToString() );
             }
 
-            static async Task<IEnumerable<ICredentialProvider>> GetCredentialProvidersAsync( IPackageSourceProvider sourceProvider, ILogger logger )
+            static async Task<IEnumerable<ICredentialProvider>> GetCredentialProvidersAsync( ILogger logger )
             {
                 var providers = new List<ICredentialProvider>();
                 var securePluginProviders = await new SecurePluginCredentialProviderBuilder( pluginManager: PluginManager.Instance, canShowDialog: false, logger: logger ).BuildAllAsync();

@@ -1,10 +1,13 @@
 using CK.Core;
 using CK.Env;
 using CK.Text;
+using NuGet.Common;
 using NuGet.Configuration;
+using NuGet.Credentials;
 using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -21,6 +24,45 @@ namespace CK.NuGetClient
         readonly Dictionary<string, IInternalFeed> _feeds;
         readonly SourcePackageProvider _sourcePackageProvider;
         internal readonly SourceCacheContext SourceCache;
+
+        #region VSS_NUGET_EXTERNAL_FEED_ENDPOINTS
+
+        private static readonly object _secretKeysLock;
+        private static readonly Dictionary<string, string> _secretKeys;
+
+        internal static void EnsureVSSFeedEndPointCredentials( IActivityMonitor m, string url, string secret )
+        {
+            lock( _secretKeysLock )
+            {
+                if( !_secretKeys.ContainsKey( url ) )
+                {
+                    _secretKeys.Add( url, secret );
+                    // The VSS_NUGET_EXTERNAL_FEED_ENDPOINTS is used by Azure Credential Provider to handle authentication
+                    // for the feed.
+                    StringBuilder b = new StringBuilder( @"{""endpointCredentials"":[" );
+                    foreach( var kv in _secretKeys )
+                    {
+                        b.Append( @"{""endpoint"":""" ).AppendJSONEscaped( kv.Key ).Append( @"""," )
+                            .Append( @"""username"":""Unused"",""password"":""" ).AppendJSONEscaped( kv.Value ).Append( @"""" )
+                            .Append( "}" );
+                    }
+                    b.Append( "]}" );
+                    m.Info( $"Updated VSS_NUGET_EXTERNAL_FEED_ENDPOINTS with {_secretKeys.Count} endpoints." );
+                    Environment.SetEnvironmentVariable( "VSS_NUGET_EXTERNAL_FEED_ENDPOINTS", b.ToString() );
+                }
+            }
+        }
+
+        static async Task<IEnumerable<ICredentialProvider>> GetCredentialProvidersAsync( ILogger logger )
+        {
+            var providers = new List<ICredentialProvider>();
+            var securePluginProviders = await new SecurePluginCredentialProviderBuilder( pluginManager: PluginManager.Instance, canShowDialog: false, logger: logger ).BuildAllAsync();
+            providers.AddRange( securePluginProviders );
+            return providers;
+        }
+
+        #endregion
+
 
         class SourcePackageProvider : IPackageSourceProvider
         {
@@ -78,6 +120,18 @@ namespace CK.NuGetClient
             Environment.SetEnvironmentVariable( "DOTNET_HOST_PATH", "dotnet" );
             Providers = new List<Lazy<INuGetResourceProvider>>();
             Providers.AddRange( Repository.Provider.GetCoreV3() );
+            _secretKeysLock = new object();
+            _secretKeys = new Dictionary<string, string>();
+        }
+
+        internal void Initalize( ILogger logger )
+        {
+            var credProviders = new AsyncLazy<IEnumerable<ICredentialProvider>>( async () => await GetCredentialProvidersAsync( logger ) );
+            HttpHandlerResourceV3.CredentialService = new Lazy<ICredentialService>(
+                () => new CredentialService(
+                    providers: credProviders,
+                    nonInteractive: true,
+                    handlesDefaultCredentials: true ) );
         }
 
         public NuGetClient( HttpClient httpClient, ISecretKeyStore keyStore )

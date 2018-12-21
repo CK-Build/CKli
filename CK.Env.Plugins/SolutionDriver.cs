@@ -360,8 +360,6 @@ namespace CK.Env.Plugins
             }
 
             string solutionPath = primary.GitFolder.FullPath;
-            Debug.Assert( solutionPath == primary.GitFolder.FileSystem.GetFileInfo( primary.SolutionFolderPath ).PhysicalPath );
-
             var ccbPath = CodeCakeBuilderHelper.GetExecutablePath( solutionPath );
             var ccbVersion = File.Exists( ccbPath ) ? CodeCakeBuilderHelper.GetVersion( ccbPath ) : null;
 

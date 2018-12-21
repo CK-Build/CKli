@@ -629,8 +629,7 @@ namespace CK.Env
         /// Gets whether <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/>, <see cref="VersionSelector"/>
         /// and <see cref="CachedGlobalGitStatus"/> is on <see cref="StandardGitStatus.Develop"/>.
         /// </summary>
-        public bool CanRelease => IsInitialized
-                                  && VersionSelector != null
+        public bool CanRelease => VersionSelector != null
                                   && WorkStatus == GlobalWorkStatus.Idle
                                   && CachedGlobalGitStatus == StandardGitStatus.Develop;
 
@@ -701,8 +700,8 @@ namespace CK.Env
         /// <summary>
         /// Gets whether <see cref="CancelRelease"/> can be called.
         /// </summary>
-        public bool CanCancelRelease => IsInitialized
-                                        && (WorkStatus == GlobalWorkStatus.Releasing || WorkStatus == GlobalWorkStatus.WaitingReleaseConfirmation);
+        public bool CanCancelRelease => WorkStatus == GlobalWorkStatus.Releasing
+                                        || WorkStatus == GlobalWorkStatus.WaitingReleaseConfirmation;
 
 
         /// <summary>
@@ -724,7 +723,7 @@ namespace CK.Env
         /// <summary>
         /// Release can be published when <see cref="GlobalWorkStatus.WaitingReleaseConfirmation"/>.
         /// </summary>
-        public bool CanPublishRelease => IsInitialized && WorkStatus == GlobalWorkStatus.WaitingReleaseConfirmation;
+        public bool CanPublishRelease => WorkStatus == GlobalWorkStatus.WaitingReleaseConfirmation;
 
         [CommandMethod]
         public bool PublishRelease( IActivityMonitor m )
@@ -736,8 +735,7 @@ namespace CK.Env
         /// <summary>
         /// CI can be published when <see cref="GlobalWorkStatus.Idle"/> and a CI build result is available.
         /// </summary>
-        public bool CanPublishCI => IsInitialized
-                                    && WorkStatus == GlobalWorkStatus.WaitingReleaseConfirmation
+        public bool CanPublishCI => WorkStatus == GlobalWorkStatus.Idle
                                     && _rawState.GetBuildResult(BuildResultType.CI) != null;
 
         [CommandMethod]
