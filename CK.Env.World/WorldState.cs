@@ -56,8 +56,6 @@ namespace CK.Env
             WorldName = worldName;
             _solutionContextLoader = solutionContextLoader;
             _localFeedProvider = localFeedProvider;
-            Debug.Assert( ((int[])Enum.GetValues( typeof( GlobalWorkStatus ) )).SequenceEqual( Enumerable.Range( 0, 7 ) ) );
-            _roWorkState = new XElement[7];
             _solutionDrivers = new HashSet<ISolutionDriver>();
             _cacheBySolutionName = new Dictionary<string, ISolutionDriver>();
             _gitRepositories = new HashSet<IGitRepository>();
@@ -324,22 +322,10 @@ namespace CK.Env
         public GlobalWorkStatus? WorkStatus => _rawState?.WorkStatus;
 
         /// <summary>
-        /// Gets the operation name (when <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.OtherOperation"/>).
-        /// </summary>
-        public string OtherOperationName => _rawState?.OtherOperationName;
-
-        /// <summary>
         /// Gets the mutable <see cref="XElement"/> general state.
-        /// This is where state information that are not specific to an operation are stored.
+        /// This is where state information are stored.
         /// </summary>
         public XElement GeneralState => _rawState?.GeneralState;
-
-        /// <summary>
-        /// Gets the mutable <see cref="XElement"/> state for an operation.
-        /// </summary>
-        /// <param name="status">The work status.</param>
-        /// <returns>The state element.</returns>
-        public XElement GetWorkState( GlobalWorkStatus status ) => _rawState?.GetWorkState( status );
 
         /// <summary>
         /// Sets the <see cref="WorkStatus"/>.
@@ -524,14 +510,14 @@ namespace CK.Env
         {
             var result = b.Run( m );
             if( result == null ) return false;
-            using( m.OpenInfo( $"Updating LastBuild with { result.GeneratedArtifacts.Count} artifacts." ) )
+            using( m.OpenInfo( $"Updating {result.Type} build result with {result.GeneratedArtifacts.Count} artifacts." ) )
             {
                 foreach( var a in result.GeneratedArtifacts.GroupBy( a => a.Artifact.Artifact.Type ) )
                 {
                     m.Info( $"{a.Key} => {a.Select( p => p.Artifact.Artifact.Name + '/' + p.Artifact.Version + " -> " + p.TargetName ).Concatenate()}" );
                 }
             }
-            GeneralState.ReplaceElementByName( new XElement( "LastBuild", result.ToXml() ) );
+            _rawState.SetBuildResult( result );
             return Save( m );
         }
 
@@ -600,7 +586,7 @@ namespace CK.Env
         {
             var depContext = GetSolutionDependentContext( monitor, true );
             if( depContext == null ) return null;
-            var previous = GetWorkState( GlobalWorkStatus.Releasing ).Element( "Roadmap" );
+            var previous = GeneralState.EnsureElement( "Releasing" ).Element( "Roadmap" );
             return ReleaseRoadmap.Create( monitor, depContext, previous );
         }
 
@@ -633,7 +619,7 @@ namespace CK.Env
             if( roadmap == null ) return null;
             bool editSucceed = roadmap.UpdateRoadmap( monitor, VersionSelector, skipPreviouslyResolved );
             // Always saves state to preserve any change in the roadmap, even on error.
-            GetWorkState( GlobalWorkStatus.Releasing ).ReplaceElementByName( roadmap.ToXml() );
+            GeneralState.EnsureElement( "Releasing" ).ReplaceElementByName( roadmap.ToXml() );
             Save( monitor );
             if( !Save( monitor ) || !editSucceed ) return null;
             return roadmap;
@@ -747,17 +733,30 @@ namespace CK.Env
             return DoPublishingRelease( m );
         }
 
+        /// <summary>
+        /// CI can be published when <see cref="GlobalWorkStatus.Idle"/> and a CI build result is available.
+        /// </summary>
+        public bool CanPublishCI => IsInitialized
+                                    && WorkStatus == GlobalWorkStatus.WaitingReleaseConfirmation
+                                    && _rawState.GetBuildResult(BuildResultType.CI) != null;
+
+        [CommandMethod]
+        public bool PublishCI( IActivityMonitor monitor )
+        {
+            if( !CanPublishCI ) throw new InvalidOperationException( nameof( CanPublishCI ) );
+            return RunSafe( monitor, $"Publishing CI.", ( m, error ) =>
+            {
+                var buildResults = _rawState.GetBuildResult( BuildResultType.CI );
+                if( !DoPublish( m, buildResults ) ) return;
+            } );
+        }
+
         bool DoPublishingRelease( IActivityMonitor monitor )
         {
             return RunSafe( monitor, $"Publishing Release.", ( m, error ) =>
             {
-                var buildResults = new BuildResult( GeneralState.Element( "LastBuild" )?.Element( "BuildResult" ) );
-                if( buildResults.BuildResultType != BuildResultType.Release )
-                {
-                    m.Error( "LastBuild is not a release." );
-                    return;
-                }
-                if( !DoPublish( m, buildResults, _localFeedProvider.Release ) ) return;
+                var buildResults = _rawState.GetBuildResult( BuildResultType.Release );
+                if( !DoPublish( m, buildResults ) ) return;
                 if( !error() )
                 {
                     SetWorkStatusAndSave( m, GlobalWorkStatus.Idle );
@@ -765,19 +764,18 @@ namespace CK.Env
             } );
         }
 
-        bool DoPublish( IActivityMonitor monitor, BuildResult buildResults, IEnvLocalFeed local )
+        bool DoPublish( IActivityMonitor monitor, BuildResult buildResults )
         {
-            return RunSafe( monitor, $"Publishing Artifacts.", ( m, error ) =>
+            Debug.Assert( buildResults.Type == BuildResultType.Release || buildResults.Type == BuildResultType.CI );
+            var local = _localFeedProvider.GetFeed( buildResults.Type );
+            return RunSafe( monitor, $"Publishing Artifacts from local '{local.PhysicalPath}'.", ( m, error ) =>
             {
                 foreach( var a in buildResults.GeneratedArtifacts.GroupBy( a => a.TargetName ) )
                 {
                     var h = _artifacts.Find( a.Key );
                     if( !local.PushLocalArtifacts( m, h, a.Select( p => p.Artifact ) ) ) return;
                 }
-                if( !error() )
-                {
-                    SetWorkStatusAndSave( m, GlobalWorkStatus.Idle );
-                }
+                _rawState.ClearBuildResult( buildResults.Type );
             } );
         }
 
@@ -786,22 +784,14 @@ namespace CK.Env
 
         StandardGitStatus _roGlobalGitStatus;
         GlobalWorkStatus _roGlobalWorkStatus;
-        string _roOtherOperationName;
         XElement _roGeneralState;
-        readonly XElement[] _roWorkState;
 
         void SetReadonlyState()
         {
             _roGlobalGitStatus = CachedGlobalGitStatus;
             _roGlobalWorkStatus = _rawState.WorkStatus;
-            _roOtherOperationName = _rawState.OtherOperationName;
             _roGeneralState = new XElement( _rawState.GeneralState );
             _roGeneralState.Changing += PreventChanges;
-            for( int i = 0; i < _roWorkState.Length; i++ )
-            {
-                _roWorkState[i] = new XElement( _rawState.GetWorkState( (GlobalWorkStatus)i ) );
-                _roWorkState[i].Changing += PreventChanges;
-            }
         }
 
         static void PreventChanges( object sender, XObjectChangeEventArgs e )
@@ -813,11 +803,7 @@ namespace CK.Env
 
         GlobalWorkStatus IWorldState.WorkStatus => _roGlobalWorkStatus;
 
-        string IWorldState.OtherOperationName => _roOtherOperationName;
-
         XElement IWorldState.GeneralState => _roGeneralState;
-
-        XElement IWorldState.GetWorkState( GlobalWorkStatus status ) => _roWorkState[(int)status];
 
         #endregion
 

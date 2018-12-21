@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Linq;
 using System.Xml.Linq;
 
 namespace CK.Env
@@ -10,14 +11,23 @@ namespace CK.Env
     public class RawXmlWorldState
     {
         static readonly XName xWorkStatusName = XNamespace.None + "WorkStatus";
-        static readonly XName xOtherOperationName = XNamespace.None + "OperationName";
         static readonly XName xGeneralStateName = XNamespace.None + "GeneralState";
-        static readonly XName xWorkStatesName = XNamespace.None + "WorkStates";
+        static readonly XName xLastBuild = XNamespace.None + "LastBuild";
+        static readonly XName xBuilds = XNamespace.None + "Builds";
+        static readonly XName xType = XNamespace.None + "Type";
+        static readonly XName xRelease = XNamespace.None + "Release";
+        static readonly XName xCI = XNamespace.None + "CI";
+        static readonly XName xLocal = XNamespace.None + "Local";
 
         readonly XDocument _doc;
         readonly IWorldName _world;
         readonly XElement _generalState;
-        readonly XElement _workStates;
+        readonly XElement _lastBuild;
+        readonly XElement _builds;
+        readonly XElement _releaseBuildResult;
+        readonly XElement _ciBuildResult;
+        readonly XElement _localBuildResult;
+        readonly BuildResult[] _buildResults;
 
         public RawXmlWorldState( IWorldName w, XDocument d )
         {
@@ -27,7 +37,13 @@ namespace CK.Env
             _world = w;
             _doc = d;
             _generalState = d.Root.EnsureElement( xGeneralStateName );
-            _workStates = d.Root.EnsureElement( xWorkStatesName );
+            _lastBuild = d.Root.EnsureElement( xLastBuild );
+            _builds = d.Root.EnsureElement( xBuilds );
+            _releaseBuildResult = _builds.EnsureElement( xRelease );
+            _ciBuildResult = _builds.EnsureElement( xCI );
+            _localBuildResult = _builds.EnsureElement( xLocal );
+            LastBuildType = _lastBuild.AttributeEnum( xType, BuildResultType.None );
+            _buildResults = new BuildResult[3];
         }
 
         public RawXmlWorldState( IWorldName w )
@@ -50,29 +66,69 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets or sets the operation name (when <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.OtherOperation"/>).
-        /// </summary>
-        public string OtherOperationName
-        {
-            get => (string)_doc.Root.Attribute( xOtherOperationName );
-            set => _doc.Root.SetAttributeValue( xOtherOperationName, value );
-        }
-
-        /// <summary>
         /// Gets the <see cref="XElement"/> general state.
-        /// This is where state information that are not specific to an operation should be stored.
+        /// This is where state information should be stored.
         /// </summary>
         public XElement GeneralState => _generalState;
 
         /// <summary>
-        /// Gets the <see cref="XElement"/> state for an operation.
+        /// Sets a build result, updating <see cref="LastBuildType"/>.
         /// </summary>
-        /// <param name="status">The work status.</param>
-        /// <returns>The element to use.</returns>
-        public XElement GetWorkState( GlobalWorkStatus status )
+        /// <param name="r">The build result.</param>
+        public void SetBuildResult( BuildResult r )
         {
-            return _workStates.EnsureElement( status.ToString() );
+            if( r == null ) throw new ArgumentNullException( nameof( r ) );
+            if( r.Type == BuildResultType.None ) throw new ArgumentException( nameof( r ) );
+            LastBuildType = r.Type;
+            _lastBuild.SetAttributeValue( xType, r.Type.ToString() );
+            var rXml = r.ToXml();
+            switch( r.Type )
+            {
+                case BuildResultType.Local: _localBuildResult.ReplaceElementByName( rXml ); break;
+                case BuildResultType.CI: _ciBuildResult.ReplaceElementByName( rXml ); break;
+                case BuildResultType.Release: _releaseBuildResult.ReplaceElementByName( rXml ); break;
+            }
+            _buildResults[(int)r.Type - 1] = r; 
         }
+
+        /// <summary>
+        /// Gets the last build result for a build type or null if not found.
+        /// </summary>
+        /// <param name="type">The build type.</param>
+        /// <returns>The build result or null.</returns>
+        public BuildResult GetBuildResult( BuildResultType type )
+        {
+            if( type == BuildResultType.None ) return null;
+            if( _buildResults[(int)type - 1]  == null )
+            {
+                XElement e;
+                switch( type )
+                {
+                    case BuildResultType.Local: e = _localBuildResult; break;
+                    case BuildResultType.CI: e = _ciBuildResult; break;
+                    case BuildResultType.Release: e = _releaseBuildResult; break;
+                    default: e = null; break;
+                }
+                e = e?.Elements().FirstOrDefault();
+                if( e != null ) _buildResults[(int)type - 1] = new BuildResult( e );
+            }
+            return _buildResults[(int)type - 1];
+        }
+
+
+        /// <summary>
+        /// Clers the build result for a build type.
+        /// </summary>
+        /// <param name="type">The build type.</param>
+        public void ClearBuildResult( BuildResultType type )
+        {
+            if( type != BuildResultType.None ) _buildResults[(int)type - 1] = null;
+        }
+
+        /// <summary>
+        /// Gets the last build type.
+        /// </summary>
+        public BuildResultType LastBuildType { get; private set; }
 
         /// <summary>
         /// Gets the full document.
