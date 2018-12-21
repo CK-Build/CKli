@@ -105,7 +105,7 @@ namespace CK.Env
                                                                    new XAttribute( "Version", a.Artifact.Version ),
                                                                    new XAttribute( "Solution", a.SolutionName ),
                                                                    new XAttribute( "Target", a.TargetName ) ) );
-            var releaseNotes = ReleaseNotes == null
+            var releaseNotes = ReleaseNotes != null
                                 ? new XElement( nameof(ReleaseNotes), ReleaseNotes.Select( r => r.ToXml() ) )
                                 : null;
 
