@@ -19,10 +19,6 @@ namespace CK.Env
 
         public event EventHandler<EventMonitoredArgs> SwitchedToDevelop;
 
-        public event EventHandler<EventMonitoredArgs> ReleaseBuildStarting;
-
-        public event EventHandler<EventMonitoredArgs> ReleaseBuildDone;
-
     }
 
 }

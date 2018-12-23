@@ -20,7 +20,7 @@ namespace CK.Env
         public ReleaseNoteInfo( XElement e )
         {
             SolutionName = (string)e.AttributeRequired( "SolutionName" );
-            Current = new ReleaseInfo( e.Element("Current") );
+            Current = new ReleaseInfo( e.Element( "ReleaseInfo" ) );
             var p = e.Element( "PreviousVersion" );
             if( p != null ) PreviousVersion = CSVersion.Parse( p.Value );
             ReleaseNote = e.Element( "ReleaseNote" ).Value;

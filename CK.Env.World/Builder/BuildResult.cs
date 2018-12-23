@@ -33,7 +33,8 @@ namespace CK.Env
             IReadOnlyList<ReleaseNoteInfo> releaseNotes)
         {
             var result = new List<(ArtifactInstance Artifact, string SolutionName, string TargetName)>();
-            foreach( var row in solutions.SelectMany( s => s.GeneratedArtifacts.Select( a => (a, s, versions[s.Index]) ) ) )
+            foreach( var row in solutions.Where( s => versions[s.Index] != null )
+                                         .SelectMany( s => s.GeneratedArtifacts.Select( a => (a, s, versions[s.Index]) ) ) )
             {
                 IArtifactRepository handler = row.s.ArtifactTargetNames
                                                     .Select( name => artifacts.Find( name ) )
@@ -102,7 +103,7 @@ namespace CK.Env
             var artifacts = GeneratedArtifacts.Select( a => new XElement( "A",
                                                                    new XAttribute( "Type", a.Artifact.Artifact.Type ),
                                                                    new XAttribute( "Name", a.Artifact.Artifact.Name ),
-                                                                   new XAttribute( "Version", a.Artifact.Version ),
+                                                                   new XAttribute( "Version", a.Artifact.Version.ToNuGetPackageString() ),
                                                                    new XAttribute( "Solution", a.SolutionName ),
                                                                    new XAttribute( "Target", a.TargetName ) ) );
             var releaseNotes = ReleaseNotes != null

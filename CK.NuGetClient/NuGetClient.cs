@@ -139,7 +139,8 @@ namespace CK.NuGetClient
             HttpClient = httpClient;
             SecretKeyStore = keyStore;
             _feeds = new Dictionary<string, IInternalFeed>();
-            SourceCache = new SourceCacheContext();
+            var c = new SourceCacheContext() { NoCache = true };
+            SourceCache = c.WithRefreshCacheTrue();
             _sourcePackageProvider = new SourcePackageProvider( this );
         }
 

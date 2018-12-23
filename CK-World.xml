@@ -2,11 +2,23 @@
 <CK-World>
 
   <SharedHttpClient />
+  <ArtifactCenter />
   <LocalFeedProvider />
   <SecretKeyStore />
   <NuGetClient />
+  <CKSetupClient />
   <SolutionCentral />
 
+  <ArtifactRepositories>
+    <Repository Type="NuGetAzure"
+                Organization="Signature-OpenSource"
+                FeedName="Default"
+                CheckName="NuGetAzure:Signature-OpenSource-Default"
+                CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
+    <Repository Type="CKSetup"
+                CheckName="CKSetup:Public"
+                CheckSecretKeyName="CKSETUPREMOTESTORE_PUSH_API_KEY" />
+  </ArtifactRepositories>
   
   <SolutionSettings>
     <NuGetSources>
@@ -19,9 +31,10 @@
       <add Name="Invenietis - Preview" />
       <add Name="Invenietis - CI" />
     </ExcludedNuGetSourceNames>
-    <NuGetPushFeeds>
-      <add Type="Azure" Organization="Signature-OpenSource" FeedName="Default" />
-    </NuGetPushFeeds>
+    <ArtifactTargets>
+      <add Name="NuGetAzure:Signature-OpenSource-Default" />
+      <add Name="CKSetup:Public" />
+    </ArtifactTargets>
     <Plugins>
       <add Type="CK.Env.Plugins.SolutionDriver, CK.Env.Plugins" />
       <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderFolder, CK.Env.Plugins" />
@@ -144,7 +157,7 @@
     <GitFolder Name="CK-Database" Url="https://gitlab.com/signature-code/CK-Database.git">
       <SolutionSettings SqlServer="2016" ProduceCKSetupComponents="true" />
       <Branch Name="develop">
-        <PrimarySolution />
+        <PrimarySolution CKSetupComponentProjects="CK.StObj.Model;CK.StObj.Runtime;CK.StObj.Engine;CK.Setupable.Model;CK.Setupable.Runtime;CK.Setupable.Engine;CK.SqlServer.Setup.Model;CK.SqlServer.Setup.Runtime;CK.SqlServer.Setup.Engine"  />
       </Branch>
     </GitFolder>
 
@@ -193,7 +206,7 @@
     <GitFolder Name="CK-Setup" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-setup.git">
       <SolutionSettings ProduceCKSetupComponents="true" />
       <Branch Name="develop">
-        <PrimarySolution />
+        <PrimarySolution CKSetupComponentProjects="CKSetup.Runner;CKSetup" />
       </Branch>
     </GitFolder>
 
@@ -212,7 +225,7 @@
     <GitFolder Name="CK-Sqlite" Url="https://github.com/Invenietis/CK-Sqlite.git">
       <SolutionSettings ProduceCKSetupComponents="true" />
       <Branch Name="develop">
-        <PrimarySolution />
+        <PrimarySolution CKSetupComponentProjects="CK.Sqlite.Setup.Model;CK.Sqlite.Setup.Runtime" />
       </Branch>
     </GitFolder>
 

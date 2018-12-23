@@ -64,14 +64,14 @@ namespace CK.NuGetClient
         {
             string personalAccessToken = ResolveSecret( logger.Monitor );
             var basicAuth = Convert.ToBase64String( Encoding.ASCII.GetBytes( ":" + personalAccessToken ) );
-            foreach( var p in pushed )
+            foreach( var p in skipped.Concat( pushed ) )
             {
                 foreach( var view in p.Version.PackageQuality.GetLabels() )
                 {
                     using( HttpRequestMessage req = new HttpRequestMessage( HttpMethod.Post, GetAzureDevOpsUrlAPI() ) )
                     {
                         req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue( "Basic", basicAuth );
-                        var body = GetPromotionJSONBody( p.PackageId, p.Version.ToString(), view.ToString() );
+                        var body = GetPromotionJSONBody( p.PackageId, p.Version.ToNuGetPackageString(), view.ToString() );
                         req.Content = new StringContent( body, Encoding.UTF8, "application/json" );
                         using( var m = await Client.HttpClient.SendAsync( req ) )
                         {

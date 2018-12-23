@@ -51,6 +51,17 @@ namespace CK.Env.Plugins
         string ISolutionDriver.BranchName => BranchPath.LastPart;
 
         /// <summary>
+        /// Gets the solution driver of the <see cref="IGitRepository.CurrentBranchName"/>.
+        /// </summary>
+        /// <returns>This solution driver or the one of the current branch.</returns>
+        public ISolutionDriver GetCurrentBranchDriver()
+        {
+            return Folder.StandardGitStatus == PluginBranch
+                ? this
+                : Folder.PluginManager.BranchPlugins[Folder.CurrentBranchName].GetPlugin<SolutionDriver>();
+        }
+
+        /// <summary>
         /// Loads or reloads the primary solution and its secondary solutions.
         /// If the solution has been reloaded (under the hood), the <see cref="Solution.Current"/> is returned:
         /// this ensures that the plugins always work with an up-to-date version of the solution.
@@ -156,8 +167,8 @@ namespace CK.Env.Plugins
                         : $@"publish" + commonArgs + versionArgs;
 
             var path = Folder.FileSystem.GetFileInfo( p.Path.RemoveLastPart() ).PhysicalPath;
-            Folder.FileSystem.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "bin" ) );
-            Folder.FileSystem.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "obj" ) );
+            FileSystem.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "bin" ) );
+            FileSystem.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "obj" ) );
 
             OnZeroBuildProject?.Invoke( this, new EventMonitoredArgs( monitor ) );
             return ProcessRunner.Run( monitor, path, "dotnet", args );

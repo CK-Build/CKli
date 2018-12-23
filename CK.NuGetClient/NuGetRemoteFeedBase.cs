@@ -137,7 +137,7 @@ namespace CK.NuGetClient
             {
                 var logger = EnsureInitialization( m );
                 var meta = await _meta;
-                var exist = files.Select( file => (file, id: new PackageIdentity( file.PackageId, NuGetVersion.Parse( file.Version.ToString() ) ) ) )
+                var exist = files.Select( file => (file, id: new PackageIdentity( file.PackageId, NuGetVersion.Parse( file.Version.ToNuGetPackageString() ) ) ) )
                                  .Select( fId => (fId.file, exists: meta.Exists( fId.id, Client.SourceCache, logger, CancellationToken.None ) ) )
                                  .ToArray();
                 await Task.WhenAll( exist.Select( e => e.exists ) );
@@ -149,29 +149,21 @@ namespace CK.NuGetClient
                     m.Info( $"Already existing packages, push skipped for: " + existing );
                 }
                 var toPush = exist.Where( e => !e.exists.Result ).Select( e => e.file ).ToArray();
-                if( toPush.Length == 0 )
+                var updater = await _updater;
+                foreach( var f in toPush )
                 {
-                    m.Info( $"All package instances already exist. Push skipped." );
+                    await updater.Push(
+                        f.FullPath,
+                        String.Empty, // no Symbol source.
+                        timeoutSeconds,
+                        disableBuffering: false,
+                        getApiKey: endpoint => apiKey,
+                        getSymbolApiKey: symbolsEndpoint => null,
+                        noServiceEndpoint: false,
+                        log: logger );
+                    await OnPackagePushed( logger, f );
                 }
-                else 
-                {
-                    var updater = await _updater;
-                    foreach( var f in toPush )
-                    {
-                        await updater.Push(
-                            f.FullPath,
-                            String.Empty, // no Symbol source.
-                            timeoutSeconds,
-                            disableBuffering: false,
-                            getApiKey: endpoint => apiKey,
-                            getSymbolApiKey: symbolsEndpoint => null,
-                            noServiceEndpoint: false,
-                            log: logger );
-                        await OnPackagePushed( logger, f );
-                    }
-                    await OnAllPackagesPushed( logger, toSkip, toPush );
-
-                }
+                await OnAllPackagesPushed( logger, toSkip, toPush );                
             }
             catch( Exception ex )
             {
@@ -185,7 +177,7 @@ namespace CK.NuGetClient
         }
 
         /// <summary>
-        /// Called whenever at least one package has been pushed.
+        /// Called even if no package has been pushed.
         /// </summary>
         /// <param name="logger">The logger.</param>
         /// <param name="skipped">The set of packages skipped because they already exist in the feed.</param>

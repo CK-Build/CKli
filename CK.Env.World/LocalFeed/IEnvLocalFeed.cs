@@ -57,7 +57,14 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="target">The repository target.</param>
         /// <param name="artifacts">Set of artifact instances.</param>
-        /// <returns>Any object </returns>
+        /// <returns>True on success, false on error.</returns>
         bool PushLocalArtifacts( IActivityMonitor m, IArtifactRepository target, IEnumerable<ArtifactInstance> artifacts );
+
+        /// <summary>
+        /// Clears all local artifacts.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>True on success, false on error.</returns>
+        bool RemoveAll( IActivityMonitor m );
     }
 }

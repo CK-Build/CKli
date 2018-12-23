@@ -329,6 +329,7 @@ namespace CK.Env
         {
             return new XElement( "S",
                         new XAttribute( "Name", Solution.UniqueSolutionName ),
+                        new XAttribute( "SubPath", Solution.GitRepository.SubPath ),
                         new XAttribute( "CommitSha", _commitVersionInfo.CommitSha ),
                         _releaseInfo.ToXml(),
                         new XElement( "ReleaseNote", new XCData( ReleaseNote ?? String.Empty ) ));

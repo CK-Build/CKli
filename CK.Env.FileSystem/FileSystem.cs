@@ -339,9 +339,9 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="dirPath">The directory path on the local file system to delete.</param>
         /// <returns>False if the directory did not exist, true if it has actually been deleted.</returns>
-        public bool RawDeleteLocalDirectory( IActivityMonitor m, string dirPath )
+        public static bool RawDeleteLocalDirectory( IActivityMonitor m, string dirPath )
         {
-            if( !Directory.Exists( dirPath ) ) return false;
+            if( !Directory.Exists( dirPath ) ) return true;
             m.Info( $"Deleting {dirPath}." );
             int tryCount = 0;
             for(; ; )

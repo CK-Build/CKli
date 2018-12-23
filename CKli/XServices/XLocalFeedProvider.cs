@@ -97,6 +97,30 @@ namespace CKli
                 if( File.Exists( f ) ) File.Delete( f );
             }
 
+            public bool RemoveAll( IActivityMonitor m )
+            {
+                using( m.OpenInfo( $"Removing '{PhysicalPath}' content." ) )
+                {
+                    bool success = true;
+                    foreach( var d in Directory.EnumerateDirectories( PhysicalPath ) )
+                    {
+                        success &= FileSystem.RawDeleteLocalDirectory( m, d );
+                    }
+                    foreach( var f in Directory.EnumerateFiles( PhysicalPath ) )
+                    {
+                        try
+                        {
+                            File.Delete( f );
+                        }
+                        catch( Exception ex )
+                        {
+                            m.Error( $"While deleting file {f}.", ex );
+                            success = false;
+                        }
+                    }
+                    return success;
+                }
+            }
         }
 
         public IEnvLocalFeed Local { get; }
@@ -111,7 +135,7 @@ namespace CKli
         {
             var packageVersion = version.AsCSVersion?.ToString( CSVersionFormat.NuGetPackage ) ?? version.NormalizedText;
             var dirPath = _localNuGetCache.AppendPart( packageId ).AppendPart( packageVersion );
-            if( _fs.RawDeleteLocalDirectory( m, dirPath ) )
+            if( FileSystem.RawDeleteLocalDirectory( m, dirPath ) )
             {
                 m.Info( $"Removed {packageId} package in version {version} from local NuGet cache." );
             }

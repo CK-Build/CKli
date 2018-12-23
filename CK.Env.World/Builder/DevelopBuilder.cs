@@ -23,14 +23,14 @@ namespace CK.Env
             _withUnitTest = withUnitTest;
         }
 
-        protected override SVersion PrepareBuild( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades )
+        protected override (SVersion Version, bool MustBuild) PrepareBuild( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades )
         {
             Debug.Assert( driver.GitRepository.CurrentBranchName == s.BranchName );
-            if( !driver.UpdatePackageDependencies( m, upgrades ) ) return null;
+            if( !driver.UpdatePackageDependencies( m, upgrades ) ) return (null,false);
             // A commit is not necessarily created here.
-            if( !driver.GitRepository.Commit( m, "Global Build commit." ) ) return null;
+            if( !driver.GitRepository.Commit( m, "Global Build commit." ) ) return (null,false);
             _commits[s.Index] = driver.GitRepository.Head.CommitSha;
-            return driver.GitRepository.GetCommitVersionInfo( m, s.BranchName ).AssemblyBuildInfo.NuGetVersion;
+            return (driver.GitRepository.GetCommitVersionInfo( m, s.BranchName ).AssemblyBuildInfo.NuGetVersion, true);
         }
 
         protected override bool Build( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IEnumerable<UpdatePackageInfo> buildProjectsUpgrade )

@@ -586,7 +586,7 @@ namespace CK.Env
         {
             var depContext = GetSolutionDependentContext( monitor, true );
             if( depContext == null ) return null;
-            var previous = GeneralState.EnsureElement( "Releasing" ).Element( "Roadmap" );
+            var previous = GeneralState.EnsureElement( "Roadmap" );
             return ReleaseRoadmap.Create( monitor, depContext, previous );
         }
 
@@ -619,7 +619,7 @@ namespace CK.Env
             if( roadmap == null ) return null;
             bool editSucceed = roadmap.UpdateRoadmap( monitor, VersionSelector, skipPreviouslyResolved );
             // Always saves state to preserve any change in the roadmap, even on error.
-            GeneralState.EnsureElement( "Releasing" ).ReplaceElementByName( roadmap.ToXml() );
+            GeneralState.ReplaceElementByName( roadmap.ToXml() );
             Save( monitor );
             if( !Save( monitor ) || !editSucceed ) return null;
             return roadmap;
@@ -683,18 +683,28 @@ namespace CK.Env
             }
             return RunSafe( monitor, $"Starting Release.", ( m, error ) =>
             {
-                var ev = new EventMonitoredArgs( m );
-                ReleaseBuildStarting?.Invoke( this, ev );
-
+                var snapshot = GeneralState.Element( "GitSnapshot" );
+                if( snapshot == null )
+                {
+                    using( m.OpenInfo( $"First run: capturing {WorldName.DevelopBranchName} and {WorldName.MasterBranchName} branches positions." ) )
+                    {
+                        snapshot = new XElement( "GitSnapshot",
+                                                 _gitRepositories.Select( g => new XElement( "G",
+                                                            new XAttribute( "P", g.SubPath ),
+                                                            new XAttribute( "D", g.GetBranchSha( m, WorldName.DevelopBranchName ) ),
+                                                            new XAttribute( "M", g.GetBranchSha( m, WorldName.MasterBranchName ) ) ) ) );
+                        GeneralState.Add( snapshot );
+                        if( !Save( m ) ) return;
+                        if( !_localFeedProvider.Release.RemoveAll( m ) ) return;
+                    }
+                }
                 var b = new ReleaseBuilder( _artifacts, roadmap, _localFeedProvider, DriverFinder );
                 if( !RunBuild( m, b ) ) return;
                 if( !error() )
                 {
-                    ReleaseBuildDone?.Invoke( this, ev );
                     SetWorkStatusAndSave( m, GlobalWorkStatus.WaitingReleaseConfirmation );
                 }
             } );
-
         }
 
         /// <summary>
@@ -709,15 +719,72 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
+        [CommandMethod]
         public bool CancelRelease( IActivityMonitor m )
         {
             if( !CanCancelRelease ) throw new InvalidOperationException( nameof( CanCancelRelease ) );
             return SetWorkStatusAndSave( m, GlobalWorkStatus.CancellingRelease ) && ConcludeCurrentWork( m );
         }
 
-        bool DoCancellingRelease( IActivityMonitor m )
+        bool DoCancellingRelease( IActivityMonitor monitor )
         {
-            throw new NotImplementedException();
+            return RunSafe( monitor, $"Cancelling current Release.", ( m, error ) =>
+            {
+                if( !HandleReleaseVersionTags( m, false ) ) return;
+                var snapshot = GeneralState.Element( "GitSnapshot" );
+                if( snapshot != null )
+                {
+                    using( m.OpenInfo( $"Restoring '{WorldName.DevelopBranchName}' and '{WorldName.MasterBranchName}' branches positions." ) )
+                    {
+                        foreach( var e in snapshot.Elements() )
+                        {
+                            var path = (string)e.AttributeRequired( "P" );
+                            var git = _gitRepositories.FirstOrDefault( g => g.SubPath == path );
+                            if( git == null )
+                            {
+                                m.Error( $"Unable to find Git repository for {path}." );
+                                return;
+                            }
+                            if( !git.ResetBranchState( m, WorldName.MasterBranchName, (string)e.AttributeRequired( "M" ) )
+                                || !git.ResetBranchState( m, WorldName.DevelopBranchName, (string)e.AttributeRequired( "D" ) ) )
+                            {
+                                return;
+                            }
+                        }
+                    }
+                    snapshot.Remove();
+                }
+                _localFeedProvider.Release.RemoveAll( m );
+                if( !error() )
+                {
+                    SetWorkStatusAndSave( m, GlobalWorkStatus.Idle );
+                }
+            } );
+        }
+
+        bool HandleReleaseVersionTags( IActivityMonitor m, bool pushVersionTagsAndBranches )
+        {
+            bool success = true;
+            using( m.OpenInfo( pushVersionTagsAndBranches ? "Pushing version tags and branches." : "Clearing version tags." ) )
+            {
+                var versions = ReleaseRoadmap.Load( GeneralState.Element( "Roadmap" ) )
+                                           .Where( e => e.Info.Level != ReleaseLevel.None )
+                                           .Select( e => (e.SubPath, e.Info, Git: _gitRepositories.FirstOrDefault( g => g.SubPath == e.SubPath )) );
+                foreach( var r in versions )
+                {
+                    if( r.Git == null )
+                    {
+                        m.Fatal( $"Unable to find Git repository for {r.SubPath} from current Roadmap." );
+                        return false;
+                    }
+                    success &= pushVersionTagsAndBranches
+                                    ? (r.Git.PushVersionTag( m, r.Info.Version )
+                                       && r.Git.Push( m, WorldName.DevelopBranchName )
+                                       && r.Git.Push( m, WorldName.MasterBranchName ) )
+                                    : r.Git.ClearVersionTag( m, r.Info.Version );
+                }
+            }
+            return success;
         }
 
         /// <summary>
@@ -754,9 +821,12 @@ namespace CK.Env
             return RunSafe( monitor, $"Publishing Release.", ( m, error ) =>
             {
                 var buildResults = _rawState.GetBuildResult( BuildResultType.Release );
-                if( !DoPublish( m, buildResults ) ) return;
+                if( buildResults != null && !DoPublish( m, buildResults ) ) return;
+                if( !HandleReleaseVersionTags( m, true ) ) return;
+
                 if( !error() )
                 {
+                    GeneralState.Element( "GitSnapshot" )?.Remove();
                     SetWorkStatusAndSave( m, GlobalWorkStatus.Idle );
                 }
             } );

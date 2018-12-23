@@ -23,6 +23,12 @@ namespace CK.Env
         string BranchName { get; }
 
         /// <summary>
+        /// Gets the solution driver of the <see cref="IGitRepository.CurrentBranchName"/>.
+        /// </summary>
+        /// <returns>This solution driver or the one of the current branch.</returns>
+        ISolutionDriver GetCurrentBranchDriver();
+
+        /// <summary>
         /// Gets the set of soltion names that this driver handles with the first one being the primary solution,
         /// followed by the secondary solutions if any.
         /// Returns null on any error that prevented the solutions to be loaded.

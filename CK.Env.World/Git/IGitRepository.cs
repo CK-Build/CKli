@@ -25,6 +25,14 @@ namespace CK.Env
         IGitHeadInfo Head { get; }
 
         /// <summary>
+        /// Gets the sha of the given branch tip or null if the branch doesnt' exist.
+        /// </summary>
+        /// <param name="m">The monitor ti use.</param>
+        /// <param name="branchName">The branch name. Must not be null or empty.</param>
+        /// <returns>The Sha or null.</returns>
+        string GetBranchSha( IActivityMonitor m, string branchName );
+
+        /// <summary>
         /// Gets whether the head can be amended: the current branch
         /// is not tracked or the current commit is ahead of the remote branch.
         /// </summary>
@@ -103,6 +111,7 @@ namespace CK.Env
 
         /// <summary>
         /// Sets a version lightweight tag on the current head.
+        /// An error is logged if the version tag already exists on another commit that the head.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="v">The version to set.</param>
@@ -116,6 +125,31 @@ namespace CK.Env
         /// <param name="v">The version to remove.</param>
         /// <returns>True on success, false on error.</returns>
         bool ClearVersionTag( IActivityMonitor m, SVersion v );
+
+        /// <summary>
+        /// Pushes a version lightweight tag to the 'origin' remote.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="v">The version to push.</param>
+        /// <returns>True on success, false on error.</returns>
+        bool PushVersionTag( IActivityMonitor m, SVersion v );
+
+        /// <summary>
+        /// Pushes changes from a branch to the origin.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="branchName">Local branch name. When null, the <see cref="CurrentBranchName"/> is used.</param>
+        /// <returns>True on success, false on error.</returns>
+        bool Push( IActivityMonitor m, string branchName = null );
+
+        /// <summary>
+        /// Resets a branch to a previous commit or deletes the branch when <paramref name="commitSha"/> is null or empty.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="branchName">The branch name.</param>
+        /// <param name="commitSha">The commit sha to restore.</param>
+        /// <returns>True on success, false on error.</returns>
+        bool ResetBranchState( IActivityMonitor m, string branchName, string commitSha );
 
         /// <summary>
         /// Attempts to check out a branch and pull any 'origin' changes.

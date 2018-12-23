@@ -23,13 +23,13 @@ namespace CK.Env
             _commitTimes = new DateTimeOffset[ ctx.Solutions.Count ];
         }
 
-        protected override SVersion PrepareBuild( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades )
+        protected override (SVersion Version, bool MustBuild) PrepareBuild( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades )
         {
             Debug.Assert( driver.GitRepository.CurrentBranchName == s.BranchName );
-            if( !driver.UpdatePackageDependencies( m, upgrades ) ) return null;
-            if( !driver.GitRepository.AmendCommit( m ) ) return null;
+            if( !driver.UpdatePackageDependencies( m, upgrades ) ) return (null,false);
+            if( !driver.GitRepository.AmendCommit( m ) ) return (null,false);
             _commitTimes[s.Index] = driver.GitRepository.Head.CommitDate;
-            return driver.GitRepository.GetCommitVersionInfo( m, s.BranchName ).AssemblyBuildInfo.NuGetVersion;
+            return (driver.GitRepository.GetCommitVersionInfo( m, s.BranchName ).AssemblyBuildInfo.NuGetVersion,true);
         }
 
         protected override bool Build( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IEnumerable<UpdatePackageInfo> buildProjectsUpgrade )

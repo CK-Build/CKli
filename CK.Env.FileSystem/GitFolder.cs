@@ -258,6 +258,38 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Gets the sha of the given branch tip or null if the branch doesnt' exist.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="branchName">The branch name. Must not be null or empty.</param>
+        /// <returns>The Sha or null.</returns>
+        public string GetBranchSha( IActivityMonitor m, string branchName )
+        {
+            if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
+            var b = GetBranch( m, branchName, false );
+            return b == null ? null : b.Tip.Sha;
+        }
+
+        Branch GetBranch( IActivityMonitor m, string branchName, bool logErrorMissingLocalOrRemote )
+        {
+            var b = _git.Branches[branchName];
+            if( b == null )
+            {
+                string remoteName = "origin/" + branchName;
+                var remote = _git.Branches[remoteName];
+                if( remote == null )
+                {
+                    if( logErrorMissingLocalOrRemote ) m.Error( $"Repository '{SubPath}': Both local '{branchName}' and remote '{remoteName}' not found." );
+                    return null;
+                }
+                m.Info( $"Creating local branch on remote '{remoteName}'." );
+                b = _git.Branches.Add( branchName, remote.Tip );
+                b = _git.Branches.Update( b, u => u.TrackedBranch = remote.CanonicalName );
+            }
+            return b;
+        }
+
+        /// <summary>
         /// Attempts to check out a branch and pull any 'origin' changes.
         /// There must not be any uncommitted changes on the current head.
         /// The branch must exist locally or on the 'origin' remote.
@@ -380,7 +412,8 @@ namespace CK.Env
                     _temp = _parent._temp;
                 }
                 f._tempBranch = this;
-                Commands.Stage( f._git, "*", new StageOptions() { IncludeIgnored = true } );
+                // IncludeIgnored = true is a very heavy operation...
+                Commands.Stage( f._git, "*", new StageOptions() { IncludeIgnored = false } );
                 _commit = f._git.Commit( "Temp", s, s, new CommitOptions() { AllowEmptyCommit = true, PrettifyMessage = false } );
             }
 
@@ -445,7 +478,7 @@ namespace CK.Env
         /// </returns>
         public (bool Success, bool ReloadNeeded) PullAllBranches( IActivityMonitor m, bool originOnly = true )
         {
-            using( m.OpenInfo( $"Pulling {(originOnly ? "origin" : "all remotes")} in repository '{FullPath}'" ) )
+            using( m.OpenInfo( $"Pulling {(originOnly ? "origin" : "all remotes")} in repository '{SubPath}'" ) )
             {
                 try
                 {
@@ -500,8 +533,8 @@ namespace CK.Env
                             info.CommitSha,
                             info.ValidReleaseTag,
                             info.BetterExistingVersion?.ThisTag,
-                            info.CommitInfo.BasicInfo?.BestCommitBelow.ThisTag,
-                            info.CommitInfo.BasicInfo?.BestCommitBelow.CommitSha,
+                            info.CommitInfo.BasicInfo?.BestCommitBelow?.ThisTag,
+                            info.CommitInfo.BasicInfo?.BestCommitBelow?.CommitSha,
                             info.NextPossibleVersions,
                             info.PossibleVersions,
                             new CommitAssemblyBuildInfoFromRepo( info ) )
@@ -561,10 +594,11 @@ namespace CK.Env
 
         /// <summary>
         /// Sets a version lightweight tag on the current head.
+        /// An error is logged if the version tag already exists on another commit that the head.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="v">The version to set.</param>
-        /// <returns>Success and whether the tag has been created or was already defined.</returns>
+        /// <returns>True on success, false on error.</returns>
         public bool SetVersionTag( IActivityMonitor m, SVersion v )
         {
             var sv = 'v' + v.ToString();
@@ -826,6 +860,75 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Resets a branch to a previous commit or deletes the branch when <paramref name="commitSha"/> is null or empty.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="branchName">The branch name.</param>
+        /// <param name="commitSha">The commit sha to restore.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool ResetBranchState( IActivityMonitor m, string branchName, string commitSha )
+        {
+            if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
+            bool delete = String.IsNullOrWhiteSpace( commitSha );
+            using( m.OpenInfo( delete ? $"Restoring {SubPath} '{branchName}' state." : $"Restoring {SubPath} '{branchName}' state (removing it)." ) )
+            {
+                try
+                {
+                    if( delete )
+                    {
+                        if( branchName == CurrentBranchName )
+                        {
+                            m.Error( $"Cannot delete the branch {branchName} since it is the current one." );
+                            return false;
+                        }
+                        var toDelete = _git.Branches[branchName];
+                        if( toDelete == null )
+                        {
+                            m.Info( $"Branch '{branchName}' does not exist." );
+                            return true;
+                        }
+                        _git.Branches.Remove( toDelete );
+                        m.Info( $"Branch '{branchName}' has been removed." );
+                        return true;
+                    }
+                    var current = _git.Head;
+                    if( branchName == current.FriendlyName )
+                    {
+                        if( commitSha == current.Tip.Sha )
+                        {
+                            m.Info( $"Current branch '{current}' is alredy on restored state." );
+                            return true;
+                        }
+                        _git.Reset( ResetMode.Hard, commitSha );
+                        m.Info( $"Current branch '{current}' has been restored to {commitSha}." );
+                        return true;
+                    }
+                    var b = _git.Branches[branchName];
+                    if( b == null )
+                    {
+                        m.Warn( $"Branch '{branchName}' not found." );
+                        return true;
+                    }
+                    if( commitSha == b.Tip.Sha )
+                    {
+                        m.Info( $"Current branch '{branchName}' is alredy on restored state." );
+                        return true;
+                    }
+                    Commands.Checkout( _git, b );
+                    _git.Reset( ResetMode.Hard, commitSha );
+                    m.Info( $"Branch '{branchName}' has been restored to {commitSha}." );
+                    Commands.Checkout( _git, current );
+                    return true;
+                }
+                catch( Exception ex )
+                {
+                    m.Error( ex );
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
         /// Checkouts the <see cref="IWorldName.LocalBranchName"/>, always merging <see cref="IWorldName.DevelopBranchName"/> into it.
         /// If the repository is not on the 'local' branch, it must be on 'develop' (a <see cref="Commit"/> is done to save any
         /// current work if <paramref name="autoCommit"/> is true), the 'local' branch is created if needed and checked out.
@@ -980,8 +1083,7 @@ namespace CK.Env
                             m.Info( $"Creating the {World.MasterBranchName }." );
                             master = _git.CreateBranch( World.MasterBranchName );
                         }
-                        // Don't instanciate plugins here.
-                        Commands.Checkout( _git, master );
+                        CheckoutWithPlugins( m, master );
                     }
                     else m.Trace( $"Already on {World.MasterBranchName}." );
 

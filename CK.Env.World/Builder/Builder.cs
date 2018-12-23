@@ -134,11 +134,11 @@ namespace CK.Env
                 _upgrades[i] = upgrades;
                 using( m.OpenInfo( $"Preparing {s} build." ) )
                 {
-                    var targetVersion = PrepareBuild( m, s, driver, upgrades );
-                    if( targetVersion == null ) return false;
-                    m.CloseGroup( $"Target version: {targetVersion}" );
-                    _targetVersions[i] = targetVersion;
-                    _packagesVersion.AddRange( s.GeneratedPackages.Select( p => new KeyValuePair<string, SVersion>( p.Name, targetVersion ) ) );
+                    var pr = PrepareBuild( m, s, driver, upgrades );
+                    if( pr.Version == null ) return false;
+                    m.CloseGroup( $"Target version: {pr.Version}{(pr.MustBuild ? "" :" (no build required)")}" );
+                    _targetVersions[i] = pr.MustBuild ? pr.Version : null;
+                    _packagesVersion.AddRange( s.GeneratedPackages.Select( p => new KeyValuePair<string, SVersion>( p.Name, pr.Version ) ) );
                 }
             }
             return true;
@@ -159,8 +159,9 @@ namespace CK.Env
                                                        z.ProjectName,
                                                        packageName,
                                                        _packagesVersion[packageName] ) ) );
-                using( m.OpenInfo( $"Running {s} build. Target version: {_targetVersions[i]}" ) )
+                using( m.OpenInfo( $"Running {s} build." ) )
                 {
+                    // _targetVersions[i] is null if build must not be done.
                     if( !Build( m, solutions[i], _drivers[i], _upgrades[i], _targetVersions[i], buildProjectsUpgrade ) ) return false;
                 }
             }
@@ -175,8 +176,8 @@ namespace CK.Env
         /// <param name="s">The solution.</param>
         /// <param name="driver">The solution driver.</param>
         /// <param name="upgrades">The set of required package upgrades.</param>
-        /// <returns>The version or null if an error occurred.</returns>
-        protected abstract SVersion PrepareBuild( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades );
+        /// <returns>The version (or null if an error occurred) and whether the build must be actually done or skipped.</returns>
+        protected abstract (SVersion Version, bool MustBuild) PrepareBuild( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades );
 
         /// <summary>
         /// Builds the solution.

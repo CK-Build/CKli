@@ -11,8 +11,8 @@
   <ArtifactRepositories>
     <Repository Type="NuGetAzure"
                 Organization="Signature-OpenSource"
-                FeedName="CKEnvTest"
-                CheckName="NuGetAzure:Signature-OpenSource-CKEnvTest"
+                FeedName="CKEnvTest3"
+                CheckName="NuGetAzure:Signature-OpenSource-CKEnvTest3"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
     <Repository Type="CKSetup"
                 CheckName="CKSetup:Public"
@@ -29,7 +29,7 @@
       <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json" >
         <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
       </add>
-      <add Name="CKEnvTest" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/CKEnvTest/nuget/v3/index.json" >
+      <add Name="CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/CKEnvTest3/nuget/v3/index.json" >
         <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
       </add>
     </NuGetSources>
@@ -39,7 +39,7 @@
       <add Name="Invenietis - CI" />
     </ExcludedNuGetSourceNames>
     <ArtifactTargets>
-      <add Name="NuGetAzure:Signature-OpenSource-CKEnvTest" />
+      <add Name="NuGetAzure:Signature-OpenSource-CKEnvTest3" />
       <add Name="CKSetup:CKEnvTest" />
     </ArtifactTargets>
     <Plugins>

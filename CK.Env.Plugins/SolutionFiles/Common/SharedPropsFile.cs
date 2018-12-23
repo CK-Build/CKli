@@ -199,9 +199,12 @@ namespace CK.Env.Plugins.SolutionFiles
             section.StartComment = ": is enabled only for Cake build. ";
             section.SetContent(
                 XElement.Parse(
+@"<PropertyGroup>
+  <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+</PropertyGroup>" ),
+                XElement.Parse(
 @"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
   <PublishRepositoryUrl>true</PublishRepositoryUrl>
-  <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
 </PropertyGroup>" ),
                 XElement.Parse(

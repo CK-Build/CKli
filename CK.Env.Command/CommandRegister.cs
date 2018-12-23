@@ -170,5 +170,11 @@ namespace CK.Env
             return _commands.Values.Where( c => p.IsMatch( c.UniqueName ) && (!checkEnabled || c.GetEnabled()) );
         }
 
+        /// <summary>
+        /// Gets the command handler. Its <see cref="ICommandHandler.GetEnabled()"/> may be false.
+        /// </summary>
+        /// <param name="path">Path of the command.</param>
+        /// <returns>The command handler or null.</returns>
+        public ICommandHandler this[NormalizedPath path] => _commands.GetValueWithDefault( path, null );
     }
 }

@@ -88,7 +88,7 @@ namespace CK.Env.Plugins.SolutionFiles
             if( !this.CheckCurrentBranch( m ) ) return;
             if( PluginBranch == StandardGitStatus.Local && _settings.ProduceCKSetupComponents && !_settings.NoUnitTests )
             {
-                EnsureStorePath( m, _localFeedProvider.Local.PhysicalPath );
+                EnsureStorePath( m, _localFeedProvider.Local.GetCKSetupStorePath() );
             }
             else
             {
@@ -109,7 +109,7 @@ namespace CK.Env.Plugins.SolutionFiles
 
         void OnLocalBranchEntered( object sender, EventMonitoredArgs e )
         {
-            if( _settings.ProduceCKSetupComponents ) EnsureStorePath( e.Monitor, _localFeedProvider.Local.PhysicalPath );
+            if( _settings.ProduceCKSetupComponents ) EnsureStorePath( e.Monitor, _localFeedProvider.Local.GetCKSetupStorePath() );
         }
 
         public bool EnsureStorePath( IActivityMonitor m, string storePath )
