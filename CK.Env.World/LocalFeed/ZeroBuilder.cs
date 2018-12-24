@@ -13,7 +13,6 @@ namespace CK.Env
     {
         readonly IEnvLocalFeedProvider _localFeedProvider;
         readonly Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> _driverFinder;
-        readonly Func<IActivityMonitor, bool> _solutionReloader;
         readonly NormalizedPath _memPath;
         readonly Dictionary<string, HashSet<string>> _sha1Cache;
         readonly HashSet<string> _mustBuild;
@@ -55,11 +54,8 @@ namespace CK.Env
         /// <returns>True on success, false on error.</returns>
         bool Run( IActivityMonitor m )
         {
+            Debug.Assert( _mustBuild.Count == _depContext.BuildProjectsInfo.Count );
             ReadCurrentSha( m );
-            if( _mustBuild.Count != _depContext.BuildProjectsInfo.Count )
-            {
-                _mustBuild.AddRange( _depContext.BuildProjectsInfo.Select( z => z.FullName ) );
-            }
             var scopeMap = new Dictionary<ISolutionDriver, IDisposable>();
             try
             {
@@ -146,7 +142,7 @@ namespace CK.Env
                         }
                     }
                 }
-                return _solutionReloader?.Invoke( m ) ?? true;
+                return true;
             }
             finally
             {
@@ -212,7 +208,9 @@ namespace CK.Env
             {
                 var builder = ZeroBuilder.Create( m, feeds, depContext, driverFinder, solutionReloader );
                 if( builder == null ) return null;
-                return builder.Run( m ) ? builder : null;
+                bool success = builder.Run( m );
+                if( solutionReloader != null ) success &= solutionReloader.Invoke( m );
+                return success ? builder : null;
             }
         }
 
@@ -222,12 +220,10 @@ namespace CK.Env
             NormalizedPath memPath,
             Dictionary<string, HashSet<string>> sha1Cache,
             HashSet<string> initialMustBuild,
-            IDependentSolutionContext depContext,
-            Func<IActivityMonitor, bool> solutionReloader )
+            IDependentSolutionContext depContext )
         {
             _localFeedProvider = localFeedProvider;
             _driverFinder = driverFinder;
-            _solutionReloader = solutionReloader;
             _memPath = memPath;
             _sha1Cache = sha1Cache;
             _mustBuild = initialMustBuild;
@@ -274,7 +270,7 @@ namespace CK.Env
             m.Info( $"File '{memPath}' contains {sha1Cache.Count} entries." );
             var currentShas = new string[depContext.BuildProjectsInfo.Count];
 
-            return new ZeroBuilder( feeds, driverFinder, memPath, sha1Cache, mustBuild, depContext, solutionReloader );
+            return new ZeroBuilder( feeds, driverFinder, memPath, sha1Cache, mustBuild, depContext );
         }
 
     }
