@@ -290,34 +290,29 @@ namespace CK.Env.MSBuild
                                                                  && !(pFrameworks = p.Frameworks.Intersect( actualFrameworks )).IsEmpty ) )
             {
                 actualFrameworks = actualFrameworks.Except( pFrameworks );
-                if( p.Version != version && !preserveExisting )
+                var currentVersion = p.Version;
+                if( currentVersion != version )
                 {
-                    var e = p.PropertyVersionElement;
-                    if( e != null )
+                    if( !preserveExisting )
                     {
-                        e.Value = sV;
+                        var e = p.PropertyVersionElement;
+                        if( e != null )
+                        {
+                            e.Value = sV;
+                        }
+                        else
+                        {
+                            e = p.OriginElement;
+                            e.Attribute( "Version" ).SetValue( sV );
+                        }
+                        ++changeCount;
+                        m.Trace( $"Update in {ToString()}: {packageId} from {currentVersion} to {sV}." );
                     }
-                    else
-                    {
-                        e = p.OriginElement;
-                        e.Attribute( "Version" ).SetValue( sV );
-                    }
-                    ++changeCount;
+                    else m.Trace( $"Preserving existing version {currentVersion} for {packageId} in {ToString()} (skipped version is {sV})." );
                 }
             }
-            if( changeCount > 0 )
-            {
-                m.Trace( $"{changeCount} version update in {ToString()} for package reference {packageId} -> {sV}." );
-            }
-            // Handle creation if needed.
-            if( actualFrameworks.IsEmpty )
-            {
-                if( changeCount == 0 )
-                {
-                    m.Trace( $"Package reference {packageId} is already in version {sV} for {ToString()}." );
-                }
-            }
-            else if( addIfNotExists )
+             // Handle creation if needed.
+            if( !actualFrameworks.IsEmpty && addIfNotExists )
             {
                 var firstPropertyGroup = ProjectFile.Document.Root.Element( "PropertyGroup" );
                 var pRef = new XElement( "ItemGroup",

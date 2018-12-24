@@ -12,24 +12,29 @@ namespace CK.Env
         readonly string[] _commits;
         readonly ReleaseRoadmap _roadmap;
         readonly IEnvLocalFeedProvider _localFeedProvider;
+        readonly Func<IActivityMonitor, bool, IDependentSolutionContext> _depContextReloader;
         ZeroBuilder _zBuilder;
 
         public ReleaseBuilder(
                 ArtifactCenter artifacts,
                 ReleaseRoadmap roadmap,
                 IEnvLocalFeedProvider localFeedProvider,
-                Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
+                Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder,
+                Func<IActivityMonitor,bool, IDependentSolutionContext> depContextReloader )
             : base( BuildResultType.Release, artifacts, roadmap.DependentSolutionContext, driverFinder )
         {
             _commits = new string[roadmap.DependentSolutionContext.Solutions.Count];
             _localFeedProvider = localFeedProvider;
+            _depContextReloader = depContextReloader;
             _roadmap = roadmap;
         }
 
-        protected override bool OnBeforePrepareBuild( IActivityMonitor m )
+        protected override IDependentSolutionContext OnBeforePrepareBuild( IActivityMonitor m )
         {
-            _zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, DependentSolutionContext, DriverFinder );
-            return _zBuilder != null;
+            _zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, DependentSolutionContext, DriverFinder, null );
+            return _zBuilder != null
+                    ? _depContextReloader( m, true )
+                    : null;
         }
 
         protected override (SVersion Version, bool MustBuild) PrepareBuild( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades )

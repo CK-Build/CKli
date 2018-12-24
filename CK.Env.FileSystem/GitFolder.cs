@@ -762,6 +762,7 @@ namespace CK.Env
                         return true;
                     }
                 }
+                else date = DateTimeOffset.Now;
                 return DoCommit( m, message, date.Value, true, hasChange );
             }
         }
@@ -771,13 +772,14 @@ namespace CK.Env
             try
             {
                 if( isDirty ) m.Info( "Working Folder is dirty. Committing changes." );
-                var author = _git.Config.BuildSignature( date );
+                var author = amendPreviousCommit ? _git.Head.Tip.Author : _git.Config.BuildSignature( date );
                 // Let AllowEmptyCommit even when amending: this avoids creating an empty commit.
                 // If we are not amending, this is an error and we let the EmptyCommitException pops.
                 var options = new CommitOptions { AmendPreviousCommit = amendPreviousCommit };
+                var committer = new Signature( "CKli", "none", date );
                 try
                 {
-                    _git.Commit( commitMessage, author, new Signature( "CKli", "none", date ), options );
+                    _git.Commit( commitMessage, author, committer, options );
                 }
                 catch( EmptyCommitException ) 
                 {
@@ -785,6 +787,8 @@ namespace CK.Env
                     Debug.Assert( _git.Head.Tip.Parents.Count() == 1, "This check on merge commit is already done by LibGit2Sharp." );
                     m.Trace( "No actual changes. Reseting branch to parent commit." );
                     _git.Reset( ResetMode.Hard, _git.Head.Tip.Parents.Single() );
+                    Debug.Assert( options.AmendPreviousCommit = true );
+                    _git.Commit( commitMessage, author, committer, options );
                     return true;
                 }
                 return true;

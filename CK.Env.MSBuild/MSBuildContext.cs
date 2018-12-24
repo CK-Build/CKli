@@ -120,14 +120,6 @@ namespace CK.Env.MSBuild
             Solution _last;
             bool _loaded;
 
-            public SolutionTracker( Solution s )
-            {
-                Debug.Assert( s != null );
-                s.SetTracker( this );
-                _last = s;
-                _loaded = true;
-            }
-
             public bool IsLoaded => _loaded;
 
             public Solution CurrentVersion => _loaded ? _last : null;
@@ -143,9 +135,10 @@ namespace CK.Env.MSBuild
 
             public void OnLoad( Solution newOne )
             {
-                Debug.Assert( !_loaded && newOne != null && _last != null );
+                Debug.Assert( !_loaded && newOne != null );
                 _last = newOne;
                 _loaded = true;
+                newOne.SetTracker( this );
             }
         }
 
@@ -192,9 +185,9 @@ namespace CK.Env.MSBuild
 
             SolutionTracker tracker = null;
             Solution s;
-            if( !force
-                && _solutions.TryGetValue( path, out tracker )
-                && tracker.IsLoaded )
+            if( _solutions.TryGetValue( path, out tracker )
+                && tracker.IsLoaded
+                && !force )
             {
                 s = tracker.LastVersion;
                 // Check that it is the same kind of solution.
@@ -231,9 +224,12 @@ namespace CK.Env.MSBuild
                     Solution s = Solution.Load( m, this, path );
                     if( s != null )
                     {
-                        if( tracker == null ) tracker = new SolutionTracker( s );
-                        else tracker.OnLoad( s );
-                        _solutions.Add( path, tracker );
+                        if( tracker == null )
+                        {
+                            tracker = new SolutionTracker();
+                            _solutions.Add( path, tracker );
+                        }
+                        tracker.OnLoad( s );
                     }
                     return s;
                 }

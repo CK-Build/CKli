@@ -350,6 +350,20 @@ namespace CK.Env
                                                     && WorkStatus != GlobalWorkStatus.Idle
                                                     && WorkStatus != GlobalWorkStatus.WaitingReleaseConfirmation;
 
+        string GetCleanBranchName( IActivityMonitor monitor )
+        {
+            if( !CheckGlobalGitStatusLocalXorDevelop( monitor ) ) return null;
+            bool allClean = true;
+            foreach( var g in _gitRepositories )
+            {
+                allClean &= g.CheckCleanCommit( monitor );
+            }
+            if( !allClean ) return null;
+            return CachedGlobalGitStatus == StandardGitStatus.Local
+                            ? WorldName.LocalBranchName
+                            : WorldName.DevelopBranchName;
+        }
+
         /// <summary>
         /// Gets the <see cref="IDependentSolutionContext"/> after having called <see cref="UpdateGlobalGitStatus"/>
         /// and checked that repositories are all on 'local' or 'develop' branch.
@@ -358,23 +372,27 @@ namespace CK.Env
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="reloadSolutions">True to force a reload of the solutions.</param>
         /// <returns>The dependency context or null on error.</returns>
-        IDependentSolutionContext GetSolutionDependentContext( IActivityMonitor monitor, bool checkCleanCommits, bool reloadSolutions = false )
+        IDependentSolutionContext GetSolutionDependentContext( IActivityMonitor monitor, bool reloadSolutions = false )
         {
-            if( !CheckGlobalGitStatusLocalXorDevelop( monitor ) ) return null;
-            if( checkCleanCommits )
-            {
-                bool allClean = true;
-                foreach( var g in _gitRepositories )
-                {
-                    allClean &= g.CheckCleanCommit( monitor ); 
-                }
-                if( !allClean ) return null;
-            }
-            var branchName = CachedGlobalGitStatus == StandardGitStatus.Local
-                                ? WorldName.LocalBranchName
-                                : WorldName.DevelopBranchName;
-            return _solutionContextLoader.Load( monitor, _gitRepositories, branchName, reloadSolutions );
+            var branchName = GetCleanBranchName( monitor );
+            return branchName != null
+                    ? _solutionContextLoader.Load( monitor, _gitRepositories, branchName, reloadSolutions )
+                    : null;
         }
+
+        /// <summary>
+        /// Ensures that all solutions are reloaded.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>True on success, false on error.</returns>
+        bool ReloadSolutions( IActivityMonitor monitor )
+        {
+            var branchName = GetCleanBranchName( monitor );
+            return branchName != null
+                    ? _solutionContextLoader.ReloadSolutions( monitor, _gitRepositories, branchName )
+                    : false;
+        }
+
 
         /// <summary>
         /// Concludes the current work.
@@ -436,10 +454,10 @@ namespace CK.Env
                 UpdateGlobalGitStatus();
                 Debug.Assert( CachedGlobalGitStatus == StandardGitStatus.Local );
 
-                var depContext = GetSolutionDependentContext( m, true );
+                var depContext = GetSolutionDependentContext( m );
                 if( depContext == null ) return;
 
-                if( ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, DriverFinder ) == null ) return;
+                if( ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, DriverFinder, ReloadSolutions ) == null ) return;
 
                 if( !error() )
                 {
@@ -470,9 +488,9 @@ namespace CK.Env
             if( !CheckGlobalGitStatusLocalXorDevelop( monitor ) ) return false;
             return RunSafe( monitor, "Fixing Build projects.", ( m, error ) =>
             {
-                var depContext = GetSolutionDependentContext( m, true );
+                var depContext = GetSolutionDependentContext( m );
                 if( depContext == null ) return;
-                ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, DriverFinder );
+                ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, DriverFinder, ReloadSolutions );
             } );
         }
 
@@ -491,11 +509,14 @@ namespace CK.Env
             if( !CheckGlobalGitStatusLocalXorDevelop( monitor ) ) return false;
             return RunSafe( monitor, $"Local build.", ( m, error ) =>
             {
-                var depContext = GetSolutionDependentContext( m, true );
+                var depContext = GetSolutionDependentContext( m );
                 if( depContext == null ) return;
 
-                ZeroBuilder zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, DriverFinder );
+                ZeroBuilder zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, DriverFinder, null );
                 if( zBuilder == null ) return;
+
+                depContext = GetSolutionDependentContext( m, true );
+                if( depContext == null ) return;
 
                 Builder builder = CachedGlobalGitStatus == StandardGitStatus.Local
                                 ? (Builder)new LocalBuilder( _artifacts, depContext, DriverFinder, withUnitTest )
@@ -563,11 +584,14 @@ namespace CK.Env
                 {
                     if( !g.SwitchLocalToDevelop( m ) ) return;
                 }
-                var depContext = GetSolutionDependentContext( m, true );
+                var depContext = GetSolutionDependentContext( m );
                 if( depContext == null ) return;
 
-                var zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, DriverFinder );
+                var zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, DriverFinder, null );
                 if( zBuilder == null ) return;
+
+                depContext = GetSolutionDependentContext( m, true );
+                if( depContext == null ) return;
 
                 var builder = new DevelopBuilder( _artifacts, depContext, DriverFinder, false );
                 if( !RunBuild( m, builder ) ) return;
@@ -584,7 +608,7 @@ namespace CK.Env
 
         ReleaseRoadmap LoadRoadmap( IActivityMonitor monitor )
         {
-            var depContext = GetSolutionDependentContext( monitor, true );
+            var depContext = GetSolutionDependentContext( monitor );
             if( depContext == null ) return null;
             var previous = GeneralState.EnsureElement( "Roadmap" );
             return ReleaseRoadmap.Create( monitor, depContext, previous );
@@ -698,7 +722,7 @@ namespace CK.Env
                         if( !_localFeedProvider.Release.RemoveAll( m ) ) return;
                     }
                 }
-                var b = new ReleaseBuilder( _artifacts, roadmap, _localFeedProvider, DriverFinder );
+                var b = new ReleaseBuilder( _artifacts, roadmap, _localFeedProvider, DriverFinder, GetSolutionDependentContext );
                 if( !RunBuild( m, b ) ) return;
                 if( !error() )
                 {

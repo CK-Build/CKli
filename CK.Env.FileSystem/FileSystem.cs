@@ -139,6 +139,7 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the file information for a path below the <see cref="Root"/>.
+        /// Never return null: <see cref="NotFoundFileInfo"/> is returned when the file does not exist.
         /// </summary>
         /// <param name="subpath">The subordinated path.</param>
         /// <returns>The file info.</returns>

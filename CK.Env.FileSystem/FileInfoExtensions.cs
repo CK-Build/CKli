@@ -131,6 +131,7 @@ namespace CK.Env
         /// <summary>
         /// Creates a <see cref="ITextFileInfo"/> for this file info if it is possible:
         /// the file exists, is not a directory and its extension denotes a text format.
+        /// Returns null otherwise.
         /// </summary>
         /// <param name="f">This file info.</param>
         /// <param name="ignoreExtension">

@@ -109,7 +109,8 @@ namespace CK.Env.Plugins
                 m.Error( "Transform function returned null." );
                 return false;
             }
-            return final != text ? fs.CopyTo( m, final, target ) : true;
+            var current = fs.GetFileInfo( target ).AsTextFileInfo()?.TextContent;
+            return final != current ? fs.CopyTo( m, final, target ) : true;
         }
 
         /// <summary>

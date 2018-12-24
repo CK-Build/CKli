@@ -18,8 +18,17 @@ namespace CK.Env
         /// <param name="repositories">Set of repositories to consider.</param>
         /// <param name="branchName">Branch name in the repositories to consider.</param>
         /// <param name="forceReload">True to force the reload of all solutions.</param>
-        /// <returns>The dependeny context or null on error.</returns>
+        /// <returns>The dependency context or null on error.</returns>
         IDependentSolutionContext Load( IActivityMonitor m, IEnumerable<IGitRepository> repositories, string branchName, bool forceReload );
+
+        /// <summary>
+        /// Ensures that all solutions are reloaded.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="repositories">Set of repositories to consider.</param>
+        /// <param name="branchName">Branch name in the repositories to consider.</param>
+        /// <returns>True on success, false on error.</returns>
+        bool ReloadSolutions( IActivityMonitor m, IEnumerable<IGitRepository> repositories, string branchName );
 
     }
 }

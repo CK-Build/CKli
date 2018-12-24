@@ -13,6 +13,7 @@ namespace CK.Env
     {
         readonly IEnvLocalFeedProvider _localFeedProvider;
         readonly Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> _driverFinder;
+        readonly Func<IActivityMonitor, bool> _solutionReloader;
         readonly NormalizedPath _memPath;
         readonly Dictionary<string, HashSet<string>> _sha1Cache;
         readonly HashSet<string> _mustBuild;
@@ -52,7 +53,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool Run( IActivityMonitor m )
+        bool Run( IActivityMonitor m )
         {
             ReadCurrentSha( m );
             if( _mustBuild.Count != _depContext.BuildProjectsInfo.Count )
@@ -145,7 +146,7 @@ namespace CK.Env
                         }
                     }
                 }
-                return true;
+                return _solutionReloader?.Invoke( m ) ?? true;
             }
             finally
             {
@@ -198,16 +199,18 @@ namespace CK.Env
         /// <param name="feeds">The local feeds.</param>
         /// <param name="depContext">The dependency context to consider.</param>
         /// <param name="driverFinder">The driver finder by solution name.</param>
+        /// <param name="solutionReloader">Optional solutions reloader.</param>
         /// <returns>The ZeroBuilder on success, null on error.</returns>
         public static ZeroBuilder EnsureZeroBuildProjects(
             IActivityMonitor m,
             IEnvLocalFeedProvider feeds,
             IDependentSolutionContext depContext,
-            Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
+            Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder,
+            Func<IActivityMonitor,bool> solutionReloader )
         {
             using( m.OpenInfo( $"Building ZeroVersion projects." ) )
             {
-                var builder = ZeroBuilder.Create( m, feeds, depContext, driverFinder );
+                var builder = ZeroBuilder.Create( m, feeds, depContext, driverFinder, solutionReloader );
                 if( builder == null ) return null;
                 return builder.Run( m ) ? builder : null;
             }
@@ -219,10 +222,12 @@ namespace CK.Env
             NormalizedPath memPath,
             Dictionary<string, HashSet<string>> sha1Cache,
             HashSet<string> initialMustBuild,
-            IDependentSolutionContext depContext )
+            IDependentSolutionContext depContext,
+            Func<IActivityMonitor, bool> solutionReloader )
         {
             _localFeedProvider = localFeedProvider;
             _driverFinder = driverFinder;
+            _solutionReloader = solutionReloader;
             _memPath = memPath;
             _sha1Cache = sha1Cache;
             _mustBuild = initialMustBuild;
@@ -239,12 +244,14 @@ namespace CK.Env
         /// <param name="feeds">The local feeds.</param>
         /// <param name="depContext">The dependency context to consider.</param>
         /// <param name="driverFinder">The driver finder by solution name.</param>
+        /// <param name="solutionReloader">Optional solutions reloader.</param>
         /// <returns>The ZeroBuilder on success, null on error.</returns>
-        public static ZeroBuilder Create(
+        static ZeroBuilder Create(
             IActivityMonitor m,
             IEnvLocalFeedProvider feeds,
             IDependentSolutionContext depContext,
-            Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
+            Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder,
+            Func<IActivityMonitor, bool> solutionReloader )
         {
             if( depContext.BuildProjectsInfo == null )
             {
@@ -267,7 +274,7 @@ namespace CK.Env
             m.Info( $"File '{memPath}' contains {sha1Cache.Count} entries." );
             var currentShas = new string[depContext.BuildProjectsInfo.Count];
 
-            return new ZeroBuilder( feeds, driverFinder, memPath, sha1Cache, mustBuild, depContext );
+            return new ZeroBuilder( feeds, driverFinder, memPath, sha1Cache, mustBuild, depContext, solutionReloader );
         }
 
     }

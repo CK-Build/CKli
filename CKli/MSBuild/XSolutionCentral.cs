@@ -174,6 +174,16 @@ namespace CKli
         /// </summary>
         public IReadOnlyList<XSolutionBase> AllDevelopSolutions => _allDevelopSolutions;
 
+        bool IDependentSolutionContextLoader.ReloadSolutions( IActivityMonitor m, IEnumerable<IGitRepository> repositories, string branchName )
+        {
+            using( m.OpenInfo( $"Reloading solutions for branch {branchName}." ) )
+            {
+                m.MinimalFilter = LogFilter.Terse;
+                IReadOnlyList<Solution> solutions = GetAllSolutions( m, repositories, true, branchName );
+                return solutions.All( s => s != null );
+            }
+        }
+
         IDependentSolutionContext IDependentSolutionContextLoader.Load( IActivityMonitor m, IEnumerable<IGitRepository> repositories, string branchName, bool forceReload )
         {
             using( m.OpenInfo( $"Computing SolutionDependencyContext for branch {branchName}." ) )

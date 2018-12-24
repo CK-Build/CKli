@@ -44,7 +44,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the dependent solution context.
         /// </summary>
-        public IDependentSolutionContext DependentSolutionContext { get; }
+        public IDependentSolutionContext DependentSolutionContext { get; private set; }
 
         /// <summary>
         /// Runs the build. Orchestrates calls to <see cref="PrepareBuild"/> and <see cref="Build"/>.
@@ -57,7 +57,9 @@ namespace CK.Env
 
             using( m.OpenDebug( "Before preparing builds." ) )
             {
-                if( !OnBeforePrepareBuild( m ) ) return null;
+                var newdDepContext = OnBeforePrepareBuild( m );
+                if( newdDepContext == null ) return null;
+                DependentSolutionContext = newdDepContext;
             }
             BuildResult result = null;
             using( m.OpenInfo( "Preparing builds." ) )
@@ -94,9 +96,9 @@ namespace CK.Env
             return null;
         }
 
-        protected virtual bool OnBeforePrepareBuild( IActivityMonitor m )
+        protected virtual IDependentSolutionContext OnBeforePrepareBuild( IActivityMonitor m )
         {
-            return true;
+            return DependentSolutionContext;
         }
 
         protected virtual bool OnBeforeBuild( IActivityMonitor m, BuildResult result )
