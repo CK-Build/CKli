@@ -15,14 +15,14 @@ namespace CK.Env
         {
             NoUnitTests = (bool?)e.Attribute( nameof( NoUnitTests ) ) ?? false;
             NoStrongNameSigning = (bool?)e.Attribute( nameof( NoStrongNameSigning ) ) ?? false;
-            ProduceCKSetupComponents = (bool?)e.Attribute( nameof(ProduceCKSetupComponents) ) ?? false;
+            UseCKSetup = (bool?)e.Attribute( nameof(UseCKSetup) ) ?? false;
             DisableSourceLink = (bool?)e.Attribute( nameof(DisableSourceLink) ) ?? false;
             SqlServer = (string)e.Attribute( nameof( SqlServer ) );
 
             NuGetSources = e.Elements( nameof( NuGetSources) )
                              .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Name" ), s => new NuGetSource( s ) )
                              .Values;
-            ExcludedNuGetSourceNames = e.Elements( nameof( ExcludedNuGetSourceNames ) )
+            RemoveNuGetSourceNames = e.Elements( nameof( RemoveNuGetSourceNames ) )
                                         .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Name" ) );
 
             ArtifactTargets = e.Elements( nameof( ArtifactTargets ) )
@@ -37,26 +37,26 @@ namespace CK.Env
         {
             NoUnitTests = other.NoUnitTests;
             NoStrongNameSigning = other.NoStrongNameSigning;
-            ProduceCKSetupComponents = other.ProduceCKSetupComponents;
+            UseCKSetup = other.UseCKSetup;
             DisableSourceLink = other.DisableSourceLink;
             SqlServer = other.SqlServer;
             if( applyConfig == null )
             {
-                ExcludedNuGetSourceNames = other.ExcludedNuGetSourceNames;
+                RemoveNuGetSourceNames = other.RemoveNuGetSourceNames;
                 NuGetSources = other.NuGetSources;
                 ArtifactTargets = other.ArtifactTargets;
             }
             else
             {
-                var excludedNuGetSourceNames = new HashSet<string>( other.ExcludedNuGetSourceNames );
+                var excludedNuGetSourceNames = new HashSet<string>( other.RemoveNuGetSourceNames );
                 var nuGetSources = other.NuGetSources.ToDictionary( s => s.Name );
                 var artifactTargets = new HashSet<IArtifactRepository>( other.ArtifactTargets );
 
                 var disableSourceLink = (bool?)applyConfig.Attribute( nameof( DisableSourceLink ) );
                 if( disableSourceLink.HasValue ) DisableSourceLink = disableSourceLink.Value;
 
-                var produceCKSetupComponents = (bool?)applyConfig.Attribute( nameof( ProduceCKSetupComponents ) );
-                if( produceCKSetupComponents.HasValue ) ProduceCKSetupComponents= produceCKSetupComponents.Value;
+                var produceCKSetupComponents = (bool?)applyConfig.Attribute( nameof( UseCKSetup ) );
+                if( produceCKSetupComponents.HasValue ) UseCKSetup= produceCKSetupComponents.Value;
 
                 var noUnitTests = (bool?)applyConfig.Attribute( nameof( NoUnitTests ) );
                 if( noUnitTests.HasValue ) NoUnitTests = noUnitTests.Value;
@@ -71,7 +71,7 @@ namespace CK.Env
                                 .ApplyAddRemoveClear( nuGetSources, s => (string)s.AttributeRequired( "Name" ), s => new NuGetSource( s ) )
                                 .Values;
 
-                ExcludedNuGetSourceNames = applyConfig.Elements( nameof( ExcludedNuGetSourceNames ) )
+                RemoveNuGetSourceNames = applyConfig.Elements( nameof( RemoveNuGetSourceNames ) )
                                             .ApplyAddRemoveClear( excludedNuGetSourceNames, s => (string)s.AttributeRequired( "Name" ) );
 
                 ArtifactTargets = applyConfig.Elements( nameof( ArtifactTargets ) )
@@ -86,7 +86,7 @@ namespace CK.Env
 
         public bool NoStrongNameSigning { get; }
 
-        public bool ProduceCKSetupComponents { get; }
+        public bool UseCKSetup { get; }
 
         public bool DisableSourceLink { get; }
 
@@ -94,7 +94,7 @@ namespace CK.Env
 
         public IReadOnlyCollection<INuGetSource> NuGetSources { get; }
 
-        public IReadOnlyCollection<string> ExcludedNuGetSourceNames { get; }
+        public IReadOnlyCollection<string> RemoveNuGetSourceNames { get; }
 
         public IReadOnlyCollection<IArtifactRepository> ArtifactTargets { get; }
 

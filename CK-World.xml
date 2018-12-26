@@ -26,11 +26,11 @@
         <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
       </add>
     </NuGetSources>
-    <ExcludedNuGetSourceNames>
+    <RemoveNuGetSourceNames>
       <add Name="Invenietis - Release" />
       <add Name="Invenietis - Preview" />
       <add Name="Invenietis - CI" />
-    </ExcludedNuGetSourceNames>
+    </RemoveNuGetSourceNames>
     <ArtifactTargets>
       <add Name="NuGetAzure:Signature-OpenSource-Default" />
       <add Name="CKSetup:Public" />
@@ -59,7 +59,7 @@
     </GitFolder>
 
     <GitFolder Name="CK-AspNet-Auth" Url="https://github.com/Invenietis/CK-AspNet-Auth.git">
-      <SolutionSettings SqlServer="2016" />
+      <SolutionSettings SqlServer="2016" UseCKSetup="true" />
       <Branch Name="develop">
         <PrimarySolution />
       </Branch>
@@ -155,56 +155,56 @@
     </GitFolder>
 
     <GitFolder Name="CK-Database" Url="https://gitlab.com/signature-code/CK-Database.git">
-      <SolutionSettings SqlServer="2016" ProduceCKSetupComponents="true" />
+      <SolutionSettings SqlServer="2016" UseCKSetup="true" />
       <Branch Name="develop">
         <PrimarySolution CKSetupComponentProjects="CK.StObj.Model;CK.StObj.Runtime;CK.StObj.Engine;CK.Setupable.Model;CK.Setupable.Runtime;CK.Setupable.Engine;CK.SqlServer.Setup.Model;CK.SqlServer.Setup.Runtime;CK.SqlServer.Setup.Engine"  />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-DB" Url="https://github.com/Invenietis/CK-DB.git">
-      <SolutionSettings SqlServer="2016"/>
+      <SolutionSettings SqlServer="2016" UseCKSetup="true"/>
       <Branch Name="develop">
         <PrimarySolution TestProjectsArePublished="True" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-DB-GitHub" Url="https://github.com/Invenietis/CK-DB-GitHub.git">
-      <SolutionSettings SqlServer="2016"/>
+      <SolutionSettings SqlServer="2016" UseCKSetup="true"/>
       <Branch Name="develop">
         <PrimarySolution TestProjectsArePublished="True" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-DB-Actor-ActorEMail" Url="https://github.com/Invenietis/CK-DB-Actor-ActorEMail.git">
-      <SolutionSettings SqlServer="2016"/>
+      <SolutionSettings SqlServer="2016" UseCKSetup="true"/>
       <Branch Name="develop">
         <PrimarySolution TestProjectsArePublished="True" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-DB-SqlCKTrait" Url="https://github.com/Invenietis/CK-DB-SqlCKTrait.git">
-      <SolutionSettings SqlServer="2016"/>
+      <SolutionSettings SqlServer="2016" UseCKSetup="true"/>
       <Branch Name="develop">
         <PrimarySolution TestProjectsArePublished="True" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-DB-User-SimpleInvitation" Url="https://github.com/Invenietis/CK-DB-User-SimpleInvitation.git">
-      <SolutionSettings SqlServer="2016"/>
+      <SolutionSettings SqlServer="2016" UseCKSetup="true"/>
       <Branch Name="develop">
         <PrimarySolution TestProjectsArePublished="True" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-DB-User-UserPassword" Url="https://github.com/Invenietis/CK-DB-User-UserPassword.git">
-      <SolutionSettings SqlServer="2016"/>
+      <SolutionSettings SqlServer="2016" UseCKSetup="true"/>
       <Branch Name="develop">
         <PrimarySolution TestProjectsArePublished="True" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Setup" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-setup.git">
-      <SolutionSettings ProduceCKSetupComponents="true" />
+      <SolutionSettings UseCKSetup="true" />
       <Branch Name="develop">
         <PrimarySolution CKSetupComponentProjects="CKSetup.Runner;CKSetup" />
       </Branch>
@@ -217,13 +217,13 @@
     </GitFolder>
 
     <GitFolder Name="CKSetupRemoteStore" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/cksetupremotestore.git">
-      <Branch Name="develop">
+      <Branch Name="develop" UseCKSetup="true">
         <PrimarySolution NotPublishedProjects="CKSetupRemoteStore;CKSetupInstaller" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Sqlite" Url="https://github.com/Invenietis/CK-Sqlite.git">
-      <SolutionSettings ProduceCKSetupComponents="true" />
+      <SolutionSettings UseCKSetup="true" />
       <Branch Name="develop">
         <PrimarySolution CKSetupComponentProjects="CK.Sqlite.Setup.Model;CK.Sqlite.Setup.Runtime" />
       </Branch>

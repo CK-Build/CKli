@@ -35,7 +35,7 @@ namespace CK.Env.Plugins.SolutionFiles
                 f.OnLocalBranchLeaving += OnLocalBranchLeaving;
             }
             // If the settings states that CKSetup is not used, there is no need to react to builds.
-            if( _settings.ProduceCKSetupComponents )
+            if( _settings.UseCKSetup )
             {
                 _solutionDriver.OnStartBuild += OnStartBuild;
                 _solutionDriver.OnBuildSucceed += OnBuildEnd;
@@ -45,7 +45,7 @@ namespace CK.Env.Plugins.SolutionFiles
 
         void OnStartBuild( object sender, BuildStartEventArgs e )
         {
-            Debug.Assert( _settings.ProduceCKSetupComponents );
+            Debug.Assert( _settings.UseCKSetup );
             if( !e.IsUsingDirtyFolder ) return;
 
             // The CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL environment variable is always required
@@ -86,7 +86,7 @@ namespace CK.Env.Plugins.SolutionFiles
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
-            if( PluginBranch == StandardGitStatus.Local && _settings.ProduceCKSetupComponents && !_settings.NoUnitTests )
+            if( PluginBranch == StandardGitStatus.Local && _settings.UseCKSetup && !_settings.NoUnitTests )
             {
                 EnsureStorePath( m, _localFeedProvider.Local.GetCKSetupStorePath() );
             }
@@ -109,7 +109,7 @@ namespace CK.Env.Plugins.SolutionFiles
 
         void OnLocalBranchEntered( object sender, EventMonitoredArgs e )
         {
-            if( _settings.ProduceCKSetupComponents ) EnsureStorePath( e.Monitor, _localFeedProvider.Local.GetCKSetupStorePath() );
+            if( _settings.UseCKSetup ) EnsureStorePath( e.Monitor, _localFeedProvider.Local.GetCKSetupStorePath() );
         }
 
         public bool EnsureStorePath( IActivityMonitor m, string storePath )

@@ -54,7 +54,7 @@ namespace CK.Env.Plugins.SolutionFiles
                 required.Add( s.SecretKeyName, s.Secret );
             }
 
-            if( _settings.ProduceCKSetupComponents )
+            if( _settings.UseCKSetup )
             {
                 var storeInfo = _settings.ArtifactTargets.Select( t => t.Info ).OfType<ICKSetupStoreInfo>().SingleOrDefault();
                 if( storeInfo == null )

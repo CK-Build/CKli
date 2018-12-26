@@ -80,7 +80,7 @@ namespace CK.Env.Plugins.SolutionFiles
                     EnsureFeedCredentials( m, s.Name, s.Credentials.UserName, s.Credentials.Password );
                 }
             }
-            foreach( var name in _settings.ExcludedNuGetSourceNames )
+            foreach( var name in _settings.RemoveNuGetSourceNames )
             {
                 RemoveFeed( m, name, withCredentials: true );
             }

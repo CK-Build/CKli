@@ -19,10 +19,13 @@ namespace CK.Env
         /// </summary>
         bool NoStrongNameSigning { get; }
 
-         /// <summary>
-        /// Gets whether the solution produces CKSetup components.
+        /// <summary>
+        /// Gets whether the solution uses CKSetup components.
+        /// When true (and when <see cref="NoUnitTests"/> is false), a RemoteStore.TestHelper.config file
+        /// is created during build so that stores in CK-Env local folders are used instead of the default
+        /// local (%UserProfile%AppData\Local\CKSetupStore) and default remote (https://cksetup.invenietis.net).
         /// </summary>
-        bool ProduceCKSetupComponents { get; }
+        bool UseCKSetup { get; }
 
        /// <summary>
         /// Gets whether source link is disabled.
@@ -49,7 +52,7 @@ namespace CK.Env
         /// Must be used to clean up existing source names that must no more be used.
         /// Impacts NuGet.config file.
         /// </summary>
-        IReadOnlyCollection<string> ExcludedNuGetSourceNames { get; }
+        IReadOnlyCollection<string> RemoveNuGetSourceNames { get; }
 
         /// <summary>
         /// Gets the repository where produced artifacts must be pushed.

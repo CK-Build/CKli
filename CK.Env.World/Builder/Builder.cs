@@ -15,6 +15,7 @@ namespace CK.Env
     abstract class Builder
     {
         protected readonly Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> DriverFinder;
+        protected readonly ZeroBuilder ZeroBuilder;
         readonly BuildResultType _type;
         readonly ISolutionDriver[] _drivers;
         readonly Dictionary<string, SVersion> _packagesVersion;
@@ -23,14 +24,17 @@ namespace CK.Env
         readonly ArtifactCenter _artifacts;
 
         protected Builder(
+            ZeroBuilder zeroBuilder,
             BuildResultType type,
             ArtifactCenter artifacts,
             IDependentSolutionContext ctx,
             Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
         {
+            if( zeroBuilder == null ) throw new ArgumentNullException( nameof( zeroBuilder ) );
             if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
             if( driverFinder == null ) throw new ArgumentNullException( nameof( driverFinder ) );
             if( artifacts == null ) throw new ArgumentNullException( nameof( artifacts ) );
+            ZeroBuilder = zeroBuilder;
             _type = type;
             _artifacts = artifacts;
             DependentSolutionContext = ctx;
@@ -55,68 +59,33 @@ namespace CK.Env
         {
             if( _packagesVersion.Count > 0 ) throw new InvalidOperationException();
 
-            using( m.OpenDebug( "Before preparing builds." ) )
-            {
-                var newdDepContext = OnBeforePrepareBuild( m );
-                if( newdDepContext == null ) return null;
-                DependentSolutionContext = newdDepContext;
-            }
             BuildResult result = null;
             using( m.OpenInfo( "Preparing builds." ) )
             {
                 if( !RunPrepareBuild( m ) )
                 {
                     m.CloseGroup( "Failed." );
-                    OnPrepareBuildFailed( m );
                     return null;
                 }
                 result = BuildResult.Create( m, _type, _artifacts, DependentSolutionContext.Solutions, _targetVersions, GetReleaseNotes() );
                 if( result == null ) return null;
                 m.CloseGroup( "Success." );
             }
-            using( m.OpenDebug( "Before running builds." ) )
-            {
-                if( !OnBeforeBuild( m, result ) ) return null;
-            }
             using( m.OpenInfo( "Running builds." ) )
             {
                 if( !RunBuild( m ) )
                 {
                     m.CloseGroup( "Failed." );
-                    OnBuildFailed( m );
                     return null;
                 }
                 m.CloseGroup( "Success." );
             }
-            return OnBuildSuccess( m, result );
+            return result;
         }
 
         protected virtual IReadOnlyList<ReleaseNoteInfo> GetReleaseNotes()
         {
             return null;
-        }
-
-        protected virtual IDependentSolutionContext OnBeforePrepareBuild( IActivityMonitor m )
-        {
-            return DependentSolutionContext;
-        }
-
-        protected virtual bool OnBeforeBuild( IActivityMonitor m, BuildResult result )
-        {
-            return true;
-        }
-
-        protected virtual void OnPrepareBuildFailed( IActivityMonitor m )
-        {
-        }
-
-        protected virtual void OnBuildFailed( IActivityMonitor m )
-        {
-        }
-
-        protected virtual BuildResult OnBuildSuccess( IActivityMonitor m, BuildResult result )
-        {
-            return result;
         }
 
         bool RunPrepareBuild( IActivityMonitor m )
@@ -138,6 +107,7 @@ namespace CK.Env
                 {
                     var pr = PrepareBuild( m, s, driver, upgrades );
                     if( pr.Version == null ) return false;
+                    ZeroBuilder.RegisterSHAlias( m );
                     m.CloseGroup( $"Target version: {pr.Version}{(pr.MustBuild ? "" :" (no build required)")}" );
                     _targetVersions[i] = pr.MustBuild ? pr.Version : null;
                     _packagesVersion.AddRange( s.GeneratedPackages.Select( p => new KeyValuePair<string, SVersion>( p.Name, pr.Version ) ) );
@@ -165,6 +135,7 @@ namespace CK.Env
                 {
                     // _targetVersions[i] is null if build must not be done.
                     if( !Build( m, solutions[i], _drivers[i], _upgrades[i], _targetVersions[i], buildProjectsUpgrade ) ) return false;
+                    ZeroBuilder.RegisterSHAlias( m );
                 }
             }
             return true;

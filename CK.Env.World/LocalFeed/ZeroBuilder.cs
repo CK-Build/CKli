@@ -12,11 +12,11 @@ namespace CK.Env
     class ZeroBuilder
     {
         readonly IEnvLocalFeedProvider _localFeedProvider;
+        readonly IDependentSolutionContext _depContext;
         readonly Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> _driverFinder;
         readonly NormalizedPath _memPath;
         readonly Dictionary<string, HashSet<string>> _sha1Cache;
         readonly HashSet<string> _mustBuild;
-        readonly IDependentSolutionContext _depContext;
         readonly string[] _currentShas;
         readonly Dictionary<string, ISolutionDriver> _driverMap;
         readonly HashSet<string> _allShas;
@@ -29,17 +29,18 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         public void RegisterSHAlias( IActivityMonitor m )
         {
-            bool mustReadSha = true;
-            if( !IsInitialized )
-            {
-                ReadCurrentSha( m );
-                mustReadSha = false;
-            }
+            Debug.Assert( IsInitialized );
+            //bool mustReadSha = true;
+            //if( !IsInitialized )
+            //{
+            //    ReadCurrentSha( m );
+            //    mustReadSha = false;
+            //}
             using( m.OpenInfo( "Registering Sha signatures aliases." ) )
             {
                 foreach( var p in _depContext.BuildProjectsInfo )
                 {
-                    if( mustReadSha ) _currentShas[p.Index] = _driverMap[p.SolutionName].GitRepository.Head.GetSha( p.PrimarySolutionRelativeFolderPath );
+                    _currentShas[p.Index] = _driverMap[p.SolutionName].GitRepository.Head.GetSha( p.PrimarySolutionRelativeFolderPath );
                     AddCurrentShaToCache( m, p );
                 }
                 SaveShaCache( m );
@@ -48,7 +49,7 @@ namespace CK.Env
 
         /// <summary>
         /// Runs the builder: publishes the build projects that needs to be.
-        /// This can be called multiple times (internal state is refreshed as needed).
+        /// This is private: <see cref="EnsureZeroBuildProjects"/> calls it.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
@@ -189,27 +190,28 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Encapsulates creation, initalization (<see cref="ReadCurrentSha"/>) and <see cref="Run"/>.
+        /// Encapsulates creation, initalization and run of the builds.
+        /// Solutions are necessarily relodaded by this call even if the Zero build fails.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="feeds">The local feeds.</param>
         /// <param name="depContext">The dependency context to consider.</param>
+        /// <param name="solutionReloader">Required solutions reloader.</param>
         /// <param name="driverFinder">The driver finder by solution name.</param>
-        /// <param name="solutionReloader">Optional solutions reloader.</param>
         /// <returns>The ZeroBuilder on success, null on error.</returns>
         public static ZeroBuilder EnsureZeroBuildProjects(
             IActivityMonitor m,
             IEnvLocalFeedProvider feeds,
-            IDependentSolutionContext depContext,
-            Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder,
-            Func<IActivityMonitor,bool> solutionReloader )
+            IDependentSolutionContext depContext,           
+            Func<IActivityMonitor,bool> solutionReloader,
+            Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
         {
             using( m.OpenInfo( $"Building ZeroVersion projects." ) )
             {
                 var builder = ZeroBuilder.Create( m, feeds, depContext, driverFinder, solutionReloader );
                 if( builder == null ) return null;
-                bool success = builder.Run( m );
-                if( solutionReloader != null ) success &= solutionReloader.Invoke( m );
+                // Do not use && here: solutions must always be reloaded.
+                bool success = builder.Run( m ) & solutionReloader( m );
                 return success ? builder : null;
             }
         }

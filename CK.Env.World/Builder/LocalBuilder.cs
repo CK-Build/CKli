@@ -13,11 +13,12 @@ namespace CK.Env
         readonly bool _withUnitTest;
 
         public LocalBuilder(
+                ZeroBuilder zeroBuilder,
                 ArtifactCenter artifacts,
                 IDependentSolutionContext ctx,
                 Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder,
                 bool withUnitTest )
-            : base( BuildResultType.Local, artifacts, ctx, driverFinder )
+            : base( zeroBuilder, BuildResultType.Local, artifacts, ctx, driverFinder )
         {
             _withUnitTest = withUnitTest;
             _commitTimes = new DateTimeOffset[ ctx.Solutions.Count ];

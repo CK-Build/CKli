@@ -421,7 +421,8 @@ namespace CK.Env
             {
                 Debug.Assert( !_closed && _f._tempBranch == this );
                 _f._git.Reset( ResetMode.Hard, _commit, new CheckoutOptions() { CheckoutModifiers = CheckoutModifiers.Force } );
-                _f._git.RemoveUntrackedFiles();
+                // Since we don't IncludeIgnored, we must not clear the untracked files.
+                // _f._git.RemoveUntrackedFiles();
 
                 if( _parent == null )
                 {

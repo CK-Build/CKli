@@ -35,6 +35,8 @@ namespace CK.Env.Plugins.SolutionFiles
             if( !_f.EnsureDirectory( m ) ) return;
             var solution = _solutionDriver.GetPrimarySolution( m );
             if( solution == null ) return;
+            bool? produceCKSetupComponents = _solutionDriver.AreCKSetupComponentsProduced( m );
+            if( produceCKSetupComponents == null ) return;
 
             var framework = MSBuildContext.Traits.FindOrCreate( "netcoreapp2.1" );
             Project ccbProject = solution.AllProjects.SingleOrDefault( p => p.Name == "CodeCakeBuilder" );
@@ -63,7 +65,7 @@ namespace CK.Env.Plugins.SolutionFiles
                 EnsureProjectReference( "NUnit.Runners.Net4",  "2.6.4" );
             }
             EnsureProjectReference( "SimpleGitVersion.Cake", "0.36.1--0015-develop" );
-            if( _settings.ProduceCKSetupComponents )
+            if( produceCKSetupComponents == true )
             {
                 EnsureProjectReference( "CKSetup.Cake", "0.36.1--0015-develop" );
 

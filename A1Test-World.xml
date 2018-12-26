@@ -33,11 +33,11 @@
         <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
       </add>
     </NuGetSources>
-    <ExcludedNuGetSourceNames>
+    <RemoveNuGetSourceNames>
       <add Name="Invenietis - Release" />
       <add Name="Invenietis - Preview" />
       <add Name="Invenietis - CI" />
-    </ExcludedNuGetSourceNames>
+    </RemoveNuGetSourceNames>
     <ArtifactTargets>
       <add Name="NuGetAzure:Signature-OpenSource-CKEnvTest3" />
       <add Name="CKSetup:CKEnvTest" />
@@ -80,7 +80,7 @@
     </GitFolder>
 
     <GitFolder Name="CK-Setup" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-setup.git">
-      <SolutionSettings ProduceCKSetupComponents="true" />
+      <SolutionSettings UseCKSetup="true" />
       <Branch Name="develop">
         <PrimarySolution CKSetupComponentProjects="CKSetup.Runner;CKSetup" />
       </Branch>

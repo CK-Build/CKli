@@ -457,7 +457,7 @@ namespace CK.Env
                 var depContext = GetSolutionDependentContext( m );
                 if( depContext == null ) return;
 
-                if( ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, DriverFinder, ReloadSolutions ) == null ) return;
+                if( ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, ReloadSolutions, DriverFinder ) == null ) return;
 
                 if( !error() )
                 {
@@ -490,7 +490,7 @@ namespace CK.Env
             {
                 var depContext = GetSolutionDependentContext( m );
                 if( depContext == null ) return;
-                ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, DriverFinder, ReloadSolutions );
+                ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, ReloadSolutions, DriverFinder );
             } );
         }
 
@@ -512,18 +512,16 @@ namespace CK.Env
                 var depContext = GetSolutionDependentContext( m );
                 if( depContext == null ) return;
 
-                ZeroBuilder zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, DriverFinder, null );
+                ZeroBuilder zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, ReloadSolutions, DriverFinder );
                 if( zBuilder == null ) return;
 
-                depContext = GetSolutionDependentContext( m, true );
+                depContext = GetSolutionDependentContext( m );
                 if( depContext == null ) return;
 
                 Builder builder = CachedGlobalGitStatus == StandardGitStatus.Local
-                                ? (Builder)new LocalBuilder( _artifacts, depContext, DriverFinder, withUnitTest )
-                                : new DevelopBuilder( _artifacts, depContext, DriverFinder, withUnitTest );
-                if( !RunBuild( m, builder ) ) return;
-
-                zBuilder.RegisterSHAlias( m );
+                                ? (Builder)new LocalBuilder( zBuilder, _artifacts, depContext, DriverFinder, withUnitTest )
+                                : new DevelopBuilder( zBuilder, _artifacts, depContext, DriverFinder, withUnitTest );
+                RunBuild( m, builder );
             } );
         }
 
@@ -587,16 +585,14 @@ namespace CK.Env
                 var depContext = GetSolutionDependentContext( m );
                 if( depContext == null ) return;
 
-                var zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, DriverFinder, null );
+                var zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, ReloadSolutions, DriverFinder );
                 if( zBuilder == null ) return;
 
-                depContext = GetSolutionDependentContext( m, true );
+                depContext = GetSolutionDependentContext( m );
                 if( depContext == null ) return;
 
-                var builder = new DevelopBuilder( _artifacts, depContext, DriverFinder, false );
+                var builder = new DevelopBuilder( zBuilder, _artifacts, depContext, DriverFinder, false );
                 if( !RunBuild( m, builder ) ) return;
-
-                zBuilder.RegisterSHAlias( m );
 
                 if( !error() )
                 {
@@ -691,20 +687,13 @@ namespace CK.Env
 
             SetWorkStatus( GlobalWorkStatus.Releasing );
             if( !Save( monitor ) ) return false;
-            return DoReleasing( monitor, roadmap );
+
+            return DoReleasing( monitor );
         }
 
-        bool DoReleasing( IActivityMonitor monitor, ReleaseRoadmap roadmap = null )
+        bool DoReleasing( IActivityMonitor monitor )
         {
-            if( roadmap == null )
-            {
-                roadmap = LoadRoadmap( monitor );
-                if( roadmap == null || !roadmap.IsValid )
-                {
-                    monitor.Error( $"Road map is invalid. Current release should be cancelled." );
-                    return false;
-                }
-            }
+
             return RunSafe( monitor, $"Starting Release.", ( m, error ) =>
             {
                 var snapshot = GeneralState.Element( "GitSnapshot" );
@@ -722,8 +711,23 @@ namespace CK.Env
                         if( !_localFeedProvider.Release.RemoveAll( m ) ) return;
                     }
                 }
-                var b = new ReleaseBuilder( _artifacts, roadmap, _localFeedProvider, DriverFinder, GetSolutionDependentContext );
+
+                var depContext = GetSolutionDependentContext( m );
+                if( depContext == null ) return;
+
+                ZeroBuilder zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, ReloadSolutions, DriverFinder );
+                if( zBuilder == null ) return;
+
+                var roadmap = LoadRoadmap( monitor );
+                if( roadmap == null || !roadmap.IsValid )
+                {
+                    monitor.Error( $"Road map is invalid. Current release should be cancelled." );
+                    return;
+                }
+
+                var b = new ReleaseBuilder( zBuilder, _artifacts, roadmap, _localFeedProvider, DriverFinder );
                 if( !RunBuild( m, b ) ) return;
+
                 if( !error() )
                 {
                     SetWorkStatusAndSave( m, GlobalWorkStatus.WaitingReleaseConfirmation );

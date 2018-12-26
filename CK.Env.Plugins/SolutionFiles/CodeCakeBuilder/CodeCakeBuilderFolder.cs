@@ -33,16 +33,9 @@ namespace CK.Env.Plugins.SolutionFiles
             SetTextResource( m, "Build.NuGetHelper.cs" );
             SetTextResource( m, "Build.StandardCheckRepository.cs", AdaptStandardCheckRepositoryForPushFeeds );
             SetTextResource( m, "Build.StandardSolutionBuild.cs" );
-            if( _settings.ProduceCKSetupComponents )
-            {
-                SetTextResource( m, "Build.StandardPushCKSetupComponents.cs", text => AdaptStandardStandardPushCKSetupComponents( m, text ) );
-            }
-            else
-            {
-                DeleteFile( m, "Build.StandardPushCKSetupComponents.cs" );
-            }
             if( _settings.NoUnitTests )
             {
+                m.Info( "Removing Build.StandardUnitTests since NoUnitTests is true." );
                 DeleteFile( m, "Build.StandardUnitTests.cs" );
             }
             else
@@ -51,6 +44,19 @@ namespace CK.Env.Plugins.SolutionFiles
             }
             SetTextResource( m, "Build.StandardCreateNuGetPackages.cs" );
             SetTextResource( m, "Build.StandardPushNuGetPackages.cs" );
+
+            bool? produceCKSetupComponents = _driver.AreCKSetupComponentsProduced( m );
+            if( produceCKSetupComponents == null ) return;
+
+            if( produceCKSetupComponents == true )
+            {
+                m.Info( "Adding Build.StandardPushCKSetupComponents.cs since CKSetup components are produced." );
+                SetTextResource( m, "Build.StandardPushCKSetupComponents.cs", text => AdaptStandardStandardPushCKSetupComponents( m, text ) );
+            }
+            else
+            {
+                DeleteFile( m, "Build.StandardPushCKSetupComponents.cs" );
+            }
         }
 
         string AdaptStandardStandardPushCKSetupComponents( IActivityMonitor monitor, string text )

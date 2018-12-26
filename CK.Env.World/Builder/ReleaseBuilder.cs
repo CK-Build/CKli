@@ -12,30 +12,20 @@ namespace CK.Env
         readonly string[] _commits;
         readonly ReleaseRoadmap _roadmap;
         readonly IEnvLocalFeedProvider _localFeedProvider;
-        readonly Func<IActivityMonitor, bool, IDependentSolutionContext> _depContextReloader;
-        ZeroBuilder _zBuilder;
 
         public ReleaseBuilder(
+                ZeroBuilder zeroBuilder,
                 ArtifactCenter artifacts,
                 ReleaseRoadmap roadmap,
                 IEnvLocalFeedProvider localFeedProvider,
-                Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder,
-                Func<IActivityMonitor,bool, IDependentSolutionContext> depContextReloader )
-            : base( BuildResultType.Release, artifacts, roadmap.DependentSolutionContext, driverFinder )
+                Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
+            : base( zeroBuilder, BuildResultType.Release, artifacts, roadmap.DependentSolutionContext, driverFinder )
         {
             _commits = new string[roadmap.DependentSolutionContext.Solutions.Count];
             _localFeedProvider = localFeedProvider;
-            _depContextReloader = depContextReloader;
             _roadmap = roadmap;
         }
 
-        protected override IDependentSolutionContext OnBeforePrepareBuild( IActivityMonitor m )
-        {
-            _zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, DependentSolutionContext, DriverFinder, null );
-            return _zBuilder != null
-                    ? _depContextReloader( m, true )
-                    : null;
-        }
 
         protected override (SVersion Version, bool MustBuild) PrepareBuild( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades )
         {
@@ -53,12 +43,6 @@ namespace CK.Env
         }
 
         protected override IReadOnlyList<ReleaseNoteInfo> GetReleaseNotes() => _roadmap.GetReleaseNotes();
-
-        protected override bool OnBeforeBuild( IActivityMonitor m, BuildResult result )
-        {
-            _zBuilder.RegisterSHAlias( m );
-            return true;
-        }
 
         protected override bool Build(
             IActivityMonitor m,
@@ -126,12 +110,6 @@ namespace CK.Env
                 m.Error( "Build failed.", ex );
                 return false;
             }
-        }
-
-        protected override BuildResult OnBuildSuccess( IActivityMonitor m, BuildResult result )
-        {
-            _zBuilder.RegisterSHAlias( m );
-            return result;
         }
 
     }

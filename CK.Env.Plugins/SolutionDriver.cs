@@ -123,6 +123,17 @@ namespace CK.Env.Plugins
         }
 
         /// <summary>
+        /// Centralized way to know whether CKSetup components are produced by this solution.
+        /// </summary>
+        /// <param name="m">The monitor use.</param>
+        /// <returns>Whether CKSetup components are produced, null on error.</returns>
+        public bool? AreCKSetupComponentsProduced( IActivityMonitor m ) => !_settings.UseCKSetup
+                                                                        ? false 
+                                                                        : GetAllSolutions( m )
+                                                                          ?.SelectMany( s => s.CKSetupComponentProjects )
+                                                                          .Any();
+
+        /// <summary>
         /// Fires before a build.
         /// </summary>
         public event EventHandler<BuildStartEventArgs> OnStartBuild;
