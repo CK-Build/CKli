@@ -11,7 +11,6 @@ namespace CK.Env
     {
         readonly string[] _commits;
         readonly ReleaseRoadmap _roadmap;
-        readonly IEnvLocalFeedProvider _localFeedProvider;
 
         public ReleaseBuilder(
                 ZeroBuilder zeroBuilder,
@@ -19,10 +18,9 @@ namespace CK.Env
                 ReleaseRoadmap roadmap,
                 IEnvLocalFeedProvider localFeedProvider,
                 Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
-            : base( zeroBuilder, BuildResultType.Release, artifacts, roadmap.DependentSolutionContext, driverFinder )
+            : base( zeroBuilder, BuildResultType.Release, artifacts, localFeedProvider, roadmap.DependentSolutionContext, driverFinder )
         {
             _commits = new string[roadmap.DependentSolutionContext.Solutions.Count];
-            _localFeedProvider = localFeedProvider;
             _roadmap = roadmap;
         }
 

@@ -44,7 +44,7 @@ namespace CK.Env.Plugins.SolutionFiles
 
         void OnLocalBranchEntered( object sender, EventMonitoredArgs e )
         {
-            EnsureLocalFeeds( e.Monitor );
+            EnsureLocalFeeds( e.Monitor, true, true, true );
             Save( e.Monitor );
         }
 
@@ -160,7 +160,7 @@ namespace CK.Env.Plugins.SolutionFiles
         /// <param name="ensureLocal">True to add the LocalFeed/Local.</param>
         /// <param name="ensureDevelop">True to add the LocalFeed/Develop.</param>
         /// <param name="ensureRelease">True to add the LocalFeed/Release.</param>
-        public void EnsureLocalFeeds( IActivityMonitor m, bool ensureLocal = true, bool ensureDevelop = true, bool ensureRelease = true )
+        public void EnsureLocalFeeds( IActivityMonitor m, bool ensureLocal = false, bool ensureDevelop = false, bool ensureRelease = false )
         {
             if( ensureLocal )
             {

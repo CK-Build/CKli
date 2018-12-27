@@ -44,12 +44,11 @@ namespace CK.Env
         IEnumerable<LocalNuGetPackageFile> GetAllPackageFiles( IActivityMonitor m );
 
         /// <summary>
-        /// Removes a specific version of a package.
+        /// Removes a an artifact instance.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="packageId">The package identifier.</param>
-        /// <param name="version">The package's version.</param>
-        void Remove( IActivityMonitor m, string packageId, SVersion version );
+        /// <param name="instance">The artifact to remove.</param>
+        void Remove( IActivityMonitor m, ArtifactInstance instance );
 
         /// <summary>
         /// Locates all instances of the required artifacts and pushes them to the given target.

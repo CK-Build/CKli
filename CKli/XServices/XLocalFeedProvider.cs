@@ -91,10 +91,28 @@ namespace CKli
                 else throw new InvalidOperationException( $"Unhandled repository type: {target.Info.UniqueArtifactRepositoryName}" );
             }
 
-            public void Remove( IActivityMonitor m, string packageId, SVersion version )
+            public void Remove( IActivityMonitor m, ArtifactInstance instance )
             {
-                var f = GetPackagePath( PhysicalPath, packageId, version );
-                if( File.Exists( f ) ) File.Delete( f );
+                if( instance.Artifact.Type == "NuGet" )
+                {
+                    var f = GetPackagePath( PhysicalPath, instance.Artifact.Name, instance.Version );
+                    if( File.Exists( f ) )
+                    {
+                        File.Delete( f );
+                        m.Info( $"Removed {instance} from {PhysicalPath}." );
+                    }
+                }
+                else
+                {
+                    var storePath = this.GetCKSetupStorePath();
+                    using( var store = LocalStore.OpenOrCreate( m, storePath ) )
+                    {
+                        if( store.RemoveComponents( c => c.Name == instance.Artifact.Name && c.Version == instance.Version ) != 0 )
+                        {
+                            m.Info( $"Removed {instance} CKSetup component from {storePath}." );
+                        }
+                    }
+                }
             }
 
             public bool RemoveAll( IActivityMonitor m )
@@ -104,7 +122,7 @@ namespace CKli
                     bool success = true;
                     foreach( var d in Directory.EnumerateDirectories( PhysicalPath ) )
                     {
-                        success &= FileSystem.RawDeleteLocalDirectory( m, d );
+                        FileSystem.RawDeleteLocalDirectory( m, d );
                     }
                     foreach( var f in Directory.EnumerateFiles( PhysicalPath ) )
                     {
@@ -146,6 +164,17 @@ namespace CKli
             var packageVersion = version.AsCSVersion?.ToString( CSVersionFormat.NuGetPackage ) ?? version.NormalizedText;
             var dirPath = _localNuGetCache.AppendPart( packageId ).AppendPart( packageVersion );
             return Directory.Exists( dirPath );
+        }
+
+        public void GlobalRemove( IActivityMonitor m, ArtifactInstance instance )
+        {
+            Local.Remove( m, instance );
+            CI.Remove( m, instance );
+            Release.Remove( m, instance );
+            if( instance.Artifact.Type == "NuGet" )
+            {
+                RemoveFromNuGetCache( m, instance.Artifact.Name, instance.Version );
+            }
         }
 
         static string GetPackagePath( string path, string packageId, SVersion v )

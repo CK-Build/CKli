@@ -15,10 +15,11 @@ namespace CK.Env
         public DevelopBuilder(
             ZeroBuilder zeroBuilder,
             ArtifactCenter artifacts,
+            IEnvLocalFeedProvider localFeedProvider,
             IDependentSolutionContext ctx,
             Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder,
             bool withUnitTest )
-            : base( zeroBuilder, BuildResultType.CI, artifacts, ctx, driverFinder )
+            : base( zeroBuilder, BuildResultType.CI, artifacts, localFeedProvider, ctx, driverFinder )
         {
             _commits = new string[ctx.Solutions.Count];
             _withUnitTest = withUnitTest;

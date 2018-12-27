@@ -15,10 +15,11 @@ namespace CK.Env
         public LocalBuilder(
                 ZeroBuilder zeroBuilder,
                 ArtifactCenter artifacts,
-                IDependentSolutionContext ctx,
+                IEnvLocalFeedProvider localFeedProvider,
+               IDependentSolutionContext ctx,
                 Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder,
                 bool withUnitTest )
-            : base( zeroBuilder, BuildResultType.Local, artifacts, ctx, driverFinder )
+            : base( zeroBuilder, BuildResultType.Local, artifacts, localFeedProvider, ctx, driverFinder )
         {
             _withUnitTest = withUnitTest;
             _commitTimes = new DateTimeOffset[ ctx.Solutions.Count ];

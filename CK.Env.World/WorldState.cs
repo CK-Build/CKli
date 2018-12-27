@@ -519,8 +519,8 @@ namespace CK.Env
                 if( depContext == null ) return;
 
                 Builder builder = CachedGlobalGitStatus == StandardGitStatus.Local
-                                ? (Builder)new LocalBuilder( zBuilder, _artifacts, depContext, DriverFinder, withUnitTest )
-                                : new DevelopBuilder( zBuilder, _artifacts, depContext, DriverFinder, withUnitTest );
+                                ? (Builder)new LocalBuilder( zBuilder, _artifacts, _localFeedProvider, depContext, DriverFinder, withUnitTest )
+                                : new DevelopBuilder( zBuilder, _artifacts, _localFeedProvider, depContext, DriverFinder, withUnitTest );
                 RunBuild( m, builder );
             } );
         }
@@ -591,7 +591,7 @@ namespace CK.Env
                 depContext = GetSolutionDependentContext( m );
                 if( depContext == null ) return;
 
-                var builder = new DevelopBuilder( zBuilder, _artifacts, depContext, DriverFinder, false );
+                var builder = new DevelopBuilder( zBuilder, _artifacts, _localFeedProvider, depContext, DriverFinder, false );
                 if( !RunBuild( m, builder ) ) return;
 
                 if( !error() )

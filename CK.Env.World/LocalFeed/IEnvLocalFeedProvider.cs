@@ -53,5 +53,11 @@ namespace CK.Env
         /// <returns>True if found, false otherwise.</returns>
         bool ExistsInNuGetCache( IActivityMonitor m, string packageId, SVersion version );
 
+        /// <summary>
+        /// Removes all possible existence of an artifact instance.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="instance">The artifact to remove.</param>
+        void GlobalRemove( IActivityMonitor m, ArtifactInstance instance );
     }
 }

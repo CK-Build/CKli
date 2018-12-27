@@ -16,6 +16,7 @@ namespace CK.Env
     {
         protected readonly Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> DriverFinder;
         protected readonly ZeroBuilder ZeroBuilder;
+        readonly IEnvLocalFeedProvider _localFeedProvider;
         readonly BuildResultType _type;
         readonly ISolutionDriver[] _drivers;
         readonly Dictionary<string, SVersion> _packagesVersion;
@@ -27,6 +28,7 @@ namespace CK.Env
             ZeroBuilder zeroBuilder,
             BuildResultType type,
             ArtifactCenter artifacts,
+            IEnvLocalFeedProvider localFeedProvider,
             IDependentSolutionContext ctx,
             Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
         {
@@ -34,9 +36,12 @@ namespace CK.Env
             if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
             if( driverFinder == null ) throw new ArgumentNullException( nameof( driverFinder ) );
             if( artifacts == null ) throw new ArgumentNullException( nameof( artifacts ) );
+            if( localFeedProvider == null ) throw new ArgumentNullException( nameof( localFeedProvider ) );
+
             ZeroBuilder = zeroBuilder;
             _type = type;
             _artifacts = artifacts;
+            _localFeedProvider = localFeedProvider;
             DependentSolutionContext = ctx;
             DriverFinder = driverFinder;
             _packagesVersion = new Dictionary<string, SVersion>();
@@ -69,6 +74,13 @@ namespace CK.Env
                 }
                 result = BuildResult.Create( m, _type, _artifacts, DependentSolutionContext.Solutions, _targetVersions, GetReleaseNotes() );
                 if( result == null ) return null;
+                using( m.OpenInfo( "Cleaning any already existing artifact that will be produced." ) )
+                {
+                    foreach( var a in result.GeneratedArtifacts )
+                    {
+                        _localFeedProvider.GlobalRemove( m, a.Artifact );
+                    }
+                }
                 m.CloseGroup( "Success." );
             }
             using( m.OpenInfo( "Running builds." ) )
