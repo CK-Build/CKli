@@ -960,7 +960,7 @@ namespace CK.Env
                         m.Error( $"Unable to find branch '{World.DevelopBranchName}'." );
                         return false;
                     }
-                    // Keep it safe for the moment: no auto merge from Ours or Theirs.
+                    // Auto merge from Ours or Theirs: we privilegiate the current branch.
                     MergeFileFavor mergeFileFavor = MergeFileFavor.Normal;
                     Branch local = _git.Branches[World.LocalBranchName];
                     if( local == null || !local.IsCurrentRepositoryHead )
@@ -992,7 +992,7 @@ namespace CK.Env
                     }
                     else
                     {
-                        m.Trace( $"Already on {World.LocalBranchName}: privilegiates 'local' file changes during merge." );
+                        m.Info( $"Already on {World.LocalBranchName}: privilegiates 'local' file changes during merge." );
                         mergeFileFavor = MergeFileFavor.Ours;
                         EnsureCurrentBranchPlugins( m );
                     }
@@ -1150,22 +1150,29 @@ namespace CK.Env
                         m.Error( $"Must be on '{World.LocalBranchName}' or '{World.DevelopBranchName}' branch." );
                         return false;
                     }
-                    if( !RaiseEnteredLocalBranch( m, false ) ) return false;
 
+                    // Auto merge from Ours or Theirs: we privilegiate the current branch.
+                    MergeFileFavor mergeFileFavor = MergeFileFavor.Normal;
                     if( bLocal.IsCurrentRepositoryHead )
                     {
+                        if( !RaiseEnteredLocalBranch( m, false ) ) return false;
                         if( !AmendCommit( m ) ) return false;
                         CheckoutWithPlugins( m, bDevelop );
+                        m.Info( $"Coming from {World.LocalBranchName}: privilegiates 'local' file changes during merge." );
+                        mergeFileFavor = MergeFileFavor.Theirs;
                     }
                     else
                     {
                         if( !CheckCleanCommit( m ) ) return false;
                         EnsureCurrentBranchPlugins( m );
+                        m.Info( $"Already on {World.DevelopBranchName}: privilegiates 'develop' file changes during merge." );
+                        mergeFileFavor = MergeFileFavor.Ours;
                     }
 
                     var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
                     var r = _git.Merge( bLocal, merger, new MergeOptions
                     {
+                        MergeFileFavor = mergeFileFavor,
                         FastForwardStrategy = FastForwardStrategy.NoFastForward,
                         FailOnConflict = true,
                         CommitOnSuccess = true
