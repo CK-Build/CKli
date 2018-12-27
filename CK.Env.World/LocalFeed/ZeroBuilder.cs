@@ -30,12 +30,6 @@ namespace CK.Env
         public void RegisterSHAlias( IActivityMonitor m )
         {
             Debug.Assert( IsInitialized );
-            //bool mustReadSha = true;
-            //if( !IsInitialized )
-            //{
-            //    ReadCurrentSha( m );
-            //    mustReadSha = false;
-            //}
             using( m.OpenInfo( "Registering Sha signatures aliases." ) )
             {
                 foreach( var p in _depContext.BuildProjectsInfo )
@@ -52,8 +46,9 @@ namespace CK.Env
         /// This is private: <see cref="EnsureZeroBuildProjects"/> calls it.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
+        /// <param name="mustReloadSolutions">True if solutions must be reloaded.</param>
         /// <returns>True on success, false on error.</returns>
-        bool Run( IActivityMonitor m )
+        bool Run( IActivityMonitor m, out bool mustReloadSolutions )
         {
             Debug.Assert( _mustBuild.Count == _depContext.BuildProjectsInfo.Count );
             ReadCurrentSha( m );
@@ -95,14 +90,18 @@ namespace CK.Env
                             {
                                 _mustBuild.Remove( p.FullName );
                                 m.CloseGroup( $"Project '{p}' is up to date. Build skipped." );
-                                continue;
                             }
                         }
                     }
                 }
-                if( _mustBuild.Count == 0 ) m.Info( "Nothing to build. Build projects are up-to-date." );
+                if( _mustBuild.Count == 0 )
+                {
+                    m.Info( "Nothing to build. Build projects are up-to-date." );
+                    mustReloadSolutions = false;
+                }
                 else
                 {
+                    mustReloadSolutions = true;
                     using( m.OpenTrace( "Creating protected scopes and applying zero dependencies." ) )
                     {
                         foreach( var p in _depContext.BuildProjectsInfo )
@@ -147,6 +146,7 @@ namespace CK.Env
             }
             finally
             {
+                m.Trace( "Closing protected scopes." );
                 foreach( var scope in scopeMap.Values ) scope.Dispose();
                 SaveShaCache( m );
             }
@@ -191,7 +191,7 @@ namespace CK.Env
 
         /// <summary>
         /// Encapsulates creation, initalization and run of the builds.
-        /// Solutions are necessarily relodaded by this call even if the Zero build fails.
+        /// Solutions are soon as version updates have been made.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="feeds">The local feeds.</param>
@@ -210,8 +210,8 @@ namespace CK.Env
             {
                 var builder = ZeroBuilder.Create( m, feeds, depContext, driverFinder, solutionReloader );
                 if( builder == null ) return null;
-                // Do not use && here: solutions must always be reloaded.
-                bool success = builder.Run( m ) & solutionReloader( m );
+                bool success = builder.Run( m, out bool mustReloadSolutions );
+                if( mustReloadSolutions ) solutionReloader( m );
                 return success ? builder : null;
             }
         }
