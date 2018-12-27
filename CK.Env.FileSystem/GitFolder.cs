@@ -752,7 +752,11 @@ namespace CK.Env
                 Commands.Stage( _git, "*" );
                 var s = _git.RetrieveStatus();
                 bool hasChange = s.IsDirty;
-                if( !hasChange )
+                if( hasChange )
+                {
+                    if( !dateUpdate ) date = DateTimeOffset.Now;
+                }
+                else
                 {
                     if( messageUpdate && dateUpdate ) m.Info( "Updating message and date." );
                     else if( dateUpdate ) m.Info( "Updating commit date." );
@@ -763,7 +767,6 @@ namespace CK.Env
                         return true;
                     }
                 }
-                else date = DateTimeOffset.Now;
                 return DoCommit( m, message, date.Value, true, hasChange );
             }
         }

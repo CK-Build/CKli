@@ -172,7 +172,7 @@ namespace CKli
                                              .ToDictionary( i => i.Artifact.Name, i => i.Version );
             if( ckSetupComponents.Count > 0 )
             {
-                using( var cache = LocalStore.Open( m, Facade.DefaultStorePath ) )
+                using( var cache = LocalStore.OpenOrCreate( m, Facade.DefaultStorePath ) )
                 {
                     cache.RemoveComponents( c => ckSetupComponents.TryGetValue( c.Name, out var v ) && c.Version == v );
                 }
