@@ -111,12 +111,12 @@ namespace CKli
             {
                 foreach( var c in ckSetupComponents )
                 {
-                    var idxU = s.PublishedProjects.IndexOf( p => p.Name == c );
-                    if( idxU < 0 )
+                    var p = s.AllProjects.FirstOrDefault( project => project.Name == c );
+                    if( p == null )
                     {
-                        m.Warn( $"CKSetupComponentProjects '{c}' not found in solution PublishedProjects: {s.PublishedProjects.Select( p => p.Name ).Concatenate()}." );
+                        m.Warn( $"CKSetupComponentProjects '{c}' not found in solution Projects: {s.AllProjects.Select( project => project.Name ).Concatenate()}." );
                     }
-                    else s.CKSetupComponentProjects.Add( s.PublishedProjects[idxU] );
+                    else s.CKSetupComponentProjects.Add( p );
                 }
             }
         }

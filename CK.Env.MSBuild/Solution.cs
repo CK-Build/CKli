@@ -192,8 +192,9 @@ namespace CK.Env.MSBuild
         public IList<Project> PublishedProjects { get; }
 
         /// <summary>
-        /// Gets the projects that must be in <see cref="PublishedProjects"/> and
-        /// are CKSetup components.
+        /// Gets the projects that are CKSetup components.
+        /// CKSetup components does not necessarily belong to <see cref="PublishedProjects"/>
+        /// (ie. they are not always published as NuGet packages) but this is often the case.
         /// This is empty by default: this must be filled explicitly.
         /// </summary>
         public IList<Project> CKSetupComponentProjects { get; }
