@@ -59,7 +59,7 @@
   </SolutionSettings>
 
   <Folder Name="Projects">
-
+    
     <GitFolder Name="CK-UnitsOfMeasure" Url="https://github.com/Invenietis/CK-UnitsOfMeasure.git">
       <Branch Name="develop">
         <PrimarySolution />

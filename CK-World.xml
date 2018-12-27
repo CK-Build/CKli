@@ -217,10 +217,11 @@
     </GitFolder>
 
     <GitFolder Name="CKSetupRemoteStore" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/cksetupremotestore.git">
-      <Branch Name="develop" UseCKSetup="true">
+      <SolutionSettings UseCKSetup="true" />
+      <Branch Name="develop">
         <PrimarySolution
-            NotPublishedProjects="CKSetupRemoteStore;CKSetupInstaller"
-            CKSetupComponentProjects="CKSetupInstaller" />
+              NotPublishedProjects="CKSetupRemoteStore;CKSetupInstaller"
+              CKSetupComponentProjects="CKSetupInstaller" />
       </Branch>
     </GitFolder>
 
