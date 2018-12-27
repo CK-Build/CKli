@@ -646,6 +646,30 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Gets whether <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/>.
+        /// </summary>
+        public bool CanPullAllBranches => WorkStatus == GlobalWorkStatus.Idle;
+
+        /// <summary>
+        /// Pulls all remote branches from 'origin'.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <returns>True on success, false on error.</returns>
+        [CommandMethod]
+        public bool PullAllBranches( IActivityMonitor monitor )
+        {
+            bool reloadNeeded = false;
+            foreach( var g in _gitRepositories )
+            {
+                if( !g.CheckCleanCommit( monitor ) ) return false;
+                var result = g.PullAllBranches( monitor );
+                if( !result.Success ) return false;
+                reloadNeeded |= result.ReloadNeeded;
+            }
+            return !reloadNeeded || ReloadSolutions( monitor );
+        }
+
+        /// <summary>
         /// Gets whether <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/>, <see cref="VersionSelector"/>
         /// and <see cref="CachedGlobalGitStatus"/> is on <see cref="StandardGitStatus.Develop"/>.
         /// </summary>
@@ -681,6 +705,7 @@ namespace CK.Env
                     reloadNeeded |= result.ReloadNeeded;
                 }
             }
+            if( reloadNeeded && !ReloadSolutions( monitor ) ) return false;
 
             var roadmap = DoEditRoadmap( monitor, !checkRoadmap && !reloadNeeded );
             if( roadmap == null ) return false;
