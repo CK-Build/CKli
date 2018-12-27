@@ -747,17 +747,17 @@ namespace CK.Env
                     m.CloseGroup( "Canceled by null date." );
                     return false;
                 }
-                bool messageUpdate = message != _git.Head.Tip.Message;
-                bool dateUpdate = date.Value != _git.Head.Tip.Committer.When;
                 Commands.Stage( _git, "*" );
                 var s = _git.RetrieveStatus();
                 bool hasChange = s.IsDirty;
                 if( hasChange )
                 {
-                    if( !dateUpdate ) date = DateTimeOffset.Now;
+                    if( editDate == null ) date = DateTimeOffset.Now;
                 }
                 else
                 {
+                    bool messageUpdate = message != _git.Head.Tip.Message;
+                    bool dateUpdate = date.Value != _git.Head.Tip.Committer.When;
                     if( messageUpdate && dateUpdate ) m.Info( "Updating message and date." );
                     else if( dateUpdate ) m.Info( "Updating commit date." );
                     else if( messageUpdate ) m.Info( "Only updating message." );
