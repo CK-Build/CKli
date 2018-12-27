@@ -15,6 +15,11 @@ namespace CK.Env
         string PrimarySolutionName { get; }
 
         /// <summary>
+        /// Gets the full physical path of the Git folder.
+        /// </summary>
+        NormalizedPath FullPhysicalPath { get; }
+
+        /// <summary>
         /// Get the path relative to the FileSystem.
         /// </summary>
         NormalizedPath SubPath { get; }

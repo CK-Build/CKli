@@ -166,14 +166,23 @@ namespace CKli
             return Directory.Exists( dirPath );
         }
 
-        public void GlobalRemove( IActivityMonitor m, ArtifactInstance instance )
+        public void RemoveFromAllCaches( IActivityMonitor m, IEnumerable<ArtifactInstance> instances )
         {
-            Local.Remove( m, instance );
-            CI.Remove( m, instance );
-            Release.Remove( m, instance );
-            if( instance.Artifact.Type == "NuGet" )
+            var ckSetupComponents = instances.Where( i => i.Artifact.Type == "CKSetup" )
+                                             .ToDictionary( i => i.Artifact.Name, i => i.Version );
+            if( ckSetupComponents.Count > 0 )
             {
-                RemoveFromNuGetCache( m, instance.Artifact.Name, instance.Version );
+                using( var cache = LocalStore.Open( m, Facade.DefaultStorePath ) )
+                {
+                    cache.RemoveComponents( c => ckSetupComponents.TryGetValue( c.Name, out var v ) && c.Version == v );
+                }
+            }
+            foreach( var i in instances )
+            {
+                if( i.Artifact.Type == "NuGet" )
+                {
+                    RemoveFromNuGetCache( m, i.Artifact.Name, i.Version );
+                }
             }
         }
 

@@ -381,9 +381,7 @@ namespace CK.Env.Plugins
                 }
             }
 
-            string solutionPath = primary.GitFolder.FullPath;
-            var ccbPath = CodeCakeBuilderHelper.GetExecutablePath( solutionPath );
-            var ccbVersion = File.Exists( ccbPath ) ? CodeCakeBuilderHelper.GetVersion( ccbPath ) : null;
+            var (ccbPath, ccbVersion) = CodeCakeBuilderHelper.GetExecutableInfo( primary.GitFolder );
 
             if( ccbVersion == SVersion.ZeroVersion )
             {
@@ -397,7 +395,7 @@ namespace CK.Env.Plugins
             {
                 if( withZeroBuilder == true )
                 {
-                    var msg = ccbVersion == null ? "CodeCakeBuilder Zero Version executable file not found." : $"Current version is '{ccbVersion}'.";
+                    var msg = ccbVersion == null ? "CodeCakeBuilder Zero Version executable file not found" : $"Current version is '{ccbVersion}'";
                     monitor.Error( $"Invalid 'withZeroBuilder' constraint: {msg}. Zero Build versions must first be built." );
                     return false;
                 }
@@ -412,7 +410,7 @@ namespace CK.Env.Plugins
                             primary,
                             v,
                             buildType,
-                            solutionPath,
+                            primary.GitFolder.FullPhysicalPath,
                             ccbPath );
 
             bool hasError = false;

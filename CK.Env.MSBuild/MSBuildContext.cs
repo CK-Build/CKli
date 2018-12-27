@@ -126,10 +126,14 @@ namespace CK.Env.MSBuild
 
             public Solution LastVersion => _last;
 
-            public Solution OnUnload()
+            public Solution OnUnload( MSBuildContext ctx )
             {
                 Debug.Assert( _loaded );
                 _loaded = false;
+                foreach( var f in _last.AllProjects.SelectMany( p => p.ProjectFile.AllFiles ) )
+                {
+                    ctx.UnloadFile( f.Path );
+                }
                 return _last;
             }
 
@@ -213,10 +217,10 @@ namespace CK.Env.MSBuild
             {
                 if( tracker != null && tracker.IsLoaded )
                 {
-                    var previous = tracker.OnUnload();
+                    var previous = tracker.OnUnload( this );
                     foreach( var secondary in previous.LoadedSecondarySolutions )
                     {
-                        _solutions[secondary.FilePath].OnUnload();
+                        _solutions[secondary.FilePath].OnUnload( this );
                     }
                 }
                 try

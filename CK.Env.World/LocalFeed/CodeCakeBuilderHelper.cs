@@ -2,13 +2,14 @@ using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace CK.Env
 {
-    static class CodeCakeBuilderHelper
+    public static class CodeCakeBuilderHelper
     {
         public static readonly string CodeCakeBuilderRelativePath = "CodeCakeBuilder/bin/Debug/netcoreapp2.1/publish/CodeCakeBuilder.dll";
 
@@ -33,5 +34,18 @@ namespace CK.Env
             return InformationalVersion.Parse( FileVersionInfo.GetVersionInfo( ccbPath ).ProductVersion ).NuGetVersion;
         }
 
+        /// <summary>
+        /// Gets the CodeCakeBuilder executable published file path an version (with a null version if
+        /// CodeCakeBuilder does not exist).
+        /// Currently in netcoreapp2.1.
+        /// </summary>
+        /// <param name="git">The Git repository.</param>
+        /// <returns>The path and version. Version is null if the file does not exist.</returns>
+        public static (string CCBExePath, SVersion Version) GetExecutableInfo( IGitRepository git )
+        {
+            string solutionPath = git.FullPhysicalPath;
+            var ccbPath = GetExecutablePath( git.FullPhysicalPath );
+            return  (ccbPath, File.Exists( ccbPath ) ? GetVersion( ccbPath ) : null);
+        }
     }
 }

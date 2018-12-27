@@ -74,12 +74,9 @@ namespace CK.Env
                 }
                 result = BuildResult.Create( m, _type, _artifacts, DependentSolutionContext.Solutions, _targetVersions, GetReleaseNotes() );
                 if( result == null ) return null;
-                using( m.OpenInfo( "Cleaning any already existing artifact that will be produced." ) )
+                using( m.OpenInfo( "Removing already existing artifacts that will be produced from caches." ) )
                 {
-                    foreach( var a in result.GeneratedArtifacts )
-                    {
-                        _localFeedProvider.GlobalRemove( m, a.Artifact );
-                    }
+                    _localFeedProvider.RemoveFromAllCaches( m, result.GeneratedArtifacts.Select( g => g.Artifact ) );
                 }
                 m.CloseGroup( "Success." );
             }

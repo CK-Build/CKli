@@ -55,8 +55,8 @@ namespace CK.Env
             IWorldName world )
         {
             Debug.Assert( gitFolder.StartsWith( fs.Root.Path ) && gitFolder.EndsWith( ".git" ) );
-            FullPath = new NormalizedPath( gitFolder.Remove( gitFolder.Length - 4 ) );
-            SubPath = FullPath.RemovePrefix( fs.Root );
+            FullPhysicalPath = new NormalizedPath( gitFolder.Remove( gitFolder.Length - 4 ) );
+            SubPath = FullPhysicalPath.RemovePrefix( fs.Root );
             if( SubPath.IsEmpty ) throw new InvalidOperationException( "Root path can not be a Git folder." );
 
             FileSystem = fs;
@@ -132,9 +132,9 @@ namespace CK.Env
         public IWorldName World { get; }
 
         /// <summary>
-        /// Gets the full path that starts with the <see cref="FileSystem"/>' root path.
+        /// Gets the full path (that starts with the <see cref="FileSystem"/>' root path) of the Git folder.
         /// </summary>
-        public NormalizedPath FullPath { get; }
+        public NormalizedPath FullPhysicalPath { get; }
 
         /// <summary>
         /// Get the path relative to the <see cref="FileSystem"/>.
@@ -1232,7 +1232,7 @@ namespace CK.Env
             _git.Dispose();
         }
 
-        public override string ToString() => $"{FullPath} ({CurrentBranchName ?? "<no branch>" }).";
+        public override string ToString() => $"{FullPhysicalPath} ({CurrentBranchName ?? "<no branch>" }).";
 
         abstract class BaseDirFileInfo : IFileInfo
         {
@@ -1272,7 +1272,7 @@ namespace CK.Env
                 _content = new IFileInfo[] { f._headFolder, f._branchesFolder, f._remoteBranchesFolder };
             }
 
-            public override DateTimeOffset LastModified => Directory.GetLastWriteTimeUtc( _f.FullPath.Path );
+            public override DateTimeOffset LastModified => Directory.GetLastWriteTimeUtc( _f.FullPhysicalPath.Path );
 
             public IEnumerator<IFileInfo> GetEnumerator() => _content.GetEnumerator();
 
@@ -1293,7 +1293,7 @@ namespace CK.Env
 
             public override DateTimeOffset LastModified => _f._git.Head.Tip.Committer.When;
 
-            public override string PhysicalPath => _f.FullPath.Path;
+            public override string PhysicalPath => _f.FullPhysicalPath.Path;
 
             public IEnumerator<IFileInfo> GetEnumerator()
             {

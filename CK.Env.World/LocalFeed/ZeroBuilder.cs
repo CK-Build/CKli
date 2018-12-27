@@ -53,6 +53,7 @@ namespace CK.Env
             Debug.Assert( _mustBuild.Count == _depContext.BuildProjectsInfo.Count );
             ReadCurrentSha( m );
             var scopeMap = new Dictionary<ISolutionDriver, IDisposable>();
+            mustReloadSolutions = true;
             try
             {
                 using( m.OpenTrace( "Analysing dependencies." ) )
@@ -79,12 +80,17 @@ namespace CK.Env
                             }
                             else if( p.Dependencies.Any( depName => _mustBuild.Contains( depName ) ) )
                             {
-                                m.Info( $"ReasonToBuild#3: Rebuild dependencies {_mustBuild.Intersect( p.Dependencies ).Concatenate()}." );
+                                m.Info( $"ReasonToBuild#3: Rebuild dependencies are {_mustBuild.Intersect( p.Dependencies ).Concatenate()}." );
                             }
                             else if( p.MustPack
                                      && _localFeedProvider.ZeroBuild.GetPackageFile( m, p.ProjectName, SVersion.ZeroVersion ) == null )
                             {
                                 m.Info( $"ReasonToBuild#4: {p.ProjectName}.0.0.0-0 does not exist in in Zero build feed." );
+                            }
+                            else if( p.ProjectName == "CodeCakeBuilder"
+                                     && CodeCakeBuilderHelper.GetExecutableInfo( _driverMap[p.SolutionName].GitRepository ).Version != SVersion.ZeroVersion )
+                            {
+                                m.Info( $"ReasonToBuild#5: Published CodeCakeBuilder is missing or is not in ZeroVersion." );
                             }
                             else
                             {
@@ -101,7 +107,6 @@ namespace CK.Env
                 }
                 else
                 {
-                    mustReloadSolutions = true;
                     using( m.OpenTrace( "Creating protected scopes and applying zero dependencies." ) )
                     {
                         foreach( var p in _depContext.BuildProjectsInfo )
@@ -146,9 +151,12 @@ namespace CK.Env
             }
             finally
             {
-                m.Trace( "Closing protected scopes." );
-                foreach( var scope in scopeMap.Values ) scope.Dispose();
-                SaveShaCache( m );
+                if( mustReloadSolutions )
+                {
+                    m.Trace( "Closing protected scopes." );
+                    foreach( var scope in scopeMap.Values ) scope.Dispose();
+                    SaveShaCache( m );
+                }
             }
         }
 
