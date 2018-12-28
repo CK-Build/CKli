@@ -30,7 +30,7 @@ namespace CK.Env
 
         public static ArtifactInstance FromComponentRef( ComponentRef c )
         {
-            return new ArtifactInstance( "CKSetup", c.TargetFramework.ToStringFramework() + '/' + c.Name, c.Version );
+            return new ArtifactInstance( "CKSetup", c.Name + '/' + c.TargetFramework.ToStringFramework(), c.Version );
         }
 
         // TODO: remove this since TargetRuntimeOrFrameworkExtension.TryParse now handles "net461" names...

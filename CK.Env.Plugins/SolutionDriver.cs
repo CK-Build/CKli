@@ -342,7 +342,7 @@ namespace CK.Env.Plugins
                                             .Select( p => new ArtifactInstance( "NuGet", p.Name, v ) );
             var ckSetupComponents = allSolutions.SelectMany( s => s.CKSetupComponentProjects )
                                                 .SelectMany( p => p.TargetFrameworks.AtomicTraits
-                                                                   .Select( t => new ArtifactInstance( "CKSetup", t.ToString() + '/' + p.Name, v ) ) );
+                                                                   .Select( t => new ArtifactInstance( "CKSetup", p.Name + '/' + t.ToString(), v ) ) );
             var allArtifacts = nuGetPackages.Concat( ckSetupComponents );
             var missing = feed.GetMissing( monitor, allArtifacts );
             if( missing.Count == 0 )
