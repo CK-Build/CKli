@@ -27,6 +27,8 @@
       </add>
     </NuGetSources>
     <RemoveNuGetSourceNames>
+      <add Name="CKEnvTest" />
+      <add Name="CKEnvTest3" />
       <add Name="Invenietis - Release" />
       <add Name="Invenietis - Preview" />
       <add Name="Invenietis - CI" />
