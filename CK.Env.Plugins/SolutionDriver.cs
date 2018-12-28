@@ -305,7 +305,8 @@ namespace CK.Env.Plugins
         {
             var primary = GetPrimarySolution( monitor );
             if( primary == null ) return false;
-
+            var allSolutions = GetAllSolutions( monitor ).ToArray();
+ 
             // Version is always provided by the current commit point.
             var v = Folder.ReadRepositoryVersionInfo( monitor )?.FinalNuGetVersion;
             if( v == null ) return false;
@@ -337,13 +338,16 @@ namespace CK.Env.Plugins
 
             monitor.Info( $"Version to build: '{v}'." );
 
-            var publishedNames = primary.LoadedSecondarySolutions.Append( primary )
-                                            .SelectMany( s => s.PublishedProjects )
-                                            .Select( p => p.Name );
-            bool buildRequired = publishedNames.Any( p => feed.GetPackageFile( monitor, p, v ) == null );
-            if( !buildRequired )
+            var nuGetPackages = allSolutions.SelectMany( s => s.PublishedProjects )
+                                            .Select( p => new ArtifactInstance( "NuGet", p.Name, v ) );
+            var ckSetupComponents = allSolutions.SelectMany( s => s.CKSetupComponentProjects )
+                                                .SelectMany( p => p.TargetFrameworks.AtomicTraits
+                                                                   .Select( t => new ArtifactInstance( "CKSetup", t.ToString() + '/' + p.Name, v ) ) );
+            var allArtifacts = nuGetPackages.Concat( ckSetupComponents );
+            var missing = feed.GetMissing( monitor, allArtifacts );
+            if( missing.Count == 0 )
             {
-                monitor.Info( $"All {publishedNames.Count()} packages are already available in {feed.PhysicalPath.LastPart} and version {v}: {publishedNames.Concatenate()}." );
+                monitor.Info( $"All artifacts are already available in {feed.PhysicalPath.LastPart} with version {v}: {allArtifacts.Select(a=>a.Artifact.ToString()).Concatenate()}." );
                 if( !withUnitTest )
                 {
                     monitor.Info( $"No unit tests required. Build is skipped." );
@@ -406,7 +410,7 @@ namespace CK.Env.Plugins
             }
             var ev = new BuildStartEventArgs(
                             monitor,
-                            buildRequired,
+                            missing.Count > 0,
                             primary,
                             v,
                             buildType,

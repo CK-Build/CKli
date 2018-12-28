@@ -80,7 +80,11 @@ namespace CK.NuGetClient
                                 var installer = Guid.NewGuid().ToString() + ".ps1";
                                 var installerPath = Path.Combine( tempPath, installer );
                                 File.WriteAllText( installerPath, r.ReadToEnd() );
-                                ProcessRunner.RunPowerShell( logger.Monitor, tempPath, installer, new[] { "-AddNetfx" } );
+                                ProcessRunner.RunPowerShell(
+                                    logger.Monitor,
+                                    tempPath,
+                                    installer,
+                                    new[] { "-AddNetfx" }, new[] { ("PSExecutionPolicyPreference", "Bypass") } );
                                 File.Delete( installerPath );
                             }
                         }

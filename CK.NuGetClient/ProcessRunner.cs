@@ -27,7 +27,7 @@ namespace CK.Env
             var a = '"' + scriptFileName + '"';
             foreach( var arg in arguments )
             {
-                a += " '" + arg.Replace( "'", "''" ) + '\''; 
+                a += " " + arg; 
             }
             return Run( m, workingDir, "Powershell.exe", a, environmentVariables );
         }

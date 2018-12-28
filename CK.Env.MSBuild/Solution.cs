@@ -185,7 +185,7 @@ namespace CK.Env.MSBuild
         public IEnumerable<Project> AllProjects => AllBaseProjects.OfType<Project>();
 
         /// <summary>
-        /// Gets the published projects (the ones that will be packaged). These projetcs are by default
+        /// Gets the NuGet published projects (the ones that will be packaged). These projetcs are by default
         /// all projects at the root of the solution for primary solutions. For secondary solutions
         /// this is empty by default.
         /// </summary>
@@ -220,14 +220,14 @@ namespace CK.Env.MSBuild
         /// </summary>
         public IList<Project> BuildProjects { get; }
 
-        /// <summary>
-        /// Gets the projects that are not in <see cref="PublishedProjects"/>, <see cref="TestProjects"/>,
-        /// and <see cref="BuildProjects"/>.
-        /// </summary>
-        public IEnumerable<Project> MiscProjects => AllProjects
-                                                        .Except( PublishedProjects )
-                                                        .Except( TestProjects )
-                                                        .Except( BuildProjects );
+        ///// <summary>
+        ///// Gets the projects that are not in <see cref="PublishedProjects"/>, <see cref="TestProjects"/>,
+        ///// and <see cref="BuildProjects"/>.
+        ///// </summary>
+        //public IEnumerable<Project> MiscProjects => AllProjects
+        //                                                .Except( PublishedProjects )
+        //                                                .Except( TestProjects )
+        //                                                .Except( BuildProjects );
 
         /// <summary>
         /// Creates a new project that must not already exist.

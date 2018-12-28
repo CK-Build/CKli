@@ -66,6 +66,31 @@ namespace CKli
                 return File.Exists( f ) ? new LocalNuGetPackageFile( f, packageId, v ) : null;
             }
 
+            public List<ArtifactInstance> GetMissing( IActivityMonitor m, IEnumerable<ArtifactInstance> artifacts )
+            {
+                var missing = new List<ArtifactInstance>();
+                var ckSetup = artifacts.Where( i => i.Artifact.Type == "CKSetup" )
+                                       .Select( a => CKSetupArtifactLocalSet.ToComponentRef( a ) ).ToList();
+                if( ckSetup.Count > 0 )
+                {
+                    using( var store = LocalStore.OpenOrCreate( m, this.GetCKSetupStorePath() ) )
+                    {
+                        foreach( var c in ckSetup )
+                        {
+                            if( !store.Contains( c.Name, c.TargetFramework, c.Version ) )
+                            {
+                                missing.Add( CKSetupArtifactLocalSet.FromComponentRef( c ) );
+                            }
+                        }
+                    }
+                }
+                foreach( var n in artifacts.Where( a => a.Artifact.Type == "NuGet" ) )
+                {
+                    if( GetPackageFile( m, n.Artifact.Name, n.Version ) == null ) missing.Add( n );
+                }
+                return missing;
+            }
+
             public bool PushLocalArtifacts( IActivityMonitor m, IArtifactRepository target, IEnumerable<ArtifactInstance> artifacts )
             {
                 if( target.HandleArtifactType( "NuGet" ) )

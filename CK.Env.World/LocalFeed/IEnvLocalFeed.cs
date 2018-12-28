@@ -20,7 +20,7 @@ namespace CK.Env
         NormalizedPath PhysicalPath { get; }
 
         /// <summary>
-        /// Gets the best version for a package.
+        /// Gets the best version for a NuGet package.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="packageId">The package name.</param>
@@ -44,7 +44,15 @@ namespace CK.Env
         IEnumerable<LocalNuGetPackageFile> GetAllPackageFiles( IActivityMonitor m );
 
         /// <summary>
-        /// Removes a an artifact instance.
+        /// Checks any missing artifact instances in this feed.
+        /// </summary>
+        /// <param name="target">The repository target.</param>
+        /// <param name="artifacts">Set of expected artifact instances.</param>
+        /// <returns>A non null list with the missing artifacts if any.</returns>
+        List<ArtifactInstance> GetMissing( IActivityMonitor m, IEnumerable<ArtifactInstance> artifacts );
+
+        /// <summary>
+        /// Removes an artifact instance.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="instance">The artifact to remove.</param>

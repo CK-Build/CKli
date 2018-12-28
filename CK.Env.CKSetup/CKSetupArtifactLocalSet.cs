@@ -18,9 +18,9 @@ namespace CK.Env
 
         public IEnumerable<ArtifactInstance> Instances { get; }
 
-        public IEnumerable<ComponentRef> ComponentRefs => Instances.Select( i => From( i ) );
+        public IEnumerable<ComponentRef> ComponentRefs => Instances.Select( i => ToComponentRef( i ) );
 
-        ComponentRef From( ArtifactInstance a )
+        public static ComponentRef ToComponentRef( ArtifactInstance a )
         {
             var breakName = a.Artifact.Name.Split( '/' );
             TargetFramework t = TryParse( breakName[1] );
@@ -28,8 +28,15 @@ namespace CK.Env
             return new ComponentRef( breakName[0], t, a.Version );
         }
 
+        public static ArtifactInstance FromComponentRef( ComponentRef c )
+        {
+            return new ArtifactInstance( "CKSetup", c.TargetFramework.ToStringFramework() + '/' + c.Name, c.Version );
+        }
+
         // TODO: remove this since TargetRuntimeOrFrameworkExtension.TryParse now handles "net461" names...
-        static public TargetFramework TryParse( string rawTargetFramework )
+        // TargetRuntimeOrFrameworkExtension.ToStringFramework( this TargetFramework f )
+
+        static TargetFramework TryParse( string rawTargetFramework )
         {
             switch( rawTargetFramework )
             {
