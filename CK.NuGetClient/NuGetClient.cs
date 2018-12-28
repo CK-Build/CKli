@@ -9,6 +9,7 @@ using NuGet.Protocol.Core.Types;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
@@ -29,6 +30,7 @@ namespace CK.NuGetClient
 
         private static readonly object _secretKeysLock;
         private static readonly Dictionary<string, string> _secretKeys;
+        private static bool _initialized;
 
         internal static void EnsureVSSFeedEndPointCredentials( IActivityMonitor m, string url, string secret )
         {
@@ -61,6 +63,38 @@ namespace CK.NuGetClient
             return providers;
         }
 
+        internal static void Initalize( NuGetLoggerAdapter logger )
+        {
+            if( !_initialized )
+            {
+                lock( _secretKeysLock )
+                {
+                    if( !_initialized )
+                    {
+                        using( logger.Monitor.OpenInfo( "Installing the Azure Artifact Credential provider (https://github.com/Microsoft/artifacts-credprovider)." ) )
+                        {
+                            var a = System.Reflection.Assembly.GetExecutingAssembly();
+                            using( var r = new StreamReader( a.GetManifestResourceStream( "CK.NuGetClient.Res.InstallCredentialProvider.ps1.txt" ) ) )
+                            {
+                                var tempPath = Path.GetTempPath();
+                                var installer = Guid.NewGuid().ToString() + ".ps1";
+                                var installerPath = Path.Combine( tempPath, installer );
+                                File.WriteAllText( installerPath, r.ReadToEnd() );
+                                ProcessRunner.RunPowerShell( logger.Monitor, tempPath, installer, new[] { "-AddNetfx" } );
+                                File.Delete( installerPath );
+                            }
+                        }
+                        var credProviders = new AsyncLazy<IEnumerable<ICredentialProvider>>( async () => await GetCredentialProvidersAsync( logger ) );
+                        HttpHandlerResourceV3.CredentialService = new Lazy<ICredentialService>(
+                            () => new CredentialService(
+                                providers: credProviders,
+                                nonInteractive: true,
+                                handlesDefaultCredentials: true ) );
+                        _initialized = true;
+                    }
+                }
+            }
+        }
         #endregion
 
 
@@ -124,15 +158,6 @@ namespace CK.NuGetClient
             _secretKeys = new Dictionary<string, string>();
         }
 
-        internal void Initalize( ILogger logger )
-        {
-            var credProviders = new AsyncLazy<IEnumerable<ICredentialProvider>>( async () => await GetCredentialProvidersAsync( logger ) );
-            HttpHandlerResourceV3.CredentialService = new Lazy<ICredentialService>(
-                () => new CredentialService(
-                    providers: credProviders,
-                    nonInteractive: true,
-                    handlesDefaultCredentials: true ) );
-        }
 
         public NuGetClient( HttpClient httpClient, ISecretKeyStore keyStore )
         {

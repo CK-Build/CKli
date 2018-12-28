@@ -496,19 +496,22 @@ namespace CK.Env
                     foreach( Remote remote in _git.Network.Remotes.Where( r => !originOnly || r.Name == "origin" ) )
                     {
                         m.Info( $"Fetching remote '{remote.Name}'." );
-                        IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification );
+                        IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification ).ToArray();
                         Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
                         {
                             CredentialsProvider = DefaultCredentialHandler,
                             TagFetchMode = TagFetchMode.All
                         }, $"Fetching remote '{remote.Name}'." );
-                        MergeResult r = _git.MergeFetchedRefs( merger, mOpt );
-                        if( r.Status == MergeStatus.Conflicts )
+                        if( _git.Head.IsTracking )
                         {
-                            m.Error( $"Merge conflicts occurred. Unable to merge changes from the remote '{remote.Name}'." );
-                            return (false, false);
+                            MergeResult r = _git.MergeFetchedRefs( merger, mOpt );
+                            if( r.Status == MergeStatus.Conflicts )
+                            {
+                                m.Error( $"Merge conflicts occurred. Unable to merge changes from the remote '{remote.Name}'." );
+                                return (false, false);
+                            }
+                            reloadNeeded |= r.Status != MergeStatus.UpToDate;
                         }
-                        reloadNeeded |= r.Status != MergeStatus.UpToDate;
                     }
                     return (true, reloadNeeded);
                 }

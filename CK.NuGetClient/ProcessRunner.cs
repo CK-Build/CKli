@@ -2,6 +2,7 @@ using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Text;
 
 namespace CK.Env
@@ -9,8 +10,28 @@ namespace CK.Env
     /// <summary>
     /// Helpful encapsulation of <see cref="ProcessStartInfo"/> and <see cref="Process"/>.
     /// </summary>
-    public static class ProcessRunner
+    static class ProcessRunner
     {
+
+        public static bool RunPowerShell(
+                 IActivityMonitor m,
+                 string workingDir,
+                 string scriptFileName,
+                 IEnumerable<string> arguments,
+                 IEnumerable<(string, string)> environmentVariables = null )
+        {
+            if( !Path.IsPathRooted( scriptFileName ) && scriptFileName[0] != '.' )
+            {
+                scriptFileName = "./" + scriptFileName;
+            }
+            var a = '"' + scriptFileName + '"';
+            foreach( var arg in arguments )
+            {
+                a += " '" + arg.Replace( "'", "''" ) + '\''; 
+            }
+            return Run( m, workingDir, "Powershell.exe", a, environmentVariables );
+        }
+
         /// <summary>
         /// Simple process run.
         /// </summary>

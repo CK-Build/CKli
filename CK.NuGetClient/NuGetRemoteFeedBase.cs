@@ -96,7 +96,7 @@ namespace CK.NuGetClient
         protected virtual NuGetLoggerAdapter EnsureInitialization( IActivityMonitor m )
         {
             var logger = new NuGetLoggerAdapter( m );
-            Client.Initalize( logger );
+            NuGetClient.Initalize( logger );
             return logger;
         }
 
