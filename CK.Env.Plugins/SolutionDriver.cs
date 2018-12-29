@@ -51,6 +51,25 @@ namespace CK.Env.Plugins
         string ISolutionDriver.BranchName => BranchPath.LastPart;
 
         /// <summary>
+        /// Gets whether <see cref="IWorldState.WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/>
+        /// and this plugin is on the active branch (<see cref="IsActive"/> is true).
+        /// </summary>
+        public bool CanPull => _world.WorkStatus == GlobalWorkStatus.Idle && IsActive;
+
+        /// <summary>
+        /// Pulls the current branch and reloads the solutions if needed.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>True on success, false on error.</returns>
+        [CommandMethod]
+        public bool Pull( IActivityMonitor m )
+        {
+            var r = Folder.Pull( m );
+            if( !r.Success ) return false;
+            return !r.ReloadNeeded || GetPrimarySolution( m, true ) != null;
+        }
+
+        /// <summary>
         /// Gets the solution driver of the <see cref="IGitRepository.CurrentBranchName"/>.
         /// </summary>
         /// <returns>This solution driver or the one of the current branch.</returns>
@@ -72,7 +91,7 @@ namespace CK.Env.Plugins
         /// <returns>The primary solution or null.</returns>
         public Solution GetPrimarySolution( IActivityMonitor m, bool reload = false )
         {
-            if( _solution == null )
+            if( _solution == null || reload )
             {
                 _solution = _solutionLoader.GetPrimarySolution( m, reload, BranchPath.LastPart );
                 if( _solution == null )

@@ -80,6 +80,19 @@
       </Branch>
     </GitFolder>
 
+
+    <GitFolder Name="CK-Text" Url="https://github.com/Invenietis/CK-Text.git">
+      <Branch Name="develop">
+        <PrimarySolution />
+      </Branch>
+    </GitFolder>
+
+    <GitFolder Name="CSemVer-Net" Url="https://github.com/SimpleGitVersion/CSemVer-Net.git">
+      <Branch Name="develop">
+        <PrimarySolution />
+      </Branch>
+    </GitFolder>
+
     <GitFolder Name="CK-Setup" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-setup.git">
       <SolutionSettings UseCKSetup="true" />
       <Branch Name="develop">

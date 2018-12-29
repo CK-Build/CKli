@@ -50,6 +50,13 @@ namespace CK.Env
         public IReadOnlyList<GitFolder> GitFolders => _gits;
 
         /// <summary>
+        /// Gets or sets whether this file system is the only one that interacts with the actual files.
+        /// When true, some operations can be done more safely (or efficienty).
+        /// Defaults to false.
+        /// </summary>
+        public bool ServerMode { get; set; }
+
+        /// <summary>
         /// Gets the physical root path.
         /// </summary>
         public NormalizedPath Root { get; }

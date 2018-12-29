@@ -34,12 +34,14 @@ namespace CK.Env
             return (driver.GitRepository.GetCommitVersionInfo( m, s.BranchName ).AssemblyBuildInfo.NuGetVersion,true);
         }
 
-        protected override bool Build( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IEnumerable<UpdatePackageInfo> buildProjectsUpgrade )
+        protected override BuildState Build( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IEnumerable<UpdatePackageInfo> buildProjectsUpgrade )
         {
             Debug.Assert( driver.GitRepository.CurrentBranchName == s.BranchName );
-            if( !driver.UpdatePackageDependencies( m, buildProjectsUpgrade ) ) return false;
-            if( !driver.GitRepository.AmendCommit( m, null, date => _commitTimes[s.Index] ) ) return false;
-            return driver.Build( m, withUnitTest: _withUnitTest, withZeroBuilder: true, withPushToRemote: false );
+            if( !driver.UpdatePackageDependencies( m, buildProjectsUpgrade ) ) return BuildState.Failed;
+            if( !driver.GitRepository.AmendCommit( m, null, date => _commitTimes[s.Index] ) ) return BuildState.Failed;
+            return driver.Build( m, withUnitTest: _withUnitTest, withZeroBuilder: true, withPushToRemote: false )
+                    ? BuildState.Succeed
+                    : BuildState.Failed;
         }
 
     }

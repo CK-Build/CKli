@@ -42,7 +42,7 @@ namespace CK.Env
 
         protected override IReadOnlyList<ReleaseNoteInfo> GetReleaseNotes() => _roadmap.GetReleaseNotes();
 
-        protected override bool Build(
+        protected override BuildState Build(
             IActivityMonitor m,
             IDependentSolution s,
             ISolutionDriver driver,
@@ -58,7 +58,7 @@ namespace CK.Env
             if( _commits[s.Index] != driver.GitRepository.Head.CommitSha )
             {
                 m.Error( $"Commit changed between PrepareBuild call and this Build. Build canceled." );
-                return false;
+                return BuildState.Failed;
             }
             bool buildResult = DoBuild( m, driver, buildProjectsUpgrade, targetVersion, sVersion != null );
             if( sVersion != null )
@@ -72,7 +72,7 @@ namespace CK.Env
                     buildResult &= driver.GitRepository.SwitchMasterToDevelop( m );
                 }
             }
-            return buildResult;
+            return buildResult ? BuildState.Succeed : BuildState.Failed;
         }
 
         private static bool DoBuild(

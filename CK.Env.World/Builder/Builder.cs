@@ -82,12 +82,40 @@ namespace CK.Env
             }
             using( m.OpenInfo( "Running builds." ) )
             {
-                if( !RunBuild( m ) )
+                BuildState state = RunBuild( m );
+                if( state == BuildState.Failed )
                 {
                     m.CloseGroup( "Failed." );
                     return null;
                 }
-                m.CloseGroup( "Success." );
+                if( state == BuildState.Succeed )
+                {
+                    m.CloseGroup( "Success." );
+                }
+                else
+                {
+                    using( m.OpenInfo( "Retrying running builds." ) )
+                    {
+                        state = RunBuild( m );
+                        if( state == BuildState.Failed )
+                        {
+                            m.CloseGroup( "Retry failed." );
+                            m.CloseGroup( "Failed." );
+                            return null;
+                        }
+                        if( state == BuildState.Succeed )
+                        {
+                            m.CloseGroup( "Retry succeed." );
+                            m.CloseGroup( "Success." );
+                        }
+                        else
+                        {
+                            m.Fatal( "Cannot retry more than once. This should never happen." );
+                            m.CloseGroup( "Invalid subsequent Retry." );
+                            m.CloseGroup( "Failed (Invalid subsequent Retry.)" );
+                        }
+                    }
+                }
             }
             return result;
         }
@@ -115,8 +143,8 @@ namespace CK.Env
                 using( m.OpenInfo( $"Preparing {s} build." ) )
                 {
                     var pr = PrepareBuild( m, s, driver, upgrades );
-                    if( pr.Version == null ) return false;
                     ZeroBuilder.RegisterSHAlias( m );
+                    if( pr.Version == null ) return false;
                     m.CloseGroup( $"Target version: {pr.Version}{(pr.MustBuild ? "" :" (no build required)")}" );
                     _targetVersions[i] = pr.MustBuild ? pr.Version : null;
                     _packagesVersion.AddRange( s.GeneratedPackages.Select( p => new KeyValuePair<string, SVersion>( p.Name, pr.Version ) ) );
@@ -125,8 +153,16 @@ namespace CK.Env
             return true;
         }
 
-        bool RunBuild( IActivityMonitor m )
+        protected enum BuildState
         {
+            Failed,
+            Succeed,
+            MustRetry
+        }
+
+        BuildState RunBuild( IActivityMonitor m )
+        {
+            BuildState finalState = BuildState.Succeed;
             var solutions = DependentSolutionContext.Solutions;
             for( int i = 0; i < solutions.Count; ++i )
             {
@@ -142,12 +178,14 @@ namespace CK.Env
                                                        _packagesVersion[packageName] ) ) );
                 using( m.OpenInfo( $"Running {s} build." ) )
                 {
-                    // _targetVersions[i] is null if build must not be done.
-                    if( !Build( m, solutions[i], _drivers[i], _upgrades[i], _targetVersions[i], buildProjectsUpgrade ) ) return false;
+                    // _targetVersions[i] is null if build must not be done (this is for ReleaseBuilder only).
+                    var sVersion = finalState == BuildState.MustRetry ? null : _targetVersions[i];
+                    finalState = Build( m, solutions[i], _drivers[i], _upgrades[i], sVersion, buildProjectsUpgrade );
                     ZeroBuilder.RegisterSHAlias( m );
+                    if( finalState == BuildState.Failed ) return BuildState.Failed;
                 }
             }
-            return true;
+            return finalState;
         }
 
         /// <summary>
@@ -170,8 +208,8 @@ namespace CK.Env
         /// <param name="upgrades">The set of required package upgrades.</param>
         /// <param name="sVersion">The version computed by <see cref="PrepareBuild"/>.</param>
         /// <param name="buildProjectsUpgrade">The build projects upgrades.</param>
-        /// <returns>True on success, false on error.</returns>
-        protected abstract bool Build( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IEnumerable<UpdatePackageInfo> buildProjectsUpgrade );
+        /// <returns>The build state.</returns>
+        protected abstract BuildState Build( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IEnumerable<UpdatePackageInfo> buildProjectsUpgrade );
 
     }
 }

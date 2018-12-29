@@ -157,7 +157,16 @@ namespace CK.Env
         bool ResetBranchState( IActivityMonitor m, string branchName, string commitSha );
 
         /// <summary>
-        /// Attempts to check out a branch and pull any 'origin' changes.
+        /// Fetches 'origin' (or all remotes) branches into this repository.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>
+        /// Success is true on success, false on error.
+        /// </returns>
+        bool FetchAll( IActivityMonitor m, bool originOnly = true );
+
+        /// <summary>
+        /// Checks out a branch: calls <see cref="FetchAll"/> and pulls remote 'origin' branch changes.
         /// There must not be any uncommitted changes on the current head.
         /// The branch must exist locally or on the 'origin' remote.
         /// If the branch exists only in the "origin" remote, a local branch is automatically
@@ -165,27 +174,22 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor.</param>
         /// <param name="branchName">The local name of the branch.</param>
-        /// <param name="alwaysPullAllBranches">
-        /// True to always call <see cref="PullAllBranches"/> even if the local branch already exists.
-        /// When false, all the remote branches are pulled only if the local branch does not already exist.
-        /// </param>
         /// <returns>
         /// Success is true on success, false on error (such as merge conflicts) and in case of success,
         /// the result states whether a reload should be required or if nothing changed.
         /// </returns>
-        (bool Success, bool ReloadNeeded) CheckoutAndPull( IActivityMonitor m, string branchName, bool alwaysPullAllBranches = false );
+        (bool Success, bool ReloadNeeded) Checkout( IActivityMonitor m, string branchName );
 
         /// <summary>
-        /// Fetches 'origin' (or all remotes) branches and merge changes into this repository.
+        /// Pulls current branch by merging changes from remote 'orgin' branch into this repository.
         /// The current head must be clean.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="originOnly">False to pull all remotes, including 'origin'.</param>
         /// <returns>
         /// Success is true on success, false on error (such as merge conflicts) and in case of success,
         /// the result states whether a reload should be required or if nothing changed.
         /// </returns>
-        (bool Success, bool ReloadNeeded) PullAllBranches( IActivityMonitor m, bool originOnly = true );
+        (bool Success, bool ReloadNeeded) Pull( IActivityMonitor m );
 
         /// <summary>
         /// Checkouts the <see cref="IWorldName.MasterBranchName"/>, always merging <see cref="IWorldName.DevelopBranchName"/> into it.

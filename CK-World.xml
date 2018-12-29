@@ -240,7 +240,7 @@
       </Branch>
     </GitFolder>
 
-    <GitFolder Name="CK-SqlServer-Parser-Model" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-sqlserver-parser-model.git">
+    <GitFolder Name="CK-SqlServer-Parser-Model" Url="https://gitlab.com/olivier-spinelli/ck-sqlserver-parser-model.git">
       <SolutionSettings NoUnitTests="true" />
       <Branch Name="develop">
         <PrimarySolution />
