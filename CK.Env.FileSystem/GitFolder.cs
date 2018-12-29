@@ -297,7 +297,7 @@ namespace CK.Env
         /// Success is true on success, false on error.
         /// </returns>
         [CommandMethod]
-        public bool FetchAll( IActivityMonitor m, bool originOnly = true )
+        public bool FetchBranches( IActivityMonitor m, bool originOnly = true )
         {
             using( m.OpenInfo( $"Fetching {(originOnly ? "origin" : "all remotes")} in repository '{SubPath}'." ) )
             {
@@ -336,7 +336,7 @@ namespace CK.Env
         {
             using( m.OpenInfo( $"Pulling branch '{CurrentBranchName}' in '{SubPath}'." ) )
             {
-                if( !FetchAll( m )
+                if( !FetchBranches( m )
                     || !CheckCleanCommit( m ) ) return (false, false);
                 try
                 {
@@ -367,7 +367,7 @@ namespace CK.Env
         {
             using( m.OpenInfo( $"Checking out branch '{branchName}' in '{SubPath}'." ) )
             {
-                if( !FetchAll( m ) ) return (false,false);
+                if( !FetchBranches( m ) ) return (false,false);
                 try
                 {
                     bool reloadNeeded = false;

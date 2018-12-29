@@ -64,6 +64,57 @@ namespace CK.Env
         {
             if( _packagesVersion.Count > 0 ) throw new InvalidOperationException();
 
+            BuildResult result = CreateResultByPreparingBuilds( m );
+            if( result == null ) return null;
+            using( m.OpenInfo( "Running builds." ) )
+            {
+                BuildState state = RunBuild( m );
+                if( state == BuildState.Failed )
+                {
+                    m.CloseGroup( "Failed." );
+                    return null;
+                }
+                if( state == BuildState.Succeed )
+                {
+                    m.CloseGroup( "Success." );
+                }
+                else
+                {
+                    // This is not really optimal but it is required only for DeveloPbuilder
+                    // (where version numbers are not fully known upfront AND commit may not be
+                    // amendable (when on a fresh checkout).
+                    // We may have resolved and applied the buildUpgrades in a tight dedicated loop
+                    // but we would need to do exactly the same code than the DevelopBuilder.RunBuild does:
+                    // applying build upgrades, checks the commit, then calls ReadCommitVersionInfo on actual
+                    // (non amended commits), applies this new version to any previous solution and start again...
+                    // This is exactly what this whole code does thanks to the BuildState.MustRetry.
+                    using( m.OpenInfo( "Retrying running builds." ) )
+                    {
+                        do
+                        {
+                            result = CreateResultByPreparingBuilds( m );
+                            state = RunBuild( m );
+                        }
+                        while( state == BuildState.MustRetry );
+                        if( state == BuildState.Failed )
+                        {
+                            m.CloseGroup( "Retry failed." );
+                            m.CloseGroup( "Failed (with retries)." );
+                            return null;
+                        }
+                        if( state == BuildState.Succeed )
+                        {
+                            m.CloseGroup( "Retry succeed." );
+                            m.CloseGroup( "Success (with retries)." );
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
+        BuildResult CreateResultByPreparingBuilds( IActivityMonitor m )
+        {
             BuildResult result = null;
             using( m.OpenInfo( "Preparing builds." ) )
             {
@@ -80,43 +131,6 @@ namespace CK.Env
                 }
                 m.CloseGroup( "Success." );
             }
-            using( m.OpenInfo( "Running builds." ) )
-            {
-                BuildState state = RunBuild( m );
-                if( state == BuildState.Failed )
-                {
-                    m.CloseGroup( "Failed." );
-                    return null;
-                }
-                if( state == BuildState.Succeed )
-                {
-                    m.CloseGroup( "Success." );
-                }
-                else
-                {
-                    using( m.OpenInfo( "Retrying running builds." ) )
-                    {
-                        state = RunBuild( m );
-                        if( state == BuildState.Failed )
-                        {
-                            m.CloseGroup( "Retry failed." );
-                            m.CloseGroup( "Failed." );
-                            return null;
-                        }
-                        if( state == BuildState.Succeed )
-                        {
-                            m.CloseGroup( "Retry succeed." );
-                            m.CloseGroup( "Success." );
-                        }
-                        else
-                        {
-                            m.Fatal( "Cannot retry more than once. This should never happen." );
-                            m.CloseGroup( "Invalid subsequent Retry." );
-                            m.CloseGroup( "Failed (Invalid subsequent Retry.)" );
-                        }
-                    }
-                }
-            }
             return result;
         }
 
@@ -127,11 +141,17 @@ namespace CK.Env
 
         bool RunPrepareBuild( IActivityMonitor m )
         {
+            // Required for DevelopBuilder retry.
+            _packagesVersion.Clear();
             var solutions = DependentSolutionContext.Solutions;
             for( int i = 0; i < solutions.Count; ++i )
             {
                 var s = solutions[i];
-                var driver = _drivers[i] = DriverFinder( m, DependentSolutionContext, s.UniqueSolutionName );
+                var driver = _drivers[i];
+                if( driver == null )
+                {
+                    driver = _drivers[i] = DriverFinder( m, DependentSolutionContext, s.UniqueSolutionName );
+                }
                 var upgrades = s.ImportedLocalPackages
                                 .Select( p => new UpdatePackageInfo(
                                                     s.UniqueSolutionName,
@@ -153,6 +173,10 @@ namespace CK.Env
             return true;
         }
 
+        /// <summary>
+        /// RunBuild returns. This is for DevelopBuilder since Release and LocalBuilder
+        /// only return Succeed or Failed (a boolean would be enough).
+        /// </summary>
         protected enum BuildState
         {
             Failed,
@@ -179,10 +203,13 @@ namespace CK.Env
                 using( m.OpenInfo( $"Running {s} build." ) )
                 {
                     // _targetVersions[i] is null if build must not be done (this is for ReleaseBuilder only).
+                    // We use the null version also for DevelopBuilder: 
                     var sVersion = finalState == BuildState.MustRetry ? null : _targetVersions[i];
                     finalState = Build( m, solutions[i], _drivers[i], _upgrades[i], sVersion, buildProjectsUpgrade );
                     ZeroBuilder.RegisterSHAlias( m );
-                    if( finalState == BuildState.Failed ) return BuildState.Failed;
+                    // For DevelopBuilder that returned Retry, we continue to apply the
+                    // current change on subsequent solutions to minimize the number of actual builds.
+                    if( finalState == BuildState.Failed ) break;
                 }
             }
             return finalState;

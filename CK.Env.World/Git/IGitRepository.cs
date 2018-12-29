@@ -163,10 +163,10 @@ namespace CK.Env
         /// <returns>
         /// Success is true on success, false on error.
         /// </returns>
-        bool FetchAll( IActivityMonitor m, bool originOnly = true );
+        bool FetchBranches( IActivityMonitor m, bool originOnly = true );
 
         /// <summary>
-        /// Checks out a branch: calls <see cref="FetchAll"/> and pulls remote 'origin' branch changes.
+        /// Checks out a branch: calls <see cref="FetchBranches"/> and pulls remote 'origin' branch changes.
         /// There must not be any uncommitted changes on the current head.
         /// The branch must exist locally or on the 'origin' remote.
         /// If the branch exists only in the "origin" remote, a local branch is automatically

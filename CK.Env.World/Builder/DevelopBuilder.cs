@@ -59,7 +59,11 @@ namespace CK.Env
                     return BuildState.MustRetry;
                 }
             }
-            if( sVersion == null ) return BuildState.MustRetry;
+            if( sVersion == null )
+            {
+                m.Trace( "Retry mode: skipping actual build." );
+                return BuildState.MustRetry;
+            }
             return driver.Build( m, _withUnitTest, withZeroBuilder: true, withPushToRemote: false )
                     ? BuildState.Succeed
                     : BuildState.Failed;
