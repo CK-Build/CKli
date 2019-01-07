@@ -189,6 +189,12 @@ namespace CK.Env.Plugins
 
             var p = FindProject( monitor, primary, info.SolutionName, info.ProjectName, true );
 
+            // This is required, otherwise the NuGet cache keeps the previous version (lost 4 hours of my life here).
+            if( info.MustPack )
+            {
+                _localFeedProvider.RemoveFromNuGetCache( monitor, info.ProjectName, SVersion.ZeroVersion );
+            }
+
             ICommitAssemblyBuildInfo b = CommitAssemblyBuildInfo.ZeroBuildInfo;
             string commonArgs = $@" --no-dependencies --source ""{_localFeedProvider.ZeroBuild.PhysicalPath}""";
             string versionArgs = $@" --configuration {b.BuildConfiguration} /p:Version=""{b.NuGetVersion}"" /p:AssemblyVersion=""{b.AssemblyVersion}"" /p:FileVersion=""{b.FileVersion}"" /p:InformationalVersion=""{b.InformationalVersion}"" ";
