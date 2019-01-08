@@ -199,8 +199,9 @@ namespace CK.Env.Plugins
             string commonArgs = $@" --no-dependencies --source ""{_localFeedProvider.ZeroBuild.PhysicalPath}""";
             string versionArgs = $@" --configuration {b.BuildConfiguration} /p:Version=""{b.NuGetVersion}"" /p:AssemblyVersion=""{b.AssemblyVersion}"" /p:FileVersion=""{b.FileVersion}"" /p:InformationalVersion=""{b.InformationalVersion}"" ";
             var args = info.MustPack
-                        ? $@"pack --output ""{_localFeedProvider.ZeroBuild.PhysicalPath}""" +  commonArgs + versionArgs
-                        : $@"publish" + commonArgs + versionArgs;
+                        ? $@"pack --output ""{_localFeedProvider.ZeroBuild.PhysicalPath}"""
+                        : $@"publish --output ""{_localFeedProvider.GetZeroVersionCodeCakeBuilderExecutablePath( primary.UniqueSolutionName ).RemoveLastPart()}""";
+            args += commonArgs + versionArgs;
 
             var path = Folder.FileSystem.GetFileInfo( p.Path.RemoveLastPart() ).PhysicalPath;
             FileSystem.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "bin" ) );
@@ -410,9 +411,9 @@ namespace CK.Env.Plugins
                 }
             }
 
-            var (ccbPath, ccbVersion) = CodeCakeBuilderHelper.GetExecutableInfo( primary.GitFolder );
+            string ccbPath = _localFeedProvider.GetZeroVersionCodeCakeBuilderExecutablePath( primary.UniqueSolutionName );
 
-            if( ccbVersion == SVersion.ZeroVersion )
+            if( File.Exists( ccbPath ) )
             {
                 if( withZeroBuilder != false )
                 {
@@ -424,10 +425,11 @@ namespace CK.Env.Plugins
             {
                 if( withZeroBuilder == true )
                 {
-                    var msg = ccbVersion == null ? "CodeCakeBuilder Zero Version executable file not found" : $"Current version is '{ccbVersion}'";
+                    var msg = "CodeCakeBuilder Zero Version executable file not found";
                     monitor.Error( $"Invalid 'withZeroBuilder' constraint: {msg}. Zero Build versions must first be built." );
                     return false;
                 }
+                ccbPath = null;
             }
             if( (buildType&BuildType.WithZeroBuilder) != BuildType.WithZeroBuilder )
             {
@@ -466,7 +468,9 @@ namespace CK.Env.Plugins
                     if( key == null ) return false;
                     ev.EnvironmentVariables.Add( ("CODECAKEBUILDER_SECRET_KEY", key) );
 
-                    var args = ev.WithZeroBuilder ? ev.CodeCakeBuilderExecutableFile : "run --project CodeCakeBuilder";
+                    var args = ev.WithZeroBuilder
+                                ? ev.CodeCakeBuilderExecutableFile + " SolutionDirectoryIsCurrentDirectory"
+                                : "run --project CodeCakeBuilder";
                     args += " -autointeraction";
                     args += " -PublishDirtyRepo=" + (ev.IsUsingDirtyFolder ? 'Y' : 'N');
                     args += " -PushToRemote=" + (ev.WithPushToRemote ? 'Y' : 'N');

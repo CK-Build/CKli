@@ -51,23 +51,25 @@ namespace CK.Env.Plugins.SolutionFiles
 
             void EnsureProjectReference( string packageId, string v )
             {
-                if( !ccbProject.Deps.Projects.Any( p => p.TargetProject.Name == packageId ) )
+                var version = SVersion.Parse( v );
+                if( !ccbProject.Deps.Projects.Any( p => p.TargetProject.Name == packageId )
+                    && !ccbProject.Deps.Packages.Where( p => p.PackageId == packageId ).All( p => p.Version >= version ) )
                 {
-                    ccbProject.SetPackageReferenceVersion( m, framework, packageId, SVersion.Parse( v ), true, true );
+                    ccbProject.SetPackageReferenceVersion( m, framework, packageId, version, true, false );
                 }
             }
 
-            EnsureProjectReference( "NuGet.Credentials", "4.8.0" );
-            EnsureProjectReference( "NuGet.Protocol", "4.8.0" );
+            EnsureProjectReference( "NuGet.Credentials", "4.9.2" );
+            EnsureProjectReference( "NuGet.Protocol", "4.9.2" );
             if( !_settings.NoUnitTests )
             {
                 EnsureProjectReference( "NUnit.ConsoleRunner", "3.9.0" );
                 EnsureProjectReference( "NUnit.Runners.Net4",  "2.6.4" );
             }
-            EnsureProjectReference( "SimpleGitVersion.Cake", "0.36.1--0015-develop" );
+            EnsureProjectReference( "SimpleGitVersion.Cake", "0.36.1--0071-develop" );
             if( produceCKSetupComponents == true )
             {
-                EnsureProjectReference( "CKSetup.Cake", "0.36.1--0015-develop" );
+                EnsureProjectReference( "CKSetup.Cake", "8.0.1--0109-develop" );
 
                 // CKSetup.Cake transitively implies CK.Text.
                 // We must not have transitive references for build projects: this breaks the
@@ -76,7 +78,7 @@ namespace CK.Env.Plugins.SolutionFiles
             }
             else
             {
-                EnsureProjectReference( "CK.Text", "7.1.1--0033-develop" );
+                EnsureProjectReference( "CK.Text", "7.1.1--0054-develop" );
             }
             solution.Save( m );
         }

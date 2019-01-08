@@ -88,9 +88,9 @@ namespace CK.Env
                                 m.Info( $"ReasonToBuild#4: {p.ProjectName}.0.0.0-0 does not exist in in Zero build feed." );
                             }
                             else if( p.ProjectName == "CodeCakeBuilder"
-                                     && CodeCakeBuilderHelper.GetExecutableInfo( _driverMap[p.SolutionName].GitRepository ).Version != SVersion.ZeroVersion )
+                                     && !System.IO.File.Exists( _localFeedProvider.GetZeroVersionCodeCakeBuilderExecutablePath( p.SolutionName ) ) )
                             {
-                                m.Info( $"ReasonToBuild#5: Published CodeCakeBuilder is missing or is not in ZeroVersion." );
+                                m.Info( $"ReasonToBuild#5: Published ZeroVersion CodeCakeBuilder is missing." );
                             }
                             else
                             {
@@ -159,6 +159,7 @@ namespace CK.Env
                 }
             }
         }
+
 
         bool IsInitialized => _driverMap?.Count > 0;
 

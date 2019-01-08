@@ -1,3 +1,4 @@
+using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -15,6 +16,12 @@ namespace CK.Env
                 case BuildResultType.Release: return @this.Release;
             }
             return null;
+        }
+
+
+        public static NormalizedPath GetZeroVersionCodeCakeBuilderExecutablePath( this IEnvLocalFeedProvider local, string solutionName )
+        {
+            return local.ZeroBuild.PhysicalPath.AppendPart( "Builders" ).AppendPart( solutionName ).AppendPart( "CodeCakeBuilder.dll" );
         }
     }
 }
