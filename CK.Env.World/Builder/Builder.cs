@@ -60,11 +60,11 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The BuildResult on success, null on error.</returns>
-        public BuildResult Run( IActivityMonitor m )
+        public BuildResult Run( IActivityMonitor m, bool forceRebuild )
         {
             if( _packagesVersion.Count > 0 ) throw new InvalidOperationException();
 
-            BuildResult result = CreateResultByPreparingBuilds( m );
+            BuildResult result = CreateResultByPreparingBuilds( m, forceRebuild );
             if( result == null ) return null;
             using( m.OpenInfo( "Running builds." ) )
             {
@@ -92,7 +92,7 @@ namespace CK.Env
                     {
                         do
                         {
-                            result = CreateResultByPreparingBuilds( m );
+                            result = CreateResultByPreparingBuilds( m, forceRebuild );
                             state = RunBuild( m );
                         }
                         while( state == BuildState.MustRetry );
@@ -113,7 +113,7 @@ namespace CK.Env
             return result;
         }
 
-        BuildResult CreateResultByPreparingBuilds( IActivityMonitor m )
+        BuildResult CreateResultByPreparingBuilds( IActivityMonitor m, bool forceRebuild )
         {
             BuildResult result = null;
             using( m.OpenInfo( "Preparing builds." ) )
@@ -125,9 +125,13 @@ namespace CK.Env
                 }
                 result = BuildResult.Create( m, _type, _artifacts, DependentSolutionContext.Solutions, _targetVersions, GetReleaseNotes() );
                 if( result == null ) return null;
-                using( m.OpenInfo( "Removing already existing artifacts that will be produced from caches." ) )
+                if( forceRebuild )
                 {
-                    _localFeedProvider.RemoveFromAllCaches( m, result.GeneratedArtifacts.Select( g => g.Artifact ) );
+                    using( m.OpenInfo( "Forcing rebuild: Removing already existing artifacts that will be produced from caches." ) )
+                    {
+                        _localFeedProvider.RemoveFromAllCaches( m, result.GeneratedArtifacts.Select( g => g.Artifact ) );
+                        _localFeedProvider.GetFeed( _type ).Remove( m, result.GeneratedArtifacts.Select( g => g.Artifact ) );
+                    }
                 }
                 m.CloseGroup( "Success." );
             }

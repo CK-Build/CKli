@@ -116,26 +116,16 @@ namespace CKli
                 else throw new InvalidOperationException( $"Unhandled repository type: {target.Info.UniqueArtifactRepositoryName}" );
             }
 
-            public void Remove( IActivityMonitor m, ArtifactInstance instance )
+            public void Remove( IActivityMonitor m, IEnumerable<ArtifactInstance> artifacts )
             {
-                if( instance.Artifact.Type == "NuGet" )
+                RemoveCKSetupComponents( m, artifacts, this.GetCKSetupStorePath() );
+                foreach( var i in artifacts.Where( i => i.Artifact.Type == "NuGet" ) )
                 {
-                    var f = GetPackagePath( PhysicalPath, instance.Artifact.Name, instance.Version );
+                    var f = GetPackagePath( PhysicalPath, i.Artifact.Name, i.Version );
                     if( File.Exists( f ) )
                     {
                         File.Delete( f );
-                        m.Info( $"Removed {instance} from {PhysicalPath}." );
-                    }
-                }
-                else
-                {
-                    var storePath = this.GetCKSetupStorePath();
-                    using( var store = LocalStore.OpenOrCreate( m, storePath ) )
-                    {
-                        if( store.RemoveComponents( c => c.Name == instance.Artifact.Name && c.Version == instance.Version ) != 0 )
-                        {
-                            m.Info( $"Removed {instance} CKSetup component from {storePath}." );
-                        }
+                        m.Info( $"Removed {i} from {PhysicalPath}." );
                     }
                 }
             }
@@ -193,20 +183,22 @@ namespace CKli
 
         public void RemoveFromAllCaches( IActivityMonitor m, IEnumerable<ArtifactInstance> instances )
         {
+            RemoveCKSetupComponents( m, instances, Facade.DefaultStorePath );
+            foreach( var i in instances.Where( i => i.Artifact.Type == "NuGet" ) )
+            {
+                RemoveFromNuGetCache( m, i.Artifact.Name, i.Version );
+            }
+        }
+
+        private static void RemoveCKSetupComponents( IActivityMonitor m, IEnumerable<ArtifactInstance> instances, string storePath )
+        {
             var ckSetupComponents = instances.Where( i => i.Artifact.Type == "CKSetup" )
                                              .ToDictionary( i => i.Artifact.Name, i => i.Version );
             if( ckSetupComponents.Count > 0 )
             {
-                using( var cache = LocalStore.OpenOrCreate( m, Facade.DefaultStorePath ) )
+                using( var cache = LocalStore.OpenOrCreate( m, storePath ) )
                 {
                     cache.RemoveComponents( c => ckSetupComponents.TryGetValue( c.Name, out var v ) && c.Version == v );
-                }
-            }
-            foreach( var i in instances )
-            {
-                if( i.Artifact.Type == "NuGet" )
-                {
-                    RemoveFromNuGetCache( m, i.Artifact.Name, i.Version );
                 }
             }
         }

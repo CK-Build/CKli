@@ -503,7 +503,7 @@ namespace CK.Env
                                        || CachedGlobalGitStatus == StandardGitStatus.Develop);
 
         [CommandMethod]
-        public bool AllBuild( IActivityMonitor monitor, bool withUnitTest = true )
+        public bool AllBuild( IActivityMonitor monitor, bool rebuildAll = false, bool withUnitTest = true )
         {
             if( !CanAllBuild ) throw new InvalidOperationException( nameof( CanAllBuild ) );
             if( !CheckGlobalGitStatusLocalXorDevelop( monitor ) ) return false;
@@ -521,13 +521,13 @@ namespace CK.Env
                 Builder builder = CachedGlobalGitStatus == StandardGitStatus.Local
                                 ? (Builder)new LocalBuilder( zBuilder, _artifacts, _localFeedProvider, depContext, DriverFinder, withUnitTest )
                                 : new DevelopBuilder( zBuilder, _artifacts, _localFeedProvider, depContext, DriverFinder, withUnitTest );
-                RunBuild( m, builder );
+                RunBuild( m, builder, rebuildAll );
             } );
         }
 
-        bool RunBuild( IActivityMonitor m, Builder b )
+        bool RunBuild( IActivityMonitor m, Builder b, bool forceRebuild )
         {
-            var result = b.Run( m );
+            var result = b.Run( m, forceRebuild );
             if( result == null ) return false;
             using( m.OpenInfo( $"Updating {result.Type} build result with {result.GeneratedArtifacts.Count} artifacts." ) )
             {
@@ -592,7 +592,7 @@ namespace CK.Env
                 if( depContext == null ) return;
 
                 var builder = new DevelopBuilder( zBuilder, _artifacts, _localFeedProvider, depContext, DriverFinder, false );
-                if( !RunBuild( m, builder ) ) return;
+                if( !RunBuild( m, builder, false ) ) return;
 
                 if( !error() )
                 {
@@ -694,15 +694,14 @@ namespace CK.Env
 
         bool DoReleasing( IActivityMonitor monitor )
         {
-
             return RunSafe( monitor, $"Starting Release.", ( m, error ) =>
             {
-                var snapshot = GeneralState.Element( "GitSnapshot" );
-                if( snapshot == null )
+                bool firstRun = GeneralState.Element( "GitSnapshot" ) == null;
+                if( firstRun )
                 {
                     using( m.OpenInfo( $"First run: capturing {WorldName.DevelopBranchName} and {WorldName.MasterBranchName} branches positions." ) )
                     {
-                        snapshot = new XElement( "GitSnapshot",
+                        var snapshot = new XElement( "GitSnapshot",
                                                  _gitRepositories.Select( g => new XElement( "G",
                                                             new XAttribute( "P", g.SubPath ),
                                                             new XAttribute( "D", g.GetBranchSha( m, WorldName.DevelopBranchName ) ),
@@ -727,7 +726,7 @@ namespace CK.Env
                 }
 
                 var b = new ReleaseBuilder( zBuilder, _artifacts, roadmap, _localFeedProvider, DriverFinder );
-                if( !RunBuild( m, b ) ) return;
+                if( !RunBuild( m, b, firstRun ) ) return;
 
                 if( !error() )
                 {

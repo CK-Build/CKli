@@ -52,11 +52,11 @@ namespace CK.Env
         List<ArtifactInstance> GetMissing( IActivityMonitor m, IEnumerable<ArtifactInstance> artifacts );
 
         /// <summary>
-        /// Removes an artifact instance.
+        /// Removes artifact instances from this feed.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="instance">The artifact to remove.</param>
-        void Remove( IActivityMonitor m, ArtifactInstance instance );
+        /// <param name="artifacts">The artifacts to remove.</param>
+        void Remove( IActivityMonitor m, IEnumerable<ArtifactInstance> artifacts );
 
         /// <summary>
         /// Locates all instances of the required artifacts and pushes them to the given target.
