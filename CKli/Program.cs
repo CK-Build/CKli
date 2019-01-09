@@ -56,18 +56,27 @@ namespace CKli
             if( !global.Open() ) return false;
             for(; ; )
             {
-                Console.Write( $">" );
+                Console.WriteLine();
+                Console.WriteLine("[run <globbed command name>|list|restart|exit]");
+                Console.Write( $"{global.CurrentWorld.FullName}> " );
                 string rep = Console.ReadLine().Trim();
                 if( rep.Length == 0 )
                 {
+                    global.CommandRegister["World/DumpGitFolderStatus"].Execute( monitor, null );
+                    continue;
+                }
+                if( rep == "list" )
+                {
+                    Console.WriteLine( "Available Commands:" );
                     foreach( var c in global.CommandRegister.GetAll().OrderBy( c => c.UniqueName ) )
                     {
+                        Console.Write( "     " );
                         Console.WriteLine( c.UniqueName );
                     }
                     continue;
                 }
                 if( rep == "exit" ) return true;
-                if( rep == "refresh" )
+                if( rep == "restart" )
                 {
                     if( !global.Open() ) return false;
                     continue;
@@ -84,33 +93,52 @@ namespace CKli
                     }
                     else if( handlersByType.Count == 1 )
                     {
-                        var payload = handlersByType[0].First().CreatePayload();
+                        var firstHandler = handlersByType[0].First();
+                        bool? globalConfirm = firstHandler.ConfirmationRequired;
+                        if( handlersByType[0].Any( h => h.ConfirmationRequired != globalConfirm.Value ) )
+                        {
+                            monitor.Warn( "Different ConfirmationRequired found among commands. Each command that requires confirmation must be confirmed. " );
+                            globalConfirm = null;
+                        }
+                        var payload = firstHandler.CreatePayload();
                         if( ReadPayload( monitor, payload ) )
                         {
-                            Console.WriteLine( "Confirm execution of:" );
-                            foreach( var h in handlersByType[0] )
+                            char c = 'Y';
+                            if( globalConfirm == true )
                             {
-                                Console.WriteLine( h.UniqueName );
-                            }
-                            if( payload != null )
-                            {
-                                Console.WriteLine( "With payload:" );
-                                if( payload is SimplePayload simple )
-                                {
-                                    foreach( var f in simple.Fields )
-                                    {
-                                        Console.WriteLine( f.ToString() );
-                                    }
-                                }
-                            }
-
-                            char c;
-                            Console.WriteLine( "Y/N?" );
-                            while( "YN".IndexOf( (c = Console.ReadKey().KeyChar) ) < 0 ) ;
-                            if( c == 'Y' )
-                            {
+                                Console.WriteLine( "Confirm execution of:" );
                                 foreach( var h in handlersByType[0] )
                                 {
+                                    Console.WriteLine( h.UniqueName );
+                                }
+                                DumpPayLoad( payload );
+                                Console.WriteLine( "Y/N?" );
+                                while( "YN".IndexOf( (c = Console.ReadKey().KeyChar) ) < 0 ) ;
+                            }
+                            if( c == 'Y' )
+                            {
+                                bool payloadDisplayed = false;
+                                foreach( var h in handlersByType[0] )
+                                {
+                                    if( globalConfirm == null && h.ConfirmationRequired )
+                                    {
+                                        Console.Write( "Confirm execution of: " );
+                                        Console.Write( h.UniqueName );
+                                        if( payloadDisplayed )
+                                        {
+                                            Console.WriteLine( " (with same payload as before)" );
+                                        }
+                                        else 
+                                        {
+                                            payloadDisplayed = true;
+                                            Console.WriteLine();
+                                            DumpPayLoad( payload );
+                                        }
+                                        Console.WriteLine( "Y/N/C (to cancel all)?" );
+                                        while( "YNC".IndexOf( (c = Console.ReadKey().KeyChar) ) < 0 ) ;
+                                        if( c == 'N' ) continue;
+                                        if( c == 'C' ) break;
+                                    }
                                     h.Execute( monitor, payload );
                                 }
                             }
@@ -122,11 +150,26 @@ namespace CKli
                         {
                             foreach( var c in handlersByType )
                             {
-                                monitor.OpenWarn( $"{c.Key?.Name ?? "<No payload>"}: {c.Select( n => n.UniqueName.ToString() ).Concatenate() }" );
+                                monitor.Warn( $"{c.Key?.Name ?? "<No payload>"}: {c.Select( n => n.UniqueName.ToString() ).Concatenate() }" );
                             }
                         }
                     }
                     continue;
+                }
+            }
+        }
+
+        static void DumpPayLoad( object payload )
+        {
+            if( payload != null )
+            {
+                Console.WriteLine( "With payload:" );
+                if( payload is SimplePayload simple )
+                {
+                    foreach( var f in simple.Fields )
+                    {
+                        Console.WriteLine( f.ToString() );
+                    }
                 }
             }
         }
@@ -149,15 +192,14 @@ namespace CKli
                 else if( f.Type == typeof( bool ) || f.Type == typeof( bool? ) )
                 {
                     bool? a = ReadNullableBoolean();
-                    if( !a.HasValue )
-                    {
-                        if( f.IsRequired ) return false;
-                    }
-                    else f.SetValue( a.Value );
+                    if( a.HasValue ) f.SetValue( a.Value );
+                    else if( !f.HasDefaultValue ) return false;
                 }
                 else if( f.Type == typeof( int ) )
                 {
-                    f.SetValue( ReadPositiveNumber() );
+                    int? i = ReadPositiveNumber();
+                    if( i.HasValue ) f.SetValue( i.Value );
+                    else if( !f.HasDefaultValue ) return false;
                 }
                 else
                 {

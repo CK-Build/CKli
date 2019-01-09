@@ -16,48 +16,46 @@ namespace CK.Env
 
             public string Name { get; }
             public Type Type { get; }
-            public bool IsRequired { get; }
+            public bool HasDefaultValue { get; }
+            public object DefaultValue { get; }
             public bool IsPassword { get; }
 
-            public bool HasValue { get; private set; }
+            public bool IsValueSet { get; private set; }
 
             public void SetValue( object value )
             {
-                HasValue = true;
+                IsValueSet = true;
                 _value = value;
             }
 
             /// <summary>
-            /// Gets the value if <see cref="HasValue"/> is true or <see cref="Type.Missing"/>.
+            /// Gets the value (the <see cref="DefaultValue"/> if <see cref="IsValueSet"/> is false and <see cref="HasDefaultValue"/> is true)
+            /// or <see cref="Type.Missing"/> if there is noi value set nor default.
             /// </summary>
             /// <returns>The value or the missing type marker.</returns>
-            public object GetValue() => HasValue  ? _value : Type.Missing;
+            public object GetValue() => IsValueSet  ? _value : Type.Missing;
 
-            public Field( string name, Type type, bool required, bool isPassword = false )
+            public Field( string name, Type type, bool hasDefaultValue, object defaultValue, bool isPassword = false )
             {
                 Name = name;
                 Type = type;
-                IsRequired = required;
+                HasDefaultValue = hasDefaultValue;
+                DefaultValue = defaultValue;
                 IsPassword = isPassword;
             }
 
-            public string RequirementAndName => $"[{(IsRequired ? "required" : "optional")}] - {Name}";
+            public string RequirementAndName => $"[{(!HasDefaultValue ? "required" : $"default value: {DefaultValue}")}] - {Name}";
 
-            public string ValueAndStatus => HasValue
+            public string ValueAndStatus => IsValueSet
                                             ? $"Value = '{GetValue()}' "
-                                            : (IsRequired ? "<Missing value>" : "<use default value>");
+                                            : (HasDefaultValue ? $"<use default value: {DefaultValue}>" : "<Missing value>");
 
             public override string ToString() => RequirementAndName + " - " + ValueAndStatus;
         }
 
-        public SimplePayload( IEnumerable<Field> f )
-        {
-            Fields = f.ToArray();
-        }
-
         public SimplePayload( IEnumerable<ParameterInfo> parameters )
         {
-            Fields = parameters.Select( p => new Field( p.Name, p.ParameterType, !p.HasDefaultValue ) ).ToArray();
+            Fields = parameters.Select( p => new Field( p.Name, p.ParameterType, p.HasDefaultValue, p.HasDefaultValue ? p.DefaultValue : null ) ).ToArray();
         }
 
         public IReadOnlyList<Field> Fields { get; }

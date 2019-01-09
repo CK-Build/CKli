@@ -326,6 +326,8 @@ namespace CK.Env
         /// <summary>
         /// Pulls current branch by merging changes from remote 'orgin' branch into this repository.
         /// The current head must be clean.
+        /// Note that this is not a [CommandMethod]: Pull command is implemented by Solution driver
+        /// so that potential reloading solution is handled.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>
@@ -790,15 +792,30 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Gets whether <see cref="Push(IActivityMonitor)"/> can be called:
+        /// the current branch is tracked and is ahead of the remote branch.
+        /// </summary>
+        /// <param name="m"></param>
+        /// <returns></returns>
+        public bool PushEnabled(IActivityMonitor m) => (_git.Head.TrackingDetails.AheadBy ?? 0) > 0;
+
+        /// <summary>
+        /// Pushes changes from the current branch to the origin.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>True on success, false on error.</returns>
+        [CommandMethod]
+        public bool Push( IActivityMonitor m ) => Push( m, CurrentBranchName );
+
+        /// <summary>
         /// Pushes changes from a branch to the origin.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="branchName">Local branch name. When null, the <see cref="CurrentBranchName"/> is used.</param>
+        /// <param name="branchName">Local branch name.</param>
         /// <returns>True on success, false on error.</returns>
-        [CommandMethod]
-        public bool Push( IActivityMonitor m, string branchName = null )
+        public bool Push( IActivityMonitor m, string branchName )
         {
-            if( branchName == null ) branchName = CurrentBranchName;
+            if( branchName == null ) throw new ArgumentNullException(nameof(branchName));
             using( m.OpenInfo( $"Pushing '{SubPath}' (branch '{branchName}') to origin." ) )
             {
                 try

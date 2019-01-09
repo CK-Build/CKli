@@ -37,8 +37,9 @@ namespace CK.Env
             readonly Func<bool> _enabled;
             readonly ParameterInfo[] _parameters;
 
-            public MethodHandler( NormalizedPath n, object instance, MethodInfo method, ParameterInfo[] parameters, Func<bool> enabled )
+            public MethodHandler( bool confirmationRequired, NormalizedPath n, object instance, MethodInfo method, ParameterInfo[] parameters, Func<bool> enabled )
             {
+                ConfirmationRequired = confirmationRequired;
                 UniqueName = n;
                 _instance = instance;
                 _method = method;
@@ -48,6 +49,8 @@ namespace CK.Env
                               : typeof(SimplePayload);
                 _enabled = enabled;
             }
+
+            public bool ConfirmationRequired { get; }
 
             public NormalizedPath UniqueName { get; }
 
@@ -94,7 +97,7 @@ namespace CK.Env
             }
         }
 
-        public ICommandHandler Register( NormalizedPath uniqueName, object o, MethodInfo method, Func<bool> enabled = null )
+        public ICommandHandler Register( bool confirmationRequired, NormalizedPath uniqueName, object o, MethodInfo method, Func<bool> enabled = null )
         {
             if( _commands.ContainsKey( uniqueName ) )
             {
@@ -105,26 +108,30 @@ namespace CK.Env
             {
                 throw new ArgumentException( $"Method {method} for command '{uniqueName}' must have a first IActivityMonitor parameter.", nameof( method ) );
             }
-            var h = new MethodHandler( uniqueName, o, method, parameters, enabled );
+            var h = new MethodHandler( confirmationRequired, uniqueName, o, method, parameters, enabled );
             _commands.Add( uniqueName, h );
             return h;
         }
 
-        public ICommandHandler Register( NormalizedPath uniqueName, object o, string commandMethodName )
+        public ICommandHandler Register( bool confirmationRequired, NormalizedPath uniqueName, object o, string commandMethodName )
         {
             var methods = o.GetType().GetMethods();
             var m = methods.Single( method => method.Name == commandMethodName );
             var enabled = GetEnabledMethod( o, methods, m.Name );
-            return Register( uniqueName, o, m, enabled );
+            return Register( confirmationRequired, uniqueName, o, m, enabled );
         }
 
         public void Register( ICommandMethodsProvider provider )
         {
             var methods = provider.GetType().GetMethods();
-            foreach( var m in methods.Where( m => m.GetCustomAttribute<CommandMethodAttribute>() != null ) )
+            foreach( var m in methods ) 
             {
-                var enabled = GetEnabledMethod( provider, methods, m.Name );
-                Register( provider.CommandProviderName.AppendPart( m.Name ), provider, m, enabled );
+                var attr = m.GetCustomAttribute<CommandMethodAttribute>();
+                if( attr != null )
+                {
+                    var enabled = GetEnabledMethod( provider, methods, m.Name );
+                    Register( attr.ConfirmationRequired, provider.CommandProviderName.AppendPart( m.Name ), provider, m, enabled );
+                }
             }
         }
 

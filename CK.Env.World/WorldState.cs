@@ -121,13 +121,12 @@ namespace CK.Env
         /// </summary>
         public IWorldName WorldName { get; }
 
-
         /// <summary>
         /// Initializes or reinitializes this world state.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
-        [CommandMethod]
+        [CommandMethod(confirmationRequired:false)]
         public bool Initialize( IActivityMonitor monitor )
         {
             if( _rawState == null )

@@ -103,7 +103,7 @@ namespace CKli
         /// </summary>
         public IWorldName World => _world;
 
-        [CommandMethod]
+        [CommandMethod(confirmationRequired:false)]
         public void DumpGitFolderStatus( IActivityMonitor m )
         {
             var gitFolders = _allGitFolders.Select( x => x.GitFolder );
