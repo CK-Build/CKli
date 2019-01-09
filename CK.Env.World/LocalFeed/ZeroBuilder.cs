@@ -118,10 +118,10 @@ namespace CK.Env
                                 {
                                     scopeMap.Add( driver, driver.GitRepository.OpenProtectedScope( m, null ) );
                                 }
-                                // Always sets Zero version dependencies even if we don't build it so that
-                                // dependent project see homogeneous Zero versions for all its dependencies.
-                                var zeroDeps = p.UpgradePackages.Select( dep => new UpdatePackageInfo( p.SolutionName, p.ProjectName, dep, SVersion.ZeroVersion ) );
-                                if( !driver.UpdatePackageDependencies( m, zeroDeps ) ) return false;
+                                //// Always sets Zero version dependencies even if we don't build it so that
+                                //// dependent project see homogeneous Zero versions for all its dependencies.
+                                //var zeroDeps = p.UpgradeZeroProjects.Select( dep => new UpdatePackageInfo( p.SolutionName, p.ProjectName, dep, SVersion.ZeroVersion ) );
+                                //if( !driver.UpdateZeroProjectDependencies( m, zeroDeps ) ) return false;
                             }
                         }
                     }

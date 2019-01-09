@@ -333,6 +333,16 @@ namespace CK.Env.MSBuild
                                                          .Deps.Packages.Any( dep => dep.PackageId == d.Project.Name ) )
                                         .Select( d => d.Project.Name )
                                         .ToArray(),
+                                    // UpgradeZeroProjects: Among direct dependencies, consider all the
+                                    //                      published projects, the ones who are actually referenced
+                                    //                      as a package AND the ones that are ProjectReference.
+                                    //                      ProjectReference MUST be transformed into PackageReference
+                                    //                      during ZeroBuild.
+                                    p.DirectDeps
+                                        .Where( d => d.IsPublished )
+                                        .Select( d => d.Project.Name )
+                                        .ToArray(),
+
                                     // Dependencies: Considers all the projects and computes their ZeroBuildProjectInfo.FullName. 
                                     p.AllDeps
                                             .Select( d => d.IsPublished

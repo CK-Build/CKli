@@ -21,6 +21,7 @@ namespace CK.Env
         /// <param name="projectName">The project name. Can not be empty.</param>
         /// <param name="mustPack">True if this is a published project.</param>
         /// <param name="upgradePackages">Set of packages name reference to upgrade.</param>
+        /// <param name="upgradePackages">Set of packages OA project name reference to upgrade to the Zero version.</param>
         /// <param name="dependencies">List of package dependencies' <see cref="FullName"/> projects.</param>
         public ZeroBuildProjectInfo(
             int index,
@@ -30,6 +31,7 @@ namespace CK.Env
             string primarySolutionRelativeFolderPath,
             bool mustPack,
             IReadOnlyCollection<string> upgradePackages,
+            IReadOnlyCollection<string> upgradeZeroProjects,
             IReadOnlyCollection<string> dependencies )
         {
             if( Index < 0 ) throw new ArgumentOutOfRangeException( nameof( index ) );
@@ -38,6 +40,7 @@ namespace CK.Env
             if( String.IsNullOrWhiteSpace( projectName ) ) throw new ArgumentNullException( nameof( projectName ) );
             if( String.IsNullOrWhiteSpace( primarySolutionRelativeFolderPath ) ) throw new ArgumentNullException( nameof( primarySolutionRelativeFolderPath ) );
             if( upgradePackages == null ) throw new ArgumentNullException( nameof( upgradePackages ) );
+            if( upgradeZeroProjects == null ) throw new ArgumentNullException( nameof( upgradeZeroProjects ) );
             if( dependencies == null ) throw new ArgumentNullException( nameof( dependencies ) );
             Index = index;
             Rank = rank;
@@ -46,6 +49,7 @@ namespace CK.Env
             PrimarySolutionRelativeFolderPath = primarySolutionRelativeFolderPath;
             MustPack = mustPack;
             UpgradePackages = upgradePackages;
+            UpgradeZeroProjects = upgradeZeroProjects;
             Dependencies = dependencies;
             FullName = mustPack ? projectName : solutionName + '/' + projectName;
         }
@@ -82,9 +86,17 @@ namespace CK.Env
         public bool MustPack { get; }
 
         /// <summary>
-        /// Gets the name of the packages that must be updated to the Zero Version.
+        /// Gets the name of the packages that must be updated.
+        /// This does not contain ProjectReferences.
         /// </summary>
         public IReadOnlyCollection<string> UpgradePackages { get; }
+
+        /// <summary>
+        /// Gets the name of the packages that must be updated to the Zero Version.
+        /// Caution: This contains the PackageReferences as well as ProjectReferences:
+        /// ProjectReferences MUST be transformed into PackageReferences to the Zero version.
+        /// </summary>
+        public IReadOnlyCollection<string> UpgradeZeroProjects { get; }
 
         /// <summary>
         /// Gets the <see cref="FullName"/> of the projects that are (transitively) used by this project.

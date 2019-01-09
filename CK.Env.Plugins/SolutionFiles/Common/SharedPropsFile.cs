@@ -67,7 +67,7 @@ namespace CK.Env.Plugins.SolutionFiles
                             new XElement( "ProductName", Folder.World.FullName ),
                             new XElement( "Company", "Signature Code" ),
                             new XElement( "Authors", "Signature Code" ),
-                            new XElement( "Copyright", @"Copyright Invenietis 2007-$([System.DateTime]::UtcNow.ToString(""yyyy""))" ),
+                            new XElement( "Copyright", @"Copyright Signature-Code 2007-$([System.DateTime]::UtcNow.ToString(""yyyy""))" ),
                             new XElement( "RepositoryType", "git" ),
                             new XComment( "Removes annoying Pack warning: The package version ... uses SemVer 2.0.0 or components of SemVer 1.0.0 that are not supported on legacy clients..." ),
                             new XElement( "NoWarn", "NU5105" ) );

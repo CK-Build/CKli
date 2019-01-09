@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using CK.Core;
 using CK.Env.MSBuild;
 using CK.Text;
@@ -194,6 +195,17 @@ namespace CK.Env.Plugins
             {
                 _localFeedProvider.RemoveFromNuGetCache( monitor, info.ProjectName, SVersion.ZeroVersion );
             }
+            var p2pRefToRemove = p.Deps.Projects.Where( p2p => info.UpgradeZeroProjects.Contains( p2p.TargetProject.Name ) ).ToList();
+            if( p2pRefToRemove.Count > 0 )
+            {
+                monitor.Info( $"Removing Project references: {p2pRefToRemove.Select( p2p => p2p.Element.ToString() ).Concatenate()}" );
+                p2pRefToRemove.Select( p2p => p2p.Element ).Remove();
+            }
+            foreach( var z in info.UpgradeZeroProjects )
+            {
+                p.SetPackageReferenceVersion( monitor, p.TargetFrameworks, z, SVersion.ZeroVersion, true, false, false );
+            }
+            if( !p.Solution.Save( monitor ) ) return false;
 
             ICommitAssemblyBuildInfo b = CommitAssemblyBuildInfo.ZeroBuildInfo;
             string commonArgs = $@" --no-dependencies --source ""{_localFeedProvider.ZeroBuild.PhysicalPath}""";

@@ -266,6 +266,7 @@ namespace CK.Env.MSBuild
         /// <param name="version">The new version to set.</param>
         /// <param name="addIfNotExists">True to add the reference. By default, it is only updated.</param>
         /// <param name="preserveExisting">True to keep any existing version.</param>
+        /// <param name="throwProjectDependendencies">False to not challenge ProjectReferences.</param>
         /// <returns>The number of changes.</returns>
         public int SetPackageReferenceVersion(
             IActivityMonitor m,
@@ -273,13 +274,14 @@ namespace CK.Env.MSBuild
             string packageId,
             SVersion version,
             bool addIfNotExists = false,
-            bool preserveExisting = false )
+            bool preserveExisting = false,
+            bool throwProjectDependendencies = true )
         {
             if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
             if( frameworks.IsEmpty ) throw new ArgumentException( "Must not be empty.", nameof(frameworks) );
             var actualFrameworks = TargetFrameworks.Intersect( frameworks );
             if( actualFrameworks.IsEmpty ) throw new ArgumentException( $"No {frameworks} in {TargetFrameworks}.", nameof(frameworks) );
-            if( _dependencies.Projects.Any( p => p.TargetProject.Name == packageId ) )
+            if( throwProjectDependendencies && _dependencies.Projects.Any( p => p.TargetProject.Name == packageId ) )
             {
                 throw new ArgumentException( $"Package {packageId} is already a ProjectReference.", nameof( packageId ) );
             }
@@ -535,7 +537,7 @@ namespace CK.Env.MSBuild
                         m.Warn( $"Useless ProjectReference (applies to undeclared frameworks): {p.Origin}." );
                         uselessDeps.Add( p.Origin );
                     }
-                    else projs.Add( new ProjectToProjectDependency( this, target, frameworks ) );
+                    else projs.Add( new ProjectToProjectDependency( this, target, frameworks, p.Origin ) );
                 }
             }
             _dependencies = new Dependencies( deps, projs, uselessDeps );
