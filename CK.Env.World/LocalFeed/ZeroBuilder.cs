@@ -107,21 +107,14 @@ namespace CK.Env
                 }
                 else
                 {
-                    using( m.OpenTrace( "Creating protected scopes and applying zero dependencies." ) )
+                    using( m.OpenTrace( "Creating protected scopes." ) )
                     {
                         foreach( var p in _depContext.BuildProjectsInfo )
                         {
-                            using( m.OpenInfo( $"Configuring {p}." ) )
+                            var driver = _driverMap[p.SolutionName];
+                            if( !scopeMap.ContainsKey( driver ) )
                             {
-                                var driver = _driverMap[p.SolutionName];
-                                if( !scopeMap.ContainsKey( driver ) )
-                                {
-                                    scopeMap.Add( driver, driver.GitRepository.OpenProtectedScope( m, null ) );
-                                }
-                                //// Always sets Zero version dependencies even if we don't build it so that
-                                //// dependent project see homogeneous Zero versions for all its dependencies.
-                                //var zeroDeps = p.UpgradeZeroProjects.Select( dep => new UpdatePackageInfo( p.SolutionName, p.ProjectName, dep, SVersion.ZeroVersion ) );
-                                //if( !driver.UpdateZeroProjectDependencies( m, zeroDeps ) ) return false;
+                                scopeMap.Add( driver, driver.GitRepository.OpenProtectedScope( m, null ) );
                             }
                         }
                     }
