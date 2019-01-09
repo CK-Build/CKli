@@ -205,7 +205,7 @@
       </Branch>
     </GitFolder>
 
-    <GitFolder Name="CK-Setup" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-setup.git">
+    <GitFolder Name="CK-Setup" Url="https://gitlab.com/olivier-spinelli/CK-Setup.git">
       <SolutionSettings UseCKSetup="true" />
       <Branch Name="develop">
         <PrimarySolution CKSetupComponentProjects="CKSetup.Runner;CKSetup" />
@@ -218,7 +218,7 @@
       </Branch>
     </GitFolder>
 
-    <GitFolder Name="CKSetupRemoteStore" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/cksetupremotestore.git">
+    <GitFolder Name="CKSetupRemoteStore" Url="https://gitlab.com/olivier-spinelli/CKSetupRemoteStore.git">
       <SolutionSettings UseCKSetup="true" />
       <Branch Name="develop">
         <PrimarySolution
@@ -234,7 +234,7 @@
       </Branch>
     </GitFolder>
 
-    <GitFolder Name="CK-SqlServer-Parser" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-sqlserver-parser.git">
+    <GitFolder Name="CK-SqlServer-Parser" Url="https://gitlab.com/olivier-spinelli/CK-SqlServer-Parser.git">
       <Branch Name="develop">
         <PrimarySolution />
       </Branch>

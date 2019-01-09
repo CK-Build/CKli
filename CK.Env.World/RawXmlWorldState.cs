@@ -14,6 +14,7 @@ namespace CK.Env
         static readonly XName xGeneralStateName = XNamespace.None + "GeneralState";
         static readonly XName xLastBuild = XNamespace.None + "LastBuild";
         static readonly XName xBuilds = XNamespace.None + "Builds";
+        static readonly XName xPublishedBuildHistory = XNamespace.None + "PublishedBuildHistory";
         static readonly XName xType = XNamespace.None + "Type";
         static readonly XName xRelease = XNamespace.None + "Release";
         static readonly XName xCI = XNamespace.None + "CI";
@@ -27,6 +28,7 @@ namespace CK.Env
         readonly XElement _releaseBuildResult;
         readonly XElement _ciBuildResult;
         readonly XElement _localBuildResult;
+        readonly XElement _publishedBuildHistory;
         readonly BuildResult[] _buildResults;
 
         public RawXmlWorldState( IWorldName w, XDocument d )
@@ -42,6 +44,7 @@ namespace CK.Env
             _releaseBuildResult = _builds.EnsureElement( xRelease );
             _ciBuildResult = _builds.EnsureElement( xCI );
             _localBuildResult = _builds.EnsureElement( xLocal );
+            _publishedBuildHistory = d.Root.EnsureElement( xPublishedBuildHistory );
             LastBuildType = _lastBuild.AttributeEnum( xType, BuildResultType.None );
             _buildResults = new BuildResult[3];
         }
@@ -101,28 +104,38 @@ namespace CK.Env
             if( type == BuildResultType.None ) return null;
             if( _buildResults[(int)type - 1]  == null )
             {
-                XElement e;
-                switch( type )
-                {
-                    case BuildResultType.Local: e = _localBuildResult; break;
-                    case BuildResultType.CI: e = _ciBuildResult; break;
-                    case BuildResultType.Release: e = _releaseBuildResult; break;
-                    default: e = null; break;
-                }
+                XElement e = GetParentBuildResultElement( type );
                 e = e?.Elements().FirstOrDefault();
                 if( e != null ) _buildResults[(int)type - 1] = new BuildResult( e );
             }
             return _buildResults[(int)type - 1];
         }
 
+        XElement GetParentBuildResultElement( BuildResultType type )
+        {
+            switch( type )
+            {
+                case BuildResultType.Local: return _localBuildResult;
+                case BuildResultType.CI: return _ciBuildResult;
+                case BuildResultType.Release: return _releaseBuildResult;
+            }
+            return null;
+        }
 
         /// <summary>
-        /// Clers the build result for a build type.
+        /// Publishes the build result for a build type: transfers the current xml result
+        /// to the PublishedBuildHistory element.
         /// </summary>
         /// <param name="type">The build type.</param>
-        public void ClearBuildResult( BuildResultType type )
+        public void PublishBuildResult( BuildResultType type )
         {
-            if( type != BuildResultType.None ) _buildResults[(int)type - 1] = null;
+            if( type == BuildResultType.None ) throw new ArgumentException();
+            var b = _buildResults[(int)type - 1];
+            if( b == null ) throw new InvalidOperationException( $"No current BuildResultType '{type}'." );
+            var e = GetParentBuildResultElement( type );
+            var xmlBuild = e.Elements().First();
+            _publishedBuildHistory.Add( xmlBuild );
+            xmlBuild.Remove();
         }
 
         /// <summary>

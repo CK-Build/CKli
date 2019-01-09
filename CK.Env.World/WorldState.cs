@@ -639,7 +639,6 @@ namespace CK.Env
             bool editSucceed = roadmap.UpdateRoadmap( monitor, VersionSelector, skipPreviouslyResolved );
             // Always saves state to preserve any change in the roadmap, even on error.
             GeneralState.ReplaceElementByName( roadmap.ToXml() );
-            Save( monitor );
             if( !Save( monitor ) || !editSucceed ) return null;
             return roadmap;
         }
@@ -792,7 +791,9 @@ namespace CK.Env
         bool HandleReleaseVersionTags( IActivityMonitor m, bool pushVersionTagsAndBranches )
         {
             bool success = true;
-            using( m.OpenInfo( pushVersionTagsAndBranches ? "Pushing version tags and branches." : "Clearing version tags." ) )
+            using( m.OpenInfo( pushVersionTagsAndBranches
+                                ? "Pushing version tags and branches."
+                                : "Clearing version tags." ) )
             {
                 var versions = ReleaseRoadmap.Load( GeneralState.Element( "Roadmap" ) )
                                            .Where( e => e.Info.Level != ReleaseLevel.None )
@@ -839,7 +840,15 @@ namespace CK.Env
             return RunSafe( monitor, $"Publishing CI.", ( m, error ) =>
             {
                 var buildResults = _rawState.GetBuildResult( BuildResultType.CI );
-                if( !DoPublish( m, buildResults ) ) return;
+                if( !DoPushArtifacts( m, buildResults ) ) return;
+                bool success = true;
+                foreach( var g in _gitRepositories )
+                {
+                    success &= g.Push( m, WorldName.DevelopBranchName );
+                }
+                if( !success ) return;
+                _rawState.PublishBuildResult( buildResults.Type );
+                Save( m );
             } );
         }
 
@@ -848,9 +857,9 @@ namespace CK.Env
             return RunSafe( monitor, $"Publishing Release.", ( m, error ) =>
             {
                 var buildResults = _rawState.GetBuildResult( BuildResultType.Release );
-                if( buildResults != null && !DoPublish( m, buildResults ) ) return;
+                if( buildResults != null && !DoPushArtifacts( m, buildResults ) ) return;
                 if( !HandleReleaseVersionTags( m, true ) ) return;
-
+                _rawState.PublishBuildResult( buildResults.Type );
                 if( !error() )
                 {
                     GeneralState.Element( "GitSnapshot" )?.Remove();
@@ -859,7 +868,7 @@ namespace CK.Env
             } );
         }
 
-        bool DoPublish( IActivityMonitor monitor, BuildResult buildResults )
+        bool DoPushArtifacts( IActivityMonitor monitor, BuildResult buildResults )
         {
             Debug.Assert( buildResults.Type == BuildResultType.Release || buildResults.Type == BuildResultType.CI );
             var local = _localFeedProvider.GetFeed( buildResults.Type );
@@ -868,9 +877,12 @@ namespace CK.Env
                 foreach( var a in buildResults.GeneratedArtifacts.GroupBy( a => a.TargetName ) )
                 {
                     var h = _artifacts.Find( a.Key );
-                    if( !local.PushLocalArtifacts( m, h, a.Select( p => p.Artifact ) ) ) return;
+                    if( !local.PushLocalArtifacts( m, h, a.Select( p => p.Artifact ) ) )
+                    {
+                        Debug.Assert( error(), "An error must have been logged." );
+                        return;
+                    }
                 }
-                _rawState.ClearBuildResult( buildResults.Type );
             } );
         }
 
