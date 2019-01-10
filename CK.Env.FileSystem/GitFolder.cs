@@ -282,7 +282,7 @@ namespace CK.Env
                     if( logErrorMissingLocalAndRemote ) m.Error( $"Repository '{SubPath}': Both local '{branchName}' and remote '{remoteName}' not found." );
                     return null;
                 }
-                m.Info( $"Creating local branch on remote '{remoteName}'." );
+                m.Info( $"Creating local branch on remote '{remoteName}' in repository '{SubPath}'." );
                 b = _git.Branches.Add( branchName, remote.Tip );
                 b = _git.Branches.Update( b, u => u.TrackedBranch = remote.CanonicalName );
             }
