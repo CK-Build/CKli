@@ -632,11 +632,11 @@ namespace CK.Env
             return DoEditRoadmap( monitor, false ) != null;
         }
 
-        ReleaseRoadmap DoEditRoadmap( IActivityMonitor monitor, bool skipPreviouslyResolved )
+        ReleaseRoadmap DoEditRoadmap( IActivityMonitor monitor, bool forgetAllExistingRoadmapVersions )
         {
             var roadmap = LoadRoadmap( monitor );
             if( roadmap == null ) return null;
-            bool editSucceed = roadmap.UpdateRoadmap( monitor, VersionSelector, skipPreviouslyResolved );
+            bool editSucceed = roadmap.UpdateRoadmap( monitor, VersionSelector, forgetAllExistingRoadmapVersions );
             // Always saves state to preserve any change in the roadmap, even on error.
             GeneralState.ReplaceElementByName( roadmap.ToXml() );
             if( !Save( monitor ) || !editSucceed ) return null;
@@ -655,15 +655,11 @@ namespace CK.Env
         /// Starts a release after an optional pull, using the current <see cref="VersionSelector"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="checkRoadmap">
-        /// True to silently skip any already set versions.
-        /// When false (the default), if the road map is valid and <see cref="pull"/> did not change anything, the
-        /// release is started immediately.
-        /// </param>
         /// <param name="pull">Pull all branches first.</param>
+        /// <param name="resetRoadmap">True to forget the current roadmap (it if exists) and ask for each and every version.</param>
         /// <returns>True on success, false on error.</returns>
         [CommandMethod]
-        public bool Release( IActivityMonitor monitor, bool checkRoadmap = false, bool pull = true )
+        public bool Release( IActivityMonitor monitor, bool pull = true, bool resetRoadmap = false )
         {
             if( !CanRelease ) throw new InvalidOperationException( nameof( CanRelease ) );
             if( !CheckGlobalGitStatus( monitor, StandardGitStatus.Develop ) ) return false;
@@ -681,7 +677,7 @@ namespace CK.Env
             }
             if( reloadNeeded && !ReloadSolutions( monitor ) ) return false;
 
-            var roadmap = DoEditRoadmap( monitor, !checkRoadmap && !reloadNeeded );
+            var roadmap = DoEditRoadmap( monitor, resetRoadmap );
             if( roadmap == null ) return false;
 
             SetWorkStatus( GlobalWorkStatus.Releasing );
@@ -703,7 +699,7 @@ namespace CK.Env
                                                  _gitRepositories.Select( g => new XElement( "G",
                                                             new XAttribute( "P", g.SubPath ),
                                                             new XAttribute( "D", g.GetBranchSha( m, WorldName.DevelopBranchName ) ),
-                                                            new XAttribute( "M", g.GetBranchSha( m, WorldName.MasterBranchName ) ) ) ) );
+                                                            new XAttribute( "M", g.GetBranchSha( m, WorldName.MasterBranchName ) ?? "" ) ) ) );
                         GeneralState.Add( snapshot );
                         if( !Save( m ) ) return;
                         if( !_localFeedProvider.Release.RemoveAll( m ) ) return;

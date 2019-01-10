@@ -279,7 +279,9 @@ namespace CK.Env
                 var remote = _git.Branches[remoteName];
                 if( remote == null )
                 {
-                    if( logErrorMissingLocalAndRemote ) m.Error( $"Repository '{SubPath}': Both local '{branchName}' and remote '{remoteName}' not found." );
+                    var msg = $"Repository '{SubPath}': Both local '{branchName}' and remote '{remoteName}' not found.";
+                    if( logErrorMissingLocalAndRemote ) m.Error( msg );
+                    else m.Warn( msg );
                     return null;
                 }
                 m.Info( $"Creating local branch on remote '{remoteName}' in repository '{SubPath}'." );

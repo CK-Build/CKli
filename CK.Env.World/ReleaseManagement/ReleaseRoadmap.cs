@@ -45,14 +45,14 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="versionSelector">The version selector to use.</param>
-        /// <param name="skipPreviouslyResolved">
+        /// <param name="forgetAllExistingRoadmapVersions">
         /// True to automatically skip any previously reolved versions.
         /// <paramref name="versionSelector"/> will not see them.
         /// </param>
         /// <returns>True on success, false on error or cancellation..</returns>
-        public bool UpdateRoadmap( IActivityMonitor m, IReleaseVersionSelector versionSelector, bool skipPreviouslyResolved )
+        public bool UpdateRoadmap( IActivityMonitor m, IReleaseVersionSelector versionSelector, bool forgetAllExistingRoadmapVersions )
         {
-            if( !skipPreviouslyResolved )
+            if( !forgetAllExistingRoadmapVersions )
             {
                 foreach( var info in _infos )
                 {
