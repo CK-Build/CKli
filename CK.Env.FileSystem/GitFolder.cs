@@ -217,13 +217,13 @@ namespace CK.Env
 
         PackageReleaseDiff CreateDiff( IActivityMonitor m, Commit commit, GeneratedPackage p )
         {
-            TreeEntry newTreeEntry = _git.Head.Tip.Tree[p.PrimarySolutionRelativeFolderPath];
+            TreeEntry newTreeEntry = _git.Head.Tip.Tree[p.PrimarySolutionRelativeFolderPath.Replace( '\\', '/' )];
             if( newTreeEntry == null || newTreeEntry.TargetType != TreeEntryTargetType.Tree )
             {
-                m.Error( $"Unable to find {p.PrimarySolutionRelativeFolderPath}." );
+                m.Error( $"Unable to find '{p.PrimarySolutionRelativeFolderPath}'." );
                 return null;
             }
-            TreeEntry oldTreeEntry = commit.Tree[p.PrimarySolutionRelativeFolderPath];
+            TreeEntry oldTreeEntry = commit.Tree[p.PrimarySolutionRelativeFolderPath.Replace( '\\', '/' )];
             if( oldTreeEntry == null || oldTreeEntry.TargetType != TreeEntryTargetType.Tree )
             {
                 m.Info( $"Previously {p.Name} did not exist." );
