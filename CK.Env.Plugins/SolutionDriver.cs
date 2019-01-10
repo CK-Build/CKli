@@ -169,7 +169,7 @@ namespace CK.Env.Plugins
         public event EventHandler<EventMonitoredArgs> OnBuildFailed;
 
         /// <summary>
-        /// Fires before <see cref="BuildOrPackBuildProject"/> actually builds a build project in ZeroVersion.
+        /// Fires before <see cref="ZeroBuildProject"/> actually builds a project in ZeroVersion.
         /// </summary>
         public event EventHandler<EventMonitoredArgs> OnZeroBuildProject;
 
@@ -208,7 +208,7 @@ namespace CK.Env.Plugins
             if( !p.Solution.Save( monitor ) ) return false;
 
             ICommitAssemblyBuildInfo b = CommitAssemblyBuildInfo.ZeroBuildInfo;
-            string commonArgs = $@" --no-dependencies --source ""{_localFeedProvider.ZeroBuild.PhysicalPath}""";
+            string commonArgs = $@" --no-dependencies";
             string versionArgs = $@" --configuration {b.BuildConfiguration} /p:Version=""{b.NuGetVersion}"" /p:AssemblyVersion=""{b.AssemblyVersion}"" /p:FileVersion=""{b.FileVersion}"" /p:InformationalVersion=""{b.InformationalVersion}"" ";
             var args = info.MustPack
                         ? $@"pack --output ""{_localFeedProvider.ZeroBuild.PhysicalPath}"""

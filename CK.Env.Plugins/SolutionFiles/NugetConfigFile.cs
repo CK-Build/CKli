@@ -29,8 +29,14 @@ namespace CK.Env.Plugins.SolutionFiles
                 f.OnLocalBranchLeaving += OnLocalBranchLeaving;
             }
             _solutionDriver.OnStartBuild += OnStartBuild;
+            _solutionDriver.OnZeroBuildProject += OnZeroBuildProject;
         }
 
+        void OnZeroBuildProject( object sender, EventMonitoredArgs e )
+        {
+            EnsureFeed( e.Monitor, "ZeroBuild-Feed", _localFeedProvider.ZeroBuild.PhysicalPath );
+            Save( e.Monitor );
+        }
 
         void OnStartBuild( object sender, BuildStartEventArgs e )
         {
@@ -58,6 +64,8 @@ namespace CK.Env.Plugins.SolutionFiles
         {
             Folder.OnLocalBranchEntered -= OnLocalBranchEntered;
             Folder.OnLocalBranchLeaving -= OnLocalBranchLeaving;
+            _solutionDriver.OnStartBuild -= OnStartBuild;
+            _solutionDriver.OnZeroBuildProject -= OnZeroBuildProject;
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
