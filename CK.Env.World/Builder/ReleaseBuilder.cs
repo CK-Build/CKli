@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Text;
 using CK.Core;
+using CK.Text;
 using CSemVer;
 
 namespace CK.Env
@@ -25,19 +27,42 @@ namespace CK.Env
         }
 
 
-        protected override (SVersion Version, bool MustBuild) PrepareBuild( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades )
+        protected override (SVersion Version, bool MustBuild) PrepareBuild(
+            IActivityMonitor m,
+            IDependentSolution s,
+            ISolutionDriver driver,
+            IReadOnlyList<UpdatePackageInfo> upgrades )
         {
             Debug.Assert( driver.GitRepository.CurrentBranchName == s.BranchName );
 
             IReleaseSolutionInfo info = _roadmap.ReleaseInfos[ s.Index ];
             var targetVersion = info.CurrentReleaseInfo.Version;
-            if( info.CurrentReleaseInfo.Level != ReleaseLevel.None )
+            if( upgrades.Count > 0 )
             {
                 if( !driver.UpdatePackageDependencies( m, upgrades ) ) return (null,false);
-                if( !driver.GitRepository.Commit( m, "Global Release commit." ) ) return (null,false);
+                var upText = upgrades.Select( u => u.PackageUpdate.ToString() ).Concatenate();
+                var msg = info.CurrentReleaseInfo.Level == ReleaseLevel.None
+                            ? $"Not released (keeping version {targetVersion}). Upgrading release dependencies: {upText}."
+                            : $"Releasing {targetVersion}. Upgrading release dependencies: {upText}." + Environment.NewLine
+                              + Environment.NewLine
+                              + info.ReleaseNote;
+                if( !driver.GitRepository.Commit( m, msg ) ) return (null,false);
             }
             _commits[s.Index] = driver.GitRepository.Head.CommitSha;
             return (targetVersion, info.CurrentReleaseInfo.Level != ReleaseLevel.None);
+        }
+
+        protected override BuildResult CreateBuildResult( IActivityMonitor m, IReadOnlyList<ISolutionDriver> drivers )
+        {
+            foreach( var s in DependentSolutionContext.Solutions )
+            {
+                var buildProjectUpgrades = GetBuildProjectUpgrades( s );
+                var driver = drivers[s.Index];
+                if( !driver.UpdatePackageDependencies( m, buildProjectUpgrades ) ) return null;
+                if( !driver.GitRepository.Commit( m, "Updated Build project dependencies.", amendIfPossible: true ) ) return null;
+                _commits[s.Index] = driver.GitRepository.Head.CommitSha;
+            }
+            return base.CreateBuildResult( m, drivers );
         }
 
         protected override IReadOnlyList<ReleaseNoteInfo> GetReleaseNotes() => _roadmap.GetReleaseNotes();
@@ -57,13 +82,18 @@ namespace CK.Env
 
             if( _commits[s.Index] != driver.GitRepository.Head.CommitSha )
             {
-                m.Error( $"Commit changed between PrepareBuild call and this Build. Build canceled." );
+                m.Error( $"Commit changed between CreateBuildResult call and this Build. Build canceled." );
                 return BuildState.Failed;
             }
-            bool buildResult = DoBuild( m, driver, buildProjectsUpgrade, targetVersion, sVersion != null );
-            if( sVersion != null )
+            if( sVersion == null )
             {
-                if( !buildResult )
+                m.Info( $"Build skipped for {s.UniqueSolutionName}." );
+                return BuildState.Succeed;
+            }
+            else
+            {
+                bool buildResult = DoBuild( m, driver, targetVersion, out bool tagCreated );
+                if( !buildResult && tagCreated )
                 {
                     driver.GitRepository.ClearVersionTag( m, targetVersion );
                 }
@@ -71,34 +101,27 @@ namespace CK.Env
                 {
                     buildResult &= driver.GitRepository.SwitchMasterToDevelop( m );
                 }
+                return buildResult ? BuildState.Succeed : BuildState.Failed;
             }
-            return buildResult ? BuildState.Succeed : BuildState.Failed;
         }
 
         private static bool DoBuild(
             IActivityMonitor m,
             ISolutionDriver driver,
-            IEnumerable<UpdatePackageInfo> buildProjectsUpgrade,
             CSVersion targetVersion,
-            bool doBuild )
+            out bool tagCreated )
         {
+            tagCreated = false;
             try
             {
-                if( !driver.UpdatePackageDependencies( m, buildProjectsUpgrade ) ) return false;
                 var git = driver.GitRepository;
-                if( !doBuild )
-                {
-                    // No release must be done but build project dependencies have been upgraded.
-                    return git.Commit( m, "Upgraded build dependencies." );
-                }
-
-                if( !git.AmendCommit( m ) ) return false;
                 if( targetVersion.PackageQuality == PackageQuality.Release )
                 {
                     if( !git.SwitchDevelopToMaster( m ) ) return false;
                     driver = driver.GetCurrentBranchDriver();
                 }
                 if( !git.SetVersionTag( m, targetVersion ) ) return false;
+                tagCreated = true;
                 if( !driver.Build( m, withUnitTest: true, withZeroBuilder: true, withPushToRemote: false ) ) return false;
                 return true;
 

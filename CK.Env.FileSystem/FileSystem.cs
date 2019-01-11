@@ -249,7 +249,7 @@ namespace CK.Env
         public bool EnsureDirectory( IActivityMonitor m, NormalizedPath dir )
         {
             dir = dir.ResolveDots();
-            if( dir.IsEmpty ) throw new ArgumentNullException( nameof( dir ) );
+            if( dir.IsEmptyPath ) throw new ArgumentNullException( nameof( dir ) );
             var p = GetFileInfo( dir );
             if( !p.Exists )
             {
@@ -275,7 +275,7 @@ namespace CK.Env
         IFileInfo GetWritableDestination( IActivityMonitor m, ref NormalizedPath destination )
         {
             destination = destination.ResolveDots();
-            if( destination.IsEmpty ) throw new ArgumentNullException( nameof( destination ) );
+            if( destination.IsEmptyPath ) throw new ArgumentNullException( nameof( destination ) );
             var fDest = GetFileInfo( destination );
             if( fDest.Exists && fDest.IsDirectory )
             {

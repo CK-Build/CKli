@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CK.Testing.Monitoring" Version="0.6.1--0049-develop" />
+    <PackageReference Include="CK.Testing.Monitoring" Version="0.7.0" />
     <PackageReference Include="FluentAssertions" Version="5.5.3" />
     <PackageReference Include="NUnit" Version="[2.6.4]" />
   </ItemGroup>

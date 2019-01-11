@@ -792,7 +792,6 @@ namespace CK.Env
                                 : "Clearing version tags." ) )
             {
                 var versions = ReleaseRoadmap.Load( GeneralState.Element( "Roadmap" ) )
-                                           .Where( e => e.Info.Level != ReleaseLevel.None )
                                            .Select( e => (e.SubPath, e.Info, Git: _gitRepositories.FirstOrDefault( g => g.SubPath == e.SubPath )) );
                 foreach( var r in versions )
                 {
@@ -801,11 +800,31 @@ namespace CK.Env
                         m.Fatal( $"Unable to find Git repository for {r.SubPath} from current Roadmap." );
                         return false;
                     }
-                    success &= pushVersionTagsAndBranches
-                                    ? (r.Git.PushVersionTag( m, r.Info.Version )
-                                       && r.Git.Push( m, WorldName.DevelopBranchName )
-                                       && r.Git.Push( m, WorldName.MasterBranchName ) )
-                                    : r.Git.ClearVersionTag( m, r.Info.Version );
+                    if( pushVersionTagsAndBranches )
+                    {
+                        if( r.Info.Level != ReleaseLevel.None )
+                        {
+                            success &= r.Git.PushVersionTag( m, r.Info.Version );
+                            // Since we have a version: we may be on master.
+                            if( success && r.Info.Version.PackageQuality == PackageQuality.Release )
+                            {
+                                success &= r.Git.Push( m, WorldName.MasterBranchName );
+                            }
+                        }
+                        // Always push develop even when Level = None since
+                        // build project dependencies may have been upgraded.
+                        if( success )
+                        {
+                            success &= r.Git.Push( m, WorldName.DevelopBranchName );
+                        }               
+                    }
+                    else
+                    {
+                        if( r.Info.Level != ReleaseLevel.None )
+                        {
+                            success &= r.Git.ClearVersionTag( m, r.Info.Version );
+                        }
+                    }
                 }
             }
             return success;

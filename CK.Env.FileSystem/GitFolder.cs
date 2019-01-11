@@ -57,7 +57,7 @@ namespace CK.Env
             Debug.Assert( gitFolder.StartsWith( fs.Root.Path ) && gitFolder.EndsWith( ".git" ) );
             FullPhysicalPath = new NormalizedPath( gitFolder.Remove( gitFolder.Length - 4 ) );
             SubPath = FullPhysicalPath.RemovePrefix( fs.Root );
-            if( SubPath.IsEmpty ) throw new InvalidOperationException( "Root path can not be a Git folder." );
+            if( SubPath.IsEmptyPath ) throw new InvalidOperationException( "Root path can not be a Git folder." );
 
             FileSystem = fs;
             World = world;
@@ -646,6 +646,7 @@ namespace CK.Env
 
         /// <summary>
         /// Removes a version lightweight tag from the repository.
+        /// If the tag 
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="v">The version to remove.</param>
@@ -655,8 +656,15 @@ namespace CK.Env
             var sv = 'v' + v.ToString();
             try
             {
-                _git.Tags.Remove( sv );
-                m.Info( $"Removing Version tag '{sv}' from {SubPath}." );
+                if( _git.Tags[sv] == null )
+                {
+                    m.Info( $"Tag '{sv}' in {SubPath} not found (cannot remove it)." );
+                }
+                else
+                {
+                    _git.Tags.Remove( sv );
+                    m.Info( $"Removing Version tag '{sv}' from {SubPath}." );
+                }
                 return true;
             }
             catch( Exception ex )
@@ -828,16 +836,25 @@ namespace CK.Env
                         m.Error( $"Unable to find branch '{branchName}'." );
                         return false;
                     }
+                    bool created = false;
                     if( !b.IsTracking )
                     {
                         m.Warn( $"Branch '{branchName}' does not exist on the remote. Creating the remote branch on 'origin'." );
                         _git.Branches.Update( b, u => { u.Remote = "origin"; u.UpstreamBranch = b.CanonicalName; } );
+                        created = true;
                     }
                     var options = new PushOptions()
                     {
                         CredentialsProvider = DefaultCredentialHandler
                     };
-                    _git.Network.Push( b, options );
+                    if( created || (b.TrackingDetails.AheadBy ?? 1) > 0 )
+                    {
+                        _git.Network.Push( b, options );
+                    }
+                    else
+                    {
+                        m.CloseGroup( "Remote branch is on the same commit. Push skipped." );
+                    }
                     return true;
                 }
                 catch( Exception ex )
@@ -882,7 +899,9 @@ namespace CK.Env
         {
             if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
             bool delete = String.IsNullOrWhiteSpace( commitSha );
-            using( m.OpenInfo( delete ? $"Restoring {SubPath} '{branchName}' state." : $"Restoring {SubPath} '{branchName}' state (removing it)." ) )
+            using( m.OpenInfo( delete
+                                ? $"Restoring {SubPath} '{branchName}' state (removing it)."
+                                : $"Restoring {SubPath} '{branchName}' state." ) )
             {
                 try
                 {
@@ -903,6 +922,7 @@ namespace CK.Env
                         m.Info( $"Branch '{branchName}' has been removed." );
                         return true;
                     }
+                    Debug.Assert( !delete );
                     var current = _git.Head;
                     if( branchName == current.FriendlyName )
                     {
@@ -1343,7 +1363,7 @@ namespace CK.Env
 
             public IDirectoryContents GetDirectoryContents( NormalizedPath sub )
             {
-                if( sub.IsEmpty ) return this;
+                if( sub.IsEmptyPath ) return this;
                 TreeEntry e = Commit.Tree[sub.ToString( '/' )];
                 if( e != null && e.TargetType != TreeEntryTargetType.GitLink )
                 {
@@ -1530,10 +1550,10 @@ namespace CK.Env
 
         internal IFileInfo GetFileInfo( NormalizedPath sub )
         {
-            if( sub.IsEmpty ) return _thisDir;
+            if( sub.IsEmptyPath ) return _thisDir;
             if( IsInWorkingFolder( ref sub ) )
             {
-                if( sub.IsEmpty ) return _headFolder;
+                if( sub.IsEmptyPath ) return _headFolder;
                 return FileSystem.PhysicalGetFileInfo( SubPath.Combine( sub ) );
             }
             RefreshBranches();
@@ -1550,10 +1570,10 @@ namespace CK.Env
 
         internal IDirectoryContents GetDirectoryContents( NormalizedPath sub )
         {
-            if( sub.IsEmpty ) return _thisDir;
+            if( sub.IsEmptyPath ) return _thisDir;
             if( IsInWorkingFolder( ref sub ) )
             {
-                if( sub.IsEmpty ) return _headFolder;
+                if( sub.IsEmptyPath ) return _headFolder;
                 return FileSystem.PhysicalGetDirectoryContents( SubPath.Combine( sub ) );
             }
             RefreshBranches();

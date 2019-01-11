@@ -123,7 +123,7 @@ namespace CK.Env
                     m.CloseGroup( "Failed." );
                     return null;
                 }
-                result = BuildResult.Create( m, _type, _artifacts, DependentSolutionContext.Solutions, _targetVersions, GetReleaseNotes() );
+                result = CreateBuildResult( m, _drivers );
                 if( result == null ) return null;
                 if( forceRebuild )
                 {
@@ -138,9 +138,46 @@ namespace CK.Env
             return result;
         }
 
+        /// <summary>
+        /// Creates the <see cref="BuildResult"/> once <see cref="PrepareBuild"/> has been called
+        /// for each solutions.
+        /// ReleaseBuilder overrides this to apply build project upgrades before its actual Build.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="drivers">The drivers for each solution.</param>
+        /// <returns>The build result. Null on error.</returns>
+        protected virtual BuildResult CreateBuildResult( IActivityMonitor m, IReadOnlyList<ISolutionDriver> drivers )
+        {
+            return BuildResult.Create( m, _type, _artifacts, DependentSolutionContext.Solutions, _targetVersions, GetReleaseNotes() );
+        }
+
+        /// <summary>
+        /// Gets the release notes. Only ReleaseBuilder overrides this to return the release notes
+        /// from the roadmap.
+        /// </summary>
+        /// <returns>Null or the release notes.</returns>
         protected virtual IReadOnlyList<ReleaseNoteInfo> GetReleaseNotes()
         {
             return null;
+        }
+
+        /// <summary>
+        /// Gets the set of upgrades that must be applied to the build projects of a solution.
+        /// This is used by Build for Develop and Local builders but ReleaseBuilder upgrades
+        /// the build project dependencies from its PrepareBuild.
+        /// </summary>
+        /// <param name="s">The solution.</param>
+        /// <returns>The build project upgrades that must be applied.</returns>
+        protected IEnumerable<UpdatePackageInfo> GetBuildProjectUpgrades( IDependentSolution s )
+        {
+            return DependentSolutionContext.BuildProjectsInfo
+                                         .Where( z => z.SolutionName == s.UniqueSolutionName )
+                                         .SelectMany( z => z.UpgradePackages
+                                               .Select( packageName => new UpdatePackageInfo(
+                                                   s.UniqueSolutionName,
+                                                   z.ProjectName,
+                                                   packageName,
+                                                   _packagesVersion[packageName] ) ) );
         }
 
         bool RunPrepareBuild( IActivityMonitor m )
@@ -196,14 +233,7 @@ namespace CK.Env
             {
                 var s = solutions[i];
                 DependentSolutionContext.LogSolutions( m, s );
-                var buildProjectsUpgrade = DependentSolutionContext.BuildProjectsInfo
-                                             .Where( z => z.SolutionName == s.UniqueSolutionName )
-                                             .SelectMany( z => z.UpgradePackages
-                                                   .Select( packageName => new UpdatePackageInfo(
-                                                       s.UniqueSolutionName,
-                                                       z.ProjectName,
-                                                       packageName,
-                                                       _packagesVersion[packageName] ) ) );
+                IEnumerable<UpdatePackageInfo> buildProjectsUpgrade = GetBuildProjectUpgrades( s );
                 using( m.OpenInfo( $"Running {s} build." ) )
                 {
                     // _targetVersions[i] is null if build must not be done (this is for ReleaseBuilder only).
@@ -218,6 +248,7 @@ namespace CK.Env
             }
             return finalState;
         }
+
 
         /// <summary>
         /// Must prepare the build (typically by applying the <paramref name="upgrades"/>) and returns

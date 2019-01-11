@@ -130,7 +130,14 @@ namespace CK.NuGetClient
 
             bool IPackageSourceProvider.IsPackageSourceEnabled( PackageSource source ) => true;
 
+            bool IPackageSourceProvider.IsPackageSourceEnabled( string name ) => true;
+
             void IPackageSourceProvider.DisablePackageSource( PackageSource source )
+            {
+                throw new NotSupportedException( "Should not be called in this scenario." );
+            }
+
+            void IPackageSourceProvider.DisablePackageSource( string name )
             {
                 throw new NotSupportedException( "Should not be called in this scenario." );
             }
@@ -144,6 +151,37 @@ namespace CK.NuGetClient
             {
                 throw new NotSupportedException( "Should not be called in this scenario." );
             }
+
+            PackageSource IPackageSourceProvider.GetPackageSourceByName( string name )
+            {
+                throw new NotSupportedException( "Should not be called in this scenario." );
+            }
+
+            PackageSource IPackageSourceProvider.GetPackageSourceBySource( string source )
+            {
+                throw new NotSupportedException( "Should not be called in this scenario." );
+            }
+
+            void IPackageSourceProvider.RemovePackageSource( string name )
+            {
+                throw new NotSupportedException( "Should not be called in this scenario." );
+            }
+
+            void IPackageSourceProvider.EnablePackageSource( string name )
+            {
+                throw new NotSupportedException( "Should not be called in this scenario." );
+            }
+
+            void IPackageSourceProvider.AddPackageSource(PackageSource source)
+            {
+                throw new NotSupportedException( "Should not be called in this scenario." );
+            }
+
+            void IPackageSourceProvider.UpdatePackageSource(PackageSource source, bool updateCredentials, bool updateEnabled)
+            {
+                throw new NotSupportedException( "Should not be called in this scenario." );
+            }
+
         }
 
         static NuGetClient()

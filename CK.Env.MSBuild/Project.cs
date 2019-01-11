@@ -109,7 +109,7 @@ namespace CK.Env.MSBuild
         {
             get
             {
-                if( _primarySolutionRelativeFolderPath.IsEmpty )
+                if( _primarySolutionRelativeFolderPath.IsEmptyPath )
                 {
                     _primarySolutionRelativeFolderPath = FolderPath.RemovePrefix( PrimarySolution.SolutionFolderPath );
                 }
