@@ -66,19 +66,13 @@ namespace CK.Env.Plugins.SolutionFiles
                 EnsureProjectReference( "NUnit.ConsoleRunner", "3.9.0" );
                 EnsureProjectReference( "NUnit.Runners.Net4",  "2.6.4" );
             }
-            EnsureProjectReference( "SimpleGitVersion.Cake", "0.36.1--0071-develop" );
-            if( produceCKSetupComponents == true )
+            if( PluginBranch != StandardGitStatus.Local )
             {
-                EnsureProjectReference( "CKSetup.Cake", "8.0.1--0109-develop" );
-
-                // CKSetup.Cake transitively implies CK.Text.
-                // We must not have transitive references for build projects: this breaks the
-                // ZeroVersion build projects!
-                ccbProject.RemoveDependency( m, "CK.Text" );
-            }
-            else
-            {
-                EnsureProjectReference( "CK.Text", "7.1.1--0054-develop" );
+                EnsureProjectReference( "SimpleGitVersion.Cake", "0.37.0" );
+                if( produceCKSetupComponents == true )
+                {
+                    EnsureProjectReference( "CKSetup.Cake", "9.0.0" );
+                }
             }
             solution.Save( m );
         }

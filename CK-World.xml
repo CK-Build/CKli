@@ -218,7 +218,7 @@
       </Branch>
     </GitFolder>
 
-    <GitFolder Name="CKSetupRemoteStore" Url="https://gitlab.com/olivier-spinelli/CKSetupRemoteStore.git">
+    <GitFolder Name="CKSetupRemoteStore" Url="https://gitlab.com/Signature-Code/CKSetupRemoteStore.git">
       <SolutionSettings UseCKSetup="true" />
       <Branch Name="develop">
         <PrimarySolution
