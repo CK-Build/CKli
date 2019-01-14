@@ -156,7 +156,7 @@
       </Branch>
     </GitFolder>
 
-    <GitFolder Name="CK-Database" Url="https://gitlab.com/signature-code/CK-Database.git">
+    <GitFolder Name="CK-Database" Url="https://gitlab.com/Signature-Code/CK-Database.git">
       <SolutionSettings SqlServer="2016" UseCKSetup="true" />
       <Branch Name="develop">
         <PrimarySolution CKSetupComponentProjects="CK.StObj.Model;CK.StObj.Runtime;CK.StObj.Engine;CK.Setupable.Model;CK.Setupable.Runtime;CK.Setupable.Engine;CK.SqlServer.Setup.Model;CK.SqlServer.Setup.Runtime;CK.SqlServer.Setup.Engine"  />
@@ -205,7 +205,7 @@
       </Branch>
     </GitFolder>
 
-    <GitFolder Name="CK-Setup" Url="https://gitlab.com/olivier-spinelli/CK-Setup.git">
+    <GitFolder Name="CK-Setup" Url="https://gitlab.com/Signature-Code/CK-Setup.git">
       <SolutionSettings UseCKSetup="true" />
       <Branch Name="develop">
         <PrimarySolution CKSetupComponentProjects="CKSetup.Runner;CKSetup" />
@@ -234,13 +234,13 @@
       </Branch>
     </GitFolder>
 
-    <GitFolder Name="CK-SqlServer-Parser" Url="https://gitlab.com/olivier-spinelli/CK-SqlServer-Parser.git">
+    <GitFolder Name="CK-SqlServer-Parser" Url="https://gitlab.com/Signature-Code/CK-SqlServer-Parser.git">
       <Branch Name="develop">
         <PrimarySolution />
       </Branch>
     </GitFolder>
 
-    <GitFolder Name="CK-SqlServer-Parser-Model" Url="https://gitlab.com/olivier-spinelli/ck-sqlserver-parser-model.git">
+    <GitFolder Name="CK-SqlServer-Parser-Model" Url="https://gitlab.com/Signature-Code/CK-SqlServer-Parser-Model.git">
       <SolutionSettings NoUnitTests="true" />
       <Branch Name="develop">
         <PrimarySolution />
