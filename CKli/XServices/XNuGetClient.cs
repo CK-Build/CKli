@@ -12,12 +12,12 @@ namespace CKli
     public class XNuGetClient : XTypedObject, IDisposable
     {
         readonly XSharedHttpClient _sharedHttpClient;
-        readonly XSecretKeyStore _secretKeyStore;
+        readonly XCKEnvKeyVault _secretKeyStore;
         readonly NuGetClient _nuGetClient;
 
         public XNuGetClient(
             XSharedHttpClient sharedHttpClient,
-            XSecretKeyStore secretKeyStore,
+            XCKEnvKeyVault secretKeyStore,
             XArtifactCenter artifact,
             FileSystem fs,
             Initializer initializer )

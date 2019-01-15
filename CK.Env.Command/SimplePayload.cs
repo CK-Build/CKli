@@ -44,11 +44,11 @@ namespace CK.Env
                 IsPassword = isPassword;
             }
 
-            public string RequirementAndName => $"[{(!HasDefaultValue ? "required" : $"default value: {DefaultValue}")}] - {Name}";
+            public string RequirementAndName => $"[{(!HasDefaultValue ? "required" : $"default value: {DefaultValue ?? "<null>"}")}] - {Name}";
 
             public string ValueAndStatus => IsValueSet
                                             ? $"Value = '{GetValue()}' "
-                                            : (HasDefaultValue ? $"<use default value: {DefaultValue}>" : "<Missing value>");
+                                            : (HasDefaultValue ? $"<use default value: {DefaultValue ?? "<null>"}>" : "<Missing value>");
 
             public override string ToString() => RequirementAndName + " - " + ValueAndStatus;
         }

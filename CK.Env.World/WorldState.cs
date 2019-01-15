@@ -240,7 +240,6 @@ namespace CK.Env
                 {
                     m.Error( $"Executing: {message}", ex is System.Reflection.TargetInvocationException t ? t.InnerException : ex );
                 }
-                if( !result ) m.CloseGroup( "Failed." );
                 UpdateGlobalGitStatus();
                 m.CloseGroup( $"{(result ? "Success" : "Failed")} => WorkStatus = {WorkStatus}, GlobalGitStatus = {_cachedGlobalGitStatus}" );
             }

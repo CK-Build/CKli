@@ -28,10 +28,10 @@ namespace CK.Env
         bool ConfirmationRequired { get; }
 
         /// <summary>
-        /// Gets the type of the payload.
+        /// Gets the signature of the payload.
         /// Can be null.
         /// </summary>
-        Type PayloadType { get; }
+        string PayloadSignature { get; }
 
         /// <summary>
         /// Creates a payload instance that can be configured.

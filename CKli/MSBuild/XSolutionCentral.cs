@@ -12,14 +12,14 @@ using System.Text;
 
 namespace CKli
 {
-    public class XSolutionCentral : XTypedObject, IDependentSolutionContextLoader, ICommandMethodsProvider
+    public class XSolutionCentral : XTypedObject, IDependentSolutionContextLoader
     {
         readonly IWorldName _world;
         readonly IWorldStore _worldStore;
         readonly XLocalFeedProvider _packageFeeds;
         readonly MSBuildContext _msBuildContext;
         readonly WorldState _worldState;
-        readonly XSecretKeyStore _publishKeyStore;
+        readonly XCKEnvKeyVault _publishKeyStore;
         readonly CommandRegister _commandRegister;
         readonly List<XGitFolder> _allGitFolders;
 
@@ -31,7 +31,7 @@ namespace CKli
             FileSystem fileSystem,
             IWorldName world,
             IWorldStore worldStore,
-            XSecretKeyStore publishKeyStore,
+            XCKEnvKeyVault publishKeyStore,
             XLocalFeedProvider packageFeeds,
             XArtifactCenter artifacts,
             CommandRegister commandRegister,
@@ -61,13 +61,7 @@ namespace CKli
             _worldState.DumpWorldStatus += onDumpOrInitialize;
             fileSystem.ServiceContainer.Add( _worldState );
             fileSystem.ServiceContainer.Add<ISolutionDriverWorld>( _worldState );
-
-            // Extends the 'World' commands.
-            CommandProviderName = _worldState.CommandProviderName;
-            commandRegister.Register( this );
         }
-
-        public NormalizedPath CommandProviderName { get; }
 
         internal void Register( XGitFolder g )
         {
@@ -131,23 +125,30 @@ namespace CKli
                     }
                 }
             }
-            m.CloseGroup( $"{dirty.Count} dirty (out of {gitFoldersCount})." );
-            if( dirty.Count > 0 ) m.Info( $"Dirty: {dirty.Concatenate()}" );
-            var byActiveBranch = gitFolders.GroupBy( g => g.CurrentBranchName );
-            if( byActiveBranch.Count() > 1 )
+            if( gitFoldersCount == 0 )
             {
-                using( m.OpenInfo( $"{byActiveBranch.Count()} different branches:" ) )
+                m.Error( "No git folder found." );
+            }
+            else
+            {
+                m.CloseGroup( $"{dirty.Count} dirty (out of {gitFoldersCount})." );
+                if( dirty.Count > 0 ) m.Info( $"Dirty: {dirty.Concatenate()}" );
+                var byActiveBranch = gitFolders.GroupBy( g => g.CurrentBranchName );
+                if( byActiveBranch.Count() > 1 )
                 {
-                    foreach( var b in byActiveBranch )
+                    using( m.OpenInfo( $"{byActiveBranch.Count()} different branches:" ) )
                     {
-                        m.Info( $"Branch '{b.Key}': {b.Select( g => g.SubPath.Path ).Concatenate()}" );
+                        foreach( var b in byActiveBranch )
+                        {
+                            m.Info( $"Branch '{b.Key}': {b.Select( g => g.SubPath.Path ).Concatenate()}" );
+                        }
                     }
                 }
-            }
-            else m.Info( $"All {gitFoldersCount} git folders are on '{byActiveBranch.First().Key}' branch." );
-            if( hasPluginInitError )
-            {
-                m.Error( "At least one git folder is unable to initialize its plugins." );
+                else m.Info( $"All {gitFoldersCount} git folders are on '{byActiveBranch.First().Key}' branch." );
+                if( hasPluginInitError )
+                {
+                    m.Error( "At least one git folder is unable to initialize its plugins." );
+                }
             }
         }
 

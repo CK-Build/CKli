@@ -4,7 +4,7 @@
   <SharedHttpClient />
   <ArtifactCenter />
   <LocalFeedProvider />
-  <SecretKeyStore />
+  <CKEnvKeyVault />
   <NuGetClient />
   <CKSetupClient />
   <SolutionCentral />

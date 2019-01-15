@@ -44,9 +44,9 @@ namespace CK.Env
                 _instance = instance;
                 _method = method;
                 _parameters = parameters;
-                PayloadType = parameters.Length == 1
+                PayloadSignature = parameters.Length == 1
                               ? null
-                              : typeof(SimplePayload);
+                              : '(' + parameters.Skip(1).Select( p => p.Name ).Concatenate() + ')';
                 _enabled = enabled;
             }
 
@@ -56,11 +56,11 @@ namespace CK.Env
 
             public bool GetEnabled() => _enabled != null ? _enabled() : true;
 
-            public Type PayloadType { get; }
+            public string PayloadSignature { get; }
 
             public object CreatePayload()
             {
-                return PayloadType != null ? new SimplePayload( _parameters.Skip( 1 ) ) : null;
+                return PayloadSignature != null ? new SimplePayload( _parameters.Skip( 1 ) ) : null;
             }
 
             public void Execute( IActivityMonitor m, object payload )
@@ -69,7 +69,7 @@ namespace CK.Env
                 {
                     try
                     {
-                        if( PayloadType != null )
+                        if( PayloadSignature != null )
                         {
                             if( !(payload is SimplePayload simple)
                                 || simple.Fields.Count != _parameters.Length - 1 )
@@ -166,14 +166,26 @@ namespace CK.Env
             _commands.Clear();
         }
 
+        /// <summary>
+        /// Gets all the registered commands.
+        /// </summary>
+        /// <param name="checkEnabled"></param>
+        /// <param name="checkEnabled">False to also return currently disabled commands.</param>
+        /// <returns>The set of commands.</returns>
         public IEnumerable<ICommandHandler> GetAllCommands( bool checkEnabled = true )
         {
             return checkEnabled ? _commands.Values.Where( c => c.GetEnabled() ) : _commands.Values;
         }
 
+        /// <summary>
+        /// Gets the registered commands that match a pattern.
+        /// </summary>
+        /// <param name="globPattern">The pattern. Must not be null or empty.</param>
+        /// <param name="checkEnabled">False to also return currently disabled commands.</param>
+        /// <returns>The set of commands.</returns>
         public IEnumerable<ICommandHandler> GetCommands( string globPattern, bool checkEnabled = true )
         {
-            if( String.IsNullOrWhiteSpace( globPattern ) ) return GetAllCommands( checkEnabled );
+            if( String.IsNullOrWhiteSpace( globPattern ) ) throw new ArgumentNullException( nameof( globPattern ) );
             var p = Glob.Parse( globPattern );
             return _commands.Values.Where( c => p.IsMatch( c.UniqueName ) && (!checkEnabled || c.GetEnabled()) );
         }

@@ -57,23 +57,46 @@ namespace CKli
             for(; ; )
             {
                 Console.WriteLine();
-                Console.WriteLine( "[run <globbed command name> | list [<globbed command name>] | restart | exit]" );
-                Console.Write( $"{global.CurrentWorld.FullName}> " );
+                Console.WriteLine( $"> World: {global.CurrentWorld.FullName} - [run <globbed command name> | list [<globbed command name>] | cls | restart | exit]" );
+                Console.Write( "> " );
                 string rep = Console.ReadLine().Trim();
                 if( rep.Length == 0 )
                 {
                     global.CommandRegister["World/Initialize"].Execute( monitor, null );
                     continue;
                 }
+                if( rep == "cls" )
+                {
+                    Console.Clear();
+                    continue;
+                }
                 if( rep.StartsWith( "list" ) )
                 {
                     rep = rep.Substring( 4 ).Trim();
-                    Console.WriteLine( "Available Commands:" );
-                    foreach( var c in global.CommandRegister.GetCommands( rep ).OrderBy( c => c.UniqueName ) )
+                    IEnumerable<ICommandHandler> commands;
+                    if( rep.Length == 0 )
                     {
+                        Console.Write( $"Available Commands:" );
+                        commands = global.CommandRegister.GetAllCommands();
+                    }
+                    else
+                    {
+                        Console.Write( $"Available Commands matching '{rep}':" );
+                        commands = global.CommandRegister.GetCommands( rep );
+                    }
+
+                    bool atLeastOne = false;
+                    foreach( var c in commands.OrderBy( c => c.UniqueName ) )
+                    {
+                        if( !atLeastOne )
+                        {
+                            Console.WriteLine();
+                            atLeastOne = true;
+                        }
                         Console.Write( "     " );
                         Console.WriteLine( c.UniqueName );
                     }
+                    if( !atLeastOne ) Console.WriteLine( " (none)" );
                     continue;
                 }
                 if( rep == "exit" ) return true;
@@ -85,18 +108,18 @@ namespace CKli
                 if( rep.StartsWith( "run " ) )
                 {
                     rep = rep.Substring( 4 ).Trim();
-                    var handlersByType = global.CommandRegister.GetCommands( rep )
-                                            .GroupBy( c => c.PayloadType )
+                    var handlersBySig = global.CommandRegister.GetCommands( rep )
+                                            .GroupBy( c => c.PayloadSignature )
                                             .ToList();
-                    if( handlersByType.Count == 0 )
+                    if( handlersBySig.Count == 0 )
                     {
                         monitor.Warn( $"Pattern '{rep}' has no match." );
                     }
-                    else if( handlersByType.Count == 1 )
+                    else if( handlersBySig.Count == 1 )
                     {
-                        var firstHandler = handlersByType[0].First();
+                        var firstHandler = handlersBySig[0].First();
                         bool? globalConfirm = firstHandler.ConfirmationRequired;
-                        if( handlersByType[0].Any( h => h.ConfirmationRequired != globalConfirm.Value ) )
+                        if( handlersBySig[0].Any( h => h.ConfirmationRequired != globalConfirm.Value ) )
                         {
                             monitor.Warn( "Different ConfirmationRequired found among commands. Each command that requires confirmation must be confirmed. " );
                             globalConfirm = null;
@@ -108,7 +131,7 @@ namespace CKli
                             if( globalConfirm == true )
                             {
                                 Console.WriteLine( "Confirm execution of:" );
-                                foreach( var h in handlersByType[0] )
+                                foreach( var h in handlersBySig[0] )
                                 {
                                     Console.WriteLine( h.UniqueName );
                                 }
@@ -119,7 +142,7 @@ namespace CKli
                             if( c == 'Y' )
                             {
                                 bool payloadDisplayed = false;
-                                foreach( var h in handlersByType[0] )
+                                foreach( var h in handlersBySig[0] )
                                 {
                                     if( globalConfirm == null && h.ConfirmationRequired )
                                     {
@@ -147,16 +170,17 @@ namespace CKli
                     }
                     else
                     {
-                        using( monitor.OpenWarn( $"Pattern '{rep}' matches require {handlersByType.Count} different payload types." ) )
+                        using( monitor.OpenWarn( $"Pattern '{rep}' matches require {handlersBySig.Count} different payloads." ) )
                         {
-                            foreach( var c in handlersByType )
+                            foreach( var c in handlersBySig )
                             {
-                                monitor.Warn( $"{c.Key?.Name ?? "<No payload>"}: {c.Select( n => n.UniqueName.ToString() ).Concatenate() }" );
+                                monitor.Warn( $"{c.Key ?? "<No payload>"}: {c.Select( n => n.UniqueName.ToString() ).Concatenate() }" );
                             }
                         }
                     }
                     continue;
                 }
+                Console.WriteLine( "Unrecognized command." );
             }
         }
 

@@ -12,12 +12,12 @@ namespace CKli
     public class XCKSetupClient : XTypedObject
     {
         readonly XSharedHttpClient _sharedHttpClient;
-        readonly XSecretKeyStore _secretKeyStore;
+        readonly XCKEnvKeyVault _secretKeyStore;
         readonly CKSetupClient _client;
 
         public XCKSetupClient(
             XSharedHttpClient sharedHttpClient,
-            XSecretKeyStore secretKeyStore,
+            XCKEnvKeyVault secretKeyStore,
             XArtifactCenter artifact,
             FileSystem fs,
             Initializer initializer )

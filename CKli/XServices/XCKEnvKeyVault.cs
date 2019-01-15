@@ -11,16 +11,19 @@ using System.Threading.Tasks;
 
 namespace CKli
 {
-    public class XSecretKeyStore : XTypedObject, ISecretKeyStore, IDisposable
+    public class XCKEnvKeyVault : XTypedObject, ISecretKeyStore, ICommandMethodsProvider, IDisposable
     {
+        static readonly NormalizedPath _commandProviderName = new NormalizedPath("KeyVault");
+
         readonly FileSystem _fs;
         readonly Dictionary<string, string> _keys;
         readonly IWorldName _worldName;
         string _passPhrase;
 
-        public XSecretKeyStore(
+        public XCKEnvKeyVault(
             IWorldName worldName,
             FileSystem fs,
+            CommandRegister commandRegister,
             Initializer initializer )
             : base( initializer )
         {
@@ -31,6 +34,7 @@ namespace CKli
             initializer.Services.Add( this );
             KeyVaultPath = _fs.Root.AppendPart( $"CKEnv-{_worldName.Name}-KeyVault.txt" );
             KeyVaultKeyName = $"CKENV_{_worldName.Name.ToUpperInvariant().Replace( '-', '_' )}_KEY_VAULT_SECRET_KEY";
+            commandRegister.Register( this );
         }
 
         string KeyVaultPath { get; }
@@ -44,17 +48,23 @@ namespace CKli
         /// </summary>
         public bool IsKeyVaultOpened => _passPhrase != null;
 
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => _commandProviderName;
+
+        /// <summary>
+        /// Gets whether the key vault is closed.
+        /// </summary>
+        public bool CanOpenKeyVault => !IsKeyVaultOpened;
+
         /// <summary>
         /// Opens the key vault bound to the current <see cref="IWorldName"/>.
-        /// Calling this when <see cref="IsKeyVaultOpened"/> is true, empties the current
-        /// secret memory.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="passPhrase">The key vault pass phrase.</param>
         /// <returns>True on success.</returns>
+        [CommandMethod(confirmationRequired:false)]
         public bool OpenKeyVault( IActivityMonitor m, string passPhrase )
         {
-            if( !CheckPassPhrase( m, passPhrase ) ) return false;
+            if( !CheckPassPhraseValidity( m, passPhrase ) ) return false;
             if( _passPhrase != null )
             {
                 m.Info( $"Key Vault is already opened." );
@@ -85,11 +95,18 @@ namespace CKli
         }
 
         /// <summary>
-        /// Saves the current secrets to the previously opened key vault bound to the current <see cref="IWorldName"/>.
+        /// Gets whether the key vault is opened.
+        /// </summary>
+        public bool CanSaveKeyVault => IsKeyVaultOpened;
+
+        /// <summary>
+        /// Saves the current secrets to the previously opened key vault bound to the current <see cref="IWorldName"/>
+        /// with a new passphrase or uses the existing one.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="newPassPhrase">Optional new passphrase.</param>
         /// <returns>True on success, false on error.</returns>
+        [CommandMethod( confirmationRequired: false )]
         public bool SaveKeyVault( IActivityMonitor m, string newPassPhrase = null )
         {
             if( _passPhrase == null )
@@ -100,7 +117,7 @@ namespace CKli
             if( newPassPhrase == null ) newPassPhrase = _passPhrase;
             else
             {
-                if( !CheckPassPhrase( m, newPassPhrase ) ) return false;
+                if( !CheckPassPhraseValidity( m, newPassPhrase ) ) return false;
                 _passPhrase = newPassPhrase;
             }
             m.Info( $"Saved Key Vault with keys: {_keys.Keys.Concatenate()}." );
@@ -109,11 +126,41 @@ namespace CKli
         }
 
         /// <summary>
+        /// Clears the current scret that may exist in memory and the persisted key vault bound
+        /// to the current <see cref="IWorldName"/>
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        [CommandMethod]
+        public void ClearKeyVault( IActivityMonitor m )
+        {
+            if( IsKeyVaultOpened )
+            {
+                _keys.Clear();
+                _passPhrase = null;
+                if( File.Exists( KeyVaultPath ) )
+                {
+                    try
+                    {
+                        File.Delete( KeyVaultPath );
+                    }
+                    catch( Exception ex )
+                    {
+                        m.Error( $"Unable to delete file '{KeyVaultPath}'.", ex );
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// May be modified to enforce constraints on the passphrase.
         /// </summary>
-        static bool CheckPassPhrase( IActivityMonitor m, string passPhrase )
+        static bool CheckPassPhraseValidity( IActivityMonitor m, string passPhrase )
         {
-            if( String.IsNullOrEmpty( passPhrase ) ) throw new ArgumentNullException( nameof( passPhrase ) );
+            if( String.IsNullOrEmpty( passPhrase ) )
+            {
+                m.Warn( "Invalid pass phrase." );
+                return false;
+            }
             return true;
         }
 
@@ -146,6 +193,10 @@ namespace CKli
             {
                 value = PromptValue( name, message, throwOnEmpty );
                 _keys.Add( name, value );
+                if( IsKeyVaultOpened )
+                {
+                    File.WriteAllText( KeyVaultPath, KeyVault.EncryptValuesToString( _keys, _passPhrase ) );
+                }
             }
             return value;
         }
