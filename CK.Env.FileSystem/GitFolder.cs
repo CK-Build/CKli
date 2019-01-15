@@ -173,7 +173,7 @@ namespace CK.Env
                                                         ? StandardGitStatus.Local
                                                         : (CurrentBranchName == World.DevelopBranchName
                                                             ? StandardGitStatus.Develop
-                                                            : StandardGitStatus.Unknwon);
+                                                            : StandardGitStatus.Unknown);
 
         /// <summary>
         /// Gets the head information.

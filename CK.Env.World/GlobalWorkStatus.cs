@@ -2,7 +2,7 @@
 namespace CK.Env
 {
     /// <summary>
-    /// Core status of the build system that applies to a whole world.
+    /// Defines the current state of a World.
     /// </summary>
     public enum GlobalWorkStatus
     {
@@ -19,7 +19,6 @@ namespace CK.Env
 
         /// <summary>
         /// Switching back to develop.
-        /// This requires remote accesses. 
         /// </summary>
         SwitchingToDevelop,
 

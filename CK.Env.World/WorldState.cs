@@ -122,45 +122,34 @@ namespace CK.Env
         public IWorldName WorldName { get; }
 
         /// <summary>
-        /// Initializes or reinitializes this world state.
+        /// Initializes (or simply dumps) this world state.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
         [CommandMethod(confirmationRequired:false)]
         public bool Initialize( IActivityMonitor monitor )
         {
-            if( _rawState == null )
+            bool alreadyInitialized = _rawState != null;
+            if( !alreadyInitialized )
             {
                 _rawState = _store.GetOrCreateLocalState( monitor, WorldName );
                 SetReadonlyState();
                 _rawState.Document.Changed += RawStateChanged;
             }
-            return RunSafe( monitor, "Initializing World.", ( m, error ) =>
+            return RunSafe( monitor, alreadyInitialized ? "World Status.": "Initializing World.", ( m, error ) =>
             {
                 var ev = new EventMonitoredArgs( monitor );
-
-                var called = new HashSet<object>();
-                bool again;
-                do
+                if( alreadyInitialized )
                 {
-                    again = false;
-                    var handlers = Initializing?.GetInvocationList();
-                    if( handlers != null )
-                    {
-                        foreach( var h in handlers )
-                        {
-                            if( called.Add( h ) )
-                            {
-                                h.DynamicInvoke( this, ev );
-                                again = !error();
-                            }
-                        }
-                    }
+                    DumpWorldStatus?.Invoke( this, ev );
                 }
-                while( again );
-                if( !error() )
+                else
                 {
-                    Initialized?.Invoke( this, ev );
+                    Initializing?.Invoke( this, ev );
+                    if( !error() )
+                    {
+                        Initialized?.Invoke( this, ev );
+                    }
                 }
             } );
         }
@@ -265,10 +254,10 @@ namespace CK.Env
         /// <returns>The standard Git status.</returns>
         StandardGitStatus UpdateGlobalGitStatus()
         {
-            _cachedGlobalGitStatus = StandardGitStatus.Unknwon;
+            _cachedGlobalGitStatus = StandardGitStatus.Unknown;
             foreach( var r in _gitRepositories )
             {
-                if( r.StandardGitStatus == StandardGitStatus.Unknwon ) return _cachedGlobalGitStatus = StandardGitStatus.Unknwon;
+                if( r.StandardGitStatus == StandardGitStatus.Unknown ) return _cachedGlobalGitStatus = StandardGitStatus.Unknown;
                 _cachedGlobalGitStatus |= r.StandardGitStatus;
             }
             return _cachedGlobalGitStatus;
@@ -432,7 +421,7 @@ namespace CK.Env
         public bool SwitchToLocal( IActivityMonitor monitor )
         {
             if( !CanSwitchToLocal ) throw new InvalidOperationException( nameof( CanSwitchToLocal ) );
-            if( !CheckGlobalGitStatus( monitor, StandardGitStatus.Unknwon, not: true ) ) return false;
+            if( !CheckGlobalGitStatus( monitor, StandardGitStatus.Unknown, not: true ) ) return false;
             if( !SetWorkStatusAndSave( monitor, GlobalWorkStatus.SwitchingToLocal ) ) return false;
             return DoSwitchToLocal( monitor );
         }
@@ -442,10 +431,6 @@ namespace CK.Env
             Debug.Assert( WorkStatus == GlobalWorkStatus.SwitchingToLocal );
             return RunSafe( monitor, $"Switching to {WorldName.LocalBranchName}.", (m,error) =>
             {
-                var ev = new EventMonitoredArgs( m );
-                SwitchingToLocal?.Invoke( this, ev );
-                if( error() ) return;
-
                 foreach( var g in _gitRepositories )
                 {
                     if( !g.SwitchDevelopToLocal( m, autoCommit: true ) ) return;
@@ -460,7 +445,6 @@ namespace CK.Env
 
                 if( !error() )
                 {
-                    SwitchedToLocal?.Invoke( this, ev );
                     SetWorkStatusAndSave( m, GlobalWorkStatus.Idle );
                 }
             } );
@@ -573,10 +557,6 @@ namespace CK.Env
             Debug.Assert( WorkStatus == GlobalWorkStatus.SwitchingToDevelop );
             return RunSafe( monitor, $"Switching to {WorldName.DevelopBranchName}.", ( m, error ) =>
             {
-                var ev = new EventMonitoredArgs( m );
-                SwitchingToDevelop?.Invoke( this, ev );
-                if( error() ) return;
-
                 foreach( var g in _gitRepositories )
                 {
                     if( !g.SwitchLocalToDevelop( m ) ) return;
@@ -595,7 +575,6 @@ namespace CK.Env
 
                 if( !error() )
                 {
-                    SwitchedToDevelop?.Invoke( this, ev );
                     SetWorkStatusAndSave( m, GlobalWorkStatus.Idle );
                 }
             } );

@@ -56,7 +56,9 @@ namespace CKli
 
             _worldState = new WorldState( commandRegister, artifacts.ArtifactCenter, worldStore, world, this, _packageFeeds );
             _worldState.VersionSelector = new ReleaseVersionSelector();
-            _worldState.Initializing += ( o, e ) => DumpGitFolderStatus( e.Monitor );
+            EventHandler<EventMonitoredArgs> onDumpOrInitialize = ( o, e ) => OnDumpWorldStatus( e.Monitor );
+            _worldState.Initializing += onDumpOrInitialize;
+            _worldState.DumpWorldStatus += onDumpOrInitialize;
             fileSystem.ServiceContainer.Add( _worldState );
             fileSystem.ServiceContainer.Add<ISolutionDriverWorld>( _worldState );
 
@@ -103,8 +105,7 @@ namespace CKli
         /// </summary>
         public IWorldName World => _world;
 
-        [CommandMethod(confirmationRequired:false)]
-        public void DumpGitFolderStatus( IActivityMonitor m )
+        void OnDumpWorldStatus( IActivityMonitor m )
         {
             var gitFolders = _allGitFolders.Select( x => x.GitFolder );
             int gitFoldersCount = 0;

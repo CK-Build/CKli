@@ -39,7 +39,7 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the standard plugin branch name into which this plugin is registered.
-        /// It is <see cref="StandardGitStatus.Unknwon"/> if the actual branch is not one
+        /// It is <see cref="StandardGitStatus.Unknown"/> if the actual branch is not one
         /// the 3 standard ones.
         /// </summary>
         public StandardGitStatus PluginBranch { get; }

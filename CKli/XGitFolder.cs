@@ -27,7 +27,7 @@ namespace CKli
         }
 
         /// <summary>
-        /// Gets the <see cref="GitFolder"/> object that encapsulates the Git repoistory.
+        /// Gets the GitFolder object that encapsulates the Git repoistory.
         /// </summary>
         public GitFolder GitFolder { get; }
 

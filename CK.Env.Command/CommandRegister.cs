@@ -154,7 +154,7 @@ namespace CK.Env
 
         public void Unregister( ICommandMethodsProvider provider )
         {
-            var r = Select( provider.CommandProviderName.AppendPart( "*" ) ).ToList();
+            var r = GetCommands( provider.CommandProviderName.AppendPart( "*" ) ).ToList();
             foreach( var p in r )
             {
                 _commands.Remove( p.UniqueName );
@@ -166,13 +166,14 @@ namespace CK.Env
             _commands.Clear();
         }
 
-        public IEnumerable<ICommandHandler> GetAll( bool checkEnabled = true )
+        public IEnumerable<ICommandHandler> GetAllCommands( bool checkEnabled = true )
         {
             return checkEnabled ? _commands.Values.Where( c => c.GetEnabled() ) : _commands.Values;
         }
 
-        public IEnumerable<ICommandHandler> Select( NormalizedPath globPattern, bool checkEnabled = true )
+        public IEnumerable<ICommandHandler> GetCommands( string globPattern, bool checkEnabled = true )
         {
+            if( String.IsNullOrWhiteSpace( globPattern ) ) return GetAllCommands( checkEnabled );
             var p = Glob.Parse( globPattern );
             return _commands.Values.Where( c => p.IsMatch( c.UniqueName ) && (!checkEnabled || c.GetEnabled()) );
         }

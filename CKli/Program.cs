@@ -57,18 +57,19 @@ namespace CKli
             for(; ; )
             {
                 Console.WriteLine();
-                Console.WriteLine("[run <globbed command name>|list|restart|exit]");
+                Console.WriteLine( "[run <globbed command name> | list [<globbed command name>] | restart | exit]" );
                 Console.Write( $"{global.CurrentWorld.FullName}> " );
                 string rep = Console.ReadLine().Trim();
                 if( rep.Length == 0 )
                 {
-                    global.CommandRegister["World/DumpGitFolderStatus"].Execute( monitor, null );
+                    global.CommandRegister["World/Initialize"].Execute( monitor, null );
                     continue;
                 }
-                if( rep == "list" )
+                if( rep.StartsWith( "list" ) )
                 {
+                    rep = rep.Substring( 4 ).Trim();
                     Console.WriteLine( "Available Commands:" );
-                    foreach( var c in global.CommandRegister.GetAll().OrderBy( c => c.UniqueName ) )
+                    foreach( var c in global.CommandRegister.GetCommands( rep ).OrderBy( c => c.UniqueName ) )
                     {
                         Console.Write( "     " );
                         Console.WriteLine( c.UniqueName );
@@ -84,7 +85,7 @@ namespace CKli
                 if( rep.StartsWith( "run " ) )
                 {
                     rep = rep.Substring( 4 ).Trim();
-                    var handlersByType = global.CommandRegister.Select( rep )
+                    var handlersByType = global.CommandRegister.GetCommands( rep )
                                             .GroupBy( c => c.PayloadType )
                                             .ToList();
                     if( handlersByType.Count == 0 )

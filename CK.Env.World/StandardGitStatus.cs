@@ -10,16 +10,16 @@ namespace CK.Env
     /// Defines the 3 standard git status that applies to one or multiple repositories.
     /// A repository (or a world of repositories) is either on <see cref="Develop"/> (the default),
     /// on <see cref="Local"/> or the <see cref="Master"/>.
-    /// Any other configurations results in a <see cref="Unknwon"/> status and when a world or a repository
+    /// Any other configurations results in a <see cref="Unknown"/> status and when a world or a repository
     /// is in this unknown status some operations cannot be done.
     /// </summary>
     [Flags]
     public enum StandardGitStatus
     {
         /// <summary>
-        /// Unknow status.
+        /// Unknown status.
         /// </summary>
-        Unknwon = 0,
+        Unknown = 0,
 
         /// <summary>
         /// On <see cref="IWorldName.LocalBranchName"/>.

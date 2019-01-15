@@ -74,7 +74,7 @@ namespace CK.Env
                     }
                 }
 
-                if( gitStatus == StandardGitStatus.Unknwon )
+                if( gitStatus == StandardGitStatus.Unknown )
                 {
                     DumpMixDetail( LogLevel.Error, "Unable to initialize status." );
                     return false;
@@ -91,7 +91,7 @@ namespace CK.Env
                     m.Error( $"All Git folders are on {World.DevelopBranchName} but Status is '{gitStatus}'." );
                     return false;
                 }
-                if( gitStatus == StandardGitStatus.Unknwon )
+                if( gitStatus == StandardGitStatus.Unknown )
                 {
                     gitStatus = StandardGitStatus.Develop;
                     m.Info( $"Initializing status on {gitStatus}." );
@@ -104,7 +104,7 @@ namespace CK.Env
                 m.Error( $"All Git folders are on {World.LocalBranchName} but Status is '{gitStatus}'." );
                 return false;
             }
-            if( gitStatus == StandardGitStatus.Unknwon )
+            if( gitStatus == StandardGitStatus.Unknown )
             {
                 gitStatus = StandardGitStatus.Local;
                 m.Info( $"Initializing status on {gitStatus}." );
