@@ -737,7 +737,8 @@ namespace CK.Env
                     m.CloseGroup( "Canceled by empty message." );
                     return false;
                 }
-                DateTimeOffset? date = _git.Head.Tip.Committer.When;
+                DateTimeOffset initialDate = _git.Head.Tip.Committer.When;
+                DateTimeOffset? date = initialDate;
                 if( editDate != null ) date = editDate( date.Value );
                 if( date == null )
                 {
@@ -749,7 +750,16 @@ namespace CK.Env
                 bool hasChange = s.IsDirty;
                 if( hasChange )
                 {
-                    if( editDate == null ) date = DateTimeOffset.Now;
+                    if( editDate == null )
+                    {
+                        var minDate = initialDate.AddSeconds( 1 );
+                        date = DateTimeOffset.Now;
+                        if( date < minDate )
+                        {
+                            m.Trace( "Adusted commit date to the next second." );
+                            date = minDate;
+                        }
+                    }
                 }
                 else
                 {
