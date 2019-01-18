@@ -164,10 +164,10 @@ namespace CK.Env
             {
                 _info = info;
                 Requirements = requirements;
-                CanUsePreviouslyResolvedInfo = info._previouslyResolvedInfo.IsValid
-                                               && info._previouslyResolvedInfo.IsCompatibleWith( requirements.Level, requirements.Constraint );
                 _possible = new PossibleVersions( requirements, info._commitVersionInfo.PreviousVersion, possibles );
-                Debug.Assert( !CanUsePreviouslyResolvedInfo || _possible.AllPossibleVersions.Contains( info._previouslyResolvedInfo.Version ) );
+                CanUsePreviouslyResolvedInfo = info._previouslyResolvedInfo.IsValid
+                                               && info._previouslyResolvedInfo.IsCompatibleWith( requirements.Level, requirements.Constraint )
+                                               && _possible.AllPossibleVersions.Contains( info._previouslyResolvedInfo.Version );
             }
 
             public IDependentSolution Solution => _info.Solution;

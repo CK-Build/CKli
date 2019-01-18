@@ -48,12 +48,12 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="mustReloadSolutions">True if solutions must be reloaded.</param>
         /// <returns>True on success, false on error.</returns>
-        bool Run( IActivityMonitor m, out bool mustReloadSolutions )
+        bool Run( IActivityMonitor m, IBasicApplicationLifetime appLife, out bool mustReloadSolutions )
         {
             Debug.Assert( _mustBuild.Count == _depContext.BuildProjectsInfo.Count );
             ReadCurrentSha( m );
             var scopeMap = new Dictionary<ISolutionDriver, IDisposable>();
-            mustReloadSolutions = true;
+            mustReloadSolutions = false;
             try
             {
                 using( m.OpenTrace( "Analysing dependencies." ) )
@@ -98,6 +98,7 @@ namespace CK.Env
                                 m.CloseGroup( $"Project '{p}' is up to date. Build skipped." );
                             }
                         }
+                        if( appLife.StopRequested( m ) ) return false;
                     }
                 }
                 if( _mustBuild.Count == 0 )
@@ -107,6 +108,7 @@ namespace CK.Env
                 }
                 else
                 {
+                    mustReloadSolutions = true;
                     using( m.OpenTrace( "Creating protected scopes." ) )
                     {
                         foreach( var p in _depContext.BuildProjectsInfo )
@@ -137,6 +139,7 @@ namespace CK.Env
                                 AddCurrentShaToCache( m, p );
                                 m.CloseGroup( "Success." );
                             }
+                            if( appLife.StopRequested( m ) ) return false;
                         }
                     }
                 }
@@ -206,13 +209,14 @@ namespace CK.Env
             IEnvLocalFeedProvider feeds,
             IDependentSolutionContext depContext,           
             Func<IActivityMonitor,bool> solutionReloader,
-            Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
+            Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder,
+            IBasicApplicationLifetime appLife )
         {
             using( m.OpenInfo( $"Building ZeroVersion projects." ) )
             {
                 var builder = ZeroBuilder.Create( m, feeds, depContext, driverFinder, solutionReloader );
                 if( builder == null ) return null;
-                bool success = builder.Run( m, out bool mustReloadSolutions );
+                bool success = builder.Run( m, appLife, out bool mustReloadSolutions );
                 if( mustReloadSolutions ) solutionReloader( m );
                 return success ? builder : null;
             }

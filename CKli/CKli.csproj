@@ -10,6 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CK.BuildSystem.Appveyor\CK.BuildSystem.Appveyor.csproj" />
     <ProjectReference Include="..\CK.Env.Plugins\CK.Env.Plugins.csproj" />
+    <ProjectReference Include="..\CK.Env.Sys\CK.Env.Sys.csproj" />
     <ProjectReference Include="..\CK.Env.XTyping\CK.Env.XTyping.csproj" />
     <ProjectReference Include="..\CK.Env.MSBuild\CK.Env.MSBuild.csproj" />
     <ProjectReference Include="..\CK.NuGetClient\CK.NuGetClient.csproj" />
@@ -22,17 +23,6 @@
     <PackageReference Include="Newtonsoft.Json" Version="12.0.1" />
     <!-- Fix run: cannot find git2-8e0b172.dll-->
     <PackageReference Include="LibGit2Sharp" Version="0.25.4" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Remove="Referential/**/*.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Remove="XExternalPackagesAction.cs" />
-    <Compile Remove="XGlobalDependencyAction.cs" />
-    <Compile Remove="XKnownPackageDependencies.cs" />
-    <Compile Remove="XKnownPackageVersions.cs" />
   </ItemGroup>
   
 </Project>

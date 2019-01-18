@@ -92,6 +92,8 @@ namespace CK.Env.Plugins.SolutionFiles
             {
                 RemoveFeed( m, name, withCredentials: true );
             }
+            // Cleanup if ever needed.
+            RemoveFeed( m, "ZeroBuild-Feed" );
             if( IsOnLocalBranch )
             {
                 EnsureLocalFeeds( m );

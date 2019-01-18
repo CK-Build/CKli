@@ -44,18 +44,20 @@ namespace CKli
             var xFactory = new XTypedFactory();
             xFactory.AutoRegisterFromLoadedAssemblies();
 
+            IBasicApplicationLifetime appLife = ConsoleCloseGuard.Default;
             var rootPath = GetRootPath( args );
-            using( var global = new GlobalContext( monitor, xFactory, rootPath ) )
+            using( var global = new GlobalContext( monitor, xFactory, rootPath, appLife ) )
             {
-                if( !InteractiveRun( monitor, global ) ) Console.ReadLine();
+                if( !InteractiveRun( monitor, global, appLife ) ) Console.ReadLine();
             }
         }
 
-        static bool InteractiveRun( ActivityMonitor monitor, GlobalContext global )
+        static bool InteractiveRun( ActivityMonitor monitor, GlobalContext global, IBasicApplicationLifetime appLife )
         {
             if( !global.Open() ) return false;
             for(; ; )
             {
+                if( appLife.CanCancelStopRequest ) appLife.CancelStopRequest();
                 Console.WriteLine();
                 Console.WriteLine( $"> World: {global.CurrentWorld.FullName} - [run <globbed command name> | list [<globbed command name>] | cls | restart | exit]" );
                 Console.Write( "> " );
@@ -163,6 +165,7 @@ namespace CKli
                                         if( c == 'N' ) continue;
                                         if( c == 'C' ) break;
                                     }
+                                    if( appLife.StopRequested( monitor ) ) break;
                                     h.Execute( monitor, payload );
                                 }
                             }

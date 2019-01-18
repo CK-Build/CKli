@@ -35,6 +35,7 @@ namespace CKli
             XLocalFeedProvider packageFeeds,
             XArtifactCenter artifacts,
             CommandRegister commandRegister,
+            IBasicApplicationLifetime appLife,
             Initializer initializer )
             : base( initializer )
         {
@@ -54,7 +55,7 @@ namespace CKli
             _allDevelopSolutions = new List<XSolutionBase>();
             _allGitFoldersWithDevelopBranchName = new List<XGitFolder>();
 
-            _worldState = new WorldState( commandRegister, artifacts.ArtifactCenter, worldStore, world, this, _packageFeeds );
+            _worldState = new WorldState( commandRegister, artifacts.ArtifactCenter, worldStore, world, this, _packageFeeds, appLife );
             _worldState.VersionSelector = new ReleaseVersionSelector();
             EventHandler<EventMonitoredArgs> onDumpOrInitialize = ( o, e ) => OnDumpWorldStatus( e.Monitor );
             _worldState.Initializing += onDumpOrInitialize;

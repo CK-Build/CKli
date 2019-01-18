@@ -18,6 +18,7 @@ namespace CKli
         readonly string _rootPath;
         readonly IWorldStore _worldStore;
         readonly LocalWorldRootPathMapping _localWorldRootPathMapping;
+        readonly IBasicApplicationLifetime _appLife;
         FileSystem _fs;
         IWorldName _currentWorld;
         XTypedObject _root;
@@ -61,11 +62,12 @@ namespace CKli
             }
         }
 
-        public GlobalContext( IActivityMonitor monitor, XTypedFactory factory, string rootPath )
+        public GlobalContext( IActivityMonitor monitor, XTypedFactory factory, string rootPath, IBasicApplicationLifetime appLife )
         {
             _monitor = monitor;
             _factory = factory;
             _rootPath = rootPath;
+            _appLife = appLife;
             CommandRegister = new CommandRegister();
             _localWorldRootPathMapping = new LocalWorldRootPathMapping( rootPath );
             _worldStore = new LocalWorldStore( Path.Combine( _rootPath, "CK-Env" ), _localWorldRootPathMapping );
@@ -92,6 +94,7 @@ namespace CKli
             baseProvider.Add( _fs );
             baseProvider.Add( w.World );
             baseProvider.Add( _worldStore );
+            baseProvider.Add( _appLife );
 
             var original = _worldStore.ReadWorldDescription( _monitor, w.World ).Root;
             var expanded = XTypedFactory.PreProcess( _monitor, original );

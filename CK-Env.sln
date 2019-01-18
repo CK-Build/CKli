@@ -35,8 +35,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.MSBuild.Tests", "Tes
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.NuGetClient", "CK.NuGetClient\CK.NuGetClient.csproj", "{D581E3F6-C9AE-4C74-B373-C0B803524DC9}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Core", "CK.Env.Core\CK.Env.Core.csproj", "{113CD757-7762-4D78-AB61-309CF2C0289F}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.NuGetClient.Abstraction", "CK.NuGetClient.Abstraction\CK.NuGetClient.Abstraction.csproj", "{004D69E1-868E-4BA7-B3CA-F8D46EF8E0D2}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Xml.Linq.Extension", "CK.Xml.Linq.Extension\CK.Xml.Linq.Extension.csproj", "{6778C7DC-9331-4802-99F2-80EC41D6CE70}"
@@ -58,6 +56,10 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Artifact", "CK.Env.Artifact\CK.Env.Artifact.csproj", "{722E1459-AF6C-41BF-AFCB-7878F33E0CF5}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.CKSetup", "CK.Env.CKSetup\CK.Env.CKSetup.csproj", "{73F50D14-C21A-476B-B150-6BFC962F862F}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.SolutionSettings", "CK.Env.SolutionSettings\CK.Env.SolutionSettings.csproj", "{ADBC3160-6149-4F73-AAF0-07636E8E83A5}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Sys", "CK.Env.Sys\CK.Env.Sys.csproj", "{DB371EAB-DEAE-4532-9C40-90B6F82F10CE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -97,10 +99,6 @@ Global
 		{D581E3F6-C9AE-4C74-B373-C0B803524DC9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D581E3F6-C9AE-4C74-B373-C0B803524DC9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D581E3F6-C9AE-4C74-B373-C0B803524DC9}.Release|Any CPU.Build.0 = Release|Any CPU
-		{113CD757-7762-4D78-AB61-309CF2C0289F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{113CD757-7762-4D78-AB61-309CF2C0289F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{113CD757-7762-4D78-AB61-309CF2C0289F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{113CD757-7762-4D78-AB61-309CF2C0289F}.Release|Any CPU.Build.0 = Release|Any CPU
 		{004D69E1-868E-4BA7-B3CA-F8D46EF8E0D2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{004D69E1-868E-4BA7-B3CA-F8D46EF8E0D2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{004D69E1-868E-4BA7-B3CA-F8D46EF8E0D2}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -145,6 +143,14 @@ Global
 		{73F50D14-C21A-476B-B150-6BFC962F862F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{73F50D14-C21A-476B-B150-6BFC962F862F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{73F50D14-C21A-476B-B150-6BFC962F862F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ADBC3160-6149-4F73-AAF0-07636E8E83A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ADBC3160-6149-4F73-AAF0-07636E8E83A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ADBC3160-6149-4F73-AAF0-07636E8E83A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ADBC3160-6149-4F73-AAF0-07636E8E83A5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DB371EAB-DEAE-4532-9C40-90B6F82F10CE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DB371EAB-DEAE-4532-9C40-90B6F82F10CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DB371EAB-DEAE-4532-9C40-90B6F82F10CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DB371EAB-DEAE-4532-9C40-90B6F82F10CE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
