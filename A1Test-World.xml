@@ -111,13 +111,6 @@
       </Branch>
     </GitFolder>
 
-    <GitFolder Name="CK-Setup" Url="https://olivier_spinelli@bitbucket.org/olivier_spinelli/ck-setup.git">
-      <SolutionSettings UseCKSetup="true" />
-      <Branch Name="develop">
-        <PrimarySolution CKSetupComponentProjects="CKSetup.Runner;CKSetup" />
-      </Branch>
-    </GitFolder>
-
   </Folder>
     
 </A1Test>

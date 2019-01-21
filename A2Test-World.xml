@@ -61,11 +61,18 @@
 
   <Folder Name="Projects">
 
-    <GitFolder Name="CK-UnitsOfMeasure" Url="https://github.com/Invenietis/CK-UnitsOfMeasure.git">
+    <GitFolder Name="CK-ActivityMonitor" Url="https://github.com/Invenietis/CK-ActivityMonitor.git">
       <Branch Name="develop">
         <PrimarySolution />
       </Branch>
     </GitFolder>
+
+    <GitFolder Name="CK-Monitoring" Url="https://github.com/Invenietis/CK-Monitoring.git">
+      <Branch Name="develop">
+        <PrimarySolution />
+      </Branch>
+    </GitFolder>
+
 
   </Folder>
     

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Text;
 using CK.Core;
+using CK.Text;
 using CSemVer;
 
 namespace CK.Env
@@ -29,8 +31,12 @@ namespace CK.Env
         {
             Debug.Assert( driver.GitRepository.CurrentBranchName == s.BranchName );
             if( !driver.UpdatePackageDependencies( m, upgrades ) ) return (null,false);
-            // A commit is not necessarily created here.
-            if( !driver.GitRepository.Commit( m, "Global Build commit." ) ) return (null,false);
+
+            // A commit is not necessarily created here if the dependencies have not changed!
+            // (When working folder is up-to-date.)
+            var upText = upgrades.Select( u => u.PackageUpdate.ToString() ).Concatenate();
+            var msg = $"CI build: Upgrading dependencies: {upText}.";
+            if( !driver.GitRepository.Commit( m, msg ) ) return (null,false);
             _commits[s.Index] = driver.GitRepository.Head.CommitSha;
             return (driver.GitRepository.GetCommitVersionInfo( m, s.BranchName ).AssemblyBuildInfo.NuGetVersion, true);
         }
