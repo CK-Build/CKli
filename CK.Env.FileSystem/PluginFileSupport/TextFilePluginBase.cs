@@ -66,11 +66,12 @@ namespace CK.Env.Plugins
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="newContent">The content. Null to delete the file.</param>
+        /// <param name="forceSave">True to always save the file.</param>
         /// <returns>True on success, false on error.</returns>
-        protected bool CreateOrUpdate( IActivityMonitor m, string newContent )
+        protected bool CreateOrUpdate( IActivityMonitor m, string newContent, bool forceSave = false )
         {
             string oldContent = GetFile()?.TextContent;
-            if( oldContent == newContent ) return true;
+            if( oldContent == newContent && !forceSave ) return true;
             if( newContent == null )
             {
                 Delete( m );

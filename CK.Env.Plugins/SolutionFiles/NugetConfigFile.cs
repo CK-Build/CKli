@@ -35,7 +35,7 @@ namespace CK.Env.Plugins.SolutionFiles
         void OnZeroBuildProject( object sender, EventMonitoredArgs e )
         {
             EnsureFeed( e.Monitor, "ZeroBuild-Feed", _localFeedProvider.ZeroBuild.PhysicalPath );
-            Save( e.Monitor );
+            Save( e.Monitor, true );
         }
 
         void OnStartBuild( object sender, BuildStartEventArgs e )

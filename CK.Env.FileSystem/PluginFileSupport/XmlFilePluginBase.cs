@@ -89,11 +89,12 @@ namespace CK.Env.Plugins
         /// Saves this <see cref="Document"/> if <see cref="IsDirty"/> is true.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
+        /// <param name="forceSave">True to ignore <see cref="IsDirty"/> and always save the file.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool Save( IActivityMonitor m )
+        public bool Save( IActivityMonitor m, bool forceSave = false )
         {
-            if( !IsDirty ) return true;
-            return CreateOrUpdate( m, GetCurrentText() );
+            if( !IsDirty && !forceSave ) return true;
+            return CreateOrUpdate( m, GetCurrentText(), forceSave );
         }
 
     }
