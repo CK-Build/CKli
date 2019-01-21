@@ -764,6 +764,7 @@ namespace CK.Env
                     }
                     snapshot.Remove();
                 }
+                ReloadSolutions( m );
                 _localFeedProvider.Release.RemoveAll( m );
                 if( !error() )
                 {
