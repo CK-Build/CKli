@@ -102,6 +102,13 @@
       </Branch>
     </GitFolder>
 
+    <GitFolder Name="CK-SqlServer-Dapper" Url="https://github.com/Invenietis/CK-SqlServer-Dapper.git">
+      <SolutionSettings SqlServer="2016" />
+      <Branch Name="develop">
+        <PrimarySolution />
+      </Branch>
+    </GitFolder>
+    
     <GitFolder Name="CK-Monitoring" Url="https://github.com/Invenietis/CK-Monitoring.git">
       <Branch Name="develop">
         <PrimarySolution />

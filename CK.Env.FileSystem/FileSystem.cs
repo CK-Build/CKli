@@ -87,13 +87,13 @@ namespace CK.Env
                         Repository.Clone( urlRepository, folderPath, new CloneOptions()
                         {
                             CredentialsProvider = GitFolder.DefaultCredentialHandler,
-                            BranchName = world.DevelopBranchName,
                             Checkout = true
                         } );
                     }
                 }
                 g = new GitFolder( this, gitFolder, _commandRegister, world );
                 _gits.Add( g );
+                g.EnsureBranch( m, world.DevelopBranchName );
             }
             return g;
         }

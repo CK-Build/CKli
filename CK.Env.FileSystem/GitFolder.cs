@@ -292,6 +292,22 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Ensures that a local branch associated to its remote exists.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="branchName">The branch name.</param>
+        public void EnsureBranch( IActivityMonitor m, string branchName )
+        {
+            if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
+            var b = GetBranch( m, branchName, logErrorMissingLocalAndRemote: false );
+            if( b == null )
+            {
+                m.Warn( $"Branch '{branchName}' does not exist. Creating local branch." );
+                b = _git.CreateBranch( branchName );
+            }
+        }
+
+        /// <summary>
         /// Fetches 'origin' (or all remotes) branches into this repository.
         /// </summary>
         /// <param name="m">The monitor to use.</param>

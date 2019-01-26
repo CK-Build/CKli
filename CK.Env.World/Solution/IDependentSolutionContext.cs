@@ -37,7 +37,12 @@ namespace CK.Env
 
     public static class DependentSolutionContextExtension
     {
-        public static void LogSolutions( this IDependentSolutionContext @this, IActivityMonitor m, IDependentSolution current = null )
+        public static void LogSolutions(
+            this IDependentSolutionContext @this,
+            IActivityMonitor m,
+            IDependentSolution current = null,
+            Func<IDependentSolution,string> solutionLineDetail = null,
+            Action<IActivityMonitor,IDependentSolution> solutionDetail = null )
         {
             int rank = -1;
             foreach( var s in @this.Solutions )
@@ -47,7 +52,14 @@ namespace CK.Env
                     rank = s.Rank;
                     m.Info( $" -- Rank {rank}" );
                 }
-                m.Info( $"{(s == current ? '*' : ' ')}   {s.Index} - {s} => {s.MinimalImpacts.Count}/{s.Impacts.Count}/{s.TransitiveImpacts.Count}" );
+                if( solutionDetail != null )
+                {
+                    using( m.OpenInfo( $"{(s == current ? '*' : ' ')}   {s.Index} - {s} {solutionLineDetail?.Invoke( s )}" ) )
+                    {
+                        solutionDetail( m, s );
+                    }
+                }
+                else m.Info( $"{(s == current ? '*' : ' ')}   {s.Index} - {s} {solutionLineDetail?.Invoke( s )}" );
             }
         }
 
