@@ -292,7 +292,7 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Ensures that a local branch associated to its remote exists.
+        /// Ensures that a local branch exists.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">The branch name.</param>

@@ -87,6 +87,7 @@ namespace CK.Env
                         Repository.Clone( urlRepository, folderPath, new CloneOptions()
                         {
                             CredentialsProvider = GitFolder.DefaultCredentialHandler,
+                            BranchName = world.DevelopBranchName,
                             Checkout = true
                         } );
                     }
