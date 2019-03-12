@@ -21,9 +21,11 @@
                 FeedName="CKEnvTest3"
                 CheckName="NuGetAzure:Signature-OpenSource-CKEnvTest3"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
+    
     <Repository Type="CKSetup"
                 CheckName="CKSetup:Public"
                 CheckSecretKeyName="CKSETUPREMOTESTORE_PUSH_API_KEY" />
+    
     <Repository Type="CKSetup"
                 Name="CKEnvTest"
                 Url="https://ckenvtest.cksetup.invenietis.net"
@@ -36,7 +38,7 @@
       <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json" >
         <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
       </add>
-      <add Name="CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/CKEnvTest3/nuget/v3/index.json" >
+      <add Name="Open-Source-CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/CKEnvTest3/nuget/v3/index.json" >
         <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
       </add>
     </NuGetSources>
@@ -82,10 +84,24 @@
       </Branch>
     </GitFolder>
 
+    <!-- PRIVATE projects -->
+    <SolutionSettings>
+      <NuGetSources>
+        <add Name="Code-CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/CKEnvTest3/nuget/v3/index.json" >
+          <!--<Credentials UserName="SignatureCode" Password="DO WE NEED A PAT ???" />-->
+        </add>
+      </NuGetSources>
+      <ArtifactTargets>
+        <remove Name="NuGetAzure:Signature-OpenSource-CKEnvTest3" />
+        <add Name="NuGetAzure:Signature-Code-CKEnvTest3" />
+      </ArtifactTargets>
+    </SolutionSettings>
+
     <GitFolder Name="CK-Observable-Domain" Url="https://gitlab.com/signature-code/CK-Observable-Domain.git">
       <Branch Name="develop">
         <PrimarySolution />
       </Branch>
+      
     </GitFolder>
 
 
