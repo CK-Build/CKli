@@ -1,20 +1,17 @@
 using CK.Core;
+using CK.Text;
+using CSemVer;
+using LibGit2Sharp;
+using LibGit2Sharp.Handlers;
+using Microsoft.Alm.Authentication;
 using Microsoft.Extensions.FileProviders;
+using SimpleGitVersion;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Text;
-using Microsoft.Extensions.Primitives;
-using LibGit2Sharp;
-using System.Collections;
 using System.Linq;
-using CK.Text;
-using LibGit2Sharp.Handlers;
-using System.Xml.Linq;
-using Microsoft.Alm.Authentication;
-using SimpleGitVersion;
-using CSemVer;
 
 namespace CK.Env
 {
@@ -24,7 +21,7 @@ namespace CK.Env
     /// </summary>
     public class GitFolder : IGitRepository, IGitHeadInfo, ICommandMethodsProvider
     {
-        static internal readonly CredentialsHandler DefaultCredentialHandler;
+        internal static readonly CredentialsHandler DefaultCredentialHandler;
 
         readonly Repository _git;
         readonly RootDir _thisDir;
@@ -387,7 +384,7 @@ namespace CK.Env
         {
             using( m.OpenInfo( $"Checking out branch '{branchName}' in '{SubPath}'." ) )
             {
-                if( !FetchBranches( m ) ) return (false,false);
+                if( !FetchBranches( m ) ) return (false, false);
                 try
                 {
                     bool reloadNeeded = false;
@@ -697,6 +694,12 @@ namespace CK.Env
         public bool CanAmendCommit => (_git.Head.TrackingDetails.AheadBy ?? 1) > 0;
 
         /// <summary>
+        /// Gets or sets whether the Git repository is public or private.
+        /// Defaults to false.
+        /// </summary>
+        public bool IsPublic { get; set; }
+
+        /// <summary>
         /// Commits any pending changes.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -741,7 +744,7 @@ namespace CK.Env
         /// Optional date transformer. By returning null, the operation is canceled and false is returned.
         /// </param>
         /// <returns>True on success, false on error.</returns>
-        public bool AmendCommit( IActivityMonitor m, Func<string, string> editMessage = null, Func<DateTimeOffset,DateTimeOffset?> editDate = null )
+        public bool AmendCommit( IActivityMonitor m, Func<string, string> editMessage = null, Func<DateTimeOffset, DateTimeOffset?> editDate = null )
         {
             if( !CanAmendCommit ) throw new InvalidOperationException( nameof( CanAmendCommit ) );
             using( m.OpenInfo( $"Amending Commit in '{SubPath}' (branch '{CurrentBranchName}')." ) )
@@ -808,7 +811,7 @@ namespace CK.Env
                 {
                     _git.Commit( commitMessage, author, committer, options );
                 }
-                catch( EmptyCommitException ) 
+                catch( EmptyCommitException )
                 {
                     if( !amendPreviousCommit ) throw;
                     Debug.Assert( _git.Head.Tip.Parents.Count() == 1, "This check on merge commit is already done by LibGit2Sharp." );
@@ -833,7 +836,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m"></param>
         /// <returns></returns>
-        public bool PushEnabled(IActivityMonitor m) => (_git.Head.TrackingDetails.AheadBy ?? 0) > 0;
+        public bool PushEnabled( IActivityMonitor m ) => (_git.Head.TrackingDetails.AheadBy ?? 0) > 0;
 
         /// <summary>
         /// Pushes changes from the current branch to the origin.
@@ -851,7 +854,7 @@ namespace CK.Env
         /// <returns>True on success, false on error.</returns>
         public bool Push( IActivityMonitor m, string branchName )
         {
-            if( branchName == null ) throw new ArgumentNullException(nameof(branchName));
+            if( branchName == null ) throw new ArgumentNullException( nameof( branchName ) );
             using( m.OpenInfo( $"Pushing '{SubPath}' (branch '{branchName}') to origin." ) )
             {
                 try

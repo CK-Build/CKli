@@ -10,6 +10,12 @@ namespace CK.Env
     public interface IGitRepository
     {
         /// <summary>
+        /// Gets whether the Git repository is public or private.
+        /// Defaults to false.
+        /// </summary>
+        bool IsPublic { get; }
+
+        /// <summary>
         /// Gets the name of the Git folder that is the name of the primary solution (by convention and by design).
         /// </summary>
         string PrimarySolutionName { get; }

@@ -9,6 +9,13 @@
   <SolutionCentral />
 
   <ArtifactRepositories>
+
+    <Repository Type="NuGetAzure"
+                Organization="Signature-Code"
+                FeedName="CKEnvTest3"
+                CheckName="NuGetAzure:Signature-Code-CKEnvTest3"
+                CheckSecretKeyName="AZURE_FEED_SIGNATURE_CODE_PAT" />
+
     <Repository Type="NuGetAzure"
                 Organization="Signature-OpenSource"
                 FeedName="CKEnvTest3"
@@ -61,19 +68,26 @@
 
   <Folder Name="Projects">
 
-    <GitFolder Name="CK-SqlServer" Url="https://github.com/Invenietis/CK-SqlServer.git">
+    <GitFolder Name="CK-SqlServer" Url="https://github.com/Invenietis/CK-SqlServer.git" IsPublic="True">
       <SolutionSettings SqlServer="2016" />
       <Branch Name="develop">
         <PrimarySolution />
       </Branch>
     </GitFolder>
     
-    <GitFolder Name="CK-SqlServer-Dapper" Url="https://github.com/Invenietis/CK-SqlServer-Dapper.git">
+    <GitFolder Name="CK-SqlServer-Dapper" Url="https://github.com/Invenietis/CK-SqlServer-Dapper.git" IsPublic="True">
       <SolutionSettings SqlServer="2016" />
       <Branch Name="develop">
         <PrimarySolution />
       </Branch>
     </GitFolder>
+
+    <GitFolder Name="CK-Observable-Domain" Url="https://gitlab.com/signature-code/CK-Observable-Domain.git">
+      <Branch Name="develop">
+        <PrimarySolution />
+      </Branch>
+    </GitFolder>
+
 
   </Folder>
     
