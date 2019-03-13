@@ -64,6 +64,7 @@
       <add Type="CK.Env.Plugins.SolutionFiles.NugetConfigFile, CK.Env.Plugins" />
       <add Type="CK.Env.Plugins.SolutionFiles.GitIgnoreFile, CK.Env.Plugins" />
       <add Type="CK.BuildSystem.Appveyor.AppveyorFile, CK.BuildSystem.Appveyor" />
+      <add Type="CK.BuildSystem.GitLab.GitLabFile, CK.BuildSystem.GitLab" />
     </Plugins>
   </SolutionSettings>
 
@@ -87,9 +88,7 @@
     <!-- PRIVATE projects -->
     <SolutionSettings>
       <NuGetSources>
-        <add Name="Code-CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/CKEnvTest3/nuget/v3/index.json" >
-          <!--<Credentials UserName="SignatureCode" Password="DO WE NEED A PAT ???" />-->
-        </add>
+        <add Name="Code-CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/CKEnvTest3/nuget/v3/index.json" />        
       </NuGetSources>
       <ArtifactTargets>
         <remove Name="NuGetAzure:Signature-OpenSource-CKEnvTest3" />
@@ -98,6 +97,7 @@
     </SolutionSettings>
 
     <GitFolder Name="CK-Observable-Domain" Url="https://gitlab.com/signature-code/CK-Observable-Domain.git">
+      <SolutionSettings NoStrongNameSigning="True"/>
       <Branch Name="develop">
         <PrimarySolution />
       </Branch>

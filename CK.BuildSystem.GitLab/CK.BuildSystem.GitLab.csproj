@@ -4,7 +4,7 @@
     <TargetFramework>net461</TargetFramework>
     <LangVersion>7.2</LangVersion>
   </PropertyGroup>
- 
+  
   <ItemGroup>
     <ProjectReference Include="..\CK.Env.SolutionSettings\CK.Env.SolutionSettings.csproj" />
     <ProjectReference Include="..\CK.Env.FileSystem\CK.Env.FileSystem.csproj" />

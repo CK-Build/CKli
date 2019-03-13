@@ -2,22 +2,15 @@ using CK.Core;
 using CK.Env;
 using CK.Env.Plugins;
 using CK.Text;
-using SharpYaml;
 using SharpYaml.Model;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
 
 namespace CK.BuildSystem.Appveyor
 {
-    public class AppveyorFile : TextFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
+    public class AppveyorFile : YamlFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly ISolutionSettings _settings;
         readonly ISecretKeyStore _secretStore;
-        YamlStream _stream;
-        YamlDocument _doc;
-        YamlMapping _firstMapping;
+
 
         public AppveyorFile( GitFolder f, ISolutionSettings settings, ISecretKeyStore secretStore, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "Appveyor.yml" ) )
@@ -37,7 +30,14 @@ namespace CK.BuildSystem.Appveyor
             YamlMapping firstMapping = GetFirstMapping( m, true );
             if( firstMapping == null ) return;
 
-            YamlMapping env = FindOrCreateEnvironment( m, firstMapping );
+            if( !Folder.IsPublic )//We don't use AppVeyor for private repositories.
+            {
+                m.Log(LogLevel.Info, "The project is private, so we don't use Appveyor and the Appveyor.yml is not needed.");
+                Delete(m);
+                return;
+            }
+            //We use AppVeyor when the repository is public.
+            YamlMapping env = FindOrCreateYamlElement( m, firstMapping, "environment" );
             if( env == null ) return;
             string appveyorSecure = _secretStore.GetSecretKey( m, "APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY", false );
             if( appveyorSecure != null )
@@ -79,79 +79,6 @@ namespace CK.BuildSystem.Appveyor
 
             CreateOrUpdate( m, YamlMappingToString( m ) );
         }
-
-        protected YamlMapping GetFirstMapping( IActivityMonitor m, bool autoCreate )
-        {
-            if( _firstMapping == null )
-            {
-                var input = TextContent;
-                if( input == null && autoCreate ) input = String.Empty;
-                if( input != null )
-                {
-                    _stream = YamlStream.Load( new StringReader( input ) );
-                    if( _stream.Count > 0 ) _doc = _stream[0];
-                    else _stream.Add( (_doc = new YamlDocument()) );
-                    if( _doc.Contents == null ) _doc.Contents = (_firstMapping = new YamlMapping());
-                    else
-                    {
-                        _firstMapping = _doc.Contents as YamlMapping;
-                        if( _firstMapping == null )
-                        {
-                            m.Error( $"Unable to parse Yaml file. Missing a first mapping object as the first document content." );
-                        }
-                    }
-                }
-            }
-            return _firstMapping;
-        }
-
-        string YamlMappingToString( IActivityMonitor m )
-        {
-            if( GetFirstMapping( m, false ) != null )
-            {
-                var output = new StringBuilder();
-                using( var w = new StringWriter( output ) )
-                {
-                    var emitter = new Emitter( w );
-                    int i = 0;
-                    foreach( var e in _stream.EnumerateEvents() )
-                    {
-                        emitter.Emit( e );
-                        if( ++i == 3 )
-                        {
-                            // Remove meta header with %TAG...
-                            output.Clear();
-                        }
-                    }
-                }
-                return output.ToString();
-            }
-            return null;
-        }
-
-        YamlMapping CreateKeyValue( string key, string value )
-        {
-            var kv = new YamlMapping();
-            kv[key] = new YamlValue( value );
-            return kv;
-        }
-
-        static YamlMapping FindOrCreateEnvironment( IActivityMonitor m, YamlMapping firstMapping )
-        {
-            YamlMapping env;
-            YamlElement environment = firstMapping["environment"];
-            if( environment != null )
-            {
-                env = environment as YamlMapping;
-                if( env == null )
-                {
-                    m.Error( $"Unable to parse Yaml file. Expecting environment mapping but found '{environment.GetType()}'." );
-                }
-            }
-            else firstMapping["environment"] = env = new YamlMapping();
-            return env;
-        }
-
         static void EnsureDefaultBranches( YamlMapping firstMapping )
         {
             YamlElement branches = firstMapping["branches"];
@@ -160,17 +87,6 @@ namespace CK.BuildSystem.Appveyor
                 firstMapping["branches"] = EnsureSequence( new YamlMapping(), "only", "master", "develop" );
             }
         }
-        static YamlMapping EnsureSequence( YamlMapping m, string key, params string[] values )
-        {
-            var seq = new YamlSequence();
-            foreach( var v in values ) seq.Add( new YamlValue( v ) );
-            m[key] = seq;
-            return m;
-        }
 
-        private void EnsureKeyValue( YamlMapping m, string key, string value )
-        {
-            m[key] = new YamlValue( value );
-        }
     }
 }
