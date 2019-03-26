@@ -30,13 +30,13 @@ namespace CK.Env.Plugins.SolutionFiles
             SetTextResource( m, "InstallCredentialProvider.ps1" );
             SetTextResource( m, "Program.cs" );
             UpdateTextResource( m, "Build.cs", AdaptBuild );
-            SetTextResource( m, "Build.NuGetHelper.cs" );
-            SetTextResource( m, "Build.StandardCheckRepository.cs", AdaptStandardCheckRepositoryForPushFeeds );
-            SetTextResource( m, "Build.StandardSolutionBuild.cs" );
+            SetTextResource( m, "dotnet\\Build.NuGetHelper.cs" );
+            SetTextResource( m, "dotnet\\Build.StandardCheckRepository.cs", AdaptStandardCheckRepositoryForPushFeeds );
+            SetTextResource( m, "dotnet\\Build.StandardSolutionBuild.cs" );
             if( _settings.NoUnitTests )
             {
                 m.Info( "Removing Build.StandardUnitTests since NoUnitTests is true." );
-                DeleteFile( m, "Build.StandardUnitTests.cs" );
+                DeleteFile( m, "dotnet\\Build.StandardUnitTests.cs" );
             }
             else
             {
@@ -92,13 +92,13 @@ namespace CK.Env.Plugins.SolutionFiles
 
         string AdaptStandardCheckRepositoryForPushFeeds( string text )
         {
-            Match m = Regex.Match( text, @"return new NuGetHelper\.Feed\[\]{.*?};", RegexOptions.Singleline|RegexOptions.CultureInvariant );
+            Match m = Regex.Match( text, @"return new NuGetHelper\.NuGetFeed\[\]{.*?};", RegexOptions.Singleline|RegexOptions.CultureInvariant );
             if( !m.Success )
             {
-                throw new Exception( "Expected pattern return new NuGetHelper.Feed[]{...} in Build.StandardCheckRepository.cs." );
+                throw new Exception( "Expected pattern return new NuGetHelper.NuGetFeed[]{...} in Build.StandardCheckRepository.cs." );
             }
             StringBuilder b = new StringBuilder( );
-            b.AppendLine( "return new NuGetHelper.Feed[]{" );
+            b.AppendLine( "return new NuGetHelper.NuGetFeed[]{" );
             bool atLeastOne = false;
             foreach( var info in _settings.ArtifactTargets.Select( a => a.Info ).OfType<INuGetFeedInfo>() )
             {
@@ -107,10 +107,10 @@ namespace CK.Env.Plugins.SolutionFiles
                 switch( info )
                 {
                     case NuGetAzureFeedInfo a:
-                        b.Append( "new SignatureVSTSFeed( \"" ).Append( a.Organization ).Append( "\", \"" ).Append( a.FeedName ).Append( "\" )" );
+                        b.Append( "new SignatureVSTSFeed(cake, \"" ).Append( a.Organization ).Append( "\", \"" ).Append( a.FeedName ).Append( "\" )" );
                         break;
                     case NuGetStandardFeedInfo n:
-                        b.Append( "new RemoteFeed( \"" ).Append( n.Name).Append( "\", \"" )
+                        b.Append( "new RemoteFeed(cake, \"" ).Append( n.Name).Append( "\", \"" )
                                                         .Append( n.Url ).Append( "\", \"" )
                                                         .Append( n.SecretKeyName ).Append( "\" )" );
                         break;
