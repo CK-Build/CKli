@@ -2,12 +2,8 @@ using CK.Core;
 using CK.Env.MSBuild;
 using CK.Text;
 using CSemVer;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Xml.Linq;
 
 namespace CK.Env.Plugins.SolutionFiles
 {
@@ -51,9 +47,9 @@ namespace CK.Env.Plugins.SolutionFiles
 
             void EnsureProjectReference( string packageId, string v )
             {
+                List<DeclaredPackageDependency> samePackageName = ccbProject.Deps.Packages.Where( p => p.PackageId == packageId ).ToList();
                 var version = SVersion.Parse( v );
-                if( !ccbProject.Deps.Projects.Any( p => p.TargetProject.Name == packageId )
-                    && !ccbProject.Deps.Packages.Where( p => p.PackageId == packageId ).All( p => p.Version >= version ) )
+                if( !ccbProject.Deps.Projects.Any( p => p.TargetProject.Name == packageId ) && (!samePackageName.Any() || !samePackageName.All( p => p.Version >= version )) )
                 {
                     ccbProject.SetPackageReferenceVersion( m, framework, packageId, version, true, false );
                 }
@@ -61,10 +57,11 @@ namespace CK.Env.Plugins.SolutionFiles
 
             EnsureProjectReference( "NuGet.Credentials", "4.9.2" );
             EnsureProjectReference( "NuGet.Protocol", "4.9.2" );
+            EnsureProjectReference( "Cake.Npm", "0.16.0" );
             if( !_settings.NoUnitTests )
             {
                 EnsureProjectReference( "NUnit.ConsoleRunner", "3.9.0" );
-                EnsureProjectReference( "NUnit.Runners.Net4",  "2.6.4" );
+                EnsureProjectReference( "NUnit.Runners.Net4", "2.6.4" );
             }
             if( PluginBranch != StandardGitStatus.Local )
             {
