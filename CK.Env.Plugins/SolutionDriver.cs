@@ -214,8 +214,8 @@ namespace CK.Env.Plugins
             args += commonArgs + versionArgs;
 
             var path = Folder.FileSystem.GetFileInfo( p.Path.RemoveLastPart() ).PhysicalPath;
-            FileSystem.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "bin" ) );
-            FileSystem.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "obj" ) );
+            FileSystem.RawDeleteLocalDirectory( monitor, Path.Combine( path, "bin" ) );
+            FileSystem.RawDeleteLocalDirectory( monitor, Path.Combine( path, "obj" ) );
 
             OnZeroBuildProject?.Invoke( this, new EventMonitoredArgs( monitor ) );
             return ProcessRunner.Run( monitor, path, "dotnet", args );

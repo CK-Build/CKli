@@ -509,7 +509,7 @@ namespace CodeCake
             /// <returns>The awaitable.</returns>
             protected override async Task OnAllArtifactsPushed( ICakeContext ctx, string path)
             {
-                var basicAuth = Convert.ToBase64String( ASCIIEncoding.ASCII.GetBytes( ":" + ctx.InteractiveEnvironmentVariable( SecretKeyName ) ) );
+                var basicAuth = Convert.ToBase64String( Encoding.ASCII.GetBytes( ":" + ctx.InteractiveEnvironmentVariable( SecretKeyName ) ) );
                 foreach( var p in ArtifactsToPublish )
                 {
                     foreach( var view in p.Value.Version.PackageQuality.GetLabels() )

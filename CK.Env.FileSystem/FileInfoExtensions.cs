@@ -145,7 +145,7 @@ namespace CK.Env
             if( f == null || !f.Exists || f.IsDirectory ) return null;
             if( !ignoreExtension )
             {
-                string ext = System.IO.Path.GetExtension( f.Name );
+                string ext = Path.GetExtension( f.Name );
                 if( Array.IndexOf( _textExtensions, ext ) < 0 ) return null;
             }
             return new Origin( f );

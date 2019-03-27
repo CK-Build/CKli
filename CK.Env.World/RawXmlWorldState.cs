@@ -64,7 +64,7 @@ namespace CK.Env
         /// </summary>
         public GlobalWorkStatus WorkStatus
         {
-            get => _doc.Root.AttributeEnum( xWorkStatusName, CK.Env.GlobalWorkStatus.Idle );
+            get => _doc.Root.AttributeEnum( xWorkStatusName, GlobalWorkStatus.Idle );
             set => _doc.Root.SetAttributeValue( xWorkStatusName, value.ToString() );
         }
 

@@ -71,7 +71,7 @@ new CKSetupComponent( "ProjectFolder", "TargetFramework" )
             var storeConf = Cake.CKSetupCreateDefaultConfiguration();
             if( globalInfo.IsLocalCIRelease )
             {
-                storeConf.TargetStoreUrl = System.IO.Path.Combine( globalInfo.LocalFeedPath, "CKSetupStore" );
+                storeConf.TargetStoreUrl = Path.Combine( globalInfo.LocalFeedPath, "CKSetupStore" );
             }
             if( !storeConf.IsValid )
             {
@@ -81,10 +81,9 @@ new CKSetupComponent( "ProjectFolder", "TargetFramework" )
 
             Cake.Information( $"Using CKSetupStoreConfiguration: {storeConf}" );
             if( components == null ) components = GetCKSetupComponents();
-
             if( !Cake.CKSetupPublishAndAddComponentFoldersToStore(
                         storeConf,
-                        components.Select( c => c.GetBinPath( globalInfo.BuildConfiguration ) ) ) )
+                        components.Select( c => c.GetBinPath( globalInfo.IsRelease ? "Debug" : "Release" ) ) ) )
             {
                 Cake.TerminateWithError( "Error while registering components in local temporary store." );
             }

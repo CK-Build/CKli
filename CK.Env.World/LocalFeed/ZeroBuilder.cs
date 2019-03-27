@@ -213,7 +213,7 @@ namespace CK.Env
         {
             using( m.OpenInfo( $"Building ZeroVersion projects." ) )
             {
-                var builder = ZeroBuilder.Create( m, feeds, depContext, driverFinder, solutionReloader );
+                var builder = Create( m, feeds, depContext, driverFinder, solutionReloader );
                 if( builder == null ) return null;
                 bool success = builder.Run( m, appLife, out bool mustReloadSolutions );
                 if( mustReloadSolutions ) solutionReloader( m );

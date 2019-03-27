@@ -31,7 +31,7 @@ namespace CK.NuGetClient
         public Task LogAsync( NuGet.Common.LogLevel level, string data )
         {
             Log( level, data );
-            return System.Threading.Tasks.Task.CompletedTask;
+            return Task.CompletedTask;
         }
 
         public void Log( NuGet.Common.ILogMessage message )
@@ -42,7 +42,7 @@ namespace CK.NuGetClient
         public Task LogAsync( NuGet.Common.ILogMessage message )
         {
             Log( message );
-            return System.Threading.Tasks.Task.CompletedTask;
+            return Task.CompletedTask;
         }
     }
 

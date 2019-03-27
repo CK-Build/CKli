@@ -54,7 +54,7 @@ namespace CKli
 
             public SVersion GetBestVersion( IActivityMonitor m, string packageId )
             {
-                return XLocalFeedProvider.GetMaxVersionFromFeed( PhysicalPath, packageId );
+                return GetMaxVersionFromFeed( PhysicalPath, packageId );
             }
 
             public LocalNuGetPackageFile GetPackageFile( IActivityMonitor m, string packageId, SVersion v )
