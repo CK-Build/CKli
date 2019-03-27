@@ -1,11 +1,8 @@
 using CK.Core;
-using CK.NuGetClient;
 using CK.SimpleKeyVault;
 using CK.Text;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Xml.Linq;
 
 namespace CK.Env.Plugins.SolutionFiles
 {

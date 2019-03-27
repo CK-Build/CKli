@@ -1,10 +1,8 @@
 using CK.Core;
 using CSemVer;
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 
 namespace CK.Env.MSBuild
 {

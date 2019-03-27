@@ -1,11 +1,5 @@
 using CK.Env;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
 using CK.Core;
-using System.Net.Http;
-using CK.NuGetClient;
 
 namespace CKli
 {

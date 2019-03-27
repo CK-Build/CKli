@@ -1,11 +1,9 @@
 using CK.Text;
-using Microsoft.Extensions.FileProviders;
 using System;
 using System.Text;
 using System.Collections.Generic;
 using System.Linq;
 using CK.Core;
-using System.IO;
 using System.Xml.Linq;
 using CK.Setup;
 using System.Diagnostics;

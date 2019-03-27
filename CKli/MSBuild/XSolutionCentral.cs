@@ -2,13 +2,10 @@ using CK.Core;
 using CK.Env;
 using CK.Env.MSBuild;
 using CK.Text;
-using CSemVer;
 using SimpleGitVersion;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text;
 
 namespace CKli
 {

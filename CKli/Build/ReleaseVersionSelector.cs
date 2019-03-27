@@ -1,16 +1,12 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using CK.Core;
 using CK.Env;
-using CK.Env.MSBuild;
 using CK.Text;
 using CSemVer;
 
 namespace CKli
-{ 
+{
     public class ReleaseVersionSelector : IReleaseVersionSelector
     {
         /// <summary>

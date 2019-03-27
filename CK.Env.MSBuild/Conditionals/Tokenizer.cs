@@ -1,6 +1,4 @@
-using System.Globalization;
 using System;
-using System.Diagnostics;
 using CK.Text;
 
 namespace CK.Env.MSBuild

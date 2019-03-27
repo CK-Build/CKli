@@ -1,11 +1,9 @@
 using CK.Core;
 using CK.Text;
-using Microsoft.Extensions.FileProviders;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Xml.Linq;
 
 namespace CK.Env.MSBuild

@@ -7,7 +7,6 @@ using NuGet.Credentials;
 using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;

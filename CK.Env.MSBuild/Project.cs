@@ -2,13 +2,10 @@ using CK.Core;
 using CK.Setup;
 using CK.Text;
 using CSemVer;
-using Microsoft.Extensions.FileProviders;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Xml.Linq;
-using System.Xml.XPath;
 
 namespace CK.Env.MSBuild
 {

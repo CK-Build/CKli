@@ -1,10 +1,8 @@
 using CK.Text;
 using FluentAssertions;
 using NUnit.Framework;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
 

@@ -1,13 +1,10 @@
-using CK.Core;
 using CK.Text;
 using FluentAssertions;
 using Microsoft.Extensions.FileProviders;
 using NUnit.Framework;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using static CK.Testing.MonitorTestHelper;
 
 namespace CK.Env.Tests
