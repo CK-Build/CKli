@@ -20,6 +20,10 @@ namespace CK.Env.Plugins
         readonly string _csResourcePrefix;
         readonly Dictionary<string, string> _textResources = new Dictionary<string, string>();
 
+        string GetTextResourceFromPath(string path)
+        {
+            return _textResources[path.Replace( '/', '.' ).Replace('\\','.')];
+        }
         public PluginFolderBase( GitFolder f, NormalizedPath branchPath, string folderPath, Type resourceHolder = null )
             : base( f, branchPath )
         {
@@ -65,7 +69,7 @@ namespace CK.Env.Plugins
         /// <param name="m">The monitor to use.</param>
         /// <param name="filePath">File path relative to this folder.</param>
         /// <returns>True on success, false on error.</returns>
-        protected bool DeleteFile( IActivityMonitor m, string filePath )
+        protected bool DeleteFile( IActivityMonitor m, NormalizedPath filePath )
         {
             return Folder.FileSystem.Delete( m, FolderPath.Combine( filePath ).ResolveDots( FolderPath.Parts.Count ) );
         }
@@ -78,12 +82,12 @@ namespace CK.Env.Plugins
         /// <param name="name">The name of the text file (without ".txt" suffix).</param>
         /// <param name="transformer">Optional transformer.</param>
         /// <returns>True on success, false on error.</returns>
-        protected bool UpdateTextResource( IActivityMonitor m, string name, Func<string, string> transformer = null )
+        protected bool UpdateTextResource( IActivityMonitor m, NormalizedPath path, Func<string, string> transformer = null )
         {
             var fs = Folder.FileSystem;
-            var target = FolderPath.AppendPart( name );
+            var target = FolderPath.Combine( path );
             var currentText = fs.GetFileInfo( target ).AsTextFileInfo()?.TextContent;
-            var final = transformer != null ? transformer( currentText ?? _textResources[name] ) : _textResources[name];
+            var final = transformer != null ? transformer( currentText ?? GetTextResourceFromPath(path) ) : GetTextResourceFromPath(path);
             return final != currentText ? fs.CopyTo( m, final, target ) : true;
         }
 
@@ -92,17 +96,17 @@ namespace CK.Env.Plugins
         /// This does not preserve exisiting content.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="name">The name of the text file (without ".txt" suffix).</param>
+        /// <param name="name">The path of the text file (without ".txt" suffix).</param>
         /// <param name="transformer">
         /// Optional transformer.
         /// When this function returns null, this is considered as an error.
         /// </param>
         /// <returns>True on success, false on error.</returns>
-        protected bool SetTextResource( IActivityMonitor m, string name, Func<string, string> transformer = null )
+        protected bool SetTextResource( IActivityMonitor m, NormalizedPath path, Func<string, string> transformer = null )
         {
             var fs = Folder.FileSystem;
-            var target = FolderPath.AppendPart( name );
-            var text = _textResources[name];
+            var target = FolderPath.Combine(path);
+            var text = GetTextResourceFromPath(path);
             var final = transformer != null ? transformer( text ) : text;
             if( final == null )
             {
@@ -140,7 +144,7 @@ namespace CK.Env.Plugins
                 }
             }
 
-            (string ResPath, string Name) ProcessTextResourceName( string resPath )
+            (string ResPath, string RelativePath) ProcessTextResourceName( string resPath )
             {
                 if( resPath.EndsWith( ".txt" ) )
                 {
@@ -159,7 +163,7 @@ namespace CK.Env.Plugins
                                 .GetManifestResourceNames()
                                 .Select( ProcessTextResourceName )
                                 .Where( p => p.ResPath != null );
-                var kv = resNames.Select( r => new KeyValuePair<string, string>( r.Name, ReadText( _resourceAssembly, r.ResPath ) ) );
+                var kv = resNames.Select( r => new KeyValuePair<string, string>( r.RelativePath, ReadText( _resourceAssembly, r.ResPath ) ) );
                 _textResources.AddRange( kv );
             }
         }
