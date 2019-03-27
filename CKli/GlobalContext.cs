@@ -79,20 +79,20 @@ namespace CKli
         {
             Close();
             _localWorldRootPathMapping.Load();
-            var w = ChooseWorld( _monitor );
-            if( w.LocalPath == null ) return false;
+            var (LocalPath, World) = ChooseWorld( _monitor );
+            if( LocalPath == null ) return false;
 
             _currentWorld = null;
-            _fs = new FileSystem( w.LocalPath, CommandRegister );
+            _fs = new FileSystem( LocalPath, CommandRegister );
             var baseProvider = new SimpleServiceContainer();
             baseProvider.Add<ISimpleObjectActivator>( new SimpleObjectActivator() );
             baseProvider.Add( CommandRegister );
             baseProvider.Add( _fs );
-            baseProvider.Add( w.World );
+            baseProvider.Add( World );
             baseProvider.Add( _worldStore );
             baseProvider.Add( _appLife );
 
-            var original = _worldStore.ReadWorldDescription( _monitor, w.World ).Root;
+            var original = _worldStore.ReadWorldDescription( _monitor, World ).Root;
             var expanded = XTypedFactory.PreProcess( _monitor, original );
             if( expanded.Errors.Count > 0 )
             {
@@ -100,7 +100,7 @@ namespace CKli
             }
             _root = _factory.CreateInstance<XTypedObject>( _monitor, expanded.Result, baseProvider );
             if( _root == null ) return false;
-            _currentWorld = w.World;
+            _currentWorld = World;
             CommandRegister["World/Initialize"].Execute( _monitor, null );
             CurrentWorldChanged?.Invoke( this, EventArgs.Empty );
             return true;
@@ -115,9 +115,9 @@ namespace CKli
                 foreach( var g in worlds.GroupBy( f => f.World.Name ) )
                 {
                     Console.WriteLine( $"- {g.Key}" );
-                    foreach( var lts in g )
+                    foreach( var (Idx, World, LocalPath) in g )
                     {
-                        Console.WriteLine( $"   > {lts.Idx + 1} - {lts.World.LTSKey ?? "<Current>"} => { lts.LocalPath ?? "(No local mapping)"}" );
+                        Console.WriteLine( $"   > {Idx + 1} - {World.LTSKey ?? "<Current>"} => { LocalPath ?? "(No local mapping)"}" );
                     }
                 }
                 Console.WriteLine( "   > x - Exit" );
@@ -125,8 +125,8 @@ namespace CKli
                 if( Int32.TryParse( r, out int result )
                     && result >= 1 && result <= worlds.Count )
                 {
-                    var c = worlds[result - 1];
-                    return (c.LocalPath, c.World);
+                    var (Idx, World, LocalPath) = worlds[result - 1];
+                    return (LocalPath, World);
                 }
                 if( r == "x" ) return (null,null);
             }

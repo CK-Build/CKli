@@ -34,8 +34,8 @@ namespace CK.Env.Plugins
         /// <returns>The document and its path. Document is null if it can't be read and a fatal error is logged.</returns>
         public static (XDocument Doc, NormalizedPath Path) GetXmlDocument( this GitFolder @this, IActivityMonitor m, string fileName )
         {
-            var f = GetFileInfo( @this, fileName );
-            return (f.FileInfo?.ReadAsXDocument(), f.Path);
+            var (FileInfo, Path) = GetFileInfo( @this, fileName );
+            return (FileInfo?.ReadAsXDocument(), Path);
         }
 
         /// <summary>
@@ -46,8 +46,8 @@ namespace CK.Env.Plugins
         /// <returns>The text file info (null if it can't be read) and its path.</returns>
         public static (ITextFileInfo, NormalizedPath Path) GetTextFileInfo( this GitFolder @this, IActivityMonitor m, string fileName )
         {
-            var f = GetFileInfo( @this, fileName );
-            return (f.FileInfo?.AsTextFileInfo( ignoreExtension: true ), f.Path);
+            var (FileInfo, Path) = GetFileInfo( @this, fileName );
+            return (FileInfo?.AsTextFileInfo( ignoreExtension: true ), Path);
         }
 
     }

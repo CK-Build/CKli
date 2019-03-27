@@ -9,8 +9,7 @@ namespace CK.Env.MSBuild
 
         public NumericNode( Token t )
         {
-            if( t == null ) throw new ArgumentNullException( nameof( t ) );
-            _t = t;
+            _t = t ?? throw new ArgumentNullException( nameof( t ) );
         }
 
         public override string StringValue => _t.Value;

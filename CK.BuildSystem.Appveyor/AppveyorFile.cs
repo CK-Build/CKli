@@ -66,8 +66,10 @@ namespace CK.BuildSystem.Appveyor
             {
                 firstMapping["services"] = new YamlValue( "mssql" + _settings.SqlServer.ToLowerInvariant() );
             }
-            var install = new YamlSequence();
-            install.Add( CreateKeyValue( "ps", "./CodeCakeBuilder/InstallCredentialProvider.ps1" ) );
+            var install = new YamlSequence
+            {
+                CreateKeyValue( "ps", "./CodeCakeBuilder/InstallCredentialProvider.ps1" )
+            };
             firstMapping["install"] = install;
 
             firstMapping["version"] = new YamlValue( "build{build}" );

@@ -57,7 +57,7 @@ namespace CK.Env
             }
         }
 
-        static string[] _textExtensions = new string[]
+        static readonly string[] _textExtensions = new string[]
         {
             ".txt",
             ".cs", ".js", ".sql",

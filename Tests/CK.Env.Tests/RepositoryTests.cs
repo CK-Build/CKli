@@ -12,7 +12,7 @@ namespace CK.Env.Tests
     [TestFixture]
     public class RepositoryTests
     {
-        CommandRegister _commandRegister = new CommandRegister();
+        readonly CommandRegister _commandRegister = new CommandRegister();
 
         [Test]
         public void FileSystem_sees_physical_files()

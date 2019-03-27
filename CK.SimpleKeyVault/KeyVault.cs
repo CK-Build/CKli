@@ -14,7 +14,7 @@ namespace CK.SimpleKeyVault
         /// <summary>
         /// This salt must be the same as the one of CodeCake.
         /// </summary>
-        private static string Salt = "{E4E66F59-CAF2-4C39-A7F8-46097B1C461B}";
+        private static readonly string Salt = "{E4E66F59-CAF2-4C39-A7F8-46097B1C461B}";
 
         /// <summary>
         /// Creates a new <see cref="SymmetricAlgorithm"/>.

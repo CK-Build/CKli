@@ -143,7 +143,7 @@ namespace CK.Env
             public IReadOnlyList<ActivityMonitorSimpleCollector.Entry> Errors { get; }
         }
 
-        static public PreProcessResult PreProcess( IActivityMonitor monitor, XElement e )
+        public static PreProcessResult PreProcess( IActivityMonitor monitor, XElement e )
         {
             IReadOnlyList<ActivityMonitorSimpleCollector.Entry> errors = null;
             XElement result;

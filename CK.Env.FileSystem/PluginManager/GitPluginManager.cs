@@ -208,10 +208,9 @@ namespace CK.Env
         public GitPluginManager( ISimpleServiceContainer baseProvider, CommandRegister commandRegister, string defaultBranchName, NormalizedPath branchesPath )
         {
             if( String.IsNullOrWhiteSpace(defaultBranchName) ) throw new ArgumentNullException( nameof( defaultBranchName ) );
-            if( commandRegister == null ) throw new ArgumentNullException( nameof( commandRegister ) );
             ServiceContainer = new SimpleServiceContainer( baseProvider );
             _defaultBranchName = defaultBranchName;
-            _commandRegister = commandRegister;
+            _commandRegister = commandRegister ?? throw new ArgumentNullException( nameof( commandRegister ) );
             _registry = new GitPluginRegistry( branchesPath );
             _plugins = new PluginCollection<IGitPlugin>( this, null );
             _branches = new Branches( this );

@@ -22,9 +22,8 @@ namespace CK.Env
         /// <param name="gitFolders">The set of <see cref="GitFolder"/> to consider. Must not be empty.</param>
         public GlobalGitContext( IWorldName world, IEnumerable<GitFolder> gitFolders )
         {
-            if( world == null ) throw new ArgumentNullException( nameof( world ) );
             if( gitFolders == null ) throw new ArgumentNullException( nameof( gitFolders ) );
-            World = world;
+            World = world ?? throw new ArgumentNullException( nameof( world ) );
             _gitFolders = gitFolders.ToList();
             if( _gitFolders.Count == 0 || _gitFolders.Any( g => g.FileSystem != _gitFolders[0].FileSystem) )
             {

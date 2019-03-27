@@ -10,11 +10,9 @@ namespace CK.Env.MSBuild
     {
         public BinaryOperatorNode( BaseNode left, TokenType op, BaseNode right )
         {
-            if( left == null ) throw new ArgumentNullException( nameof( left ) );
-            if( right == null ) throw new ArgumentNullException( nameof( right ) );
-            Left = left;
+            Left = left ?? throw new ArgumentNullException( nameof( left ) );
             Operator = op;
-            Right = right;
+            Right = right ?? throw new ArgumentNullException( nameof( right ) );
         }
 
         public BaseNode Left { get; }

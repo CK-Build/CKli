@@ -52,8 +52,10 @@ namespace CKli
             _allDevelopSolutions = new List<XSolutionBase>();
             _allGitFoldersWithDevelopBranchName = new List<XGitFolder>();
 
-            _worldState = new WorldState( commandRegister, artifacts.ArtifactCenter, worldStore, world, this, _packageFeeds, appLife );
-            _worldState.VersionSelector = new ReleaseVersionSelector();
+            _worldState = new WorldState( commandRegister, artifacts.ArtifactCenter, worldStore, world, this, _packageFeeds, appLife )
+            {
+                VersionSelector = new ReleaseVersionSelector()
+            };
             EventHandler<EventMonitoredArgs> onDumpOrInitialize = ( o, e ) => OnDumpWorldStatus( e.Monitor );
             _worldState.Initializing += onDumpOrInitialize;
             _worldState.DumpWorldStatus += onDumpOrInitialize;

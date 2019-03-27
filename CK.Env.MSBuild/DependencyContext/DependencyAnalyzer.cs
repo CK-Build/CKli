@@ -471,7 +471,7 @@ namespace CK.Env.MSBuild
         /// <param name="m">The monitor to use.</param>
         /// <param name="solutionFiles">The set of <see cref="Solution"/> to consider.</param>
         /// <returns>A new dependency context.</returns>
-        static public DependencyAnalyser Create( IActivityMonitor m, IEnumerable<Solution> solutionFiles )
+        public static DependencyAnalyser Create( IActivityMonitor m, IEnumerable<Solution> solutionFiles )
         {
             var packages = new Dictionary<string, Package>();
             var solutions = solutionFiles.ToArray();

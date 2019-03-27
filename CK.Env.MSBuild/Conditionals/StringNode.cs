@@ -11,8 +11,7 @@ namespace CK.Env.MSBuild
     {
         public StringNode( string value )
         {
-            if( value == null ) throw new ArgumentNullException( nameof( value ) );
-            StringValue = value;
+            StringValue = value ?? throw new ArgumentNullException( nameof( value ) );
             RequiresExpansion = value.IndexOf("$(", StringComparison.Ordinal ) >= 0;
         }
 

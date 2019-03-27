@@ -80,8 +80,7 @@ namespace CK.Env
             @this = @this?.NextNode;
             while( @this != null )
             {
-                var n = @this as TNode;
-                if( n != null ) return n;
+                if( @this is TNode n ) return n;
                 @this = @this.NextNode;
             }
             return null;

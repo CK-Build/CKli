@@ -9,10 +9,8 @@ namespace CK.Env.MSBuild
     {
         public FunctionCallNode( string functionName, IReadOnlyList<BaseNode> arguments )
         {
-            if( functionName == null ) throw new ArgumentNullException( nameof( functionName ) );
-            if( arguments == null ) throw new ArgumentNullException( nameof( arguments ) );
-            FunctionName = functionName;
-            Arguments = arguments;
+            FunctionName = functionName ?? throw new ArgumentNullException( nameof( functionName ) );
+            Arguments = arguments ?? throw new ArgumentNullException( nameof( arguments ) );
         }
 
         public string FunctionName { get; }

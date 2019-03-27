@@ -264,7 +264,7 @@ namespace CK.Env
         {
             if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
             var b = GetBranch( m, branchName, false );
-            return b == null ? null : b.Tip.Sha;
+            return b?.Tip.Sha;
         }
 
         Branch GetBranch( IActivityMonitor m, string branchName, bool logErrorMissingLocalAndRemote )

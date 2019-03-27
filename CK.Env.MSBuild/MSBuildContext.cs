@@ -19,7 +19,7 @@ namespace CK.Env.MSBuild
         /// The <see cref="CKTraitContext.Separator"/> is the ';' to match the one used by csproj (parsing and
         /// string representation becomes straightforward).
         /// </summary>
-        static readonly public CKTraitContext Traits = new CKTraitContext( "ProjectFileContext", ';' );
+        public static readonly CKTraitContext Traits = new CKTraitContext( "ProjectFileContext", ';' );
 
         /// <summary>
         /// Defines import of a <see cref="File"/> from another File.

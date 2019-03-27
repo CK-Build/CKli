@@ -545,14 +545,14 @@ namespace CK.Env.MSBuild
             CKTrait frameworks = TargetFrameworks;
             foreach( var framework in TargetFrameworks.AtomicTraits )
             {
-                foreach( var condition in e.AncestorsAndSelf()
+                foreach( var (E, C) in e.AncestorsAndSelf()
                                        .Select( x => (E: x, C: (string)x.Attribute( "Condition" )) )
                                        .Where( x => x.C != null ) )
                 {
-                    bool? include = evaluator.EvalFinalResult( m, condition.C, f => f == "$(TargetFramework)" ? framework.ToString() : null );
+                    bool? include = evaluator.EvalFinalResult( m, C, f => f == "$(TargetFramework)" ? framework.ToString() : null );
                     if( include == null )
                     {
-                        m.Error( $"Unable to evaluate condition of {condition.E}." );
+                        m.Error( $"Unable to evaluate condition of {E}." );
                         return null;
                     }
                     if( include == false )

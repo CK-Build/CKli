@@ -63,9 +63,9 @@ namespace CK.Env.Plugins
         [CommandMethod]
         public bool Pull( IActivityMonitor m )
         {
-            var r = Folder.Pull( m );
-            if( !r.Success ) return false;
-            return !r.ReloadNeeded || GetPrimarySolution( m, true ) != null;
+            var (Success, ReloadNeeded) = Folder.Pull( m );
+            if( !Success ) return false;
+            return !ReloadNeeded || GetPrimarySolution( m, true ) != null;
         }
 
         /// <summary>
@@ -137,7 +137,7 @@ namespace CK.Env.Plugins
         public IEnumerable<string> GetSolutionNames( IActivityMonitor monitor )
         {
             var a = GetAllSolutions( monitor );
-            return a == null ? null : a.Select( s => s.UniqueSolutionName );
+            return a?.Select( s => s.UniqueSolutionName );
         }
 
         /// <summary>

@@ -249,8 +249,7 @@ namespace CK.NuGetClient
         IArtifactRepository IArtifactTypeFactory.FindOrCreate( IActivityMonitor m, IArtifactRepositoryInfo info )
         {
             if( info == null ) throw new ArgumentNullException( nameof( info ) );
-            var fInfo = info as INuGetFeedInfo;
-            if( fInfo == null ) return null;
+            if( !(info is INuGetFeedInfo fInfo) ) return null;
             return FindOrCreate( fInfo );
         }
     }

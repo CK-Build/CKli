@@ -68,8 +68,10 @@ namespace CK.Env.Plugins
 
         protected YamlMapping CreateKeyValue( string key, string value )
         {
-            var kv = new YamlMapping();
-            kv[key] = new YamlValue( value );
+            var kv = new YamlMapping
+            {
+                [key] = new YamlValue( value )
+            };
             return kv;
         }
 

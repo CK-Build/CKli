@@ -29,18 +29,12 @@ namespace CK.Env
             IDependentSolutionContext ctx,
             Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
         {
-            if( zeroBuilder == null ) throw new ArgumentNullException( nameof( zeroBuilder ) );
-            if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
-            if( driverFinder == null ) throw new ArgumentNullException( nameof( driverFinder ) );
-            if( artifacts == null ) throw new ArgumentNullException( nameof( artifacts ) );
-            if( localFeedProvider == null ) throw new ArgumentNullException( nameof( localFeedProvider ) );
-
-            ZeroBuilder = zeroBuilder;
+            ZeroBuilder = zeroBuilder ?? throw new ArgumentNullException( nameof( zeroBuilder ) );
             _type = type;
-            _artifacts = artifacts;
-            _localFeedProvider = localFeedProvider;
-            DependentSolutionContext = ctx;
-            DriverFinder = driverFinder;
+            _artifacts = artifacts ?? throw new ArgumentNullException( nameof( artifacts ) );
+            _localFeedProvider = localFeedProvider ?? throw new ArgumentNullException( nameof( localFeedProvider ) );
+            DependentSolutionContext = ctx ?? throw new ArgumentNullException( nameof( ctx ) );
+            DriverFinder = driverFinder ?? throw new ArgumentNullException( nameof( driverFinder ) );
             _packagesVersion = new Dictionary<string, SVersion>();
             _upgrades = new List<UpdatePackageInfo>[ctx.Solutions.Count];
             _targetVersions = new SVersion[ctx.Solutions.Count];

@@ -153,7 +153,7 @@ namespace CK.Env.MSBuild
             return false;
         }
 
-        static internal Token TryParseNumeric( StringMatcher m )
+        internal static Token TryParseNumeric( StringMatcher m )
         {
             int start = m.StartIndex;
             ulong uL = 0UL;
