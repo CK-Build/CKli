@@ -27,7 +27,7 @@ namespace CKli
             initializer.Services.Add( this );
         }
 
-        public INuGetClient NuGetClient => _nuGetClient;       
+        public INuGetClient NuGetClient => _nuGetClient;
 
         void IDisposable.Dispose()
         {

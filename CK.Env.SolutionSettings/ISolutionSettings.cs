@@ -50,6 +50,7 @@ namespace CK.Env
         /// </summary>
         IReadOnlyCollection<string> RemoveNuGetSourceNames { get; }
 
+
         /// <summary>
         /// Gets the repository where produced artifacts must be pushed.
         /// </summary>

@@ -40,6 +40,11 @@ namespace CKli
         /// Gets the <see cref="XBranch"/> that is the direct parent.
         /// </summary>
         public new XBranch Parent => (XBranch)base.Parent;
+        /// <summary>
+        /// Gets a semicolon separated list of project path that are npm projects to publish.
+        /// These path should be valid path
+        /// </summary>
+        public string NpmProjectsPathToPublish { get; private set; }
 
         /// <summary>
         /// Gets whether <see cref="CK.Env.MSBuild.Solution.TestProjects"/> must be added to <see cref="CK.Env.MSBuild.Solution.PublishedProjects"/>.
