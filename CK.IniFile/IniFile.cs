@@ -1,138 +1,74 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace CK.IniFile
 {
-    /// <summary>
-    /// In-memory representation of an INI file.
-    /// </summary>
-    /// <remarks>
-    /// <para><see cref="IniFile"/> is a central class of MadMilkman.Ini component.</para>
-    /// <para>To define an INI file's format use <see cref="IniOptions"/> object.</para>
-    /// <para>To load (read) an INI file from a file's path or a stream use <see cref="O:MadMilkman.Ini.IniFile.Load">IniFile.Load</see> methods.</para>
-    /// <para>To save (write) an INI file to a file's path or a stream use <see cref="O:MadMilkman.Ini.IniFile.Save">IniFile.Save</see> methods.</para>
-    /// <para>To view INI file's structure representation see <see href="c49dc3a5-866f-4d2d-8f89-db303aceb5fe.htm#diagram" target="_self">IniFile's Content Hierarchy Diagram</see>.</para>
-    /// </remarks>
-    /// <seealso href="http://en.wikipedia.org/wiki/INI_file">INI file format on Wikipedia.</seealso>
-    public sealed class IniFile
+    class IniFile<T> : ICollection<T>
+        where T : IniLine
     {
+        readonly List<T> _lines;
+        public T this[int index] { get => _lines[index]; set => _lines[index] = value; }
 
-        /// <summary>
-        /// Initializes a new instance of <see cref="IniFile"/> class.
-        /// </summary>
-        public IniFile() : this( new IniOptions() ) { }
+        public int Count => _lines.Count;
 
-        /// <summary>
-        /// Initializes a new instance of <see cref="IniFile"/> class.
-        /// </summary>
-        /// <param name="options"><see cref="IniOptions"/> object that defines INI file's format, settings for both <see cref="O:MadMilkman.Ini.IniFile.Load">Load</see> and <see cref="O:MadMilkman.Ini.IniFile.Save">Save</see> methods.</param>
-        public IniFile( IniOptions options )
+        IniFile( IniFormat format )
         {
-            if( options == null )
-                throw new ArgumentNullException( "options" );
-
-            this.options = new IniOptions( options );
-            sections = new IniSectionCollection( this, options.SectionDuplicate, options.SectionNameCaseSensitive );
+            Format = format;
+            _lines = new List<T>();
         }
+        public IniFormat Format { get; }
 
-        /// <summary>
-        /// Gets file's sections.
-        /// </summary>
-        public Tuple<char,char> Sections { get { return sections; } }
+        public bool IsReadOnly => false;
 
-        /// <summary>
-        /// Gets the mappings of <see cref="IniKey.Value"/>s and their results, used in <see cref="O:MadMilkman.Ini.IniKey.TryParseValue"/> methods.
-        /// </summary>
-        public IniValueMappings ValueMappings
+        
+
+        public static IniFile<T> FromText( string text, IniFormat format )
         {
-            get
+            if( format.SupportSection )
             {
-                if( valueMappings == null )
-                    valueMappings = new IniValueMappings();
-                return valueMappings;
+                throw new NotImplementedException();
             }
+            var output = new IniFile<T>( format );
+            string[] lines = Regex.Split( text, "\r\n|\r|\n" );
+            for( int i = 0; i < lines.Length; i++ )
+            {
+                
+            }
+            return output;
         }
 
-        internal bool HasValueMappings { get { return valueMappings != null; } }
-
-        /// <summary>
-        /// Loads a file from a path.
-        /// </summary>
-        /// <param name="filePath">Path from which to load a file.</param>
-        public void Load( string filePath )
+        public void Add( T item )
         {
-            if( filePath == null )
-                throw new ArgumentNullException( "filePath" );
-
-            using( Stream fileStream = File.Open( filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite ) )
-                Load( fileStream );
+            if( Format.Duplication != IniDuplication.Allowed && _lines.Any( p => p.Key == item.Key ) )
+            {
+                throw new InvalidOperationException( "Format does not allow duplicate Key." );
+            }
+            _lines.Add( item );
         }
 
-        /// <summary>
-        /// Loads a file from a stream.
-        /// </summary>
-        /// <param name="fileStream">Stream from which to load a file.</param>
-        public void Load( Stream fileStream )
+        public void Clear() => _lines.Clear();
+
+
+        public bool Contains( T item ) => _lines.Contains( item );
+
+
+        public void CopyTo( T[] array, int arrayIndex ) => _lines.CopyTo( array, arrayIndex );
+
+
+        public bool Remove( T item ) => _lines.Remove( item );
+
+        public int RemoveByKey( string key )
         {
-            if( fileStream == null )
-                throw new ArgumentNullException( "fileStream" );
-
-            Load( new StreamReader( fileStream, options.Encoding ) );
-
-            if( fileStream.CanSeek )
-                fileStream.Seek( 0, SeekOrigin.Begin );
+            return _lines.RemoveAll( p => p.Key == key );
         }
 
-        /// <summary>
-        /// Loads a file from a reader.
-        /// </summary>
-        /// <param name="fileReader">Reader from which to load a file.</param>
-        public void Load( TextReader fileReader )
-        {
-            if( fileReader == null )
-                throw new ArgumentNullException( "fileReader" );
+        public IEnumerator<T> GetEnumerator() => _lines.GetEnumerator();
 
-            new IniReader( options ).Read( this, fileReader );
-        }
-
-        /// <summary>
-        /// Saves a file to a path.
-        /// </summary>
-        /// <param name="filePath">Path to which to save a file.</param>
-        public void Save( string filePath )
-        {
-            if( filePath == null )
-                throw new ArgumentNullException( "filePath" );
-
-            using( Stream fileStream = File.Create( filePath ) )
-                Save( fileStream );
-        }
-
-        /// <summary>
-        /// Saves a file to a stream.
-        /// </summary>
-        /// <param name="fileStream">Stream to which to save a file.</param>
-        public void Save( Stream fileStream )
-        {
-            if( fileStream == null )
-                throw new ArgumentNullException( "fileStream" );
-
-            Save( new StreamWriter( fileStream, options.Encoding ) );
-
-            if( fileStream.CanSeek )
-                fileStream.Seek( 0, SeekOrigin.Begin );
-        }
-
-        /// <summary>
-        /// Saves a file to a writer.
-        /// </summary>
-        /// <param name="fileWriter">Writer to which to save a file.</param>
-        public void Save( TextWriter fileWriter )
-        {
-            if( fileWriter == null )
-                throw new ArgumentNullException( "fileWriter" );
-
-            new IniWriter( options ).Write( this, fileWriter );
-        }
+        IEnumerator IEnumerable.GetEnumerator() => _lines.GetEnumerator();
     }
 }
