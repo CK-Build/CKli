@@ -389,7 +389,10 @@ namespace CK.Env.MSBuild
                         var primary = sortables[s.PrimarySolution];
                         primary.AddSecondaryProjects( GetProjectItems( s, strategy ) );
                     }
-                    else sortables.Add( s, new SortableSolutionFile( s, GetProjectItems( s, strategy ) ) );
+                    else
+                    {
+                        sortables.Add( s, new SortableSolutionFile( s, GetProjectItems( s, strategy ) ) );
+                    }
                 }
             }
 
@@ -503,7 +506,10 @@ namespace CK.Env.MSBuild
                 {
                     m.Warn( $"Dependency analyzer created on {solutionCount} solutions from more than one branch: {branchNames.Concatenate()}" );
                 }
-                else if( branchNames.Count > 0 ) uniqueBranchName = branchNames[0];
+                else if( branchNames.Count > 0 )
+                {
+                    uniqueBranchName = branchNames[0];
+                }
             }
             using( m.OpenDebug( "Creating Package for all Published projects in all solutions." ) )
             {

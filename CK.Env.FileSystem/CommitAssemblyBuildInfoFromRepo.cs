@@ -25,7 +25,10 @@ namespace CK.Env
             {
                 FileVersion = info.ValidReleaseTag.ToStringFileVersion( false );
             }
-            else FileVersion = CSemVer.InformationalVersion.ZeroFileVersion;
+            else
+            {
+                FileVersion = CSemVer.InformationalVersion.ZeroFileVersion;
+            }
         }
 
         public string BuildConfiguration { get; }

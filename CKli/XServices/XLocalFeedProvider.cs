@@ -110,7 +110,10 @@ namespace CKli
                     string localStore = this.GetCKSetupStorePath();
                     return target.PushAsync( m, new CKSetupArtifactLocalSet( artifacts, localStore ) ).GetAwaiter().GetResult();
                 }
-                else throw new InvalidOperationException( $"Unhandled repository type: {target.Info.UniqueArtifactRepositoryName}" );
+                else
+                {
+                    throw new InvalidOperationException( $"Unhandled repository type: {target.Info.UniqueArtifactRepositoryName}" );
+                }
             }
 
             public void Remove( IActivityMonitor m, IEnumerable<ArtifactInstance> artifacts )

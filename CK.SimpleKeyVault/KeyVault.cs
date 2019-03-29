@@ -104,7 +104,10 @@ namespace CK.SimpleKeyVault
                     }
                     b.AppendLine( kv.Key );
                     w.Write( kv.Key );
-                    if( kv.Value == null ) w.Write( false );
+                    if( kv.Value == null )
+                    {
+                        w.Write( false );
+                    }
                     else
                     {
                         w.Write( true );

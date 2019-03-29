@@ -74,7 +74,11 @@ namespace CK.Env
                     return false;
                 }
             }
-            else _typeRegister.Add( n, t );
+            else
+            {
+                _typeRegister.Add( n, t );
+            }
+
             return true;
         }
 

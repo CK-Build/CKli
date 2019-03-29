@@ -209,7 +209,11 @@ namespace CK.Env.MSBuild
                 {
                     _curToken = Token.And;
                 }
-                else _curToken = new Token( TokenType.String, s );
+                else
+                {
+                    _curToken = new Token( TokenType.String, s );
+                }
+
                 return true;
             }
             return false;

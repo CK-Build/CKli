@@ -116,8 +116,15 @@ namespace CKli
                         hasPluginInitError = true;
                         pluginInfo = "Plugin initialization error.";
                     }
-                    else pluginInfo = $"({git.PluginManager.BranchPlugins[git.CurrentBranchName].Count} plugins)";
-                    if( git.CheckCleanCommit( m ) ) m.CloseGroup( "Up-to-date. " + pluginInfo );
+                    else
+                    {
+                        pluginInfo = $"({git.PluginManager.BranchPlugins[git.CurrentBranchName].Count} plugins)";
+                    }
+
+                    if( git.CheckCleanCommit( m ) )
+                    {
+                        m.CloseGroup( "Up-to-date. " + pluginInfo );
+                    }
                     else
                     {
                         dirty.Add( git.SubPath );
@@ -144,7 +151,11 @@ namespace CKli
                         }
                     }
                 }
-                else m.Info( $"All {gitFoldersCount} git folders are on '{byActiveBranch.First().Key}' branch." );
+                else
+                {
+                    m.Info( $"All {gitFoldersCount} git folders are on '{byActiveBranch.First().Key}' branch." );
+                }
+
                 if( hasPluginInitError )
                 {
                     m.Error( "At least one git folder is unable to initialize its plugins." );

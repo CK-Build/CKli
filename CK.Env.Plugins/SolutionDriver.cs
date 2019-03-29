@@ -326,7 +326,10 @@ namespace CK.Env.Plugins
             {
                 if( !UpgradeLocalPackages( monitor, false ) ) return false;
             }
-            else if( !LocalCommit( monitor ) ) return false;
+            else if( !LocalCommit( monitor ) )
+            {
+                return false;
+            }
 
             return DoBuild( monitor, withUnitTest, null, false );
         }

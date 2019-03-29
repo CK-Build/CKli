@@ -31,7 +31,10 @@ namespace CK.Env.Tests
                     node.Should().NotBeNull();
                     node.ToString().Should().Be( d );
                 }
-                else node.Should().BeNull();
+                else
+                {
+                    node.Should().BeNull();
+                }
             }
         }
 

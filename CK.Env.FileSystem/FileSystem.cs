@@ -196,6 +196,7 @@ namespace CK.Env
             var fDest = GetWritableDestination( m, ref destination );
             if( fDest == null ) return false;
             using( m.OpenInfo( $"{(fDest.Exists ? "Replacing" : "Creating")} {destination}." ) )
+            {
                 try
                 {
                     File.WriteAllText( fDest.PhysicalPath, content );
@@ -206,6 +207,7 @@ namespace CK.Env
                     m.Error( ex );
                     return false;
                 }
+            }
         }
 
         /// <summary>
@@ -224,6 +226,7 @@ namespace CK.Env
             IFileInfo fDest = GetWritableDestination( m, ref destination );
             if( fDest == null ) return false;
             using( m.OpenInfo( $"{(fDest.Exists ? "Replacing" : "Creating")} {destination}." ) )
+            {
                 try
                 {
                     using( var d = new FileStream( fDest.PhysicalPath, FileMode.Create, FileAccess.Write, FileShare.Read ) )
@@ -237,6 +240,7 @@ namespace CK.Env
                     m.Fatal( ex );
                     return false;
                 }
+            }
         }
 
         /// <summary>

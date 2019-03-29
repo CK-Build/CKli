@@ -354,7 +354,11 @@ namespace CK.Env
             using( m.OpenInfo( $"Pulling branch '{CurrentBranchName}' in '{SubPath}'." ) )
             {
                 if( !FetchBranches( m )
-                    || !CheckCleanCommit( m ) ) return (false, false);
+                    || !CheckCleanCommit( m ) )
+                {
+                    return (false, false);
+                }
+
                 try
                 {
                     return DoPull( m, false, FileSystem.ServerMode ? MergeFileFavor.Theirs : MergeFileFavor.Ours );
@@ -784,9 +788,18 @@ namespace CK.Env
                 {
                     bool messageUpdate = message != _git.Head.Tip.Message;
                     bool dateUpdate = date.Value != _git.Head.Tip.Committer.When;
-                    if( messageUpdate && dateUpdate ) m.Info( "Updating message and date." );
-                    else if( dateUpdate ) m.Info( "Updating commit date." );
-                    else if( messageUpdate ) m.Info( "Only updating message." );
+                    if( messageUpdate && dateUpdate )
+                    {
+                        m.Info( "Updating message and date." );
+                    }
+                    else if( dateUpdate )
+                    {
+                        m.Info( "Updating commit date." );
+                    }
+                    else if( messageUpdate )
+                    {
+                        m.Info( "Only updating message." );
+                    }
                     else
                     {
                         m.CloseGroup( "Working folder is up-to-date." );
@@ -1146,7 +1159,10 @@ namespace CK.Env
                         }
                         CheckoutWithPlugins( m, master );
                     }
-                    else m.Trace( $"Already on {World.MasterBranchName}." );
+                    else
+                    {
+                        m.Trace( $"Already on {World.MasterBranchName}." );
+                    }
 
                     var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
                     var r = _git.Merge( bDevelop, merger, new MergeOptions
@@ -1489,7 +1505,11 @@ namespace CK.Env
                         _branches[name] = new CommitFolder( name, b.Tip );
                     }
                 }
-                else _branches.Add( name, new CommitFolder( name, b.Tip ) );
+                else
+                {
+                    _branches.Add( name, new CommitFolder( name, b.Tip ) );
+                }
+
                 return true;
             }
 

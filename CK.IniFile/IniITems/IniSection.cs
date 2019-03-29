@@ -68,8 +68,10 @@ namespace CK.IniFile.IniITems
             this.keys = new IniKeyCollection( parentFile, this, parentFile.options.KeyDuplicate, parentFile.options.KeyNameCaseSensitive );
 
             if( keys != null )
+            {
                 foreach( IniKey key in keys )
                     this.keys.Add( key );
+            }
         }
 
         // Constructor used by IniReader.
@@ -123,8 +125,10 @@ namespace CK.IniFile.IniITems
         private static IEnumerable<IniKey> GetIniKeysFromKeyValuePairs( IniFile parentFile, IEnumerable<KeyValuePair<string, string>> nameValuePairs )
         {
             if( nameValuePairs != null )
+            {
                 foreach( KeyValuePair<string, string> pair in nameValuePairs )
                     yield return new IniKey( parentFile, pair );
+            }
         }
     }
 }

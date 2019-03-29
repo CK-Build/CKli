@@ -95,7 +95,10 @@ namespace CKli
                         {
                             m.Warn( $"NotPublishedProject '{u}' not found in solution PublishedProjects: {s.PublishedProjects.Select( p => p.Name ).Concatenate()}." );
                         }
-                        else s.PublishedProjects.RemoveAt( idxU );
+                        else
+                        {
+                            s.PublishedProjects.RemoveAt( idxU );
+                        }
                     }
                 }
                 HandleCKSetupComponentProjects( m, s );
@@ -117,7 +120,10 @@ namespace CKli
                     {
                         m.Warn( $"CKSetupComponentProjects '{c}' not found in solution Projects: {s.AllProjects.Select( project => project.Name ).Concatenate()}." );
                     }
-                    else s.CKSetupComponentProjects.Add( p );
+                    else
+                    {
+                        s.CKSetupComponentProjects.Add( p );
+                    }
                 }
             }
         }

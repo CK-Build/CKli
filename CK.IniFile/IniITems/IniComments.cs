@@ -35,9 +35,11 @@ namespace CK.IniFile.IniITems
             set
             {
                 if( value != null && _type == IniCommentType.Leading )
+                {
                     _text = value.Replace( "\r\n", " " )
                                      .Replace( "\n", " " )
                                      .Replace( "\r", " " );
+                }
                 else
                     _text = value;
             }

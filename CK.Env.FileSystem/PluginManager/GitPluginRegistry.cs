@@ -189,7 +189,10 @@ namespace CK.Env
             var parameters = new object[desc.Parameters.Length];
             for( int i = 0; i < parameters.Length; ++i )
             {
-                if( i == desc.BranchParameterIdx ) parameters[i] = _branchesPath.AppendPart( branchName );
+                if( i == desc.BranchParameterIdx )
+                {
+                    parameters[i] = _branchesPath.AppendPart( branchName );
+                }
                 else
                 {
                     var pType = desc.Parameters[i].ParameterType;

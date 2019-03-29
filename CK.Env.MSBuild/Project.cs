@@ -307,7 +307,10 @@ namespace CK.Env.MSBuild
                         ++changeCount;
                         m.Trace( $"Update in {ToString()}: {packageId} from {currentVersion} to {sV}." );
                     }
-                    else m.Trace( $"Preserving existing version {currentVersion} for {packageId} in {ToString()} (skipped version is {sV})." );
+                    else
+                    {
+                        m.Trace( $"Preserving existing version {currentVersion} for {packageId} in {ToString()} (skipped version is {sV})." );
+                    }
                 }
             }
              // Handle creation if needed.
@@ -510,7 +513,10 @@ namespace CK.Env.MSBuild
                         m.Warn( $"Useless PackageReference (applies to undeclared frameworks): {p.Origin}." );
                         uselessDeps.Add( p.Origin );
                     }
-                    else deps.Add( new DeclaredPackageDependency( this, p.PackageId, versionLocked, version, p.Origin, propertyDef, frameworks ) );
+                    else
+                    {
+                        deps.Add( new DeclaredPackageDependency( this, p.PackageId, versionLocked, version, p.Origin, propertyDef, frameworks ) );
+                    }
                 }
                 else
                 {
@@ -534,7 +540,10 @@ namespace CK.Env.MSBuild
                         m.Warn( $"Useless ProjectReference (applies to undeclared frameworks): {p.Origin}." );
                         uselessDeps.Add( p.Origin );
                     }
-                    else projs.Add( new ProjectToProjectDependency( this, target, frameworks, p.Origin ) );
+                    else
+                    {
+                        projs.Add( new ProjectToProjectDependency( this, target, frameworks, p.Origin ) );
+                    }
                 }
             }
             _dependencies = new Dependencies( deps, projs, uselessDeps );

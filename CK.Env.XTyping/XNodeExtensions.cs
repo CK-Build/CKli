@@ -34,7 +34,10 @@ namespace CK.Env
             while( current != null )
             {
                 XElement next = null;
-                if( predicate( current ) ) yield return current;
+                if( predicate( current ) )
+                {
+                    yield return current;
+                }
                 else
                 {
                     // Dive into the children (if any).

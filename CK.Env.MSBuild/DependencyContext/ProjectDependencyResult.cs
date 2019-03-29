@@ -104,7 +104,10 @@ namespace CK.Env.MSBuild
             {
                 var count = ByVersion.Count();
                 Debug.Assert( count > 0 );
-                if( count == 1 ) monoVersions.Add( (ByVersion.First().First().RawPackageDependency.Package, ByVersion.First().Select( r => r.SourceProject ).Distinct().ToArray() ) );
+                if( count == 1 )
+                {
+                    monoVersions.Add( (ByVersion.First().First().RawPackageDependency.Package, ByVersion.First().Select( r => r.SourceProject ).Distinct().ToArray() ) );
+                }
                 else
                 {
                     foreach( var v in ByVersion )

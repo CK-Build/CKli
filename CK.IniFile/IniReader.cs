@@ -76,12 +76,14 @@ namespace CK.IniFile
         private void ReadTrailingComment( int leftIndention, string text )
         {
             if( currentTrailingComment == null )
+            {
                 currentTrailingComment = new IniComment( IniCommentType.Trailing )
                 {
                     EmptyLinesBefore = currentEmptyLinesBefore,
                     LeftIndentation = leftIndention,
                     Text = text
                 };
+            }
             else
                 currentTrailingComment.Text += Environment.NewLine + text;
         }
@@ -169,14 +171,18 @@ namespace CK.IniFile
 
             /* MZ(2016-04-04): Fixed issue with trimming values. */
             if( valueEndIndex == -1 )
+            {
                 key.Value = lineLeftover;
+            }
             else if( valueEndIndex == 0 )
             {
                 key.Value = string.Empty;
                 key.LeadingComment.Text = lineLeftover.Substring( 1 );
             }
             else
+            {
                 ReadValueLeadingComment( lineLeftover, valueEndIndex, key );
+            }
         }
 
         /* MZ(2016-02-23): Added support for quoted values which can contain comment's starting characters. */
@@ -184,11 +190,15 @@ namespace CK.IniFile
         {
             int quoteEndIndex = lineLeftover.IndexOf( '"', 1 );
             if( lineLeftover[0] == '"' && quoteEndIndex != -1 )
+            {
                 while( quoteEndIndex > potentialCommentIndex && potentialCommentIndex != -1 )
                     potentialCommentIndex = lineLeftover.IndexOf( (char)options.CommentStarter, ++potentialCommentIndex );
+            }
 
             if( potentialCommentIndex == -1 )
+            {
                 key.Value = lineLeftover.TrimEnd();
+            }
             else
             {
                 key.LeadingComment.Text = lineLeftover.Substring( potentialCommentIndex + 1 );

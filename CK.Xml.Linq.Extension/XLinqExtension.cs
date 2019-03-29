@@ -103,7 +103,10 @@ namespace System.Xml.Linq
             for( int i = 0; i < currentText.Length; ++i )
             {
                 char car = currentText[i];
-                if( car == '\n' ) ++newLineCount;
+                if( car == '\n' )
+                {
+                    ++newLineCount;
+                }
                 else if( car != '\r' && car != '\t' && car != ' ' )
                 {
                     hasActualText = true;

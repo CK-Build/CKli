@@ -55,7 +55,10 @@ namespace CK.Env
                                 c = new PluginCollection<IGitBranchPlugin>( _manager, branchName );
                                 _branchPlugins.Add( branchName, ensureFirstLoad ? c.EnsureFirstLoad() : c );
                             }
-                            else c.EnsureFirstLoad();
+                            else
+                            {
+                                c.EnsureFirstLoad();
+                            }
                         }
                         catch( Exception ex )
                         {

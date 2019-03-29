@@ -28,7 +28,10 @@ namespace CK.Env.Plugins
                     _yamlStream = YamlStream.Load( new StringReader( input ) );
                     if( _yamlStream.Count > 0 ) _doc = _yamlStream[0];
                     else _yamlStream.Add( (_doc = new YamlDocument()) );
-                    if( _doc.Contents == null ) _doc.Contents = (_firstMapping = new YamlMapping());
+                    if( _doc.Contents == null )
+                    {
+                        _doc.Contents = (_firstMapping = new YamlMapping());
+                    }
                     else
                     {
                         _firstMapping = _doc.Contents as YamlMapping;
