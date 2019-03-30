@@ -32,9 +32,16 @@ namespace CK.Env.Plugins.SolutionFiles
             _solutionDriver.OnZeroBuildProject += OnZeroBuildProject;
         }
 
-        void OnZeroBuildProject( object sender, EventMonitoredArgs e )
+        void OnZeroBuildProject( object sender, ZeroBuildEventArgs e )
         {
-            EnsureFeed( e.Monitor, "ZeroBuild-Feed", _localFeedProvider.ZeroBuild.PhysicalPath );
+            if( e.IsStarting )
+            {
+                EnsureFeed( e.Monitor, "ZeroBuild-Feed", _localFeedProvider.ZeroBuild.PhysicalPath );
+            }
+            else
+            {
+                RemoveFeed( e.Monitor, "ZeroBuild-Feed" );
+            }
             Save( e.Monitor, true );
         }
 

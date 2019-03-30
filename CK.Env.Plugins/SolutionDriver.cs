@@ -169,9 +169,10 @@ namespace CK.Env.Plugins
         public event EventHandler<EventMonitoredArgs> OnBuildFailed;
 
         /// <summary>
-        /// Fires before <see cref="ZeroBuildProject"/> actually builds a project in ZeroVersion.
+        /// Fires before and after <see cref="ZeroBuildProject"/> actually builds a
+        /// project in ZeroVersion.
         /// </summary>
-        public event EventHandler<EventMonitoredArgs> OnZeroBuildProject;
+        public event EventHandler<ZeroBuildEventArgs> OnZeroBuildProject;
 
         /// <summary>
         /// Builds the given project (that must be handled by this driver otherwise an exception is thrown).
@@ -219,8 +220,15 @@ namespace CK.Env.Plugins
             FileSystem.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "bin" ) );
             FileSystem.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "obj" ) );
 
-            OnZeroBuildProject?.Invoke( this, new EventMonitoredArgs( monitor ) );
-            return ProcessRunner.Run( monitor, path, "dotnet", args );
+            OnZeroBuildProject?.Invoke( this, new ZeroBuildEventArgs( monitor, true, info ) );
+            try
+            {
+                return ProcessRunner.Run( monitor, path, "dotnet", args );
+            }
+            finally
+            {
+                OnZeroBuildProject?.Invoke( this, new ZeroBuildEventArgs( monitor, false, info ) );
+            }
         }
 
         Project FindProject( IActivityMonitor monitor, Solution primary, string solutionName, string projectName, bool throwOnNotFound )
