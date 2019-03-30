@@ -173,6 +173,7 @@ namespace CK.Env.MSBuild
             return _file;
         }
 
+
         /// <summary>
         /// Gets the Sdk attribute of the primary project file.
         /// Null if the project can not be read.

@@ -31,7 +31,9 @@ namespace CKli
                     branch.Parent.Name + ".sln" )
         {
             if( !(initializer.Parent is XBranch) ) throw new Exception( "A primary solution must be a direct child of a Git branch." );
+            // Will be used to load NpmProjects.
             _xElement = initializer.Element;
+            // The primary solution is available to siblings (ie. up to the end of the parent git branch).
             initializer.Services.Add( this );
             branch.Parent.GitFolder.PluginManager.RegisterSettings( solutionSettings.SolutionSettings, branch.Name );
             foreach( var type in solutionSettings.SolutionSettings.Plugins )
@@ -76,6 +78,7 @@ namespace CKli
                                                     m,
                                                     GetSolutionFilePath( projectToBranchName ),
                                                     null,
+                                                    _xElement.Elements( "NpmProjects" ).Elements( "NpmProject" ).Select( e => new NpmProjectDescription( e ) ),
                                                     SolutionSpecialType.None,
                                                     reload );
             if( loaded )

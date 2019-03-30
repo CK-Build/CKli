@@ -40,8 +40,16 @@ namespace CK.Env
 
             public XTypedObject Parent { get; }
 
+            /// <summary>
+            /// Gets the service container for siblings and children elements.
+            /// Service added to this container will be available to siblings and children.
+            /// </summary>
             public ISimpleServiceContainer Services { get; }
 
+            /// <summary>
+            /// Gets the service container for children elements only.
+            /// Service added to this container will be available only to children.
+            /// </summary>
             public ISimpleServiceContainer ChildServices { get; }
 
             public IDictionary<object, object> InitializationState
