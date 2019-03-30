@@ -24,6 +24,7 @@ namespace CKli
             central.Register( this );
             initializer.ChildServices.Add( this );
             GitFolder = FileSystem.EnsureGitFolder( initializer.Monitor, central.World, FullPath, Url );
+            GitFolder.IsPublic = IsPublic;
         }
 
         /// <summary>
@@ -40,6 +41,11 @@ namespace CKli
         /// Gets the url of the remote repository.
         /// </summary>
         public string Url { get; private set; }
+
+        /// <summary>
+        /// Gets whether this repository is public (Open Source) or not.
+        /// </summary>
+        public bool IsPublic { get; private set; }
 
         /// <summary>
         /// Gets the develop branch (<see cref="IWorldName.DevelopBranchName"/>).

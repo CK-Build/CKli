@@ -88,6 +88,12 @@ namespace CK.Env
         public KnownGitProvider KnownGitProvider { get; }
 
         /// <summary>
+        /// Gets or sets whether the Git repository is public or private.
+        /// Defaults to false.
+        /// </summary>
+        public bool IsPublic { get; set; }
+
+        /// <summary>
         /// Gets the service container for this GitFolder.
         /// </summary>
         public SimpleServiceContainer ServiceContainer { get; }
@@ -694,12 +700,6 @@ namespace CK.Env
         public bool CanAmendCommit => (_git.Head.TrackingDetails.AheadBy ?? 1) > 0;
 
         /// <summary>
-        /// Gets or sets whether the Git repository is public or private.
-        /// Defaults to false.
-        /// </summary>
-        public bool IsPublic { get; set; }
-
-        /// <summary>
         /// Commits any pending changes.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -900,6 +900,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
+        [CommandMethod]
         public bool ResetHard( IActivityMonitor m )
         {
             using( m.OpenInfo( $"Reset --hard changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )

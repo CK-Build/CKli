@@ -30,13 +30,14 @@ namespace CK.BuildSystem.Appveyor
             YamlMapping firstMapping = GetFirstMapping( m, true );
             if( firstMapping == null ) return;
 
-            if( !Folder.IsPublic )//We don't use AppVeyor for private repositories.
+            // We don't use AppVeyor for private repositories.
+            if( !Folder.IsPublic ) 
             {
                 m.Log(LogLevel.Info, "The project is private, so we don't use Appveyor and the Appveyor.yml is not needed.");
                 Delete(m);
                 return;
             }
-            //We use AppVeyor when the repository is public.
+            // We currently always use AppVeyor when the repository is public.
             YamlMapping env = FindOrCreateYamlElement( m, firstMapping, "environment" );
             if( env == null ) return;
             string appveyorSecure = _secretStore.GetSecretKey( m, "APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY", false );
@@ -48,6 +49,7 @@ namespace CK.BuildSystem.Appveyor
             {
                 m.Warn( "Update of CODECAKEBUILDER_SECRET_KEY secure key has been skipped." );
             }
+            // Remove obsolete environment variables definitions.
             env.Remove( "NUGET_API_KEY" );
             env.Remove( "MYGET_RELEASE_API_KEY" );
             env.Remove( "MYGET_PREVIEW_API_KEY" );
@@ -79,6 +81,7 @@ namespace CK.BuildSystem.Appveyor
 
             CreateOrUpdate( m, YamlMappingToString( m ) );
         }
+
         static void EnsureDefaultBranches( YamlMapping firstMapping )
         {
             YamlElement branches = firstMapping["branches"];
