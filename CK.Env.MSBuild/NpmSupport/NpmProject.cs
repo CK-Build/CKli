@@ -28,25 +28,24 @@ namespace CK.Env.MSBuild
         {
             var fullPath = s.SolutionFolderPath.Combine( desc.Folder );
             var dir = s.GitFolder.FileSystem.GetDirectoryContents( fullPath );
+            var packagePath = fullPath.AppendPart( "package.json" );
             if( !dir.Exists )
             {
-                m.Error( $"Folder not found for expected NPM project '{fullPath}'." );
-                return null;
+                m.Warn( $"Folder not found for expected NPM project '{fullPath}'." );
             }
-            var packagePath = fullPath.AppendPart( "package.json" );
-            var package = s.GitFolder.FileSystem.GetFileInfo( packagePath );
-            if( !package.Exists )
+            else
             {
-                m.Error( $"Unable to find package.json file for expected NPM package '{fullPath}'." );
-                return null;
+                var package = s.GitFolder.FileSystem.GetFileInfo( packagePath );
+                if( !package.Exists )
+                {
+                    m.Warn( $"Unable to find package.json file for expected NPM package '{fullPath}'." );
+                }
             }
-            //TODO: check that desc.IsPrivate == isPrivate in json.
-
             return new NpmProject( s, fullPath, packagePath, desc );
         }
 
         /// <summary>
-        /// Gets or sets whether the package is private (ie. not published).
+        /// Gets whether the package is private (ie. not published).
         /// Defaults to false.
         /// </summary>
         public bool IsPrivate => _desc.IsPrivate;

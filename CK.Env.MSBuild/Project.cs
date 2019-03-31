@@ -13,7 +13,7 @@ using System.Xml.XPath;
 namespace CK.Env.MSBuild
 {
     /// <summary>
-    /// Represents an actual project in a solution.
+    /// Represents an actual Visual Studio project in a solution.
     /// </summary>
     public class Project : ProjectBase
     {
@@ -79,7 +79,7 @@ namespace CK.Env.MSBuild
         }
 
         readonly MSBuildContext _ctx;
-        MSBuildContext.File _file;
+        MSBuildContext.ProjectFile _file;
         Dependencies _dependencies;
         NormalizedPath _primarySolutionRelativeFolderPath;
 
@@ -95,7 +95,7 @@ namespace CK.Env.MSBuild
         /// is created.
         /// This is null if an error occurred while loading.
         /// </summary>
-        public MSBuildContext.File ProjectFile => _file;
+        public MSBuildContext.ProjectFile ProjectFile => _file;
 
         /// <summary>
         /// Gets the folder path of this project. 
@@ -117,7 +117,7 @@ namespace CK.Env.MSBuild
             }
         }
 
-        internal MSBuildContext.File ReloadProjectFile( IActivityMonitor m )
+        internal MSBuildContext.ProjectFile ReloadProjectFile( IActivityMonitor m )
         {
             IsTestProject = false;
             _dependencies = new Dependencies();

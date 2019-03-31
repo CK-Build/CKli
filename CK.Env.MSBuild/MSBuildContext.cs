@@ -24,14 +24,14 @@ namespace CK.Env.MSBuild
         static readonly public CKTraitContext Traits = new CKTraitContext( "ProjectFileContext", ';' );
 
         /// <summary>
-        /// Defines import of a <see cref="File"/> from another File.
+        /// Defines import of a <see cref="ProjectFile"/> from another File.
         /// </summary>
         public struct Import
         {
             public readonly XElement ImportElement;
-            public readonly File ImportedFile;
+            public readonly ProjectFile ImportedFile;
 
-            internal Import( XElement e, File f )
+            internal Import( XElement e, ProjectFile f )
             {
                 ImportElement = e;
                 ImportedFile = f;
@@ -39,11 +39,26 @@ namespace CK.Env.MSBuild
         }
 
         /// <summary>
+        /// Package.json file.
+        /// </summary>
+        public sealed class NpmPackageFile
+        {
+            bool _hasChanged;
+
+            /// <summary>
+            /// Gets the file path in the <see cref="FileSystem"/>.
+            /// </summary>
+            public NormalizedPath Path { get; }
+
+            public JObject Document { get; }
+        }
+
+        /// <summary>
         /// Project Xml file.
         /// </summary>
-        public class File
+        public sealed class ProjectFile
         {
-            IReadOnlyList<File> _allFiles;
+            IReadOnlyList<ProjectFile> _allFiles;
             bool _hasChanged;
 
             /// <summary>
@@ -61,9 +76,9 @@ namespace CK.Env.MSBuild
             /// <summary>
             /// Gets a list starting with this one and all the imported files without duplicate.
             /// </summary>
-            public IReadOnlyList<File> AllFiles => _allFiles;
+            public IReadOnlyList<ProjectFile> AllFiles => _allFiles;
 
-            internal File( NormalizedPath p, XDocument d, List<Import> imports )
+            internal ProjectFile( NormalizedPath p, XDocument d, List<Import> imports )
             {
                 Path = p;
                 Document = d;
@@ -103,7 +118,7 @@ namespace CK.Env.MSBuild
 
             internal void Initialize()
             {
-                var start = new File[] { this };
+                var start = new ProjectFile[] { this };
                 _allFiles = start.Concat( Imports.SelectMany( i => i.ImportedFile.AllFiles ) )
                                  .Distinct().ToArray();
             }
@@ -146,7 +161,7 @@ namespace CK.Env.MSBuild
             }
         }
 
-        readonly Dictionary<NormalizedPath, File> _files;
+        readonly Dictionary<NormalizedPath, ProjectFile> _files;
         readonly Dictionary<NormalizedPath, SolutionTracker> _solutions;
 
         /// <summary>
@@ -156,7 +171,7 @@ namespace CK.Env.MSBuild
         public MSBuildContext( FileSystem fileSystem )
         {
             FileSystem = fileSystem;
-            _files = new Dictionary<NormalizedPath, File>();
+            _files = new Dictionary<NormalizedPath, ProjectFile>();
             _solutions = new Dictionary<NormalizedPath, SolutionTracker>();
         }
 
@@ -251,9 +266,9 @@ namespace CK.Env.MSBuild
             }
         }
 
-        internal File FindOrLoadProjectFile( IActivityMonitor m, NormalizedPath path )
+        internal ProjectFile FindOrLoadProjectFile( IActivityMonitor m, NormalizedPath path )
         {
-            if( _files.TryGetValue( path, out File f )  )
+            if( _files.TryGetValue( path, out ProjectFile f )  )
             {
                 return f;
             }
@@ -263,7 +278,7 @@ namespace CK.Env.MSBuild
                 {
                     XDocument content = FileSystem.GetFileInfo( path ).ReadAsXDocument();
                     var imports = new List<Import>();
-                    f = new File( path, content, imports );
+                    f = new ProjectFile( path, content, imports );
                     _files[path] = f;
                     var folder = path.RemoveLastPart();
                     imports.AddRange( content.Root.Descendants( "Import" )

@@ -15,17 +15,6 @@ namespace CK.Env.MSBuild
     public class NpmProjectDescription
     {
         /// <summary>
-        /// Initializes a new <see cref="NpmProjectDescription"/>.
-        /// </summary>
-        /// <param name="folderRelativePath">Relative path to the NPM project folder from the container solution folder.</param>
-        /// <param name="isPrivate">Whether the project must be private (ie. not published).</param>
-        public NpmProjectDescription( NormalizedPath folderRelativePath, bool isPrivate = false )
-        {
-            Folder = folderRelativePath;
-            IsPrivate = IsPrivate;
-        }
-
-        /// <summary>
         /// Initializes a new Npm project instance from a Xml element.
         /// </summary>
         /// <param name="s">The holding solution.</param>
