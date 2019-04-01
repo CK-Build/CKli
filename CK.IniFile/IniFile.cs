@@ -1,48 +1,57 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
 
 namespace CK.IniFile
 {
-    class IniFile<T> : ICollection<T>
-        where T : IniLine
+    public class IniFile<TFormat, TLine> : ICollection<TLine>
+        where TFormat : IniFormat<TLine>
+        where TLine : IniLine
     {
-        readonly List<T> _lines;
-        public T this[int index] { get => _lines[index]; set => _lines[index] = value; }
+        readonly List<TLine> _lines;
+        public TLine this[int index] { get => _lines[index]; set => _lines[index] = value; }
 
         public int Count => _lines.Count;
-
-        IniFile( IniFormat format )
+        /// <summary>
+        /// Create a new IniFile.
+        /// </summary>
+        /// <param name="format"></param>
+        public IniFile( TFormat format )
         {
             Format = format;
-            _lines = new List<T>();
+            _lines = new List<TLine>();
         }
-        public IniFormat Format { get; }
+        public TFormat Format { get; }
 
         public bool IsReadOnly => false;
 
-        
-
-        public static IniFile<T> FromText( string text, IniFormat format )
+        public static IniFile<TFormat, TLine> FromText( string text, TFormat format )
         {
             if( format.SupportSection )
             {
                 throw new NotImplementedException();
             }
-            var output = new IniFile<T>( format );
+            var output = new IniFile<TFormat,TLine>( format );
             string[] lines = Regex.Split( text, "\r\n|\r|\n" );
             for( int i = 0; i < lines.Length; i++ )
             {
-                
+                format.ParseLine( lines[i] );
             }
             return output;
         }
+        /// <summary>
+        /// It will also remove duplicate entries
+        /// </summary>
+        /// <param name="line"></param>
+        public void EnsureLine(TLine line)
+        {
+            _lines.RemoveAll( p => p.Key == line.Key );
+            _lines.Add( line );
+        }
 
-        public void Add( T item )
+        public void Add( TLine item )
         {
             if( Format.Duplication != IniDuplication.Allowed && _lines.Any( p => p.Key == item.Key ) )
             {
@@ -54,21 +63,25 @@ namespace CK.IniFile
         public void Clear() => _lines.Clear();
 
 
-        public bool Contains( T item ) => _lines.Contains( item );
+        public bool Contains( TLine item ) => _lines.Contains( item );
 
 
-        public void CopyTo( T[] array, int arrayIndex ) => _lines.CopyTo( array, arrayIndex );
+        public void CopyTo( TLine[] array, int arrayIndex ) => _lines.CopyTo( array, arrayIndex );
 
 
-        public bool Remove( T item ) => _lines.Remove( item );
+        public bool Remove( TLine item ) => _lines.Remove( item );
 
         public int RemoveByKey( string key )
         {
             return _lines.RemoveAll( p => p.Key == key );
         }
 
-        public IEnumerator<T> GetEnumerator() => _lines.GetEnumerator();
+        public IEnumerator<TLine> GetEnumerator() => _lines.GetEnumerator();
 
         IEnumerator IEnumerable.GetEnumerator() => _lines.GetEnumerator();
+        public override string ToString()
+        {
+            return string.Join( "\n", _lines.Select( p => p.ToString<TFormat, TLine>( Format ) ));
+        }
     }
 }

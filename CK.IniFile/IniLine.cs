@@ -1,36 +1,21 @@
 using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
 
 namespace CK.IniFile
 {
-    class IniLine<TFormat> where TFormat : IniFormat
+    public class IniLine
     {
-        IniLine()
+        /// <summary>
+        /// Deep copy constructor
+        /// </summary>
+        /// <param name="iniLine"></param>
+        protected IniLine( IniLine iniLine )
         {
+            Comment = iniLine.Comment;
+            CommentType = iniLine.CommentType;
+            Key = iniLine.Key;
+            Value = iniLine.Value;
         }
-        protected virtual IniLine<TFormat> ParseLine( string line, TFormat format )
-        {
-            if( string.IsNullOrWhiteSpace( line ) )
-            {
-                return null;
-            }
-            string[] commentSplitted = line.Split( format.CommentChar.ToArray(), 2 );
-            if( commentSplitted.Length == 1 ) //No comment on this line
-            {
-                string[] keyValue = line.Split( format.KeyDelimiter );
-                if( keyValue.Length != 2 ) throw new InvalidDataException();
-                return new IniLine<TFormat>( keyValue[0], keyValue[1] );
-            }
-            if( string.IsNullOrWhiteSpace( commentSplitted[0] ) ) //Leading comment
-            {
-                return new IniLine<TFormat>( commentSplitted[1] );
-            }
-            string[] kv = commentSplitted[0].Split( Format.KeyDelimiter );
-            if( kv.Length != 2 ) throw new InvalidDataException();
-            return (T)new IniLine( kv[0], kv[1], commentSplitted[1] );
-        }
+
         string _comment;
         string _key;
         /// <summary>
@@ -66,6 +51,23 @@ namespace CK.IniFile
             Key = key;
             Value = value;
         }
+
+        public virtual string ToString<TFormat, TLine>( TFormat iniFormat )
+        where TFormat : IniFormat<TLine>
+        where TLine : IniLine
+        {
+            switch( CommentType )
+            {
+                case IniCommentType.Leading:
+                    return iniFormat.CommentChar[0] + Comment;
+                case IniCommentType.None:
+                    return Key + iniFormat.KeyDelimiter + Value;
+                case IniCommentType.Trailing:
+                    return Key + iniFormat.KeyDelimiter + Value + " " + iniFormat.CommentChar[0] + Comment;
+                default:
+                    throw new InvalidOperationException();
+            }
+        }
         public IniCommentType CommentType { get; }
         public string Comment
         {
@@ -87,7 +89,7 @@ namespace CK.IniFile
         }
         public string Value { get; set; }
     }
-    enum IniCommentType
+    public enum IniCommentType
     {
         /// <summary>
         /// No comment on this line.

@@ -1,33 +1,28 @@
+using CK.IniFile.SpecificImplementation;
 using CK.Text;
-using MadMilkman.Ini;
-using System.IO;
-
+using CK.IniFile;
 namespace CK.Env.Plugins
 {
     class IniFilePluginBase : TextFilePluginBase
     {
-        IniValueMappings _firstMapping;
-        IniFile _iniFile;
         string _currentText;
-        public IniFilePluginBase( GitFolder f, NormalizedPath branchPath, NormalizedPath filePath ) : base( f, branchPath, filePath )
+        IniFile<IniFormat<IniLine>, IniLine> _iniConfig;
+        readonly IniFormat<IniLine> _format;
+        public IniFilePluginBase( IniFormat<IniLine> format, GitFolder f, NormalizedPath branchPath, NormalizedPath filePath ) : base( f, branchPath, filePath )
         {
+            _format = format;
         }
 
-        IniValueMappings GetFirstMapping()
+        IniFile<IniFormat<IniLine>, IniLine> GetConfig()
         {
-
-            if( _firstMapping == null && (_currentText = TextContent) != null )
+            if( _iniConfig == null && (_currentText = TextContent) != null )
             {
-                var _config = new IniFile( new IniOptions()
-                {
-
-                } );
-                _config.Load( new StringReader( _currentText ) );
-                _iniFile = _config;
-                _firstMapping = _config.ValueMappings;
+                _iniConfig = IniFile<IniFormat<IniLine>, IniLine>.FromText( _currentText , _format );
             }
-            return _firstMapping;
+            return _iniConfig;
         }
+
+       
 
     }
 }
