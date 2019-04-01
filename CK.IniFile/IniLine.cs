@@ -21,11 +21,11 @@ namespace CK.IniFile
             {
                 string[] keyValue = line.Split( format.KeyDelimiter );
                 if( keyValue.Length != 2 ) throw new InvalidDataException();
-                return (T)new IniLine( keyValue[0], keyValue[1] );
+                return new IniLine<TFormat>( keyValue[0], keyValue[1] );
             }
             if( string.IsNullOrWhiteSpace( commentSplitted[0] ) ) //Leading comment
             {
-                return (T)new IniLine( commentSplitted[1] );
+                return new IniLine<TFormat>( commentSplitted[1] );
             }
             string[] kv = commentSplitted[0].Split( Format.KeyDelimiter );
             if( kv.Length != 2 ) throw new InvalidDataException();
