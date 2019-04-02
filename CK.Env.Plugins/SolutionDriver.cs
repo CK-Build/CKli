@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Xml.Linq;
 using CK.Core;
 using CK.Env.MSBuild;
@@ -65,9 +63,9 @@ namespace CK.Env.Plugins
         [CommandMethod]
         public bool Pull( IActivityMonitor m )
         {
-            var r = Folder.Pull( m );
-            if( !r.Success ) return false;
-            return !r.ReloadNeeded || GetPrimarySolution( m, true ) != null;
+            var (Success, ReloadNeeded) = Folder.Pull( m );
+            if( !Success ) return false;
+            return !ReloadNeeded || GetPrimarySolution( m, true ) != null;
         }
 
         /// <summary>
@@ -139,7 +137,7 @@ namespace CK.Env.Plugins
         public IEnumerable<string> GetSolutionNames( IActivityMonitor monitor )
         {
             var a = GetAllSolutions( monitor );
-            return a == null ? null : a.Select( s => s.UniqueSolutionName );
+            return a?.Select( s => s.UniqueSolutionName );
         }
 
         /// <summary>
@@ -217,8 +215,8 @@ namespace CK.Env.Plugins
             args += commonArgs + versionArgs;
 
             var path = Folder.FileSystem.GetFileInfo( p.Path.RemoveLastPart() ).PhysicalPath;
-            FileSystem.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "bin" ) );
-            FileSystem.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "obj" ) );
+            FileSystem.RawDeleteLocalDirectory( monitor, Path.Combine( path, "bin" ) );
+            FileSystem.RawDeleteLocalDirectory( monitor, Path.Combine( path, "obj" ) );
 
             OnZeroBuildProject?.Invoke( this, new ZeroBuildEventArgs( monitor, true, info ) );
             try
@@ -336,7 +334,10 @@ namespace CK.Env.Plugins
             {
                 if( !UpgradeLocalPackages( monitor, false ) ) return false;
             }
-            else if( !LocalCommit( monitor ) ) return false;
+            else if( !LocalCommit( monitor ) )
+            {
+                return false;
+            }
 
             return DoBuild( monitor, withUnitTest, null, false );
         }

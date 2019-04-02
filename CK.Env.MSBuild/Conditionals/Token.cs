@@ -4,20 +4,20 @@ namespace CK.Env.MSBuild
 {
     public sealed class Token
     {
-        internal readonly static Token Comma = new Token( TokenType.Comma, "," );
-        internal readonly static Token LeftParenthesis = new Token( TokenType.OpenPar, "(" );
-        internal readonly static Token RightParenthesis = new Token( TokenType.ClosePar, ")" );
-        internal readonly static Token LessThan = new Token( TokenType.LessThan, "<" );
-        internal readonly static Token GreaterThan = new Token( TokenType.GreaterThan, ">" );
-        internal readonly static Token LessThanOrEqualTo = new Token( TokenType.LessOrEqualTo, "<=" );
-        internal readonly static Token GreaterThanOrEqualTo = new Token( TokenType.GreaterOrEqualTo, ">=" );
-        internal readonly static Token And = new Token( TokenType.And, "and" );
-        internal readonly static Token Or = new Token( TokenType.Or, "or" );
-        internal readonly static Token EqualTo = new Token( TokenType.EqualTo, "==" );
-        internal readonly static Token NotEqualTo = new Token( TokenType.NotEqualTo, "!=" );
-        internal readonly static Token Not = new Token( TokenType.Not, "!" );
-        internal readonly static Token EndOfInput = new Token( TokenType.EndOfInput, null );
-        internal readonly static Token EmptyString = new Token( TokenType.String, String.Empty );
+        internal static readonly Token Comma = new Token( TokenType.Comma, "," );
+        internal static readonly Token LeftParenthesis = new Token( TokenType.OpenPar, "(" );
+        internal static readonly Token RightParenthesis = new Token( TokenType.ClosePar, ")" );
+        internal static readonly Token LessThan = new Token( TokenType.LessThan, "<" );
+        internal static readonly Token GreaterThan = new Token( TokenType.GreaterThan, ">" );
+        internal static readonly Token LessThanOrEqualTo = new Token( TokenType.LessOrEqualTo, "<=" );
+        internal static readonly Token GreaterThanOrEqualTo = new Token( TokenType.GreaterOrEqualTo, ">=" );
+        internal static readonly Token And = new Token( TokenType.And, "and" );
+        internal static readonly Token Or = new Token( TokenType.Or, "or" );
+        internal static readonly Token EqualTo = new Token( TokenType.EqualTo, "==" );
+        internal static readonly Token NotEqualTo = new Token( TokenType.NotEqualTo, "!=" );
+        internal static readonly Token Not = new Token( TokenType.Not, "!" );
+        internal static readonly Token EndOfInput = new Token( TokenType.EndOfInput, null );
+        internal static readonly Token EmptyString = new Token( TokenType.String, String.Empty );
 
         public Token( TokenType type, string value )
             : this( type, value, 0L, 0.0 )

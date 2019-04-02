@@ -1,7 +1,5 @@
-using CK.Text;
 using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace CK.Env
 {
@@ -39,18 +37,15 @@ namespace CK.Env
             if( String.IsNullOrWhiteSpace( solutionName ) ) throw new ArgumentNullException( nameof( solutionName ) );
             if( String.IsNullOrWhiteSpace( projectName ) ) throw new ArgumentNullException( nameof( projectName ) );
             if( String.IsNullOrWhiteSpace( primarySolutionRelativeFolderPath ) ) throw new ArgumentNullException( nameof( primarySolutionRelativeFolderPath ) );
-            if( upgradePackages == null ) throw new ArgumentNullException( nameof( upgradePackages ) );
-            if( upgradeZeroProjects == null ) throw new ArgumentNullException( nameof( upgradeZeroProjects ) );
-            if( dependencies == null ) throw new ArgumentNullException( nameof( dependencies ) );
             Index = index;
             Rank = rank;
             SolutionName = solutionName;
             ProjectName = projectName;
             PrimarySolutionRelativeFolderPath = primarySolutionRelativeFolderPath;
             MustPack = mustPack;
-            UpgradePackages = upgradePackages;
-            UpgradeZeroProjects = upgradeZeroProjects;
-            Dependencies = dependencies;
+            UpgradePackages = upgradePackages ?? throw new ArgumentNullException( nameof( upgradePackages ) );
+            UpgradeZeroProjects = upgradeZeroProjects ?? throw new ArgumentNullException( nameof( upgradeZeroProjects ) );
+            Dependencies = dependencies ?? throw new ArgumentNullException( nameof( dependencies ) );
             FullName = mustPack ? projectName : solutionName + '/' + projectName;
         }
 

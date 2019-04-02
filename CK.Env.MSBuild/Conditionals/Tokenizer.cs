@@ -1,6 +1,4 @@
-using System.Globalization;
 using System;
-using System.Diagnostics;
 using CK.Text;
 
 namespace CK.Env.MSBuild
@@ -155,7 +153,7 @@ namespace CK.Env.MSBuild
             return false;
         }
 
-        static internal Token TryParseNumeric( StringMatcher m )
+        internal static Token TryParseNumeric( StringMatcher m )
         {
             int start = m.StartIndex;
             ulong uL = 0UL;
@@ -211,7 +209,11 @@ namespace CK.Env.MSBuild
                 {
                     _curToken = Token.And;
                 }
-                else _curToken = new Token( TokenType.String, s );
+                else
+                {
+                    _curToken = new Token( TokenType.String, s );
+                }
+
                 return true;
             }
             return false;

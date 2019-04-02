@@ -1,4 +1,3 @@
-using System;
 using CK.Text;
 
 namespace CK.Env.MSBuild

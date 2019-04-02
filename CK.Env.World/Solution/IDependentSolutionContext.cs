@@ -1,7 +1,6 @@
 using CK.Core;
 using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace CK.Env
 {
@@ -59,7 +58,10 @@ namespace CK.Env
                         solutionDetail( m, s );
                     }
                 }
-                else m.Info( $"{(s == current ? '*' : ' ')}   {s.Index} - {s} {solutionLineDetail?.Invoke( s )}" );
+                else
+                {
+                    m.Info( $"{(s == current ? '*' : ' ')}   {s.Index} - {s} {solutionLineDetail?.Invoke( s )}" );
+                }
             }
         }
 

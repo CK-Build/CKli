@@ -5,9 +5,6 @@ using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CKli
 {
@@ -114,7 +111,10 @@ namespace CKli
                 m.Info( "Key vault is closed." );
                 return false;
             }
-            if( newPassPhrase == null ) newPassPhrase = _passPhrase;
+            if( newPassPhrase == null )
+            {
+                newPassPhrase = _passPhrase;
+            }
             else
             {
                 if( !CheckPassPhraseValidity( m, newPassPhrase ) ) return false;
@@ -185,7 +185,11 @@ namespace CKli
                 {
                     m.Info( $"Using {KeyVaultKeyName} environment variable to open the Key Vault for {_worldName.FullName}." );
                 }
-                else passPhrase = PromptValue( KeyVaultKeyName, $"Open the Key Vault for {_worldName.FullName}.", throwOnEmpty: false );
+                else
+                {
+                    passPhrase = PromptValue( KeyVaultKeyName, $"Open the Key Vault for {_worldName.FullName}.", throwOnEmpty: false );
+                }
+
                 if( passPhrase != null ) OpenKeyVault( m, passPhrase );
             }
             bool exists = _keys.TryGetValue( name, out var value );

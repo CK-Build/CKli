@@ -49,7 +49,7 @@
       <add Name="Invenietis - CI" />
     </RemoveNuGetSourceNames>
     <ArtifactTargets>
-      <add Name="NuGetAzure:Signature-OpenSource-CKEnvTest3" />
+      <add Name="NuGetAzure:Signature-Code-CKEnvTest3" />
       <add Name="CKSetup:CKEnvTest" />
     </ArtifactTargets>
     <Plugins>

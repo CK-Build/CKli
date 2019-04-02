@@ -2,13 +2,10 @@ using CK.Core;
 using CK.Setup;
 using CK.Text;
 using CSemVer;
-using Microsoft.Extensions.FileProviders;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Xml.Linq;
-using System.Xml.XPath;
 
 namespace CK.Env.MSBuild
 {
@@ -311,7 +308,10 @@ namespace CK.Env.MSBuild
                         ++changeCount;
                         m.Trace( $"Update in {ToString()}: {packageId} from {currentVersion} to {sV}." );
                     }
-                    else m.Trace( $"Preserving existing version {currentVersion} for {packageId} in {ToString()} (skipped version is {sV})." );
+                    else
+                    {
+                        m.Trace( $"Preserving existing version {currentVersion} for {packageId} in {ToString()} (skipped version is {sV})." );
+                    }
                 }
             }
              // Handle creation if needed.
@@ -514,7 +514,10 @@ namespace CK.Env.MSBuild
                         m.Warn( $"Useless PackageReference (applies to undeclared frameworks): {p.Origin}." );
                         uselessDeps.Add( p.Origin );
                     }
-                    else deps.Add( new DeclaredPackageDependency( this, p.PackageId, versionLocked, version, p.Origin, propertyDef, frameworks ) );
+                    else
+                    {
+                        deps.Add( new DeclaredPackageDependency( this, p.PackageId, versionLocked, version, p.Origin, propertyDef, frameworks ) );
+                    }
                 }
                 else
                 {
@@ -538,7 +541,10 @@ namespace CK.Env.MSBuild
                         m.Warn( $"Useless ProjectReference (applies to undeclared frameworks): {p.Origin}." );
                         uselessDeps.Add( p.Origin );
                     }
-                    else projs.Add( new ProjectToProjectDependency( this, target, frameworks, p.Origin ) );
+                    else
+                    {
+                        projs.Add( new ProjectToProjectDependency( this, target, frameworks, p.Origin ) );
+                    }
                 }
             }
             _dependencies = new Dependencies( deps, projs, uselessDeps );
@@ -549,14 +555,14 @@ namespace CK.Env.MSBuild
             CKTrait frameworks = TargetFrameworks;
             foreach( var framework in TargetFrameworks.AtomicTraits )
             {
-                foreach( var condition in e.AncestorsAndSelf()
+                foreach( var (E, C) in e.AncestorsAndSelf()
                                        .Select( x => (E: x, C: (string)x.Attribute( "Condition" )) )
                                        .Where( x => x.C != null ) )
                 {
-                    bool? include = evaluator.EvalFinalResult( m, condition.C, f => f == "$(TargetFramework)" ? framework.ToString() : null );
+                    bool? include = evaluator.EvalFinalResult( m, C, f => f == "$(TargetFramework)" ? framework.ToString() : null );
                     if( include == null )
                     {
-                        m.Error( $"Unable to evaluate condition of {condition.E}." );
+                        m.Error( $"Unable to evaluate condition of {E}." );
                         return null;
                     }
                     if( include == false )

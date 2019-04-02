@@ -1,13 +1,8 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using LibGit2Sharp;
-using NUnit.Framework;
 using System.Runtime.CompilerServices;
-using CK.Core;
 using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
 using CK.Text;

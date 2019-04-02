@@ -4,13 +4,10 @@ using CK.NuGetClient;
 using CK.Text;
 using CKSetup;
 using CSemVer;
-using Microsoft.Extensions.FileProviders;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
 
 namespace CKli
 {
@@ -57,7 +54,7 @@ namespace CKli
 
             public SVersion GetBestVersion( IActivityMonitor m, string packageId )
             {
-                return XLocalFeedProvider.GetMaxVersionFromFeed( PhysicalPath, packageId );
+                return GetMaxVersionFromFeed( PhysicalPath, packageId );
             }
 
             public LocalNuGetPackageFile GetPackageFile( IActivityMonitor m, string packageId, SVersion v )
@@ -113,7 +110,10 @@ namespace CKli
                     string localStore = this.GetCKSetupStorePath();
                     return target.PushAsync( m, new CKSetupArtifactLocalSet( artifacts, localStore ) ).GetAwaiter().GetResult();
                 }
-                else throw new InvalidOperationException( $"Unhandled repository type: {target.Info.UniqueArtifactRepositoryName}" );
+                else
+                {
+                    throw new InvalidOperationException( $"Unhandled repository type: {target.Info.UniqueArtifactRepositoryName}" );
+                }
             }
 
             public void Remove( IActivityMonitor m, IEnumerable<ArtifactInstance> artifacts )

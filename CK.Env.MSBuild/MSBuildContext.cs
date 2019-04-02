@@ -1,11 +1,9 @@
 using CK.Core;
 using CK.Text;
-using Microsoft.Extensions.FileProviders;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Xml.Linq;
 
 namespace CK.Env.MSBuild
@@ -21,7 +19,7 @@ namespace CK.Env.MSBuild
         /// The <see cref="CKTraitContext.Separator"/> is the ';' to match the one used by csproj (parsing and
         /// string representation becomes straightforward).
         /// </summary>
-        static readonly public CKTraitContext Traits = new CKTraitContext( "ProjectFileContext", ';' );
+        public static readonly CKTraitContext Traits = new CKTraitContext( "ProjectFileContext", ';' );
 
         /// <summary>
         /// Defines import of a <see cref="ProjectFile"/> from another File.

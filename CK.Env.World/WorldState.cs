@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Xml.Linq;
 
 namespace CK.Env
@@ -50,16 +49,11 @@ namespace CK.Env
             IEnvLocalFeedProvider localFeedProvider,
             IBasicApplicationLifetime appLife )
         {
-            if( store == null ) throw new ArgumentNullException( nameof( store ) );
-            if( worldName == null ) throw new ArgumentNullException( nameof( worldName ) );
-            if( solutionContextLoader == null ) throw new ArgumentNullException( nameof( solutionContextLoader ) );
-            if( artifacts == null ) throw new ArgumentNullException( nameof( artifacts ) );
-            if( localFeedProvider == null ) throw new ArgumentNullException( nameof( localFeedProvider ) );
-            _artifacts = artifacts;
-            _store = store;
-            WorldName = worldName;
-            _solutionContextLoader = solutionContextLoader;
-            _localFeedProvider = localFeedProvider;
+            _artifacts = artifacts ?? throw new ArgumentNullException( nameof( artifacts ) );
+            _store = store ?? throw new ArgumentNullException( nameof( store ) );
+            WorldName = worldName ?? throw new ArgumentNullException( nameof( worldName ) );
+            _solutionContextLoader = solutionContextLoader ?? throw new ArgumentNullException( nameof( solutionContextLoader ) );
+            _localFeedProvider = localFeedProvider ?? throw new ArgumentNullException( nameof( localFeedProvider ) );
             _appLife = appLife;
             _solutionDrivers = new HashSet<ISolutionDriver>();
             _cacheBySolutionName = new Dictionary<string, ISolutionDriver>();
@@ -658,9 +652,9 @@ namespace CK.Env
                 if( !g.CheckCleanCommit( monitor ) ) return false;
                 if( pull )
                 {
-                    var result = g.Pull( monitor );
-                    if( !result.Success ) return false;
-                    reloadNeeded |= result.ReloadNeeded;
+                    var (Success, ReloadNeeded) = g.Pull( monitor );
+                    if( !Success ) return false;
+                    reloadNeeded |= ReloadNeeded;
                 }
             }
             if( reloadNeeded && !ReloadSolutions( monitor ) ) return false;
@@ -782,36 +776,36 @@ namespace CK.Env
             {
                 var versions = ReleaseRoadmap.Load( GeneralState.Element( "Roadmap" ) )
                                            .Select( e => (e.SubPath, e.Info, Git: _gitRepositories.FirstOrDefault( g => g.SubPath == e.SubPath )) );
-                foreach( var r in versions )
+                foreach( var (SubPath, Info, Git) in versions )
                 {
-                    if( r.Git == null )
+                    if( Git == null )
                     {
-                        m.Fatal( $"Unable to find Git repository for {r.SubPath} from current Roadmap." );
+                        m.Fatal( $"Unable to find Git repository for {SubPath} from current Roadmap." );
                         return false;
                     }
                     if( pushVersionTagsAndBranches )
                     {
-                        if( r.Info.Level != ReleaseLevel.None )
+                        if( Info.Level != ReleaseLevel.None )
                         {
-                            success &= r.Git.PushVersionTag( m, r.Info.Version );
+                            success &= Git.PushVersionTag( m, Info.Version );
                             // Since we have a version: we may be on master.
-                            if( success && r.Info.Version.PackageQuality == PackageQuality.Release )
+                            if( success && Info.Version.PackageQuality == PackageQuality.Release )
                             {
-                                success &= r.Git.Push( m, WorldName.MasterBranchName );
+                                success &= Git.Push( m, WorldName.MasterBranchName );
                             }
                         }
                         // Always push develop even when Level = None since
                         // build project dependencies may have been upgraded.
                         if( success )
                         {
-                            success &= r.Git.Push( m, WorldName.DevelopBranchName );
+                            success &= Git.Push( m, WorldName.DevelopBranchName );
                         }               
                     }
                     else
                     {
-                        if( r.Info.Level != ReleaseLevel.None )
+                        if( Info.Level != ReleaseLevel.None )
                         {
-                            success &= r.Git.ClearVersionTag( m, r.Info.Version );
+                            success &= Git.ClearVersionTag( m, Info.Version );
                         }
                     }
                 }

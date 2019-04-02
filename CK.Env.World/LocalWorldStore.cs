@@ -21,9 +21,8 @@ namespace CK.Env
         public LocalWorldStore( string directoryPath, ILocalWorldRootPathMapping localWorldRootPathMapping )
         {
             if( String.IsNullOrWhiteSpace( directoryPath ) ) throw new ArgumentNullException( nameof( directoryPath ) );
-            if( localWorldRootPathMapping == null ) throw new ArgumentNullException( nameof( localWorldRootPathMapping ) );
             _directoryPath = Path.GetFullPath( Environment.ExpandEnvironmentVariables( directoryPath ) );
-            _localWorldRootPathMapping = localWorldRootPathMapping;
+            _localWorldRootPathMapping = localWorldRootPathMapping ?? throw new ArgumentNullException( nameof( localWorldRootPathMapping ) );
         }
 
         LocalWorldName ToLocal( IWorldName w )

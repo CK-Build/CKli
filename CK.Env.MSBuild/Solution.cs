@@ -1,11 +1,9 @@
 using CK.Text;
-using Microsoft.Extensions.FileProviders;
 using System;
 using System.Text;
 using System.Collections.Generic;
 using System.Linq;
 using CK.Core;
-using System.IO;
 using System.Xml.Linq;
 using CK.Setup;
 using System.Diagnostics;
@@ -262,8 +260,10 @@ namespace CK.Env.MSBuild
                     }
                 }
                 var projectGuid = Guid.NewGuid().ToString( "B" );
-                project = new Project( BuildContext, projectGuid, projectName, projectFilePath, "{9A19103F-16F7-4668-BE54-9A1E7A4F7556}" );
-                project.Solution = this;
+                project = new Project( BuildContext, projectGuid, projectName, projectFilePath, "{9A19103F-16F7-4668-BE54-9A1E7A4F7556}" )
+                {
+                    Solution = this
+                };
                 if( project.ReloadProjectFile( m ) == null ) return null;
                 _allProjects.Add( project );
             }
@@ -342,7 +342,7 @@ namespace CK.Env.MSBuild
             ArtifactTargetNames = new List<string>();
         }
 
-        static internal Solution Load(
+        internal static Solution Load(
             IActivityMonitor m,
             MSBuildContext ctx,
             NormalizedPath filePath )
@@ -493,8 +493,7 @@ namespace CK.Env.MSBuild
             if( child != null )
             {
                 // Parent should be a folder
-                SolutionFolder parent = projects.FirstOrDefault( x => StringComparer.OrdinalIgnoreCase.Equals( x.ProjectGuid, projectIds[1].Trim() ) ) as SolutionFolder;
-                if( parent != null )
+                if( projects.FirstOrDefault( x => StringComparer.OrdinalIgnoreCase.Equals( x.ProjectGuid, projectIds[1].Trim() ) ) is SolutionFolder parent )
                 {
                     parent.Items.Add( child );
                     child.Parent = parent;

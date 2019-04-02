@@ -2,13 +2,10 @@ using CK.Core;
 using CK.Env;
 using CK.Env.MSBuild;
 using CK.Text;
-using CSemVer;
 using SimpleGitVersion;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text;
 
 namespace CKli
 {
@@ -55,8 +52,10 @@ namespace CKli
             _allDevelopSolutions = new List<XSolutionBase>();
             _allGitFoldersWithDevelopBranchName = new List<XGitFolder>();
 
-            _worldState = new WorldState( commandRegister, artifacts.ArtifactCenter, worldStore, world, this, _packageFeeds, appLife );
-            _worldState.VersionSelector = new ReleaseVersionSelector();
+            _worldState = new WorldState( commandRegister, artifacts.ArtifactCenter, worldStore, world, this, _packageFeeds, appLife )
+            {
+                VersionSelector = new ReleaseVersionSelector()
+            };
             EventHandler<EventMonitoredArgs> onDumpOrInitialize = ( o, e ) => OnDumpWorldStatus( e.Monitor );
             _worldState.Initializing += onDumpOrInitialize;
             _worldState.DumpWorldStatus += onDumpOrInitialize;
@@ -117,8 +116,15 @@ namespace CKli
                         hasPluginInitError = true;
                         pluginInfo = "Plugin initialization error.";
                     }
-                    else pluginInfo = $"({git.PluginManager.BranchPlugins[git.CurrentBranchName].Count} plugins)";
-                    if( git.CheckCleanCommit( m ) ) m.CloseGroup( "Up-to-date. " + pluginInfo );
+                    else
+                    {
+                        pluginInfo = $"({git.PluginManager.BranchPlugins[git.CurrentBranchName].Count} plugins)";
+                    }
+
+                    if( git.CheckCleanCommit( m ) )
+                    {
+                        m.CloseGroup( "Up-to-date. " + pluginInfo );
+                    }
                     else
                     {
                         dirty.Add( git.SubPath );
@@ -145,7 +151,11 @@ namespace CKli
                         }
                     }
                 }
-                else m.Info( $"All {gitFoldersCount} git folders are on '{byActiveBranch.First().Key}' branch." );
+                else
+                {
+                    m.Info( $"All {gitFoldersCount} git folders are on '{byActiveBranch.First().Key}' branch." );
+                }
+
                 if( hasPluginInitError )
                 {
                     m.Error( "At least one git folder is unable to initialize its plugins." );

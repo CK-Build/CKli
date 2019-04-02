@@ -1,10 +1,8 @@
 using CK.Core;
-using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Xml.Linq;
 using System.Xml.XPath;
 
@@ -76,7 +74,11 @@ namespace CK.Env
                     return false;
                 }
             }
-            else _typeRegister.Add( n, t );
+            else
+            {
+                _typeRegister.Add( n, t );
+            }
+
             return true;
         }
 
@@ -145,7 +147,7 @@ namespace CK.Env
             public IReadOnlyList<ActivityMonitorSimpleCollector.Entry> Errors { get; }
         }
 
-        static public PreProcessResult PreProcess( IActivityMonitor monitor, XElement e )
+        public static PreProcessResult PreProcess( IActivityMonitor monitor, XElement e )
         {
             IReadOnlyList<ActivityMonitorSimpleCollector.Entry> errors = null;
             XElement result;

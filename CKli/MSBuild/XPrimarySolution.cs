@@ -1,8 +1,4 @@
-using CK.Env;
 using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
 using CK.Core;
 using CK.Env.MSBuild;
 using CK.Text;
@@ -48,6 +44,11 @@ namespace CKli
         /// Gets the <see cref="XBranch"/> that is the direct parent.
         /// </summary>
         public new XBranch Parent => (XBranch)base.Parent;
+        /// <summary>
+        /// Gets a semicolon separated list of project path that are npm projects to publish.
+        /// These path should be valid path
+        /// </summary>
+        public string NpmProjectsPathToPublish { get; private set; }
 
         /// <summary>
         /// Gets the optional NPMProjects (that must be defined before the primary solution).
@@ -104,7 +105,10 @@ namespace CKli
                         {
                             m.Warn( $"NotPublishedProject '{u}' not found in solution PublishedProjects: {s.PublishedProjects.Select( p => p.Name ).Concatenate()}." );
                         }
-                        else s.PublishedProjects.RemoveAt( idxU );
+                        else
+                        {
+                            s.PublishedProjects.RemoveAt( idxU );
+                        }
                     }
                 }
                 HandleCKSetupComponentProjects( m, s );
@@ -126,7 +130,10 @@ namespace CKli
                     {
                         m.Warn( $"CKSetupComponentProjects '{c}' not found in solution Projects: {s.AllProjects.Select( project => project.Name ).Concatenate()}." );
                     }
-                    else s.CKSetupComponentProjects.Add( p );
+                    else
+                    {
+                        s.CKSetupComponentProjects.Add( p );
+                    }
                 }
             }
         }

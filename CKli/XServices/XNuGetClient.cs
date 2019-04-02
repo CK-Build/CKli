@@ -1,10 +1,6 @@
 using CK.Env;
 using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
 using CK.Core;
-using System.Net.Http;
 using CK.NuGetClient;
 
 namespace CKli
@@ -31,7 +27,7 @@ namespace CKli
             initializer.Services.Add( this );
         }
 
-        public INuGetClient NuGetClient => _nuGetClient;       
+        public INuGetClient NuGetClient => _nuGetClient;
 
         void IDisposable.Dispose()
         {

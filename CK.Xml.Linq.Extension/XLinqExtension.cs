@@ -1,10 +1,7 @@
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using System.Xml.Linq;
 
 namespace System.Xml.Linq
 {
@@ -106,7 +103,10 @@ namespace System.Xml.Linq
             for( int i = 0; i < currentText.Length; ++i )
             {
                 char car = currentText[i];
-                if( car == '\n' ) ++newLineCount;
+                if( car == '\n' )
+                {
+                    ++newLineCount;
+                }
                 else if( car != '\r' && car != '\t' && car != ' ' )
                 {
                     hasActualText = true;

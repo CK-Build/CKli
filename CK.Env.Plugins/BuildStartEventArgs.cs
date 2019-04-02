@@ -3,9 +3,6 @@ using CK.Env.MSBuild;
 using CSemVer;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CK.Env
 {
@@ -88,13 +85,11 @@ namespace CK.Env
             string codeCakeBuilderExecutableFile )
             : base( m )
         {
-            if( primary == null ) throw new ArgumentNullException( nameof( primary ) );
-            if( version == null ) throw new ArgumentNullException( nameof( version ) );
             if( !buildRequired && (buildType&(BuildType.WithUnitTests|BuildType.WithPushToRemote)) == 0 ) throw new ArgumentException( "No build, tests or push." );
 
             BuildIsRequired = buildRequired;
-            PrimarySolution = primary;
-            Version = version;
+            PrimarySolution = primary ?? throw new ArgumentNullException( nameof( primary ) );
+            Version = version ?? throw new ArgumentNullException( nameof( version ) );
             EnvironmentVariables = new List<(string KeyName, string Value)>();
             BuildType = buildType;
             SolutionPhysicalPath = solutionPhysicalPath;

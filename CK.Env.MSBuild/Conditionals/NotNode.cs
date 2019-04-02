@@ -10,8 +10,7 @@ namespace CK.Env.MSBuild
     {
         public NotNode( BaseNode left )
         {
-            if( left == null ) throw new ArgumentNullException( nameof( left ) );
-            Left = left;
+            Left = left ?? throw new ArgumentNullException( nameof( left ) );
         }
 
         public BaseNode Left { get; }

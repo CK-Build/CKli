@@ -1,7 +1,5 @@
 using CSemVer;
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace CK.Env
 {
@@ -17,9 +15,8 @@ namespace CK.Env
         /// <param name="version">The version. Can not be null.</param>
         public ArtifactInstance( Artifact a, SVersion version )
         {
-            if( version == null ) throw new ArgumentNullException( nameof( version ) );
             Artifact = a;
-            Version = version;
+            Version = version ?? throw new ArgumentNullException( nameof( version ) );
         }
 
         /// <summary>

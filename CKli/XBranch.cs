@@ -1,10 +1,7 @@
 using CK.Env;
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Text;
 using CK.Core;
-using System.Xml.Linq;
 using CK.Env.MSBuild;
 using System.Diagnostics;
 using CK.Text;

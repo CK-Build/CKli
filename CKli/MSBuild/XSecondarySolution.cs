@@ -1,12 +1,5 @@
-using CK.Env;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
 using CK.Core;
 using CK.Env.MSBuild;
-using CK.Text;
-using System.Linq;
 
 namespace CKli
 {

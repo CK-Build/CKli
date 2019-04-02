@@ -1,8 +1,5 @@
-using CK.Core;
 using System;
 using System.Collections.Generic;
-using System.Text;
-using System.Linq;
 using System.Xml.Linq;
 
 namespace CK.Env
@@ -48,7 +45,7 @@ namespace CK.Env
         /// <param name="e">The Xml element.</param>
         /// <param name="mapper">The function that associates an Xml element to a type.</param>
         /// <returns>The TypedXml object.</returns>
-        static public TypedXml Create( XElement e, Func<XElement, Type> mapper, Type rootType = null )
+        public static TypedXml Create( XElement e, Func<XElement, Type> mapper, Type rootType = null )
         {
             if( e == null ) throw new ArgumentNullException( nameof( e ) );
             if( mapper == null ) throw new ArgumentNullException( nameof( mapper ) );

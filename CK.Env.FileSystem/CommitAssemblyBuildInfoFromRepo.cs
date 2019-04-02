@@ -1,9 +1,5 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using CSemVer;
 using SimpleGitVersion;
 
@@ -29,7 +25,10 @@ namespace CK.Env
             {
                 FileVersion = info.ValidReleaseTag.ToStringFileVersion( false );
             }
-            else FileVersion = CSemVer.InformationalVersion.ZeroFileVersion;
+            else
+            {
+                FileVersion = CSemVer.InformationalVersion.ZeroFileVersion;
+            }
         }
 
         public string BuildConfiguration { get; }

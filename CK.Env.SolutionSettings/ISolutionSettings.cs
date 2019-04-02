@@ -1,9 +1,5 @@
-using CK.NuGetClient;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CK.Env
 {
@@ -53,6 +49,7 @@ namespace CK.Env
         /// Impacts NuGet.config file.
         /// </summary>
         IReadOnlyCollection<string> RemoveNuGetSourceNames { get; }
+
 
         /// <summary>
         /// Gets the repository where produced artifacts must be pushed.

@@ -2,7 +2,6 @@ using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Xml.Linq;
 
 namespace CK.Env
@@ -35,7 +34,10 @@ namespace CK.Env
             while( current != null )
             {
                 XElement next = null;
-                if( predicate( current ) ) yield return current;
+                if( predicate( current ) )
+                {
+                    yield return current;
+                }
                 else
                 {
                     // Dive into the children (if any).
@@ -81,8 +83,7 @@ namespace CK.Env
             @this = @this?.NextNode;
             while( @this != null )
             {
-                var n = @this as TNode;
-                if( n != null ) return n;
+                if( @this is TNode n ) return n;
                 @this = @this.NextNode;
             }
             return null;

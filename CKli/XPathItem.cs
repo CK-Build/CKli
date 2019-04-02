@@ -1,9 +1,5 @@
 
 using CK.Core;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
 using CK.Env;
 using Microsoft.Extensions.FileProviders;
 using CK.Text;

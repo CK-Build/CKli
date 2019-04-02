@@ -1,5 +1,4 @@
 using CK.Env;
-using System;
 using System.Net.Http;
 
 namespace CK.NuGetClient

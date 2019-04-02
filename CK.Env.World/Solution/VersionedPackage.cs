@@ -1,9 +1,6 @@
 using CSemVer;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CK.Env
 {
@@ -31,9 +28,8 @@ namespace CK.Env
         public VersionedPackage( string p, SVersion v )
         {
             if( String.IsNullOrWhiteSpace( p ) ) throw new ArgumentNullException( nameof( p ) );
-            if( v == null ) throw new ArgumentNullException( nameof( v ) );
             PackageId = p;
-            Version = v;
+            Version = v ?? throw new ArgumentNullException( nameof( v ) );
         }
 
         /// <summary>

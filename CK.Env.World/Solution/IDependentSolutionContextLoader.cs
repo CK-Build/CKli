@@ -1,7 +1,5 @@
-using System;
 using System.Collections.Generic;
 using CK.Core;
-using System.Text;
 
 namespace CK.Env
 {

@@ -1,11 +1,6 @@
 using CK.Core;
-using CK.NuGetClient;
-using CK.Text;
 using CSemVer;
-using Microsoft.Extensions.FileProviders;
-using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace CK.Env
 {

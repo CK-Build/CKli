@@ -1,9 +1,7 @@
 using CK.Core;
-using LibGit2Sharp;
 using System;
 using System.IO;
 using System.Runtime.CompilerServices;
-using System.Xml.Linq;
 using System.Linq;
 using CK.Env;
 using System.Text.RegularExpressions;

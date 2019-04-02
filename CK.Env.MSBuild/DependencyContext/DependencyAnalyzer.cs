@@ -2,11 +2,9 @@ using CK.Core;
 using CK.Setup;
 using CK.Text;
 using CSemVer;
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 
 namespace CK.Env.MSBuild
 {
@@ -391,7 +389,10 @@ namespace CK.Env.MSBuild
                         var primary = sortables[s.PrimarySolution];
                         primary.AddSecondaryProjects( GetProjectItems( s, strategy ) );
                     }
-                    else sortables.Add( s, new SortableSolutionFile( s, GetProjectItems( s, strategy ) ) );
+                    else
+                    {
+                        sortables.Add( s, new SortableSolutionFile( s, GetProjectItems( s, strategy ) ) );
+                    }
                 }
             }
 
@@ -473,7 +474,7 @@ namespace CK.Env.MSBuild
         /// <param name="m">The monitor to use.</param>
         /// <param name="solutionFiles">The set of <see cref="Solution"/> to consider.</param>
         /// <returns>A new dependency context.</returns>
-        static public DependencyAnalyser Create( IActivityMonitor m, IEnumerable<Solution> solutionFiles )
+        public static DependencyAnalyser Create( IActivityMonitor m, IEnumerable<Solution> solutionFiles )
         {
             var packages = new Dictionary<string, Package>();
             var solutions = solutionFiles.ToArray();
@@ -505,7 +506,10 @@ namespace CK.Env.MSBuild
                 {
                     m.Warn( $"Dependency analyzer created on {solutionCount} solutions from more than one branch: {branchNames.Concatenate()}" );
                 }
-                else if( branchNames.Count > 0 ) uniqueBranchName = branchNames[0];
+                else if( branchNames.Count > 0 )
+                {
+                    uniqueBranchName = branchNames[0];
+                }
             }
             using( m.OpenDebug( "Creating Package for all Published projects in all solutions." ) )
             {

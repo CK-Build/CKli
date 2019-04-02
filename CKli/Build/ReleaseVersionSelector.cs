@@ -1,16 +1,12 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using CK.Core;
 using CK.Env;
-using CK.Env.MSBuild;
 using CK.Text;
 using CSemVer;
 
 namespace CKli
-{ 
+{
     public class ReleaseVersionSelector : IReleaseVersionSelector
     {
         /// <summary>
@@ -55,7 +51,10 @@ namespace CKli
                     }
                 }
             }
-            else Console.WriteLine( "(No previous released version)" );
+            else
+            {
+                Console.WriteLine( "(No previous released version)" );
+            }
 
             foreach( var kv in c.PossibleVersions )
             {
@@ -95,7 +94,10 @@ namespace CKli
                 {
                     Console.Write( $"= (Enter the final release number and press enter)> " );
                     string line = Console.ReadLine();
-                    if( line == "X" ) c.Cancel();
+                    if( line == "X" )
+                    {
+                        c.Cancel();
+                    }
                     else if( Int32.TryParse( line, out var num ) && num >= 0 && num < possibleVersions.Count )
                     {
                         c.SetChoice( level, possibleVersions[num] );

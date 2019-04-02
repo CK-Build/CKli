@@ -1,10 +1,8 @@
 using CK.Core;
 using CSemVer;
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 
 namespace CK.Env.MSBuild
 {
@@ -101,17 +99,20 @@ namespace CK.Env.MSBuild
             IEnumerable<ProjectDepencyRow> all = DependencyTable;
             if( externalDependencies.HasValue ) all = all.Where( r => r.IsExternalDependency == externalDependencies.Value );
 
-            foreach( var dep in all.GroupBy( d => d.PackageId )
+            foreach( var (PackageId, ByVersion) in all.GroupBy( d => d.PackageId )
                                    .Select( g => (PackageId: g.Key, ByVersion: g.GroupBy( r => r.Version )) ) )
             {
-                var count = dep.ByVersion.Count();
+                var count = ByVersion.Count();
                 Debug.Assert( count > 0 );
-                if( count == 1 ) monoVersions.Add( (dep.ByVersion.First().First().RawPackageDependency.Package, dep.ByVersion.First().Select( r => r.SourceProject ).Distinct().ToArray() ) );
+                if( count == 1 )
+                {
+                    monoVersions.Add( (ByVersion.First().First().RawPackageDependency.Package, ByVersion.First().Select( r => r.SourceProject ).Distinct().ToArray() ) );
+                }
                 else
                 {
-                    foreach( var v in dep.ByVersion )
+                    foreach( var v in ByVersion )
                     {
-                        VersionedPackage p = new VersionedPackage( dep.PackageId, v.Key );
+                        VersionedPackage p = new VersionedPackage( PackageId, v.Key );
                         IReadOnlyList<IProjectFramework> refs = _projectFrameworkCache.Create( v ).ToList();
                         multiVersions.Add( (p, refs) );
                     }

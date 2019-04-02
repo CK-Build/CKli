@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace CK.Env
 {
@@ -26,10 +24,8 @@ namespace CK.Env
         /// <param name="name">Artifact name.</param>
         public Artifact( string type, string name )
         {
-            if( type == null ) throw new ArgumentNullException( nameof( type ) );
-            if( name == null ) throw new ArgumentNullException( nameof( name ) );
-            Type = type;
-            Name = name;
+            Type = type ?? throw new ArgumentNullException( nameof( type ) );
+            Name = name ?? throw new ArgumentNullException( nameof( name ) );
         }
 
         /// <summary>

@@ -1,10 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using CK.Core;
 using CK.Text;
 
@@ -58,7 +55,10 @@ namespace CK.Env
                                 c = new PluginCollection<IGitBranchPlugin>( _manager, branchName );
                                 _branchPlugins.Add( branchName, ensureFirstLoad ? c.EnsureFirstLoad() : c );
                             }
-                            else c.EnsureFirstLoad();
+                            else
+                            {
+                                c.EnsureFirstLoad();
+                            }
                         }
                         catch( Exception ex )
                         {
@@ -211,10 +211,9 @@ namespace CK.Env
         public GitPluginManager( ISimpleServiceContainer baseProvider, CommandRegister commandRegister, string defaultBranchName, NormalizedPath branchesPath )
         {
             if( String.IsNullOrWhiteSpace(defaultBranchName) ) throw new ArgumentNullException( nameof( defaultBranchName ) );
-            if( commandRegister == null ) throw new ArgumentNullException( nameof( commandRegister ) );
             ServiceContainer = new SimpleServiceContainer( baseProvider );
             _defaultBranchName = defaultBranchName;
-            _commandRegister = commandRegister;
+            _commandRegister = commandRegister ?? throw new ArgumentNullException( nameof( commandRegister ) );
             _registry = new GitPluginRegistry( branchesPath );
             _plugins = new PluginCollection<IGitPlugin>( this, null );
             _branches = new Branches( this );

@@ -1,8 +1,6 @@
 using CK.Core;
 using CK.Env;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Xml.Linq;
 
 namespace CK.NuGetClient

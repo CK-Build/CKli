@@ -2,9 +2,6 @@ using CK.Core;
 using CK.Text;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
 using System.Xml.Linq;
 
 namespace CK.Env
@@ -90,7 +87,11 @@ namespace CK.Env
                     {
                         v = Enum.Parse( p.PropertyType, a.Value );
                     }
-                    else v = Convert.ChangeType( a.Value, p.PropertyType );
+                    else
+                    {
+                        v = Convert.ChangeType( a.Value, p.PropertyType );
+                    }
+
                     p.SetValue( this, v );
                 }
                 a = a.NextAttribute;
@@ -133,7 +134,10 @@ namespace CK.Env
             while( current != null )
             {
                 XTypedObject next = null;
-                if( predicate( current ) ) yield return current;
+                if( predicate( current ) )
+                {
+                    yield return current;
+                }
                 else
                 {
                     // Dive into the children (if any).

@@ -1,9 +1,6 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Collections;
-using System.Globalization;
-using System.IO;
 using System;
 using System.Collections.Generic;
 using CK.Text;
@@ -14,8 +11,7 @@ namespace CK.Env.MSBuild
     {
         public StringNode( string value )
         {
-            if( value == null ) throw new ArgumentNullException( nameof( value ) );
-            StringValue = value;
+            StringValue = value ?? throw new ArgumentNullException( nameof( value ) );
             RequiresExpansion = value.IndexOf("$(", StringComparison.Ordinal ) >= 0;
         }
 

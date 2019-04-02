@@ -2,14 +2,9 @@ using CK.Core;
 using CK.NuGetClient;
 using CK.Text;
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using System.Xml.Linq;
 
 namespace CK.Env.Plugins.SolutionFiles
 {
@@ -27,23 +22,68 @@ namespace CK.Env.Plugins.SolutionFiles
 
         protected override void DoApplySettings( IActivityMonitor m )
         {
+            //clean old CodeCakeBuilders files
+            DeleteFile( m, "Build.NuGetHelper.cs" );
+            DeleteFile( m, "Build.StandardCheckRepository.cs" );
+            DeleteFile( m, "Build.StandardCreateNuGetPackages.cs" );
+            DeleteFile( m, "Build.StandardPushNuGetPackages.cs" );
+            DeleteFile( m, "Build.StandardSolutionBuild.cs" );
+            DeleteFile( m, "Build.StandardUnitTests.cs" );
+
+            //Root files
             SetTextResource( m, "InstallCredentialProvider.ps1" );
             SetTextResource( m, "Program.cs" );
+            SetTextResource( m, "Build.SetCIVersionOnRunner.cs" );
+            SetTextResource( m, "Build.StandardCheckRepositoryWithoutNuGet.cs" );
+            SetTextResource( m, "Build.StandardPushCKSetupComponents.cs" );
             UpdateTextResource( m, "Build.cs", AdaptBuild );
-            SetTextResource( m, "Build.NuGetHelper.cs" );
-            SetTextResource( m, "Build.StandardCheckRepository.cs", AdaptStandardCheckRepositoryForPushFeeds );
-            SetTextResource( m, "Build.StandardSolutionBuild.cs" );
-            if( _settings.NoUnitTests )
+
+            //Abstractions files
+            SetTextResource( m, "Abstractions/Artifact.cs" );
+            SetTextResource( m, "Abstractions/ArtifactFeed.cs" );
+            SetTextResource( m, "Abstractions/ArtifactInstance.cs" );
+            SetTextResource( m, "Abstractions/ArtifactRepository.cs" );
+
+
+            bool useDotnet = true;
+            bool pushDotnet = true;
+            if( useDotnet )
             {
-                m.Info( "Removing Build.StandardUnitTests since NoUnitTests is true." );
-                DeleteFile( m, "Build.StandardUnitTests.cs" );
+                SetTextResource( m, "dotnet/Build.NuGetHelper.cs" );
+                SetTextResource( m, "dotnet/Build.NugetRepository.cs", AdaptStandardCheckRepositoryForPushFeeds );
+                SetTextResource( m, "dotnet/Build.StandardCheckRepository.cs" );
+                SetTextResource( m, "dotnet/Build.StandardSolutionBuild.cs" );
+                if( _settings.NoUnitTests )
+                {
+                    m.Info( "Removing Build.StandardUnitTests since NoUnitTests is true." );
+                    DeleteFile( m, "dotnet/Build.StandardUnitTests.cs" );
+                }
+                else
+                {
+                    SetTextResource( m, "dotnet/Build.StandardUnitTests.cs" );
+                }
+                if( pushDotnet )
+                {
+                    SetTextResource( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
+                    SetTextResource( m, "dotnet/Build.StandardPushNuGetPackages.cs" );
+                }
             }
-            else
+
+            bool useNpm = true;
+            if( useNpm )
             {
-                SetTextResource( m, "Build.StandardUnitTests.cs" );
+                //CakeExtensions
+                SetTextResource( m, "CakeExtensions/NpmDistTagRunner.cs" );
+                SetTextResource( m, "CakeExtensions/NpmGet.cs" );
+                SetTextResource( m, "CakeExtensions/NpmGetPackagesToPublish.cs" );
+                SetTextResource( m, "CakeExtensions/NpmView.cs" );
+                //npm itself
+                SetTextResource( m, "npm/Build.NpmFeed.cs" );
+                SetTextResource( m, "npm/Build.NpmHelper.cs" );
+                SetTextResource( m, "npm/Build.NpmRepository.cs" );
+                SetTextResource( m, "npm/Build.StandardNpmBuild.cs" );
+                SetTextResource( m, "npm/Build.StandardNpmUnitTests.cs" );
             }
-            SetTextResource( m, "Build.StandardCreateNuGetPackages.cs" );
-            SetTextResource( m, "Build.StandardPushNuGetPackages.cs" );
 
             bool? produceCKSetupComponents = _driver.AreCKSetupComponentsProduced( m );
             if( produceCKSetupComponents == null ) return;
@@ -92,13 +132,13 @@ namespace CK.Env.Plugins.SolutionFiles
 
         string AdaptStandardCheckRepositoryForPushFeeds( string text )
         {
-            Match m = Regex.Match( text, @"return new NuGetHelper\.Feed\[\]{.*?};", RegexOptions.Singleline|RegexOptions.CultureInvariant );
+            Match m = Regex.Match( text, @"return new NuGetHelper\.NuGetFeed\[\]{.*?};", RegexOptions.Singleline | RegexOptions.CultureInvariant );
             if( !m.Success )
             {
-                throw new Exception( "Expected pattern return new NuGetHelper.Feed[]{...} in Build.StandardCheckRepository.cs." );
+                throw new Exception( "Expected pattern return new NuGetHelper.NuGetFeed[]{...} in Build.StandardCheckRepository.cs." );
             }
-            StringBuilder b = new StringBuilder( );
-            b.AppendLine( "return new NuGetHelper.Feed[]{" );
+            StringBuilder b = new StringBuilder();
+            b.AppendLine( "return new NuGetHelper.NuGetFeed[]{" );
             bool atLeastOne = false;
             foreach( var info in _settings.ArtifactTargets.Select( a => a.Info ).OfType<INuGetFeedInfo>() )
             {
@@ -107,10 +147,10 @@ namespace CK.Env.Plugins.SolutionFiles
                 switch( info )
                 {
                     case NuGetAzureFeedInfo a:
-                        b.Append( "new SignatureVSTSFeed( \"" ).Append( a.Organization ).Append( "\", \"" ).Append( a.FeedName ).Append( "\" )" );
+                        b.Append( "new SignatureVSTSFeed(cake, \"" ).Append( a.Organization ).Append( "\", \"" ).Append( a.FeedName ).Append( "\" )" );
                         break;
                     case NuGetStandardFeedInfo n:
-                        b.Append( "new RemoteFeed( \"" ).Append( n.Name).Append( "\", \"" )
+                        b.Append( "new RemoteFeed(cake, \"" ).Append( n.Name ).Append( "\", \"" )
                                                         .Append( n.Url ).Append( "\", \"" )
                                                         .Append( n.SecretKeyName ).Append( "\" )" );
                         break;
@@ -127,7 +167,7 @@ namespace CK.Env.Plugins.SolutionFiles
             Regex r = new Regex(
                   "(?<1>const\\s+string\\s+solutionName\\s*=\\s*\").*?(?<2>\";\\s*//\\s*!Transformable)",
                   RegexOptions.ExplicitCapture | RegexOptions.CultureInvariant );
-            return r.Replace( text, "$1"+name+"$2" );
+            return r.Replace( text, "$1" + name + "$2" );
         }
     }
 }

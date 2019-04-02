@@ -1,11 +1,8 @@
 using CK.Core;
-using CK.NuGetClient;
 using CK.SimpleKeyVault;
 using CK.Text;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Xml.Linq;
 
 namespace CK.Env.Plugins.SolutionFiles
 {
@@ -49,9 +46,9 @@ namespace CK.Env.Plugins.SolutionFiles
                 m.Error( "A required repository secret is missing." );
                 return;
             }
-            foreach( var s in repositorySecrets )
+            foreach( var (SecretKeyName, Secret) in repositorySecrets )
             {
-                required.Add( s.SecretKeyName, s.Secret );
+                required.Add( SecretKeyName, Secret );
             }
 
             if( _settings.UseCKSetup )
