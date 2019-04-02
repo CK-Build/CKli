@@ -4,6 +4,8 @@ using CK.Env.MSBuild;
 using CK.Text;
 using System.Linq;
 using System.Xml.Linq;
+using CK.Env.NPM;
+using System.Collections.Generic;
 
 namespace CKli
 {
@@ -17,8 +19,7 @@ namespace CKli
             Initializer initializer,
             XBranch branch,
             XSolutionSettings solutionSettings,
-            XSolutionCentral central,
-            XNPMProjects npmProjects = null )
+            XSolutionCentral central )
             : base( initializer,
                     branch,
                     central,
@@ -33,28 +34,13 @@ namespace CKli
             {
                 branch.Parent.GitFolder.PluginManager.Register( type, branch.Name, allowGitPlugin: true );
             }
-            if( npmProjects != null )
-            {
-                npmProjects.SetSolution( this );
-                NPMProjects = npmProjects;
-            }
+            NPMProjects = new List<INPMProjectSpec>();
         }
 
         /// <summary>
         /// Gets the <see cref="XBranch"/> that is the direct parent.
         /// </summary>
         public new XBranch Parent => (XBranch)base.Parent;
-        /// <summary>
-        /// Gets a semicolon separated list of project path that are npm projects to publish.
-        /// These path should be valid path
-        /// </summary>
-        public string NpmProjectsPathToPublish { get; private set; }
-
-        /// <summary>
-        /// Gets the optional NPMProjects (that must be defined before the primary solution).
-        /// Can be null.
-        /// </summary>
-        public XNPMProjects NPMProjects { get; }
 
         /// <summary>
         /// Gets whether <see cref="CK.Env.MSBuild.Solution.TestProjects"/> must be added to <see cref="CK.Env.MSBuild.Solution.PublishedProjects"/>.
@@ -72,6 +58,11 @@ namespace CKli
         /// These names must be projects in <see cref="Solution.PublishedProjects"/>.
         /// </summary>
         public string CKSetupComponentProjects { get; private set; }
+
+        /// <summary>
+        /// Gets the NPM project specifications. Can be empty.
+        /// </summary>
+        public IList<INPMProjectSpec> NPMProjects { get; }
 
         /// <summary>
         /// Overridden to load the primary solution and applies <see cref="TestProjectsArePublished"/>
@@ -113,6 +104,7 @@ namespace CKli
                 }
                 HandleCKSetupComponentProjects( m, s );
                 HandleArtifactTargetNames( m, s );
+                s.NPMProjects.AddRange( NPMProjects.Select( spec => s.BuildContext.NPMProjectContext.Ensure( m, spec ) ) );
             }
             return s;
         }

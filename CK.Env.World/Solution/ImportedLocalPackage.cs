@@ -19,6 +19,12 @@ namespace CK.Env
             Package = new VersionedPackage( d.TargetProjectName, d.Version );
         }
 
+
+        /// <summary>
+        /// Gets the type of the dependency involved (ie. "NuGet", "NPM", etc.).
+        /// </summary>
+        public string Type => _dep.Type;
+
         /// <summary>
         /// Gets the primary solution that produces this package.
         /// </summary>

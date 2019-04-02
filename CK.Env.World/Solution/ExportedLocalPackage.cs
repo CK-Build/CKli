@@ -20,6 +20,11 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Gets the type of the dependency involved (ie. "NuGet", "NPM", etc.).
+        /// </summary>
+        public string Type => _dep.Type;
+
+        /// <summary>
         /// Gets the primary solution that consumes this package.
         /// </summary>
         public IDependentSolution Target => _dep.Origin;

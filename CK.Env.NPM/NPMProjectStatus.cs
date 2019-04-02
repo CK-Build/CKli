@@ -8,9 +8,12 @@ namespace CK.Env.NPM
 {
     public enum NPMProjectStatus
     {
-        Invalid,
-        WarnMissingFolder,
-        WarnMissingPackageJson,
-        Valid
+        FatalInitialiizationError,
+        ErrorMissingPackageJson,
+        ErrorPackageMustBePrivate,
+        ErrorPackageMustNotBePrivate,
+        ErrorPackageNameMissing,
+        ErrorPackageInvalidName,
+        Valid,
     }
 }

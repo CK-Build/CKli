@@ -49,7 +49,7 @@ namespace CK.Env
         /// See <see cref="ExportedLocalPackages"/> to know the solutions and projects in the context that
         /// use/consume some or all these packages.
         /// </summary>
-        IReadOnlyCollection<GeneratedPackage> GeneratedPackages { get; }
+        IReadOnlyCollection<GeneratedArtifact> GeneratedPackages { get; }
 
         /// <summary>
         /// Gets the set of final artifacts that this solution produces.

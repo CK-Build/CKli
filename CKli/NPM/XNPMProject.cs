@@ -10,27 +10,29 @@ using System.Threading.Tasks;
 
 namespace CKli
 {
-    public class XNPMProject : XTypedObject, INPMProjectDescription
+    public class XNPMProject : XTypedObject, INPMProjectSpec
     {
         public XNPMProject(
-                Initializer initializer
+                Initializer initializer,
+                XNPMProjectCenter projectCenter,
+                XPrimarySolution solution
             )
             : base( initializer )
         {
-            if( !(initializer.Parent is XNPMProjects projects) ) throw new Exception( "A NPMProject must be a direct child of a NPMProjects." );
-            Projects = projects;
+            Solution = solution;
             if( PackageName == null ) PackageName = Folder.LastPart.ToLowerInvariant();
+            Solution.NPMProjects.Add( this );
         }
 
-        public XNPMProjects Projects { get; }
+        public XPrimarySolution Solution { get; }
+
+        public NormalizedPath Folder { get; private set; }
 
         public string PackageName { get; private set; }
 
         public bool IsPrivate { get; private set; }
 
-        public NormalizedPath Folder { get; private set; }
-
-        public NormalizedPath FullPath => Projects.Solution.FullPath.Combine( Folder );
+        public NormalizedPath FullPath => Solution.FullPath.Combine( Folder );
 
     }
 }

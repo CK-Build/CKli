@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Env.NPM;
 using CK.Text;
 using System;
 using System.Collections.Generic;
@@ -153,15 +154,20 @@ namespace CK.Env.MSBuild
         /// <param name="fileSystem">The file system provider.</param>
         public MSBuildContext( FileSystem fileSystem )
         {
-            FileSystem = fileSystem;
+            NPMProjectContext = new NPMProjectContext( fileSystem );
             _files = new Dictionary<NormalizedPath, ProjectFile>();
             _solutions = new Dictionary<NormalizedPath, SolutionTracker>();
         }
 
         /// <summary>
+        /// Gets the context for NPM projects.
+        /// </summary>
+        public NPMProjectContext NPMProjectContext { get; }
+
+        /// <summary>
         /// Gets the file system.
         /// </summary>
-        public FileSystem FileSystem { get; }
+        public FileSystem FileSystem => NPMProjectContext.FileSystem;    
 
         /// <summary>
         /// Returns a newly loaded <see cref="Solution"/> or retrieves it from the cache.

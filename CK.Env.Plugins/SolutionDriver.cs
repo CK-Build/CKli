@@ -300,7 +300,9 @@ namespace CK.Env.Plugins
             var allSolutions = GetAllSolutions( monitor );
             if( allSolutions == null ) return false;
 
-            var feed = PluginBranch == StandardGitStatus.Local ? _localFeedProvider.Local : _localFeedProvider.CI;
+            var feed = PluginBranch == StandardGitStatus.Local
+                        ? _localFeedProvider.Local
+                        : _localFeedProvider.CI;
 
             var toUpgrade = allSolutions
                         .SelectMany( s => s.AllProjects )

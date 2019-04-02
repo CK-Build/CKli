@@ -18,6 +18,7 @@ namespace CK.IniFile
 
         string _comment;
         string _key;
+
         /// <summary>
         /// Create with <see cref="CommentType"/> = <see cref="IniCommentType.Leading"/>
         /// </summary>
@@ -27,6 +28,7 @@ namespace CK.IniFile
             CommentType = IniCommentType.Leading;
             Comment = comment;
         }
+
         /// <summary>
         /// Create with <see cref="CommentType"/> = <see cref="IniCommentType.None"/>
         /// </summary>
@@ -38,6 +40,7 @@ namespace CK.IniFile
             Key = key;
             Value = value;
         }
+
         /// <summary>
         /// Create with <see cref="CommentType"/> = <see cref="IniCommentType.Trailing"/>
         /// </summary>
@@ -53,8 +56,8 @@ namespace CK.IniFile
         }
 
         public virtual string ToString<TFormat, TLine>( TFormat iniFormat )
-        where TFormat : IniFormat<TLine>
-        where TLine : IniLine
+                                where TFormat : IniFormat<TLine>
+                                where TLine : IniLine
         {
             switch( CommentType )
             {

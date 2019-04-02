@@ -1,4 +1,3 @@
-using CK.IniFile.SpecificImplementation;
 using CK.Text;
 using CK.IniFile;
 namespace CK.Env.Plugins
@@ -8,6 +7,7 @@ namespace CK.Env.Plugins
         string _currentText;
         IniFile<IniFormat<IniLine>, IniLine> _iniConfig;
         readonly IniFormat<IniLine> _format;
+
         public IniFilePluginBase( IniFormat<IniLine> format, GitFolder f, NormalizedPath branchPath, NormalizedPath filePath ) : base( f, branchPath, filePath )
         {
             _format = format;

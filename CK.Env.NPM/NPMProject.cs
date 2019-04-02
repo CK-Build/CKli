@@ -12,45 +12,72 @@ namespace CK.Env.NPM
     public class NPMProject
     {
         readonly PackageJsonFile _packageFile;
-        INPMProjectDescription _desc;
+        INPMProjectSpec _spec;
         NPMProjectStatus _status;
 
-        public NPMProject( NPMContext c, IActivityMonitor m, INPMProjectDescription description )
+        internal NPMProject( NPMProjectContext c, IActivityMonitor m, INPMProjectSpec spec )
         {
             NPMContext = c;
-            FullPath = description.FullPath;
             _packageFile = new PackageJsonFile( this );
-            UpdateDescription( m, description );
+            UpdateDescription( m, spec );
         }
 
-        public NPMContext NPMContext { get; }
+        public NPMProjectContext NPMContext { get; }
 
         public FileSystem FileSystem => NPMContext.FileSystem;
 
-        public INPMProjectDescription Description => _desc;
+        public INPMProjectSpec Specification => _spec;
 
         public NPMProjectStatus Status => _status;
 
-        public NormalizedPath FullPath { get; }
+        public NormalizedPath FullPath => _spec.FullPath;
 
-        public NormalizedPath PackageJsonPath { get; }
+        public PackageJsonFile PackageJson => _packageFile;
 
-        internal void UpdateDescription( IActivityMonitor m, INPMProjectDescription d )
+        internal void UpdateDescription( IActivityMonitor m, INPMProjectSpec d )
         {
-            if( _desc != d )
+            if( _spec != d )
             {
-                _desc = d;
+                _spec = d;
                 _status = RefreshStatus( m );
             }
         }
 
         NPMProjectStatus RefreshStatus( IActivityMonitor m )
         {
-            var dir = FileSystem.GetDirectoryContents( FullPath );
-            if( !dir.Exists ) return NPMProjectStatus.WarnMissingFolder;
-            if( _packageFile.Root == null ) return NPMProjectStatus.WarnMissingPackageJson;
+            NPMProjectStatus Error( NPMProjectStatus s, string msg = null )
+            {
+                m.Error( msg ?? $"Error: {s}" );
+                return s;
+            }
 
-            return NPMProjectStatus.Valid;
+            try
+            {
+                if( _packageFile.Root == null )
+                {
+                    return FileSystem.GetDirectoryContents( FullPath ).Exists
+                        ? Error( NPMProjectStatus.ErrorMissingPackageJson )
+                        : Error( NPMProjectStatus.FatalInitialiizationError );
+                }
+                if( _spec.IsPrivate )
+                {
+                    if( !_packageFile.IsPrivate ) return Error( NPMProjectStatus.ErrorPackageMustBePrivate );
+                }
+                else
+                {
+                    if( _packageFile.IsPrivate ) return Error( NPMProjectStatus.ErrorPackageMustNotBePrivate );
+                    if( _packageFile.Name == null ) return Error( NPMProjectStatus.ErrorPackageNameMissing );
+                    if( _packageFile.Name != _spec.PackageName )
+                        return Error( NPMProjectStatus.ErrorPackageInvalidName, $"Expected package name is '{_spec.PackageName}' but found '{_packageFile.Name}'." );
+                }
+                return NPMProjectStatus.Valid;
+            }
+            catch( Exception ex )
+            {
+                m.Error( $"While reading NPM project '{_spec.FullPath}'.", ex );
+                return NPMProjectStatus.FatalInitialiizationError;
+            }
+
         }
     }
 }

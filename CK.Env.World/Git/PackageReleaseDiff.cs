@@ -13,7 +13,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="p">The package.</param>
         /// <param name="c">The change.</param>
-        public PackageReleaseDiff( GeneratedPackage p, PackageReleaseDiffType c )
+        public PackageReleaseDiff( GeneratedArtifact p, PackageReleaseDiffType c )
         {
             Package = p;
             DiffType = c;
@@ -25,7 +25,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="p">The package.</param>
         /// <param name="changes">The changes.</param>
-        public PackageReleaseDiff( GeneratedPackage p, IReadOnlyCollection<FileReleaseDiff> changes )
+        public PackageReleaseDiff( GeneratedArtifact p, IReadOnlyCollection<FileReleaseDiff> changes )
         {
             Package = p;
             DiffType = changes.Count == 0 ? PackageReleaseDiffType.None : PackageReleaseDiffType.Changed;
@@ -35,11 +35,11 @@ namespace CK.Env
         /// <summary>
         /// Gets the package.
         /// </summary>
-        public GeneratedPackage Package { get; }
+        public GeneratedArtifact Package { get; }
 
         /// <summary>
         /// Gets the global change type that occured in
-        /// the <see cref="GeneratedPackage.PrimarySolutionRelativeFolderPath"/>.
+        /// the <see cref="GeneratedArtifact.PrimarySolutionRelativeFolderPath"/>.
         /// </summary>
         public PackageReleaseDiffType DiffType { get; }
 

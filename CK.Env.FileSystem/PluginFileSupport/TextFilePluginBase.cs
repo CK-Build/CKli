@@ -10,7 +10,6 @@ namespace CK.Env.Plugins
     public abstract class TextFilePluginBase : TextFileBase, IGitBranchPlugin
     {
         readonly GitBranchPluginImpl _pluginImpl;
-        ITextFileInfo _file;
 
         protected TextFilePluginBase( GitFolder f, NormalizedPath branchPath, NormalizedPath filePath )
             : base( f.FileSystem, filePath )

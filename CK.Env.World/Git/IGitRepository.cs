@@ -55,7 +55,7 @@ namespace CK.Env
         /// <param name="previousVersionCommitSha">Previous commit.</param>
         /// <param name="packages">Generated packages of a solution.</param>
         /// <returns>The set of diff or null on error.</returns>
-        IReadOnlyCollection<PackageReleaseDiff> GetReleaseDiff( IActivityMonitor m, string previousVersionCommitSha, IReadOnlyCollection<GeneratedPackage> packages );
+        IReadOnlyCollection<PackageReleaseDiff> GetReleaseDiff( IActivityMonitor m, string previousVersionCommitSha, IReadOnlyCollection<GeneratedArtifact> packages );
 
         /// <summary>
         /// Commits any pending changes.

@@ -40,6 +40,7 @@ namespace CK.IniFile
         public IniDuplication Duplication { get; protected set; }
         
     }
+
     public enum IniDuplication
     {
         /// <summary>

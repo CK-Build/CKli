@@ -7,6 +7,7 @@ namespace CK.Env.Plugins
     {
         string _currentText;
         NpmrcFile _iniConfig;
+
         public NpmrcFilePluginBase( GitFolder f, NormalizedPath branchPath, NormalizedPath filePath ) : base( f, branchPath, filePath )
         {
         }

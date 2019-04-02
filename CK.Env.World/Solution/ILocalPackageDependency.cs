@@ -9,6 +9,11 @@ namespace CK.Env
     public interface ILocalPackageDependency
     {
         /// <summary>
+        /// Gets the type of the dependency involved (ie. "NuGet", "NPM", etc.).
+        /// </summary>
+        string Type { get; }
+
+        /// <summary>
         /// Gets the primary solution that references the <see cref="TargetProjectName"/> package.
         /// </summary>
         IDependentSolution Origin { get; }

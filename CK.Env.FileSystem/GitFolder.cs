@@ -204,7 +204,7 @@ namespace CK.Env
         /// <param name="previousVersionCommitSha">Previous commit.</param>
         /// <param name="packages">Generated packages of a solution.</param>
         /// <returns>The set of diff or null on error.</returns>
-        public IReadOnlyCollection<PackageReleaseDiff> GetReleaseDiff( IActivityMonitor m, string previousVersionCommitSha, IReadOnlyCollection<GeneratedPackage> packages )
+        public IReadOnlyCollection<PackageReleaseDiff> GetReleaseDiff( IActivityMonitor m, string previousVersionCommitSha, IReadOnlyCollection<GeneratedArtifact> packages )
         {
             if( packages.Count == 0 ) return Array.Empty<PackageReleaseDiff>();
             var r = new List<PackageReleaseDiff>();
@@ -218,7 +218,7 @@ namespace CK.Env
             return r;
         }
 
-        PackageReleaseDiff CreateDiff( IActivityMonitor m, Commit commit, GeneratedPackage p )
+        PackageReleaseDiff CreateDiff( IActivityMonitor m, Commit commit, GeneratedArtifact p )
         {
             TreeEntry newTreeEntry = _git.Head.Tip.Tree[p.PrimarySolutionRelativeFolderPath.Replace( '\\', '/' )];
             if( newTreeEntry == null || newTreeEntry.TargetType != TreeEntryTargetType.Tree )

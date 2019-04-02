@@ -7,6 +7,7 @@
   <NuGetClient />
   <CKSetupClient />
   <SolutionCentral />
+  <NPMProjectCenter />
 
   <ArtifactRepositories>
 
@@ -49,7 +50,7 @@
       <add Name="Invenietis - CI" />
     </RemoveNuGetSourceNames>
     <ArtifactTargets>
-      <add Name="NuGetAzure:Signature-Code-CKEnvTest3" />
+      <add Name="NuGetAzure:Signature-OpenSource-CKEnvTest3" />
       <add Name="CKSetup:CKEnvTest" />
     </ArtifactTargets>
     <Plugins>
@@ -100,6 +101,7 @@
       <SolutionSettings NoStrongNameSigning="True"/>
       <Branch Name="develop">
         <PrimarySolution />
+        <NPMProject Folder="js" PackageName="@signature/ck-observable-domain" />
       </Branch>
       
     </GitFolder>

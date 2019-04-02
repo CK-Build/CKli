@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace CK.Env.NPM
 {
-    public interface INPMProjectDescription
+    public interface INPMProjectSpec
     {
         /// <summary>
         /// Gets the package name.

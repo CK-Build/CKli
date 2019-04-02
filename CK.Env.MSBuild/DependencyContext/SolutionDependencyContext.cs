@@ -48,7 +48,7 @@ namespace CK.Env.MSBuild
             public Project Target { get; }
 
             /// <summary>
-            /// Gets the single version refrence from <see cref="Origin"/> to <see cref="Target"/>.
+            /// Gets the single version reference from <see cref="Origin"/> to <see cref="Target"/>.
             /// Null if <see cref="Solution"/> does not require any other solution.
             /// Note that this relation does not support per framework dependencies: a locally produced package can not
             /// have different versions at the same time in a World. An <see cref="InvalidOperationException"/> is thrown
@@ -75,16 +75,18 @@ namespace CK.Env.MSBuild
             }
         }
 
-        class LocalDep : ILocalPackageDependency
+        class NuGetLocalDep : ILocalPackageDependency
         {
             readonly DependencyRow _row;
 
-            public LocalDep( DependencyRow row, Dictionary<string, DependentSolution> indexByName )
+            public NuGetLocalDep( DependencyRow row, Dictionary<string, DependentSolution> indexByName )
             {
                 _row = row;
                 Origin = indexByName[row.Origin.PrimarySolution.UniqueSolutionName];
                 Target = indexByName[row.Target.PrimarySolution.UniqueSolutionName];
             }
+
+            public string Type => "NuGet";
 
             public IDependentSolution Origin { get; }
 
@@ -216,7 +218,7 @@ namespace CK.Env.MSBuild
             /// See <see cref="ExportedLocalPackages"/> to know the solutions and projects in the context that
             /// use/consume some or all these packages.
             /// </summary>
-            public IReadOnlyCollection<GeneratedPackage> GeneratedPackages { get; private set; }
+            public IReadOnlyCollection<GeneratedArtifact> GeneratedPackages { get; private set; }
 
             /// <summary>
             /// Gets the set of final artifacts that this solution produces.
@@ -280,7 +282,7 @@ namespace CK.Env.MSBuild
                                          .ToArray();
 
                 GeneratedPackages = Solution.PublishedProjects
-                                            .Select( p => new GeneratedPackage( p.Name, p.PrimarySolutionRelativeFolderPath ) )
+                                            .Select( p => new GeneratedArtifact( new Artifact( "NuGet", p.Name ), p.PrimarySolutionRelativeFolderPath ) )
                                             .ToArray();
 
                 var artifacts = Solution.PublishedProjects
@@ -343,7 +345,7 @@ namespace CK.Env.MSBuild
             DependencyTable = t;
             Solutions = solutions;
             PackageDependencies = t.Where( row => row.Origin != null )
-                                   .Select( row => new LocalDep( row, _indexByName ) )
+                                   .Select( row => new NuGetLocalDep( row, _indexByName ) )
                                    .ToArray();
             for( int i = solutions.Count - 1; i >= 0; --i ) solutions[i].Initialize( this );
         }
