@@ -11,79 +11,37 @@ namespace CK.Env.Plugins
     /// <summary>
     /// Basic base class for text files.
     /// </summary>
-    public abstract class TextFilePluginBase : GitBranchPluginBase
+    public abstract class TextFilePluginBase : TextFileBase, IGitBranchPlugin
     {
+        readonly GitBranchPluginImpl _pluginImpl;
         ITextFileInfo _file;
 
         protected TextFilePluginBase( GitFolder f, NormalizedPath branchPath, NormalizedPath filePath )
-            : base( f, branchPath )
+            : base( f.FileSystem, filePath )
         {
             if( !filePath.StartsWith( branchPath ) ) throw new ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
-            FilePath = filePath;
-        }
-
-        ITextFileInfo GetFile() => _file ?? (_file = Folder.FileSystem.GetFileInfo( FilePath ).AsTextFileInfo( ignoreExtension: true ));
-
-        /// <summary>
-        /// Gets the path in the <see cref="GitFolder.FileSystem"/> root.
-        /// </summary>
-        public NormalizedPath FilePath { get; }
-
-        /// <summary>
-        /// Gets the text file content or null if it does not exist.
-        /// To update this content, <see cref="CreateOrUpdate(IActivityMonitor, string)"/> must
-        /// be used.
-        /// </summary>
-        public string TextContent => GetFile()?.TextContent;
-
-        /// <summary>
-        /// Deletes the file if it exists.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        public void Delete( IActivityMonitor m )
-        {
-            if( GetFile() != null )
-            {
-                Folder.FileSystem.Delete( m, FilePath );
-                _file = null;
-            }
-            OnDeleted( m );
+            _pluginImpl = new GitBranchPluginImpl( f, branchPath );
         }
 
         /// <summary>
-        /// Called by <see cref="Delete"/> once <see cref="TextContent"/> is null
-        /// and the file has been deleted from the file system.
+        /// Gets the Git folder.
+        /// Its <see cref="GitFolder.CurrentBranchName"/> can be different from
+        /// the branch of the plugin (see <see cref="BranchPath"/>).
         /// </summary>
-        /// <param name="m"></param>
-        protected virtual void OnDeleted( IActivityMonitor m )
-        {
-        }
+        public GitFolder Folder => _pluginImpl.Folder;
 
         /// <summary>
-        /// Saves (creates or updates), this file with a new content or calls <see cref="Delete"/>
-        /// if content is null.
-        /// If the content is the same as the current <see cref="TextContent"/> the save is skipped.
+        /// Gets the branch path (relative to the <see cref="FileSystem"/>) into
+        /// which this plugin is registered.
+        /// The <see cref="NormalizedPath.LastPart"/> is the actual branch name.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="newContent">The content. Null to delete the file.</param>
-        /// <param name="forceSave">True to always save the file.</param>
-        /// <returns>True on success, false on error.</returns>
-        protected bool CreateOrUpdate( IActivityMonitor m, string newContent, bool forceSave = false )
-        {
-            string oldContent = GetFile()?.TextContent;
-            if( oldContent == newContent && !forceSave ) return true;
-            if( newContent == null )
-            {
-                Delete( m );
-                return true;
-            }
-            if( !Folder.FileSystem.CopyTo( m, newContent, FilePath ) )
-            {
-                return false;
-            }
-            _file = null;
-            return true;
-        }
+        public NormalizedPath BranchPath => _pluginImpl.BranchPath;
 
+        /// <summary>
+        /// Gets the standard plugin branch name into which this plugin is registered.
+        /// It is <see cref="StandardGitStatus.Unknown"/> if the actual branch is not one
+        /// the 3 standard ones.
+        /// </summary>
+        public StandardGitStatus PluginBranch => _pluginImpl.PluginBranch;
     }
 }

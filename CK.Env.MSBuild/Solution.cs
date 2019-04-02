@@ -17,7 +17,6 @@ namespace CK.Env.MSBuild
     /// </summary>
     public sealed class Solution : IDependentItemContainerRef
     {
-        readonly List<NpmProject> _npmProjects;
         SolutionSpecialType _specialType;
         List<Solution> _secondarySolutions;
         List<ProjectBase> _allProjects;
@@ -201,19 +200,6 @@ namespace CK.Env.MSBuild
         public IList<Project> CKSetupComponentProjects { get; }
 
         /// <summary>
-        /// Gets the Npm projects associated to this solution.
-        /// </summary>
-        public IReadOnlyList<NpmProject> NpmProjects => _npmProjects;
-
-        internal bool LoadNpmProject( IActivityMonitor m, NpmProjectDescription desc )
-        {
-            var p = NpmProject.Load( m, this, desc );
-            if( p == null ) return false;
-            _npmProjects.Add( p );
-            return true;
-        }
-
-        /// <summary>
         /// Gets the target names where generated artifacts should be pushed.
         /// This is empty by default: this must be filled explicitly.
         /// </summary>
@@ -353,15 +339,13 @@ namespace CK.Env.MSBuild
                                                                         && p.Path.Parts.Count == FilePath.Parts.Count + 1 )
                                                           .ToList();
             CKSetupComponentProjects = new List<Project>();
-            _npmProjects = new List<NpmProject>();
             ArtifactTargetNames = new List<string>();
         }
 
         static internal Solution Load(
             IActivityMonitor m,
             MSBuildContext ctx,
-            NormalizedPath filePath,
-            IEnumerable<NpmProjectDescription> npmProjects )
+            NormalizedPath filePath )
         {
             if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
             var file = ctx.FileSystem.GetFileInfo( filePath ).AsTextFileInfo();
@@ -443,14 +427,6 @@ namespace CK.Env.MSBuild
                     if( p.ReloadProjectFile( m ) == null )
                     {
                         m.Error( $"Error while loading project '{p}'." );
-                        return null;
-                    }
-                }
-                foreach( var npm in npmProjects )
-                {
-                    if( !s.LoadNpmProject( m, npm ) )
-                    {
-                        m.Error( $"Error while loading NPM project '{npm}'." );
                         return null;
                     }
                 }

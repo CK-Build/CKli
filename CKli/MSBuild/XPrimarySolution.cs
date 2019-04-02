@@ -17,13 +17,12 @@ namespace CKli
     /// </summary>
     public class XPrimarySolution : XSolutionBase
     {
-        readonly XElement _xElement;
-
         public XPrimarySolution(
             Initializer initializer,
             XBranch branch,
             XSolutionSettings solutionSettings,
-            XSolutionCentral central )
+            XSolutionCentral central,
+            XNPMProjects npmProjects = null )
             : base( initializer,
                     branch,
                     central,
@@ -31,8 +30,6 @@ namespace CKli
                     branch.Parent.Name + ".sln" )
         {
             if( !(initializer.Parent is XBranch) ) throw new Exception( "A primary solution must be a direct child of a Git branch." );
-            // Will be used to load NpmProjects.
-            _xElement = initializer.Element;
             // The primary solution is available to siblings (ie. up to the end of the parent git branch).
             initializer.Services.Add( this );
             branch.Parent.GitFolder.PluginManager.RegisterSettings( solutionSettings.SolutionSettings, branch.Name );
@@ -40,12 +37,23 @@ namespace CKli
             {
                 branch.Parent.GitFolder.PluginManager.Register( type, branch.Name, allowGitPlugin: true );
             }
+            if( npmProjects != null )
+            {
+                npmProjects.SetSolution( this );
+                NPMProjects = npmProjects;
+            }
         }
 
         /// <summary>
         /// Gets the <see cref="XBranch"/> that is the direct parent.
         /// </summary>
         public new XBranch Parent => (XBranch)base.Parent;
+
+        /// <summary>
+        /// Gets the optional NPMProjects (that must be defined before the primary solution).
+        /// Can be null.
+        /// </summary>
+        public XNPMProjects NPMProjects { get; }
 
         /// <summary>
         /// Gets whether <see cref="CK.Env.MSBuild.Solution.TestProjects"/> must be added to <see cref="CK.Env.MSBuild.Solution.PublishedProjects"/>.
@@ -78,7 +86,6 @@ namespace CKli
                                                     m,
                                                     GetSolutionFilePath( projectToBranchName ),
                                                     null,
-                                                    _xElement.Elements( "NpmProjects" ).Elements( "NpmProject" ).Select( e => new NpmProjectDescription( e ) ),
                                                     SolutionSpecialType.None,
                                                     reload );
             if( loaded )

@@ -13,89 +13,37 @@ namespace CK.Env.Plugins
     /// <summary>
     /// Exposes a <see cref="XDocument"/> from a file.
     /// </summary>
-    public abstract class XmlFilePluginBase : TextFilePluginBase
+    public abstract class XmlFilePluginBase : XmlFileBase, IGitBranchPlugin
     {
-        XDocument _doc;
-        string _currentText;
+        readonly GitBranchPluginImpl _pluginImpl;
 
         public XmlFilePluginBase( GitFolder f, NormalizedPath branchPath, NormalizedPath filePath )
-            : base( f, branchPath, filePath )
+            : base( f.FileSystem, filePath )
         {
+            if( !filePath.StartsWith( branchPath ) ) throw new ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
+            _pluginImpl = new GitBranchPluginImpl( f, branchPath );
         }
 
-        XDocument GetDocument()
-        {
-            if( _doc == null && (_currentText = TextContent) != null )
-            {
-                _doc = XDocument.Parse( _currentText, LoadOptions.PreserveWhitespace|LoadOptions.SetLineInfo );
-                _doc.Changed += OnDocChanged;
-            }
-            return _doc;
-        }
-
-        void OnDocChanged( object sender, XObjectChangeEventArgs e )
-        {
-            _currentText = null;
-        }
-
-        void ClearDocument()
-        {
-            if( _doc != null )
-            {
-                _doc.Changed -= OnDocChanged;
-                _doc = null;
-            }
-        }
-
-        string GetCurrentText()
-        {
-            if( _currentText == null && GetDocument() != null )
-            {
-                _currentText = _doc.Beautify().ToString();
-            }
-            return _currentText;
-        }
 
         /// <summary>
-        /// Gets or sets the <see cref="XDocument"/>.
-        /// Null if it does not exist.
-        /// This document is mutable and any change to it are tracked (<see cref="IsDirty"/>
-        /// is dynamically updated).
+        /// Gets the Git folder.
+        /// Its <see cref="GitFolder.CurrentBranchName"/> can be different from
+        /// the branch of the plugin (see <see cref="BranchPath"/>).
         /// </summary>
-        public XDocument Document
-        {
-            get => GetDocument();
-            set
-            {
-                if( value != _doc )
-                {
-                    ClearDocument();
-                    if( (_doc = value) != null ) _doc.Changed += OnDocChanged;
-                }
-            }
-        }
+        public GitFolder Folder => _pluginImpl.Folder;
 
         /// <summary>
-        /// Gets whether the <see cref="Document"/> must be saved.
+        /// Gets the branch path (relative to the <see cref="FileSystem"/>) into
+        /// which this plugin is registered.
+        /// The <see cref="NormalizedPath.LastPart"/> is the actual branch name.
         /// </summary>
-        public bool IsDirty => TextContent != GetCurrentText();
-
-        protected override void OnDeleted( IActivityMonitor m )
-        {
-            ClearDocument();
-        }
+        public NormalizedPath BranchPath => _pluginImpl.BranchPath;
 
         /// <summary>
-        /// Saves this <see cref="Document"/> if <see cref="IsDirty"/> is true.
+        /// Gets the standard plugin branch name into which this plugin is registered.
+        /// It is <see cref="StandardGitStatus.Unknown"/> if the actual branch is not one
+        /// the 3 standard ones.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="forceSave">True to ignore <see cref="IsDirty"/> and always save the file.</param>
-        /// <returns>True on success, false on error.</returns>
-        public bool Save( IActivityMonitor m, bool forceSave = false )
-        {
-            if( !IsDirty && !forceSave ) return true;
-            return CreateOrUpdate( m, GetCurrentText(), forceSave );
-        }
-
+        public StandardGitStatus PluginBranch => _pluginImpl.PluginBranch;
     }
 }

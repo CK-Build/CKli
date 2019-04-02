@@ -39,21 +39,6 @@ namespace CK.Env.MSBuild
         }
 
         /// <summary>
-        /// Package.json file.
-        /// </summary>
-        public sealed class NpmPackageFile
-        {
-            bool _hasChanged;
-
-            /// <summary>
-            /// Gets the file path in the <see cref="FileSystem"/>.
-            /// </summary>
-            public NormalizedPath Path { get; }
-
-            public JObject Document { get; }
-        }
-
-        /// <summary>
         /// Project Xml file.
         /// </summary>
         public sealed class ProjectFile
@@ -188,7 +173,6 @@ namespace CK.Env.MSBuild
         /// <param name="path">The path in the <see cref="FileSystem"/>.</param>
         /// <param name="settings"></param>
         /// <param name="primary">The primary solution if this solution is a secondary solution.</param>
-        /// <param name="npmProjects">Optional list of expected NPM projects.</param>
         /// <param name="type">The special secondary solution type.</param>
         /// <param name="force">True to force the reload of the solution.</param>
         /// <returns>The solution and whether it has been loaded or obtained from the cache. Null if the solution doesn't exist.</returns>
@@ -196,7 +180,6 @@ namespace CK.Env.MSBuild
             IActivityMonitor m,
             NormalizedPath path,
             Solution primary = null,
-            IEnumerable<NpmProjectDescription> npmProjects = null,
             SolutionSpecialType type = SolutionSpecialType.None,
             bool force = false )
         {
@@ -219,7 +202,7 @@ namespace CK.Env.MSBuild
                     return (s, false);
                 }
             }
-            s = DoLoad( m, path, npmProjects, tracker );
+            s = DoLoad( m, path, tracker );
             if( s != null )
             {
                 if( primary != null ) s.SetAsSecondarySolution( primary, type );
@@ -231,7 +214,6 @@ namespace CK.Env.MSBuild
         Solution DoLoad(
             IActivityMonitor m,
             NormalizedPath path,
-            IEnumerable<NpmProjectDescription> npmProjects,
             SolutionTracker tracker )
         {
             using( m.OpenTrace( $"Loading solution {path}." ) )
@@ -246,7 +228,7 @@ namespace CK.Env.MSBuild
                 }
                 try
                 {
-                    Solution s = Solution.Load( m, this, path, npmProjects ?? Array.Empty<NpmProjectDescription>() );
+                    Solution s = Solution.Load( m, this, path );
                     if( s != null )
                     {
                         if( tracker == null )

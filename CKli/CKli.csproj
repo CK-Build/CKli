@@ -10,6 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CK.BuildSystem.Appveyor\CK.BuildSystem.Appveyor.csproj" />
     <ProjectReference Include="..\CK.BuildSystem.GitLab\CK.BuildSystem.GitLab.csproj" />
+    <ProjectReference Include="..\CK.Env.NPM\CK.Env.NPM.csproj" />
     <ProjectReference Include="..\CK.Env.Plugins\CK.Env.Plugins.csproj" />
     <ProjectReference Include="..\CK.Env.Sys\CK.Env.Sys.csproj" />
     <ProjectReference Include="..\CK.Env.XTyping\CK.Env.XTyping.csproj" />

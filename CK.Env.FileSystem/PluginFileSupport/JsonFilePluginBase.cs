@@ -12,11 +12,11 @@ using System.Threading.Tasks;
 
 namespace CK.Env.Plugins
 {
-    public class YamlFilePluginBase : YamlFileBase
+    public class JsonFilePluginBase : JsonFileBase
     {
         readonly GitBranchPluginImpl _pluginImpl;
 
-        public YamlFilePluginBase( GitFolder f, NormalizedPath branchPath, NormalizedPath filePath )
+        public JsonFilePluginBase( GitFolder f, NormalizedPath branchPath, NormalizedPath filePath )
             : base( f.FileSystem, filePath )
         {
             if( !filePath.StartsWith( branchPath ) ) throw new ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
