@@ -18,8 +18,9 @@ namespace CK.Env.NPM
         internal NPMProject( NPMProjectContext c, IActivityMonitor m, INPMProjectSpec spec )
         {
             NPMContext = c;
+            _spec = spec;
             _packageFile = new PackageJsonFile( this );
-            UpdateDescription( m, spec );
+            _status = RefreshStatus( m );
         }
 
         public NPMProjectContext NPMContext { get; }
@@ -33,15 +34,6 @@ namespace CK.Env.NPM
         public NormalizedPath FullPath => _spec.FullPath;
 
         public PackageJsonFile PackageJson => _packageFile;
-
-        internal void UpdateDescription( IActivityMonitor m, INPMProjectSpec d )
-        {
-            if( _spec != d )
-            {
-                _spec = d;
-                _status = RefreshStatus( m );
-            }
-        }
 
         NPMProjectStatus RefreshStatus( IActivityMonitor m )
         {
@@ -57,7 +49,7 @@ namespace CK.Env.NPM
                 {
                     return FileSystem.GetDirectoryContents( FullPath ).Exists
                         ? Error( NPMProjectStatus.ErrorMissingPackageJson )
-                        : Error( NPMProjectStatus.FatalInitialiizationError );
+                        : Error( NPMProjectStatus.FatalInitializationError );
                 }
                 if( _spec.IsPrivate )
                 {
@@ -69,13 +61,13 @@ namespace CK.Env.NPM
                     if( _packageFile.Name == null ) return Error( NPMProjectStatus.ErrorPackageNameMissing );
                     if( _packageFile.Name != _spec.PackageName )
                         return Error( NPMProjectStatus.ErrorPackageInvalidName, $"Expected package name is '{_spec.PackageName}' but found '{_packageFile.Name}'." );
-                }
-                return NPMProjectStatus.Valid;
+                }               
+                return _packageFile.Refresh( m );
             }
             catch( Exception ex )
             {
                 m.Error( $"While reading NPM project '{_spec.FullPath}'.", ex );
-                return NPMProjectStatus.FatalInitialiizationError;
+                return NPMProjectStatus.FatalInitializationError;
             }
 
         }

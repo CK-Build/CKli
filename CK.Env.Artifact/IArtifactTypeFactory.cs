@@ -9,7 +9,7 @@ namespace CK.Env
     /// </summary>
     public interface IArtifactTypeFactory
     {
-        /// <summary>
+        /// <summary>!
         /// Creates a repository information from an Xml element or returns null if the element
         /// cannnot be handled.
         /// </summary>

@@ -103,5 +103,17 @@ namespace CK.Env
             return CreateOrUpdate( m, GetCurrentText(), forceSave );
         }
 
+        /// <summary>
+        /// Sets a non null property value on a JObject or removes it if it is null.
+        /// </summary>
+        /// <param name="propertyName">The property name. Must not be null nor empty.</param>
+        /// <param name="value">The nullable value.</param>
+        protected void SetNonNullProperty( JObject o, string propertyName, string value )
+        {
+            if( String.IsNullOrEmpty( propertyName ) ) throw new ArgumentException( nameof( propertyName ) );
+            if( value == null ) o.Remove( propertyName );
+            else Root[propertyName] = value;
+        }
+
     }
 }

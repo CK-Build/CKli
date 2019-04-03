@@ -8,7 +8,7 @@ namespace CK.Env.NPM
 {
     public enum NPMProjectStatus
     {
-        FatalInitialiizationError,
+        FatalInitializationError,
         ErrorMissingPackageJson,
         ErrorPackageMustBePrivate,
         ErrorPackageMustNotBePrivate,

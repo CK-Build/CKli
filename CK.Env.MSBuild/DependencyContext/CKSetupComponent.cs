@@ -63,12 +63,12 @@ namespace CK.Env
         /// <returns>A readable string.</returns>
         public override string ToString() => FullName;
 
-        /// <summary>
-        /// Get the bin path (relative to the solution folder).
-        /// </summary>
-        /// <param name="buildConfiguration">Build configuration (Debug/Release).</param>
-        /// <returns>The bin path.</returns>
-        public string GetBinPath( string buildConfiguration ) => $"{ProjectPath}/bin/{buildConfiguration}/{TargetFramework}";
+        ///// <summary>
+        ///// Get the bin path (relative to the solution folder).
+        ///// </summary>
+        ///// <param name="buildConfiguration">Build configuration (Debug/Release).</param>
+        ///// <returns>The bin path.</returns>
+        //public string GetBinPath( string buildConfiguration ) => $"{ProjectPath}/bin/{buildConfiguration}/{TargetFramework}";
 
         /// <summary>
         /// Equality is <see cref="FullName"/> based.

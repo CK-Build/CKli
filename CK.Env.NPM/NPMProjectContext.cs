@@ -24,7 +24,6 @@ namespace CK.Env.NPM
         {
             if( _projects.TryGetValue( description.FullPath, out var p ) )
             {
-                p.UpdateDescription( m, description );
                 return p;
             }
             p = new NPMProject( this, m, description );
