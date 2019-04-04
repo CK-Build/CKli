@@ -6,12 +6,10 @@
   <CKEnvKeyVault />
   <ArtifactCenter />
   <SolutionCentral />
+  <SolutionSettings>
 
+  </SolutionSettings>
   <Folder Name="ENGIE">
-
-
-
-
     <GitFolder Name="CK-DB-Feedermarket" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/CK-DB-Feedermarket">
       <Branch Name="develop">
         <PrimarySolution />
@@ -95,8 +93,7 @@
         <PrimarySolution />
       </Branch>
     </GitFolder>
-
-    <GitFolder Name="Feedermarket-Plateform" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Plateform">
+    <GitFolder Name="Feedermarket-Plateform" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Platform">
       <Branch Name="develop">
         <PrimarySolution />
       </Branch>

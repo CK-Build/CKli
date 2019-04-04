@@ -2,8 +2,6 @@ using CK.Core;
 using CK.Text;
 using CSemVer;
 using LibGit2Sharp;
-using LibGit2Sharp.Handlers;
-using Microsoft.Alm.Authentication;
 using Microsoft.Extensions.FileProviders;
 using SimpleGitVersion;
 using System;
@@ -19,46 +17,33 @@ namespace CK.Env
     /// Implements Git repository mapping.
     /// GitFolder are internally created (and disposed) by <see cref="FileSystem"/>.
     /// </summary>
-    public class GitFolder : IGitRepository, IGitHeadInfo, ICommandMethodsProvider
+    public class GitFolder : ProtoGitFolder, IGitRepository, IGitHeadInfo, ICommandMethodsProvider
     {
-        internal static readonly CredentialsHandler DefaultCredentialHandler;
-
         readonly Repository _git;
         readonly RootDir _thisDir;
         readonly HeadFolder _headFolder;
         readonly BranchesFolder _branchesFolder;
         readonly RemotesFolder _remoteBranchesFolder;
+        readonly IActivityMonitor _activityMonitor;
+        readonly ISecretKeyStore _secretKeyStore;
         readonly CommandRegister _commandRegister;
         bool _branchRefreshed;
-
-        static GitFolder()
-        {
-            var secrets = new SecretStore( "git" );
-            var auth = new BasicAuthentication( secrets );
-            DefaultCredentialHandler = ( url, user, cred ) =>
-            {
-                var uri = new Uri( url ).GetLeftPart( UriPartial.Authority );
-                var creds = auth.GetCredentials( new TargetUri( uri ) );
-                return creds != null
-                        ? new UsernamePasswordCredentials { Username = creds.Username, Password = creds.Password }
-                        : null;
-            };
-        }
-
         internal GitFolder(
+            IActivityMonitor activityMonitor,
+            ISecretKeyStore secretKeyStore,
             FileSystem fs,
-            string gitFolder,
             CommandRegister commandRegister,
-            IWorldName world )
+            IWorldName world,
+            string path,
+            string url = null) : base( url, path, world, secretKeyStore, fs, commandRegister )
         {
-            Debug.Assert( gitFolder.StartsWith( fs.Root.Path ) && gitFolder.EndsWith( ".git" ) );
-            FullPhysicalPath = new NormalizedPath( gitFolder.Remove( gitFolder.Length - 4 ) );
+            Debug.Assert( path.StartsWith( fs.Root.Path ) );
             SubPath = FullPhysicalPath.RemovePrefix( fs.Root );
             if( SubPath.IsEmptyPath ) throw new InvalidOperationException( "Root path can not be a Git folder." );
-
-            FileSystem = fs;
-            World = world;
-            _git = new Repository( gitFolder );
+            _activityMonitor = activityMonitor;
+            _secretKeyStore = secretKeyStore;
+            _git = new Repository( path );
+            if( url != null && _git.Network.Remotes["origin"]?.Url != url ) throw new InvalidOperationException( "The repository origin url is different than the repository url specified in the world" );
             _commandRegister = commandRegister;
             _headFolder = new HeadFolder( this );
             _branchesFolder = new BranchesFolder( this, "branches", isRemote: false );
@@ -67,25 +52,10 @@ namespace CK.Env
             ServiceContainer = new SimpleServiceContainer( FileSystem.ServiceContainer );
             ServiceContainer.Add( this );
             PluginManager = new GitPluginManager( ServiceContainer, commandRegister, world.DevelopBranchName, SubPath.AppendPart( "branches" ) );
-
-            string origin = _git.Network.Remotes["origin"]?.Url;
-            if( origin != null )
-            {
-                if( origin.IndexOf( "github.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.GitHub;
-                else if( origin.IndexOf( "gitlab.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.GitLab;
-                else if( origin.IndexOf( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.Vsts;
-                else if( origin.IndexOf( "bitbucket.org", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.Bitbucket;
-            }
-            OriginUrl = origin;
             commandRegister.Register( this );
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => SubPath;
-
-        /// <summary>
-        /// Gets the known Git provider.
-        /// </summary>
-        public KnownGitProvider KnownGitProvider { get; }
 
         /// <summary>
         /// Gets or sets whether the Git repository is public or private.
@@ -102,6 +72,40 @@ namespace CK.Env
         /// Gets the plugin manager for this GitFolder and its branches.
         /// </summary>
         public GitPluginManager PluginManager { get; }
+
+        /// <summary>
+        /// Ensures that the Git folder is loaded.
+        /// </summary>
+        /// <param name="folderPath">
+        /// The folder path is a sub path of <see cref="Root"/> and contains the .git sub folder.
+        /// </param>
+        /// <returns>The <see cref="GitFolder"/> or null if there is not .git subfolder.</returns>
+        public static GitFolder EnsureGitFolder(IActivityMonitor m, IWorldName world, ISecretKeyStore secretKeyStore, FileSystem fs, CommandRegister commandRegister, string path, string url = null)
+        {
+            if( path.Contains( ".git" ) ) throw new ArgumentException( "Path should be the repository directory and not the .git directory" );
+            var gitFolderPath = Path.Combine( path, ".git" );
+            GitFolder gitFolder;
+            if( !Directory.Exists( gitFolderPath ) )
+            {
+                if( string.IsNullOrWhiteSpace( url ) )
+                {
+                    m.Warn( "Url repository is not specified. Skipping automatic clone." );
+                    return null;
+                }
+                var proto = new ProtoGitFolder( url, path, world, secretKeyStore, fs, commandRegister );
+                gitFolder = gitFolder = proto.Clone( m );
+            }
+            else
+            {
+                if( !Repository.IsValid( gitFolderPath ) )
+                {
+                    throw new InvalidOperationException( "Git folder exist but is not a valid Repository" );
+                }
+                gitFolder = new GitFolder(m, secretKeyStore, fs, commandRegister, world, path, url);
+            }
+            gitFolder.EnsureBranch( m, world.DevelopBranchName );
+            return gitFolder;
+        }
 
         /// <summary>
         /// Ensures that plugins are loaded for the <see cref="CurrentBranchName"/>.
@@ -125,21 +129,6 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the current remote origin url.
-        /// </summary>
-        public string OriginUrl { get; }
-
-        /// <summary>
-        /// Gets the current <see cref="IWorldName"/>.
-        /// </summary>
-        public IWorldName World { get; }
-
-        /// <summary>
-        /// Gets the full path (that starts with the <see cref="FileSystem"/>' root path) of the Git folder.
-        /// </summary>
-        public NormalizedPath FullPhysicalPath { get; }
-
-        /// <summary>
         /// Get the path relative to the <see cref="FileSystem"/>.
         /// </summary>
         public NormalizedPath SubPath { get; }
@@ -148,11 +137,6 @@ namespace CK.Env
         /// Gets the name of the Git folder that is the name of the primary solution (by convention and by design).
         /// </summary>
         public string PrimarySolutionName => SubPath.LastPart;
-
-        /// <summary>
-        /// Gets the file system.
-        /// </summary>
-        public FileSystem FileSystem { get; }
 
         /// <summary>
         /// Fires whenever we switched to the local branch.
@@ -330,7 +314,7 @@ namespace CK.Env
                         IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification ).ToArray();
                         Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
                         {
-                            CredentialsProvider = DefaultCredentialHandler,
+                            CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, url, user, cred ),
                             TagFetchMode = TagFetchMode.All
                         }, $"Fetching remote '{remote.Name}'." );
                     }
@@ -429,7 +413,7 @@ namespace CK.Env
                 FetchOptions = new FetchOptions
                 {
                     TagFetchMode = TagFetchMode.All,
-                    CredentialsProvider = DefaultCredentialHandler
+                    CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, url, user, cred )
                 },
                 MergeOptions = new MergeOptions
                 {
@@ -648,7 +632,10 @@ namespace CK.Env
                 try
                 {
                     Remote remote = _git.Network.Remotes["origin"];
-                    var options = new PushOptions() { CredentialsProvider = DefaultCredentialHandler };
+                    var options = new PushOptions()
+                    {
+                        CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, url, user, cred )
+                    };
 
                     var exists = _git.Tags[sv];
                     if( exists == null )
@@ -887,7 +874,7 @@ namespace CK.Env
                     }
                     var options = new PushOptions()
                     {
-                        CredentialsProvider = DefaultCredentialHandler
+                        CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, url, user, cred )
                     };
                     if( created || (b.TrackingDetails.AheadBy ?? 1) > 0 )
                     {

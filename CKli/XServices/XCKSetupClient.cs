@@ -6,20 +6,18 @@ namespace CKli
     public class XCKSetupClient : XTypedObject
     {
         readonly XSharedHttpClient _sharedHttpClient;
-        readonly XCKEnvKeyVault _secretKeyStore;
         readonly CKSetupClient _client;
 
         public XCKSetupClient(
             XSharedHttpClient sharedHttpClient,
-            XCKEnvKeyVault secretKeyStore,
+            ISecretKeyStore secretKeyStore,
             XArtifactCenter artifact,
             FileSystem fs,
             Initializer initializer )
             : base( initializer )
         {
             _sharedHttpClient = sharedHttpClient;
-            _secretKeyStore = secretKeyStore;
-            _client = new CKSetupClient( _secretKeyStore, sharedHttpClient.Shared );
+            _client = new CKSetupClient( secretKeyStore, sharedHttpClient.Shared );
             fs.ServiceContainer.Add( _client );
             artifact.ArtifactCenter.Add( _client );
             initializer.Services.Add( this );

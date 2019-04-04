@@ -5,7 +5,7 @@ namespace CK.Env
         Unknown = 0,
         GitHub = 1,
         GitLab = 2,
-        Vsts = 3,
+        AzureDevOps = 3,
         Bitbucket = 4
     }
 }

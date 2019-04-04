@@ -83,15 +83,17 @@ namespace CKli
             if( LocalPath == null ) return false;
 
             _currentWorld = null;
-            _fs = new FileSystem( LocalPath, CommandRegister );
+
             var baseProvider = new SimpleServiceContainer();
+            _fs = new FileSystem( LocalPath, CommandRegister, baseProvider );
+            var keyStore = new CKEnvKeyVault( World, _fs, CommandRegister );
             baseProvider.Add<ISimpleObjectActivator>( new SimpleObjectActivator() );
             baseProvider.Add( CommandRegister );
             baseProvider.Add( _fs );
             baseProvider.Add( World );
             baseProvider.Add( _worldStore );
             baseProvider.Add( _appLife );
-
+            baseProvider.Add<ISecretKeyStore>( keyStore );
             var original = _worldStore.ReadWorldDescription( _monitor, World ).Root;
             var expanded = XTypedFactory.PreProcess( _monitor, original );
             if( expanded.Errors.Count > 0 )
