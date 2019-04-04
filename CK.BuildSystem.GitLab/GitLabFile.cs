@@ -22,18 +22,22 @@ namespace CK.BuildSystem.GitLab
             if( !this.CheckCurrentBranch( m ) ) return;
             YamlMapping firstMapping = GetFirstMapping( m, true );
             if( firstMapping == null ) return;
-            if( Folder.IsPublic )//We don't use GitLab for public repositories
+            // We don't use GitLab for public repositories
+            if( Folder.IsPublic )
             {
-                m.Log(LogLevel.Info, "The project is public, so we don't use GitLab and the .gitlab-ci.yml is not needed." );
-                Delete( m );
+                if( TextContent != null )
+                {
+                    m.Log( LogLevel.Info, "The project is public, so we don't use GitLab and the .gitlab-ci.yml is not needed." );
+                    Delete( m );
+                }
                 return;
             }
-            //We use GitLab when the repository is private.
+            // We use GitLab when the repository is private.
             YamlMapping codeCakeJob = FindOrCreateYamlElement( m, firstMapping, "codecakebuilder" );
             EnsureSequence( codeCakeJob, "tags", "windows" );
             EnsureSequence( codeCakeJob, "script", "dotnet run --project CodeCakeBuilder -nointeraction" );
             CreateOrUpdate( m, YamlMappingToString( m ) );
         }
-        
+
     }
 }

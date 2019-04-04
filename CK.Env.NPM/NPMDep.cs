@@ -37,5 +37,26 @@ namespace CK.Env.NPM
         /// is <see cref="VersionDependencyType.MinVersion"/>, otherwise it is null.
         /// </summary>
         public SVersion MinVersion { get; }
+
+        public NPMDep( string name, DependencyKind kind, SVersion minVersion )
+        {
+            Name = name;
+            Type = VersionDependencyType.MinVersion;
+            Kind = kind;
+            MinVersion = minVersion ?? throw new ArgumentNullException( nameof( minVersion ) );
+            RawDep = ">=" + minVersion.ToNuGetPackageString();
+        }
+
+        public NPMDep( string name, VersionDependencyType type, DependencyKind kind, string rawDep, SVersion minVersion )
+        {
+            Name = name;
+            Type = type;
+            Kind = kind;
+            RawDep = rawDep;
+            MinVersion = minVersion;
+        }
+
+        public override string ToString() => $"{Kind.ToJsonKey()}: {Name} => {RawDep}";
+
     }
 }

@@ -33,4 +33,18 @@ namespace CK.Env.NPM
         /// </summary>
         Peer
     }
+
+    public static class DependencyKindExtension
+    {
+        public static string ToJsonKey( this DependencyKind @this )
+        {
+            switch( @this)
+            {
+                case DependencyKind.Dev: return "devDependencies";
+                case DependencyKind.Peer: return "peerDependencies";
+                case DependencyKind.Normal: return "dependencies";
+                default: return String.Empty;
+            }
+        }
+    }
 }

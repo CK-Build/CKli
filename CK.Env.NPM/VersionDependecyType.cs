@@ -12,6 +12,11 @@ namespace CK.Env.NPM
     public enum VersionDependencyType
     {
         /// <summary>
+        /// Non applicable or invalid.
+        /// </summary>
+        None,
+
+        /// <summary>
         /// 'file:' url that references a local folder relative to the package.
         /// </summary>
         LocalPath,
