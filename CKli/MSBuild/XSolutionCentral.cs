@@ -16,7 +16,6 @@ namespace CKli
         readonly XLocalFeedProvider _packageFeeds;
         readonly MSBuildContext _msBuildContext;
         readonly WorldState _worldState;
-        readonly XCKEnvKeyVault _publishKeyStore;
         readonly CommandRegister _commandRegister;
         readonly List<XGitFolder> _allGitFolders;
 
@@ -28,7 +27,6 @@ namespace CKli
             FileSystem fileSystem,
             IWorldName world,
             IWorldStore worldStore,
-            XCKEnvKeyVault publishKeyStore,
             XLocalFeedProvider packageFeeds,
             XArtifactCenter artifacts,
             CommandRegister commandRegister,
@@ -39,7 +37,6 @@ namespace CKli
             _world = world;
             _worldStore = worldStore;
             _packageFeeds = packageFeeds;
-            _publishKeyStore = publishKeyStore;
             _commandRegister = commandRegister;
 
             _msBuildContext = new MSBuildContext( fileSystem );

@@ -8,7 +8,7 @@ using System.IO;
 
 namespace CKli
 {
-    public class XCKEnvKeyVault : XTypedObject, ISecretKeyStore, ICommandMethodsProvider, IDisposable
+    public class CKEnvKeyVault : ISecretKeyStore, ICommandMethodsProvider, IDisposable
     {
         static readonly NormalizedPath _commandProviderName = new NormalizedPath("KeyVault");
 
@@ -17,18 +17,14 @@ namespace CKli
         readonly IWorldName _worldName;
         string _passPhrase;
 
-        public XCKEnvKeyVault(
+        public CKEnvKeyVault(
             IWorldName worldName,
             FileSystem fs,
-            CommandRegister commandRegister,
-            Initializer initializer )
-            : base( initializer )
+            CommandRegister commandRegister)
         {
             _keys = new Dictionary<string, string>();
             _fs = fs;
-            _fs.ServiceContainer.Add<ISecretKeyStore>( this );
             _worldName = worldName;
-            initializer.Services.Add( this );
             KeyVaultPath = _fs.Root.AppendPart( $"CKEnv-{_worldName.Name}-KeyVault.txt" );
             KeyVaultKeyName = $"CKENV_{_worldName.Name.ToUpperInvariant().Replace( '-', '_' )}_KEY_VAULT_SECRET_KEY";
             commandRegister.Register( this );

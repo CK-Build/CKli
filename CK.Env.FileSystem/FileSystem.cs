@@ -1,14 +1,13 @@
 using CK.Core;
-using Microsoft.Extensions.FileProviders;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using Microsoft.Extensions.Primitives;
-using System.Collections;
-using System.Linq;
 using CK.Text;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Primitives;
+using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Diagnostics;
-using LibGit2Sharp;
+using System.IO;
+using System.Linq;
 
 namespace CK.Env
 {
@@ -21,18 +20,20 @@ namespace CK.Env
     public class FileSystem : IFileProvider, IDisposable
     {
         readonly CommandRegister _commandRegister;
+        ISecretKeyStore _secretKeyStore;
         readonly List<GitFolder> _gits;
 
         /// <summary>
         /// Initializes a new <see cref="FileSystem"/> on a physical root path.
         /// </summary>
         /// <param name="rootPath">Physical root path.</param>
-        public FileSystem( string rootPath, CommandRegister commandRegister )
+        public FileSystem( string rootPath, CommandRegister commandRegister, IServiceProvider sp )
         {
+
             Root = new NormalizedPath( Path.GetFullPath( rootPath ) );
             _commandRegister = commandRegister;
             _gits = new List<GitFolder>();
-            ServiceContainer = new SimpleServiceContainer();
+            ServiceContainer = new SimpleServiceContainer( sp );
             ServiceContainer.Add( this );
             ServiceContainer.Add<IFileProvider>( this );
         }
@@ -69,31 +70,16 @@ namespace CK.Env
         /// <returns>The <see cref="GitFolder"/> or null if there is not .git subfolder.</returns>
         public GitFolder EnsureGitFolder( IActivityMonitor m, IWorldName world, NormalizedPath folderPath, string urlRepository = null )
         {
+            if( _secretKeyStore == null )
+            {
+                _secretKeyStore = ServiceContainer.GetService<ISecretKeyStore>( throwOnNull: true );
+            }
             GitFolder g = GitFolders.FirstOrDefault( f => f.SubPath == folderPath );
             if( g == null )
             {
                 folderPath = Root.Combine( folderPath );
-                var gitFolder = Path.Combine( folderPath, ".git" );
-                if( !Directory.Exists( gitFolder ) )
-                {
-                    if( String.IsNullOrWhiteSpace( urlRepository ) )
-                    {
-                        m.Warn( "Url repository is not specified. Skipping automatic clone." );
-                        return null;
-                    }
-                    using( m.OpenInfo( $"Checking out '{folderPath}' from '{urlRepository}' on {world.DevelopBranchName}." ) )
-                    {
-                        Repository.Clone( urlRepository, folderPath, new CloneOptions()
-                        {
-                            CredentialsProvider = GitFolder.DefaultCredentialHandler,
-                            BranchName = world.DevelopBranchName,
-                            Checkout = true
-                        } );
-                    }
-                }
-                g = new GitFolder( this, gitFolder, _commandRegister, world );
+                g = GitFolder.EnsureGitFolder( m, world, _secretKeyStore, this, _commandRegister, folderPath, urlRepository );
                 _gits.Add( g );
-                g.EnsureBranch( m, world.DevelopBranchName );
             }
             return g;
         }
@@ -434,7 +420,7 @@ namespace CK.Env
 
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         }
-   
+
         internal IFileInfo PhysicalGetFileInfo( NormalizedPath sub )
         {
             Debug.Assert( sub == sub.ResolveDots() );
@@ -447,7 +433,7 @@ namespace CK.Env
         internal IDirectoryContents PhysicalGetDirectoryContents( NormalizedPath sub )
         {
             Debug.Assert( sub == sub.ResolveDots() );
-           return new PhysicalDirectoryContents( Root.Combine( sub ) );
+            return new PhysicalDirectoryContents( Root.Combine( sub ) );
         }
 
         IChangeToken IFileProvider.Watch( string filter )
