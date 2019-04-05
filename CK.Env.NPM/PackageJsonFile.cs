@@ -108,19 +108,23 @@ namespace CK.Env.NPM
         NPMProjectStatus FillDeps( IActivityMonitor m, DependencyKind depKind )
         {
             string depNameKind = depKind.ToJsonKey();
-            foreach( var d in Root[depNameKind] )
+            var oDeps = Root[depNameKind];
+            if( oDeps != null )
             {
-                if( !(d is JProperty dP)
-                    || String.IsNullOrWhiteSpace( dP.Name )
-                    || dP.Value.Type != JTokenType.String )
+                foreach( var d in oDeps )
                 {
-                    m.Error( $"Invalid dependency in {depNameKind}: {d}" );
-                    return NPMProjectStatus.ErrorInvalidDependencyRecord;
+                    if( !(d is JProperty dP)
+                        || String.IsNullOrWhiteSpace( dP.Name )
+                        || dP.Value.Type != JTokenType.String )
+                    {
+                        m.Error( $"Invalid dependency in {depNameKind}: {d}" );
+                        return NPMProjectStatus.ErrorInvalidDependencyRecord;
+                    }
+                    var rawDep = (string)dP.Value;
+                    var (v, type) = GetVersionType( m, depNameKind, dP.Name, rawDep );
+                    if( type == VersionDependencyType.None ) return NPMProjectStatus.ErrorInvalidDependencyVersion;
+                    _deps.Add( new NPMDep( dP.Name, type, depKind, rawDep, v ) );
                 }
-                var rawDep = (string)dP.Value;
-                var (v, type) = GetVersionType( m, depNameKind, dP.Name, rawDep );
-                if( type == VersionDependencyType.None ) return NPMProjectStatus.ErrorInvalidDependencyVersion;
-                _deps.Add( new NPMDep( dP.Name, type, depKind, rawDep, v ) );
             }
             return NPMProjectStatus.Valid;
         }
