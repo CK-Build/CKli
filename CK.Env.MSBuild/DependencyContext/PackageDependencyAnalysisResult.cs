@@ -12,8 +12,8 @@ namespace CK.Env.MSBuild
     {
         internal PackageDependencyAnalysisResult(
             bool? externalDependencies,
-            IReadOnlyList<(VersionedPackage Package, IReadOnlyList<IDependentProject> Projects)> monoVersions,
-            IReadOnlyList<(VersionedPackage Package, IReadOnlyList<IProjectFramework> Projects)> multiVersions
+            IReadOnlyList<(ArtifactInstance Package, IReadOnlyList<IDependentProject> Projects)> monoVersions,
+            IReadOnlyList<(ArtifactInstance Package, IReadOnlyList<IProjectFramework> Projects)> multiVersions
             )
         {
             WithExternalDependencies = !externalDependencies.HasValue || externalDependencies.Value;
@@ -36,13 +36,13 @@ namespace CK.Env.MSBuild
         /// Gets the <see cref="VersionedPackage"/> that are referenced with the same unique version across all projects
         /// (and the projects that reference them).
         /// </summary>
-        public IReadOnlyList<(VersionedPackage Package, IReadOnlyList<IDependentProject> Projects)> MonoVersions { get; }
+        public IReadOnlyList<(ArtifactInstance Package, IReadOnlyList<IDependentProject> Projects)> MonoVersions { get; }
 
         /// <summary>
         /// Gets the <see cref="VersionedPackage"/> that are referenced with more than one version across all projects.
         /// Each versioned package is associated to the list of the <see cref="IProjectFramework"/> that reference it.
         /// </summary>
-        public IReadOnlyList<(VersionedPackage Package, IReadOnlyList<IProjectFramework> Projects)> MultiVersions { get; }
+        public IReadOnlyList<(ArtifactInstance Package, IReadOnlyList<IProjectFramework> Projects)> MultiVersions { get; }
 
     }
 }

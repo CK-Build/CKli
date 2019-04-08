@@ -167,6 +167,7 @@ namespace CK.Env
                                                .Select( packageName => new UpdatePackageInfo(
                                                    s.UniqueSolutionName,
                                                    z.ProjectName,
+                                                   "NuGet",
                                                    packageName,
                                                    _packagesVersion[packageName] ) ) );
         }
@@ -188,8 +189,9 @@ namespace CK.Env
                                 .Select( p => new UpdatePackageInfo(
                                                     s.UniqueSolutionName,
                                                     p.ProjectName,
-                                                    p.Package.PackageId,
-                                                    _packagesVersion[p.Package.PackageId] ) )
+                                                    p.Package.Artifact.Type,
+                                                    p.Package.Artifact.Name,
+                                                    _packagesVersion[p.Package.Artifact.Name] ) )
                                 .ToList();
                 _upgrades[i] = upgrades;
                 using( m.OpenInfo( $"Preparing {s} build." ) )

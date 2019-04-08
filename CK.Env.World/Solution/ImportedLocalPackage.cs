@@ -16,14 +16,8 @@ namespace CK.Env
         public ImportedLocalPackage( ILocalPackageDependency d )
         {
             _dep = d;
-            Package = new VersionedPackage( d.TargetProjectName, d.Version );
+            Package = new ArtifactInstance( d.Type, d.TargetProjectName, d.Version );
         }
-
-
-        /// <summary>
-        /// Gets the type of the dependency involved (ie. "NuGet", "NPM", etc.).
-        /// </summary>
-        public string Type => _dep.Type;
 
         /// <summary>
         /// Gets the primary solution that produces this package.
@@ -44,6 +38,6 @@ namespace CK.Env
         /// <summary>
         /// Gets the package name and version.
         /// </summary>
-        public VersionedPackage Package { get; }
+        public ArtifactInstance Package { get; }
     }
 }

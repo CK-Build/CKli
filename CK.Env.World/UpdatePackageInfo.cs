@@ -17,7 +17,7 @@ namespace CK.Env
         /// <param name="solutionName">The solution name. Can not be null or white space.</param>
         /// <param name="projectName">The project name. Can not be null or white space.</param>
         /// <param name="package">The package identifier and version to upgrade.</param>
-        public UpdatePackageInfo( string solutionName, string projectName, VersionedPackage package )
+        public UpdatePackageInfo( string solutionName, string projectName, ArtifactInstance package )
         {
             if( String.IsNullOrWhiteSpace( solutionName ) ) throw new ArgumentNullException( nameof( solutionName ) );
             if( String.IsNullOrWhiteSpace( projectName ) ) throw new ArgumentNullException( nameof( projectName ) );
@@ -31,10 +31,11 @@ namespace CK.Env
         /// </summary>
         /// <param name="solutionName">The solution name. Can not be null or white space.</param>
         /// <param name="projectName">The project name. Can not be null or white space.</param>
+        /// <param name="packageType">Type of the package.</param>
         /// <param name="packageId">The package identifier.</param>
         /// <param name="version">The package version.</param>
-        public UpdatePackageInfo( string solutionName, string projectName, string packageId, SVersion version )
-            : this( solutionName, projectName, new VersionedPackage( packageId, version) )
+        public UpdatePackageInfo( string solutionName, string projectName, string packageType, string packageId, SVersion version )
+            : this( solutionName, projectName, new ArtifactInstance( packageType, packageId, version) )
         {
         }
 
@@ -46,7 +47,10 @@ namespace CK.Env
         public UpdatePackageInfo( XElement e, string solutionName = null )
             : this( (string)e.Attribute("Solution") ?? solutionName,
                     (string)e.AttributeRequired("Project"),
-                    new VersionedPackage( (string)e.AttributeRequired( "PackageId" ), CSVersion.Parse( (string)e.AttributeRequired( "Version" )) ) )
+                    new ArtifactInstance(
+                        (string)e.Attribute( "PackageType" ) ?? "NuGet",
+                        (string)e.AttributeRequired( "PackageId" ),
+                        SVersion.Parse( (string)e.AttributeRequired( "Version" )) ) )
         {
         }
 
@@ -65,7 +69,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the package to update and its target version.
         /// </summary>
-        public VersionedPackage PackageUpdate { get; }
+        public ArtifactInstance PackageUpdate { get; }
 
         /// <summary>
         /// Exports this <see cref="UpdatePackageInfo"/> in Xml format.
@@ -77,7 +81,8 @@ namespace CK.Env
             return new XElement( "PackageUdate",
                         withSolutionName ? new XAttribute( "Solution", SolutionName ) : null,
                         new XAttribute( "Project", ProjectName ),
-                        new XAttribute( "PackageId", PackageUpdate.PackageId ),
+                        new XAttribute( "PackageType", PackageUpdate.Artifact.Type ),
+                        new XAttribute( "PackageId", PackageUpdate.Artifact.Name ),
                         new XAttribute( "Version", PackageUpdate.Version ) );
         }
     }
