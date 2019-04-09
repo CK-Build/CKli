@@ -13,7 +13,7 @@ namespace CK.BuildSystem.Appveyor
 
 
         public AppveyorFile( GitFolder f, ISolutionSettings settings, ISecretKeyStore secretStore, NormalizedPath branchPath )
-            : base( f, branchPath, branchPath.AppendPart( "Appveyor.yml" ) )
+            : base( f, branchPath, branchPath.AppendPart( "appveyor.yml" ) )
         {
             _settings = settings;
             _secretStore = secretStore;
