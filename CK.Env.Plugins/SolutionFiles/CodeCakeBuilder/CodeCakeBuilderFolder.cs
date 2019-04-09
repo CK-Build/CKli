@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.NPMClient;
 using CK.NuGetClient;
 using CK.Text;
 using System;
@@ -22,7 +23,7 @@ namespace CK.Env.Plugins.SolutionFiles
 
         protected override void DoApplySettings( IActivityMonitor m )
         {
-            //clean old CodeCakeBuilders files
+            // Clean old CodeCakeBuilders files
             DeleteFile( m, "Build.NuGetHelper.cs" );
             DeleteFile( m, "Build.StandardCheckRepository.cs" );
             DeleteFile( m, "Build.StandardCreateNuGetPackages.cs" );
@@ -30,7 +31,7 @@ namespace CK.Env.Plugins.SolutionFiles
             DeleteFile( m, "Build.StandardSolutionBuild.cs" );
             DeleteFile( m, "Build.StandardUnitTests.cs" );
 
-            //Root files
+            // Root files
             SetTextResource( m, "InstallCredentialProvider.ps1" );
             SetTextResource( m, "Program.cs" );
             SetTextResource( m, "Build.SetCIVersionOnRunner.cs" );
@@ -38,7 +39,7 @@ namespace CK.Env.Plugins.SolutionFiles
             SetTextResource( m, "Build.StandardPushCKSetupComponents.cs" );
             UpdateTextResource( m, "Build.cs", AdaptBuild );
 
-            //Abstractions files
+            // Abstractions files
             SetTextResource( m, "Abstractions/Artifact.cs" );
             SetTextResource( m, "Abstractions/ArtifactFeed.cs" );
             SetTextResource( m, "Abstractions/ArtifactInstance.cs" );
@@ -46,11 +47,10 @@ namespace CK.Env.Plugins.SolutionFiles
 
 
             bool useDotnet = true;
-            bool pushDotnet = true;
             if( useDotnet )
             {
                 SetTextResource( m, "dotnet/Build.NuGetHelper.cs" );
-                SetTextResource( m, "dotnet/Build.NugetRepository.cs", AdaptStandardCheckRepositoryForPushFeeds );
+                SetTextResource( m, "dotnet/Build.NugetRepository.cs", AdaptBuildNugetRepositoryForPushFeeds );
                 SetTextResource( m, "dotnet/Build.StandardCheckRepository.cs" );
                 SetTextResource( m, "dotnet/Build.StandardSolutionBuild.cs" );
                 if( _settings.NoUnitTests )
@@ -62,14 +62,20 @@ namespace CK.Env.Plugins.SolutionFiles
                 {
                     SetTextResource( m, "dotnet/Build.StandardUnitTests.cs" );
                 }
-                if( pushDotnet )
+                if( _driver.GetAllSolutions( m ).SelectMany( s => s.PublishedProjects ).Any() )
                 {
                     SetTextResource( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
                     SetTextResource( m, "dotnet/Build.StandardPushNuGetPackages.cs" );
                 }
+                else
+                {
+                    m.Info( "Removing build files related to NuGet packaging." );
+                    DeleteFile( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
+                    DeleteFile( m, "dotnet/Build.StandardPushNuGetPackages.cs" );
+                }
             }
 
-            bool useNpm = true;
+            bool useNpm = _driver.GetAllNPMProjects( m ).Any();
             if( useNpm )
             {
                 //CakeExtensions
@@ -80,9 +86,22 @@ namespace CK.Env.Plugins.SolutionFiles
                 //npm itself
                 SetTextResource( m, "npm/Build.NpmFeed.cs" );
                 SetTextResource( m, "npm/Build.NpmHelper.cs" );
-                SetTextResource( m, "npm/Build.NpmRepository.cs" );
+                SetTextResource( m, "npm/Build.NpmRepository.cs", AdaptBuildNPMRepositoryForPushFeeds );
                 SetTextResource( m, "npm/Build.StandardNpmBuild.cs" );
                 SetTextResource( m, "npm/Build.StandardNpmUnitTests.cs" );
+            }
+            else
+            {
+                m.Info( "Removing build files related to NPM handling." );
+                DeleteFile( m, "CakeExtensions/NpmDistTagRunner.cs" );
+                DeleteFile( m, "CakeExtensions/NpmGet.cs" );
+                DeleteFile( m, "CakeExtensions/NpmGetPackagesToPublish.cs" );
+                DeleteFile( m, "CakeExtensions/NpmView.cs" );
+                DeleteFile( m, "npm/Build.NpmFeed.cs" );
+                DeleteFile( m, "npm/Build.NpmHelper.cs" );
+                DeleteFile( m, "npm/Build.NpmRepository.cs" );
+                DeleteFile( m, "npm/Build.StandardNpmBuild.cs" );
+                DeleteFile( m, "npm/Build.StandardNpmUnitTests.cs" );
             }
 
             bool? produceCKSetupComponents = _driver.AreCKSetupComponentsProduced( m );
@@ -130,12 +149,12 @@ namespace CK.Env.Plugins.SolutionFiles
 
         }
 
-        string AdaptStandardCheckRepositoryForPushFeeds( string text )
+        string AdaptBuildNugetRepositoryForPushFeeds( string text )
         {
             Match m = Regex.Match( text, @"return new NuGetHelper\.NuGetFeed\[\]{.*?};", RegexOptions.Singleline | RegexOptions.CultureInvariant );
             if( !m.Success )
             {
-                throw new Exception( "Expected pattern return new NuGetHelper.NuGetFeed[]{...} in Build.StandardCheckRepository.cs." );
+                throw new Exception( "Expected pattern return new NuGetHelper.NuGetFeed[]{...} in Build.NugetRepository.cs." );
             }
             StringBuilder b = new StringBuilder();
             b.AppendLine( "return new NuGetHelper.NuGetFeed[]{" );
@@ -153,6 +172,36 @@ namespace CK.Env.Plugins.SolutionFiles
                         b.Append( "new RemoteFeed(cake, \"" ).Append( n.Name ).Append( "\", \"" )
                                                         .Append( n.Url ).Append( "\", \"" )
                                                         .Append( n.SecretKeyName ).Append( "\" )" );
+                        break;
+                }
+            }
+            b.AppendLine().Append( "};" );
+            text = text.Replace( m.Value, b.ToString() );
+            return text;
+        }
+
+        string AdaptBuildNPMRepositoryForPushFeeds( string text )
+        {
+            Match m = Regex.Match( text, @"return new NpmRemoteFeed\[\]{.*?};", RegexOptions.Singleline | RegexOptions.CultureInvariant );
+            if( !m.Success )
+            {
+                throw new Exception( "Expected pattern return new NpmRemoteFeed[]{...} in Build.NPMRepository.cs." );
+            }
+            StringBuilder b = new StringBuilder();
+            b.AppendLine( "return new NpmRemoteFeed[]{" );
+            bool atLeastOne = false;
+            foreach( var info in _settings.ArtifactTargets.Select( a => a.Info ).OfType<INPMFeedInfo>() )
+            {
+                b.AppendLine( atLeastOne ? "," : "" );
+                atLeastOne = true;
+                switch( info )
+                {
+                    case NPMAzureFeedInfo a:
+                        b.Append( "new VSTSNpmFeed(cake, info, \"" ).Append( a.Organization ).Append( "\", \"" ).Append( a.Url ).Append( "\" )" );
+                        break;
+                    case NPMStandardFeedInfo n:
+                        b.Append( "new NpmRemoteFeed(cake, info, \"" ).Append( n.SecretKeyName ).Append( "\", \"" )
+                                                        .Append( n.Url ).Append( "\" )" );
                         break;
                 }
             }

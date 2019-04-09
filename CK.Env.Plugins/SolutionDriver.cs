@@ -6,6 +6,7 @@ using System.Linq;
 using System.Xml.Linq;
 using CK.Core;
 using CK.Env.MSBuild;
+using CK.Env.NPM;
 using CK.Text;
 using CSemVer;
 
@@ -146,10 +147,19 @@ namespace CK.Env.Plugins
         /// <param name="m">The monitor use.</param>
         /// <returns>Whether CKSetup components are produced, null on error.</returns>
         public bool? AreCKSetupComponentsProduced( IActivityMonitor m ) => !_settings.UseCKSetup
-                                                                        ? false 
+                                                                        ? false
                                                                         : GetAllSolutions( m )
                                                                           ?.SelectMany( s => s.CKSetupComponentProjects )
                                                                           .Any();
+
+        /// <summary>
+        /// Gets all NPM projects.
+        /// </summary>
+        /// <param name="m">The monitor use.</param>
+        /// <returns>The set of NPM projects that are declared.</returns>
+        public IEnumerable<NPMProject> GetAllNPMProjects( IActivityMonitor m ) => GetAllSolutions( m )?
+                                                                           .SelectMany( s => s.NPMProjects )
+                                                                           ?? Array.Empty<NPMProject>();
 
         /// <summary>
         /// Fires before a build.

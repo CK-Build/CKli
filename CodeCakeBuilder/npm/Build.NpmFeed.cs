@@ -74,14 +74,12 @@ namespace CodeCake
             readonly SVersion _version;
             protected readonly string FeedUri;
 
-            public NpmRemoteFeed( ICakeContext cake, CheckRepositoryInfo checkInfo, string organization, string feedUri ) : base( cake )
+            public NpmRemoteFeed( ICakeContext cake, CheckRepositoryInfo checkInfo, string secretKeyName, string feedUri )
+                : base( cake )
             {
                 _gitInfo = checkInfo.GitInfo;
                 _version = checkInfo.Version;
-                SecretKeyName = "NPM_FEED_" + organization.ToUpperInvariant()
-                                        .Replace( '-', '_' )
-                                        .Replace( ' ', '_' )
-                                        + "_PAT";
+                SecretKeyName = secretKeyName;
                 FeedUri = feedUri;
             }
 
@@ -93,7 +91,9 @@ namespace CodeCake
             {
                 return Cake.InteractiveEnvironmentVariable( SecretKeyName );
             }
+
             public abstract NpmrcTokenInjector TokenInjector( string projectPath );
+
             public override Task InitializeArtifactsToPublishAsync( IReadOnlyDictionary<string, ArtifactInstance> allArtifactsToPublish )
             {
                 ArtifactsToPublish = allArtifactsToPublish.Where( p =>

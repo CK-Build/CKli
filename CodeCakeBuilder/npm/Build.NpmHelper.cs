@@ -29,6 +29,7 @@ namespace CodeCake
             {
                 _npmrcPath = path;
             }
+
             public static NpmrcTokenInjector TokenLogin( string pushUri, string token, string npmrcPath )
             {
                 if( !File.Exists( npmrcPath ) ) throw new ArgumentException( "npmrcPath File does not exist" );
@@ -45,6 +46,7 @@ namespace CodeCake
             {
                 return PasswordLogin( pushUri, Convert.ToBase64String( Encoding.UTF8.GetBytes( pat ) ), npmrcPath );
             }
+
             public static NpmrcTokenInjector PasswordLogin( string pushUri, string password, string npmrcPath )
             {
                 if( !File.Exists( npmrcPath ) ) throw new ArgumentException( "npmrcPath File does not exist" );
@@ -59,6 +61,7 @@ namespace CodeCake
                 File.WriteAllLines( npmrcPath, npmrc.ToArray() );
                 return new NpmrcTokenInjector( npmrcPath );
             }
+
             public void Dispose()
             {
                 File.WriteAllLines(

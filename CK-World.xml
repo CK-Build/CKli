@@ -6,6 +6,7 @@
   <LocalFeedProvider />
   <CKEnvKeyVault />
   <NuGetClient />
+  <NPMClient />
   <CKSetupClient />
   <NPMProjectCenter />
   <SolutionCentral />
@@ -18,12 +19,26 @@
                 CheckName="NuGetAzure:Signature-OpenSource-Default"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
 
+    <Repository Type="NPMAzure"
+                NPMScope="@signature"
+                Organization="Signature-OpenSource"
+                FeedName="Default"
+                CheckName="NPMAzure:@signature->Signature-OpenSource-Default"
+                CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
+
     <Repository Type="NuGetAzure"
                 Organization="Signature-Code"
                 FeedName="Default"
                 CheckName="NuGetAzure:Signature-Code-Default"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_CODE_PAT" />
-    
+
+    <Repository Type="NPMAzure"
+                NPMScope="@signature"
+                Organization="Signature-Code"
+                FeedName="Default"
+                CheckName="NPMAzure:@signature->Signature-Code-Default"
+                CheckSecretKeyName="AZURE_FEED_SIGNATURE_CODE_PAT" />
+
     <Repository Type="CKSetup"
                 CheckName="CKSetup:Public"
                 CheckSecretKeyName="CKSETUPREMOTESTORE_PUSH_API_KEY" />
@@ -44,6 +59,7 @@
       <add Name="Invenietis - CI" />
     </RemoveNuGetSourceNames>
     <ArtifactTargets>
+      <add Name="NPMAzure:@signature->Signature-OpenSource-Default" />
       <add Name="NuGetAzure:Signature-OpenSource-Default" />
       <add Name="CKSetup:Public" />
     </ArtifactTargets>
@@ -69,7 +85,9 @@
       </NuGetSources>
       <ArtifactTargets>
         <remove Name="NuGetAzure:Signature-OpenSource-Default" />
+        <remove Name="NPMAzure:@signature->Signature-OpenSource-Default" />
         <add Name="NuGetAzure:Signature-Code-Default" />
+        <add Name="NPMAzure:@signature->Signature-Code-Default" />
       </ArtifactTargets>
     </SolutionSettings>
   </Reusable>

@@ -38,7 +38,7 @@ namespace CK.Env.Plugins.SolutionFiles
 
             var required = new Dictionary<string, string>();
 
-            // Skips CKSetup store.
+            // Skips CKSetup store (it is handled below).
             var artifactTargets = _settings.ArtifactTargets.Where( t => !(t.Info is ICKSetupStoreInfo) );
             var repositorySecrets = _artfifacts.ResolveSecrets( m, artifactTargets );
             if( repositorySecrets.Any( r => r.Secret == null ) )
@@ -56,7 +56,7 @@ namespace CK.Env.Plugins.SolutionFiles
                 var storeInfo = _settings.ArtifactTargets.Select( t => t.Info ).OfType<ICKSetupStoreInfo>().SingleOrDefault();
                 if( storeInfo == null )
                 {
-                    m.Error( $"Single CKSetup Artifact target not found. Since ProduceCKSetupComponents is true, one and only one CKSetup store target must be available." );
+                    m.Error( $"Single CKSetup Artifact target not found. Since UseCKSetup is true, one and only one CKSetup store target must be available." );
                     return;
                 }
                 var s = _secretStore.GetSecretKey( m, storeInfo.SecretKeyName, true, $"Required to push components to {storeInfo}." );

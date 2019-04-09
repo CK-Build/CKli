@@ -100,7 +100,6 @@ namespace CK.NuGetClient
         }
         #endregion
 
-
         class SourcePackageProvider : IPackageSourceProvider
         {
             readonly NuGetClient _c;
