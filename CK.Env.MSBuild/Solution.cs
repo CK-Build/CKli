@@ -256,7 +256,7 @@ namespace CK.Env.MSBuild
                                       new XElement( "PropertyGroup",
                                         new XElement( framework.IsAtomic ? "TargetFramework" : "TargetFrameworks", framework ) ) ) );
                     configure?.Invoke( d );
-                    if(!BuildContext.FileSystem.EnsureDirectory( m, projectDirectory )
+                    if( !BuildContext.FileSystem.EnsureDirectory( m, projectDirectory )
                         || !BuildContext.FileSystem.CopyTo( m, d.Beautify().ToString(), projectFilePath ) )
                     {
                         return null;
@@ -352,7 +352,18 @@ namespace CK.Env.MSBuild
             NormalizedPath filePath )
         {
             if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
-            var file = ctx.FileSystem.GetFileInfo( filePath ).AsTextFileInfo();
+            var fileInfo = ctx.FileSystem.GetFileInfo( filePath );
+            if( !fileInfo.Exists )
+            {
+                m.Error( $"Solution file '{filePath}' does not exist" );
+                return null;
+            }
+            if( fileInfo.IsDirectory )
+            {
+                m.Error( $"Solution path '{filePath}' is a Directory, expected a .sln file." );
+                return null;
+            }
+            var file = fileInfo.AsTextFileInfo();
             if( file == null )
             {
                 m.Error( $"Unable to read solution file '{filePath}'." );

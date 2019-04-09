@@ -55,6 +55,11 @@ namespace CK.Env.Plugins.SolutionFiles
                 }
             }
 
+            void DeleteProjectReference( string packageId )
+            {
+                ccbProject.RemoveDependencies( m, ccbProject.Deps.Packages.Where( p => p.PackageId == packageId ).ToList() );
+            }
+
             EnsureProjectReference( "NuGet.Credentials", "4.9.2" );
             EnsureProjectReference( "NuGet.Protocol", "4.9.2" );
             EnsureProjectReference( "Cake.Npm", "0.16.0" );
@@ -66,6 +71,8 @@ namespace CK.Env.Plugins.SolutionFiles
             if( PluginBranch != StandardGitStatus.Local )
             {
                 EnsureProjectReference( "SimpleGitVersion.Cake", "0.37.0" );
+                DeleteProjectReference( "SimpleGitVersion.Core" ); //imported by SimpleGitVersion.Cake
+                DeleteProjectReference( "Code.Cake" ); //imported by SimpleGitVersion.Cake
                 if( produceCKSetupComponents == true )
                 {
                     EnsureProjectReference( "CKSetup.Cake", "9.0.0" );

@@ -7,9 +7,66 @@
   <ArtifactCenter />
   <SolutionCentral />
   <SolutionSettings>
-
+    <NuGetSources>
+      <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default@Stable/nuget/v3/index.json" />
+    </NuGetSources>
+    <RemoveNuGetSourceNames>
+      <add Name="MyGet_Invenietis_Release" />
+      <add Name="MyGet_Invenietis_Preview" />
+      <add Name="MyGet_Invenietis_CI" />
+      <add Name="VSTS_Invenietis_Release" />
+      <add Name="VSTS_Invenietis_Preview" />
+      <add Name="VSTS_Invenietis_CI" />
+      <add Name="VSTS_Invenietis_Engie" />
+      <add Name="EngieCI" />
+      <add Name="NuGet"/>
+    </RemoveNuGetSourceNames>
+    <Plugins>
+      <add Type="CK.Env.Plugins.SolutionDriver, CK.Env.Plugins" />
+      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderFolder, CK.Env.Plugins" />
+      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderCSProjFile, CK.Env.Plugins" />
+      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderKeyVaultFile, CK.Env.Plugins" />
+      <add Type="CK.Env.Plugins.SolutionFiles.CommonFolder, CK.Env.Plugins" />
+      <add Type="CK.Env.Plugins.SolutionFiles.SharedPropsFile, CK.Env.Plugins" />
+      <add Type="CK.Env.Plugins.SolutionFiles.RepositoryXmlFile, CK.Env.Plugins" />
+      <add Type="CK.Env.Plugins.SolutionFiles.NugetConfigFile, CK.Env.Plugins" />
+      <add Type="CK.Env.Plugins.SolutionFiles.GitIgnoreFile, CK.Env.Plugins" />
+    </Plugins>
   </SolutionSettings>
+  <!-- NuGetSources Signature-OpenSource  -->
   <Folder Name="ENGIE">
+    <GitFolder Name="Feedermarket-Auth" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Auth">
+      <Branch Name="develop">
+        <PrimarySolution />
+      </Branch>
+    </GitFolder>
+
+    <GitFolder Name="Feedermarket-Content" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket.Content">
+      <Branch Name="develop">
+        <PrimarySolution />
+      </Branch>
+    </GitFolder>
+
+    <SolutionSettings>
+      <NuGetSources>
+        <add Name="Invenietis-Release" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-release/nuget/v3/index.json" />
+        <add Name="Invenietis-Preview" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-preview/nuget/v3/index.json" />
+        <add Name="Invenietis-CI" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-ci/nuget/v3/index.json" />
+        <add Name="Engie" Url="https://pkgs.dev.azure.com/invenietis/_packaging/Engie/nuget/v3/index.json" />
+        <add Name="Engie-CI" Url="https://pkgs.dev.azure.com/invenietis/_packaging/Engie-CI/nuget/v3/index.json" />
+        <remove Name="Signature-OpenSource" />
+      </NuGetSources>
+      <RemoveNuGetSourceNames>
+        <add Name="Signature-OpenSource" />
+      </RemoveNuGetSourceNames>
+
+    </SolutionSettings>
+    <!-- NuGetSources Invenietis -->
+
+
+
+
+
     <GitFolder Name="CK-DB-Feedermarket" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/CK-DB-Feedermarket">
       <Branch Name="develop">
         <PrimarySolution />
@@ -24,15 +81,10 @@
 
     <GitFolder Name="data-weather-sdk" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/data-weather-sdk">
       <Branch Name="develop">
-        <PrimarySolution />
       </Branch>
     </GitFolder>
 
-    <GitFolder Name="Feedermarket-Auth" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Auth">
-      <Branch Name="develop">
-        <PrimarySolution />
-      </Branch>
-    </GitFolder>
+
 
     <GitFolder Name="Feedermarket-Buildings" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Buildings">
       <Branch Name="develop">
@@ -84,7 +136,6 @@
 
     <GitFolder Name="Feedermarket-MarketOptimum" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-MarketOptimum">
       <Branch Name="develop">
-        <PrimarySolution />
       </Branch>
     </GitFolder>
 
@@ -93,7 +144,7 @@
         <PrimarySolution />
       </Branch>
     </GitFolder>
-    <GitFolder Name="Feedermarket-Plateform" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Platform">
+    <GitFolder Name="Feedermarket-Platform" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Platform">
       <Branch Name="develop">
         <PrimarySolution />
       </Branch>
@@ -101,17 +152,10 @@
 
     <GitFolder Name="Feedermarket-Siradel-Demo" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Siradel-Demo">
       <Branch Name="develop">
-        <PrimarySolution />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="Feedermarket-Utils" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Utils">
-      <Branch Name="develop">
-        <PrimarySolution />
-      </Branch>
-    </GitFolder>
-
-    <GitFolder Name="Feedermarket.Content" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket.Content">
       <Branch Name="develop">
         <PrimarySolution />
       </Branch>

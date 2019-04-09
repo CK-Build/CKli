@@ -276,9 +276,9 @@ namespace CK.Env.MSBuild
             bool throwProjectDependendencies = true )
         {
             if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
-            if( frameworks.IsEmpty ) throw new ArgumentException( "Must not be empty.", nameof(frameworks) );
+            if( frameworks.IsEmpty ) throw new ArgumentException( "Must not be empty.", nameof( frameworks ) );
             var actualFrameworks = TargetFrameworks.Intersect( frameworks );
-            if( actualFrameworks.IsEmpty ) throw new ArgumentException( $"No {frameworks} in {TargetFrameworks}.", nameof(frameworks) );
+            if( actualFrameworks.IsEmpty ) throw new ArgumentException( $"No {frameworks} in {TargetFrameworks}.", nameof( frameworks ) );
             if( throwProjectDependendencies && _dependencies.Projects.Any( p => p.TargetProject.Name == packageId ) )
             {
                 throw new ArgumentException( $"Package {packageId} is already a ProjectReference.", nameof( packageId ) );
@@ -314,7 +314,7 @@ namespace CK.Env.MSBuild
                     }
                 }
             }
-             // Handle creation if needed.
+            // Handle creation if needed.
             if( !actualFrameworks.IsEmpty && addIfNotExists )
             {
                 var firstPropertyGroup = ProjectFile.Document.Root.Element( "PropertyGroup" );
@@ -438,9 +438,10 @@ namespace CK.Env.MSBuild
         public int RemoveDependencies( IActivityMonitor m, IReadOnlyList<DeclaredPackageDependency> toRemove )
         {
             if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
-            if( toRemove == null || toRemove.Count == 0 ) throw new ArgumentException( "Empty dependency to remove.", nameof(toRemove) );
+            if( toRemove == null ) throw new ArgumentException( "Empty dependency to remove.", nameof( toRemove ) );
+            if( toRemove.Count == 0 ) return 0;
             var extra = toRemove.FirstOrDefault( r => !_dependencies.Packages.Contains( r ) );
-            if( extra != null ) throw new ArgumentException( $"Dependency not contained: {extra}.", nameof(toRemove) );
+            if( extra != null ) throw new ArgumentException( $"Dependency not contained: {extra}.", nameof( toRemove ) );
             int changeCount = toRemove.Count;
             var parents = toRemove.Select( p => p.OriginElement.Parent ).Distinct().ToList();
             changeCount += parents.Count;
@@ -488,7 +489,7 @@ namespace CK.Env.MSBuild
                         || String.IsNullOrWhiteSpace( p.RawVersion )
                         || (
                              !(isPropVersion = p.RawVersion.StartsWith( "$(" ))
-                             && !((versionLocked,version) = SVersionRange.TryParseSimpleRange( p.RawVersion )).version.IsValid
+                             && !((versionLocked, version) = SVersionRange.TryParseSimpleRange( m, p.RawVersion )).version.IsValid
                            ) )
                     {
                         if( version != null )
@@ -598,8 +599,8 @@ namespace CK.Env.MSBuild
                 return null;
             }
             XElement propertyDef = candidates[0];
-            var v = SVersionRange.TryParseSimpleRange( propertyDef.Value );
-            if( !v.Version.IsValid)
+            var v = SVersionRange.TryParseSimpleRange( m, propertyDef.Value );
+            if( !v.Version.IsValid )
             {
                 m.Error( $"Invalid $({propName}) version definition {p.Origin} in {propertyDef}: {version.ErrorMessage}." );
                 return null;
