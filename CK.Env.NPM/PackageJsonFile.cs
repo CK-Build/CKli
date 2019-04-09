@@ -1,10 +1,12 @@
 using CK.Core;
 using CK.Env.Plugins;
 using CSemVer;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace CK.Env.NPM
@@ -71,6 +73,12 @@ namespace CK.Env.NPM
         /// <param name="v">The minimal version. Must not be null.</param>
         public void SetDependencyMinVersion( string name, SVersion v )
         {
+            var idx = _deps.FindIndex( dep => dep.Name == name );
+            if( idx < 0 ) throw new ArgumentException( $"Dependency '{name}' not found.", nameof( name ) );
+            var dOrig = _deps[idx];
+            var d = new NPMDep( dOrig.Name, dOrig.Kind, v );
+            Root[d.Kind.ToJsonKey()][d.Name] = d.RawDep;
+            _deps[idx] = d;
         }
 
         /// <summary>
@@ -81,11 +89,83 @@ namespace CK.Env.NPM
         /// <param name="kind">The kind of the dependency.</param>
         public void EnsureDependency( string name, SVersion v, DependencyKind kind )
         {
+            var d = new NPMDep( name, kind, v );
+            Root[d.Kind.ToJsonKey()][d.Name] = d.RawDep;
+            var idx = _deps.FindIndex( dep => dep.Name == name );
+            if( idx >= 0 ) _deps[idx] = d;
+            else _deps.Add( d );
         }
 
         internal NPMProjectStatus Refresh( IActivityMonitor m )
-        {           
+        {
+            _deps.Clear();
+            var s = FillDeps( m, DependencyKind.Normal );
+            if( s == NPMProjectStatus.Valid ) s = FillDeps( m, DependencyKind.Dev );
+            if( s == NPMProjectStatus.Valid ) s = FillDeps( m, DependencyKind.Peer );
+            return s;
+        }
+
+        NPMProjectStatus FillDeps( IActivityMonitor m, DependencyKind depKind )
+        {
+            string depNameKind = depKind.ToJsonKey();
+            var oDeps = Root[depNameKind];
+            if( oDeps != null )
+            {
+                foreach( var d in oDeps )
+                {
+                    if( !(d is JProperty dP)
+                        || String.IsNullOrWhiteSpace( dP.Name )
+                        || dP.Value.Type != JTokenType.String )
+                    {
+                        m.Error( $"Invalid dependency in {depNameKind}: {d}" );
+                        return NPMProjectStatus.ErrorInvalidDependencyRecord;
+                    }
+                    var rawDep = (string)dP.Value;
+                    var (v, type) = GetVersionType( m, depNameKind, dP.Name, rawDep );
+                    if( type == VersionDependencyType.None ) return NPMProjectStatus.ErrorInvalidDependencyVersion;
+                    _deps.Add( new NPMDep( dP.Name, type, depKind, rawDep, v ) );
+                }
+            }
             return NPMProjectStatus.Valid;
+        }
+
+        (SVersion, VersionDependencyType) GetVersionType( IActivityMonitor m, string depNameKind, string name, string value )
+        {
+            if( value.IndexOf("://") > 0 )
+            {
+                if( value.StartsWith( "file://" ) ) return (null, VersionDependencyType.LocalPath);
+                if( value.StartsWith( "http://" ) || value.StartsWith( "https://" ) ) return (null, VersionDependencyType.UrlTar);
+                if( value.StartsWith( "git://" )
+                    || value.StartsWith( "git+ssh://" )
+                    || value.StartsWith( "git+http://" )
+                    || value.StartsWith( "git+https://" )
+                    || value.StartsWith( "git+file://" ) ) return (null, VersionDependencyType.UrlGit);
+                m.Error( $"Unable to handle what seems to be a url dependency '{value}' for {depNameKind}/{name}." );
+                return (null, VersionDependencyType.None);
+            }
+            if( value.Length == 0 || value == "*" ) return (null, VersionDependencyType.AllVersions);
+            if( value.IndexOf( " - " ) >= 0
+                || value.IndexOf( "||" ) >= 0
+                || value.IndexOf( '<' ) >= 0
+                || value.IndexOf( '^' ) >= 0
+                || value.IndexOf( '~' ) >= 0
+                || SVersion.TryParse( value ).IsValid )
+            {
+                return (null, VersionDependencyType.OtherVersionSpec);
+            }
+            if( value.StartsWith( ">=" ) )
+            {
+                var v = SVersion.TryParse( value );
+                if( !v.IsValid )
+                {
+                    m.Error( $"Invalid version for {depNameKind}/{name} '{value}': {v.ErrorMessage}" );
+                    return (null, VersionDependencyType.None);
+                }
+                return (v, VersionDependencyType.MinVersion);
+            }
+            if( Regex.IsMatch( value, "\\w+/\\w+" ) ) return (null, VersionDependencyType.GitHub);
+            if( Regex.IsMatch( value, "\\w+" ) ) return (null, VersionDependencyType.Tag);
+            return (null, VersionDependencyType.OtherVersionSpec);
         }
     }
 }

@@ -43,7 +43,11 @@ namespace CK.Env
             _activityMonitor = activityMonitor;
             _secretKeyStore = secretKeyStore;
             _git = new Repository( path );
-            if( url != null && _git.Network.Remotes["origin"]?.Url != url ) throw new InvalidOperationException( "The repository origin url is different than the repository url specified in the world" );
+            if( url != null
+                && !StringComparer.OrdinalIgnoreCase.Equals( _git.Network.Remotes["origin"]?.Url, url ) )
+            {
+                throw new InvalidOperationException( $"The repository 'origin' url (ie. '{_git.Network.Remotes["origin"]?.Url}') is different than the repository url specified in the world: {url}" );
+            }
             _commandRegister = commandRegister;
             _headFolder = new HeadFolder( this );
             _branchesFolder = new BranchesFolder( this, "branches", isRemote: false );

@@ -265,7 +265,7 @@ namespace CK.Env.Plugins
             foreach( var update in packageInfos )
             {
                 var p = FindProject( monitor, primary, update.SolutionName, update.ProjectName, true );
-                int changes = p.SetPackageReferenceVersion( monitor, p.TargetFrameworks, update.PackageUpdate.PackageId, update.PackageUpdate.Version );
+                int changes = p.SetPackageReferenceVersion( monitor, p.TargetFrameworks, update.PackageUpdate.Artifact.Name, update.PackageUpdate.Version );
                 if( changes != 0 && !toSave.Contains( p.Solution ) ) toSave.Add( p.Solution );
             }
             foreach( var solution in toSave )
@@ -310,7 +310,7 @@ namespace CK.Env.Plugins
                         .SelectMany( p => p.Deps.Packages )
                         .Select( dep => (Dep: dep, LocalVersion: feed.GetBestVersion( monitor, dep.PackageId )) )
                         .Where( pv => pv.LocalVersion != null )
-                        .Select( pv => new UpdatePackageInfo( pv.Dep.Owner.Solution.UniqueSolutionName, pv.Dep.Owner.Name, pv.Dep.PackageId, pv.LocalVersion ) );
+                        .Select( pv => new UpdatePackageInfo( pv.Dep.Owner.Solution.UniqueSolutionName, pv.Dep.Owner.Name, "NuGet", pv.Dep.PackageId, pv.LocalVersion ) );
 
             if( !UpdatePackageDependencies( monitor, toUpgrade ) ) return false;
             return LocalCommit( monitor );

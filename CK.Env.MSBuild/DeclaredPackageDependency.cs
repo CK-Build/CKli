@@ -16,7 +16,7 @@ namespace CK.Env.MSBuild
             CKTrait frameworks )
         {
             Owner = owner;
-            Package = new VersionedPackage( packageId, version );
+            Package = new ArtifactInstance( "NuGet", packageId, version );
             OriginElement = originElement;
             PropertyVersionElement = finalDeclaration;
             Frameworks = frameworks;
@@ -30,12 +30,12 @@ namespace CK.Env.MSBuild
         /// <summary>
         /// Gets the package identifier and version.
         /// </summary>
-        public VersionedPackage Package { get; }
+        public ArtifactInstance Package { get; }
 
         /// <summary>
         /// Gets the package identifier.
         /// </summary>
-        public string PackageId => Package.PackageId;
+        public string PackageId => Package.Artifact.Name;
 
         /// <summary>
         /// Gets whether the version is locked: it is inside square brackets (ex. Version="[2.6.4]").

@@ -33,8 +33,11 @@ namespace CK.BuildSystem.Appveyor
             // We don't use AppVeyor for private repositories.
             if( !Folder.IsPublic ) 
             {
-                m.Log(LogLevel.Info, "The project is private, so we don't use Appveyor and the Appveyor.yml is not needed.");
-                Delete(m);
+                if( TextContent != null )
+                {
+                    m.Log( LogLevel.Info, "The project is private, so we don't use Appveyor and the Appveyor.yml is not needed." );
+                    Delete( m );
+                }
                 return;
             }
             // We currently always use AppVeyor when the repository is public.

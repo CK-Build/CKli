@@ -36,15 +36,15 @@ namespace CK.Env.MSBuild
             /// <summary>
             /// Gets the source project.
             /// </summary>
-            public IDependentProject SourceProject { get; }
+            public IDotNetDependentProject SourceProject { get; }
 
             /// <summary>
             /// Gets the target package.
-            /// Note that if is is a locally published package, this TargetPackage
-            /// will have a null <see cref="IDependentPackage.Version"/>.
+            /// Note that if it is a locally published package, this TargetPackage
+            /// will have a null <see cref="IDotNetDependentPackage.Version"/>.
             /// The <see cref="Version"/> property should be used since it is the one of the <see cref="RawPackageDependency"/>.
             /// </summary>
-            public IDependentPackage TargetPackage { get; }
+            public IDotNetDependentPackage TargetPackage { get; }
 
             /// <summary>
             /// Gets the target package identifier.
@@ -56,10 +56,15 @@ namespace CK.Env.MSBuild
             /// </summary>
             public SVersion Version => RawPackageDependency.Version;
 
+            /// <summary>
+            /// Gets the target artifact instance.
+            /// </summary>
+            public ArtifactInstance Target => RawPackageDependency.Package;
+
             internal ProjectDepencyRow(
                 DeclaredPackageDependency d,
-                IDependentProject s,
-                IDependentPackage t )
+                IDotNetDependentProject s,
+                IDotNetDependentPackage t )
             {
                 Debug.Assert( d.PackageId == t.PackageId );
                 Debug.Assert( d.Owner == s.Project );
@@ -93,13 +98,13 @@ namespace CK.Env.MSBuild
 
         PackageDependencyAnalysisResult ComputeExternalDependencies( bool? externalDependencies = null )
         {
-            var monoVersions = new List<(VersionedPackage Package, IReadOnlyList<IDependentProject> Projects)>();
-            var multiVersions = new List<(VersionedPackage Package, IReadOnlyList<IProjectFramework> Projects)>();
+            var monoVersions = new List<(ArtifactInstance Package, IReadOnlyList<IDotNetDependentProject> Projects)>();
+            var multiVersions = new List<(ArtifactInstance Package, IReadOnlyList<IProjectFramework> Projects)>();
 
             IEnumerable<ProjectDepencyRow> all = DependencyTable;
             if( externalDependencies.HasValue ) all = all.Where( r => r.IsExternalDependency == externalDependencies.Value );
 
-            foreach( var (PackageId, ByVersion) in all.GroupBy( d => d.PackageId )
+            foreach( var (Artifact, ByVersion) in all.GroupBy( d => d.Target.Artifact )
                                    .Select( g => (PackageId: g.Key, ByVersion: g.GroupBy( r => r.Version )) ) )
             {
                 var count = ByVersion.Count();
@@ -112,7 +117,7 @@ namespace CK.Env.MSBuild
                 {
                     foreach( var v in ByVersion )
                     {
-                        VersionedPackage p = new VersionedPackage( PackageId, v.Key );
+                        ArtifactInstance p = new ArtifactInstance( Artifact, v.Key );
                         IReadOnlyList<IProjectFramework> refs = _projectFrameworkCache.Create( v ).ToList();
                         multiVersions.Add( (p, refs) );
                     }

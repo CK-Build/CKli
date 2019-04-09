@@ -32,7 +32,7 @@ namespace CKli
 
         public bool IsPrivate { get; private set; }
 
-        public NormalizedPath FullPath => Solution.FullPath.Combine( Folder );
+        public NormalizedPath FullPath => Solution.FullPath.RemoveLastPart().Combine( Folder );
 
     }
 }

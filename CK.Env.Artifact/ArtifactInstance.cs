@@ -31,7 +31,7 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the artifact.
+        /// Gets the artifact (type and name only).
         /// </summary>
         public Artifact Artifact { get; }
 

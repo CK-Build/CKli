@@ -16,8 +16,8 @@ namespace CK.Env.MSBuild
     public class DependencyAnalyser
     {
         readonly Solution[] _solutions;
-        readonly Dictionary<string, Package> _packages;
-        readonly ProjectItem.Cache _projects;
+        readonly Dictionary<string, DotNetPackageItem> _packages;
+        readonly DotNetProjectItem.Cache _projects;
         readonly CKTrait _frameworks;
         ProjectDependencyResult _projectDependencies;
 
@@ -26,14 +26,14 @@ namespace CK.Env.MSBuild
         /// locally produced (the item requires the Solution that owns its source code), and external
         /// packages.
         /// </summary>
-        internal class Package : IDependentPackage, IDependentItem, IDependentItemRef
+        internal class DotNetPackageItem : IDotNetDependentPackage, IDependentItem, IDependentItemRef
         {
             // This contains only the Solution of the Project for local projects (the Package -published- requires the
             // Solution that owns its source code.)
             // Otherwise, for external packages, this is null (no requirements).
             readonly IDependentItemRef[] _requires;
 
-            internal Package( ProjectItem localProject )
+            internal DotNetPackageItem( DotNetProjectItem localProject )
             {
                 _requires = new IDependentItemRef[] { localProject.Project.Solution };
                 Project = localProject.Project;
@@ -42,7 +42,7 @@ namespace CK.Env.MSBuild
                 FullName = Project.Name;
             }
 
-            internal Package( string packageId, SVersion v, string fullName )
+            internal DotNetPackageItem( string packageId, SVersion v, string fullName )
             {
                 PackageId = packageId;
                 Version = v;
@@ -94,10 +94,10 @@ namespace CK.Env.MSBuild
         }
 
         /// <summary>
-        /// This internal class is the IDependentItem that represents a Project
+        /// This internal class is the IDependentItem that represents a DotNet/NuGet Project
         /// in a SortableSolutionFile graph.
         /// </summary>
-        internal class ProjectItem : IDependentProject, IDependentItem, IDependentItemRef
+        internal class DotNetProjectItem : IDotNetDependentProject, IDependentItem, IDependentItemRef
         {
             readonly Project _p;
             readonly List<IDependentItemRef> _requires;
@@ -105,39 +105,39 @@ namespace CK.Env.MSBuild
 
             public class Cache
             {
-                readonly Dictionary<Project, ProjectItem> _cache;
+                readonly Dictionary<Project, DotNetProjectItem> _cache;
 
                 public Cache()
                 {
-                    _cache = new Dictionary<Project, ProjectItem>();
+                    _cache = new Dictionary<Project, DotNetProjectItem>();
                 }
 
-                public ProjectItem this[Project p] => _cache[p];
+                public DotNetProjectItem this[Project p] => _cache[p];
 
                 public IEnumerable<Project> AllProjects => _cache.Keys;
 
-                public IEnumerable<ProjectItem> AllProjectItems => _cache.Values;
+                public IEnumerable<DotNetProjectItem> AllProjectItems => _cache.Values;
 
                 /// <summary>
                 /// Dirty trick: when set to true this property forces all ProjectItem's <see cref="IDependentItem.Container"/>
                 /// to be null and <see cref="IDependentItem.Requires"/> to contain the ProjectItem requirements instead of
-                /// the <see cref="IDependentPackage"/> requirements for locally published packages.
+                /// the <see cref="IDotNetDependentPackage"/> requirements for locally published packages.
                 /// We use this to reuse ProjectItems to compute Build projects graph dependencies
                 /// (this graph ignores the solutions and focuses only on projects).
                 /// </summary>
                 public bool PureProjectsMode { get; set; }
 
-                internal void Add( Project p, ProjectItem pItem ) => _cache.Add( p, pItem );
+                internal void Add( Project p, DotNetProjectItem pItem ) => _cache.Add( p, pItem );
 
-                public ProjectItem Create( Project p )
+                public DotNetProjectItem Create( Project p )
                 {
                     if( _cache.TryGetValue( p, out var item ) ) return item;
-                    return new ProjectItem( p, this );
+                    return new DotNetProjectItem( p, this );
                 }
 
             }
 
-            ProjectItem( Project p, Cache cache )
+            DotNetProjectItem( Project p, Cache cache )
             {
                 _p = p;
                 _cache = cache;
@@ -177,6 +177,8 @@ namespace CK.Env.MSBuild
 
             internal void AddRequires( IDependentItemRef p ) => _requires.Add( p );
 
+            string IDependentProject.Type => "NuGet";
+
             IDependentItemContainerRef IDependentItem.Container => _cache.PureProjectsMode
                                                                     ? null
                                                                     : (_p.Solution.SpecialType == SolutionSpecialType.IncludedSecondarySolution
@@ -191,7 +193,7 @@ namespace CK.Env.MSBuild
                 {
                     if( _cache.PureProjectsMode )
                     {
-                        return _requires.Select(  d => d is IDependentPackage p && p.Project != null ? _cache[p.Project] : d );
+                        return _requires.Select(  d => d is IDotNetDependentPackage p && p.Project != null ? _cache[p.Project] : d );
                     }
                     return _requires;
                 }
@@ -211,8 +213,8 @@ namespace CK.Env.MSBuild
         DependencyAnalyser(
             string uniqueBranchName,
             Solution[] solutions,
-            Dictionary<string, Package> packages,
-            ProjectItem.Cache projects,
+            Dictionary<string, DotNetPackageItem> packages,
+            DotNetProjectItem.Cache projects,
             CKTrait frameworks )
         {
             UniqueBranchName = uniqueBranchName;
@@ -242,10 +244,10 @@ namespace CK.Env.MSBuild
             {
                 if( _projectDependencies != null ) return _projectDependencies;
 
-                Package FindPackage( DeclaredPackageDependency d, bool isIncludedSolutionProject )
+                DotNetPackageItem FindPackage( DeclaredPackageDependency d, bool isIncludedSolutionProject )
                 {
                     // Check for a published Package.
-                    if( _packages.TryGetValue( d.PackageId, out Package p ) )
+                    if( _packages.TryGetValue( d.PackageId, out DotNetPackageItem p ) )
                     {
                         // If this published Package is from the primary solution of
                         // the project's solution that has SpecialType=IncludedSecondarySolution, we ignore
@@ -305,15 +307,15 @@ namespace CK.Env.MSBuild
                 else
                 {
                     var rankedProjects = rBuildProjects.SortedItems
-                                                .Where( i => i.Item is IDependentProject )
+                                                .Where( i => i.Item is IDotNetDependentProject )
                                                 .Select( i => (i.Rank,
-                                                               Project: (IDependentProject)i.Item,
+                                                               Project: (IDotNetDependentProject)i.Item,
                                                                DirectDeps: i.Requires
                                                                             .Select( s => s.Item )
-                                                                            .OfType<IDependentProject>(),
+                                                                            .OfType<IDotNetDependentProject>(),
                                                                AllDeps: i.GetAllRequires()
                                                                          .Select( s => s.Item )
-                                                                         .OfType<IDependentProject>()) );
+                                                                         .OfType<IDotNetDependentProject>()) );
 
                     var zeroBuildProjects = rankedProjects.Select( (p,idx) => new ZeroBuildProjectInfo(
                                     idx,
@@ -418,7 +420,7 @@ namespace CK.Env.MSBuild
                                                             .Where( c => c.Project != null )
                                                             .SelectMany( c => c.ProjectSorted.DirectRequires
                                                                             .Select( r => r.Item )
-                                                                            .OfType<Package>()
+                                                                            .OfType<DotNetPackageItem>()
                                                                             .Where( package => package.Project != null )
                                                                             .Select( package => (Origin: c.Project, Target: package) )
                                         )) )
@@ -455,7 +457,7 @@ namespace CK.Env.MSBuild
             return new SolutionDependencyContext( UniqueBranchName, indexByName, strategy, result, ProjectDependencies, table, depSolutions, GetBuildProjectInfo( m ) );
         }
 
-        IEnumerable<ProjectItem> GetProjectItems( Solution s, SolutionSortStrategy content )
+        IEnumerable<DotNetProjectItem> GetProjectItems( Solution s, SolutionSortStrategy content )
         {
             switch( content )
             {
@@ -476,9 +478,9 @@ namespace CK.Env.MSBuild
         /// <returns>A new dependency context.</returns>
         public static DependencyAnalyser Create( IActivityMonitor m, IEnumerable<Solution> solutionFiles )
         {
-            var packages = new Dictionary<string, Package>();
+            var packages = new Dictionary<string, DotNetPackageItem>();
             var solutions = solutionFiles.ToArray();
-            var projectItems = new ProjectItem.Cache();
+            var projectItems = new DotNetProjectItem.Cache();
             var frameworks = MSBuildContext.Traits.EmptyTrait;
             // Note: Project to project references are translated into Requirements directly
             //       in the ProjectItem constructor.
@@ -524,9 +526,9 @@ namespace CK.Env.MSBuild
                                 m.Error( $"{p} is already published: {alreadyPublished}." );
                                 return null;
                             }
-                            ProjectItem projectItem = projectItems[p];
+                            DotNetProjectItem projectItem = projectItems[p];
                             projectItem.IsPublished = true;
-                            packages.Add( p.Name, new Package( projectItem ) );
+                            packages.Add( p.Name, new DotNetPackageItem( projectItem ) );
                             m.Debug( $"Package {p.Name} created." );
                         }
                     }
@@ -543,7 +545,7 @@ namespace CK.Env.MSBuild
                 foreach( var dep in project.Project.Deps.Packages )
                 {
                     IDependentItemRef refTarget;
-                    if( packages.TryGetValue( dep.PackageId, out Package target ) )
+                    if( packages.TryGetValue( dep.PackageId, out DotNetPackageItem target ) )
                     {
                         // Dependency to a Published projects from the primary solution are
                         // transfomed into requirements to the Project itself.
@@ -566,12 +568,12 @@ namespace CK.Env.MSBuild
             return new DependencyAnalyser( uniqueBranchName, solutions, packages, projectItems, frameworks );
         }
 
-        static Package RegisterExternal( Dictionary<string, Package> externals, DeclaredPackageDependency dep )
+        static DotNetPackageItem RegisterExternal( Dictionary<string, DotNetPackageItem> externals, DeclaredPackageDependency dep )
         {
             string fullName = dep.PackageId + '/' + dep.Version.ToString();
             if( !externals.TryGetValue( fullName, out var p ) )
             {
-                p = new Package( dep.PackageId, dep.Version, fullName );
+                p = new DotNetPackageItem( dep.PackageId, dep.Version, fullName );
                 externals.Add( fullName, p );
             }
             return p;

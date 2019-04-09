@@ -7,6 +7,8 @@ namespace CK.Env
     /// Captures information required to build the Build projects and its dependencies in Zero Version.
     /// This is computed by analyzing the the pure build projects dependency graph (ignoring Solutions) that is
     /// the transitive closure of all Solution's build projects.
+    /// Currently, build projects are only NuGet projects and builder can only be the CodeCakeBuilder project, but
+    /// this may be extended to support other type of build projects.
     /// </summary>
     public class ZeroBuildProjectInfo
     {

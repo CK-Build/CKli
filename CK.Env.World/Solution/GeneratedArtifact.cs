@@ -24,7 +24,7 @@ namespace CK.Env
         /// Initializes a new <see cref="GeneratedArtifact"/>.
         /// </summary>
         /// <param name="a">The artifact.</param>
-        /// <param name="path">Pame of the package.</param>
+        /// <param name="path">Path of the package.</param>
         public GeneratedArtifact( Artifact a, string path )
         {
             Artifact = a;

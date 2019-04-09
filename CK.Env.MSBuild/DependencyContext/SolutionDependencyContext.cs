@@ -242,7 +242,7 @@ namespace CK.Env.MSBuild
 
             string IDependentSolution.BranchName => Solution.BranchName;
 
-            IReadOnlyList <IDependentSolution> IDependentSolution.Requirements => Requirements;
+            IReadOnlyList<IDependentSolution> IDependentSolution.Requirements => Requirements;
 
             IReadOnlyList<IDependentSolution> IDependentSolution.PublishedRequirements => PublishedRequirements;
 
