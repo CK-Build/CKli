@@ -11,8 +11,6 @@ namespace CKli
 {
     public class XNPMProjectCenter : XTypedObject
     {
-        NPMProjectContext _context;
-
         public XNPMProjectCenter(
             Initializer initializer,
             FileSystem fs )

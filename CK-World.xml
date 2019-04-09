@@ -7,17 +7,27 @@
   <CKEnvKeyVault />
   <NuGetClient />
   <CKSetupClient />
+  <NPMProjectCenter />
   <SolutionCentral />
 
   <ArtifactRepositories>
+
     <Repository Type="NuGetAzure"
                 Organization="Signature-OpenSource"
                 FeedName="Default"
                 CheckName="NuGetAzure:Signature-OpenSource-Default"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
+
+    <Repository Type="NuGetAzure"
+                Organization="Signature-Code"
+                FeedName="Default"
+                CheckName="NuGetAzure:Signature-Code-Default"
+                CheckSecretKeyName="AZURE_FEED_SIGNATURE_CODE_PAT" />
+    
     <Repository Type="CKSetup"
                 CheckName="CKSetup:Public"
                 CheckSecretKeyName="CKSETUPREMOTESTORE_PUSH_API_KEY" />
+
   </ArtifactRepositories>
   
   <SolutionSettings>
@@ -51,7 +61,19 @@
       <add Type="CK.BuildSystem.Appveyor.AppveyorFile, CK.BuildSystem.Appveyor" />
     </Plugins>
   </SolutionSettings>
-   
+
+  <Reusable Name="Private-SolutionSettings">
+    <SolutionSettings>
+      <NuGetSources>
+        <add Name="Signature-Code" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/Default/nuget/v3/index.json" />
+      </NuGetSources>
+      <ArtifactTargets>
+        <remove Name="NuGetAzure:Signature-OpenSource-Default" />
+        <add Name="NuGetAzure:Signature-Code-Default" />
+      </ArtifactTargets>
+    </SolutionSettings>
+  </Reusable>
+  
   <Folder Name="CK-AspNet-Projects">
 
     <GitFolder Name="CK-AspNet" Url="https://github.com/Invenietis/CK-AspNet.git" IsPublic="True" >
@@ -153,6 +175,16 @@
       </Branch>
     </GitFolder>
 
+    <Reuse Name="Private-SolutionSettings" />
+
+    <GitFolder Name="CK-Observable-Domain" Url="https://gitlab.com/Signature-Code/CK-Observable-Domain.git">
+      <SolutionSettings NoStrongNameSigning="True"/>
+      <Branch Name="develop">
+        <PrimarySolution />
+        <NPMProject Folder="js" PackageName="@signature/ck-observable-domain" />
+      </Branch>
+    </GitFolder>
+    
   </Folder>
 
   <Folder Name="CK-Database-Projects">
