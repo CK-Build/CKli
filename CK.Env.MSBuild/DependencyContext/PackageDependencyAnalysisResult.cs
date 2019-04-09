@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace CK.Env.MSBuild
 {
     /// <summary>
-    /// Summarizes all the <see cref="VersionedPackage"/> in the context associated to the <see cref="IDependentProject"/> that
+    /// Summarizes all the <see cref="VersionedPackage"/> in the context associated to the <see cref="IDotNetDependentProject"/> that
     /// consume them or <see cref="IProjectFramework"/> if more than one version are referenced.
     /// This is exposed by <see cref="ProjectDependencyResult.AllPackageDependencies"/>, <see cref="ProjectDependencyResult.ExternalPackageDependencies"/>
     /// and <see cref="ProjectDependencyResult.LocalPackageDependencies"/>.
@@ -12,7 +12,7 @@ namespace CK.Env.MSBuild
     {
         internal PackageDependencyAnalysisResult(
             bool? externalDependencies,
-            IReadOnlyList<(ArtifactInstance Package, IReadOnlyList<IDependentProject> Projects)> monoVersions,
+            IReadOnlyList<(ArtifactInstance Package, IReadOnlyList<IDotNetDependentProject> Projects)> monoVersions,
             IReadOnlyList<(ArtifactInstance Package, IReadOnlyList<IProjectFramework> Projects)> multiVersions
             )
         {
@@ -36,7 +36,7 @@ namespace CK.Env.MSBuild
         /// Gets the <see cref="VersionedPackage"/> that are referenced with the same unique version across all projects
         /// (and the projects that reference them).
         /// </summary>
-        public IReadOnlyList<(ArtifactInstance Package, IReadOnlyList<IDependentProject> Projects)> MonoVersions { get; }
+        public IReadOnlyList<(ArtifactInstance Package, IReadOnlyList<IDotNetDependentProject> Projects)> MonoVersions { get; }
 
         /// <summary>
         /// Gets the <see cref="VersionedPackage"/> that are referenced with more than one version across all projects.

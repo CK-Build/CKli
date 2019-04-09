@@ -6,19 +6,19 @@ namespace CK.Env.MSBuild
     public interface IDependentProject
     {
         /// <summary>
-        /// Gets the project itself.
-        /// </summary>
-        Project Project { get; }
-
-        /// <summary>
-        /// Whether this project belongs to the Published ones.
+        /// Whether this project is published, ie. it produces a package.
         /// When a project is published, to distinguish it from the associated necessarily
-        /// unique DependencyContext.Package we use its file name as the item's FullName (with the .csproj
-        /// extension: the naked project name is used for its Package's FullName).
+        /// unique DependencyContext.Package we use a file name as the item's FullName (for .Net, this is
+        /// the .csproj, for NPM, this is the package.json: the naked project name is used for its Package's FullName).
         /// But when a project is not published, we scope its file name to its solution name to compute the
         /// FullName so that utility projects can have the same name in different solutions.
         /// </summary>
         bool IsPublished { get; }
+
+        /// <summary>
+        /// Gets the project's type ("NPM", "NuGet", etc.).
+        /// </summary>
+        string Type { get; }
 
         /// <summary>
         /// Gets the full name of this project item (see <see cref="IsPublished"/>).

@@ -36,15 +36,15 @@ namespace CK.Env.MSBuild
             /// <summary>
             /// Gets the source project.
             /// </summary>
-            public IDependentProject SourceProject { get; }
+            public IDotNetDependentProject SourceProject { get; }
 
             /// <summary>
             /// Gets the target package.
             /// Note that if it is a locally published package, this TargetPackage
-            /// will have a null <see cref="IDependentPackage.Version"/>.
+            /// will have a null <see cref="IDotNetDependentPackage.Version"/>.
             /// The <see cref="Version"/> property should be used since it is the one of the <see cref="RawPackageDependency"/>.
             /// </summary>
-            public IDependentPackage TargetPackage { get; }
+            public IDotNetDependentPackage TargetPackage { get; }
 
             /// <summary>
             /// Gets the target package identifier.
@@ -63,8 +63,8 @@ namespace CK.Env.MSBuild
 
             internal ProjectDepencyRow(
                 DeclaredPackageDependency d,
-                IDependentProject s,
-                IDependentPackage t )
+                IDotNetDependentProject s,
+                IDotNetDependentPackage t )
             {
                 Debug.Assert( d.PackageId == t.PackageId );
                 Debug.Assert( d.Owner == s.Project );
@@ -98,7 +98,7 @@ namespace CK.Env.MSBuild
 
         PackageDependencyAnalysisResult ComputeExternalDependencies( bool? externalDependencies = null )
         {
-            var monoVersions = new List<(ArtifactInstance Package, IReadOnlyList<IDependentProject> Projects)>();
+            var monoVersions = new List<(ArtifactInstance Package, IReadOnlyList<IDotNetDependentProject> Projects)>();
             var multiVersions = new List<(ArtifactInstance Package, IReadOnlyList<IProjectFramework> Projects)>();
 
             IEnumerable<ProjectDepencyRow> all = DependencyTable;

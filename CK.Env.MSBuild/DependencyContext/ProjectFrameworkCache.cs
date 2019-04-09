@@ -11,12 +11,12 @@ namespace CK.Env.MSBuild
     class ProjectFrameworkCache
     {
         readonly IReadOnlyList<ProjectDependencyResult.ProjectDepencyRow> _dependencies;
-        readonly Dictionary<(IDependentProject, CKTrait), Referencer> _referencers;
+        readonly Dictionary<(IDotNetDependentProject, CKTrait), Referencer> _referencers;
 
         public ProjectFrameworkCache( IReadOnlyList<ProjectDependencyResult.ProjectDepencyRow> dependencies )
         {
             _dependencies = dependencies;
-            _referencers = new Dictionary<(IDependentProject, CKTrait), Referencer>();
+            _referencers = new Dictionary<(IDotNetDependentProject, CKTrait), Referencer>();
         }
 
         public class Referencer : IProjectFramework
@@ -24,7 +24,7 @@ namespace CK.Env.MSBuild
             readonly HashSet<IProjectFramework> _allRefs;
             IReadOnlyList<IProjectFramework> _refs;
 
-            public IDependentProject Project { get; }
+            public IDotNetDependentProject Project { get; }
             public CKTrait Framework { get; }
             public IReadOnlyList<IProjectFramework> Refs => _refs;
             public int Depth { get; private set; }
@@ -38,7 +38,7 @@ namespace CK.Env.MSBuild
                 if( refs.Count > 0 ) Depth = refs.Select( r => r.Depth ).Max();
             }
 
-            public Referencer( IDependentProject project, CKTrait f )
+            public Referencer( IDotNetDependentProject project, CKTrait f )
             {
                 Debug.Assert( project != null
                                 && f != null
@@ -57,7 +57,7 @@ namespace CK.Env.MSBuild
             return rows.SelectMany( r => r.RawPackageDependency.Frameworks.AtomicTraits.Select( f => Create( r.SourceProject, f ) ) );
         }
 
-        Referencer Create( IDependentProject p, CKTrait atomic )
+        Referencer Create( IDotNetDependentProject p, CKTrait atomic )
         {
             var key = (p, atomic);
             if( !_referencers.TryGetValue( key, out var referencer ) )

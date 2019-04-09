@@ -14,7 +14,7 @@ namespace CK.Env.MSBuild
         /// <summary>
         /// Gets the local project.
         /// </summary>
-        IDependentProject Project { get; }
+        IDotNetDependentProject Project { get; }
 
         /// <summary>
         /// Gets the atomic framework of this <see cref="IProjectFramework"/>.
