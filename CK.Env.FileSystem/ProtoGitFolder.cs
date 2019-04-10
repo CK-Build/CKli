@@ -2,6 +2,7 @@ using CK.Core;
 using CK.Text;
 using LibGit2Sharp;
 using System;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace CK.Env
@@ -71,7 +72,8 @@ namespace CK.Env
             switch( KnownGitProvider )
             {
                 case KnownGitProvider.AzureDevOps:
-                    string organization = Regex.Match( url, @"(?:\:\/\/)[^\/]*\/([^\/]*)" ).Groups[0].Value;
+                    var regex = Regex.Match( url, @"(?:\:\/\/)[^\/]*\/([^\/]*)" );
+                    string organization = regex.Groups[1].Value;
                     keyName = "AZURE_GIT_" + organization
                         .ToUpperInvariant()
                         .Replace( '-', '_' )
@@ -82,11 +84,12 @@ namespace CK.Env
                     keyName = KnownGitProvider.ToString() + "_GIT_PAT";
                     break;
             }
-
+            string pat = SecretKeyStore.GetSecretKey( m, keyName, true );
+            pat = Convert.ToBase64String( Encoding.UTF8.GetBytes( pat ) );
             return new UsernamePasswordCredentials()
             {
                 Username = "CK-Env",
-                Password = SecretKeyStore.GetSecretKey( m, keyName, true )
+                Password = pat
             };
         }
 
