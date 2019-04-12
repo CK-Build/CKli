@@ -35,18 +35,25 @@ namespace CK.Env
             CommandRegister commandRegister,
             IWorldName world,
             string path,
-            string url = null) : base( url, path, world, secretKeyStore, fs, commandRegister )
+            string originUrl ) : base( originUrl, path, world, secretKeyStore, fs, commandRegister )
         {
+            if( originUrl == null ) throw new ArgumentNullException( nameof( originUrl ) );
             Debug.Assert( path.StartsWith( fs.Root.Path ) );
             SubPath = FullPhysicalPath.RemovePrefix( fs.Root );
             if( SubPath.IsEmptyPath ) throw new InvalidOperationException( "Root path can not be a Git folder." );
             _activityMonitor = activityMonitor;
             _secretKeyStore = secretKeyStore;
             _git = new Repository( path );
-            if( url != null
-                && !StringComparer.OrdinalIgnoreCase.Equals( _git.Network.Remotes["origin"]?.Url, url ) )
+            if( _git.Branches.Count() == 0 )
             {
-                throw new InvalidOperationException( $"The repository 'origin' url (ie. '{_git.Network.Remotes["origin"]?.Url}') is different than the repository url specified in the world: {url}" );
+                _git.Dispose();
+                throw new InvalidDataException( "This git repository does not contain any branches." );
+            }
+            string remoteUrl;
+            if( !StringComparer.OrdinalIgnoreCase.Equals( (remoteUrl = _git.Network.Remotes["origin"]?.Url), originUrl ) )
+            {
+                _git.Dispose();
+                throw new InvalidOperationException( $"The repository 'origin' url (ie. '{remoteUrl}') is different than the repository url specified in the world: {originUrl}" );
             }
             _commandRegister = commandRegister;
             _headFolder = new HeadFolder( this );
@@ -84,7 +91,7 @@ namespace CK.Env
         /// The folder path is a sub path of <see cref="Root"/> and contains the .git sub folder.
         /// </param>
         /// <returns>The <see cref="GitFolder"/> or null if there is not .git subfolder.</returns>
-        public static GitFolder EnsureGitFolder(IActivityMonitor m, IWorldName world, ISecretKeyStore secretKeyStore, FileSystem fs, CommandRegister commandRegister, string path, string url = null)
+        public static GitFolder EnsureGitFolder( IActivityMonitor m, IWorldName world, ISecretKeyStore secretKeyStore, FileSystem fs, CommandRegister commandRegister, string path, string url = null )
         {
             if( path.Contains( ".git" ) ) throw new ArgumentException( "Path should be the repository directory and not the .git directory" );
             var gitFolderPath = Path.Combine( path, ".git" );
@@ -105,7 +112,7 @@ namespace CK.Env
                 {
                     throw new InvalidOperationException( "Git folder exist but is not a valid Repository" );
                 }
-                gitFolder = new GitFolder(m, secretKeyStore, fs, commandRegister, world, path, url);
+                gitFolder = new GitFolder( m, secretKeyStore, fs, commandRegister, world, path, url );
             }
             gitFolder.EnsureBranch( m, world.DevelopBranchName );
             return gitFolder;
@@ -296,6 +303,14 @@ namespace CK.Env
                 m.Warn( $"Branch '{branchName}' does not exist. Creating local branch." );
                 b = _git.CreateBranch( branchName );
             }
+        }
+
+        public void CreateBranch( IActivityMonitor m, string branchName )
+        {
+            if( string.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
+            m.Info( $"Creating Branch {branchName} in repository {PrimarySolutionName}" );
+            var a = _git.CreateBranch( branchName );
+
         }
 
         /// <summary>

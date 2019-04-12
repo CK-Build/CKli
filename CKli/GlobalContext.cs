@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Env;
+using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -21,8 +22,8 @@ namespace CKli
 
         class LocalWorldRootPathMapping : ILocalWorldRootPathMapping
         {
-            readonly string _rootPath;
-            Dictionary<string, string> _map;
+            readonly NormalizedPath _rootPath;
+            Dictionary<string, NormalizedPath> _map;
 
             public LocalWorldRootPathMapping( string rootPath )
             {
@@ -39,18 +40,24 @@ namespace CKli
                         .Where( p => p.Length == 2 )
                         .Select( p => (p[0].Trim(), p[1].Trim()) )
                         .Where( p => p.Item1.Length > 0 && p.Item2.Length > 0 )
-                        .ToDictionary( p => p.Item1, p => p.Item2 )
-                        : new Dictionary<string, string>();
+                        .ToDictionary( p => p.Item1, p => new NormalizedPath(p.Item2) )
+                        : new Dictionary<string, NormalizedPath>();
                 if( !_map.ContainsKey( "CK" ) )
                 {
-                    _map.Add( "CK", _rootPath );
+                    if( _rootPath.LastPart != "CK" )
+                    {
+                        throw new Exception( "When CK is not mapped in LocalWorldRootPathMapping.txt, CK-Env MUST BE ran from a 'CK/CK-Env' folder." );
+                    }
+                    _map.Add( "CK", _rootPath.RemoveLastPart() );
                 }
             }
 
             public string GetRootPath( IWorldName w )
             {
-                if( _map.TryGetValue( w.FullName, out string p ) )
+                if( _map.TryGetValue( w.FullName, out NormalizedPath p )
+                    || _map.TryGetValue( w.Name, out p ) )
                 {
+                    p = p.AppendPart( w.FullName );
                     Directory.CreateDirectory( p );
                     File.WriteAllText( Path.Combine( p, "CK-World.htm" ), "<html></html>" );
                 }
@@ -130,7 +137,7 @@ namespace CKli
                     var (Idx, World, LocalPath) = worlds[result - 1];
                     return (LocalPath, World);
                 }
-                if( r == "x" ) return (null,null);
+                if( r == "x" ) return (null, null);
             }
         }
 
@@ -152,6 +159,6 @@ namespace CKli
             }
         }
 
-        public void Dispose() => Close(); 
+        public void Dispose() => Close();
     }
 }

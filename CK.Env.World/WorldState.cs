@@ -20,7 +20,7 @@ namespace CK.Env
         readonly ArtifactCenter _artifacts;
 
         readonly HashSet<ISolutionDriver> _solutionDrivers;
-        readonly Dictionary<string,ISolutionDriver> _cacheBySolutionName;
+        readonly Dictionary<string, ISolutionDriver> _cacheBySolutionName;
         readonly HashSet<IGitRepository> _gitRepositories;
 
         readonly IBasicApplicationLifetime _appLife;
@@ -76,7 +76,7 @@ namespace CK.Env
             }
         }
 
-        void ISolutionDriverWorld.Unregister(ISolutionDriver driver)
+        void ISolutionDriverWorld.Unregister( ISolutionDriver driver )
         {
             if( !_solutionDrivers.Remove( driver ) ) throw new InvalidOperationException( "Not registered." );
             foreach( var k in _cacheBySolutionName.Where( kv => kv.Value == driver ).Select( kv => kv.Key ).ToList() )
@@ -125,7 +125,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
-        [CommandMethod(confirmationRequired:false)]
+        [CommandMethod( confirmationRequired: false )]
         public bool Initialize( IActivityMonitor monitor )
         {
             bool alreadyInitialized = _rawState != null;
@@ -135,22 +135,22 @@ namespace CK.Env
                 SetReadonlyState();
                 _rawState.Document.Changed += RawStateChanged;
             }
-            return RunSafe( monitor, alreadyInitialized ? "World Status.": "Initializing World.", ( m, error ) =>
-            {
-                var ev = new EventMonitoredArgs( monitor );
-                if( alreadyInitialized )
-                {
-                    DumpWorldStatus?.Invoke( this, ev );
-                }
-                else
-                {
-                    Initializing?.Invoke( this, ev );
-                    if( !error() )
-                    {
-                        Initialized?.Invoke( this, ev );
-                    }
-                }
-            } );
+            return RunSafe( monitor, alreadyInitialized ? "World Status." : "Initializing World.", ( m, error ) =>
+             {
+                 var ev = new EventMonitoredArgs( monitor );
+                 if( alreadyInitialized )
+                 {
+                     DumpWorldStatus?.Invoke( this, ev );
+                 }
+                 else
+                 {
+                     Initializing?.Invoke( this, ev );
+                     if( !error() )
+                     {
+                         Initialized?.Invoke( this, ev );
+                     }
+                 }
+             } );
         }
 
         /// <summary>
@@ -173,7 +173,7 @@ namespace CK.Env
         public ISolutionDriver FindSolutionDriver( IActivityMonitor monitor, string uniqueSolutionName, string branchName, bool throwOnNotFound = true )
         {
             if( String.IsNullOrWhiteSpace( uniqueSolutionName ) ) throw new ArgumentNullException( nameof( uniqueSolutionName ) );
-            if( String.IsNullOrWhiteSpace( branchName)) throw new ArgumentNullException( nameof( branchName ) );
+            if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
             if( !_cacheBySolutionName.TryGetValue( branchName + ':' + uniqueSolutionName, out var driver ) )
             {
                 string primary = uniqueSolutionName;
@@ -427,7 +427,7 @@ namespace CK.Env
         bool DoSwitchToLocal( IActivityMonitor monitor )
         {
             Debug.Assert( WorkStatus == GlobalWorkStatus.SwitchingToLocal );
-            return RunSafe( monitor, $"Switching to {WorldName.LocalBranchName}.", (m,error) =>
+            return RunSafe( monitor, $"Switching to {WorldName.LocalBranchName}.", ( m, error ) =>
             {
                 foreach( var g in _gitRepositories )
                 {
@@ -799,7 +799,7 @@ namespace CK.Env
                         if( success )
                         {
                             success &= Git.Push( m, WorldName.DevelopBranchName );
-                        }               
+                        }
                     }
                     else
                     {
@@ -829,7 +829,7 @@ namespace CK.Env
         /// CI can be published when <see cref="GlobalWorkStatus.Idle"/> and a CI build result is available.
         /// </summary>
         public bool CanPublishCI => WorkStatus == GlobalWorkStatus.Idle
-                                    && _rawState.GetBuildResult(BuildResultType.CI) != null;
+                                    && _rawState.GetBuildResult( BuildResultType.CI ) != null;
 
         [CommandMethod]
         public bool PublishCI( IActivityMonitor monitor )
@@ -883,7 +883,52 @@ namespace CK.Env
                 }
             } );
         }
+        public bool CanGenerateLTSWorld => WorldName.LTSKey == null && !IsDirty;
 
+        [CommandMethod( confirmationRequired: true )]
+        public bool GenerateLTSWorld( IActivityMonitor m, string LTSKey )
+        {
+            if( !CanGenerateLTSWorld )
+            {
+                if( !CanGenerateLTSWorld ) throw new InvalidOperationException( nameof( CanGenerateLTSWorld ) );
+            }
+            m.Info( "Fetching all branches." );
+            foreach( var repo in _gitRepositories )
+            {
+                if( !repo.FetchBranches( m ) )
+                {
+                    m.Error( "Could not fetch branches, aborting" );
+                    return false;
+                }
+            }
+
+            var worldData = _store.ReadWorldDescription( m, WorldName );
+            var worldRoot = worldData.Root;
+            string newWorldName = WorldName.Name + "-" + LTSKey + "-World";
+            using( m.OpenInfo( $"Changing XML root element from '{worldRoot.Name} to {newWorldName}" ) )
+            {
+                worldRoot.Name = newWorldName;
+                foreach( XElement branch in worldData.Root.Descendants( "Branch" ) )
+                {
+                    var branchName = branch.Attribute( "Name" );
+                    if( branchName != null && (branchName.Value == "master" || branchName.Value == "develop") )
+                    {
+                        string newName = branchName.Value + "-" + LTSKey;
+                        string repoUri = branch.Parent.Attribute( "Url" ).Value;
+                        var repo = _gitRepositories.Single( p => StringComparer.OrdinalIgnoreCase.Equals( repoUri, p.OriginUrl ) );
+                        m.Info( "Creating branch " + newName );
+                        repo.CreateBranch( m, newName );
+                        m.Info( "Pushing branch" );
+                        repo.Push( m, newName );
+                        m.Info( $"Changing Branch from {branchName.Value} to {newName}" );
+                        branchName.Value = newName;
+                    }
+                }
+            }
+            m.Info( $"Creating new World {newWorldName}" );
+            _store.CreateNew( m, WorldName.Name, LTSKey, worldData );
+            return true;
+        }
 
         #region Read only State
 

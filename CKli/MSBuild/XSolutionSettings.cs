@@ -14,6 +14,7 @@ namespace CKli
             if( previous != null )
             {
                 SolutionSettings = new SolutionSettings( previous.SolutionSettings, artifactHandler.ArtifactCenter, initializer.Element );
+                initializer.Services.Remove<XSolutionSettings>();
             }
             else
             {

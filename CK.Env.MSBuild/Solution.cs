@@ -237,6 +237,10 @@ namespace CK.Env.MSBuild
         /// <returns>if the command was successfully executed</returns>
         public Solution EnsureProjectIsInSln( IActivityMonitor m, NormalizedPath projectPath )
         {
+            if(AllProjects.Any(p=>p.Path == projectPath))
+            {
+                return this;
+            }
             string args = "sln add " + projectPath.RemoveFirstPart( SolutionFolderPath.Parts.Count );
             if( !ProcessRunner.Run( m, BuildContext.FileSystem.GetFileInfo( SolutionFolderPath ).PhysicalPath, "dotnet", args ) )
             {

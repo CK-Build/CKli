@@ -44,7 +44,6 @@ namespace CK.Env.Plugins.SolutionFiles
                 if( ccbProject == null ) return;
             }
             var projectPath = _f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" );
-            solution.EnsureProjectIsInSln( m, projectPath );
             ccbProject.SetTargetFrameworks( m, framework );
             ccbProject.SetLangVersion( m, "7.2" );
             ccbProject.SetOutputType( m, "Exe" );
@@ -87,6 +86,7 @@ namespace CK.Env.Plugins.SolutionFiles
                 }
             }
             solution.Save( m );
+            solution.EnsureProjectIsInSln( m, projectPath );
         }
     }
 }
