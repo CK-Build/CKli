@@ -4,27 +4,43 @@ namespace CK.IniFile.SpecificImplementation
 {
     public class NpmrcLine : IniLine
     {
-        public NpmrcLine( IniLine iniLine, Uri registryScope ) : base( iniLine )
+        string _scope;
+
+        public NpmrcLine( IniLine iniLine, Uri registryScope )
+            : base( iniLine )
         {
             IsARegistryParam = true;
             string fullUri = registryScope.ToString();
             Scope = fullUri.Remove( 0, fullUri.IndexOf( ':' ) + 1 );
         }
-        public NpmrcLine( IniLine iniLine, string scope ) : base( iniLine )
+
+        public NpmrcLine( IniLine iniLine, string scope )
+            : base( iniLine )
         {
-            if(!scope.StartsWith("@") && scope != "")
+            if( !scope.StartsWith( "@" ) )
             {
                 throw new ArgumentException( "A scope should start with an @" );
             }
-            IsARegistryParam = false;
             Scope = scope;
         }
-        public NpmrcLine( IniLine iniLine) : base( iniLine )
+
+        public NpmrcLine( string scope, string key, string value )
+            : this( new IniLine( scope + ':' + key, value ) )
         {
         }
-        string _scope;
+
+        public NpmrcLine( string key, string value )
+            : this( new IniLine( key, value ) )
+        {
+        }
+
+        public NpmrcLine( IniLine iniLine)
+            : base( iniLine )
+        {
+        }
 
         public bool IsARegistryParam { get; }
+
         public string Scope
         {
             get => _scope;
@@ -61,6 +77,7 @@ namespace CK.IniFile.SpecificImplementation
                 _scope = value;
             }
         }
+
         public override string ToString<TFormat, TLine>( TFormat iniFormat )
         {
             return Scope + ":" + base.ToString<TFormat, TLine>( iniFormat );

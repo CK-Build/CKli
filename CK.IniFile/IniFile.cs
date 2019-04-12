@@ -14,6 +14,7 @@ namespace CK.IniFile
         public TLine this[int index] { get => _lines[index]; set => _lines[index] = value; }
 
         public int Count => _lines.Count;
+
         /// <summary>
         /// Create a new IniFile.
         /// </summary>
@@ -41,6 +42,7 @@ namespace CK.IniFile
             }
             return output;
         }
+
         /// <summary>
         /// It will also remove duplicate entries
         /// </summary>
@@ -65,23 +67,19 @@ namespace CK.IniFile
 
         public bool Contains( TLine item ) => _lines.Contains( item );
 
-
         public void CopyTo( TLine[] array, int arrayIndex ) => _lines.CopyTo( array, arrayIndex );
-
 
         public bool Remove( TLine item ) => _lines.Remove( item );
 
-        public int RemoveByKey( string key )
-        {
-            return _lines.RemoveAll( p => p.Key == key );
-        }
+        public int RemoveAll( Predicate<TLine> match ) => _lines.RemoveAll( match );
 
         public IEnumerator<TLine> GetEnumerator() => _lines.GetEnumerator();
 
         IEnumerator IEnumerable.GetEnumerator() => _lines.GetEnumerator();
+
         public override string ToString()
         {
-            return string.Join( "\n", _lines.Select( p => p.ToString<TFormat, TLine>( Format ) ));
+            return string.Join( "\r\n", _lines.Select( p => p.ToString<TFormat, TLine>( Format ) ));
         }
     }
 }

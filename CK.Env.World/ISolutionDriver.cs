@@ -27,8 +27,8 @@ namespace CK.Env
         ISolutionDriver GetCurrentBranchDriver();
 
         /// <summary>
-        /// Gets the set of soltion names that this driver handles with the first one being the primary solution,
-        /// followed by the secondary solutions if any.
+        /// Gets the set of solution names that this driver handles with the first one being
+        /// the primary solution, followed by the secondary solutions if any.
         /// Returns null on any error that prevented the solutions to be loaded.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>

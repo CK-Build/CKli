@@ -5,6 +5,8 @@ namespace CK.IniFile.SpecificImplementation
         public NpmrcFile( NpmrcFormat format ) : base( format )
         {
         }
+
+
         public static NpmrcFile FromText(string text)
         {
             return (NpmrcFile)FromText( text, NpmrcFormat.DefaultConfig );

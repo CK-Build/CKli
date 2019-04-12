@@ -71,37 +71,46 @@ namespace CK.IniFile
                     throw new InvalidOperationException();
             }
         }
+
         public IniCommentType CommentType { get; }
+
         public string Comment
         {
             get => _comment;
             set
             {
-                if( CommentType == IniCommentType.None ) throw new InvalidOperationException( "Can't set the comment if CommentType is None" );
-                _comment = value;
+                if( !String.IsNullOrEmpty( value ) )
+                {
+                    if( CommentType == IniCommentType.None ) throw new InvalidOperationException( "Can't set the comment if CommentType is None" );
+                    _comment = value;
+                }
             }
         }
+
         public string Key
         {
             get => _key;
             set
             {
-                if( CommentType == IniCommentType.Leading ) throw new InvalidOperationException( "Can't set the comment if CommentType is leading" );
+                if( value != null && CommentType == IniCommentType.Leading ) throw new InvalidOperationException( "Can't set the key if CommentType is leading" );
                 _key = value;
             }
         }
         public string Value { get; set; }
     }
+
     public enum IniCommentType
     {
         /// <summary>
         /// No comment on this line.
         /// </summary>
         None,
+
         /// <summary>
         /// The whole line is a comment
         /// </summary>
         Leading,
+
         /// <summary>
         /// There is a comment a the end of the line
         /// </summary>

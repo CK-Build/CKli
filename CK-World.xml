@@ -48,9 +48,14 @@
   <SolutionSettings>
     <NuGetSources>
       <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json" >
-        <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
       </add>
     </NuGetSources>
+    <NPMSources>
+      <add Scope="@signature" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/npm/registry/" >
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
+      </add>
+    </NPMSources>
     <RemoveNuGetSourceNames>
       <add Name="CKEnvTest" />
       <add Name="CKEnvTest3" />
@@ -74,6 +79,7 @@
       <add Type="CK.Env.Plugins.SolutionFiles.RepositoryXmlFile, CK.Env.Plugins" />
       <add Type="CK.Env.Plugins.SolutionFiles.NugetConfigFile, CK.Env.Plugins" />
       <add Type="CK.Env.Plugins.SolutionFiles.GitIgnoreFile, CK.Env.Plugins" />
+      <add Type="CK.Env.Plugins.SolutionFiles.NPMRCFiles, CK.Env.Plugins" />
       <add Type="CK.BuildSystem.Appveyor.AppveyorFile, CK.BuildSystem.Appveyor" />
     </Plugins>
   </SolutionSettings>
@@ -83,6 +89,11 @@
       <NuGetSources>
         <add Name="Signature-Code" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/Default/nuget/v3/index.json" />
       </NuGetSources>
+      <NPMSources>
+        <add Scope="@signature-code" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/Default/npm/registry/" >
+          <Credentials UserName="SignatureCode" PasswordSecretKeyName="SIGNATURE_CODE_READ_PAT" />
+        </add>
+      </NPMSources>
       <ArtifactTargets>
         <remove Name="NuGetAzure:Signature-OpenSource-Default" />
         <remove Name="NPMAzure:@signature->Signature-OpenSource-Default" />

@@ -7,12 +7,14 @@ namespace CK.IniFile.SpecificImplementation
     public class NpmrcFormat : IniFormat<NpmrcLine>
     {
         public static NpmrcFormat DefaultConfig => new NpmrcFormat();
+
         public NpmrcFormat()
         {
             CommentChar = new List<char>( ";#" );
             KeyDelimiter = '=';
             Duplication = IniDuplication.Ignored;
         }
+
         internal override NpmrcLine ParseLine( string line )
         {
             IniLine iniLine = InternalParse( line );

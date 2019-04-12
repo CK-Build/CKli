@@ -57,6 +57,6 @@ namespace CK.NPMClient
         /// </summary>
         public string NPMScope { get; }
 
-        public string Url => $"https://pkgs.dev.azure.com/{Organization}/_packaging/{FeedName}/npm/registry/always-auth=true";
+        public string Url => $"https://pkgs.dev.azure.com/{Organization}/_packaging/{FeedName}/npm/registry/";
     }
 }

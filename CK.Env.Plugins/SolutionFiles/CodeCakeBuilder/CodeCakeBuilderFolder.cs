@@ -197,11 +197,10 @@ namespace CK.Env.Plugins.SolutionFiles
                 switch( info )
                 {
                     case NPMAzureFeedInfo a:
-                        b.Append( "new VSTSNpmFeed(cake, info, \"" ).Append( a.Organization ).Append( "\", \"" ).Append( a.Url ).Append( "\" )" );
+                        b.Append( "new VSTSNpmFeed( cake, \"" ).Append( a.Organization ).Append( "\", \"" ).Append( a.FeedName ).Append( "\" )" );
                         break;
                     case NPMStandardFeedInfo n:
-                        b.Append( "new NpmRemoteFeed(cake, info, \"" ).Append( n.SecretKeyName ).Append( "\", \"" )
-                                                        .Append( n.Url ).Append( "\" )" );
+                        b.Append( "new NpmRemoteFeed( cake, " ).Append( n.SecretKeyName ).Append( "\", \"" ).Append( n.Url ).Append( "\" )" );
                         break;
                 }
             }

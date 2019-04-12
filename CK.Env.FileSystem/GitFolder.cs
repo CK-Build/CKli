@@ -28,6 +28,7 @@ namespace CK.Env
         readonly ISecretKeyStore _secretKeyStore;
         readonly CommandRegister _commandRegister;
         bool _branchRefreshed;
+
         internal GitFolder(
             IActivityMonitor activityMonitor,
             ISecretKeyStore secretKeyStore,
