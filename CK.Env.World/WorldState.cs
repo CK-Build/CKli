@@ -892,6 +892,12 @@ namespace CK.Env
             {
                 if( !CanGenerateLTSWorld ) throw new InvalidOperationException( nameof( CanGenerateLTSWorld ) );
             }
+            return CreateParallelWorld( m, LTSKey );
+        }
+
+
+        public bool CreateParallelWorld( IActivityMonitor m, string branchName )
+        {
             m.Info( "Fetching all branches." );
             foreach( var repo in _gitRepositories )
             {
@@ -901,32 +907,38 @@ namespace CK.Env
                     return false;
                 }
             }
-
             var worldData = _store.ReadWorldDescription( m, WorldName );
             var worldRoot = worldData.Root;
-            string newWorldName = WorldName.Name + "-" + LTSKey + "-World";
+            string newWorldName = WorldName.Name + "-" + branchName + "-World";
+            worldRoot.Name = newWorldName;
             using( m.OpenInfo( $"Changing XML root element from '{worldRoot.Name} to {newWorldName}" ) )
             {
-                worldRoot.Name = newWorldName;
                 foreach( XElement branch in worldData.Root.Descendants( "Branch" ) )
                 {
-                    var branchName = branch.Attribute( "Name" );
-                    if( branchName != null && (branchName.Value == "master" || branchName.Value == "develop") )
+                    XAttribute oldBranchAttribute = branch.Attribute( "Name" );
+                    string oldBranchName = oldBranchAttribute?.Value;
+                    if( oldBranchAttribute != null
+                        && (oldBranchName == "master"
+                            || oldBranchName == "develop"
+                            || oldBranchName.StartsWith( "master-" )
+                            || oldBranchName.StartsWith( "develop-" )
+                           )
+                      )
                     {
-                        string newName = branchName.Value + "-" + LTSKey;
+                        string newName = oldBranchName + "-" + branchName;
                         string repoUri = branch.Parent.Attribute( "Url" ).Value;
                         var repo = _gitRepositories.Single( p => StringComparer.OrdinalIgnoreCase.Equals( repoUri, p.OriginUrl ) );
                         m.Info( "Creating branch " + newName );
                         repo.CreateBranch( m, newName );
                         m.Info( "Pushing branch" );
                         repo.Push( m, newName );
-                        m.Info( $"Changing Branch from {branchName.Value} to {newName}" );
-                        branchName.Value = newName;
+                        m.Info( $"Changing Branch from {oldBranchName} to {newName}" );
+                        oldBranchAttribute.Value = newName;
                     }
                 }
             }
             m.Info( $"Creating new World {newWorldName}" );
-            _store.CreateNew( m, WorldName.Name, LTSKey, worldData );
+            _store.CreateNew( m, WorldName.Name, branchName, worldData );
             return true;
         }
 

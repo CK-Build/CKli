@@ -18,12 +18,22 @@ namespace CK.Env
         /// Gets the Origin URL of the Git repository
         /// </summary>
         string OriginUrl { get; }
+
         /// <summary>
         /// Create a local branch in the repository
         /// </summary>
         /// <param name="m"></param>
         /// <param name="branchName"></param>
         void CreateBranch( IActivityMonitor m, string branchName );
+
+        /// <summary>
+        /// Create a local branch pointing on the given commit on a given commit in the repository
+        /// </summary>
+        /// <param name="m"></param>
+        /// <param name="branchName"></param>
+        /// <param name="commitHash"></param>
+        void CreateBranch( IActivityMonitor m, string branchName, string commitHash );
+
         /// <summary>
         /// Gets the name of the Git folder that is the name of the primary solution (by convention and by design).
         /// </summary>
