@@ -43,7 +43,7 @@ namespace CK.NuGetClient
         /// <param name="point">The API point (after the /nuget/).</param>
         /// <param name="version">The API version.</param>
         /// <returns>The url.</returns>
-        protected string GetAzureDevOpsUrlAPI( string point = "packagesBatch", string version = "api-version=5.0" )
+        protected string GetAzureDevOpsUrlAPI( string point = "packagesBatch", string version = "api-version=5.0-preview.1" )
         {
             return $"https://pkgs.dev.azure.com/{Info.Organization}/_apis/packaging/feeds/{Info.FeedName}/nuget/{point}?{version}";
         }

@@ -47,11 +47,8 @@ namespace CK.Env
                  string arguments,
                  IEnumerable<(string, string)> environmentVariables = null )
         {
-            var encoding = Encoding.GetEncoding( 437 );
             ProcessStartInfo cmdStartInfo = new ProcessStartInfo
             {
-                StandardOutputEncoding = encoding,
-                StandardErrorEncoding = encoding,
                 WorkingDirectory = workingDir,
                 UseShellExecute = false,
                 CreateNoWindow = true,

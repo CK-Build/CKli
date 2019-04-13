@@ -8,6 +8,7 @@ using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -41,15 +42,22 @@ namespace CK.NuGetClient
                     // The VSS_NUGET_EXTERNAL_FEED_ENDPOINTS is used by Azure Credential Provider to handle authentication
                     // for the feed.
                     StringBuilder b = new StringBuilder( @"{""endpointCredentials"":[" );
+                    bool already = false;
                     foreach( var kv in _secretKeys )
                     {
+                        if( already ) b.Append( ',' );
+                        else already = true;
+
                         b.Append( @"{""endpoint"":""" ).AppendJSONEscaped( kv.Key ).Append( @"""," )
                             .Append( @"""username"":""Unused"",""password"":""" ).AppendJSONEscaped( kv.Value ).Append( @"""" )
                             .Append( "}" );
                     }
                     b.Append( "]}" );
+                    var json = b.ToString();
                     m.Info( $"Updated VSS_NUGET_EXTERNAL_FEED_ENDPOINTS with {_secretKeys.Count} endpoints." );
-                    Environment.SetEnvironmentVariable( "VSS_NUGET_EXTERNAL_FEED_ENDPOINTS", b.ToString() );
+
+                    Debug.Assert( Newtonsoft.Json.Linq.JObject.Parse( json )["endpointCredentials"] != null );
+                    Environment.SetEnvironmentVariable( "VSS_NUGET_EXTERNAL_FEED_ENDPOINTS", json );
                 }
             }
         }
@@ -126,14 +134,7 @@ namespace CK.NuGetClient
 
             public IEnumerable<PackageSource> LoadPackageSources() => _packageSources;
 
-            bool IPackageSourceProvider.IsPackageSourceEnabled( PackageSource source ) => true;
-
             bool IPackageSourceProvider.IsPackageSourceEnabled( string name ) => true;
-
-            void IPackageSourceProvider.DisablePackageSource( PackageSource source )
-            {
-                throw new NotSupportedException( "Should not be called in this scenario." );
-            }
 
             void IPackageSourceProvider.DisablePackageSource( string name )
             {

@@ -570,7 +570,7 @@ namespace CK.Env.MSBuild
 
         static DotNetPackageItem RegisterExternal( Dictionary<string, DotNetPackageItem> externals, DeclaredPackageDependency dep )
         {
-            string fullName = dep.PackageId + '/' + dep.Version.ToString();
+            string fullName = "NuGet:" + dep.PackageId + '/' + dep.Version.ToString();
             if( !externals.TryGetValue( fullName, out var p ) )
             {
                 p = new DotNetPackageItem( dep.PackageId, dep.Version, fullName );

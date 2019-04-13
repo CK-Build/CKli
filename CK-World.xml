@@ -26,19 +26,6 @@
                 CheckName="NPMAzure:@signature->Signature-OpenSource-Default"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
 
-    <Repository Type="NuGetAzure"
-                Organization="Signature-Code"
-                FeedName="Default"
-                CheckName="NuGetAzure:Signature-Code-Default"
-                CheckSecretKeyName="AZURE_FEED_SIGNATURE_CODE_PAT" />
-
-    <Repository Type="NPMAzure"
-                NPMScope="@signature"
-                Organization="Signature-Code"
-                FeedName="Default"
-                CheckName="NPMAzure:@signature->Signature-Code-Default"
-                CheckSecretKeyName="AZURE_FEED_SIGNATURE_CODE_PAT" />
-
     <Repository Type="CKSetup"
                 CheckName="CKSetup:Public"
                 CheckSecretKeyName="CKSETUPREMOTESTORE_PUSH_API_KEY" />
@@ -83,25 +70,6 @@
       <add Type="CK.BuildSystem.Appveyor.AppveyorFile, CK.BuildSystem.Appveyor" />
     </Plugins>
   </SolutionSettings>
-
-  <Reusable Name="Private-SolutionSettings">
-    <SolutionSettings>
-      <NuGetSources>
-        <add Name="Signature-Code" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/Default/nuget/v3/index.json" />
-      </NuGetSources>
-      <NPMSources>
-        <add Scope="@signature-code" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/Default/npm/registry/" >
-          <Credentials UserName="SignatureCode" PasswordSecretKeyName="SIGNATURE_CODE_READ_PAT" />
-        </add>
-      </NPMSources>
-      <ArtifactTargets>
-        <remove Name="NuGetAzure:Signature-OpenSource-Default" />
-        <remove Name="NPMAzure:@signature->Signature-OpenSource-Default" />
-        <add Name="NuGetAzure:Signature-Code-Default" />
-        <add Name="NPMAzure:@signature->Signature-Code-Default" />
-      </ArtifactTargets>
-    </SolutionSettings>
-  </Reusable>
   
   <Folder Name="CK-AspNet-Projects">
 
@@ -201,16 +169,6 @@
       <SolutionSettings NoUnitTests="true" />
       <Branch Name="develop">
         <PrimarySolution />
-      </Branch>
-    </GitFolder>
-
-    <Reuse Name="Private-SolutionSettings" />
-
-    <GitFolder Name="CK-Observable-Domain" Url="https://gitlab.com/Signature-Code/CK-Observable-Domain.git">
-      <SolutionSettings NoStrongNameSigning="True"/>
-      <Branch Name="develop">
-        <PrimarySolution />
-        <NPMProject Folder="js" PackageName="@signature/ck-observable-domain" />
       </Branch>
     </GitFolder>
     
