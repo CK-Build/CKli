@@ -19,7 +19,7 @@ namespace CK.Env.MSBuild
                 string[] numbers = r.Split( '.' );
                 if(numbers.Length == 4)
                 {
-                    m.Warn( "Old version in format X.Y.Z.A removing last number to parse the NuGet Version" );
+                    m.Warn( $"Old Version in format X.Y.Z.A :'{r}', removing last number to parse it, new version:'{numbers[0]}.{numbers[1]}.{numbers[2]}'" );
                     v = SVersion.Create( int.Parse(numbers[0]), int.Parse(numbers[1]), int.Parse(numbers[2]) );
                 }
 

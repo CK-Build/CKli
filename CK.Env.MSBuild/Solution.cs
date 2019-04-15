@@ -231,8 +231,26 @@ namespace CK.Env.MSBuild
         //                                                .Except( BuildProjects );
 
         /// <summary>
+        /// Add a project in the sln if it's not already in it.
+        /// </summary>
+        /// <param name="m"></param>
+        /// <returns>if the command was successfully executed</returns>
+        public Solution EnsureProjectIsInSln( IActivityMonitor m, NormalizedPath projectPath )
+        {
+            if(AllProjects.Any(p=>p.Path == projectPath))
+            {
+                return this;
+            }
+            string args = "sln add " + projectPath.RemoveFirstPart( SolutionFolderPath.Parts.Count );
+            if( !ProcessRunner.Run( m, BuildContext.FileSystem.GetFileInfo( SolutionFolderPath ).PhysicalPath, "dotnet", args ) )
+            {
+                return null;
+            }
+            return BuildContext.FindOrLoadSolution( m, FilePath, PrimarySolution, SpecialType, true ).Solution;
+        }
+
+        /// <summary>
         /// Creates a new project that must not already exist.
-        /// TODO: impact .sln (currently nothing is done).
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="framework">The framework or frameworks from <see cref="MSBuildContext.Traits"/>. Must not be empty.</param>
@@ -241,7 +259,7 @@ namespace CK.Env.MSBuild
         /// <returns>The new project.</returns>
         public Project CreateNewClassLibraryProject( IActivityMonitor m, CKTrait framework, string projectName, Action<XDocument> configure = null )
         {
-            if( String.IsNullOrWhiteSpace( projectName ) ) throw new ArgumentNullException( nameof( projectName ) );
+            if( string.IsNullOrWhiteSpace( projectName ) ) throw new ArgumentNullException( nameof( projectName ) );
             if( framework.IsEmpty || framework.Context != MSBuildContext.Traits ) throw new ArgumentException( "Invalid framework.", nameof( framework ) );
             var project = AllProjects.FirstOrDefault( p => StringComparer.OrdinalIgnoreCase.Equals( p.Name, projectName ) );
             if( project != null ) throw new InvalidOperationException( $"Project {projectName} already exists." );

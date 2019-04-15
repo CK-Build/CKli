@@ -16,17 +16,15 @@ namespace CK.Env
             IWorldName world,
             ISecretKeyStore secretKeyStore,
             FileSystem fileSystem,
-            CommandRegister commandRegister)
+            CommandRegister commandRegister )
         {
-            if( url != null )
-            {
-                if( url.IndexOf( "github.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.GitHub;
-                else if( url.IndexOf( "gitlab.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.GitLab;
-                else if( url.IndexOf( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.AzureDevOps;
-                else if( url.IndexOf( "bitbucket.org", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.Bitbucket;
-            }
+            if( url == null ) throw new ArgumentNullException(nameof(url));
+            if( url.IndexOf( "github.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.GitHub;
+            else if( url.IndexOf( "gitlab.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.GitLab;
+            else if( url.IndexOf( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.AzureDevOps;
+            else if( url.IndexOf( "bitbucket.org", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.Bitbucket;
 
-            Url = url;
+            OriginUrl = url;
             World = world;
             SecretKeyStore = secretKeyStore;
             FullPhysicalPath = path;
@@ -44,7 +42,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the current remote origin url.
         /// </summary>
-        public string Url { get; }
+        public string OriginUrl { get; }
 
         /// <summary>
         /// Gets the full path (that starts with the <see cref="FileSystem"/>' root path) of the Git folder.
@@ -53,25 +51,26 @@ namespace CK.Env
 
         public GitFolder Clone( IActivityMonitor m )
         {
-            using( m.OpenInfo( $"Checking out '{FullPhysicalPath}' from '{ Url }' on { World.DevelopBranchName }." ) )
+            using( m.OpenInfo( $"Checking out '{FullPhysicalPath}' from '{ OriginUrl }' on { World.DevelopBranchName }." ) )
             {
-                Repository.Clone( Url, FullPhysicalPath, new CloneOptions()
+                Repository.Clone( OriginUrl, FullPhysicalPath, new CloneOptions()
                 {
-                    CredentialsProvider = (url, user, cred) => PATCredentialsHandler(m, url, user, cred),
+                    CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, url, user, cred ),
                     BranchName = World.DevelopBranchName,
                     Checkout = true
                 } );
             }
-            return new GitFolder(m, SecretKeyStore, FileSystem, CommandRegister, World, FullPhysicalPath, Url);
+            return new GitFolder( m, SecretKeyStore, FileSystem, CommandRegister, World, FullPhysicalPath, OriginUrl );
         }
 
-        protected Credentials PATCredentialsHandler(IActivityMonitor m, string url, string user, SupportedCredentialTypes cred )
+        protected Credentials PATCredentialsHandler( IActivityMonitor m, string url, string user, SupportedCredentialTypes cred )
         {
             string keyName;
             switch( KnownGitProvider )
             {
                 case KnownGitProvider.AzureDevOps:
-                    string organization = Regex.Match( url, @"(?:\:\/\/)[^\/]*\/([^\/]*)" ).Groups[0].Value;
+                    var regex = Regex.Match( url, @"(?:\:\/\/)[^\/]*\/([^\/]*)" );
+                    string organization = regex.Groups[1].Value;
                     keyName = "AZURE_GIT_" + organization
                         .ToUpperInvariant()
                         .Replace( '-', '_' )
@@ -82,11 +81,11 @@ namespace CK.Env
                     keyName = KnownGitProvider.ToString() + "_GIT_PAT";
                     break;
             }
-
+            string pat = SecretKeyStore.GetSecretKey( m, keyName, true );
             return new UsernamePasswordCredentials()
             {
                 Username = "CK-Env",
-                Password = SecretKeyStore.GetSecretKey( m, keyName, true )
+                Password = pat
             };
         }
 

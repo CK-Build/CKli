@@ -445,7 +445,11 @@ namespace CK.Env.MSBuild
             int changeCount = toRemove.Count;
             var parents = toRemove.Select( p => p.OriginElement.Parent ).Distinct().ToList();
             changeCount += parents.Count;
-            toRemove.Select( r => r.OriginElement ).Remove();
+            toRemove.Select( r =>
+            {
+                m.Trace( $"Remove in {ToString()}: {r.PackageId}." );
+                return r.OriginElement;
+            } ).Remove();
             OnChange( m );
             return changeCount;
         }

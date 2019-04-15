@@ -59,7 +59,7 @@ namespace CK.Env.Plugins.SolutionFiles
                 section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
             }
             var p = new XElement( "PropertyGroup",
-                            new XElement( "RepositoryUrl", Folder.Url ),
+                            new XElement( "RepositoryUrl", Folder.OriginUrl ),
                             new XElement( "ProductName", Folder.World.FullName ),
                             new XElement( "Company", "Signature Code" ),
                             new XElement( "Authors", "Signature Code" ),

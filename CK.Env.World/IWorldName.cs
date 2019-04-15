@@ -9,7 +9,7 @@ namespace CK.Env
     public interface IWorldName
     {
         /// <summary>
-        /// Gets tne name of this world.
+        /// Gets the name of this world.
         /// </summary>
         string Name { get; }
 

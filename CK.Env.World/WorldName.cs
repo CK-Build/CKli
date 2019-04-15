@@ -48,6 +48,7 @@ namespace CK.Env
         public WorldName( string worldName, string ltsKey )
         {
             if( String.IsNullOrWhiteSpace( worldName ) ) throw new ArgumentNullException( nameof( worldName ) );
+            if( worldName.IndexOf( '-' ) >= 0 ) throw new ArgumentException( nameof( worldName ) + " can't contain a '-' character" );
             Name = worldName;
             if( !String.IsNullOrWhiteSpace( ltsKey ) )
             {

@@ -25,6 +25,8 @@ namespace CK.Env.Plugins.SolutionFiles
 
         public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
 
+       
+
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
         {
@@ -41,6 +43,7 @@ namespace CK.Env.Plugins.SolutionFiles
                 ccbProject = solution.CreateNewClassLibraryProject( m, framework, "CodeCakeBuilder" );
                 if( ccbProject == null ) return;
             }
+            var projectPath = _f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" );
             ccbProject.SetTargetFrameworks( m, framework );
             ccbProject.SetLangVersion( m, "7.2" );
             ccbProject.SetOutputType( m, "Exe" );
@@ -63,22 +66,27 @@ namespace CK.Env.Plugins.SolutionFiles
             EnsureProjectReference( "NuGet.Credentials", "4.9.2" );
             EnsureProjectReference( "NuGet.Protocol", "4.9.2" );
             EnsureProjectReference( "Cake.Npm", "0.16.0" );
+            EnsureProjectReference( "CK.Text", "8.0.2" );
+            DeleteProjectReference( "SimpleGitVersion.Core" ); //imported by SimpleGitVersion.Cake
+            DeleteProjectReference( "Code.Cake" ); //imported by SimpleGitVersion.Cake
+            DeleteProjectReference( "Cake.Common" ); //imported by Code.Cake
+            DeleteProjectReference( "Cake.Core" ); //imported by Cake.Common
             if( !_settings.NoUnitTests )
             {
                 EnsureProjectReference( "NUnit.ConsoleRunner", "3.9.0" );
                 EnsureProjectReference( "NUnit.Runners.Net4", "2.6.4" );
             }
-            if( PluginBranch != StandardGitStatus.Local )
+            if( PluginBranch != StandardGitStatus.Local || _f.Folder.World.Name != "CK-World" )
             {
-                EnsureProjectReference( "SimpleGitVersion.Cake", "0.37.0" );
-                DeleteProjectReference( "SimpleGitVersion.Core" ); //imported by SimpleGitVersion.Cake
-                DeleteProjectReference( "Code.Cake" ); //imported by SimpleGitVersion.Cake
+                EnsureProjectReference( "SimpleGitVersion.Cake", "0.37.3" );
+
                 if( produceCKSetupComponents == true )
                 {
                     EnsureProjectReference( "CKSetup.Cake", "9.0.0" );
                 }
             }
             solution.Save( m );
+            solution.EnsureProjectIsInSln( m, projectPath );
         }
     }
 }
