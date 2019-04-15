@@ -30,6 +30,7 @@ namespace CodeCake
             /// </summary>
             /// <returns></returns>
             public override IEnumerable<ArtifactFeed> GetTargetRemoteFeeds() => GetTargetRemoteFeeds(Cake);
+
             public override IEnumerable<ArtifactFeed> GetLocalFeeds()
             {
                 return new NuGetHelper.NuGetFeed[] {
@@ -38,6 +39,7 @@ namespace CodeCake
             }
 
             readonly IDictionary<string, ArtifactInstance> _resolved;
+
             protected override IDictionary<string, ArtifactInstance> ArtifactResolver( IEnumerable<string> projectsToPublish )
             {
                 return _resolved;

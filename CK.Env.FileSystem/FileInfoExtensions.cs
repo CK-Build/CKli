@@ -27,6 +27,12 @@ namespace CK.Env
             }
         }
 
+        /// <summary>
+        /// Reads this file as a text (uses a <see cref="StreamReader"/>) as multiple
+        /// lines. This must exist and be a file otherwise exceptions will be thrown.
+        /// </summary>
+        /// <param name="this">This file info.</param>
+        /// <returns>The lines.</returns>
         public static IEnumerable<string> ReadAsTextLines( this IFileInfo @this )
         {
             using( var t = @this is ITextFileInfo txt

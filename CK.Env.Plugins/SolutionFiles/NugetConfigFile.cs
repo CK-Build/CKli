@@ -11,14 +11,16 @@ namespace CK.Env.Plugins.SolutionFiles
         readonly ISolutionSettings _settings;
         readonly IEnvLocalFeedProvider _localFeedProvider;
         readonly SolutionDriver _solutionDriver;
+        readonly ISecretKeyStore _secretStore;
         XElement _packageSources;
 
-        public NugetConfigFile( GitFolder f, SolutionDriver driver, IEnvLocalFeedProvider localFeedProvider, ISolutionSettings s, NormalizedPath branchPath )
+        public NugetConfigFile( GitFolder f, SolutionDriver driver, IEnvLocalFeedProvider localFeedProvider, ISecretKeyStore secretStore, ISolutionSettings s, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "NuGet.config" ) )
         {
             _localFeedProvider = localFeedProvider;
             _settings = s;
             _solutionDriver = driver;
+            _secretStore = secretStore;
             if( IsOnLocalBranch )
             {
                 f.OnLocalBranchEntered += OnLocalBranchEntered;
@@ -88,7 +90,10 @@ namespace CK.Env.Plugins.SolutionFiles
                 EnsureFeed( m, s.Name, s.Url );
                 if( s.Credentials != null )
                 {
-                    EnsureFeedCredentials( m, s.Name, s.Credentials.UserName, s.Credentials.Password );
+                    string password = s.Credentials.IsSecretKeyName
+                                        ? _secretStore.GetSecretKey( m, s.Credentials.PasswordOrSecretKeyName, throwOnEmpty: true )
+                                        : s.Credentials.PasswordOrSecretKeyName;
+                    EnsureFeedCredentials( m, s.Name, s.Credentials.UserName, password );
                 }
             }
             foreach( var name in _settings.RemoveNuGetSourceNames )

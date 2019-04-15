@@ -874,11 +874,14 @@ namespace CK.Env
             {
                 foreach( var a in buildResults.GeneratedArtifacts.GroupBy( a => a.TargetName ) )
                 {
-                    var h = _artifacts.Find( a.Key );
-                    if( !local.PushLocalArtifacts( m, h, a.Select( p => p.Artifact ) ) )
+                    using( m.OpenInfo( $"Publishing to target: {a.Key}." ) )
                     {
-                        Debug.Assert( error(), "An error must have been logged." );
-                        return;
+                        var h = _artifacts.Find( a.Key );
+                        if( !local.PushLocalArtifacts( m, h, a.Select( p => p.Artifact ) ) )
+                        {
+                            Debug.Assert( error(), "An error must have been logged." );
+                            return;
+                        }
                     }
                 }
             } );

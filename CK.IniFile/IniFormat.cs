@@ -47,6 +47,7 @@ namespace CK.IniFile
         /// Allow duplicates keys
         /// </summary>
         Allowed = 0,
+
         /// <summary>
         /// Disallow duplicate keys.
         /// </summary>
@@ -54,6 +55,7 @@ namespace CK.IniFile
         /// <see cref="InvalidOperationException"/> is thrown on duplicate name occurence.
         /// </remarks>
         Disallowed,
+
         /// <summary>
         /// Ignore duplicate names.
         /// </summary>

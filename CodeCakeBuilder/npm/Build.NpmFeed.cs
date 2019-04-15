@@ -19,7 +19,8 @@ namespace CodeCake
     {
         abstract class NpmFeed : ArtifactFeed
         {
-            public NpmFeed( ICakeContext cake ) : base( cake )
+            public NpmFeed( ICakeContext cake )
+                : base( cake )
             {
             }
 
@@ -36,6 +37,7 @@ namespace CodeCake
                 }
                 return System.Threading.Tasks.Task.CompletedTask;
             }
+
             protected abstract void PublishOnePackage( ArtifactInstance package, string tarDirectory );
 
         }
@@ -56,6 +58,7 @@ namespace CodeCake
                 string packPath = Path.Combine( releaseDirectory, GetTgzNameOfPackage( artifact ) );
                 Cake.MoveFile( packPath, Path.Combine( _pathToLocalFeed, Path.GetFileName( packPath ) ) );
             }
+
             /// <summary>
             /// Gets the number of packages that exist in the feed.
             /// This is computed by <see cref="InitializePackagesToPublish"/>.
@@ -70,18 +73,12 @@ namespace CodeCake
 
         abstract class NpmRemoteFeed : NpmFeed
         {
-            readonly SimpleRepositoryInfo _gitInfo;
-            readonly SVersion _version;
             protected readonly string FeedUri;
 
-            public NpmRemoteFeed( ICakeContext cake, CheckRepositoryInfo checkInfo, string organization, string feedUri ) : base( cake )
+            public NpmRemoteFeed( ICakeContext cake, string secretKeyName, string feedUri )
+                : base( cake )
             {
-                _gitInfo = checkInfo.GitInfo;
-                _version = checkInfo.Version;
-                SecretKeyName = "NPM_FEED_" + organization.ToUpperInvariant()
-                                        .Replace( '-', '_' )
-                                        .Replace( ' ', '_' )
-                                        + "_PAT";
+                SecretKeyName = secretKeyName;
                 FeedUri = feedUri;
             }
 
@@ -89,23 +86,22 @@ namespace CodeCake
 
             public string SecretKeyName { get; }
 
-            public string ResolveAPIKey()
-            {
-                return Cake.InteractiveEnvironmentVariable( SecretKeyName );
-            }
-            public abstract NpmrcTokenInjector TokenInjector( string projectPath );
+            public string ResolveAPIKey() => Cake.InteractiveEnvironmentVariable( SecretKeyName );
+
+            protected abstract NpmrcTokenInjector TokenInjector( string projectPath );
+
             public override Task InitializeArtifactsToPublishAsync( IReadOnlyDictionary<string, ArtifactInstance> allArtifactsToPublish )
             {
                 ArtifactsToPublish = allArtifactsToPublish.Where( p =>
                 {
-                    using( NpmrcTokenInjector tokenInjector = TokenInjector(p.Key) )
+                    using( NpmrcTokenInjector tokenInjector = TokenInjector( p.Key ) )
                     {
                         string viewString = Cake.NpmView( p.Value.Artifact.Name, p.Key );
                         if( string.IsNullOrEmpty( viewString ) ) return true;
                         JObject json = JObject.Parse( viewString );
                         if( json.TryGetValue( "versions", out JToken versions ) )
                         {
-                            return !((JArray)versions).ToObject<string[]>().Contains( _version.ToString() );
+                            return !((JArray)versions).ToObject<string[]>().Contains( p.Value.Version.ToString() );
                         }
                         return true;
                     }
@@ -118,7 +114,7 @@ namespace CodeCake
             {
                 List<string> tags = new List<string>();
                 var qualities = artifact.Version.PackageQuality.GetLabels();
-                tags.AddRange(qualities.Select(q=>q.ToString()));
+                tags.AddRange( qualities.Select( q => q.ToString() ) );
                 string artifactPath = ArtifactsToPublish.Single( p => p.Value.Artifact.Name == artifact.Artifact.Name ).Key;
                 using( NpmrcTokenInjector tokenInjector = NpmrcTokenInjector.VstsPatLogin( FeedUri, ResolveAPIKey(), Path.Combine( artifactPath, ".npmrc" ) ) )
                 {
@@ -135,7 +131,7 @@ namespace CodeCake
                             Tag = tags.First()
                         }
                     );
-                    foreach( string tag in tags.Skip(1))
+                    foreach( string tag in tags.Skip( 1 ) )
                     {
                         Cake.Information( $"Adding tag \"{tag}\" to \"{artifact.Artifact.Name}@{artifact.Version}\"..." );
                         // The FromPath is actually required - if executed outside the relevant directory,
@@ -146,13 +142,22 @@ namespace CodeCake
             }
         }
 
+        /// <summary>
+        /// The secret key name is built by <see cref="SignatureVSTSFeed.GetSecretKeyName"/>:
+        /// "AZURE_FEED_" + Organization.ToUpperInvariant().Replace( '-', '_' ).Replace( ' ', '_' ) + "_PAT".
+        /// </summary>
+        /// <param name="organization">Name of the organization.</param>
+        /// <param name="feedName">Identifier of the feed in Azure, inside the organization.</param>
         class VSTSNpmFeed : NpmRemoteFeed
         {
-            public VSTSNpmFeed( ICakeContext cake, CheckRepositoryInfo checkInfo, string organization, string feedUri ) : base( cake, checkInfo, organization, feedUri )
+            public VSTSNpmFeed( ICakeContext cake, string organization, string feedName )
+                : base( cake,
+                        SignatureVSTSFeed.GetSecretKeyName( organization ),
+                        $"https://pkgs.dev.azure.com/{organization}/_packaging/{feedName}/npm/registry/" )
             {
             }
 
-            public override NpmrcTokenInjector TokenInjector( string projectPath )
+            protected override NpmrcTokenInjector TokenInjector( string projectPath )
             {
                 return NpmrcTokenInjector.VstsPatLogin( FeedUri, ResolveAPIKey(), Path.Combine( projectPath, ".npmrc" ) );
             }

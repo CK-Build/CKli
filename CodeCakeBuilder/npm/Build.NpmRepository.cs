@@ -16,6 +16,18 @@ namespace CodeCake
         /// </summary>
         class NpmRepository : ArtifactRepository
         {
+            /// <summary>
+            /// Gets the remote target feeds.
+            /// (This is extracted as an independent function to be more easily transformable.)
+            /// </summary>
+            /// <returns></returns>
+            public static IEnumerable<NpmRemoteFeed> GetTargetRemoteFeeds( ICakeContext cake )
+            {
+                return new NpmRemoteFeed[]{
+new VSTSNpmFeed(cake, "Signature-Code", "Default"  )
+};
+            }
+
             public NpmRepository( ICakeContext ctx, CheckRepositoryInfo checkInfo, IEnumerable<string> projectsToPublish ) : base( ctx, checkInfo, projectsToPublish )
             {
             }
@@ -25,10 +37,7 @@ namespace CodeCake
                 return new ArtifactFeed[] { new NpmLocalFeed( Cake, CheckRepositoryInfo.LocalFeedPath ) };
             }
 
-            public override IEnumerable<ArtifactFeed> GetTargetRemoteFeeds()
-            {
-                return new ArtifactFeed[] { new VSTSNpmFeed( Cake, CheckRepositoryInfo, "Signature-Code", "https://pkgs.dev.azure.com/Signature-Code/_packaging/CKEnvTest3/npm/registry/" ) };
-            }
+            public override IEnumerable<ArtifactFeed> GetTargetRemoteFeeds() => GetTargetRemoteFeeds( Cake );
 
             public IEnumerable<PackageJson> PackagesJsonInfo { get; private set; }
 
@@ -58,7 +67,7 @@ namespace CodeCake
                 get
                 {
                     string match = Regex.Match( ArtifactInstance.Artifact.Name, @"@+.*\/" ).Value;
-                    return match.Substring( 1, match.Length-2);
+                    return match.Substring( 1, match.Length - 2 );
                 }
             }
 

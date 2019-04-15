@@ -1,21 +1,23 @@
 using CK.Core;
+using System;
 using System.Linq;
 using System.Xml.Linq;
 
 namespace CK.Env
 {
     /// <summary>
-    /// Concrete and immutable implementation of <see cref="INuGetSource"/>.
+    /// Concrete and immutable implementation of <see cref="INPMSource"/>.
     /// </summary>
-    public class NuGetSource : INuGetSource
+    public class NPMSource : INPMSource
     {
         /// <summary>
-        /// Initializes a new <see cref="NuGetSource"/> from its xml representation.
+        /// Initializes a new <see cref="NPMSource"/> from its xml representation.
         /// </summary>
         /// <param name="e">The xml element.</param>
-        public NuGetSource( XElement e )
+        public NPMSource( XElement e )
         {
-            Name = (string)e.AttributeRequired( "Name" );
+            Scope = (string)e.AttributeRequired( "Scope" );
+            if( !Scope.StartsWith( "@" ) ) throw new Exception( $"Element '{e}': Scope must start with @." );
             Url = (string)e.AttributeRequired( "Url" );
             Credentials = e.Elements( "Credentials" )
                             .Select( c => new SimpleCredentials( c ) )
@@ -26,21 +28,21 @@ namespace CK.Env
         /// Copy constructor.
         /// </summary>
         /// <param name="other">The other source information.</param>
-        public NuGetSource( INuGetSource other )
+        public NPMSource( INPMSource other )
         {
-            Name = other.Name;
+            Scope = other.Scope;
             Url = other.Url;
             Credentials = other.Credentials;
         }
 
         /// <summary>
-        /// Gets the feed name.
-        /// Can not be null.
+        /// Gets the scope.
+        /// Can not be null and always starts with @.
         /// </summary>
-        public string Name { get; }
+        public string Scope { get; }
 
         /// <summary>
-        /// Gets the feed url.
+        /// Gets the registry url.
         /// Can not be null.
         /// </summary>
         public string Url { get; }

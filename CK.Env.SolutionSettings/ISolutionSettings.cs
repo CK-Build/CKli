@@ -50,6 +50,19 @@ namespace CK.Env
         /// </summary>
         IReadOnlyCollection<string> RemoveNuGetSourceNames { get; }
 
+        /// <summary>
+        /// Defines the set of NPM sources that is used.
+        /// Impacts .npmrc file.
+        /// </summary>
+        IReadOnlyCollection<INPMSource> NPMSources { get; }
+
+        /// <summary>
+        /// Gets the NPM scope names that must be excluded.
+        /// Must be used to clean up existing scope names that must no more be used.
+        /// Impacts .npmrc file.
+        /// </summary>
+        IReadOnlyCollection<string> RemoveNPMScopeNames { get; }
+
 
         /// <summary>
         /// Gets the repository where produced artifacts must be pushed.

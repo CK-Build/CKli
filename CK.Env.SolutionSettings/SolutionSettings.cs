@@ -16,11 +16,17 @@ namespace CK.Env
             DisableSourceLink = (bool?)e.Attribute( nameof(DisableSourceLink) ) ?? false;
             SqlServer = (string)e.Attribute( nameof( SqlServer ) );
 
-            NuGetSources = e.Elements( nameof( NuGetSources) )
+            NuGetSources = e.Elements( nameof( NuGetSources ) )
                              .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Name" ), s => new NuGetSource( s ) )
                              .Values;
             RemoveNuGetSourceNames = e.Elements( nameof( RemoveNuGetSourceNames ) )
                                         .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Name" ) );
+
+            NPMSources = e.Elements( nameof( NPMSources ) )
+                             .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Scope" ), s => new NPMSource( s ) )
+                             .Values;
+            RemoveNPMScopeNames = e.Elements( nameof( RemoveNPMScopeNames ) )
+                                        .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Scope" ) );
 
             ArtifactTargets = e.Elements( nameof( ArtifactTargets ) )
                              .ApplyAddRemoveClear( s => artifacts.Find( (string)s.AttributeRequired( "Name" ) ) );
@@ -39,14 +45,19 @@ namespace CK.Env
             SqlServer = other.SqlServer;
             if( applyConfig == null )
             {
-                RemoveNuGetSourceNames = other.RemoveNuGetSourceNames;
                 NuGetSources = other.NuGetSources;
+                RemoveNuGetSourceNames = other.RemoveNuGetSourceNames;
+                NPMSources = other.NPMSources;
+                RemoveNPMScopeNames = other.RemoveNPMScopeNames;
                 ArtifactTargets = other.ArtifactTargets;
             }
             else
             {
-                var excludedNuGetSourceNames = new HashSet<string>( other.RemoveNuGetSourceNames );
                 var nuGetSources = other.NuGetSources.ToDictionary( s => s.Name );
+                var excludedNuGetSourceNames = new HashSet<string>( other.RemoveNuGetSourceNames );
+                var npmSources = other.NPMSources.ToDictionary( s => s.Scope );
+                var excludedNPMScopeNames = new HashSet<string>( other.RemoveNPMScopeNames );
+
                 var artifactTargets = new HashSet<IArtifactRepository>( other.ArtifactTargets );
 
                 var disableSourceLink = (bool?)applyConfig.Attribute( nameof( DisableSourceLink ) );
@@ -71,6 +82,14 @@ namespace CK.Env
                 RemoveNuGetSourceNames = applyConfig.Elements( nameof( RemoveNuGetSourceNames ) )
                                             .ApplyAddRemoveClear( excludedNuGetSourceNames, s => (string)s.AttributeRequired( "Name" ) );
 
+                NPMSources = applyConfig.Elements( nameof( NPMSources ) )
+                                .ApplyAddRemoveClear( npmSources, s => (string)s.AttributeRequired( "Scope" ), s => new NPMSource( s ) )
+                                .Values;
+
+                RemoveNPMScopeNames = applyConfig.Elements( nameof( RemoveNPMScopeNames ) )
+                                            .ApplyAddRemoveClear( excludedNuGetSourceNames, s => (string)s.AttributeRequired( "Scope" ) );
+
+
                 ArtifactTargets = applyConfig.Elements( nameof( ArtifactTargets ) )
                                     .ApplyAddRemoveClear( artifactTargets, eF => artifacts.Find( (string)eF.AttributeRequired( "Name" ) ) );
 
@@ -92,6 +111,10 @@ namespace CK.Env
         public IReadOnlyCollection<INuGetSource> NuGetSources { get; }
 
         public IReadOnlyCollection<string> RemoveNuGetSourceNames { get; }
+
+        public IReadOnlyCollection<INPMSource> NPMSources { get; }
+
+        public IReadOnlyCollection<string> RemoveNPMScopeNames { get; }
 
         public IReadOnlyCollection<IArtifactRepository> ArtifactTargets { get; }
 

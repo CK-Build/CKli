@@ -94,14 +94,7 @@ namespace CodeCake
                 /// <returns></returns>
                 public IEnumerable<PackageSource> LoadPackageSources() => _sources.Value;
 
-                bool IPackageSourceProvider.IsPackageSourceEnabled( PackageSource source ) => true;
-
                 bool IPackageSourceProvider.IsPackageSourceEnabled( string name ) => true;
-
-                void IPackageSourceProvider.DisablePackageSource( PackageSource source )
-                {
-                    throw new NotSupportedException( "Should not be called in this scenario." );
-                }
 
                 void IPackageSourceProvider.SaveActivePackageSource( PackageSource source )
                 {
@@ -347,7 +340,7 @@ namespace CodeCake
                     var updater = await _updater;
                     foreach( var package in ArtifactsToPublish )
                     {
-                        string packageString = package.Value.Artifact.Name + "."+package.Value.Version.ToNuGetPackageString();
+                        string packageString = package.Value.Artifact.Name + "." + package.Value.Version.ToNuGetPackageString();
                         var fullPath = System.IO.Path.Combine( releasesDir, packageString + ".nupkg" );
                         await updater.Push(
                             fullPath,
@@ -384,7 +377,7 @@ namespace CodeCake
 
                 public override async Task InitializeArtifactsToPublishAsync( IReadOnlyDictionary<string, ArtifactInstance> allArtifactsToPublish )
                 {
-                    if(allArtifactsToPublish == null) throw new ArgumentNullException();
+                    if( allArtifactsToPublish == null ) throw new ArgumentNullException();
                     if( ArtifactsToPublish != null )
                     {
                         ArtifactsAlreadyPublishedCount = 0;
@@ -428,8 +421,8 @@ namespace CodeCake
             /// <param name="name">Name of the feed.</param>
             /// <param name="urlV3">Must be a v3/index.json url otherwise an argument exception is thrown.</param>
             /// <param name="secretKeyName">The secret key name. When null or empty, push is skipped.</param>
-            public VSTSFeed(ICakeContext ctx, string name, string urlV3, string secretKeyName )
-                : base(ctx, name, urlV3 )
+            public VSTSFeed( ICakeContext ctx, string name, string urlV3, string secretKeyName )
+                : base( ctx, name, urlV3 )
             {
                 SecretKeyName = secretKeyName;
             }
@@ -465,11 +458,23 @@ namespace CodeCake
         /// <summary>
         /// A SignatureVSTSFeed handles Stable, Latest, Preview and CI Azure feed views with
         /// package promotion based on the published version.
-        /// The secret key name is:
+        /// The secret key name is built by <see cref="GetSecretKeyName"/>:
         /// "AZURE_FEED_" + Organization.ToUpperInvariant().Replace( '-', '_' ).Replace( ' ', '_' ) + "_PAT".
         /// </summary>
         class SignatureVSTSFeed : VSTSFeed
         {
+            /// <summary>
+            /// Builds the standardized secret key name from the organization name: this is
+            /// the Personal Access Token that allows push packages.
+            /// </summary>
+            /// <param name="organization">Organization name.</param>
+            /// <returns>The secret key name to use.</returns>
+            public static string GetSecretKeyName( string organization )
+                                    => "AZURE_FEED_" + organization.ToUpperInvariant()
+                                                                   .Replace( '-', '_' )
+                                                                   .Replace( ' ', '_' )
+                                                     + "_PAT";
+
             /// <summary>
             /// Initialize a new SignatureVSTSFeed.
             /// Its <see cref="NuGetHelper.Feed.Name"/> is set to "<paramref name="organization"/>-<paramref name="feedName"/>"
@@ -477,14 +482,10 @@ namespace CodeCake
             /// </summary>
             /// <param name="organization">Name of the organization.</param>
             /// <param name="feedName">Identifier of the feed in Azure, inside the organization.</param>
-            public SignatureVSTSFeed(ICakeContext ctx, string organization, string feedName )
-                : base(ctx, organization + "-" + feedName,
+            public SignatureVSTSFeed( ICakeContext ctx, string organization, string feedName )
+                : base( ctx, organization + "-" + feedName,
                         $"https://pkgs.dev.azure.com/{organization}/_packaging/{feedName}/nuget/v3/index.json",
-                        "AZURE_FEED_" + organization
-                                        .ToUpperInvariant()
-                                        .Replace( '-', '_' )
-                                        .Replace( ' ', '_' )
-                                        + "_PAT" )
+                        GetSecretKeyName( organization ) )
             {
                 Organization = organization;
                 FeedName = feedName;
@@ -500,14 +501,13 @@ namespace CodeCake
             /// </summary>
             public string FeedName { get; }
 
-
             /// <summary>
             /// Implements Package promotion in @CI, @Preview, @Latest and @Stable views.
             /// </summary>
             /// <param name="ctx">The Cake context.</param>
             /// <param name="path">The path where the .nupkg mus be found.</param>
             /// <returns>The awaitable.</returns>
-            protected override async Task OnAllArtifactsPushed( ICakeContext ctx, string path)
+            protected override async Task OnAllArtifactsPushed( ICakeContext ctx, string path )
             {
                 var basicAuth = Convert.ToBase64String( Encoding.ASCII.GetBytes( ":" + ctx.InteractiveEnvironmentVariable( SecretKeyName ) ) );
                 foreach( var p in ArtifactsToPublish )
@@ -570,8 +570,8 @@ namespace CodeCake
             /// <param name="name">Name of the feed.</param>
             /// <param name="urlV3">Must be a v3/index.json url otherwise an argument exception is thrown.</param>
             /// <param name="secretKeyName">The secret key name.</param>
-            public RemoteFeed(ICakeContext ctx, string name, string urlV3, string secretKeyName )
-                : base(ctx, name, urlV3 )
+            public RemoteFeed( ICakeContext ctx, string name, string urlV3, string secretKeyName )
+                : base( ctx, name, urlV3 )
             {
                 SecretKeyName = secretKeyName;
             }
@@ -603,8 +603,8 @@ namespace CodeCake
         /// </summary>
         class NugetLocalFeed : NuGetHelper.NuGetFeed
         {
-            public NugetLocalFeed(ICakeContext ctx, string path )
-                : base(ctx, path )
+            public NugetLocalFeed( ICakeContext ctx, string path )
+                : base( ctx, path )
             {
             }
 

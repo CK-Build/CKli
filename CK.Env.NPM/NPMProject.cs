@@ -31,8 +31,14 @@ namespace CK.Env.NPM
 
         public NPMProjectStatus Status => _status;
 
+        /// <summary>
+        /// Gets the project folder path relative to the <see cref="FileSystem"/>.
+        /// </summary>
         public NormalizedPath FullPath => _spec.FullPath;
 
+        /// <summary>
+        /// Gets the package.json file path relative to the <see cref="FileSystem"/>.
+        /// </summary>
         public PackageJsonFile PackageJson => _packageFile;
 
         NPMProjectStatus RefreshStatus( IActivityMonitor m )

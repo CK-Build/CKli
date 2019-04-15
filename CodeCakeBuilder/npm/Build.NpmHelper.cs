@@ -25,10 +25,12 @@ namespace CodeCake
             }
 
             readonly string _npmrcPath;
+
             NpmrcTokenInjector( string path )
             {
                 _npmrcPath = path;
             }
+
             public static NpmrcTokenInjector TokenLogin( string pushUri, string token, string npmrcPath )
             {
                 if( !File.Exists( npmrcPath ) ) throw new ArgumentException( "npmrcPath File does not exist" );
@@ -45,6 +47,7 @@ namespace CodeCake
             {
                 return PasswordLogin( pushUri, Convert.ToBase64String( Encoding.UTF8.GetBytes( pat ) ), npmrcPath );
             }
+
             public static NpmrcTokenInjector PasswordLogin( string pushUri, string password, string npmrcPath )
             {
                 if( !File.Exists( npmrcPath ) ) throw new ArgumentException( "npmrcPath File does not exist" );
@@ -59,6 +62,7 @@ namespace CodeCake
                 File.WriteAllLines( npmrcPath, npmrc.ToArray() );
                 return new NpmrcTokenInjector( npmrcPath );
             }
+
             public void Dispose()
             {
                 File.WriteAllLines(
@@ -114,22 +118,12 @@ namespace CodeCake
             File.Delete( Path.Combine( releasesDir, packName ) );
             File.Move( packPath, Path.Combine( releasesDir, packName ) );
         }
+
         public static string GetTgzNameOfPackage( ArtifactInstance packageJson )
         {
             string name = packageJson.Artifact.Name.Replace( "@", "" ).Replace( '/', '-' );
             return name + "-" + packageJson.Version.ToString() + ".tgz";
         }
-        public static string GetRegistryUriFromNprmc( string npmrcPath )
-        {
-            var packageJson = PackageJson.FromDirectoryPath( npmrcPath );
-            string[] npmrc = File.ReadAllLines( Path.Combine( npmrcPath, ".npmrc" ) );
-            string registryLine = npmrc.Where( l => l.Replace( " ", "" ).StartsWith( $"@{packageJson.Scope}:registry=" ) ).SingleOrDefault();
-            if( registryLine == null )//If there is only one registry for the whole .npmrc
-            {
-                registryLine = npmrc.Single( l => l.StartsWith( "registry=" ) );
-            }
-            //Todo: if there is no registry line, use npmjs.com as default
-            return registryLine.Split( '=' )[1];
-        }
+
     }
 }

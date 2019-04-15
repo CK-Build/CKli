@@ -6,6 +6,7 @@ using System.Linq;
 using System.Xml.Linq;
 using CK.Core;
 using CK.Env.MSBuild;
+using CK.Env.NPM;
 using CK.Text;
 using CSemVer;
 
@@ -128,6 +129,37 @@ namespace CK.Env.Plugins
         }
 
         /// <summary>
+        /// Gets all NPM projects.
+        /// </summary>
+        /// <param name="m">The monitor use.</param>
+        /// <returns>The set of NPM projects that are declared.</returns>
+        public IEnumerable<NPMProject> GetAllNPMProjects( IActivityMonitor m ) => GetAllSolutions( m )?
+                                                                           .SelectMany( s => s.NPMProjects )
+                                                                           ?? Array.Empty<NPMProject>();
+
+        /// <summary>
+        /// Gets all the NPM projects defined in the solution as long as they are all
+        /// valid: if any status is not <see cref="NPMProjectStatus.Valid"/>, a warning
+        /// is emitted and null is returned.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>The set of NPM projects (can be empty) or null on error.</returns>
+        public IEnumerable<NPMProject> GetAllValidNPMProjects( IActivityMonitor m )
+        {
+            var all = GetAllSolutions( m )?.SelectMany( s => s.NPMProjects );
+            if( all != null )
+            {
+                var invalid = all.Where( p => p.Status != NPMProjectStatus.Valid );
+                if( invalid.Any() )
+                {
+                    m.Error( $"Unable to consider NPM projects since they must all be valid. Invalid projects: {invalid.Select( p => $"{p.FullPath} - {p.Status}" ).Concatenate()}" );
+                    return null;
+                }
+            }
+            return all;
+        }
+
+        /// <summary>
         /// Gets the set of solution names that this driver handles with the first one being the primary solution,
         /// followed by the secondary solutions if any.
         /// Returns null on any error that prevented the solutions to be loaded.
@@ -146,7 +178,7 @@ namespace CK.Env.Plugins
         /// <param name="m">The monitor use.</param>
         /// <returns>Whether CKSetup components are produced, null on error.</returns>
         public bool? AreCKSetupComponentsProduced( IActivityMonitor m ) => !_settings.UseCKSetup
-                                                                        ? false 
+                                                                        ? false
                                                                         : GetAllSolutions( m )
                                                                           ?.SelectMany( s => s.CKSetupComponentProjects )
                                                                           .Any();

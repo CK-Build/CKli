@@ -6,6 +6,7 @@
   <LocalFeedProvider />
   <CKEnvKeyVault />
   <NuGetClient />
+  <NPMClient />
   <CKSetupClient />
   <NPMProjectCenter />
   <SolutionCentral />
@@ -18,12 +19,13 @@
                 CheckName="NuGetAzure:Signature-OpenSource-Default"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
 
-    <Repository Type="NuGetAzure"
-                Organization="Signature-Code"
+    <Repository Type="NPMAzure"
+                NPMScope="@signature"
+                Organization="Signature-OpenSource"
                 FeedName="Default"
-                CheckName="NuGetAzure:Signature-Code-Default"
-                CheckSecretKeyName="AZURE_FEED_SIGNATURE_CODE_PAT" />
-    
+                CheckName="NPMAzure:@signature->Signature-OpenSource-Default"
+                CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
+
     <Repository Type="CKSetup"
                 CheckName="CKSetup:Public"
                 CheckSecretKeyName="CKSETUPREMOTESTORE_PUSH_API_KEY" />
@@ -33,9 +35,14 @@
   <SolutionSettings>
     <NuGetSources>
       <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json" >
-        <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
       </add>
     </NuGetSources>
+    <NPMSources>
+      <add Scope="@signature" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/npm/registry/" >
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
+      </add>
+    </NPMSources>
     <RemoveNuGetSourceNames>
       <add Name="CKEnvTest" />
       <add Name="CKEnvTest3" />
@@ -44,6 +51,7 @@
       <add Name="Invenietis - CI" />
     </RemoveNuGetSourceNames>
     <ArtifactTargets>
+      <add Name="NPMAzure:@signature->Signature-OpenSource-Default" />
       <add Name="NuGetAzure:Signature-OpenSource-Default" />
       <add Name="CKSetup:Public" />
     </ArtifactTargets>
@@ -58,21 +66,10 @@
       <add Type="CK.Env.Plugins.SolutionFiles.RepositoryXmlFile, CK.Env.Plugins" />
       <add Type="CK.Env.Plugins.SolutionFiles.NugetConfigFile, CK.Env.Plugins" />
       <add Type="CK.Env.Plugins.SolutionFiles.GitIgnoreFile, CK.Env.Plugins" />
+      <add Type="CK.Env.Plugins.SolutionFiles.NPMRCFiles, CK.Env.Plugins" />
       <add Type="CK.BuildSystem.Appveyor.AppveyorFile, CK.BuildSystem.Appveyor" />
     </Plugins>
   </SolutionSettings>
-
-  <Reusable Name="Private-SolutionSettings">
-    <SolutionSettings>
-      <NuGetSources>
-        <add Name="Signature-Code" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/Default/nuget/v3/index.json" />
-      </NuGetSources>
-      <ArtifactTargets>
-        <remove Name="NuGetAzure:Signature-OpenSource-Default" />
-        <add Name="NuGetAzure:Signature-Code-Default" />
-      </ArtifactTargets>
-    </SolutionSettings>
-  </Reusable>
   
   <Folder Name="CK-AspNet-Projects">
 
@@ -172,16 +169,6 @@
       <SolutionSettings NoUnitTests="true" />
       <Branch Name="develop">
         <PrimarySolution />
-      </Branch>
-    </GitFolder>
-
-    <Reuse Name="Private-SolutionSettings" />
-
-    <GitFolder Name="CK-Observable-Domain" Url="https://gitlab.com/Signature-Code/CK-Observable-Domain.git">
-      <SolutionSettings NoStrongNameSigning="True"/>
-      <Branch Name="develop">
-        <PrimarySolution />
-        <NPMProject Folder="js" PackageName="@signature/ck-observable-domain" />
       </Branch>
     </GitFolder>
     
