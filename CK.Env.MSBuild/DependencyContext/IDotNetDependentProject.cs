@@ -1,7 +1,8 @@
 namespace CK.Env.MSBuild
 {
     /// <summary>
-    /// Describes a project in a <see cref="DependencyAnalyser"/> context.
+    /// Describes a .Net project (actually a .csproj) in
+    /// a <see cref="DependencyAnalyser"/> context.
     /// </summary>
     public interface IDotNetDependentProject : IDependentProject
     {

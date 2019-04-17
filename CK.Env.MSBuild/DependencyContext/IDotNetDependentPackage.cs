@@ -3,9 +3,9 @@ using CSemVer;
 namespace CK.Env.MSBuild
 {
     /// <summary>
-    /// Describes a dependent package  in a <see cref="DependencyAnalyser"/> context.
-    /// A dependent package may be an external or local package (a local published <see cref="Project"/> exists that
-    /// produces this package).
+    /// Describes a dependent package in a <see cref="DependencyAnalyser"/> context.
+    /// A dependent package may be an external or local package (a local published <see cref="Project"/>
+    /// exists that produces this package).
     /// </summary>
     public interface IDotNetDependentPackage : IDependentPackage
     {

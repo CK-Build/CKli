@@ -1,5 +1,5 @@
 A1Test > C:\Dev\CKEnvTest
 A2Test > C:\Dev\CKEnvTest
-SC > C:\Dev\CK
+SC > C:\Dev\
 ENGIE > C:\Dev\
 

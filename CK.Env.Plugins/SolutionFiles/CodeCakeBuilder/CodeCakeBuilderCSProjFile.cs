@@ -52,7 +52,8 @@ namespace CK.Env.Plugins.SolutionFiles
             {
                 List<DeclaredPackageDependency> samePackageName = ccbProject.Deps.Packages.Where( p => p.PackageId == packageId ).ToList();
                 var version = SVersion.Parse( v );
-                if( !ccbProject.Deps.Projects.Any( p => p.TargetProject.Name == packageId ) && (!samePackageName.Any() || !samePackageName.All( p => p.Version >= version )) )
+                if( !ccbProject.Deps.Projects.Any( p => p.TargetProject.Name == packageId )
+                                                        && (!samePackageName.Any() || !samePackageName.All( p => p.Version >= version )) )
                 {
                     ccbProject.SetPackageReferenceVersion( m, framework, packageId, version, true, false );
                 }
@@ -83,6 +84,10 @@ namespace CK.Env.Plugins.SolutionFiles
                 if( produceCKSetupComponents == true )
                 {
                     EnsureProjectReference( "CKSetup.Cake", "9.0.0" );
+                    // CKSetup.Cake references CK.Text.
+                    // Removing the direct ref avoids error
+                    // NU1605: Detected package downgrade: CK.Text from 8.0.3--0019-develop to 8.0.2. 
+                    DeleteProjectReference( "CK.Text" );
                 }
             }
             solution.Save( m );
