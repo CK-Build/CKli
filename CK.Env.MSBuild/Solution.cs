@@ -15,6 +15,7 @@ namespace CK.Env.MSBuild
     /// </summary>
     public sealed class Solution : IDependentItemContainerRef
     {
+        readonly Dictionary<NormalizedPath, NPMProject> _npmProjects;
         SolutionSpecialType _specialType;
         List<Solution> _secondarySolutions;
         List<ProjectBase> _allProjects;
@@ -46,6 +47,18 @@ namespace CK.Env.MSBuild
         /// When this is true, <see cref="Save"/> always fails with an error logged.
         /// </summary>
         public bool SyncLost => _tracker.CurrentVersion != this;
+
+        /// <summary>
+        /// Forces a reload of this solution: <see cref="SyncLost"/> becomes true and
+        /// the <see cref="Current"/> becomes null until the solution is reloaded.
+        /// May be the solution SHOULD know how to reload itself: this could be simpler
+        /// to understand, but to support this, we need to give the solution its factory method
+        /// that is rather strange.
+        /// </summary>
+        public void ForceReloadCurrentVersion()
+        {
+            _tracker.ForceReloadCurrentVersion( BuildContext );
+        }
 
         /// <summary>
         /// Gets the .sln path (relative to the <see cref="FileSystem"/>).
@@ -200,7 +213,24 @@ namespace CK.Env.MSBuild
         /// <summary>
         /// Gets the NPM projects list.
         /// </summary>
-        public IList<NPM.NPMProject> NPMProjects { get; }
+        public IReadOnlyCollection<NPMProject> NPMProjects => _npmProjects.Values;
+
+        /// <summary>
+        /// Finds or creates (based on <see cref="NPM.INPMProjectSpec.FullPath"/>) the
+        /// NPM project in <see cref="NPMProjects"/> collection.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="spec">The project specification.</param>
+        /// <returns>The NMP project.</returns>
+        NPMProject EnsureNPMProject( IActivityMonitor m, NPM.INPMProjectSpec spec )
+        {
+            if( _npmProjects.TryGetValue( spec.FullPath, out var p ) ) return p;
+            NPM.INPMProject npm = BuildContext.NPMProjectContext.Ensure( m, spec );
+            p = new NPMProject( this, npm );
+            _npmProjects.Add( p.FullPath, p );
+            m.Info( $"Added {npm} project." );
+            return p;
+        }
 
         /// <summary>
         /// Gets the target names where generated artifacts should be pushed.
@@ -222,32 +252,23 @@ namespace CK.Env.MSBuild
         public IList<Project> BuildProjects { get; }
 
         ///// <summary>
-        ///// Gets the projects that are not in <see cref="PublishedProjects"/>, <see cref="TestProjects"/>,
-        ///// and <see cref="BuildProjects"/>.
+        ///// Add a project in the sln if it's not already in it.
+        ///// Since this calls an external process, <see cref="ForceReloadCurrentVersion"/> is called:
+        ///// after this call, this solution is no more the "current" one.
         ///// </summary>
-        //public IEnumerable<Project> MiscProjects => AllProjects
-        //                                                .Except( PublishedProjects )
-        //                                                .Except( TestProjects )
-        //                                                .Except( BuildProjects );
-
-        /// <summary>
-        /// Add a project in the sln if it's not already in it.
-        /// </summary>
-        /// <param name="m"></param>
-        /// <returns>if the command was successfully executed</returns>
-        public Solution EnsureProjectIsInSln( IActivityMonitor m, NormalizedPath projectPath )
-        {
-            if(AllProjects.Any(p=>p.Path == projectPath))
-            {
-                return this;
-            }
-            string args = "sln add " + projectPath.RemoveFirstPart( SolutionFolderPath.Parts.Count );
-            if( !ProcessRunner.Run( m, BuildContext.FileSystem.GetFileInfo( SolutionFolderPath ).PhysicalPath, "dotnet", args ) )
-            {
-                return null;
-            }
-            return BuildContext.FindOrLoadSolution( m, FilePath, PrimarySolution, SpecialType, true ).Solution;
-        }
+        ///// <param name="m">The monitor to use.</param>
+        ///// <param name="projectPath">The project path.</param>
+        ///// <returns>True on success, false otherwise.</returns>
+        //public void EnsureProjectIsInSln( IActivityMonitor m, NormalizedPath projectPath )
+        //{
+        //    if( AllProjects.Any( p => p.Path == projectPath ) ) return;
+        //    string args = "sln add " + projectPath.RemoveFirstPart( SolutionFolderPath.Parts.Count );
+        //    if( !ProcessRunner.Run( m, BuildContext.FileSystem.GetFileInfo( SolutionFolderPath ).PhysicalPath, "dotnet", args ) )
+        //    {
+        //        return;
+        //    }
+        //    ForceReloadCurrentVersion();
+        //}
 
         /// <summary>
         /// Creates a new project that must not already exist.
@@ -360,14 +381,15 @@ namespace CK.Env.MSBuild
                                                                         && p.Path.Parts.Count == FilePath.Parts.Count + 1 )
                                                           .ToList();
             CKSetupComponentProjects = new List<Project>();
-            NPMProjects = new List<NPM.NPMProject>();
+            _npmProjects = new Dictionary<NormalizedPath, NPMProject>();
             ArtifactTargetNames = new List<string>();
         }
 
         internal static Solution Load(
             IActivityMonitor m,
             MSBuildContext ctx,
-            NormalizedPath filePath )
+            NormalizedPath filePath,
+            IEnumerable<NPM.INPMProjectSpec> npmProjects )
         {
             if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
             var fileInfo = ctx.FileSystem.GetFileInfo( filePath );
@@ -462,6 +484,23 @@ namespace CK.Env.MSBuild
                         m.Error( $"Error while loading project '{p}'." );
                         return null;
                     }
+                }
+                bool allValid = true;
+                foreach( var npmSpec in npmProjects )
+                {
+                    allValid &= s.EnsureNPMProject( m, npmSpec ).Status == NPM.NPMProjectStatus.Valid;
+                }
+                if( allValid )
+                {
+                    foreach( var npm in s.NPMProjects )
+                    {
+                        npm.RefreshStatus( m );
+                    }
+                }
+                if( !allValid )
+                {
+                    m.Error( $"All NPM projects must be valid. Solution loading aborted." );
+                    return null;
                 }
                 return s;
             }

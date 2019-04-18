@@ -91,7 +91,7 @@ namespace CK.Env.Plugins.SolutionFiles
                 }
             }
             solution.Save( m );
-            solution.EnsureProjectIsInSln( m, projectPath );
+            //solution.EnsureProjectIsInSln( m, projectPath );
         }
     }
 }

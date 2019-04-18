@@ -62,7 +62,7 @@ namespace CK.Env.Plugins.SolutionFiles
                 {
                     SetTextResource( m, "dotnet/Build.StandardUnitTests.cs" );
                 }
-                if( _driver.GetAllSolutions( m ).SelectMany( s => s.PublishedProjects ).Any() )
+                if( _driver.GetAllSolutions( m )?.SelectMany( s => s.PublishedProjects ).Any() ?? false )
                 {
                     SetTextResource( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
                     SetTextResource( m, "dotnet/Build.StandardPushNuGetPackages.cs" );

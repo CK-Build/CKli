@@ -450,6 +450,8 @@ namespace CK.Env.MSBuild
                 m.Trace( $"Remove in {ToString()}: {r.PackageId}." );
                 return r.OriginElement;
             } ).Remove();
+            // Removes empty <ItemGroup />.
+            parents.Where( p => !p.HasElements ).Remove();
             OnChange( m );
             return changeCount;
         }

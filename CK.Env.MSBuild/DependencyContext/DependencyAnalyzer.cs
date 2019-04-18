@@ -2,6 +2,7 @@ using CK.Core;
 using CK.Setup;
 using CK.Text;
 using CSemVer;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -18,6 +19,8 @@ namespace CK.Env.MSBuild
         readonly Solution[] _solutions;
         readonly Dictionary<string, DotNetPackageItem> _packages;
         readonly DotNetProjectItem.Cache _projects;
+        readonly Dictionary<string, NPMPackageItem> _npmPackages;
+        readonly NPMProjectItem.Cache _npmProjects;
         readonly CKTrait _frameworks;
         ProjectDependencyResult _projectDependencies;
 
@@ -55,6 +58,78 @@ namespace CK.Env.MSBuild
             /// and this <see cref="Version"/> is null.
             /// </summary>
             public Project Project { get; }
+
+            /// <summary>
+            /// Gets the package identifier.
+            /// </summary>
+            public string PackageId { get; }
+
+            /// <summary>
+            /// Gets the referenced version.
+            /// This is null for a locally published project.
+            /// </summary>
+            public SVersion Version { get; }
+
+            /// <summary>
+            /// Gets <see cref="PackageId"/>/<see cref="Version"/> for external packages
+            /// and the versionless package identifier if the project is locally published.
+            /// </summary>
+            public string FullName { get; }
+
+            public override string ToString() => Project == null
+                                                    ? $"External: {FullName}"
+                                                    : $"Local: {Project}";
+
+            IDependentItemContainerRef IDependentItem.Container => null;
+
+            IDependentItemRef IDependentItem.Generalization => null;
+
+            IEnumerable<IDependentItemRef> IDependentItem.Requires => _requires;
+
+            IEnumerable<IDependentItemRef> IDependentItem.RequiredBy => null;
+
+            IEnumerable<IDependentItemGroupRef> IDependentItem.Groups => null;
+
+            object IDependentItem.StartDependencySort( IActivityMonitor m ) => this;
+
+            bool IDependentItemRef.Optional => false;
+
+        }
+
+        /// <summary>
+        /// Package items are not bound to any container (solution). There is 2 kind of packages:
+        /// locally produced (the item requires the Solution that owns its source code), and external
+        /// packages.
+        /// </summary>
+        internal class NPMPackageItem : INPMDependentPackage, IDependentItem, IDependentItemRef
+        {
+            // This contains only the Solution of the Project for local projects (the Package -published- requires the
+            // Solution that owns its source code.)
+            // Otherwise, for external packages, this is null (no requirements).
+            readonly IDependentItemRef[] _requires;
+
+            internal NPMPackageItem( NPMProjectItem localProject )
+            {
+                _requires = new IDependentItemRef[] { localProject.Project.Solution };
+                Project = localProject.Project;
+                Version = null;
+                PackageId = Project.PackageJson.Name;
+                FullName = Project.PackageJson.Name;
+            }
+
+            internal NPMPackageItem( string packageId, SVersion v, string fullName )
+            {
+                PackageId = packageId;
+                Version = v;
+                FullName = fullName;
+            }
+
+            /// <summary>
+            /// Gets the local project that produces this package.
+            /// This is null for external packages: for external package this <see cref="FullName"/> is the <see cref="ProjectBase.Name"/>
+            /// and this <see cref="Version"/> is null.
+            /// </summary>
+            public NPMProject Project { get; }
 
             /// <summary>
             /// Gets the package identifier.
@@ -168,11 +243,12 @@ namespace CK.Env.MSBuild
                                         : _p.Solution.UniqueSolutionName + '/' + _p.Path.LastPart;
 
             /// <summary>
-            /// Gets the name of the package produced by this project or null when <see cref="IsPublished"/> is false.
+            /// Gets the name of the package produced by this project or null when <see cref="IsPublished"/>
+            /// is false.
             /// When not null, this is the nameof the project folder.
             /// </summary>
             public string PublishedName => IsPublished
-                                        ? _p.Path.Parts[_p.Path.Parts.Count-2]
+                                        ? _p.Path.Parts[_p.Path.Parts.Count - 2]
                                         : null;
 
             internal void AddRequires( IDependentItemRef p ) => _requires.Add( p );
@@ -193,7 +269,125 @@ namespace CK.Env.MSBuild
                 {
                     if( _cache.PureProjectsMode )
                     {
-                        return _requires.Select(  d => d is IDotNetDependentPackage p && p.Project != null ? _cache[p.Project] : d );
+                        return _requires.Select( d => d is IDotNetDependentPackage p && p.Project != null ? _cache[p.Project] : d );
+                    }
+                    return _requires;
+                }
+            }
+
+            IEnumerable<IDependentItemRef> IDependentItem.RequiredBy => null;
+
+            IEnumerable<IDependentItemGroupRef> IDependentItem.Groups => null;
+
+            bool IDependentItemRef.Optional => false;
+
+            object IDependentItem.StartDependencySort( IActivityMonitor m ) => _p;
+
+            public override string ToString() => _p.ToString();
+        }
+
+        /// <summary>
+        /// This internal class is the IDependentItem that represents a NPM Project
+        /// in a SortableSolutionFile graph.
+        /// </summary>
+        internal class NPMProjectItem : INPMDependentProject, IDependentItem, IDependentItemRef
+        {
+            readonly NPMProject _p;
+            readonly List<IDependentItemRef> _requires;
+            readonly Cache _cache;
+
+            public class Cache
+            {
+                readonly Dictionary<NPMProject, NPMProjectItem> _cache;
+
+                public Cache()
+                {
+                    _cache = new Dictionary<NPMProject, NPMProjectItem>();
+                }
+
+                public NPMProjectItem this[NPMProject p] => _cache[p];
+
+                public IEnumerable<NPMProject> AllProjects => _cache.Keys;
+
+                public IEnumerable<NPMProjectItem> AllProjectItems => _cache.Values;
+
+                public int Count => _cache.Count;
+
+                /// <summary>
+                /// Dirty trick: when set to true this property forces all ProjectItem's <see cref="IDependentItem.Container"/>
+                /// to be null and <see cref="IDependentItem.Requires"/> to contain the ProjectItem requirements instead of
+                /// the <see cref="IDotNetDependentPackage"/> requirements for locally published packages.
+                /// We use this to reuse ProjectItems to compute Build projects graph dependencies
+                /// (this graph ignores the solutions and focuses only on projects).
+                /// </summary>
+                public bool PureProjectsMode { get; set; }
+
+                internal void Add( NPMProject p, NPMProjectItem pItem ) => _cache.Add( p, pItem );
+
+                public NPMProjectItem Create( NPMProject p )
+                {
+                    if( _cache.TryGetValue( p, out var item ) ) return item;
+                    return new NPMProjectItem( p, this );
+                }
+
+            }
+
+            NPMProjectItem( NPMProject p, Cache cache )
+            {
+                _p = p;
+                _cache = cache;
+                cache.Add( p, this );
+                _requires = p.ProjectDependencies.Select( dep => cache.Create( dep.Project ) )
+                             .ToList<IDependentItemRef>();
+            }
+
+            /// <summary>
+            /// Gets the project itself.
+            /// </summary>
+            public NPMProject Project => _p;
+
+            /// <summary>
+            /// Whether this project is published.
+            /// When a project is published, this FullName is the "Package name/package.json"
+            /// (the package itself uses the naked "Package name" as tis FullName).
+            /// When NOT published, we use the "Solution name/<see cref="NPM.PackageJsonFile.SafeName"/>".
+            /// </summary>
+            public bool IsPublished => _p.PackageJson.IsPublished;
+
+            /// <summary>
+            /// Gets the full name of this project item (see <see cref="IsPublished"/>).
+            /// </summary>
+            public string FullName => IsPublished
+                                        ? _p.PackageJson.Name + "/package.json"
+                                        : _p.Solution.UniqueSolutionName + '/' + _p.PackageJson.SafeName;
+
+            /// <summary>
+            /// Gets the name of the package produced by this project or null when <see cref="IsPublished"/> is false.
+            /// When not null, this is the <see cref="NPM.PackageJsonFile.Name"/>.
+            /// </summary>
+            public string PublishedName => IsPublished
+                                        ? _p.PackageJson.Name
+                                        : null;
+
+            internal void AddRequires( IDependentItemRef p ) => _requires.Add( p );
+
+            string IDependentProject.Type => "NuGet";
+
+            IDependentItemContainerRef IDependentItem.Container => _cache.PureProjectsMode
+                                                                    ? null
+                                                                    : _p.Solution;
+
+            IDependentItemRef IDependentItem.Generalization => null;
+
+            IEnumerable<IDependentItemRef> IDependentItem.Requires
+            {
+                get
+                {
+                    if( _cache.PureProjectsMode )
+                    {
+                        return _requires.Select( d => d is INPMDependentPackage p && p.Project != null
+                                                        ? _cache[p.Project]
+                                                        : d );
                     }
                     return _requires;
                 }
@@ -215,12 +409,16 @@ namespace CK.Env.MSBuild
             Solution[] solutions,
             Dictionary<string, DotNetPackageItem> packages,
             DotNetProjectItem.Cache projects,
+            Dictionary<string, NPMPackageItem> npmPackages,
+            NPMProjectItem.Cache npmProjects,
             CKTrait frameworks )
         {
             UniqueBranchName = uniqueBranchName;
             _solutions = solutions;
             _packages = packages;
             _projects = projects;
+            _npmPackages = npmPackages;
+            _npmProjects = npmProjects;
             _frameworks = frameworks;
         }
 
@@ -457,17 +655,23 @@ namespace CK.Env.MSBuild
             return new SolutionDependencyContext( UniqueBranchName, indexByName, strategy, result, ProjectDependencies, table, depSolutions, GetBuildProjectInfo( m ) );
         }
 
-        IEnumerable<DotNetProjectItem> GetProjectItems( Solution s, SolutionSortStrategy content )
+        IEnumerable<IDependentItemRef> GetProjectItems( Solution s, SolutionSortStrategy content )
         {
+            IEnumerable<IDependentItemRef> dotNetItems;
             switch( content )
             {
                 case SolutionSortStrategy.PublishedProjects:
-                    return s.PublishedProjects.Select( p => _projects[p] );
+                    dotNetItems = s.PublishedProjects.Select( p => _projects[p] );
+                    break;
                 case SolutionSortStrategy.PublishedAndTestsProjects:
-                    return s.PublishedProjects.Concat( s.TestProjects ).Distinct().Select( p => _projects[p] );
-                default:
-                    return s.AllProjects.Except( s.BuildProjects ).Select( p => _projects[p] );
+                    dotNetItems = s.PublishedProjects.Concat( s.TestProjects ).Distinct().Select( p => _projects[p] );
+                    break;
+                case SolutionSortStrategy.EverythingExceptBuildProjects:
+                    dotNetItems = s.AllProjects.Except( s.BuildProjects ).Select( p => _projects[p] );
+                    break;
+                default: throw new Exception( "Unsuported SolutionSortStrategy" );
             }
+            return dotNetItems.Concat( s.NPMProjects.Select( p => _npmProjects[p] ) );
         }
 
         /// <summary>
@@ -479,8 +683,10 @@ namespace CK.Env.MSBuild
         public static DependencyAnalyser Create( IActivityMonitor m, IEnumerable<Solution> solutionFiles )
         {
             var packages = new Dictionary<string, DotNetPackageItem>();
+            Dictionary<string, NPMPackageItem> npmPackages;
             var solutions = solutionFiles.ToArray();
             var projectItems = new DotNetProjectItem.Cache();
+            var npmProjectItems = new NPMProjectItem.Cache();
             var frameworks = MSBuildContext.Traits.EmptyTrait;
             // Note: Project to project references are translated into Requirements directly
             //       in the ProjectItem constructor.
@@ -501,6 +707,11 @@ namespace CK.Env.MSBuild
                         {
                             frameworks = frameworks.Union( project.TargetFrameworks );
                             projectItems.Create( project );
+                        }
+                        // NPM projects.
+                        foreach( var npm in s.NPMProjects )
+                        {
+                            npmProjectItems.Create( npm );
                         }
                     }
                 }
@@ -563,9 +774,65 @@ namespace CK.Env.MSBuild
                     }
                     project.AddRequires( refTarget );
                 }
-
             }
-            return new DependencyAnalyser( uniqueBranchName, solutions, packages, projectItems, frameworks );
+            using( m.OpenInfo( $"Handling {npmProjectItems.Count} NPM projects." ) )
+            {
+                npmPackages = npmProjectItems.AllProjectItems
+                            .Where( npm => npm.IsPublished )
+                            .ToDictionary( npm => npm.PublishedName, npm => new NPMPackageItem( npm ) );
+                m.Info( $"Found {npmPackages.Count} published packages." );
+
+                foreach( var npmProject in npmProjectItems.AllProjectItems )
+                {
+                    foreach( var dep in npmProject.Project.PackageJson.Dependencies )
+                    {
+                        if( dep.Type != NPM.VersionDependencyType.MinVersion )
+                        {
+                            if( dep.Type != NPM.VersionDependencyType.LocalPath )
+                            {
+                                m.Warn( $"Ignored {dep} dependency in {npmProject.Project.PackageJson.FilePath}." );
+                            }
+                            continue;
+                        }
+                        IDependentItemRef refTarget;
+                        if( npmPackages.TryGetValue( dep.Name, out NPMPackageItem target ) )
+                        {
+                            // Dependency to a Published projects from the primary solution are
+                            // transfomed into requirements to the Project itself.
+                            refTarget = target;
+                            if( target.Project.Solution == npmProject.Project.Solution )
+                            {
+                                refTarget = npmProjectItems[target.Project];
+                            }
+                        }
+                        else
+                        {
+                            // Dependency to an external Package.
+                            refTarget = RegisterExternal( npmPackages, dep );
+                        }
+                        npmProject.AddRequires( refTarget );
+                    }
+                }
+            }
+            return new DependencyAnalyser(
+                        uniqueBranchName,
+                        solutions,
+                        packages,
+                        projectItems,
+                        npmPackages,
+                        npmProjectItems,
+                        frameworks );
+        }
+
+        static NPMPackageItem RegisterExternal( Dictionary<string, NPMPackageItem> externals, NPM.NPMDep dep )
+        {
+            string fullName = "NPM:" + dep.Name+ '/' + dep.MinVersion.ToNuGetPackageString();
+            if( !externals.TryGetValue( fullName, out var p ) )
+            {
+                p = new NPMPackageItem( dep.Name, dep.MinVersion, fullName );
+                externals.Add( fullName, p );
+            }
+            return p;
         }
 
         static DotNetPackageItem RegisterExternal( Dictionary<string, DotNetPackageItem> externals, DeclaredPackageDependency dep )
