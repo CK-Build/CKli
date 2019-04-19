@@ -77,6 +77,7 @@ namespace CKli
             var (s, loaded) = SolutionCentral.MSBuildContext.FindOrLoadSolution(
                                                     m,
                                                     GetSolutionFilePath( projectToBranchName ),
+                                                    NPMProjects,
                                                     null,
                                                     SolutionSpecialType.None,
                                                     reload );
@@ -104,8 +105,7 @@ namespace CKli
                 }
                 HandleCKSetupComponentProjects( m, s );
                 HandleArtifactTargetNames( m, s );
-                s.NPMProjects.AddRange( NPMProjects.Select( spec => s.BuildContext.NPMProjectContext.Ensure( m, spec ) ) );
-            }
+             }
             return s;
         }
 

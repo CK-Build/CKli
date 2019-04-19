@@ -20,7 +20,7 @@ namespace CK.Env.NPM
 
         public FileSystem FileSystem { get; }
 
-        public NPMProject Ensure( IActivityMonitor m, INPMProjectSpec description )
+        public INPMProject Ensure( IActivityMonitor m, INPMProjectSpec description )
         {
             if( _projects.TryGetValue( description.FullPath, out var p ) )
             {

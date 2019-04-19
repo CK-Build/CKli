@@ -11,6 +11,9 @@ using System.Threading.Tasks;
 
 namespace CK.Env.NPM
 {
+    /// <summary>
+    /// Specialized <see cref="JsonFileBase"/> for package.json file.
+    /// </summary>
     public class PackageJsonFile : JsonFileBase
     {
         readonly List<NPMDep> _deps;
@@ -32,6 +35,11 @@ namespace CK.Env.NPM
         }
 
         /// <summary>
+        /// Gets the name.
+        /// </summary>
+        public string SafeName => Name ?? FilePath.Parts[FilePath.Parts.Count - 2];
+
+        /// <summary>
         /// Gets or sets whether this package is private: even if it has a <see cref="Name"/>
         /// and a <see cref="Version"/>, it must not be published.
         /// </summary>
@@ -49,6 +57,8 @@ namespace CK.Env.NPM
 
         /// <summary>
         /// Gets or sets the version.
+        /// This should always be the <see cref="SVersion.ZeroVersion"/> except when the actual version is
+        /// computed during a build/packaging.
         /// Can be null: a non-published package does not require any version (nor <see cref="Name"/>).
         /// </summary>
         public SVersion Version
@@ -96,6 +106,13 @@ namespace CK.Env.NPM
             else _deps.Add( d );
         }
 
+        /// <summary>
+        /// Overridden to return the name of the package or the '<see cref="SafeName"/> (unpublished)'
+        /// when <see cref="IsPublished"/> is false.
+        /// </summary>
+        /// <returns>A readable string.</returns>
+        public override string ToString() => IsPublished ? Name : $"{SafeName} (unpublished)";
+
         internal NPMProjectStatus Refresh( IActivityMonitor m )
         {
             _deps.Clear();
@@ -133,7 +150,15 @@ namespace CK.Env.NPM
         {
             if( value.IndexOf("://") > 0 )
             {
-                if( value.StartsWith( "file://" ) ) return (null, VersionDependencyType.LocalPath);
+                if( value.StartsWith( "file:" ) )
+                {
+                    if( !value.StartsWith( "file:.." ) )
+                    {
+                        m.Error( $"Dependency '{value}' for {depNameKind}/{name} must be relative and starts with 'file:..'." );
+                        return (null, VersionDependencyType.None);
+                    }
+                    else return (null, VersionDependencyType.LocalPath);
+                }
                 if( value.StartsWith( "http://" ) || value.StartsWith( "https://" ) ) return (null, VersionDependencyType.UrlTar);
                 if( value.StartsWith( "git://" )
                     || value.StartsWith( "git+ssh://" )

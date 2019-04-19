@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace CK.Env.NPM
 {
-    public class NPMProject
+    class NPMProject : INPMProject
     {
         readonly PackageJsonFile _packageFile;
         INPMProjectSpec _spec;
@@ -27,8 +27,14 @@ namespace CK.Env.NPM
 
         public FileSystem FileSystem => NPMContext.FileSystem;
 
+        /// <summary>
+        /// Gets the project specification.
+        /// </summary>
         public INPMProjectSpec Specification => _spec;
 
+        /// <summary>
+        /// Gets the project status (that can be on error).
+        /// </summary>
         public NPMProjectStatus Status => _status;
 
         /// <summary>
@@ -37,11 +43,11 @@ namespace CK.Env.NPM
         public NormalizedPath FullPath => _spec.FullPath;
 
         /// <summary>
-        /// Gets the package.json file path relative to the <see cref="FileSystem"/>.
+        /// Gets the package.json file object.
         /// </summary>
         public PackageJsonFile PackageJson => _packageFile;
 
-        NPMProjectStatus RefreshStatus( IActivityMonitor m )
+        public NPMProjectStatus RefreshStatus( IActivityMonitor m )
         {
             NPMProjectStatus Error( NPMProjectStatus s, string msg = null )
             {
@@ -66,8 +72,10 @@ namespace CK.Env.NPM
                     if( _packageFile.IsPrivate ) return Error( NPMProjectStatus.ErrorPackageMustNotBePrivate );
                     if( _packageFile.Name == null ) return Error( NPMProjectStatus.ErrorPackageNameMissing );
                     if( _packageFile.Name != _spec.PackageName )
+                    {
                         return Error( NPMProjectStatus.ErrorPackageInvalidName, $"Expected package name is '{_spec.PackageName}' but found '{_packageFile.Name}'." );
-                }               
+                    }
+                }
                 return _packageFile.Refresh( m );
             }
             catch( Exception ex )
@@ -77,5 +85,7 @@ namespace CK.Env.NPM
             }
 
         }
+
+        public override string ToString() => _packageFile.ToString();
     }
 }

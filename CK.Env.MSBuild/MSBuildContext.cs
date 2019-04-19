@@ -112,6 +112,8 @@ namespace CK.Env.MSBuild
         {
             Solution CurrentVersion { get; }
             Solution LastVersion { get; }
+
+            void ForceReloadCurrentVersion( MSBuildContext ctx );
         }
 
         class SolutionTracker : ISolutionTracker
@@ -124,6 +126,11 @@ namespace CK.Env.MSBuild
             public Solution CurrentVersion => _loaded ? _last : null;
 
             public Solution LastVersion => _last;
+
+            public void ForceReloadCurrentVersion( MSBuildContext ctx )
+            {
+                if( _loaded ) OnUnload( ctx );
+            }
 
             public Solution OnUnload( MSBuildContext ctx )
             {
@@ -167,7 +174,7 @@ namespace CK.Env.MSBuild
         /// <summary>
         /// Gets the file system.
         /// </summary>
-        public FileSystem FileSystem => NPMProjectContext.FileSystem;    
+        public FileSystem FileSystem => NPMProjectContext.FileSystem;
 
         /// <summary>
         /// Returns a newly loaded <see cref="Solution"/> or retrieves it from the cache.
@@ -175,7 +182,7 @@ namespace CK.Env.MSBuild
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="path">The path in the <see cref="FileSystem"/>.</param>
-        /// <param name="settings"></param>
+        /// <param name="npmProjects">Optional list of npm projects.</param>
         /// <param name="primary">The primary solution if this solution is a secondary solution.</param>
         /// <param name="type">The special secondary solution type.</param>
         /// <param name="force">True to force the reload of the solution.</param>
@@ -183,6 +190,7 @@ namespace CK.Env.MSBuild
         public (Solution Solution, bool Loaded) FindOrLoadSolution(
             IActivityMonitor m,
             NormalizedPath path,
+            IEnumerable<INPMProjectSpec> npmProjects,
             Solution primary = null,
             SolutionSpecialType type = SolutionSpecialType.None,
             bool force = false )
@@ -190,6 +198,7 @@ namespace CK.Env.MSBuild
             if( primary == null && type != SolutionSpecialType.None ) throw new ArgumentException( $"Primary solution, type must be None." );
             if( primary != null && type == SolutionSpecialType.None ) throw new ArgumentException( $"Secondary solution, type must be IncludedSecondarySolution or IndependantSecondarySolution." );
             if( primary != null && primary.Current != primary ) throw new ArgumentException( $"Primary solution is not the current one." );
+            if( npmProjects == null ) npmProjects = Array.Empty<INPMProjectSpec>();
 
             SolutionTracker tracker = null;
             Solution s;
@@ -206,7 +215,7 @@ namespace CK.Env.MSBuild
                     return (s, false);
                 }
             }
-            s = DoLoad( m, path, tracker );
+            s = DoLoad( m, path, tracker, npmProjects );
             if( s != null )
             {
                 if( primary != null ) s.SetAsSecondarySolution( primary, type );
@@ -218,7 +227,8 @@ namespace CK.Env.MSBuild
         Solution DoLoad(
             IActivityMonitor m,
             NormalizedPath path,
-            SolutionTracker tracker )
+            SolutionTracker tracker,
+            IEnumerable<INPMProjectSpec> npmProjects )
         {
             using( m.OpenTrace( $"Loading solution {path}." ) )
             {
@@ -232,7 +242,7 @@ namespace CK.Env.MSBuild
                 }
                 try
                 {
-                    Solution s = Solution.Load( m, this, path );
+                    Solution s = Solution.Load( m, this, path, npmProjects );
                     if( s != null )
                     {
                         if( tracker == null )
