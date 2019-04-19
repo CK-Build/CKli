@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.27130.2027
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.28803.156
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CKli", "CKli\CKli.csproj", "{21EE2C7F-2467-4929-B0E8-18B4D6E4F2CF}"
 EndProject
@@ -68,6 +68,8 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.NPMClient", "CK.NPMClient\CK.NPMClient.csproj", "{E8B40C94-EEB7-4292-A107-7002F20A70EB}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeCakeBuilder", "CodeCakeBuilder\CodeCakeBuilder.csproj", "{370AB245-9A08-48B0-AD43-74661EECB54D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Npm.Net", "Npm.Net\Npm.Net.csproj", "{6F97791F-CFE1-4951-84EA-E17059CAE3DC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -175,6 +177,10 @@ Global
 		{370AB245-9A08-48B0-AD43-74661EECB54D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{370AB245-9A08-48B0-AD43-74661EECB54D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{370AB245-9A08-48B0-AD43-74661EECB54D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6F97791F-CFE1-4951-84EA-E17059CAE3DC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6F97791F-CFE1-4951-84EA-E17059CAE3DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6F97791F-CFE1-4951-84EA-E17059CAE3DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6F97791F-CFE1-4951-84EA-E17059CAE3DC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
