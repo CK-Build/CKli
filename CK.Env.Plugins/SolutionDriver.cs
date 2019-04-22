@@ -184,6 +184,14 @@ namespace CK.Env.Plugins
                                                                           .Any();
 
         /// <summary>
+        /// Gets whether .Net packages are published.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>Null on error, true if at least one .Net packages is produced, false otherwise.</returns>
+        public bool? HasDotnetPublishedProjects( IActivityMonitor m ) => GetPrimarySolution( m, false )?.PublishedProjects.Any();
+
+
+        /// <summary>
         /// Fires before a build.
         /// </summary>
         public event EventHandler<BuildStartEventArgs> OnStartBuild;
