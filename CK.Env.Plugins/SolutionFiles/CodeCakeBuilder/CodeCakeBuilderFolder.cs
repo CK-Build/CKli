@@ -23,6 +23,9 @@ namespace CK.Env.Plugins.SolutionFiles
 
         protected override void DoApplySettings( IActivityMonitor m )
         {
+            bool? useDotnet = _driver.HasDotnetPublishedProjects( m );
+            if( useDotnet == null ) return;
+
             // Clean old CodeCakeBuilders files
             DeleteFile( m, "Build.NuGetHelper.cs" );
             DeleteFile( m, "Build.StandardCheckRepository.cs" );
@@ -35,7 +38,19 @@ namespace CK.Env.Plugins.SolutionFiles
             SetTextResource( m, "InstallCredentialProvider.ps1" );
             SetTextResource( m, "Program.cs" );
             SetTextResource( m, "Build.SetCIVersionOnRunner.cs" );
-            SetTextResource( m, "Build.StandardCheckRepositoryWithoutNuGet.cs" );
+            SetTextResource( m, "Build.StandardCheckRepositoryWithoutNuGet.cs", t =>
+            {
+                if( useDotnet == true ) return t;
+                var all = Regex.Matches( t, @"\s*\[Obsolete\(""Use IsRelease instead, and do not use this.*?\(a => a is NuGetRepositoryInfo\);",
+                                            RegexOptions.Singleline
+                                            | RegexOptions.CultureInvariant );
+                if( all.Count != 1 )
+                {
+                    throw new Exception( "There must be 1 and only one [Obsolete]... BuildConfiguration property in Build.StandardCheckRepositoryWithoutNuGet.cs." );
+                }
+                return t.Remove( all[0].Index, all[0].Length );
+            }
+            );
             SetTextResource( m, "Build.StandardPushCKSetupComponents.cs" );
             UpdateTextResource( m, "Build.cs", AdaptBuild );
 
@@ -46,8 +61,7 @@ namespace CK.Env.Plugins.SolutionFiles
             SetTextResource( m, "Abstractions/ArtifactRepository.cs" );
 
 
-            bool useDotnet = true;
-            if( useDotnet )
+            if( useDotnet == true )
             {
                 SetTextResource( m, "dotnet/Build.NuGetHelper.cs" );
                 SetTextResource( m, "dotnet/Build.NugetRepository.cs", AdaptBuildNugetRepositoryForPushFeeds );
@@ -73,6 +87,16 @@ namespace CK.Env.Plugins.SolutionFiles
                     DeleteFile( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
                     DeleteFile( m, "dotnet/Build.StandardPushNuGetPackages.cs" );
                 }
+            }
+            else
+            {
+                DeleteFile( m, "dotnet/Build.NuGetHelper.cs" );
+                DeleteFile( m, "dotnet/Build.NugetRepository.cs" );
+                DeleteFile( m, "dotnet/Build.StandardCheckRepository.cs" );
+                DeleteFile( m, "dotnet/Build.StandardSolutionBuild.cs" );
+                DeleteFile( m, "dotnet/Build.StandardUnitTests.cs" );
+                DeleteFile( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
+                DeleteFile( m, "dotnet/Build.StandardPushNuGetPackages.cs" );
             }
 
             bool useNpm = _driver.GetAllNPMProjects( m ).Any();

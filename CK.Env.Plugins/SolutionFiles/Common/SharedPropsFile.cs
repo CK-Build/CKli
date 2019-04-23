@@ -24,6 +24,13 @@ namespace CK.Env.Plugins.SolutionFiles
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
         {
+            bool? useDotnet = _commonFolder.HasDotnetPublishedProjects( m );
+            if( useDotnet == null ) return;
+            if( useDotnet == false )
+            {
+                Delete( m );
+                return;
+            }
             if( !_commonFolder.EnsureDirectory( m ) ) return;
 
             // If Shared.props exists, we make sure ther is no xml namespace defined.

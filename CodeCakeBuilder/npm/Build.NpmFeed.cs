@@ -150,9 +150,21 @@ namespace CodeCake
         /// <param name="feedName">Identifier of the feed in Azure, inside the organization.</param>
         class VSTSNpmFeed : NpmRemoteFeed
         {
+            /// <summary>
+            /// Builds the standardized secret key name from the organization name: this is
+            /// the Personal Access Token that allows push packages.
+            /// </summary>
+            /// <param name="organization">Organization name.</param>
+            /// <returns>The secret key name to use.</returns>
+            public static string GetSecretKeyName( string organization )
+                                    => "AZURE_FEED_" + organization.ToUpperInvariant()
+                                                                   .Replace( '-', '_' )
+                                                                   .Replace( ' ', '_' )
+                                                     + "_PAT";
+
             public VSTSNpmFeed( ICakeContext cake, string organization, string feedName )
                 : base( cake,
-                        SignatureVSTSFeed.GetSecretKeyName( organization ),
+                        GetSecretKeyName( organization ),
                         $"https://pkgs.dev.azure.com/{organization}/_packaging/{feedName}/npm/registry/" )
             {
             }

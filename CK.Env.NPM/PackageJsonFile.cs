@@ -74,7 +74,7 @@ namespace CK.Env.NPM
         /// <summary>
         /// Gets the list of dependencies.
         /// </summary>
-        public IReadOnlyList<NPMDep> Dependencies { get; }
+        public IReadOnlyList<NPMDep> Dependencies => _deps;
 
         /// <summary>
         /// Sets a minimum version for a dependency that must exist, regardless of it current status.
