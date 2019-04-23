@@ -16,11 +16,11 @@ namespace CKli
             ISecretKeyStore secretKeyStore,
             XArtifactCenter artifact,
             FileSystem fs,
-            Initializer initializer )
+            Initializer initializer)
             : base( initializer )
         {
             _sharedHttpClient = sharedHttpClient;
-            _npmClient = new NPMClient( _sharedHttpClient.Shared, secretKeyStore );
+            _npmClient = new NPMClient( _sharedHttpClient.Shared, secretKeyStore, initializer.Monitor );
             fs.ServiceContainer.Add<INPMClient>( _npmClient );
             artifact.ArtifactCenter.Add( _npmClient );
             initializer.Services.Add( this );
