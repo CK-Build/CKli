@@ -1,11 +1,11 @@
 using CK.Core;
 using CK.Env;
-using CK.Text;
 using CSemVer;
+using Npm.Net;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace CK.NPMClient
@@ -18,11 +18,11 @@ namespace CK.NPMClient
         protected readonly NPMClient Client;
         string _secret;
 
-        internal NPMRemoteFeedBase( NPMClient c, INPMFeedInfo info )
+        internal NPMRemoteFeedBase( NPMClient c, INPMFeedInfo info, Registry registry )
         {
             Info = info;
+            Registry = registry;
             Client = c;
-
         }
 
         /// <summary>
@@ -38,6 +38,7 @@ namespace CK.NPMClient
         /// Gets the info of this feed.
         /// </summary>
         public INPMFeedInfo Info { get; }
+        public Registry Registry { get; }
 
         /// <summary>
         /// Must resolve the push API key.
@@ -64,7 +65,7 @@ namespace CK.NPMClient
                 if( !String.IsNullOrWhiteSpace( s ) )
                 {
                     _secret = Client.SecretKeyStore.GetSecretKey( m, s, throwOnEmpty, $"Needed for feed '{Info}'." );
-                    if( _secret != null ) OnSecretResolved( m, _secret ); 
+                    if( _secret != null ) OnSecretResolved( m, _secret );
                 }
             }
             return String.IsNullOrWhiteSpace( _secret ) ? null : _secret;
@@ -83,9 +84,7 @@ namespace CK.NPMClient
         /// <returns>True if found, false otherwise.</returns>
         public virtual Task<bool> ExistsAsync( IActivityMonitor m, string packageId, SVersion version )
         {
-            m.Error( "NOT IMPLEMENTED YET." );
-            System.Diagnostics.Debugger.Break();
-            return Task.FromResult( false );
+            return Registry.ExistAsync( m, packageId, version );
         }
 
 
@@ -96,11 +95,23 @@ namespace CK.NPMClient
         /// <param name="files">The set of packages to push.</param>
         /// <param name="timeoutSeconds">Timeout in seconds.</param>
         /// <returns>The awaitable.</returns>
-        public Task PushPackagesAsync( IActivityMonitor m, IEnumerable<LocalNPMPackageFile> files, int timeoutSeconds = 20 )
+        public async Task PushPackagesAsync( IActivityMonitor m, IEnumerable<LocalNPMPackageFile> files, int timeoutSeconds = 20 )
         {
-            m.Error( "NOT IMPLEMENTED YET." );
-            System.Diagnostics.Debugger.Break();
-            return Task.CompletedTask;
+            using( var a = m.OpenInfo( "Pushing packages..." ) )
+            {
+                foreach( LocalNPMPackageFile file in files )
+                {
+                    using( Stream fileStream = File.OpenRead( file.FullPath ) )
+                    {
+                        var tags = file.Version.PackageQuality.GetLabels().Select( p => p.ToString() ).ToList();
+                        await Registry.Publish( m, fileStream, tags.First() );
+                        foreach( string tag in tags.Skip( 1 ) )
+                        {
+                            await Registry.AddDistTag( m, file.PackageId, file.Version, tag );
+                        }
+                    }
+                }
+            }
         }
 
         public async Task<bool> PushAsync( IActivityMonitor m, IArtifactLocalSet artifacts )

@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Env;
 using CK.Text;
+using Npm.Net;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -15,11 +16,13 @@ namespace CK.NPMClient
     public class NPMClient : INPMClient
     {
         readonly Dictionary<string, INPMFeed> _feeds;
+        readonly IActivityMonitor _activityMonitor;
 
-        public NPMClient( HttpClient httpClient, ISecretKeyStore keyStore )
+        public NPMClient( HttpClient httpClient, ISecretKeyStore keyStore, IActivityMonitor activityMonitor )
         {
             HttpClient = httpClient;
             SecretKeyStore = keyStore;
+            _activityMonitor = activityMonitor;
             _feeds = new Dictionary<string, INPMFeed>();
         }
 
@@ -33,14 +36,15 @@ namespace CK.NPMClient
             return f;
         }
 
-        public INPMFeed FindOrCreate( INPMFeedInfo info )
+        public INPMFeed FindOrCreate(INPMFeedInfo info )
         {
             if( !_feeds.TryGetValue( info.UniqueArtifactRepositoryName, out var feed ) )
             {
+                string pat = SecretKeyStore.GetSecretKey( _activityMonitor, info.SecretKeyName, true );
                 switch( info )
                 {
-                    case NPMAzureFeedInfo a: feed = new NPMClientAzureFeed( this, a ); break;
-                    case NPMStandardFeedInfo s: feed = new NPMClientStandardFeed( this, s ); break;
+                    case NPMAzureFeedInfo a: feed = new NPMClientAzureFeed( this, a, pat ); break;
+                    case NPMStandardFeedInfo s: feed = new NPMClientStandardFeed( this, s, pat ); break;
                     default: throw new ArgumentException( $"Unhandled type: {info}", nameof( info ) );
                 }
                 _feeds.Add( info.UniqueArtifactRepositoryName, feed );

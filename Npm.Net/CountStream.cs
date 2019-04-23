@@ -43,22 +43,10 @@ namespace Npm.Net
             return amount;
         }
 
-        public override int Read( Span<byte> buffer )
-        {
-            int amount = _stream.Read( buffer );
-            Interlocked.Add( ref _position, amount );
-            return amount;
-        }
 
         public override async Task<int> ReadAsync( byte[] buffer, int offset, int count, CancellationToken cancellationToken )
         {
             int amount = await base.ReadAsync( buffer, offset, count, cancellationToken );
-            Interlocked.Add( ref _position, amount );
-            return amount;
-        }
-        public override async ValueTask<int> ReadAsync( Memory<byte> buffer, CancellationToken cancellationToken = default )
-        {
-            int amount = await base.ReadAsync( buffer, cancellationToken );
             Interlocked.Add( ref _position, amount );
             return amount;
         }
@@ -86,20 +74,10 @@ namespace Npm.Net
             _stream.Write( buffer, offset, count );
         }
 
-        public override void Write( ReadOnlySpan<byte> buffer )
-        {
-            Interlocked.Add( ref _position, buffer.Length );
-            _stream.Write( buffer );
-        }
         public override Task WriteAsync( byte[] buffer, int offset, int count, CancellationToken cancellationToken )
         {
             Interlocked.Add( ref _position, count );
             return _stream.WriteAsync( buffer, offset, count, cancellationToken );
-        }
-        public override ValueTask WriteAsync( ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default )
-        {
-            Interlocked.Add( ref _position, buffer.Length );
-            return base.WriteAsync( buffer, cancellationToken );
         }
 
         public override void WriteByte( byte value )

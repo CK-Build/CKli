@@ -1,10 +1,12 @@
 using CK.Core;
 using CSemVer;
+using dotnettar;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -61,7 +63,7 @@ namespace Npm.Net
         static string GenerateSessionId()
         {
             byte[] bytes = new byte[8];
-            RandomNumberGenerator.Fill( bytes );
+            RandomNumberGenerator.Create().GetBytes( bytes );
             return BitConverter.ToString( bytes ).Replace( "-", "" ).ToLower();
         }
 
@@ -87,7 +89,7 @@ namespace Npm.Net
         /// <param name="httpClient">The <see cref="HttpClient"/> used to send the requests</param>
         /// <param name="registryUri">Registry <see cref="Uri"/>, https://registry.npmjs.org/ is used if the uri is not specified </param>
         /// <param name="token">Bearer token used to authenticate </param>
-        public Registry( HttpClient httpClient, string token, Uri registryUri = null ) : this(httpClient, registryUri )
+        public Registry( HttpClient httpClient, string token, Uri registryUri = null ) : this( httpClient, registryUri )
         {
             _authHeader = new AuthenticationHeaderValue( "Bearer", token );
         }
@@ -105,7 +107,7 @@ namespace Npm.Net
             _authHeader = new AuthenticationHeaderValue( "Basic", basic );
         }
 
-        
+
         /// <summary>
         /// Uri of the registry
         /// </summary>
@@ -151,6 +153,28 @@ namespace Npm.Net
             }
         }
 
+
+        async Task<JObject> GetPackageJsonFromTarball( IActivityMonitor m, Stream tarball )
+        {
+            using( GZipStream dezippedStream = new GZipStream( tarball, CompressionMode.Decompress ) )
+            using( TarBallReader tarBallReader = new TarBallReader( dezippedStream ) )
+            {
+                TarFileReader entry = null;
+                do
+                {
+                    using( entry = await tarBallReader.GetEntryAsync() )
+                    using( StreamReader reader = new StreamReader( entry ) )
+                    {
+                        if( entry.Header.Name == "package/package.json" )
+                        {
+                            m.Info( "Found package.json in tarball" );
+                            return JObject.Parse( await reader.ReadToEndAsync() );
+                        }
+                    }
+                } while( entry != null );
+                throw new InvalidDataException( "There no package.json in the tarball" );
+            }
+        }
         /// <summary>
         /// Publish a package to the repository
         /// </summary>
@@ -159,8 +183,10 @@ namespace Npm.Net
         /// <param name="tarball">This stream must be Seek-able. <see cref="Stream"/> of the tarball of the package to push.</param>
         /// <param name="distTag"></param>
         /// <returns></returns>
-        public async Task Publish( IActivityMonitor m, JObject packageJson, Stream tarball, string distTag )
+        public async Task Publish( IActivityMonitor m, Stream tarball, string distTag = null )
         {
+            if( !tarball.CanSeek ) throw new ArgumentException( "I need to do two pass on this stream" );
+            JObject packageJson = await GetPackageJsonFromTarball( m, tarball );
             using( HttpRequestMessage req = NpmRequestMessage( m, packageJson["name"].ToString(), HttpMethod.Put ) )
             using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream( m, RegistryUri, packageJson, tarball, distTag ) )
             {
@@ -244,7 +270,7 @@ namespace Npm.Net
             }
         }
 
-        public async Task<bool> Exist( IActivityMonitor m, string packageName, SVersion version )
+        public async Task<bool> ExistAsync( IActivityMonitor m, string packageName, SVersion version )
         {
             if( IsAzureRepository() )
             {
@@ -403,7 +429,7 @@ namespace Npm.Net
             if( headers.Contains( "npm-notice" ) && !headers.Contains( "x-local-cache" ) )
             {
                 List<string> notices = headers.GetValues( "npm-notice" ).ToList();
-                m.Log( LogLevel.Info, string.Join( ',', notices ) );
+                m.Log( LogLevel.Info, string.Join( ",", notices ) );
             }
             bool fail = false;
             if( LogWarnings( m, headers ) && failOnWarning ) fail = true;
@@ -447,7 +473,7 @@ namespace Npm.Net
                     }
                     else
                     {
-                        m.Error( "Unable to authenticate, need: " + string.Join( ',', auth ) );
+                        m.Error( "Unable to authenticate, need: " + string.Join( ",", auth ) );
                     }
                 }
                 else
