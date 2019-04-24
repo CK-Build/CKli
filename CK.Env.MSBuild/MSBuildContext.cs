@@ -272,7 +272,13 @@ namespace CK.Env.MSBuild
             {
                 try
                 {
-                    XDocument content = FileSystem.GetFileInfo( path ).ReadAsXDocument();
+                    var fP = FileSystem.GetFileInfo( path );
+                    if( !fP.Exists )
+                    {
+                        m.Warn( $"Unable to find project file '{path}'. This project is ignored." );
+                        return null;
+                    }
+                    XDocument content = fP.ReadAsXDocument();
                     var imports = new List<Import>();
                     f = new ProjectFile( path, content, imports );
                     _files[path] = f;

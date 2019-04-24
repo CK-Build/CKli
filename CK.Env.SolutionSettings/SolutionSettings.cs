@@ -12,6 +12,7 @@ namespace CK.Env
         {
             NoUnitTests = (bool?)e.Attribute( nameof( NoUnitTests ) ) ?? false;
             NoStrongNameSigning = (bool?)e.Attribute( nameof( NoStrongNameSigning ) ) ?? false;
+            NoSharedPropsFile = (bool?)e.Attribute( nameof( NoSharedPropsFile ) ) ?? false;
             UseCKSetup = (bool?)e.Attribute( nameof(UseCKSetup) ) ?? false;
             DisableSourceLink = (bool?)e.Attribute( nameof(DisableSourceLink) ) ?? false;
             SqlServer = (string)e.Attribute( nameof( SqlServer ) );
@@ -40,6 +41,7 @@ namespace CK.Env
         {
             NoUnitTests = other.NoUnitTests;
             NoStrongNameSigning = other.NoStrongNameSigning;
+            NoSharedPropsFile = other.NoSharedPropsFile;
             UseCKSetup = other.UseCKSetup;
             DisableSourceLink = other.DisableSourceLink;
             SqlServer = other.SqlServer;
@@ -72,6 +74,9 @@ namespace CK.Env
                 var noStrongNameSigning = (bool?)applyConfig.Attribute( nameof( NoStrongNameSigning ) );
                 if( noStrongNameSigning.HasValue ) NoStrongNameSigning = noStrongNameSigning.Value;
 
+                var noNoSharedPropsFile = (bool?)applyConfig.Attribute( nameof( NoSharedPropsFile ) );
+                if( noNoSharedPropsFile.HasValue ) NoSharedPropsFile = noNoSharedPropsFile.Value;
+
                 var sqlServer = (string)applyConfig.Attribute( nameof( SqlServer ) );
                 if( sqlServer != null ) SqlServer = sqlServer;
 
@@ -101,6 +106,8 @@ namespace CK.Env
         public bool NoUnitTests { get; }
 
         public bool NoStrongNameSigning { get; }
+
+        public bool NoSharedPropsFile { get; }
 
         public bool UseCKSetup { get; }
 

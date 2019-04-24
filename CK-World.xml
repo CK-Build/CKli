@@ -67,6 +67,7 @@
       <add Type="CK.Env.Plugins.SolutionFiles.NugetConfigFile, CK.Env.Plugins" />
       <add Type="CK.Env.Plugins.SolutionFiles.GitIgnoreFile, CK.Env.Plugins" />
       <add Type="CK.Env.Plugins.SolutionFiles.NPMRCFiles, CK.Env.Plugins" />
+      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderNPMSolutionFile, CK.Env.Plugins" />
       <add Type="CK.BuildSystem.Appveyor.AppveyorFile, CK.BuildSystem.Appveyor" />
     </Plugins>
   </SolutionSettings>
@@ -97,6 +98,7 @@
   <Folder Name="CK-Core-Projects">
 
     <GitFolder Name ="json-graph-serializer" Url="https://github.com/Invenietis/json-graph-serializer.git" IsPublic="True" >
+      <SolutionSettings NoSharedPropsFile="True" />
       <Branch Name="develop">
         <PrimarySolution />
         <NPMProject PackageName="@signature/json-graph-serializer" />
@@ -224,6 +226,13 @@
       </Branch>
     </GitFolder>
 
+    <GitFolder Name="CK-DB-TokenStore" Url="https://github.com/Invenietis/CK-DB-TokenStore.git" IsPublic="True" >
+      <SolutionSettings SqlServer="2016" UseCKSetup="true"/>
+      <Branch Name="develop">
+        <PrimarySolution TestProjectsArePublished="True" />
+      </Branch>
+    </GitFolder>
+    
     <GitFolder Name="CK-DB-User-SimpleInvitation" Url="https://github.com/Invenietis/CK-DB-User-SimpleInvitation.git" IsPublic="True" >
       <SolutionSettings SqlServer="2016" UseCKSetup="true"/>
       <Branch Name="develop">

@@ -18,27 +18,25 @@ namespace CodeCake
         {
             Cake.Log.Verbosity = Verbosity.Diagnostic;
             string solutionFilePath = Cake.GetFiles( "*.sln" ).Single().FullPath;
-            var releasesDir = Cake.Directory( "CodeCakeBuilder/Releases" );
             var projects = Cake.ParseSolution( solutionFilePath )
                                        .Projects
-                                       .Where( p => !(p is SolutionFolder)
-                                                    && p.Name != "CodeCakeBuilder" );
+                                       .Where( p => !(p is SolutionFolder) && p.Name != "CodeCakeBuilder" );
 
             // We do not generate NuGet packages for /Tests projects for this solution.
             var projectsToPublish = projects
                                         .Where( p => !p.Path.Segments.Contains( "Tests" ) );
-            var packageDir = Cake.Directory( "js" );
-            var packageJsonPath = packageDir.Path.CombineWithFilePath( "package.json" ).FullPath;
-            var packageLockJsonPath = packageDir.Path.CombineWithFilePath( "package-lock.json" ).FullPath;
+
             SimpleRepositoryInfo gitInfo = Cake.GetSimpleRepositoryInfo();
-            CheckRepositoryInfo globalInfo = new CheckRepositoryInfo( Cake, gitInfo );
-            NuGetRepositoryInfo nugetInfo = null;
+            StandardGlobalInfo globalInfo = null;
+
             // Configuration is either "Debug" or "Release".
             Task( "Check-Repository" )
                 .Does( () =>
                 {
-                    globalInfo = StandardCheckRepositoryWithoutNuget( gitInfo );
-                    globalInfo.AddAndInitRepository( nugetInfo = new NuGetRepositoryInfo( Cake, globalInfo, projectsToPublish ) );
+                    globalInfo = CreateStandardGlobalInfo( gitInfo );
+                    new NuGetArtifactType( globalInfo, projectsToPublish );
+                    new NPMArtifactType( globalInfo );
+                    globalInfo.SetCIBuildTag();
                     if( globalInfo.ShouldStop )
                     {
                         Cake.TerminateWithSuccess( "All packages from this commit are already available. Build skipped." );
@@ -49,7 +47,7 @@ namespace CodeCake
                 .Does( () =>
                 {
                     Cake.CleanDirectories( projects.Select( p => p.Path.GetDirectory().Combine( "bin" ) ) );
-                    Cake.CleanDirectories( releasesDir );
+                    Cake.CleanDirectories( globalInfo.ReleasesFolder );
                     Cake.DeleteFiles( "Tests/**/TestResult*.xml" );
                 } );
 
@@ -58,7 +56,7 @@ namespace CodeCake
                 .IsDependentOn( "Clean" )
                 .Does( () =>
                 {
-                    StandardSolutionBuild( solutionFilePath, nugetInfo );
+                    StandardSolutionBuild( solutionFilePath, globalInfo );
                 } );
 
             Task( "Unit-Testing" )
@@ -68,7 +66,7 @@ namespace CodeCake
                 .Does( () =>
                 {
                     var testProjects = projects.Where( p => p.Name.EndsWith( ".Tests" ) );
-                    StandardUnitTests( nugetInfo, testProjects );
+                    StandardUnitTests( globalInfo, testProjects );
                 } );
 
 
@@ -77,19 +75,20 @@ namespace CodeCake
                 .IsDependentOn( "Unit-Testing" )
                 .Does( () =>
                 {
-                    StandardCreateNuGetPackages( nugetInfo, releasesDir );
+                    StandardCreateNuGetPackages( globalInfo );
                 } );
 
-            Task( "Push-NuGet-Packages" )
+            Task( "Push-Artifacts" )
                 .IsDependentOn( "Create-NuGet-Packages" )
                 .WithCriteria( () => gitInfo.IsValid )
                 .Does( () =>
                 {
-                    globalInfo.PushArtifacts( releasesDir );
+                    globalInfo.PushArtifacts();
                 } );
+
             // The Default task for this script can be set here.
             Task( "Default" )
-                .IsDependentOn( "Push-NuGet-Packages" );
+                .IsDependentOn( "Push-Artifacts" );
         }
 
     }

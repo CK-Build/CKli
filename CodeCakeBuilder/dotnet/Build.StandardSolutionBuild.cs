@@ -14,28 +14,18 @@ namespace CodeCake
         /// optionally other projects.
         /// </summary>
         /// <param name="solutionFileName">The solution file name to build (relative to the repository root).</param>
-        /// <param name="gitInfo">The current git info.</param>
-        /// <param name="buildConfiguration">The build configuration.</param>
+        /// <param name="globalInfo">The current StandardGlobalInfo.</param>
         /// <param name="excludedProjectName">Optional project names (without path nor .csproj extension).</param>
-        [Obsolete( "Use StandardSolutionBuild(string solutionFileName, NugetRepositoryInfo nugetInfo, params string[] excludedProjectName )")]
-        void StandardSolutionBuild( string solutionFileName, SimpleRepositoryInfo gitInfo, NuGetRepositoryInfo nugetInfo, params string[] excludedProjectName )
-        {
-            StandardSolutionBuild(solutionFileName, nugetInfo, excludedProjectName);
-        }
-
-        void StandardSolutionBuild(string solutionFileName, NuGetRepositoryInfo nugetInfo, params string[] excludedProjectName )
+        void StandardSolutionBuild( string solutionFileName, StandardGlobalInfo globalInfo, params string[] excludedProjectName )
         {
             using( var tempSln = Cake.CreateTemporarySolutionFile( solutionFileName ) )
             {
-                var exclude = new List<string>( excludedProjectName )
-                {
-                    "CodeCakeBuilder"
-                };
+                var exclude = new List<string>( excludedProjectName ) { "CodeCakeBuilder" };
                 tempSln.ExcludeProjectsFromBuild( exclude.ToArray() );
                 Cake.DotNetCoreBuild( tempSln.FullPath.FullPath,
-                    new DotNetCoreBuildSettings().AddVersionArguments( nugetInfo.CheckRepositoryInfo.GitInfo, s =>
+                    new DotNetCoreBuildSettings().AddVersionArguments( globalInfo.GitInfo, s =>
                     {
-                        s.Configuration = nugetInfo.BuildConfiguration;
+                        s.Configuration = globalInfo.BuildConfiguration;
                     } ) );
             }
         }

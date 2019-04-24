@@ -537,7 +537,7 @@ namespace CK.Env.Plugins
                     args += " -autointeraction";
                     args += " -PublishDirtyRepo=" + (ev.IsUsingDirtyFolder ? 'Y' : 'N');
                     args += " -PushToRemote=" + (ev.WithPushToRemote ? 'Y' : 'N');
-                    if( !ev.BuildIsRequired ) args += " -target=\"Unit-Testing\" -exclusiveOptional -IgnoreNoPackagesToProduce=Y";
+                    if( !ev.BuildIsRequired ) args += " -target=\"Unit-Testing\" -exclusiveOptional -IgnoreNoArtifactsToProduce=Y";
                     if( !ev.WithUnitTest ) args += " -RunUnitTests=N";
                     if( !ProcessRunner.Run( m, ev.SolutionPhysicalPath, "dotnet", args, ev.EnvironmentVariables ) )
                     {

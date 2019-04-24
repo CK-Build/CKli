@@ -59,6 +59,7 @@ namespace Cake.Npm
             
         }
     }
+
     [CakeAliasCategory( "Npm" )]
     [CakeNamespaceImport( "Cake.Npm" )]
     public static class NpmViewAliases

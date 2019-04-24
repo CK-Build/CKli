@@ -7,7 +7,7 @@ using System.Linq;
 
 namespace CK.Env.Plugins.SolutionFiles
 {
-    public class CodeCakeBuilderCSProjFile : XmlFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
+    public class CodeCakeBuilderCSProjFile : XmlFilePluginBase, ICommandMethodsProvider
     {
         readonly CodeCakeBuilderFolder _f;
         readonly ISolutionSettings _settings;

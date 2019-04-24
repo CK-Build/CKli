@@ -7,13 +7,21 @@ namespace CK.Env
     {
         /// <summary>
         /// Gets whether the solution has no unit tests.
+        /// Defaults to false.
         /// </summary>
         bool NoUnitTests { get; }
 
         /// <summary>
         /// Gets whether no strong name singing should be used.
+        /// Defaults to false.
         /// </summary>
         bool NoStrongNameSigning { get; }
+
+        /// <summary>
+        /// Gets whether no shared props file should be used.
+        /// Defaults to false.
+        /// </summary>
+        bool NoSharedPropsFile { get; }
 
         /// <summary>
         /// Gets whether the solution uses CKSetup components.
@@ -23,7 +31,7 @@ namespace CK.Env
         /// </summary>
         bool UseCKSetup { get; }
 
-       /// <summary>
+        /// <summary>
         /// Gets whether source link is disabled.
         /// Impacts Common/Shared.props file.
         /// </summary>

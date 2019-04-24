@@ -24,9 +24,7 @@ namespace CK.Env.Plugins.SolutionFiles
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
         {
-            bool? useDotnet = _commonFolder.HasDotnetPublishedProjects( m );
-            if( useDotnet == null ) return;
-            if( useDotnet == false )
+            if( _settings.NoSharedPropsFile )
             {
                 Delete( m );
                 return;

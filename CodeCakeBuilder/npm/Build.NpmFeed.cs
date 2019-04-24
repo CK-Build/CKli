@@ -12,71 +12,73 @@ using Cake.Core;
 using CodeCake.Abstractions;
 using SimpleGitVersion;
 using Cake.Common.Diagnostics;
+using CK.Text;
 
 namespace CodeCake
 {
     public partial class Build
     {
-        abstract class NpmFeed : ArtifactFeed
+        abstract class NPMFeed : ArtifactFeed
         {
-            public NpmFeed( ICakeContext cake )
-                : base( cake )
+            public NPMFeed( NPMArtifactType t )
+                : base( t )
             {
             }
 
             /// <summary>
-            /// Call <see cref="PublishOnePackage(ArtifactInstance)"/> on all the <see cref="ArtifactsToPublish"/>.
+            /// Pushes a set of artifacts.
             /// </summary>
-            /// <param name="releaseDirectory">Directory where the packed npm module can be found</param>
-            /// <returns>The awaitable</returns>
-            public override Task PushArtifactsAsync( string releaseDirectory )
+            /// <param name="pushes">The instances to push (that necessary target this feed).</param>
+            /// <returns>The awaitable.</returns>
+            public override async Task PushAsync( IEnumerable<ArtifactPush> pushes )
             {
-                foreach( KeyValuePair<string, ArtifactInstance> package in ArtifactsToPublish )
-                {
-                    PublishOnePackage( package.Value, releaseDirectory );
-                }
-                return System.Threading.Tasks.Task.CompletedTask;
+                var tasks = pushes.Select( p => PublishOnePackageAsync( p ) ).ToArray();
+                await System.Threading.Tasks.Task.WhenAll( tasks );
             }
 
-            protected abstract void PublishOnePackage( ArtifactInstance package, string tarDirectory );
+            protected abstract Task PublishOnePackageAsync( ArtifactPush push );
 
         }
 
-        class NpmLocalFeed : NpmFeed
+        class NPMLocalFeed : NPMFeed
         {
-            readonly string _pathToLocalFeed;
+            readonly NormalizedPath _pathToLocalFeed;
 
             public override string Name => "NpmLocalFeed";
 
-            public NpmLocalFeed( ICakeContext cake, string pathToLocalFeed ) : base( cake )
+            public NPMLocalFeed( NPMArtifactType t, NormalizedPath pathToLocalFeed )
+                : base( t )
             {
                 _pathToLocalFeed = pathToLocalFeed;
             }
 
-            protected override void PublishOnePackage( ArtifactInstance artifact, string releaseDirectory )
+            public override Task<IEnumerable<ArtifactPush>> CreatePushListAsync( IEnumerable<ILocalArtifact> artifacts )
             {
-                string packPath = Path.Combine( releaseDirectory, GetTgzNameOfPackage( artifact ) );
-                Cake.MoveFile( packPath, Path.Combine( _pathToLocalFeed, Path.GetFileName( packPath ) ) );
+                var result = artifacts.Cast<NPMPublishedProject>()
+                                .Select( a => (A: a, P: _pathToLocalFeed.AppendPart( a.TGZName ) ) )
+                                .Where( aP => !File.Exists( aP.P ) )
+                                .Select( aP => new ArtifactPush( aP.A, this ) )
+                                .ToList();
+                return System.Threading.Tasks.Task.FromResult<IEnumerable<ArtifactPush>>( result );
             }
 
-            /// <summary>
-            /// Gets the number of packages that exist in the feed.
-            /// This is computed by <see cref="InitializePackagesToPublish"/>.
-            /// </summary>
-            public override Task InitializeArtifactsToPublishAsync( IReadOnlyDictionary<string, ArtifactInstance> allPackagesToPublish )
+            protected override Task PublishOnePackageAsync( ArtifactPush p )
             {
-                ArtifactsToPublish = (IReadOnlyDictionary<string, ArtifactInstance>)allPackagesToPublish;// allPackagesToPublish.Where( p => !File.Exists( System.IO.Path.Combine( _pathToLocalFeed, GetTgzNameOfPackage( p ) ) ) ).ToList();
-                ArtifactsAlreadyPublishedCount = allPackagesToPublish.Count() - ArtifactsToPublish.Count();
+                if( p.Feed != this ) throw new ArgumentException( "ArtifactPush: feed mismatch." );
+                var project = (NPMPublishedProject)p.LocalArtifact;
+                var target = _pathToLocalFeed.AppendPart( project.TGZName );
+                var source = ArtifactType.GlobalInfo.ReleasesFolder.AppendPart( project.TGZName );
+                Cake.MoveFile( source.Path, target.Path );
                 return System.Threading.Tasks.Task.CompletedTask;
             }
         }
 
-        abstract class NpmRemoteFeed : NpmFeed
+        abstract class NPMRemoteFeed : NPMFeed
         {
             protected readonly string FeedUri;
 
-            public NpmRemoteFeed( ICakeContext cake, string secretKeyName, string feedUri )
-                : base( cake )
+            public NPMRemoteFeed( NPMArtifactType t, string secretKeyName, string feedUri )
+                : base( t )
             {
                 SecretKeyName = secretKeyName;
                 FeedUri = feedUri;
@@ -88,57 +90,53 @@ namespace CodeCake
 
             public string ResolveAPIKey() => Cake.InteractiveEnvironmentVariable( SecretKeyName );
 
-            protected abstract NpmrcTokenInjector TokenInjector( string projectPath );
+            protected abstract IDisposable TokenInjector( NPMPublishedProject project );
 
-            public override Task InitializeArtifactsToPublishAsync( IReadOnlyDictionary<string, ArtifactInstance> allArtifactsToPublish )
+            public override Task<IEnumerable<ArtifactPush>> CreatePushListAsync( IEnumerable<ILocalArtifact> artifacts )
             {
-                ArtifactsToPublish = allArtifactsToPublish.Where( p =>
-                {
-                    using( NpmrcTokenInjector tokenInjector = TokenInjector( p.Key ) )
-                    {
-                        string viewString = Cake.NpmView( p.Value.Artifact.Name, p.Key );
-                        if( string.IsNullOrEmpty( viewString ) ) return true;
-                        JObject json = JObject.Parse( viewString );
-                        if( json.TryGetValue( "versions", out JToken versions ) )
-                        {
-                            return !((JArray)versions).ToObject<string[]>().Contains( p.Value.Version.ToString() );
-                        }
-                        return true;
-                    }
-                } ).ToDictionary( kvp => kvp.Key, kvp => kvp.Value );
-                ArtifactsAlreadyPublishedCount = allArtifactsToPublish.Count() - ArtifactsToPublish.Count();
-                return System.Threading.Tasks.Task.CompletedTask;
+                var result = artifacts.Cast<NPMPublishedProject>()
+                         .Where( a =>
+                            {
+                                using( TokenInjector( a ) )
+                                {
+                                    string viewString = Cake.NpmView( a.Name, a.DirectoryPath );
+                                    if( string.IsNullOrEmpty( viewString ) ) return true;
+                                    JObject json = JObject.Parse( viewString );
+                                    if( json.TryGetValue( "versions", out JToken versions ) )
+                                    {
+                                        return !((JArray)versions).ToObject<string[]>().Contains( a.ArtifactInstance.Version.ToString() );
+                                    }
+                                    return true;
+                                }
+                            } )
+                         .Select( a => new ArtifactPush( a, this ) )
+                         .ToList();
+                return System.Threading.Tasks.Task.FromResult<IEnumerable<ArtifactPush>>( result );
             }
 
-            protected override void PublishOnePackage( ArtifactInstance artifact, string releasesDir )
+            protected override Task PublishOnePackageAsync( ArtifactPush p )
             {
-                List<string> tags = new List<string>();
-                var qualities = artifact.Version.PackageQuality.GetLabels();
-                tags.AddRange( qualities.Select( q => q.ToString() ) );
-                string artifactPath = ArtifactsToPublish.Single( p => p.Value.Artifact.Name == artifact.Artifact.Name ).Key;
-                using( NpmrcTokenInjector tokenInjector = NpmrcTokenInjector.VstsPatLogin( FeedUri, ResolveAPIKey(), Path.Combine( artifactPath, ".npmrc" ) ) )
+                var tags = p.Version.PackageQuality.GetLabels().Select( l => l.ToString() ).ToList();
+                var project = (NPMPublishedProject)p.LocalArtifact;
+                using( TokenInjector( project ) )
                 {
-                    string path = Path.GetFullPath( Path.Combine(
-                        releasesDir,
-                        GetTgzNameOfPackage( artifact ) )
-                    );
-
                     Cake.NpmPublish(
                         new NpmPublishSettings()
                         {
-                            Source = path,
-                            WorkingDirectory = artifactPath,
+                            Source = ArtifactType.GlobalInfo.ReleasesFolder.AppendPart( project.TGZName ),
+                            WorkingDirectory = project.DirectoryPath.Path,
                             Tag = tags.First()
                         }
                     );
                     foreach( string tag in tags.Skip( 1 ) )
                     {
-                        Cake.Information( $"Adding tag \"{tag}\" to \"{artifact.Artifact.Name}@{artifact.Version}\"..." );
+                        Cake.Information( $"Adding tag \"{tag}\" to \"{project.Name}@{project.ArtifactInstance.Version}\"..." );
                         // The FromPath is actually required - if executed outside the relevant directory,
                         // it will miss the .npmrc with registry configs.
-                        Cake.NpmDistTagAdd( artifact.Artifact.Name, artifact.Version.ToString(), tag, s => s.FromPath( artifactPath ) );
+                        Cake.NpmDistTagAdd( project.Name, project.ArtifactInstance.Version.ToString(), tag, s => s.FromPath( project.DirectoryPath.Path ) );
                     }
                 }
+                return System.Threading.Tasks.Task.CompletedTask;
             }
         }
 
@@ -148,7 +146,7 @@ namespace CodeCake
         /// </summary>
         /// <param name="organization">Name of the organization.</param>
         /// <param name="feedName">Identifier of the feed in Azure, inside the organization.</param>
-        class VSTSNpmFeed : NpmRemoteFeed
+        class AzureNPMFeed : NPMRemoteFeed
         {
             /// <summary>
             /// Builds the standardized secret key name from the organization name: this is
@@ -162,16 +160,16 @@ namespace CodeCake
                                                                    .Replace( ' ', '_' )
                                                      + "_PAT";
 
-            public VSTSNpmFeed( ICakeContext cake, string organization, string feedName )
-                : base( cake,
+            public AzureNPMFeed( NPMArtifactType t, string organization, string feedName )
+                : base( t,
                         GetSecretKeyName( organization ),
                         $"https://pkgs.dev.azure.com/{organization}/_packaging/{feedName}/npm/registry/" )
             {
             }
 
-            protected override NpmrcTokenInjector TokenInjector( string projectPath )
+            protected override IDisposable TokenInjector( NPMPublishedProject project )
             {
-                return NpmrcTokenInjector.VstsPatLogin( FeedUri, ResolveAPIKey(), Path.Combine( projectPath, ".npmrc" ) );
+                return project.TemporarySetPushTargetAndAzurePatLogin( FeedUri, ResolveAPIKey() );
             }
         }
     }
