@@ -7,5 +7,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CK.NPMClient.Abstraction\CK.NPMClient.Abstraction.csproj" />
+    <ProjectReference Include="..\Npm.Net\Npm.Net.csproj" />
   </ItemGroup>
 </Project>
