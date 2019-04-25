@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,29 +9,29 @@ namespace CK.Env
     /// <summary>
     /// Captures the 
     /// </summary>
-    public class PackageReleaseDiff
+    public class DirectoryDiff
     {
         /// <summary>
-        /// Initializes an new <see cref="PackageReleaseDiff"/> with a no change set but a status.
+        /// Initializes an new <see cref="DirectoryDiff"/> with a no change set but a status.
         /// </summary>
         /// <param name="p">The package name.</param>
         /// <param name="c">The change.</param>
-        public PackageReleaseDiff( string p, PackageReleaseDiffType c )
+        public DirectoryDiff( NormalizedPath p, DirectoryDiffType c )
         {
-            Package = p;
+            Path = p;
             DiffType = c;
             Changes = Array.Empty<FileReleaseDiff>();
         }
 
         /// <summary>
-        /// Initializes an new <see cref="PackageReleaseDiff"/> with a change set.
+        /// Initializes an new <see cref="DirectoryDiff"/> with a change set.
         /// </summary>
         /// <param name="p">The package name.</param>
         /// <param name="changes">The changes.</param>
-        public PackageReleaseDiff( string p, IReadOnlyCollection<FileReleaseDiff> changes )
+        public DirectoryDiff( NormalizedPath p, IReadOnlyCollection<FileReleaseDiff> changes )
         {
-            Package = p;
-            DiffType = changes.Count == 0 ? PackageReleaseDiffType.None : PackageReleaseDiffType.Changed;
+            Path = p;
+            DiffType = changes.Count == 0 ? DirectoryDiffType.None : DirectoryDiffType.Changed;
             Changes = changes;
         }
 
@@ -38,8 +39,8 @@ namespace CK.Env
 
         public void DumpDiff()
         {
-            Console.WriteLine( $"=    => {Package}: {DiffType}" );
-            if( DiffType == PackageReleaseDiffType.Changed )
+            Console.WriteLine( $"=    => {Path}: {DiffType}" );
+            if( DiffType == DirectoryDiffType.Changed )
             {
                 foreach( var fC in Changes.GroupBy( fC => fC.DiffType ) )
                 {
@@ -55,13 +56,13 @@ namespace CK.Env
         /// <summary>
         /// Gets the package.
         /// </summary>
-        public string Package { get; }
+        public NormalizedPath Path { get; }
 
         /// <summary>
         /// Gets the global change type that occured in
         /// the <see cref="GeneratedArtifact.PrimarySolutionRelativeFolderPath"/>.
         /// </summary>
-        public PackageReleaseDiffType DiffType { get; }
+        public DirectoryDiffType DiffType { get; }
 
         /// <summary>
         /// Gets the file change set.

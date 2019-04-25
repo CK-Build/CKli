@@ -1,9 +1,9 @@
-using System;
-using System.Linq;
 using CK.Core;
 using CK.Env;
 using CK.Text;
 using CSemVer;
+using System;
+using System.Linq;
 
 namespace CKli
 {
@@ -21,13 +21,13 @@ namespace CKli
             if( c.PreviousVersionCommitSha != null )
             {
                 Console.Write( $" last release: {c.PreviousVersion}" );
-                var diffs = c.Solution.GitRepository.GetReleaseDiff( m, c.PreviousVersionCommitSha, c.Solution.GeneratedPackages );
+                var diffs = c.Solution.GitRepository.GetPathsDiff( m, c.PreviousVersionCommitSha, c.Solution.GeneratedPackages.Select( p => new NormalizedPath( p.PrimarySolutionRelativeFolderPath ) ).ToList() );
                 if( diffs == null )
                 {
                     c.Cancel();
                     return;
                 }
-                if( diffs.All( d => d.DiffType == PackageReleaseDiffType.None ) )
+                if( diffs.All( d => d.DiffType == DirectoryDiffType.None ) )
                 {
                     Console.WriteLine( $" (No change in {c.Solution.GeneratedPackages.Select( p => p.Name ).Concatenate()})" );
                 }

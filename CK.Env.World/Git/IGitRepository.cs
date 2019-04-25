@@ -69,13 +69,13 @@ namespace CK.Env
         bool CanAmendCommit { get; }
 
         /// <summary>
-        /// Gets the set of <see cref="PackageReleaseDiff"/> for packages from the current head.
+        /// Gets the set of <see cref="DirectoryDiff"/> for packages from the current head.
         /// </summary>
         /// <param name="m">The minitor to use.</param>
         /// <param name="previousVersionCommitSha">Previous commit.</param>
         /// <param name="packages">Generated packages of a solution.</param>
         /// <returns>The set of diff or null on error.</returns>
-        IReadOnlyCollection<PackageReleaseDiff> GetReleaseDiff( IActivityMonitor m, string previousVersionCommitSha, IReadOnlyCollection<GeneratedArtifact> packages );
+        IReadOnlyCollection<DirectoryDiff> GetPathsDiff( IActivityMonitor m, string previousVersionCommitSha, IReadOnlyCollection<NormalizedPath> packages );
 
         /// <summary>
         /// Commits any pending changes.

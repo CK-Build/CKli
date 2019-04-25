@@ -194,23 +194,23 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the set of <see cref="PackageReleaseDiff"/> for packages from the current head.
+        /// Gets the set of <see cref="DirectoryDiff"/> for packages from the current head.
         /// </summary>
         /// <param name="m">The minitor to use.</param>
         /// <param name="previousVersionCommitSha">Previous commit.</param>
-        /// <param name="packages">Generated packages of a solution.</param>
+        /// <param name="paths">Generated packages of a solution.</param>
         /// <returns>The set of diff or null on error.</returns>
-        public IReadOnlyCollection<PackageReleaseDiff> GetReleaseDiff( IActivityMonitor m, string previousVersionCommitSha, IReadOnlyCollection<GeneratedArtifact> packages )
+        public IReadOnlyCollection<DirectoryDiff> GetPathsDiff( IActivityMonitor m, string previousVersionCommitSha, IReadOnlyCollection<NormalizedPath> paths )
         {
             Commit commit = _git.Lookup<Commit>( previousVersionCommitSha );
-            return GetReleaseDiff( m, packages, _git.Head.Tip, commit );
+            return GetReleaseDiff( m, paths, _git.Head.Tip, commit );
         }
 
-        IReadOnlyCollection<PackageReleaseDiff> GetReleaseDiff( IActivityMonitor m, IReadOnlyCollection<GeneratedArtifact> packages, Commit topCommit, Commit commit )
+        IReadOnlyCollection<DirectoryDiff> GetReleaseDiff( IActivityMonitor m, IReadOnlyCollection<NormalizedPath> paths, Commit topCommit, Commit commit )
         {
-            if( packages.Count == 0 ) return Array.Empty<PackageReleaseDiff>();
-            var r = new List<PackageReleaseDiff>();
-            foreach( var p in packages )
+            if( paths.Count == 0 ) return Array.Empty<DirectoryDiff>();
+            var r = new List<DirectoryDiff>();
+            foreach( var p in paths )
             {
                 var d = CreateDiff( m, topCommit, commit, p );
                 if( d == null ) return null;
@@ -219,30 +219,30 @@ namespace CK.Env
             return r;
         }
 
-        PackageReleaseDiff CreateDiff( IActivityMonitor m, Commit topCommit, Commit commit, GeneratedArtifact p )
+        DirectoryDiff CreateDiff( IActivityMonitor m, Commit topCommit, Commit commit, NormalizedPath path )
         {
-            TreeEntry newTreeEntry = topCommit.Tree[p.PrimarySolutionRelativeFolderPath.Replace( '\\', '/' )];
+            TreeEntry newTreeEntry = topCommit.Tree[path];
             if( newTreeEntry == null || newTreeEntry.TargetType != TreeEntryTargetType.Tree )
             {
-                m.Error( $"Unable to find '{p.PrimarySolutionRelativeFolderPath}'." );
+                m.Error( $"Unable to find '{path}'." );
                 return null;
             }
-            TreeEntry oldTreeEntry = commit.Tree[p.PrimarySolutionRelativeFolderPath.Replace( '\\', '/' )];
+            TreeEntry oldTreeEntry = commit.Tree[path];
             if( oldTreeEntry == null || oldTreeEntry.TargetType != TreeEntryTargetType.Tree )
             {
-                m.Info( $"Previously {p.Name} did not exist." );
-                return new PackageReleaseDiff( p.Name, PackageReleaseDiffType.NewPackage );
+                m.Info( $"Previously {path} did not exist." );
+                return new DirectoryDiff( path, DirectoryDiffType.NewPackage );
             }
             Tree oldTree = (Tree)oldTreeEntry.Target;
             Tree newTree = (Tree)newTreeEntry.Target;
             if( oldTree.Sha == newTree.Sha )
             {
-                return new PackageReleaseDiff( p.Name, PackageReleaseDiffType.None );
+                return new DirectoryDiff( path, DirectoryDiffType.None );
             }
             using( TreeChanges changes = _git.Diff.Compare<TreeChanges>( oldTree, newTree ) )
             {
                 var allChanges = changes.Select( gC => new FileReleaseDiff( gC.Path, (FileReleaseDiffType)gC.Status ) ).ToList();
-                return new PackageReleaseDiff( p.PrimarySolutionRelativeFolderPath, allChanges );
+                return new DirectoryDiff( path, allChanges );
             }
         }
 
@@ -253,48 +253,29 @@ namespace CK.Env
             return _git.Head.Commits.SkipWhile( p => p.Committer.When > ending ).TakeWhile( p => p.Committer.When > beginning );
         }
 
-        [CommandMethod]
-        public bool ShowLogsBetweenDates( IActivityMonitor m, string dateBeginning, string dateEnding )
+        public void ShowLogsBetweenDates( IActivityMonitor m, DateTimeOffset beginning, DateTimeOffset ending, IReadOnlyCollection<NormalizedPath> paths )
         {
-            if( !DateTimeOffset.TryParse( dateBeginning, out DateTimeOffset beginning ) )
-            {
-                m.Error( $"{dateBeginning} is not a valid date" );
-                return false;
-            }
-            if( !DateTimeOffset.TryParse( dateEnding, out DateTimeOffset ending ) )
-            {
-                m.Error( $"{dateEnding} is not a valid date" );
-                return false;
-            }
-            m.Info( "Parsed beginning date: " + beginning.ToString() );
-            m.Info( "Parsed ending date: " + ending.ToString() );
-            List<Commit> commits = GetCommitsBetweenDates( beginning, ending )
-                .Where( c =>
-                     c.Tree.Any( t =>
-                         !t.Name.EndsWith( ".csproj" )
-                )
-            ).ToList();
-
+            List<Commit> commits = GetCommitsBetweenDates( beginning, ending ).ToList();
             if( !commits.Any() )
             {
-                m.Info( "No changes between the given dates" );
+                m.Info( "No commits between the given dates" );
             }
             else
             {
-                using( var treeChange = _git.Diff.Compare<TreeChanges>( commits.Last().Tree, commits.First().Tree ) )
+                var diffs = GetReleaseDiff( m, paths, commits.Last(), commits.First() );
+                if(diffs.Count == 0)
                 {
-                    var allChanges = treeChange.Select( gC => new FileReleaseDiff( gC.Path, (FileReleaseDiffType)gC.Status ) ).ToList();
-                    var packageReleaseDiff = new PackageReleaseDiff( FullPhysicalPath, allChanges );
-                    packageReleaseDiff.DumpDiff();
+                    m.Info( "No diffs" );
+                }
+                foreach( var d in diffs )
+                {
+                    d.DumpDiff();
                 }
                 foreach( Commit commit in commits )
                 {
                     m.Info( $"Commit {commit.Id.Sha}: {commit.Message}" );
                 }
             }
-
-
-            return true;
         }
 
         /// <summary>
