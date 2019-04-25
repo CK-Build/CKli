@@ -434,7 +434,7 @@ namespace CK.Env
 
         (bool Success, bool ReloadNeeded) DoPull( IActivityMonitor m, bool alreadyReloadNeeded, MergeFileFavor mergeFileFavor )
         {
-            var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
+            var merger = _git.Config.BuildSignature( DateTimeOffset.Now ) ?? new Signature( "CKli", "none", DateTimeOffset.Now );
             var result = Commands.Pull( _git, merger, new PullOptions
             {
                 FetchOptions = new FetchOptions
@@ -829,14 +829,14 @@ namespace CK.Env
             try
             {
                 if( isDirty ) m.Info( "Working Folder is dirty. Committing changes." );
-                var author = amendPreviousCommit ? _git.Head.Tip.Author : _git.Config.BuildSignature( date );
+                Signature author = amendPreviousCommit ? _git.Head.Tip.Author : _git.Config.BuildSignature( date );
                 // Let AllowEmptyCommit even when amending: this avoids creating an empty commit.
                 // If we are not amending, this is an error and we let the EmptyCommitException pops.
                 var options = new CommitOptions { AmendPreviousCommit = amendPreviousCommit };
                 var committer = new Signature( "CKli", "none", date );
                 try
                 {
-                    _git.Commit( commitMessage, author, committer, options );
+                    _git.Commit( commitMessage, author ?? committer, committer, options );
                 }
                 catch( EmptyCommitException )
                 {

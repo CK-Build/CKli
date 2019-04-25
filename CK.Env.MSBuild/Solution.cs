@@ -481,7 +481,7 @@ namespace CK.Env.MSBuild
                 {
                     if( p.ReloadProjectFile( m ) == null )
                     {
-                        m.Error( $"Error while loading project '{p}'." );
+                        m.Error( $"Error while loading project '{p}'. This may be a case sensivity issue !" );
                         return null;
                     }
                 }

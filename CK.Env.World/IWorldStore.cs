@@ -10,7 +10,7 @@ namespace CK.Env
     public interface IWorldStore
     {
         /// <summary>
-        /// Returns all the available worlds in this store.
+        /// Returns all the available worlds in this store ordered by world name.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The world list.</returns>

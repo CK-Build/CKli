@@ -42,7 +42,7 @@ namespace CKli
             var xFactory = new XTypedFactory();
             xFactory.AutoRegisterFromLoadedAssemblies();
 
-            IBasicApplicationLifetime appLife = ConsoleCloseGuard.Default;
+            IBasicApplicationLifetime appLife = new FakeApplicationLifetime();
             var rootPath = GetRootPath( args );
             using( var global = new GlobalContext( monitor, xFactory, rootPath, appLife ) )
             {
