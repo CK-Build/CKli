@@ -37,18 +37,7 @@ namespace CKli
                 }
                 foreach( var d in diffs )
                 {
-                    Console.WriteLine( $"=    => {d.Package.Name}: {d.DiffType}" );
-                    if( d.DiffType == PackageReleaseDiffType.Changed )
-                    {
-                        foreach( var fC in d.Changes.GroupBy( fC => fC.DiffType ) )
-                        {
-                            Console.WriteLine( $"=       - {fC.Key}" );
-                            foreach( var f in fC )
-                            {
-                                Console.WriteLine( $"               {f.FilePath}" );
-                            }
-                        }
-                    }
+                    d.DumpDiff();
                 }
             }
             else
