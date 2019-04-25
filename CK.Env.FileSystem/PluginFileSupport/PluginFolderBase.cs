@@ -20,6 +20,7 @@ namespace CK.Env.Plugins
         {
             return _textResources[path.Replace( '/', '.' ).Replace('\\','.')];
         }
+
         public PluginFolderBase( GitFolder f, NormalizedPath branchPath, string folderPath, Type resourceHolder = null )
             : base( f, branchPath )
         {
@@ -30,9 +31,18 @@ namespace CK.Env.Plugins
             _csResourcePrefix = _csProtocol + _resourcePrefix;
         }
 
+        /// <summary>
+        /// Gets the folder path (relative to the <see cref="FileSystem"/>).
+        /// </summary>
         public NormalizedPath FolderPath { get; }
 
-        NormalizedPath ICommandMethodsProvider.CommandProviderName => FolderPath;
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => GetCommandProviderName();
+
+        /// <summary>
+        /// Gets the name of the command: it defaults to the <see cref="FolderPath"/>.
+        /// </summary>
+        /// <returns>The command name.</returns>
+        protected virtual NormalizedPath GetCommandProviderName() => FolderPath;
 
         public bool EnsureDirectory( IActivityMonitor m )
         {

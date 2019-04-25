@@ -14,6 +14,7 @@ namespace CK.NPMClient
             Name = (string)e.AttributeRequired( "Name" );
             Url = (string)e.AttributeRequired( "Url" );
             SecretKeyName = (string)e.AttributeRequired( "SecretKeyName" );
+            UsePassword = (bool?)e.Attribute( "UsePassword" ) ?? false;
         }
 
         public override NPMFeedType Type => NPMFeedType.NPMStandard;
@@ -21,6 +22,12 @@ namespace CK.NPMClient
         public override string Name { get; }
 
         public string Url { get; }
+
+        /// <summary>
+        /// Gets whether password authentication must be used (ie. "registry:_password=..." in .npmrc).
+        /// Defaults to false: uses "registry:_authToken=..." in .npmrc.
+        /// </summary>
+        public bool UsePassword { get; }
 
         public override string SecretKeyName { get; }
 

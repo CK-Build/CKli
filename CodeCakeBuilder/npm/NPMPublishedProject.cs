@@ -7,17 +7,18 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace CodeCake
 {
     public class NPMPublishedProject : NPMProject, ILocalArtifact
     {
-        public NPMPublishedProject( NormalizedPath path, string name, SVersion v )
-            : base( path )
+        NPMPublishedProject( NormalizedPath path, SimplePackageJsonFile json, SVersion v )
+            : base( path, json )
         {
-            ArtifactInstance = new ArtifactInstance( new Artifact( "NPM", name ), v );
-            string tgz = name.Replace( "@", "" ).Replace( '/', '-' );
+            ArtifactInstance = new ArtifactInstance( new Artifact( "NPM", json.Name ), v );
+            string tgz = json.Name.Replace( "@", "" ).Replace( '/', '-' );
             TGZName = tgz + "-" + v.ToString() + ".tgz";
         }
 
@@ -29,6 +30,11 @@ namespace CodeCake
 
         public string TGZName { get; }
 
+        /// <summary>
+        /// Runs the 'build-debug', 'build-release' or 'build' script after
+        /// having set the version to publish.
+        /// </summary>
+        /// <param name="globalInfo">The global information object.</param>
         public override void RunBuild( StandardGlobalInfo globalInfo )
         {
             using( TemporarySetVersion( ArtifactInstance.Version ) )
@@ -45,6 +51,11 @@ namespace CodeCake
             }
         }
 
+        /// <summary>
+        /// Generates the .tgz file in the <see cref="StandardGlobalInfo.ReleasesFolder"/>
+        /// by calling npm pack.
+        /// </summary>
+        /// <param name="globalInfo">The global information object.</param>
         public void RunPack( StandardGlobalInfo globalInfo )
         {
             using( TemporarySetVersion( ArtifactInstance.Version ) )
@@ -64,14 +75,13 @@ namespace CodeCake
 
         public static NPMPublishedProject Load( NormalizedPath directoryPath, string expectedName = null, SVersion v = null )
         {
-            JObject json = JObject.Parse( directoryPath.AppendPart( "package.json" ) );
-            if( v == null ) v = SVersion.TryParse( json.Value<string>( "version" ) );
-            var name = json.Value<string>( "name" );
-            if( expectedName != null && name != expectedName )
+            var json = new SimplePackageJsonFile( directoryPath );
+            if( expectedName != null && json.Name != expectedName )
             {
-                throw new Exception( $"NPM package '{directoryPath}' must be a published package named '{expectedName}', not '{name}'." );
+                throw new Exception( $"NPM package '{directoryPath}' must be a published package named '{expectedName}', not '{json.Name}'." );
             }
-            return new NPMPublishedProject( directoryPath, name, v );
+            if( v == null ) v = SVersion.TryParse( json.Version );
+            return new NPMPublishedProject( directoryPath, json, v );
         }
 
     }

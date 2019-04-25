@@ -47,7 +47,7 @@
       </add>
     </NPMSources>
     <Plugins>
-            <add Type="CK.Env.Plugins.SolutionDriver, CK.Env.Plugins" />
+      <add Type="CK.Env.Plugins.SolutionDriver, CK.Env.Plugins" />
       <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderFolder, CK.Env.Plugins" />
       <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderCSProjFile, CK.Env.Plugins" />
       <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderKeyVaultFile, CK.Env.Plugins" />
@@ -58,6 +58,7 @@
       <add Type="CK.Env.Plugins.SolutionFiles.NugetConfigFile, CK.Env.Plugins" />
       <add Type="CK.Env.Plugins.SolutionFiles.GitIgnoreFile, CK.Env.Plugins" />
       <add Type="CK.Env.Plugins.SolutionFiles.NPMRCFiles, CK.Env.Plugins" />
+      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderNPMSolutionFile, CK.Env.Plugins" />
       <add Type="CK.BuildSystem.Appveyor.AppveyorFile, CK.BuildSystem.Appveyor" />
     </Plugins>
   </SolutionSettings>

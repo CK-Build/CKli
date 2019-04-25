@@ -54,7 +54,11 @@
       <add Type="CK.Env.Plugins.SolutionFiles.RepositoryXmlFile, CK.Env.Plugins" />
       <add Type="CK.Env.Plugins.SolutionFiles.NugetConfigFile, CK.Env.Plugins" />
       <add Type="CK.Env.Plugins.SolutionFiles.GitIgnoreFile, CK.Env.Plugins" />
+      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderNPMSolutionFile, CK.Env.Plugins" />
+      <add Type="CK.Env.Plugins.SolutionFiles.SolutionFolder, CK.Env.Plugins" />
+
       <add Type="CK.BuildSystem.Appveyor.AppveyorFile, CK.BuildSystem.Appveyor" />
+      <add Type="CK.BuildSystem.GitLab.GitLabFile, CK.BuildSystem.GitLab" />
     </Plugins>
   </SolutionSettings>
 

@@ -7,6 +7,15 @@ using System.Linq;
 
 namespace CodeCake
 {
+    public static class StandardGlobalInfoNuGetExtension
+    {
+        public static StandardGlobalInfo AddNuGet( this StandardGlobalInfo globalInfo, IEnumerable<SolutionProject> projectsToPublish )
+        {
+            new Build.NuGetArtifactType( globalInfo, projectsToPublish );
+            return globalInfo;
+        }
+    }
+
     public partial class Build
     {
         /// <summary>
@@ -36,11 +45,10 @@ namespace CodeCake
             }
 
             /// <summary>
-            /// Gets a mutable list of NuGet artifacts.
+            /// Downcasts the mutable list <see cref="ILocalArtifact"/> as a set of <see cref="NuGetArtifact"/>.
             /// </summary>
-            /// <param name="reset">True to recompute a list.</param>
             /// <returns>The set of NuGet artifacts.</returns>
-            public new IList<NuGetArtifact> GetArtifacts( bool reset = false ) => (IList<NuGetArtifact>)base.GetArtifacts( reset );
+            public IEnumerable<NuGetArtifact> GetNuGetArtifacts() => GetArtifacts().Cast<NuGetArtifact>();
 
             /// <summary>
             /// Gets the remote target feeds.

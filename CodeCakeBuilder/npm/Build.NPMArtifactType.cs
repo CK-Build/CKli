@@ -11,27 +11,59 @@ using System.Threading.Tasks;
 
 namespace CodeCake
 {
+
+    public static class StandardGlobalInfoNPMExtension
+    {
+        /// <summary>
+        /// Adds the <see cref="Build.NPMArtifactType"/> for NPM artifacts.
+        /// </summary>
+        /// <param name="this">This global info.</param>
+        /// <param name="solution">The NPM solution.</param>
+        /// <returns>This info.</returns>
+        public static StandardGlobalInfo AddNPM( this StandardGlobalInfo globalInfo, NPMSolution solution )
+        {
+            new Build.NPMArtifactType( globalInfo, solution );
+            return globalInfo;
+        }
+
+        /// <summary>
+        /// Adds the <see cref="Build.NPMArtifactType"/> for NPM based on <see cref="NPMSolution.ReadFromNPMSolutionFile"/>
+        /// (projects are defined by "CodeCakeBuilder/NPMSolution.xml" file).
+        /// </summary>
+        /// <param name="this">This global info.</param>
+        /// <returns>This info.</returns>
+        public static StandardGlobalInfo AddNPM( this StandardGlobalInfo @this )
+        {
+            return AddNPM( @this, NPMSolution.ReadFromNPMSolutionFile( @this.Version ) );
+        }
+
+        /// <summary>
+        /// Gets the NPM solution handled by the single <see cref="Build.NPMArtifactType"/>.
+        /// </summary>
+        /// <param name="this">This global info.</param>
+        /// <returns>The NPM solution.</returns>
+        public static NPMSolution GetNPMSolution( this StandardGlobalInfo @this )
+        {
+            return @this.ArtifactTypes.OfType<Build.NPMArtifactType>().Single().Solution;
+        }
+    }
+
     public partial class Build
     {
         /// <summary>
+        /// Supports NPM packages.
         /// </summary>
-        class NPMArtifactType : ArtifactType
+        public class NPMArtifactType : ArtifactType
         {
-            readonly IReadOnlyList<NPMPublishedProject> _projects;
-
-            public NPMArtifactType( StandardGlobalInfo globalInfo )
+            public NPMArtifactType( StandardGlobalInfo globalInfo, NPMSolution solution )
                 : base( globalInfo, "NPM" )
             {
-                _projects = NPMSolution.ReadFromNPMSolutionFile( globalInfo.Version ).PublishedProjects;
+                Solution = solution;
             }
 
-            public NPMArtifactType( StandardGlobalInfo globalInfo, IEnumerable<NPMPublishedProject> projects )
-                : base( globalInfo, "NPM" )
-            {
-                _projects = projects.ToList();
-            }
+            public NPMSolution Solution { get; }
 
-            protected override IEnumerable<ILocalArtifact> GetLocalArtifacts() => _projects;
+            protected override IEnumerable<ILocalArtifact> GetLocalArtifacts() => Solution.PublishedProjects;
 
             protected override IEnumerable<ArtifactFeed> GetLocalFeeds()
             {
@@ -42,7 +74,7 @@ namespace CodeCake
 
             protected override IEnumerable<ArtifactFeed> GetRemoteFeeds()
             {
-                return new NPMRemoteFeed[]{
+                return new NPMRemoteFeedBase[]{
                         new AzureNPMFeed( this, "Signature-Code", "Default" )
                 };
             }

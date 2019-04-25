@@ -44,7 +44,7 @@ namespace CodeCake
         {
             readonly NormalizedPath _pathToLocalFeed;
 
-            public override string Name => "NpmLocalFeed";
+            public override string Name => _pathToLocalFeed;
 
             public NPMLocalFeed( NPMArtifactType t, NormalizedPath pathToLocalFeed )
                 : base( t )
@@ -73,18 +73,18 @@ namespace CodeCake
             }
         }
 
-        abstract class NPMRemoteFeed : NPMFeed
+        abstract class NPMRemoteFeedBase : NPMFeed
         {
             protected readonly string FeedUri;
 
-            public NPMRemoteFeed( NPMArtifactType t, string secretKeyName, string feedUri )
+            public NPMRemoteFeedBase( NPMArtifactType t, string secretKeyName, string feedUri )
                 : base( t )
             {
                 SecretKeyName = secretKeyName;
                 FeedUri = feedUri;
             }
 
-            public override string Name => "NpmRemoteFeed";
+            public override string Name => FeedUri;
 
             public string SecretKeyName { get; }
 
@@ -141,12 +141,33 @@ namespace CodeCake
         }
 
         /// <summary>
+        /// Feed for a standard NPM server.
+        /// </summary>
+        class NPMRemoteFeed : NPMRemoteFeedBase
+        {
+            readonly bool _usePassword;
+
+            public NPMRemoteFeed( NPMArtifactType t, string secretKeyName, string feedUri, bool usePassword )
+                : base( t, secretKeyName, feedUri )
+            {
+                _usePassword = usePassword;
+            }
+
+            protected override IDisposable TokenInjector( NPMPublishedProject project )
+            {
+                return _usePassword
+                        ? project.TemporarySetPushTargetAndPasswordLogin( FeedUri, ResolveAPIKey() )
+                        : project.TemporarySetPushTargetAndTokenLogin( FeedUri, ResolveAPIKey() );
+            }
+        }
+
+        /// <summary>
         /// The secret key name is built by <see cref="SignatureVSTSFeed.GetSecretKeyName"/>:
         /// "AZURE_FEED_" + Organization.ToUpperInvariant().Replace( '-', '_' ).Replace( ' ', '_' ) + "_PAT".
         /// </summary>
         /// <param name="organization">Name of the organization.</param>
         /// <param name="feedName">Identifier of the feed in Azure, inside the organization.</param>
-        class AzureNPMFeed : NPMRemoteFeed
+        class AzureNPMFeed : NPMRemoteFeedBase
         {
             /// <summary>
             /// Builds the standardized secret key name from the organization name: this is
@@ -165,7 +186,15 @@ namespace CodeCake
                         GetSecretKeyName( organization ),
                         $"https://pkgs.dev.azure.com/{organization}/_packaging/{feedName}/npm/registry/" )
             {
+                Organization = organization;
+                FeedName = feedName;
             }
+
+            public string Organization { get; }
+
+            public string FeedName { get; }
+
+            public override string Name => $"AzureNPM:{Organization}/{FeedName}";
 
             protected override IDisposable TokenInjector( NPMPublishedProject project )
             {

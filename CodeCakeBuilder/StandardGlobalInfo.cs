@@ -153,8 +153,10 @@ namespace CodeCake
 
         /// <summary>
         /// Tags the build when running on Appveyor or AzureDevOps (GitLab does not support this).
+        /// Note that if <see cref="ShouldStop"/> is true, " (Skipped)" is appended.
         /// </summary>
-        public void SetCIBuildTag()
+        /// <returns>This info object (allowing fluent syntax).</returns>
+        public StandardGlobalInfo SetCIBuildTag()
         {
             string AddSkipped( string s ) => ShouldStop ? s + " (Skipped)" : s;
 
@@ -204,6 +206,21 @@ namespace CodeCake
                     }
                 }
             }
+            return this;
+        }
+
+        /// <summary>
+        /// Terminates the script with success if <see cref="ShouldStop"/> is true.
+        /// (Calls <see cref="TerminateAliases.TerminateWithSuccess(ICakeContext, string)">Cake.TerminateWithSuccess</see>.)
+        /// </summary>
+        /// <returns>This info object (allowing fluent syntax).</returns>
+        public StandardGlobalInfo TerminateIfShouldStop()
+        {
+            if( ShouldStop )
+            {
+                Cake.TerminateWithSuccess( "All packages from this commit are already available. Build skipped." );
+            }
+            return this;
         }
 
     }

@@ -23,24 +23,55 @@ namespace CodeCake
 
             public PackageVersionReplacer( NPMProject p, SVersion version )
             {
-                _savedPackageJson = File.ReadAllText( p.PackageJsonPath );
+                _p = p;
+                _savedPackageJson = File.ReadAllText( p.PackageJson.JsonFilePath );
 
                 // Replace token by SafeSemVersion
                 JObject json = JObject.Parse( _savedPackageJson );
                 json["version"] = version.ToNuGetPackageString();
-                File.WriteAllText( p.PackageJsonPath, json.ToString() );
+                File.WriteAllText( p.PackageJson.JsonFilePath, json.ToString() );
             }
 
             public void Dispose()
             {
-                File.WriteAllText( _p.PackageJsonPath.Path, _savedPackageJson );
+                File.WriteAllText( _p.PackageJson.JsonFilePath.Path, _savedPackageJson );
+            }
+        }
+
+        public readonly struct SimplePackageJsonFile
+        {
+            public readonly NormalizedPath JsonFilePath;
+            public readonly string Name;
+            public readonly string Version;
+            public readonly IReadOnlyList<string> Scripts;
+
+            public SimplePackageJsonFile( NormalizedPath folderPath )
+            {
+                JsonFilePath = folderPath.AppendPart( "package.json" );
+                JObject json = JObject.Parse( JsonFilePath );
+                Name = json.Value<string>( "name" );
+                Version = json.Value<string>( "version" );
+
+                if( json.TryGetValue( "scripts", out JToken scriptsToken ) && scriptsToken.HasValues )
+                {
+                    Scripts = scriptsToken.Children<JProperty>().Select( p => p.Name ).ToArray();
+                }
+                else
+                {
+                    Scripts = Array.Empty<string>();
+                }
             }
         }
 
         public NPMProject( NormalizedPath path )
+            : this( path, new SimplePackageJsonFile( path ) )
+        {
+        }
+
+        protected NPMProject( NormalizedPath path, SimplePackageJsonFile json )
         {
             DirectoryPath = path;
-            PackageJsonPath = path.AppendPart( "package.json" );
+            PackageJson = json;
             NPMRCPath = path.AppendPart( ".npmrc" );
         }
 
@@ -48,14 +79,44 @@ namespace CodeCake
 
         public NormalizedPath DirectoryPath { get; }
 
-        public NormalizedPath PackageJsonPath { get; }
+        public SimplePackageJsonFile PackageJson { get; }
 
         public NormalizedPath NPMRCPath { get; }
 
+        public virtual void RunInstall( StandardGlobalInfo globalInfo )
+        {
+            globalInfo.Cake.NpmInstall( new Cake.Npm.Install.NpmInstallSettings()
+            {
+                LogLevel = NpmLogLevel.Info,
+                WorkingDirectory = DirectoryPath.Path
+            } );
+        }
+
+        public virtual void RunInstallAndClean( StandardGlobalInfo globalInfo, string cleanScriptName = "clean" )
+        {
+            RunInstall( globalInfo );
+            globalInfo.Cake.NpmRunScript(
+                    cleanScriptName,
+                    s => s
+                        .WithLogLevel( NpmLogLevel.Info )
+                        .FromPath( DirectoryPath.Path )
+                );
+        }
+
+        /// <summary>
+        /// Runs the 'build-debug', 'build-release' or 'build' script.
+        /// </summary>
+        /// <param name="globalInfo">The global information object.</param>
         public virtual void RunBuild( StandardGlobalInfo globalInfo )
         {
+            string name = globalInfo.IsRelease && PackageJson.Scripts.Contains( "build-debug" )
+                            ? "build-debug"
+                            : (!globalInfo.IsRelease && PackageJson.Scripts.Contains( "build-release" )
+                                ? "build-release"
+                                : "build");
+
             globalInfo.Cake.NpmRunScript(
-                    "build",
+                    name,
                     s => s
                         .WithLogLevel( NpmLogLevel.Info )
                         .FromPath( DirectoryPath.Path )
@@ -71,6 +132,7 @@ namespace CodeCake
                         .FromPath( DirectoryPath.Path )
                 );
         }
+
 
         public IDisposable TemporarySetVersion( SVersion version ) => new PackageVersionReplacer( this, version );
 

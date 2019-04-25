@@ -30,7 +30,7 @@ namespace CodeCake
                 c.Configuration = nugetInfo.GlobalInfo.BuildConfiguration;
                 c.OutputDirectory = nugetInfo.GlobalInfo.ReleasesFolder.Path;
             } );
-            foreach( var p in nugetInfo.GetArtifacts() )
+            foreach( var p in nugetInfo.GetNuGetArtifacts() )
             {
                 Cake.Information( p.ArtifactInstance );
                 Cake.DotNetCorePack( p.Project.Path.FullPath, settings );

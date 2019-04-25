@@ -191,12 +191,15 @@ namespace CK.Env.Plugins.SolutionFiles
                 switch( info )
                 {
                     case NuGetAzureFeedInfo a:
-                        b.Append( "new SignatureVSTSFeed(cake, \"" ).Append( a.Organization ).Append( "\", \"" ).Append( a.FeedName ).Append( "\" )" );
+                        b.Append( "new SignatureVSTSFeed( this, \"" )
+                                    .Append( a.Organization ).Append( "\", \"" )
+                                    .Append( a.FeedName ).Append( "\" )" );
                         break;
                     case NuGetStandardFeedInfo n:
-                        b.Append( "new RemoteFeed(cake, \"" ).Append( n.Name ).Append( "\", \"" )
-                                                        .Append( n.Url ).Append( "\", \"" )
-                                                        .Append( n.SecretKeyName ).Append( "\" )" );
+                        b.Append( "new RemoteFeed( this, \"" )
+                                            .Append( n.Name ).Append( "\", \"" )
+                                            .Append( n.Url ).Append( "\", \"" )
+                                            .Append( n.SecretKeyName ).Append( "\" )" );
                         break;
                 }
             }
@@ -207,13 +210,13 @@ namespace CK.Env.Plugins.SolutionFiles
 
         string AdaptBuildNPMArtifactForPushFeeds( string text )
         {
-            Match m = Regex.Match( text, @"return new NpmRemoteFeed\[\]{.*?};", RegexOptions.Singleline | RegexOptions.CultureInvariant );
+            Match m = Regex.Match( text, @"return new NPMRemoteFeedBase\[\]{.*?};", RegexOptions.Singleline | RegexOptions.CultureInvariant );
             if( !m.Success )
             {
-                throw new Exception( "Expected pattern return new NpmRemoteFeed[]{...} in Build.NPMRepository.cs." );
+                throw new Exception( "Expected pattern return new NPMRemoteFeedBase[]{...} in Build.NPMArtifactType.cs." );
             }
             StringBuilder b = new StringBuilder();
-            b.AppendLine( "return new NpmRemoteFeed[]{" );
+            b.AppendLine( "return new NPMRemoteFeedBase[]{" );
             bool atLeastOne = false;
             foreach( var info in _settings.ArtifactTargets.Select( a => a.Info ).OfType<INPMFeedInfo>() )
             {
@@ -222,10 +225,18 @@ namespace CK.Env.Plugins.SolutionFiles
                 switch( info )
                 {
                     case NPMAzureFeedInfo a:
-                        b.Append( "new VSTSNpmFeed( cake, \"" ).Append( a.Organization ).Append( "\", \"" ).Append( a.FeedName ).Append( "\" )" );
+                        b.Append( "new AzureNPMFeed( this, \"" )
+                            .Append( a.Organization ).Append( "\", \"" )
+                            .Append( a.FeedName ).Append( "\" )" );
                         break;
                     case NPMStandardFeedInfo n:
-                        b.Append( "new NpmRemoteFeed( cake, " ).Append( n.SecretKeyName ).Append( "\", \"" ).Append( n.Url ).Append( "\" )" );
+                        b.Append( "new NPMRemoteFeed( this, " )
+                            .Append( n.SecretKeyName )
+                            .Append( "\", \"" )
+                            .Append( n.Url )
+                            .Append( "\", " )
+                            .Append( n.UsePassword )
+                            .Append( " )" );
                         break;
                 }
             }

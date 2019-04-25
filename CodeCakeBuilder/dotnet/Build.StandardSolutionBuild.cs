@@ -13,10 +13,10 @@ namespace CodeCake
         /// Builds the provided .sln without "CodeCakeBuilder" project itself and
         /// optionally other projects.
         /// </summary>
-        /// <param name="solutionFileName">The solution file name to build (relative to the repository root).</param>
         /// <param name="globalInfo">The current StandardGlobalInfo.</param>
+        /// <param name="solutionFileName">The solution file name to build (relative to the repository root).</param>
         /// <param name="excludedProjectName">Optional project names (without path nor .csproj extension).</param>
-        void StandardSolutionBuild( string solutionFileName, StandardGlobalInfo globalInfo, params string[] excludedProjectName )
+        void StandardSolutionBuild( StandardGlobalInfo globalInfo, string solutionFileName, params string[] excludedProjectName )
         {
             using( var tempSln = Cake.CreateTemporarySolutionFile( solutionFileName ) )
             {

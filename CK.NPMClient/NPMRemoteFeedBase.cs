@@ -38,6 +38,7 @@ namespace CK.NPMClient
         /// Gets the info of this feed.
         /// </summary>
         public INPMFeedInfo Info { get; }
+
         public Registry Registry { get; }
 
         /// <summary>

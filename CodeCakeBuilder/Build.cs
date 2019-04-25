@@ -17,8 +17,10 @@ namespace CodeCake
         public Build()
         {
             Cake.Log.Verbosity = Verbosity.Diagnostic;
-            string solutionFilePath = Cake.GetFiles( "*.sln" ).Single().FullPath;
-            var projects = Cake.ParseSolution( solutionFilePath )
+
+            var solutionFileName = Cake.Environment.WorkingDirectory.GetDirectoryName() + ".sln";
+
+            var projects = Cake.ParseSolution( solutionFileName )
                                        .Projects
                                        .Where( p => !(p is SolutionFolder) && p.Name != "CodeCakeBuilder" );
 
@@ -33,20 +35,17 @@ namespace CodeCake
             Task( "Check-Repository" )
                 .Does( () =>
                 {
-                    globalInfo = CreateStandardGlobalInfo( gitInfo );
-                    new NuGetArtifactType( globalInfo, projectsToPublish );
-                    new NPMArtifactType( globalInfo );
-                    globalInfo.SetCIBuildTag();
-                    if( globalInfo.ShouldStop )
-                    {
-                        Cake.TerminateWithSuccess( "All packages from this commit are already available. Build skipped." );
-                    }
+                    globalInfo = CreateStandardGlobalInfo( gitInfo )
+                                    .AddNuGet( projectsToPublish )
+                                    .SetCIBuildTag()
+                                    .TerminateIfShouldStop();
                 } );
             Task( "Clean" )
                 .IsDependentOn( "Check-Repository" )
                 .Does( () =>
                 {
                     Cake.CleanDirectories( projects.Select( p => p.Path.GetDirectory().Combine( "bin" ) ) );
+                    Cake.CleanDirectories( projects.Select( p => p.Path.GetDirectory().Combine( "obj" ) ) );
                     Cake.CleanDirectories( globalInfo.ReleasesFolder );
                     Cake.DeleteFiles( "Tests/**/TestResult*.xml" );
                 } );
@@ -56,7 +55,7 @@ namespace CodeCake
                 .IsDependentOn( "Clean" )
                 .Does( () =>
                 {
-                    StandardSolutionBuild( solutionFilePath, globalInfo );
+                    StandardSolutionBuild( globalInfo, solutionFileName );
                 } );
 
             Task( "Unit-Testing" )

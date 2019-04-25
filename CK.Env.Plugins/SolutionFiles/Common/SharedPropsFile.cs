@@ -7,10 +7,10 @@ namespace CK.Env.Plugins.SolutionFiles
 {
     public class SharedPropsFile : XmlFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
-        readonly CommonFolder _commonFolder;
+        readonly SolutionFolder _commonFolder;
         readonly ISolutionSettings _settings;
 
-        public SharedPropsFile( CommonFolder f, ISolutionSettings settings, NormalizedPath branchPath )
+        public SharedPropsFile( SolutionFolder f, ISolutionSettings settings, NormalizedPath branchPath )
             : base( f.Folder, branchPath, f.FolderPath.AppendPart( "Shared.props" ) )
         {
             _commonFolder = f;
