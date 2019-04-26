@@ -34,6 +34,10 @@ namespace CodeCake
         /// </summary>
         public IReadOnlyList<NPMPublishedProject> PublishedProjects { get; }
 
+        /// <summary>
+        /// Runs "npm -i" on all <see cref="Projects"/>.
+        /// </summary>
+        /// <param name="globalInfo">The global information object.</param>
         public void RunInstall( StandardGlobalInfo globalInfo )
         {
             foreach( var p in Projects )
@@ -42,7 +46,15 @@ namespace CodeCake
             }
         }
 
-        public void RunInstallAndClean( StandardGlobalInfo globalInfo, string cleanScriptName = "clean" )
+        /// <summary>
+        /// Runs "npm -i"  and a required clean script on all <see cref="Projects"/>.
+        /// </summary>
+        /// <param name="cleanScriptName">The script name that must exist in the package.json.</param>
+        /// <param name="scriptMustExist">
+        /// False to only emit a warning and return false if the script doesn't exist instead of
+        /// throwing an exception.
+        /// </param>
+        public void RunInstallAndClean( StandardGlobalInfo globalInfo, string cleanScriptName = "clean", bool scriptMustExist = true )
         {
             foreach( var p in Projects )
             {
@@ -54,19 +66,32 @@ namespace CodeCake
         /// Runs the 'build-debug', 'build-release' or 'build' script on all <see cref="Projects"/>.
         /// </summary>
         /// <param name="globalInfo">The global information object.</param>
-        public void RunBuild( StandardGlobalInfo globalInfo )
+        /// <param name="scriptMustExist">
+        /// False to only emit a warning and return false if the script doesn't exist instead of
+        /// throwing an exception.
+        /// </param>
+        public void RunBuild( StandardGlobalInfo globalInfo, bool scriptMustExist = true )
         {
             foreach( var p in Projects )
             {
-                p.RunBuild( globalInfo );
+                p.RunBuild( globalInfo, scriptMustExist );
             }
         }
 
-        public void RunTest( StandardGlobalInfo globalInfo )
+        /// <summary>
+        /// Runs the 'test' script on all <see cref="Projects"/>.
+        /// </summary>
+        /// <param name="globalInfo">The global information object.</param>
+        /// <param name="globalInfo"></param>
+        /// <param name="scriptMustExist">
+        /// False to only emit a warning and return false if the script doesn't exist instead of
+        /// throwing an exception.
+        /// </param>
+        public void RunTest( StandardGlobalInfo globalInfo, bool scriptMustExist = true )
         {
             foreach( var p in Projects )
             {
-                p.RunTest( globalInfo );
+                p.RunTest( globalInfo, scriptMustExist );
             }
         }
 

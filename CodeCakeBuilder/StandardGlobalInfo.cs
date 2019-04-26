@@ -10,6 +10,7 @@ using CSemVer;
 using SimpleGitVersion;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -34,6 +35,7 @@ namespace CodeCake
             IsRelease = gitInfo.IsValidRelease
                            && (gitInfo.PreReleaseName.Length == 0 || gitInfo.PreReleaseName == "rc");
             ReleasesFolder = "CodeCakeBuilder/Releases";
+            Directory.CreateDirectory( ReleasesFolder );
         }
 
         /// <summary>
@@ -52,9 +54,9 @@ namespace CodeCake
         public ISet<ArtifactType> ArtifactTypes => _artifactTypes;
 
         /// <summary>
-        /// Gets or sets the release folder: defaults to "CodeCakeBuilder/Releases".
+        /// Gets the release folder: "CodeCakeBuilder/Releases".
         /// </summary>
-        public NormalizedPath ReleasesFolder { get; set; }
+        public NormalizedPath ReleasesFolder { get; }
 
         /// <summary>
         /// Gets or sets if the build is a release
