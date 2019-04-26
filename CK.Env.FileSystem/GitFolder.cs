@@ -212,40 +212,46 @@ namespace CK.Env
             var r = new List<DirectoryDiff>();
             foreach( var p in paths )
             {
-                var d = CreateDiff( m, topCommit, commit, p );
-                if( d == null ) return null;
+                var d = CreateDiff( topCommit, commit, p );
+                if( d == null )
+                {
+
+                }
                 r.Add( d );
             }
             return r;
         }
 
-        DirectoryDiff CreateDiff( IActivityMonitor m, Commit topCommit, Commit commit, NormalizedPath path )
+        /// <summary>
+        /// Create Diff on a single file.
+        /// </summary>
+        /// <param name="topCommit"></param>
+        /// <param name="commit"></param>
+        /// <param name="directoryPath"></param>
+        /// 
+        /// <returns></returns>
+        DirectoryDiff CreateDiff( Commit topCommit, Commit commit, NormalizedPath directoryPath )
         {
-            TreeEntry newTreeEntry = topCommit.Tree[path];
-            if( newTreeEntry == null || newTreeEntry.TargetType != TreeEntryTargetType.Tree )
+            if( topCommit.Tree.Sha == commit.Tree.Sha )
             {
-                m.Error( $"Unable to find '{path}'." );
-                return null;
+                return new DirectoryDiff( directoryPath, DirectoryDiffType.None );
             }
-            TreeEntry oldTreeEntry = commit.Tree[path];
-            if( oldTreeEntry == null || oldTreeEntry.TargetType != TreeEntryTargetType.Tree )
+            var allCommitsIHave = _git.Commits.QueryBy( new CommitFilter()
             {
-                m.Info( $"Previously {path} did not exist." );
-                return new DirectoryDiff( path, DirectoryDiffType.NewPackage );
-            }
-            Tree oldTree = (Tree)oldTreeEntry.Target;
-            Tree newTree = (Tree)newTreeEntry.Target;
-            if( oldTree.Sha == newTree.Sha )
+                IncludeReachableFrom = commit,
+                ExcludeReachableFrom = topCommit
+            } );
+            var commitsAndParents = allCommitsIHave.Select( s => (s, s.Parents.FirstOrDefault()) );
+            //There is a diff with the first commit and his parent, and we don't want it
+            var commitsAndDiffWithParent = commitsAndParents.Select( c => (c.s, _git.Diff.Compare<TreeChanges>( c.s.Tree, c.Item2.Tree )) );
+            var commitsThatChangedTheDirectory = commitsAndDiffWithParent.Where( p => p.Item2.Any( q => q.Path.StartsWith( directoryPath ) ) ).Select( p => p.s );
+
+            using( TreeChanges changes = _git.Diff.Compare<TreeChanges>( commit.Tree, topCommit.Tree ) )
             {
-                return new DirectoryDiff( path, DirectoryDiffType.None );
-            }
-            using( TreeChanges changes = _git.Diff.Compare<TreeChanges>( oldTree, newTree ) )
-            {
-                var allChanges = changes.Select( gC => new FileReleaseDiff( gC.Path, (FileReleaseDiffType)gC.Status ) ).ToList();
-                return new DirectoryDiff( path, allChanges );
+                var allChanges = changes.Where( p => p.Path.StartsWith( directoryPath ) ).Select( gC => new FileReleaseDiff( gC.Path, (FileReleaseDiffType)gC.Status ) ).ToList();
+                return new DirectoryDiff( directoryPath, allChanges, commitsThatChangedTheDirectory.Select( p => (p.Sha, p.Message) ).ToList() );
             }
         }
-
 
         IEnumerable<Commit> GetCommitsBetweenDates( DateTimeOffset beginning, DateTimeOffset ending )
         {
@@ -263,17 +269,13 @@ namespace CK.Env
             else
             {
                 var diffs = GetReleaseDiff( m, paths, commits.Last(), commits.First() );
-                if(diffs.Count == 0)
+                if( diffs.Count == 0 )
                 {
                     m.Info( "No diffs" );
                 }
                 foreach( var d in diffs )
                 {
                     d.DumpDiff();
-                }
-                foreach( Commit commit in commits )
-                {
-                    m.Info( $"Commit {commit.Id.Sha}: {commit.Message}" );
                 }
             }
         }

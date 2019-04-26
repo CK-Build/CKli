@@ -571,7 +571,7 @@ namespace CK.Env.Plugins
             var solution = GetPrimarySolution( m );
             Folder.ShowLogsBetweenDates( m, beginningDate, endingDate,
                 solution.AllProjects
-                    .Select( p => p.Path )
+                    .Select( p => p.PrimarySolutionRelativeFolderPath )
                     .Union(
                         solution.NPMProjects.Select( p => p.FullPath )
                     ).ToList() );
