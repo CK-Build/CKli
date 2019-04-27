@@ -106,7 +106,7 @@ namespace CodeCake
         {
             foreach( var p in PublishedProjects )
             {
-                p.RunPack( globalInfo );
+                p.RunPack( globalInfo, cleanupPackageJson, packageJsonPreProcessor );
             }
         }
 

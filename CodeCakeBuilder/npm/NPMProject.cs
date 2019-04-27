@@ -6,9 +6,11 @@ using CSemVer;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace CodeCake
 {
@@ -52,6 +54,8 @@ namespace CodeCake
         {
             public readonly NormalizedPath JsonFilePath;
             public readonly string Name;
+            public readonly string Scope;
+            public readonly string ShortName;
             public readonly string Version;
             public readonly IReadOnlyList<string> Scripts;
 
@@ -60,6 +64,18 @@ namespace CodeCake
                 JsonFilePath = folderPath.AppendPart( "package.json" );
                 JObject json = JObject.Parse( File.ReadAllText( JsonFilePath ) );
                 Name = json.Value<string>( "name" );
+                Match m;
+                if( Name != null
+                    && (m = Regex.Match( Name, "(?<1>@[a-z\\d][\\w-.]+)/(?<2>[a-z\\d][\\w-.]*)", RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture )).Success )
+                {
+                    Scope = m.Groups[1].Value;
+                    ShortName = m.Groups[2].Value;
+                }
+                else
+                {
+                    Scope = null;
+                    ShortName = Name;
+                }
                 Version = json.Value<string>( "version" );
 
                 if( json.TryGetValue( "scripts", out JToken scriptsToken ) && scriptsToken.HasValues )
@@ -229,29 +245,17 @@ namespace CodeCake
         /// <returns>False if the script doesn't exist (<paramref name="scriptMustExist"/> is false), otherwise true.</returns>
         public void RunTest( StandardGlobalInfo globalInfo, bool scriptMustExist = true ) => RunScript( globalInfo, "test", scriptMustExist );
 
-
-        public IDisposable TemporarySetVersion( SVersion version ) => new PackageVersionReplacer( this, version, false, null );
+        private protected IDisposable TemporarySetVersion( SVersion version )
+        {
+            return new PackageVersionReplacer( this, version, false, null );
+        }
 
         private protected IDisposable TemporaryPrePack( SVersion version, bool cleanupPackageJson, Action<JObject> packageJsonPreProcessor )
         {
             return new PackageVersionReplacer( this, version, cleanupPackageJson, packageJsonPreProcessor );
         }
 
-        public IDisposable TemporarySetPushTargetAndTokenLogin( string pushUri, string token )
-        {
-            return NPMRCTokenInjector.TokenLogin( pushUri, token, NPMRCPath );
-        }
-
-        public IDisposable TemporarySetPushTargetAndAzurePatLogin( string pushUri, string pat )
-        {
-            var pwd = Convert.ToBase64String( Encoding.UTF8.GetBytes( pat ) );
-            return TemporarySetPushTargetAndPasswordLogin( pushUri, pwd );
-        }
-
-        public IDisposable TemporarySetPushTargetAndPasswordLogin( string pushUri, string password )
-        {
-            return NPMRCTokenInjector.PasswordLogin( pushUri, password, NPMRCPath );
-        }
+        #region .npmrc configuration
 
         class NPMRCTokenInjector : IDisposable
         {
@@ -264,51 +268,62 @@ namespace CodeCake
             {
                 return lines.Where( s => s.StartsWith( "#" ) ).Select( s => s.Substring( 1 ) );
             }
-
-            readonly NormalizedPath _npmrcPath;
-
-            NPMRCTokenInjector( NormalizedPath path )
-            {
-                _npmrcPath = path;
-            }
-
             static List<string> ReadCommentedLines( NormalizedPath npmrcPath )
             {
                 string[] npmrc = File.Exists( npmrcPath ) ? File.ReadAllLines( npmrcPath ) : Array.Empty<string>();
                 return CommentEverything( npmrc ).ToList();
             }
 
-            public static NPMRCTokenInjector TokenLogin( string pushUri, string token, NormalizedPath npmrcPath )
-            {
-                List<string> npmrc = ReadCommentedLines( npmrcPath );
-                npmrc.Add( "registry=" + pushUri );
-                npmrc.Add( "always-auth=true" );
-                npmrc.Add( pushUri.Replace( "https:", "" ) + ":_authToken=" + token );
-                File.WriteAllLines( npmrcPath, npmrc );
-                return new NPMRCTokenInjector( npmrcPath );
-            }
+            readonly NormalizedPath _npmrcPath;
 
-            public static NPMRCTokenInjector PasswordLogin( string pushUri, string password, NormalizedPath npmrcPath )
+            public NPMRCTokenInjector( NormalizedPath path, string pushUri, string scope, Action<List<string>,string> configure )
             {
-                List<string> npmrc = ReadCommentedLines( npmrcPath );
-                var argPushUri = pushUri.Replace( "https:", "" );
-                npmrc.Add( "registry=" + pushUri );
-                npmrc.Add( "always-auth=true" );
-                npmrc.Add( argPushUri + ":username=CodeCakeBuilder" );
-                npmrc.Add( argPushUri + ":_password=" + password );
-                npmrc.Add( argPushUri + ":always-auth=true" );
-                File.WriteAllLines( npmrcPath, npmrc );
-                return new NPMRCTokenInjector( npmrcPath );
+                List<string> npmrc = ReadCommentedLines( path );
+                if( String.IsNullOrEmpty( scope ) )
+                {
+                    npmrc.Add( "registry=" + pushUri );
+                }
+                else
+                {
+                    Debug.Assert( scope[0] == '@' );
+                    npmrc.Add( scope + ":registry=" + pushUri );
+                }
+                pushUri = pushUri.Replace( "https:", "" );
+                npmrc.Add( pushUri + ":always-auth=true" );
+                configure( npmrc, pushUri );
+                File.WriteAllLines( path, npmrc );
+
+                _npmrcPath = path;
             }
 
             public void Dispose()
             {
                 File.WriteAllLines(
                     _npmrcPath,
-                    UncommentAndRemoveNotCommented( File.ReadAllLines( _npmrcPath ).ToList() )
+                    UncommentAndRemoveNotCommented( File.ReadAllLines( _npmrcPath ) )
                 );
             }
         }
 
+        public IDisposable TemporarySetPushTargetAndTokenLogin( string pushUri, string token )
+        {
+            return new NPMRCTokenInjector( NPMRCPath, pushUri, PackageJson.Scope, (npmrc,u) => npmrc.Add( u + ":_authToken=" + token ) );
+        }
+
+        public IDisposable TemporarySetPushTargetAndPasswordLogin( string pushUri, string password )
+        {
+            return new NPMRCTokenInjector( NPMRCPath, pushUri, PackageJson.Scope, ( npmrc, u ) =>
+            {
+                npmrc.Add( u + ":username=CodeCakeBuilder" );
+                npmrc.Add( u + ":_password=" + password );
+            } );
+        }
+
+        public IDisposable TemporarySetPushTargetAndAzurePatLogin( string pushUri, string pat )
+        {
+            var pwd = Convert.ToBase64String( Encoding.UTF8.GetBytes( pat ) );
+            return TemporarySetPushTargetAndPasswordLogin( pushUri, pwd );
+        }
+        #endregion
     }
 }
