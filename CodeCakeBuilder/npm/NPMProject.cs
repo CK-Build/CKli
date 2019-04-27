@@ -288,6 +288,8 @@ namespace CodeCake
                     Debug.Assert( scope[0] == '@' );
                     npmrc.Add( scope + ":registry=" + pushUri );
                 }
+                npmrc.Add( "always-auth=true" );
+
                 pushUri = pushUri.Replace( "https:", "" );
                 npmrc.Add( pushUri + ":always-auth=true" );
                 configure( npmrc, pushUri );
