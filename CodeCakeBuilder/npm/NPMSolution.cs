@@ -1,10 +1,8 @@
-using Cake.Core;
 using CSemVer;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text;
 using System.Xml.Linq;
 
 namespace CodeCake
@@ -35,7 +33,7 @@ namespace CodeCake
         public IReadOnlyList<NPMPublishedProject> PublishedProjects { get; }
 
         /// <summary>
-        /// Runs "npm -i" on all <see cref="Projects"/>.
+        /// Runs "npm install" on all <see cref="Projects"/>.
         /// </summary>
         /// <param name="globalInfo">The global information object.</param>
         public void RunInstall( StandardGlobalInfo globalInfo )
@@ -47,18 +45,18 @@ namespace CodeCake
         }
 
         /// <summary>
-        /// Runs "npm -i"  and a required clean script on all <see cref="Projects"/>.
+        /// Runs "npm install"  and a required (or optional) "clean" script on all <see cref="Projects"/>.
         /// </summary>
-        /// <param name="cleanScriptName">The script name that must exist in the package.json.</param>
         /// <param name="scriptMustExist">
         /// False to only emit a warning and return false if the script doesn't exist instead of
         /// throwing an exception.
         /// </param>
-        public void RunInstallAndClean( StandardGlobalInfo globalInfo, string cleanScriptName = "clean", bool scriptMustExist = true )
+        /// <param name="cleanScriptName">The script name that must exist in the package.json.</param>
+        public void RunInstallAndClean( StandardGlobalInfo globalInfo, bool scriptMustExist = true, string cleanScriptName = "clean" )
         {
             foreach( var p in Projects )
             {
-                p.RunInstallAndClean( globalInfo, cleanScriptName );
+                p.RunInstallAndClean( globalInfo, scriptMustExist, cleanScriptName );
             }
         }
 
@@ -100,7 +98,11 @@ namespace CodeCake
         /// by calling npm pack for all <see cref="PublishedProjects"/>.
         /// </summary>
         /// <param name="globalInfo">The global information object.</param>
-        public void RunPack( StandardGlobalInfo globalInfo )
+        /// <param name="cleanupPackageJson">
+        /// By default, "scripts" and "devDependencies" are removed from the package.json file.
+        /// </param>
+        /// <param name="packageJsonPreProcessor">Optional package.json pre processor.</param>
+        public void RunPack( StandardGlobalInfo globalInfo, bool cleanupPackageJson = true, Action<JObject> packageJsonPreProcessor = null )
         {
             foreach( var p in PublishedProjects )
             {

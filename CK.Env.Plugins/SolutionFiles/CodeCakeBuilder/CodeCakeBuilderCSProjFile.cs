@@ -72,7 +72,7 @@ namespace CK.Env.Plugins.SolutionFiles
             DeleteProjectReference( "Code.Cake" ); //imported by SimpleGitVersion.Cake
             DeleteProjectReference( "Cake.Common" ); //imported by Code.Cake
             DeleteProjectReference( "Cake.Core" ); //imported by Cake.Common
-            if( !_settings.NoUnitTests )
+            if( !_settings.NoDotNetUnitTests )
             {
                 EnsureProjectReference( "NUnit.ConsoleRunner", "3.9.0" );
                 EnsureProjectReference( "NUnit.Runners.Net4", "2.6.4" );

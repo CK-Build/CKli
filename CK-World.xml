@@ -103,7 +103,7 @@
   <Folder Name="CK-Core-Projects">
 
     <GitFolder Name ="json-graph-serializer" Url="https://github.com/Invenietis/json-graph-serializer.git" IsPublic="True" >
-      <SolutionSettings NoSharedPropsFile="True" />
+      <SolutionSettings NoSharedPropsFile="True" NoDotNetUnitTests="True" />
       <Branch Name="develop">
         <PrimarySolution />
         <NPMProject PackageName="@signature/json-graph-serializer" />
@@ -180,7 +180,7 @@
     </GitFolder>
 
     <GitFolder Name="CK-WeakAssemblyNameResolver" Url="https://github.com/Invenietis/CK-WeakAssemblyNameResolver.git" IsPublic="True" >
-      <SolutionSettings NoUnitTests="true" />
+      <SolutionSettings NoDotNetUnitTests="true" />
       <Branch Name="develop">
         <PrimarySolution />
       </Branch>
@@ -288,7 +288,7 @@
     </GitFolder>
 
     <GitFolder Name="CK-SqlServer-Parser-Model" Url="https://gitlab.com/Signature-Code/CK-SqlServer-Parser-Model.git" IsPublic="True" >
-      <SolutionSettings NoUnitTests="true" />
+      <SolutionSettings NoDotNetUnitTests="true" />
       <Branch Name="develop">
         <PrimarySolution />
       </Branch>
@@ -309,7 +309,7 @@
   <Folder Name="SimpleGitVersion">
 
     <GitFolder Name="CodeCake" Url="https://github.com/SimpleGitVersion/CodeCake.git" IsPublic="True" >
-      <SolutionSettings NoUnitTests="true" NoStrongNameSigning="true" />
+      <SolutionSettings NoDotNetUnitTests="true" NoStrongNameSigning="true" />
       <Branch Name="develop">
         <PrimarySolution />
       </Branch>

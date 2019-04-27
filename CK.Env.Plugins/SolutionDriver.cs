@@ -442,13 +442,13 @@ namespace CK.Env.Plugins
                     monitor.Info( $"No unit tests required. Build is skipped." );
                     return true;
                 }
-                if( _settings.NoUnitTests )
+                if( _settings.NoDotNetUnitTests )
                 {
-                    monitor.Info( $"Solution settings: NoUnitTests is true. Build is skipped." );
+                    monitor.Info( $"Solution settings: NoDotNetUnitTests is true. Build is skipped." );
                     return true;
                 }
             }
-            if( withUnitTest && !_settings.NoUnitTests ) buildType |= BuildType.WithUnitTests;
+            if( withUnitTest && !_settings.NoDotNetUnitTests ) buildType |= BuildType.WithUnitTests;
             if( withPushToRemote )
             {
                 if( buildType == BuildType.CI )

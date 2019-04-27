@@ -22,14 +22,23 @@ namespace CodeCake
             readonly NPMProject _p;
             readonly string _savedPackageJson;
 
-            public PackageVersionReplacer( NPMProject p, SVersion version )
+            public PackageVersionReplacer(
+                NPMProject p,
+                SVersion version,
+                bool preparePack,
+                Action<JObject> packageJsonPreProcessor )
             {
                 _p = p;
                 _savedPackageJson = File.ReadAllText( p.PackageJson.JsonFilePath );
 
-                // Replace token by SafeSemVersion
                 JObject json = JObject.Parse( _savedPackageJson );
                 json["version"] = version.ToNuGetPackageString();
+                if( preparePack )
+                {
+                    json.Remove( "devDependencies" );
+                    json.Remove( "scripts" );
+                }
+                if( packageJsonPreProcessor != null ) packageJsonPreProcessor( json );
                 File.WriteAllText( p.PackageJson.JsonFilePath, json.ToString() );
             }
 
@@ -148,24 +157,24 @@ namespace CodeCake
         public string FindBestScript( StandardGlobalInfo globalInfo, string name, bool scriptMustExist = true )
         {
             string n = FindBestScript( globalInfo.IsRelease, name, scriptMustExist ? (bool?)true : null );
-            if( name == null )
+            if( n == null )
             {
                 globalInfo.Cake.Warning( $"Missing script '{name}' in '{PackageJson.JsonFilePath}'." );
             }
-            return name;
+            return n;
         }
 
         /// <summary>
-        /// Runs a "npm -i" followed by a call to the clean script (that must exist, see <see cref="FindBestScript(StandardGlobalInfo, string, bool)"/>). 
+        /// Runs a "npm install" followed by a call to the clean script (that must exist, see <see cref="FindBestScript(StandardGlobalInfo, string, bool)"/>). 
         /// </summary>
         /// <param name="globalInfo">The global information object.</param>
-        /// <param name="cleanScriptName">Clean script name.</param>
         /// <param name="scriptMustExist">
         /// False to only emit a warning and return false if the script doesn't exist instead of
         /// throwing an exception.
         /// </param>
+        /// <param name="cleanScriptName">Clean script name.</param>
         /// <returns>False if the script doesn't exist (<paramref name="scriptMustExist"/> is false), otherwise true.</returns>
-        public virtual void RunInstallAndClean( StandardGlobalInfo globalInfo, string cleanScriptName = "clean", bool scriptMustExist = true )
+        public virtual void RunInstallAndClean( StandardGlobalInfo globalInfo, bool scriptMustExist = true, string cleanScriptName = "clean" )
         {
             RunInstall( globalInfo );
             RunScript( globalInfo, cleanScriptName, scriptMustExist );
@@ -221,7 +230,12 @@ namespace CodeCake
         public void RunTest( StandardGlobalInfo globalInfo, bool scriptMustExist = true ) => RunScript( globalInfo, "test", scriptMustExist );
 
 
-        public IDisposable TemporarySetVersion( SVersion version ) => new PackageVersionReplacer( this, version );
+        public IDisposable TemporarySetVersion( SVersion version ) => new PackageVersionReplacer( this, version, false, null );
+
+        private protected IDisposable TemporaryPrePack( SVersion version, bool cleanupPackageJson, Action<JObject> packageJsonPreProcessor )
+        {
+            return new PackageVersionReplacer( this, version, cleanupPackageJson, packageJsonPreProcessor );
+        }
 
         public IDisposable TemporarySetPushTargetAndTokenLogin( string pushUri, string token )
         {

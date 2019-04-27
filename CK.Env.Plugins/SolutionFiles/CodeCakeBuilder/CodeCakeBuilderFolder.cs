@@ -83,9 +83,9 @@ namespace CK.Env.Plugins.SolutionFiles
                     DeleteFile( m, "dotnet/Build.NuGetHelper.cs" );
                     DeleteFile( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
                 }
-                if( _settings.NoUnitTests )
+                if( _settings.NoDotNetUnitTests )
                 {
-                    m.Info( "Removing Build.StandardUnitTests since NoUnitTests is true." );
+                    m.Info( "Removing Build.StandardUnitTests since NoDotNetUnitTests is true." );
                     DeleteFile( m, "dotnet/Build.StandardUnitTests.cs" );
                 }
                 else

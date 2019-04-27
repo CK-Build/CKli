@@ -59,7 +59,7 @@ namespace CK.Env.Plugins.SolutionFiles
             if( !_localFeedProvider.EnsureCKSetupStores( e.Monitor ) ) return;
 
             var targetStore = _localFeedProvider.GetCKSetupStorePath( e.Monitor, e.BuildType );
-            if( !_settings.NoUnitTests )
+            if( !_settings.NoDotNetUnitTests )
             {
                 EnsureStorePath( e.Monitor, targetStore );
             }
@@ -81,7 +81,7 @@ namespace CK.Env.Plugins.SolutionFiles
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
-            if( PluginBranch == StandardGitStatus.Local && _settings.UseCKSetup && !_settings.NoUnitTests )
+            if( PluginBranch == StandardGitStatus.Local && _settings.UseCKSetup && !_settings.NoDotNetUnitTests )
             {
                 EnsureStorePath( m, _localFeedProvider.Local.GetCKSetupStorePath() );
             }

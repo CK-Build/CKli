@@ -43,9 +43,13 @@ namespace CodeCake
         /// by calling npm pack.
         /// </summary>
         /// <param name="globalInfo">The global information object.</param>
-        public void RunPack( StandardGlobalInfo globalInfo )
+        /// <param name="cleanupPackageJson">
+        /// By default, "scripts" and "devDependencies" are removed from the package.json file.
+        /// </param>
+        /// <param name="packageJsonPreProcessor">Optional package.json pre processor.</param>
+        public void RunPack( StandardGlobalInfo globalInfo, bool cleanupPackageJson = true, Action<JObject> packageJsonPreProcessor = null )
         {
-            using( TemporarySetVersion( ArtifactInstance.Version ) )
+            using( TemporaryPrePack( ArtifactInstance.Version, cleanupPackageJson, packageJsonPreProcessor ) )
             {
                 globalInfo.Cake.NpmPack( new NpmPackSettings()
                 {

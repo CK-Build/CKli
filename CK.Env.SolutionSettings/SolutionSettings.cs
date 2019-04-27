@@ -10,7 +10,7 @@ namespace CK.Env
     {
         public SolutionSettings( XElement e, ArtifactCenter artifacts )
         {
-            NoUnitTests = (bool?)e.Attribute( nameof( NoUnitTests ) ) ?? false;
+            NoDotNetUnitTests = (bool?)e.Attribute( nameof( NoDotNetUnitTests ) ) ?? false;
             NoStrongNameSigning = (bool?)e.Attribute( nameof( NoStrongNameSigning ) ) ?? false;
             NoSharedPropsFile = (bool?)e.Attribute( nameof( NoSharedPropsFile ) ) ?? false;
             UseCKSetup = (bool?)e.Attribute( nameof(UseCKSetup) ) ?? false;
@@ -39,7 +39,7 @@ namespace CK.Env
 
         public SolutionSettings( ISolutionSettings other, ArtifactCenter artifacts, XElement applyConfig = null )
         {
-            NoUnitTests = other.NoUnitTests;
+            NoDotNetUnitTests = other.NoDotNetUnitTests;
             NoStrongNameSigning = other.NoStrongNameSigning;
             NoSharedPropsFile = other.NoSharedPropsFile;
             UseCKSetup = other.UseCKSetup;
@@ -68,8 +68,8 @@ namespace CK.Env
                 var produceCKSetupComponents = (bool?)applyConfig.Attribute( nameof( UseCKSetup ) );
                 if( produceCKSetupComponents.HasValue ) UseCKSetup= produceCKSetupComponents.Value;
 
-                var noUnitTests = (bool?)applyConfig.Attribute( nameof( NoUnitTests ) );
-                if( noUnitTests.HasValue ) NoUnitTests = noUnitTests.Value;
+                var noUnitTests = (bool?)applyConfig.Attribute( nameof( NoDotNetUnitTests ) );
+                if( noUnitTests.HasValue ) NoDotNetUnitTests = noUnitTests.Value;
 
                 var noStrongNameSigning = (bool?)applyConfig.Attribute( nameof( NoStrongNameSigning ) );
                 if( noStrongNameSigning.HasValue ) NoStrongNameSigning = noStrongNameSigning.Value;
@@ -103,7 +103,7 @@ namespace CK.Env
             }
         }
 
-        public bool NoUnitTests { get; }
+        public bool NoDotNetUnitTests { get; }
 
         public bool NoStrongNameSigning { get; }
 
