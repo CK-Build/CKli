@@ -68,7 +68,7 @@ namespace CodeCake
                 var project = (NPMPublishedProject)p.LocalArtifact;
                 var target = _pathToLocalFeed.AppendPart( project.TGZName );
                 var source = ArtifactType.GlobalInfo.ReleasesFolder.AppendPart( project.TGZName );
-                Cake.MoveFile( source.Path, target.Path );
+                Cake.CopyFile( source.Path, target.Path );
                 return System.Threading.Tasks.Task.CompletedTask;
             }
         }
@@ -120,14 +120,14 @@ namespace CodeCake
                 var project = (NPMPublishedProject)p.LocalArtifact;
                 using( TokenInjector( project ) )
                 {
+                    var absTgzPath = Path.GetFullPath( ArtifactType.GlobalInfo.ReleasesFolder.AppendPart( project.TGZName ) );
                     Cake.NpmPublish(
                         new NpmPublishSettings()
                         {
-                            Source = ArtifactType.GlobalInfo.ReleasesFolder.AppendPart( project.TGZName ),
+                            Source = absTgzPath,
                             WorkingDirectory = project.DirectoryPath.Path,
                             Tag = tags.First()
-                        }
-                    );
+                        } );
                     foreach( string tag in tags.Skip( 1 ) )
                     {
                         Cake.Information( $"Adding tag \"{tag}\" to \"{project.Name}@{project.ArtifactInstance.Version}\"..." );

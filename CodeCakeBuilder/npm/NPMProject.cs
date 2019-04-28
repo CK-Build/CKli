@@ -109,12 +109,17 @@ namespace CodeCake
 
         public NormalizedPath NPMRCPath { get; }
 
+        /// <summary>
+        /// Runs "npm ci" (instead of "npm install") on this project.
+        /// See https://docs.npmjs.com/cli/ci.html.
+        /// </summary>
+        /// <param name="globalInfo">The global information object.</param>
         public virtual void RunInstall( StandardGlobalInfo globalInfo )
         {
-            globalInfo.Cake.NpmInstall( new Cake.Npm.Install.NpmInstallSettings()
+            globalInfo.Cake.NpmCi( settings =>
             {
-                LogLevel = NpmLogLevel.Info,
-                WorkingDirectory = DirectoryPath.Path
+                settings.LogLevel = NpmLogLevel.Warn;
+                settings.WorkingDirectory = DirectoryPath.Path;
             } );
         }
 
@@ -288,8 +293,6 @@ namespace CodeCake
                     Debug.Assert( scope[0] == '@' );
                     npmrc.Add( scope + ":registry=" + pushUri );
                 }
-                npmrc.Add( "always-auth=true" );
-
                 pushUri = pushUri.Replace( "https:", "" );
                 npmrc.Add( pushUri + ":always-auth=true" );
                 configure( npmrc, pushUri );
