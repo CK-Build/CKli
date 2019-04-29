@@ -11,7 +11,7 @@ namespace CK.Env
     /// </summary>
     public class DirectoryDiff
     {
-        readonly IReadOnlyCollection<(string commitSha, string logMessage)> _commits;
+        readonly IReadOnlyCollection<CommitInfo> _commits;
 
         /// <summary>
         /// Initializes an new <see cref="DirectoryDiff"/> with a no change set but a status.
@@ -30,7 +30,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="p">The package name.</param>
         /// <param name="changes">The changes.</param>
-        public DirectoryDiff( NormalizedPath p, IReadOnlyCollection<FileReleaseDiff> changes, IReadOnlyCollection<(string commitSha, string logMessage)> commits )
+        public DirectoryDiff( NormalizedPath p, IReadOnlyCollection<FileReleaseDiff> changes, IReadOnlyCollection<CommitInfo> commits )
         {
             Path = p;
             DiffType = changes.Count == 0 ? DirectoryDiffType.None : DirectoryDiffType.Changed;
@@ -43,9 +43,9 @@ namespace CK.Env
         public void DumpDiff()
         {
             Console.WriteLine( $"=    => {Path}: {DiffType}" );
-            foreach( (string commitSha, string logMessage) in _commits )
+            foreach( CommitInfo commit in _commits )
             {
-                Console.Write( $"{commitSha}: {logMessage}" );
+                Console.Write( $"{commit.Sha.Take( 5 )}: {commit.Message}" );
             }
             if( DiffType == DirectoryDiffType.Changed )
             {
