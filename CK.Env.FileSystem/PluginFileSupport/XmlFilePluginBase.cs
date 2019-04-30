@@ -19,7 +19,6 @@ namespace CK.Env.Plugins
             _pluginImpl = new GitBranchPluginImpl( f, branchPath );
         }
 
-
         /// <summary>
         /// Gets the Git folder.
         /// Its <see cref="GitFolder.CurrentBranchName"/> can be different from

@@ -3,18 +3,21 @@ using CK.Env;
 using CK.Env.Plugins;
 using CK.Text;
 using SharpYaml.Model;
+using System.Linq;
 
 namespace CK.BuildSystem.Appveyor
 {
     public class AppveyorFile : YamlFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
+        readonly SolutionDriver _driver;
         readonly ISolutionSettings _settings;
         readonly ISecretKeyStore _secretStore;
 
 
-        public AppveyorFile( GitFolder f, ISolutionSettings settings, ISecretKeyStore secretStore, NormalizedPath branchPath )
+        public AppveyorFile( GitFolder f, SolutionDriver driver, ISolutionSettings settings, ISecretKeyStore secretStore, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "appveyor.yml" ) )
         {
+            _driver = driver;
             _settings = settings;
             _secretStore = secretStore;
         }
@@ -75,6 +78,11 @@ namespace CK.BuildSystem.Appveyor
             {
                 CreateKeyValue( "ps", "./CodeCakeBuilder/InstallCredentialProvider.ps1" )
             };
+            // Temporary: installs the 6.9.0 of npm.
+            if( _driver.GetAllValidNPMProjects( m ).Any() )
+            {
+                install.Add( CreateKeyValue( "cmd", "npm install -g npm@6.9.0" ) );
+            }
             firstMapping["install"] = install;
 
             firstMapping["version"] = new YamlValue( "build{build}" );

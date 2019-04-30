@@ -11,6 +11,7 @@ namespace CK.Env.NPM
     {
         /// <summary>
         /// Gets the package name.
+        /// This can be null if <see cref="IsPrivate"/> is true.
         /// </summary>
         string PackageName { get; }
 

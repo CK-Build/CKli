@@ -24,10 +24,10 @@ namespace CK.Env.Plugins.SolutionFiles
 
         protected override void DoApplySettings( IActivityMonitor m )
         {
-            bool? useDotnet = HasDotnetPublishedProjects( m );
-            if( useDotnet == null ) return;
+            bool? dotNet = HasDotnetPublishedProjects( m );
+            if( dotNet == null ) return;
 
-            if( _settings.NoStrongNameSigning || useDotnet == false )
+            if( _settings.NoStrongNameSigning || dotNet == false )
             {
                 DeleteFile( m, "SharedKey.snk" );
             }

@@ -28,12 +28,27 @@ namespace CK.Env.Plugins.SolutionFiles
             List<string> GetLines() => lines ?? (lines = TextContent.NormalizeEOLToCRLF()
                                                    .Split( new[] { "\r\n" }, StringSplitOptions.None )
                                                    .ToList());
-            if( !_settings.NoUnitTests )
+            EnsureLine( GetLines(), "[Bb]in/" );
+            EnsureLine( GetLines(), "[Oo]bj/" );
+            EnsureLine( GetLines(), "[Rr]elease/" );
+            EnsureLine( GetLines(), "[Rr]eleases/" );
+            EnsureLine( GetLines(), ".vs/" );
+            EnsureLine( GetLines(), "*.suo" );
+            EnsureLine( GetLines(), "*.user" );
+
+            if( !_settings.NoDotNetUnitTests )
             {
                 EnsureLine( GetLines(), "Tests/**/TestResult*.xml" );
                 EnsureLine( GetLines(), "CodeCakeBuilder/UnitTestsDone.*.txt" );
                 EnsureLine( GetLines(), "Tests/**/Logs/" );
                 EnsureLine( GetLines(), "Tests/**/CKSetup-WorkingDir/" );
+            }
+            else
+            {
+                RemoveLine( GetLines(), "Tests/**/TestResult*.xml" );
+                RemoveLine( GetLines(), "CodeCakeBuilder/UnitTestsDone.*.txt" );
+                RemoveLine( GetLines(), "Tests/**/Logs/" );
+                RemoveLine( GetLines(), "Tests/**/CKSetup-WorkingDir/" );
             }
             if( lines != null )
             {
@@ -45,5 +60,7 @@ namespace CK.Env.Plugins.SolutionFiles
         {
             if( !lines.Contains( line ) ) lines.Add( line );
         }
+
+        void RemoveLine( List<string> lines, string line ) => lines.Remove( line );
     }
 }

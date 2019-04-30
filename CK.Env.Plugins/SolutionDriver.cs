@@ -442,13 +442,13 @@ namespace CK.Env.Plugins
                     monitor.Info( $"No unit tests required. Build is skipped." );
                     return true;
                 }
-                if( _settings.NoUnitTests )
+                if( _settings.NoDotNetUnitTests )
                 {
-                    monitor.Info( $"Solution settings: NoUnitTests is true. Build is skipped." );
+                    monitor.Info( $"Solution settings: NoDotNetUnitTests is true. Build is skipped." );
                     return true;
                 }
             }
-            if( withUnitTest && !_settings.NoUnitTests ) buildType |= BuildType.WithUnitTests;
+            if( withUnitTest && !_settings.NoDotNetUnitTests ) buildType |= BuildType.WithUnitTests;
             if( withPushToRemote )
             {
                 if( buildType == BuildType.CI )
@@ -537,7 +537,7 @@ namespace CK.Env.Plugins
                     args += " -autointeraction";
                     args += " -PublishDirtyRepo=" + (ev.IsUsingDirtyFolder ? 'Y' : 'N');
                     args += " -PushToRemote=" + (ev.WithPushToRemote ? 'Y' : 'N');
-                    if( !ev.BuildIsRequired ) args += " -target=\"Unit-Testing\" -exclusiveOptional -IgnoreNoPackagesToProduce=Y";
+                    if( !ev.BuildIsRequired ) args += " -target=\"Unit-Testing\" -exclusiveOptional -IgnoreNoArtifactsToProduce=Y";
                     if( !ev.WithUnitTest ) args += " -RunUnitTests=N";
                     if( !ProcessRunner.Run( m, ev.SolutionPhysicalPath, "dotnet", args, ev.EnvironmentVariables ) )
                     {

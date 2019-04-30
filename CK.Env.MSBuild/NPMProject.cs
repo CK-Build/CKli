@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Xml.Linq;
 using CK.Core;
 using CK.Env.NPM;
 using CK.Text;
@@ -21,8 +22,15 @@ namespace CK.Env.MSBuild
             Solution = s;
             _p = p;
         }
+
+        /// <summary>
+        /// Gets the <see cref="Solution"/>.
+        /// </summary>
         public Solution Solution { get; }
 
+        /// <summary>
+        /// Gets the project folder path relative to the <see cref="FileSystem"/>.
+        /// </summary>
         public NormalizedPath FullPath => _p.FullPath;
 
         public PackageJsonFile PackageJson => _p.PackageJson;
@@ -39,6 +47,14 @@ namespace CK.Env.MSBuild
 
         public NPMProjectStatus RefreshStatus( IActivityMonitor m ) => DoRefreshStatus( m );
 
+        public XElement ToXml()
+        {
+            return new XElement( "Project",
+                        new XAttribute( "Path", FullPath.RemovePrefix( Solution.SolutionFolderPath ) ),
+                        new XAttribute( "IsPublished", PackageJson.IsPublished ),
+                        PackageJson.Name != null ? new XAttribute( "ExpectedName", PackageJson.Name ) : null );
+        }
+
         NPMProjectStatus DoRefreshStatus( IActivityMonitor m )
         {
             _projectDependencies = null;
@@ -53,6 +69,9 @@ namespace CK.Env.MSBuild
             return _status;
         }
 
+        /// <summary>
+        /// Captures a dependency to another <see cref="NPMProject"/>.
+        /// </summary>
         public struct ProjectToProjectDependency
         {
             public readonly NPMProject Project;

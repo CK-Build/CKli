@@ -26,7 +26,7 @@ namespace CK.Env.NPM
 
         /// <summary>
         /// Gets or sets the name.
-        /// Can be null: a non-published package does not require a name (nor <see cref="Version"/>).
+        /// Can be null: a non-published package does not require a name (nor a <see cref="Version"/>).
         /// </summary>
         public string Name
         {

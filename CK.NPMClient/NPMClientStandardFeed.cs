@@ -9,9 +9,13 @@ namespace CK.NPMClient
     class NPMClientStandardFeed : NPMRemoteFeedBase
     {
         public NPMClientStandardFeed( NPMClient c, NPMStandardFeedInfo info, string pat )
-            : base( c, info, new Registry( c.HttpClient, pat, new System.Uri( info.Url ) ))
-            {
-            }
+            : base( c,
+                    info,
+                    info.UsePassword
+                        ? new Registry( c.HttpClient, "CodeCakeBuilder", pat, new System.Uri( info.Url ) )
+                        : new Registry( c.HttpClient, pat, new System.Uri( info.Url ) ) )
+        {
+        }
 
         /// <summary>
         /// Gets the <see cref="NPMStandardFeedInfo"/> info.

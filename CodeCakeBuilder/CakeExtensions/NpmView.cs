@@ -51,14 +51,16 @@ namespace Cake.Npm
                 } );
                 return string.Join( "\n", output );
 
-            } catch(CakeException)
+            }
+            catch( CakeException ex )
             {
-                CakeLog.Information("Error should be a 404 and i ignore it.");
+                CakeLog.Information( "Error while calling npm view: " + ex.Message );
                 return "";
             }
-            
+
         }
     }
+
     [CakeAliasCategory( "Npm" )]
     [CakeNamespaceImport( "Cake.Npm" )]
     public static class NpmViewAliases
@@ -76,6 +78,7 @@ namespace Cake.Npm
         {
             NpmViewSettings settings = new NpmViewSettings()
             {
+                LogLevel = NpmLogLevel.Info,
                 PackageName = packageName,
                 WorkingDirectory = workingDirectory
             };

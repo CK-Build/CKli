@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -6,8 +6,7 @@
   </PropertyGroup>
  
   <ItemGroup>
-    <ProjectReference Include="..\CK.Env.SolutionSettings\CK.Env.SolutionSettings.csproj" />
-    <ProjectReference Include="..\CK.Env.FileSystem\CK.Env.FileSystem.csproj" />
+    <ProjectReference Include="..\CK.Env.Plugins\CK.Env.Plugins.csproj" />
   </ItemGroup>
 
 </Project>

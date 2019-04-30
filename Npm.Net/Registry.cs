@@ -20,6 +20,56 @@ namespace Npm.Net
 {
     public class Registry
     {
+        bool _registryIsUpToDate;
+        readonly HttpClient _httpClient;
+        readonly AuthenticationHeaderValue _authHeader;
+        readonly string _session = GenerateSessionId();
+
+        /// <summary>
+        /// Create a registry that make unauthentified request
+        /// </summary>
+        /// <param name="httpClient">The <see cref="HttpClient"/> used to send the requests</param>
+        /// <param name="registryUri">Registry <see cref="Uri"/>, https://registry.npmjs.org/ is used if the uri is not specified </param>
+        public Registry( HttpClient httpClient, Uri registryUri = null )
+        {
+            RegistryUri = registryUri;
+            if( RegistryUri == null )
+            {
+                RegistryUri = new Uri( "https://registry.npmjs.org/" );
+            }
+            InitRegistryUpToDate();
+            _httpClient = httpClient;
+        }
+
+        /// <summary>
+        /// Create a registry that make unauthentified request
+        /// </summary>
+        /// <param name="httpClient">The <see cref="HttpClient"/> used to send the requests</param>
+        /// <param name="registryUri">Registry <see cref="Uri"/>, https://registry.npmjs.org/ is used if the uri is not specified </param>
+        /// <param name="token">Bearer token used to authenticate </param>
+        public Registry( HttpClient httpClient, string token, Uri registryUri = null )
+            : this( httpClient, registryUri )
+        {
+            _authHeader = new AuthenticationHeaderValue( "Bearer", token );
+        }
+
+        /// <summary>
+        /// Create a registry that make unauthentified request
+        /// </summary>
+        /// <param name="httpClient">The <see cref="HttpClient"/> used to send the requests</param>
+        /// <param name="registryUri">Registry <see cref="Uri"/>, https://registry.npmjs.org/ is used if the uri is not specified </param>
+        /// <param name="username">Username used for the authentification.</param>
+        /// <param name="password">
+        /// Password used for the authentification.
+        /// Npm base64 decode the password, we don't, so you must do it yourself.
+        /// </param>
+        public Registry( HttpClient httpClient, string username, string password, Uri registryUri = null )
+            : this( httpClient, registryUri )
+        {
+            string basic = Convert.ToBase64String( Encoding.ASCII.GetBytes( $"{username}:{password}" ) );
+            _authHeader = new AuthenticationHeaderValue( "Basic", basic );
+        }
+
         /// <summary>
         /// Simple cache storing if we know that a registry have newer api endpoint
         /// If the registry is not in the dictionary, we did'nt tested a new endpoint.
@@ -83,9 +133,6 @@ namespace Npm.Net
         }
 
         bool _thisRegistryIsUpToDate;
-        readonly HttpClient _httpClient;
-        readonly AuthenticationHeaderValue _authHeader;
-        readonly string _session = GenerateSessionId();
         /// <summary>
         /// NPM ask a one time password, so here you have one.
         /// </summary>
@@ -98,59 +145,20 @@ namespace Npm.Net
         }
 
         /// <summary>
-        /// Create a registry that make unauthentified request
-        /// </summary>
-        /// <param name="httpClient">The <see cref="HttpClient"/> used to send the requests</param>
-        /// <param name="registryUri">Registry <see cref="Uri"/>, https://registry.npmjs.org/ is used if the uri is not specified </param>
-        public Registry( HttpClient httpClient, Uri registryUri = null )
-        {
-            RegistryUri = registryUri;
-            if( RegistryUri == null )
-            {
-                RegistryUri = new Uri( "https://registry.npmjs.org/" );
-            }
-            InitRegistryUpToDate();
-            _httpClient = httpClient;
-        }
-
-        /// <summary>
-        /// Create a registry that make unauthentified request
-        /// </summary>
-        /// <param name="httpClient">The <see cref="HttpClient"/> used to send the requests</param>
-        /// <param name="registryUri">Registry <see cref="Uri"/>, https://registry.npmjs.org/ is used if the uri is not specified </param>
-        /// <param name="token">Bearer token used to authenticate </param>
-        public Registry( HttpClient httpClient, string token, Uri registryUri = null ) : this( httpClient, registryUri )
-        {
-            _authHeader = new AuthenticationHeaderValue( "Bearer", token );
-        }
-
-        /// <summary>
-        /// Create a registry that make unauthentified request
-        /// </summary>
-        /// <param name="httpClient">The <see cref="HttpClient"/> used to send the requests</param>
-        /// <param name="registryUri">Registry <see cref="Uri"/>, https://registry.npmjs.org/ is used if the uri is not specified </param>
-        /// <param name="username">username used for the authentification</param>
-        /// <param name="password">Password used for the authentification. Npm base64 decode the password, we don't, so you must do it yourself</param>
-        public Registry( HttpClient httpClient, string username, string password, Uri registryUri = null ) : this( httpClient, registryUri )
-        {
-            string basic = Convert.ToBase64String( Encoding.ASCII.GetBytes( $"{username}:{password}" ) );
-            _authHeader = new AuthenticationHeaderValue( "Basic", basic );
-        }
-
-
-        /// <summary>
         /// Uri of the registry
         /// </summary>
         public Uri RegistryUri { get; }
+
         /// <summary>
         /// Gets or Sets wether we are running in CI or not.
-        /// The fields is automatically setted based on the environement variables with the same bahavior of npm.
+        /// The fields is automatically set based on the environement variables with the same behavior as npm.
         /// </summary>
-        public bool NpmInCi { get; set; } = Environment.GetEnvironmentVariable( "CI" ) == "true" ||
-            Environment.GetEnvironmentVariable( "TDDIUM" ) != null ||
-            Environment.GetEnvironmentVariable( "JENKINS_URL" ) != null ||
-            Environment.GetEnvironmentVariable( "bamboo.buildKey" ) != null ||
-            Environment.GetEnvironmentVariable( "GO_PIPELINE_NAME" ) != null;
+        public bool NpmInCi { get; set; }
+            = Environment.GetEnvironmentVariable( "CI" ) == "true"
+                || Environment.GetEnvironmentVariable( "TDDIUM" ) != null
+                || Environment.GetEnvironmentVariable( "JENKINS_URL" ) != null
+                || Environment.GetEnvironmentVariable( "bamboo.buildKey" ) != null
+                || Environment.GetEnvironmentVariable( "GO_PIPELINE_NAME" ) != null;
 
         /// <summary>
         /// 
@@ -182,7 +190,6 @@ namespace Npm.Net
                 }
             }
         }
-
 
         async Task<JObject> GetPackageJsonFromTarball( IActivityMonitor m, Stream tarball )
         {
@@ -222,7 +229,7 @@ namespace Npm.Net
             {
                 req.Content = metadataStream;
                 /**
-                 * npm does more things than we does:
+                 * npm does more things than we do:
                  * if the first request return 409: conflict, npm fetch the versions availables in the registry.
                  * With these versions npm patch the metadata and resend a packet.
                  * We think it's probably for legacy reason, the simple request works on Azure Devops and Verdaccio
@@ -462,6 +469,8 @@ namespace Npm.Net
             if( await LogErrors( m, res ) ) fail = true;
             return !fail;
         }
+
+
         /// <summary>
         /// 
         /// </summary>

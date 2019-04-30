@@ -7,23 +7,31 @@ namespace CK.Env
     {
         /// <summary>
         /// Gets whether the solution has no unit tests.
+        /// Defaults to false.
         /// </summary>
-        bool NoUnitTests { get; }
+        bool NoDotNetUnitTests { get; }
 
         /// <summary>
         /// Gets whether no strong name singing should be used.
+        /// Defaults to false.
         /// </summary>
         bool NoStrongNameSigning { get; }
 
         /// <summary>
+        /// Gets whether no shared props file should be used.
+        /// Defaults to false.
+        /// </summary>
+        bool NoSharedPropsFile { get; }
+
+        /// <summary>
         /// Gets whether the solution uses CKSetup components.
-        /// When true (and when <see cref="NoUnitTests"/> is false), a RemoteStore.TestHelper.config file
+        /// When true (and when <see cref="NoDotNetUnitTests"/> is false), a RemoteStore.TestHelper.config file
         /// is created during build so that stores in CK-Env local folders are used instead of the default
         /// local (%UserProfile%AppData\Local\CKSetupStore) and default remote (https://cksetup.invenietis.net).
         /// </summary>
         bool UseCKSetup { get; }
 
-       /// <summary>
+        /// <summary>
         /// Gets whether source link is disabled.
         /// Impacts Common/Shared.props file.
         /// </summary>
