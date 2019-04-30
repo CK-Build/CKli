@@ -10,7 +10,7 @@ namespace CK.Env.MSBuild
 {
     /// <summary>
     /// Encapsulates the result of the dependencies analysis at the solution level.
-    /// This is produced by <see cref="DependencyAnalyser.CreateDependencyContext(Core.IActivityMonitor, SolutionSortStrategy)"/>.
+    /// This is produced by <see cref="DependencyAnalyser.CreateDependencyContext(IActivityMonitor, SolutionSortStrategy)"/>.
     /// </summary>
     public class SolutionDependencyContext : IDependentSolutionContext
     {

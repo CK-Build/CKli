@@ -225,6 +225,17 @@ namespace CK.Env.MSBuild
         NPMProject EnsureNPMProject( IActivityMonitor m, NPM.INPMProjectSpec spec )
         {
             if( _npmProjects.TryGetValue( spec.FullPath, out var p ) ) return p;
+            string folderName = spec.FullPath.RemovePrefix( SolutionFolderPath ).LastPart;
+            string packageName = spec.PackageName;
+            if( packageName.StartsWith( "@" ) )
+            {
+                packageName = packageName.Substring( packageName.IndexOf( '/' ) + 1 );
+            }
+            if( !string.IsNullOrWhiteSpace( spec.PackageName ) && packageName != folderName && !string.IsNullOrEmpty( folderName ) )
+            {
+                m.Warn( $"The npm project name is {packageName} while it's located in a directory named {folderName}." +
+               $"The folder name and the package name should be the same." );
+            }
             NPM.INPMProject npm = BuildContext.NPMProjectContext.Ensure( m, spec );
             p = new NPMProject( this, npm );
             _npmProjects.Add( p.FullPath, p );
@@ -553,6 +564,13 @@ namespace CK.Env.MSBuild
             if( type.Equals( SolutionFolder.TypeIdentifier, StringComparison.OrdinalIgnoreCase ) )
             {
                 return new SolutionFolder( idBuilder.ToString(), nameBuilder.ToString(), path );
+            }
+            string dirName = path.Parts[path.Parts.Count - 2];
+            string fileNameWithoutExtension = path.LastPart.Replace( ".csproj", "" );
+            if( fileNameWithoutExtension != projectName || dirName != projectName )
+            {
+                m.Warn( $"The solution project name is {projectName} while it's csproj is named {fileNameWithoutExtension} located in a directory named {dirName}." +
+                $"The folder name and the project name should be the same." );
             }
             return new Project( ctx, projectGuid, projectName, path, type );
         }
