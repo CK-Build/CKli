@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Env;
+using CK.NPMClient;
 using CK.NuGetClient;
 using CK.Text;
 using CKSetup;
@@ -52,6 +53,11 @@ namespace CKli
                 return XLocalFeedProvider.GetAllPackageFiles( m, PhysicalPath );
             }
 
+            public IEnumerable<LocalNPMPackageFile> GetAllNPMPackageFiles( IActivityMonitor m )
+            {
+                return XLocalFeedProvider.GetAllNPMPackageFiles( m, PhysicalPath );
+            }
+
             public SVersion GetBestVersion( IActivityMonitor m, string packageId )
             {
                 return GetMaxVersionFromFeed( PhysicalPath, packageId );
@@ -61,6 +67,12 @@ namespace CKli
             {
                 var f = GetPackagePath( PhysicalPath, packageId, v );
                 return File.Exists( f ) ? new LocalNuGetPackageFile( f, packageId, v ) : null;
+            }
+
+            public LocalNPMPackageFile GetNPMPackageFile( IActivityMonitor m, string packageId, SVersion v )
+            {
+                var f = GetPackagePath( PhysicalPath, packageId, v );
+                return File.Exists( f ) ? new LocalNPMPackageFile( f, packageId, v ) : null;
             }
 
             public List<ArtifactInstance> GetMissing( IActivityMonitor m, IEnumerable<ArtifactInstance> artifacts )
@@ -81,9 +93,16 @@ namespace CKli
                         }
                     }
                 }
-                foreach( var n in artifacts.Where( a => a.Artifact.Type == "NuGet" ) )
+                foreach( var n in artifacts )
                 {
-                    if( GetPackageFile( m, n.Artifact.Name, n.Version ) == null ) missing.Add( n );
+                    if( n.Artifact.Type == "NuGet" )
+                    {
+                        if( GetPackageFile( m, n.Artifact.Name, n.Version ) == null ) missing.Add( n );
+                    }
+                    else if( n.Artifact.Type == "NPM" )
+                    {
+                        if( GetNPMPackageFile( m, n.Artifact.Name, n.Version ) == null ) missing.Add( n );
+                    }
                 }
                 return missing;
             }
@@ -109,6 +128,21 @@ namespace CKli
                 {
                     string localStore = this.GetCKSetupStorePath();
                     return target.PushAsync( m, new CKSetupArtifactLocalSet( artifacts, localStore ) ).GetAwaiter().GetResult();
+                }
+                else if( target.HandleArtifactType( "NPM" ) )
+                {
+                    var locals = new List<LocalNPMPackageFile>();
+                    foreach( var a in artifacts )
+                    {
+                        var local = GetNPMPackageFile( m, a.Artifact.Name, a.Version );
+                        if( local == null )
+                        {
+                            m.Error( $"Unable to find local NPM package {a} in {PhysicalPath}." );
+                            return false;
+                        }
+                        locals.Add( local );
+                    }
+                    return target.PushAsync( m, new NPMArtifactLocalSet( locals ) ).GetAwaiter().GetResult();
                 }
                 else
                 {
@@ -208,6 +242,11 @@ namespace CKli
             return Path.Combine( path, packageId + '.' + v.ToNuGetPackageString() + ".nupkg" );
         }
 
+        static string GetNPMPackagePath( string path, string packageId, SVersion v )
+        {
+            return Path.Combine( path, packageId.Replace( "@", "" ).Replace( '/', '-' ) + '-' + v.ToNuGetPackageString() + ".tgz" );
+        }
+
         static IEnumerable<SVersion> GetAllVersionsFromFeed( string path, string packageId )
         {
             // Do not use TryParse here: pattern MUST be a version since we remove
@@ -233,6 +272,12 @@ namespace CKli
             return Directory.EnumerateFiles( feedPath, "*.nupkg" )
                             .Where( f => !f.EndsWith( ".symbols.nupkg" ) )
                             .Select( f => LocalNuGetPackageFile.Parse( f ) );
+        }
+
+        static IEnumerable<LocalNPMPackageFile> GetAllNPMPackageFiles( IActivityMonitor m, string feedPath )
+        {
+            return Directory.EnumerateFiles( feedPath, "*.tgz" )
+                            .Select( f => LocalNPMPackageFile.Parse( f ) );
         }
 
         static SVersion SafeParse( IActivityMonitor m, string path )

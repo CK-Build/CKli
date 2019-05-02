@@ -24,7 +24,7 @@ namespace CK.Env.Plugins.SolutionFiles
 
         protected override void DoApplySettings( IActivityMonitor m )
         {
-            bool? dotNet = HasDotnetPublishedProjects( m );
+            bool? dotNet = _driver.HasDotnetProjects( m );
             if( dotNet == null ) return;
 
             if( _settings.NoStrongNameSigning || dotNet == false )

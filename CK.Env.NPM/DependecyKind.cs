@@ -19,7 +19,7 @@ namespace CK.Env.NPM
         /// <summary>
         /// Normal (private) dependencies.
         /// </summary>
-        Normal,
+        Private,
 
         /// <summary>
         /// Development only dependency.
@@ -42,7 +42,7 @@ namespace CK.Env.NPM
             {
                 case DependencyKind.Dev: return "devDependencies";
                 case DependencyKind.Peer: return "peerDependencies";
-                case DependencyKind.Normal: return "dependencies";
+                case DependencyKind.Private: return "dependencies";
                 default: return String.Empty;
             }
         }

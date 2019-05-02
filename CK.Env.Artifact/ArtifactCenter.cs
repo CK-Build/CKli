@@ -28,7 +28,7 @@ namespace CK.Env
         {
             if( factory == null ) throw new ArgumentNullException( nameof( factory ) );
             if( factory == this ) throw new ArgumentException( nameof( factory ) );
-            if( _factories.Contains( factory) ) throw new InvalidOperationException( nameof( factory ) );
+            if( _factories.Contains( factory ) ) throw new InvalidOperationException( nameof( factory ) );
             _factories.Add( factory );
         }
 

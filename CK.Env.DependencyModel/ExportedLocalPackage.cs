@@ -3,40 +3,36 @@ namespace CK.Env
     /// <summary>
     /// Defines the view of a locally produced package exported by a solution into
     /// the other solutions. 
-    /// This is a wrapper on <see cref="ILocalPackageDependency"/> that helps to resolve the Origin vs. Target
+    /// This is a wrapper on <see cref="LocalPackageDependency"/> that helps to resolve the Origin vs. Target
     /// ambiguity.
     /// </summary>
     public readonly struct ExportedLocalPackage
     {
-        readonly ILocalPackageDependency _dep;
+        readonly LocalPackageDependency _dep;
 
         /// <summary>
         /// Initializes an <see cref="ExportedLocalPackage"/> view.
         /// </summary>
         /// <param name="d">The local package dependency.</param>
-        public ExportedLocalPackage( ILocalPackageDependency d )
+        public ExportedLocalPackage( LocalPackageDependency d )
         {
             _dep = d;
         }
 
         /// <summary>
-        /// Gets the type of the dependency involved (ie. "NuGet", "NPM", etc.).
-        /// </summary>
-        public string Type => _dep.Type;
-
-        /// <summary>
         /// Gets the primary solution that consumes this package.
         /// </summary>
-        public IDependentSolution Target => _dep.Origin;
+        public DependentSolution Target => _dep.Origin;
 
         /// <summary>
-        /// Gets the name that reference this package.
+        /// Gets the project that references this package.
         /// </summary>
-        public string TargetProjectName => _dep.OriginProjectName;
+        public DependentProject TargetProject => _dep.OriginProject;
 
         /// <summary>
-        /// Gets the package name.
+        /// Gets the type of the dependency involved (ie. "NuGet", "NPM", etc.).
         /// </summary>
-        public string PackageName => _dep.TargetProjectName;
+        public ArtifactInstance Reference => _dep.Reference;
+
     }
 }

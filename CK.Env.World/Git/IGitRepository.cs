@@ -27,7 +27,7 @@ namespace CK.Env
         void CreateBranch( IActivityMonitor m, string branchName );
 
         /// <summary>
-        /// Create a local branch pointing on the given commit on a given commit in the repository
+        /// Create a local branch pointing on the given commitin the repository.
         /// </summary>
         /// <param name="m"></param>
         /// <param name="branchName"></param>

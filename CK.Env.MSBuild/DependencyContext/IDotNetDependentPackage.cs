@@ -14,6 +14,6 @@ namespace CK.Env.MSBuild
         /// When a local project exists, this <see cref="FullName"/> is the <see cref="ProjectBase.Name"/>
         /// and this <see cref="Version"/> is null.
         /// </summary>
-        Project Project { get; }
+        IP Project { get; }
     }
 }

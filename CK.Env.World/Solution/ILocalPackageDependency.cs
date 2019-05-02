@@ -19,12 +19,6 @@ namespace CK.Env
         IDependentSolution Origin { get; }
 
         /// <summary>
-        /// Gets the secondary solution name of the solution that actually references package
-        /// or null it the <see cref="OriginProjectName"/> belongs to the <see cref="Origin"/>.
-        /// </summary>
-        string OriginSecondarySolutionName { get; }
-
-        /// <summary>
         /// Gets the name of the project that references the <see cref="TargetProjectName"/>.
         /// </summary>
         string OriginProjectName { get; }
@@ -38,12 +32,6 @@ namespace CK.Env
         /// Gets the primary solution that produces this package.
         /// </summary>
         IDependentSolution Target { get; }
-
-        /// <summary>
-        /// Gets the secondary solution name of the solution that actually produces this package
-        /// or null if it the <see cref="TargetProjectName"/> belongs to the <see cref="Target"/>.
-        /// </summary>
-        string TargetSecondarySolutionName { get; }
 
         /// <summary>
         /// Gets the target project name that is also the package name.

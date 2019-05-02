@@ -190,6 +190,17 @@ namespace CK.Env.Plugins
         /// <returns>Null on error, true if at least one .Net packages is produced, false otherwise.</returns>
         public bool? HasDotnetPublishedProjects( IActivityMonitor m ) => GetPrimarySolution( m, false )?.PublishedProjects.Any();
 
+        /// <summary>
+        /// Gets whether .Net packages are published.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>Null on error, true if at least one .Net packages is produced, false otherwise.</returns>
+        public bool? HasDotnetProjects( IActivityMonitor m )
+        {
+            var s = GetPrimarySolution( m, false );
+            if( s == null ) return null;
+            return s.AllProjects.Except( s.BuildProjects ).Any();
+        }
 
         /// <summary>
         /// Fires before a build.

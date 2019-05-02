@@ -10,7 +10,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the artifact type.
         /// </summary>
-        public string Type { get; }
+        public ArtifactType Type { get; }
 
         /// <summary>
         /// Gets the artifact name.
@@ -18,13 +18,19 @@ namespace CK.Env
         public string Name { get; }
 
         /// <summary>
+        /// Gets whether this Artifact is the default, invalid, one.
+        /// </summary>
+        public bool IsDefault => Type.IsDefault;
+
+        /// <summary>
         /// Initializes a new <see cref="Artifact"/>.
         /// </summary>
         /// <param name="type">Artifact type.</param>
         /// <param name="name">Artifact name.</param>
-        public Artifact( string type, string name )
+        public Artifact( in ArtifactType type, string name )
         {
-            Type = type ?? throw new ArgumentNullException( nameof( type ) );
+            if( type.IsDefault ) throw new ArgumentException( "Unspecified type.", nameof( type ) );
+            Type = type;
             Name = name ?? throw new ArgumentNullException( nameof( name ) );
         }
 
@@ -54,7 +60,7 @@ namespace CK.Env
         /// <param name="x">First artifact.</param>
         /// <param name="y">Second artifact.</param>
         /// <returns>True if they are equal.</returns>
-        public static bool operator ==( Artifact x, Artifact y ) => x.Equals( y );
+        public static bool operator ==( in Artifact x, in Artifact y ) => x.Equals( y );
 
         /// <summary>
         /// Implements != operator.
@@ -62,7 +68,7 @@ namespace CK.Env
         /// <param name="x">First artifact.</param>
         /// <param name="y">Second artifact.</param>
         /// <returns>True if they are not equal.</returns>
-        public static bool operator !=( Artifact x, Artifact y ) => !x.Equals( y );
+        public static bool operator !=( in Artifact x, in Artifact y ) => !x.Equals( y );
 
         public override string ToString() => $"{Type}:{Name}";
     }

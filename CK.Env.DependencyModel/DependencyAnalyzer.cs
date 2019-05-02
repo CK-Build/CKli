@@ -1,0 +1,482 @@
+using CK.Core;
+using CK.Setup;
+using CK.Text;
+using CSemVer;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+
+namespace CK.Env
+{
+    /// <summary>
+    /// Root class of dependency analysis.
+    /// A DependencyAnalyzer can be created on any set of <see cref="Solution"/> thanks to the
+    /// factory method <see cref="Create(IActivityMonitor, IEnumerable{Solution})"/>.
+    /// </summary>
+    public class DependencyAnalyser
+    {
+        readonly PrimarySolution[] _solutions;
+        readonly Dictionary<Artifact, LocalPackageItem> _packages;
+        readonly ProjectItem.Cache _projects;
+        readonly IReadOnlyList<PackageReference> _externalRefs;
+
+        /// <summary>
+        /// Package items are not bound to any container (PrimarySolution). There is 2 kind of packages:
+        /// locally produced (the item requires the Solution that owns its source code), and external
+        /// packages.
+        /// This handles the locally produced package.
+        /// </summary>
+        internal class LocalPackageItem : IDependentItem, IDependentItemRef
+        {
+            // This contains only the Solution of the Project for local projects (the Package -published- requires the
+            // Solution that owns its source code.)
+            readonly IDependentItemRef[] _requires;
+
+            internal LocalPackageItem( Artifact package, DependentProject project )
+            {
+                _requires = new IDependentItemRef[] { project.Solution };
+                Project = project;
+                Package = package;
+            }
+
+            /// <summary>
+            /// Gets the local project that produces this package.
+            /// </summary>
+            public DependentProject Project { get; }
+
+            /// <summary>
+            /// Gets the package information (name and type).
+            /// </summary>
+            public Artifact Package { get; }
+
+            /// <summary>
+            /// Gets <see cref="PackageId"/>/<see cref="Version"/> for external packages
+            /// and the versionless package identifier if the project is locally published.
+            /// </summary>
+            public string FullName { get; }
+
+            public override string ToString() => Project.ToString();
+
+            IDependentItemContainerRef IDependentItem.Container => null;
+
+            IDependentItemRef IDependentItem.Generalization => null;
+
+            IEnumerable<IDependentItemRef> IDependentItem.Requires => _requires;
+
+            IEnumerable<IDependentItemRef> IDependentItem.RequiredBy => null;
+
+            IEnumerable<IDependentItemGroupRef> IDependentItem.Groups => null;
+
+            object IDependentItem.StartDependencySort( IActivityMonitor m ) => this;
+
+            bool IDependentItemRef.Optional => false;
+
+        }
+
+        /// <summary>
+        /// This internal class is the IDependentItem that represents a DependentProject
+        /// in a SortableSolutionFile graph.
+        /// </summary>
+        internal class ProjectItem : IDependentItem, IDependentItemRef
+        {
+            readonly DependentProject _p;
+            readonly List<IDependentItemRef> _requires;
+            readonly Cache _cache;
+
+            public class Cache
+            {
+                readonly Dictionary<DependentProject, ProjectItem> _cache;
+
+                public Cache()
+                {
+                    _cache = new Dictionary<DependentProject, ProjectItem>();
+                }
+
+                public ProjectItem this[DependentProject p] => _cache[p];
+
+                public IEnumerable<DependentProject> AllProjects => _cache.Keys;
+
+                public IEnumerable<ProjectItem> AllProjectItems => _cache.Values;
+
+                /// <summary>
+                /// Dirty trick: when set to true this property forces all ProjectItem's <see cref="IDependentItem.Container"/>
+                /// to be null and <see cref="IDependentItem.Requires"/> to contain the ProjectItem requirements instead of
+                /// the <see cref="LocalPackageItem"/> for locally published packages.
+                /// We use this to reuse ProjectItems to compute Build projects graph dependencies
+                /// (this graph ignores the solutions and focuses only on projects).
+                /// </summary>
+                public bool PureProjectsMode { get; set; }
+
+                internal void Add( DependentProject p, ProjectItem pItem ) => _cache.Add( p, pItem );
+
+                public ProjectItem Create( DependentProject p )
+                {
+                    if( _cache.TryGetValue( p, out var item ) ) return item;
+                    return new ProjectItem( p, this );
+                }
+
+            }
+
+            ProjectItem( DependentProject p, Cache cache )
+            {
+                _p = p;
+                _cache = cache;
+                cache.Add( p, this );
+                _requires = p.ProjectReferences.Select( dep => cache.Create( dep.Target ) ).ToList<IDependentItemRef>();
+            }
+
+            /// <summary>
+            /// Gets the project itself.
+            /// </summary>
+            public DependentProject Project => _p;
+
+            /// <summary>
+            /// Gets the full name of this project item (see <see cref="IsPublished"/>).
+            /// </summary>
+            public string FullName => _p.Name;
+
+            internal void AddRequires( IDependentItemRef p ) => _requires.Add( p );
+
+            IDependentItemContainerRef IDependentItem.Container => _cache.PureProjectsMode
+                                                                    ? null
+                                                                    : _p.Solution;
+
+            IDependentItemRef IDependentItem.Generalization => null;
+
+            IEnumerable<IDependentItemRef> IDependentItem.Requires
+            {
+                get
+                {
+                    if( _cache.PureProjectsMode )
+                    {
+                        return _requires.Select( d => d is LocalPackageItem p && p.Project != null ? _cache[p.Project] : d );
+                    }
+                    return _requires;
+                }
+            }
+
+            IEnumerable<IDependentItemRef> IDependentItem.RequiredBy => null;
+
+            IEnumerable<IDependentItemGroupRef> IDependentItem.Groups => null;
+
+            bool IDependentItemRef.Optional => false;
+
+            object IDependentItem.StartDependencySort( IActivityMonitor m ) => _p;
+
+            public override string ToString() => _p.ToString();
+        }
+
+        DependencyAnalyser(
+            PrimarySolution[] solutions,
+            Dictionary<Artifact, LocalPackageItem> packages,
+            ProjectItem.Cache projects,
+            List<PackageReference> externalRefs )
+        {
+            _solutions = solutions;
+            _packages = packages;
+            _projects = projects;
+            _externalRefs = externalRefs;
+        }
+
+        /// <summary>
+        /// Gets the set of solutions.
+        /// </summary>
+        public IReadOnlyCollection<PrimarySolution> Solutions => _solutions;
+
+        /// <summary>
+        /// Gets all the external package references.
+        /// </summary>
+        public IReadOnlyList<PackageReference> ExternalReferences => _externalRefs;
+
+        /// <summary>
+        /// Gets the information about build projects (see <see cref="PrimarySolution.BuildProject"/>)
+        /// and their dependencies.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>The build projects information.</returns>
+        BuildProjectsInfo GetBuildProjectInfo( IActivityMonitor m )
+        {
+            Debug.Assert( !_projects.PureProjectsMode );
+            _projects.PureProjectsMode = true;
+            try
+            {
+                IDependencySorterResult rBuildProjects = DependencySorter.OrderItems( m, _projects.AllProjectItems.Where( p => p.Project.IsBuildProject ), null );
+                if( !rBuildProjects.IsComplete )
+                {
+                    rBuildProjects.LogError( m );
+                    return new BuildProjectsInfo( rBuildProjects, null );
+                }
+                else
+                {
+                    var rankedProjects = rBuildProjects.SortedItems
+                                                .Where( i => i.Item is DependentProject )
+                                                .Select( i => (i.Rank,
+                                                               Project: (DependentProject)i.Item,
+                                                               DirectDeps: i.Requires
+                                                                            .Select( s => s.Item )
+                                                                            .OfType<DependentProject>(),
+                                                               AllDeps: i.GetAllRequires()
+                                                                         .Select( s => s.Item )
+                                                                         .OfType<DependentProject>()) );
+
+                    var zeroBuildProjects = rankedProjects.Select( ( p, idx ) => new ZeroBuildProjectInfo(
+                                    idx,
+                                    p.Rank,
+                                    p.Project,
+                                    // UpgradePackages: Among direct dependencies, consider only the
+                                    //                  published projects and the ones who are actually referenced
+                                    //                  as a package (ignores ProjectReference).
+                                    p.DirectDeps
+                                        .Where( d => d.IsPublished
+                                                     && p.Project.PackageReferences.Any( r => d.GeneratedArtifacts
+                                                                                               .Select( a => a.Artifact )
+                                                                                               .Contains( r.Target.Artifact ) ) )
+                                        .ToArray(),
+                                    // UpgradeZeroProjects: Among direct dependencies, consider all the
+                                    //                      published projects, the ones who are actually referenced
+                                    //                      as a package AND the ones that are ProjectReference.
+                                    //                      ProjectReference MUST be transformed into PackageReference
+                                    //                      during ZeroBuild.
+                                    p.DirectDeps
+                                        .Where( d => d.IsPublished )
+                                        .ToArray(),
+
+                                    // Dependencies: Considers all the projects. 
+                                    p.AllDeps.ToArray()
+
+                                    ) )
+                        .ToArray();
+
+                    Debug.Assert( zeroBuildProjects.Select( z => z.Rank ).IsSortedLarge() );
+                    Debug.Assert( zeroBuildProjects.Select( z => z.Index ).IsSortedStrict() );
+
+                    return new BuildProjectsInfo( rBuildProjects, zeroBuildProjects );
+                }
+            }
+            finally
+            {
+                _projects.PureProjectsMode = false;
+            }
+        }
+
+        class SolutionItem : IDependentItemContainer
+        {
+            readonly PrimarySolution _solution;
+            IEnumerable<IDependentItemRef> _projects;
+
+            internal SolutionItem( PrimarySolution f, IEnumerable<IDependentItemRef> projects )
+            {
+                _solution = f;
+                _projects = projects;
+            }
+
+            public PrimarySolution Solution => _solution;
+
+            string IDependentItem.FullName => _solution.Name;
+
+            IDependentItemContainerRef IDependentItem.Container => _solution;
+
+            IEnumerable<IDependentItemRef> IDependentItemGroup.Children => _projects;
+
+            IDependentItemRef IDependentItem.Generalization => null;
+
+            IEnumerable<IDependentItemRef> IDependentItem.Requires => null;
+
+            IEnumerable<IDependentItemRef> IDependentItem.RequiredBy => null;
+
+            IEnumerable<IDependentItemGroupRef> IDependentItem.Groups => null;
+
+            object IDependentItem.StartDependencySort( IActivityMonitor m ) => _solution;
+
+        }
+
+        /// <summary>
+        /// Creates a new <see cref="SolutionDependencyContext"/>.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="strategy">The strategy.</param>
+        /// <returns>The context or null on error.</returns>
+        public SolutionDependencyContext CreateDependencyContext( IActivityMonitor m, SolutionSortStrategy strategy = SolutionSortStrategy.EverythingExceptBuildProjects )
+        {
+            var sortables = new Dictionary<PrimarySolution, SolutionItem>();
+            foreach( var s in _solutions )
+            {
+                sortables.Add( s, new SolutionItem( s, GetProjectItems( s, strategy ) ) );
+            }
+            IDependencySorterResult result = DependencySorter.OrderItems( m, sortables.Values, null );
+            if( !result.IsComplete )
+            {
+                return new SolutionDependencyContext( strategy, result, GetBuildProjectInfo( m ) );
+            }
+            // Building the list of SolutionDependencyContext.DependencyRow.
+            var table = result.SortedItems
+                          // 1 - Selects solutions along with their ordered index.
+                          .Where( sorted => sorted.GroupForHead == null && sorted.Item is SolutionItem )
+                          .Select( ( sorted, idx ) =>
+                                        (
+                                            Index: idx,
+                                            Solution: (PrimarySolution)sorted.StartValue,
+                                            // The projects from this solution that reference packages that are
+                                            // produced by local solutions have a direct requires to a Package
+                                            // that has a local Project.
+                                            // 2 - First Map: LocalRefs is a set of value tuple (Project Origin, Package Target).
+                                            LocalRefs: sorted.Children
+                                                            .Select( c => (SProject: c, Project: (DependentProject)c.StartValue) )
+                                                            .SelectMany( c => c.SProject.DirectRequires
+                                                                            .Select( r => r.Item )
+                                                                            .OfType<LocalPackageItem>()
+                                                                            .Select( package => (Origin: c.Project, Target: package) )
+                                        )) )
+                           // 3 - Second Map: Expands the LocalRefs.
+                           .SelectMany( s => s.LocalRefs.Any()
+                                                ? s.LocalRefs.Select( r => new DependentSolution.Row
+                                                                (
+                                                                    s.Index,
+                                                                    s.Solution,
+                                                                    r.Origin,
+                                                                    r.Target.Project
+                                                                ) )
+                                                : new[] { new DependentSolution.Row( s.Index, s.Solution, null, null ) }
+                                      )
+                            .ToList();
+            Debug.Assert( table.Select( r => r.Index ).IsSortedLarge() );
+
+            // Now that the table of SolutionDependencyContext.DependencyRow is built, use it to compute the
+            // pure solution dependency graph.
+            //
+            var index = new Dictionary<object, DependentSolution>();
+            PrimarySolution current = null;
+            var depSolutions = new DependentSolution[sortables.Count];
+            foreach( var r in table )
+            {
+                if( current != r.Solution )
+                {
+                    current = r.Solution;
+                    var newDependent = new DependentSolution( current, r.Index, table, s => index[s] );
+                    depSolutions[r.Index] = newDependent;
+                    index.Add( current.Name, newDependent );
+                    index.Add( current, newDependent );
+                }
+            }
+            return new SolutionDependencyContext( index, strategy, result, table, depSolutions, GetBuildProjectInfo( m ) );
+        }
+
+        IEnumerable<IDependentItemRef> GetProjectItems( PrimarySolution s, SolutionSortStrategy content )
+        {
+            IEnumerable<DependentProject> projects;
+            switch( content )
+            {
+                case SolutionSortStrategy.PublishedProjects:
+                    projects = s.Projects.Where( p => p.IsPublished );
+                    break;
+                case SolutionSortStrategy.PublishedAndTestsProjects:
+                    projects = s.Projects.Where( p => p.IsPublished || p.IsTestProject );
+                    break;
+                case SolutionSortStrategy.EverythingExceptBuildProjects:
+                    projects = s.Projects.Where( p => p != s.BuildProject );
+                    break;
+                default: throw new Exception( "Unsuported SolutionSortStrategy" );
+            }
+            return projects.Select( p => _projects[p] );
+        }
+
+        /// <summary>
+        /// Factory method for a <see cref="DependencyAnalyser"/>.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="solutionFiles">The set of <see cref="Solution"/> to consider.</param>
+        /// <returns>A new dependency context.</returns>
+        public static DependencyAnalyser Create( IActivityMonitor m, IEnumerable<PrimarySolution> solutionFiles )
+        {
+            var packages = new Dictionary<Artifact, LocalPackageItem>();
+            var solutions = solutionFiles.ToArray();
+            var projectItems = new ProjectItem.Cache();
+            var externalRefs = new List<PackageReference>();
+
+            // Note: Project to project references are translated into Requirements directly
+            //       in the ProjectItem constructor.
+            //       After having built the ProjectItem, we handle here the Packages (and PackageReferences between
+            //       projects).
+            using( m.OpenDebug( "Creating all the ProjectItem for all projects in all solutions." ) )
+            {
+                foreach( var s in solutions )
+                {
+                    using( m.OpenDebug( $"Solution {s.Name}." ) )
+                    {
+                        foreach( var project in s.Projects )
+                        {
+                            projectItems.Create( project );
+                        }
+                    }
+                }
+            }
+            using( m.OpenDebug( "Creating Package for all installable Artifacts in all solutions." ) )
+            {
+                foreach( var s in solutions )
+                {
+                    using( m.OpenDebug( $"Solution {s.Name}." ) )
+                    {
+                        foreach( var project in s.Projects )
+                        {
+                            foreach( var package in project.GeneratedArtifacts.Where( a => a.Artifact.Type.IsInstallable ) )
+                            {
+                                if( packages.TryGetValue( package.Artifact, out var alreadyPublished ) )
+                                {
+                                    m.Error( $"'{package}' is already published by {alreadyPublished.Project}." );
+                                    return null;
+                                }
+                                packages.Add( package.Artifact, new LocalPackageItem( package.Artifact, project ) );
+                                m.Debug( $"Package '{package}' created." );
+                            }
+
+                        }
+                    }
+                }
+            }
+
+            // 3 - Create the requirements between each project and either
+            //     a Package that is bound to a Published project or to an
+            //     external Package.
+            //     For projects that belong to a secondary solution whose SpecialType is
+            //     IncludedSecondarySolution, we depends on the project instead of the published Package.
+            foreach( var project in projectItems.AllProjectItems )
+            {
+                // Consider package references (Project to Project references are handled by ProjectItem constructors).
+                foreach( var dep in project.Project.PackageReferences )
+                {
+                    if( packages.TryGetValue( dep.Target.Artifact, out LocalPackageItem target ) )
+                    {
+                        if( target.Project.Solution != project.Project.Solution )
+                        {
+                            project.AddRequires( target );
+                        }
+                        else
+                        {
+                            // A project is referencing a Package that is generated by
+                            // its own Solution. This can happen (even if it is strange): for instance to test packages
+                            // from the solution itself (the more correct way to do this is to use another
+                            // Repository/Solution to test the packages since here you always test the "previous"
+                            // package version). 
+                            //
+                            // We transform the package reference into a project reference so that this edge
+                            // case does not create cycles.
+                            project.AddRequires( projectItems[target.Project] );
+                        }
+                    }
+                    else
+                    {
+                        // Dependency to an external Package.
+                        externalRefs.Add( dep );
+                    }
+                }
+            }
+            return new DependencyAnalyser(
+                        solutions,
+                        packages,
+                        projectItems,
+                        externalRefs );
+        }
+
+    }
+}

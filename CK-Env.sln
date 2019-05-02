@@ -70,6 +70,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeCakeBuilder", "CodeCake
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Npm.Net", "Npm.Net\Npm.Net.csproj", "{6F97791F-CFE1-4951-84EA-E17059CAE3DC}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.DependencyModel", "CK.Env.DependencyModel\CK.Env.DependencyModel.csproj", "{A8F9C82B-83A9-4039-8C34-6A3DBBF792E6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -180,6 +182,10 @@ Global
 		{6F97791F-CFE1-4951-84EA-E17059CAE3DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6F97791F-CFE1-4951-84EA-E17059CAE3DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6F97791F-CFE1-4951-84EA-E17059CAE3DC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A8F9C82B-83A9-4039-8C34-6A3DBBF792E6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A8F9C82B-83A9-4039-8C34-6A3DBBF792E6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A8F9C82B-83A9-4039-8C34-6A3DBBF792E6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A8F9C82B-83A9-4039-8C34-6A3DBBF792E6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

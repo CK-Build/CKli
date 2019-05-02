@@ -4,7 +4,7 @@ using System.Xml.Linq;
 namespace CK.Env
 {
     /// <summary>
-    /// Root abstraction that creates repository and repository info of a certain kind.
+    /// Root abstraction that creates repository and repository information of a certain kind.
     /// These handlers are registered in <see cref="ArtifactCenter"/>.
     /// </summary>
     public interface IArtifactTypeFactory

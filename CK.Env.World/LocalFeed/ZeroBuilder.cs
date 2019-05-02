@@ -67,7 +67,7 @@ namespace CK.Env
                             var currentTreeSha = _currentShas[p.Index];
                             if( currentTreeSha == null )
                             {
-                                throw new Exception( $"Unable to get Sha for {p.PrimarySolutionRelativeFolderPath}." );
+                                throw new Exception( $"Unable to get Sha for {p}." );
                             }
                             if( !_sha1Cache.TryGetValue( p.FullName, out var shaList ) )
                             {

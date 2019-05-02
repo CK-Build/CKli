@@ -22,10 +22,10 @@ namespace CK.Env
         /// <summary>
         /// Initializes a new <see cref="ArtifactInstance"/>.
         /// </summary>
-        /// <param name="type">The artifact type. Can not be null.</param>
+        /// <param name="type">The artifact type.</param>
         /// <param name="name">The artifact name. Can not be null.</param>
         /// <param name="version">The version. Can not be null.</param>
-        public ArtifactInstance( string type, string name, SVersion version )
+        public ArtifactInstance( ArtifactType type, string name, SVersion version )
             : this( new Artifact( type, name ), version )
         {
         }
@@ -59,7 +59,7 @@ namespace CK.Env
         /// <param name="x">First artifact instance.</param>
         /// <param name="y">Second artifact instance.</param>
         /// <returns>True if they are equal.</returns>
-        public static bool operator ==( ArtifactInstance x, ArtifactInstance y ) => x.Equals( y );
+        public static bool operator ==( in ArtifactInstance x, in ArtifactInstance y ) => x.Equals( y );
 
         /// <summary>
         /// Implements != operator.
@@ -67,7 +67,7 @@ namespace CK.Env
         /// <param name="x">First artifact instance.</param>
         /// <param name="y">Second artifact instance.</param>
         /// <returns>True if they are not equal.</returns>
-        public static bool operator !=( ArtifactInstance x, ArtifactInstance y ) => !x.Equals( y );
+        public static bool operator !=( in ArtifactInstance x, in ArtifactInstance y ) => !x.Equals( y );
 
     }
 }

@@ -116,7 +116,7 @@ namespace CK.Env.NPM
         internal NPMProjectStatus Refresh( IActivityMonitor m )
         {
             _deps.Clear();
-            var s = FillDeps( m, DependencyKind.Normal );
+            var s = FillDeps( m, DependencyKind.Private );
             if( s == NPMProjectStatus.Valid ) s = FillDeps( m, DependencyKind.Dev );
             if( s == NPMProjectStatus.Valid ) s = FillDeps( m, DependencyKind.Peer );
             return s;

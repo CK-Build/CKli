@@ -11,7 +11,7 @@ using CK.Text;
 namespace CK.Env.MSBuild
 {
 
-    public class NPMProject : NPM.INPMProject
+    public class NPMProject : NPM.INPMProject, IP
     {
         NPMProjectStatus _status;
         List<ProjectToProjectDependency> _projectDependencies;
@@ -19,19 +19,27 @@ namespace CK.Env.MSBuild
 
         internal NPMProject( Solution s, NPM.INPMProject p )
         {
-            Solution = s;
+            PrimarySolution = s;
             _p = p;
         }
 
         /// <summary>
-        /// Gets the <see cref="Solution"/>.
+        /// Gets the <see cref="PrimarySolution"/>.
         /// </summary>
-        public Solution Solution { get; }
+        public Solution PrimarySolution { get; }
+
+        public string ProjectType => "NPM";
+
+        public string ProjectName => PackageJson.IsPublished ? PackageJson.Name : PrimarySolutionRelativeFolderPath.Path;
+
+        public bool IsPublished => PackageJson.IsPublished;
 
         /// <summary>
         /// Gets the project folder path relative to the <see cref="FileSystem"/>.
         /// </summary>
         public NormalizedPath FullPath => _p.FullPath;
+
+        public NormalizedPath PrimarySolutionRelativeFolderPath => FullPath.RemovePrefix( PrimarySolution.SolutionFolderPath );
 
         public PackageJsonFile PackageJson => _p.PackageJson;
 
@@ -40,7 +48,7 @@ namespace CK.Env.MSBuild
         public NPMProjectStatus Status => _status;
 
         /// <summary>
-        /// Gets the NPM projects in this <see cref="Solution"/> that are dependencies.
+        /// Gets the NPM projects in this <see cref="PrimarySolution"/> that are dependencies.
         /// Never null.
         /// </summary>
         public IReadOnlyList<ProjectToProjectDependency> ProjectDependencies => (IReadOnlyList<ProjectToProjectDependency>)_projectDependencies ?? Array.Empty<ProjectToProjectDependency>();
@@ -50,7 +58,7 @@ namespace CK.Env.MSBuild
         public XElement ToXml()
         {
             return new XElement( "Project",
-                        new XAttribute( "Path", FullPath.RemovePrefix( Solution.SolutionFolderPath ) ),
+                        new XAttribute( "Path", FullPath.RemovePrefix( PrimarySolution.SolutionFolderPath ) ),
                         new XAttribute( "IsPublished", PackageJson.IsPublished ),
                         PackageJson.Name != null ? new XAttribute( "ExpectedName", PackageJson.Name ) : null );
         }
@@ -86,9 +94,9 @@ namespace CK.Env.MSBuild
         }
 
         /// <summary>
-        /// Gets the NPM projects in this <see cref="Solution"/> that are dependencies.
+        /// Gets the NPM projects in this <see cref="PrimarySolution"/> that are dependencies.
         /// Note that any <see cref="VersionDependencyType.LocalPath"/> that references absolute paths or
-        /// projects outside this <see cref="Solution"/> is an error.
+        /// projects outside this <see cref="PrimarySolution"/> is an error.
         /// </summary>
         /// <param name="m">The activity monitor.</param>
         /// <returns>True on success, false on error.</returns>
@@ -106,12 +114,12 @@ namespace CK.Env.MSBuild
                                                                 .Combine( d.RawDep.Substring( "file:".Length ) )
                                                                 .ResolveDots()) ) )
             {
-                if( !pDep.Path.StartsWith( Solution.SolutionFolderPath, strict: true ) )
+                if( !pDep.Path.StartsWith( PrimarySolution.SolutionFolderPath, strict: true ) )
                 {
                     m.Error( $"Project {ToString()} has file dependency {pDep.Path} that is outside the parent Solution." );
                     return false;
                 }
-                var p = Solution.NPMProjects.FirstOrDefault( d => d.Specification.FullPath == pDep.Path );
+                var p = PrimarySolution.NPMProjects.FirstOrDefault( d => d.Specification.FullPath == pDep.Path );
                 if( p == null )
                 {
                     m.Error( $"Project {ToString()} has file dependency {pDep.Path} that is not declared as a NPM project." );
@@ -123,6 +131,6 @@ namespace CK.Env.MSBuild
             return true;
         }
 
-        public override string ToString() => $"{Solution}/{_p.ToString()}";
+        public override string ToString() => $"{PrimarySolution}/{_p.ToString()}";
     }
 }

@@ -37,10 +37,10 @@ namespace CK.NPMClient
         public ArtifactInstance Instance { get; }
 
         /// <summary>
-        /// Returns the "<see cref="PackageId"/>.<see cref="Version"/>" string.
+        /// Returns the "<see cref="PackageId"/>@<see cref="Version"/>" string.
         /// </summary>
         /// <returns>The package and version.</returns>
-        public override string ToString() => $"{PackageId}.{Version}";
+        public override string ToString() => $"{PackageId}@{Version}";
 
         /// <summary>
         /// Parses a full path and extracts a <see cref="LocalNPMPackageFile"/>.
@@ -50,7 +50,7 @@ namespace CK.NPMClient
         public static LocalNPMPackageFile Parse( string fullPath )
         {
             var fName = Path.GetFileNameWithoutExtension( fullPath );
-            int idxV = Regex.Match( fName, "\\.\\d" ).Index;
+            int idxV = Regex.Match( fName, "-\\d" ).Index;
             var id = fName.Substring( 0, idxV );
             var v = SVersion.Parse( fName.Substring( idxV + 1 ) );
             return new LocalNPMPackageFile( fullPath, id, v );

@@ -9,10 +9,41 @@ using System.Xml.Linq;
 
 namespace CK.Env.MSBuild
 {
+
+    public interface IP
+    {
+        /// <summary>
+        /// Gets the primary solution of this project.
+        /// It is never null.
+        /// </summary>
+        Solution PrimarySolution { get; }
+
+        /// <summary>
+        /// Gets the project name.
+        /// </summary>
+        string ProjectName { get; }
+
+        /// <summary>
+        /// Gets the project type.
+        /// </summary>
+        string ProjectType { get; }
+
+        /// <summary>
+        /// Gets whether this project is published as a package.
+        /// </summary>
+        bool IsPublished { get; }
+        
+        /// <summary>
+        /// Gets the <see cref="FolderPath"/> of this project relative to the <see cref="PrimarySolution"/> folder.
+        /// </summary>
+        NormalizedPath PrimarySolutionRelativeFolderPath { get; }
+
+    }
+
     /// <summary>
     /// Represents an actual Visual Studio project in a solution.
     /// </summary>
-    public class Project : ProjectBase
+    public class Project : ProjectBase, IP
     {
         /// <summary>
         /// Captures <see cref="DeclaredPackageDependency"/> and <see cref="ProjectToProjectDependency"/>.
@@ -93,6 +124,12 @@ namespace CK.Env.MSBuild
         /// This is null if an error occurred while loading.
         /// </summary>
         public MSBuildContext.ProjectFile ProjectFile => _file;
+
+        public string ProjectType => "NuGet";
+
+        public string ProjectName => PrimarySolution.PublishedProjects.Contains( this )
+                                        ? Name
+                                        : PrimarySolution.UniqueSolutionName + '/' + Name;
 
         /// <summary>
         /// Gets the folder path of this project. 
@@ -210,6 +247,8 @@ namespace CK.Env.MSBuild
         /// It is contained in this <see cref="Solution"/>'s <see cref="Solution.BuildProjects"/>.
         /// </summary>
         public bool IsBuildProject => Solution.BuildProjects.Contains( this );
+
+        public bool IsPublished => Solution.PublishedProjects.Contains( this );
 
         /// <summary>
         /// Gets the dependencies.
