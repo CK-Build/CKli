@@ -112,7 +112,8 @@ namespace CKli
                 }
                 else
                 {
-                    throw new InvalidOperationException( $"Unhandled repository type: {target.Info.UniqueArtifactRepositoryName}" );
+                    // throw new InvalidOperationException( $"Unhandled repository type: {target.Info.UniqueArtifactRepositoryName}" );
+                    return true;
                 }
             }
 
