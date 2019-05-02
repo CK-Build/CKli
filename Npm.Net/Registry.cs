@@ -26,7 +26,7 @@ namespace Npm.Net
         readonly string _session = GenerateSessionId();
 
         /// <summary>
-        /// Create a registry that make unauthentified request
+        /// Create a registry that make unauthentified request.
         /// </summary>
         /// <param name="httpClient">The <see cref="HttpClient"/> used to send the requests</param>
         /// <param name="registryUri">Registry <see cref="Uri"/>, https://registry.npmjs.org/ is used if the uri is not specified </param>
@@ -71,7 +71,8 @@ namespace Npm.Net
         }
 
         /// <summary>
-        /// Simple cache storing if we know that a registry have newer api endpoint
+        /// Simple cache storing.
+        /// If we know that a registry have newer api endpoint
         /// If the registry is not in the dictionary, we did'nt tested a new endpoint.
         /// If it's it, we know if the registry is up to date or not.
         /// </summary>
@@ -145,7 +146,7 @@ namespace Npm.Net
         }
 
         /// <summary>
-        /// Uri of the registry
+        /// Gets the Uri of the registry.
         /// </summary>
         public Uri RegistryUri { get; }
 

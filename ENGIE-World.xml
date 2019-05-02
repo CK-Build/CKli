@@ -117,6 +117,7 @@
     </GitFolder>
 
     <GitFolder Name="Feedermarket-Functions-Siradel" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions-Siradel">
+    <SolutionSettings NoStrongNameSigning="true" />
       <Branch Name="develop">
         <PrimarySolution />
       </Branch>

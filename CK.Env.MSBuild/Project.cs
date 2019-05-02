@@ -124,7 +124,15 @@ namespace CK.Env.MSBuild
                 Sdk = (string)_file.Document.Root.Attribute( "Sdk" );
                 if( Sdk == null )
                 {
-                    m.Error( $"There must be a Sdk element on root {Path}." );
+                    if( _file.Document.Root.Elements( "Import" ).Where( el => el.Attribute( "Sdk" ) != null ).Any() )
+                    {
+                        m.Error( "Explicit Import of the Sdk is not supported, only the Sdk attribute on the project element is supported: https://docs.microsoft.com/en-us/visualstudio/msbuild/how-to-use-project-sdk." );
+                    }
+                    if( _file.Document.Root.Elements( "Sdk" ).Any() )
+                    {
+                        m.Error( "Top level element Sdk is not supported, only the Sdk attribute on the project element is supported: https://docs.microsoft.com/en-us/visualstudio/msbuild/how-to-use-project-sdk." );
+                    }
+                    m.Error( $"There must be a Sdk attribute on root {Path}." );
                     _file = null;
                 }
                 else
@@ -488,46 +496,56 @@ namespace CK.Env.MSBuild
             {
                 if( p.Origin.Name.LocalName == "PackageReference" )
                 {
-                    bool isPropVersion;
-                    bool versionLocked = false;
-                    SVersion version = null;
-                    if( String.IsNullOrWhiteSpace( p.PackageId )
-                        || String.IsNullOrWhiteSpace( p.RawVersion )
-                        || (
-                             !(isPropVersion = p.RawVersion.StartsWith( "$(" ))
-                             && !((versionLocked, version) = SVersionRange.TryParseSimpleRange( m, p.RawVersion )).version.IsValid
-                           ) )
+                    if( p.Origin.Attribute( "Include" ) != null )
                     {
-                        if( version != null )
+
+
+                        bool isPropVersion;
+                        bool versionLocked = false;
+                        SVersion version = null;
+                        if( String.IsNullOrWhiteSpace( p.PackageId )
+                            || String.IsNullOrWhiteSpace( p.RawVersion )
+                            || (
+                                 !(isPropVersion = p.RawVersion.StartsWith( "$(" ))
+                                 && !((versionLocked, version) = SVersionRange.TryParseSimpleRange( m, p.RawVersion )).version.IsValid
+                               ) )
                         {
-                            m.Error( $"Unable to parse Version attribute on element {p.Origin}: {version.ErrorMessage}" );
+                            if( version != null )
+                            {
+                                m.Error( $"Unable to parse Version attribute on element {p.Origin}: {version.ErrorMessage}" );
+                            }
+                            else
+                            {
+                                m.Error( $"Invalid Include or Version attribute on element {p.Origin}." );
+                            }
+                            return;
+                        }
+                        XElement propertyDef = null;
+                        if( isPropVersion )
+                        {
+                            propertyDef = FollowRefPropertyVersion( m, p, ref versionLocked, ref version );
+                            if( propertyDef == null ) return;
+                        }
+                        CKTrait frameworks = ComputeFrameworks( m, p.Origin, conditionEvaluator );
+                        if( frameworks == null ) return;
+                        if( frameworks.IsEmpty )
+                        {
+                            m.Warn( $"Useless PackageReference (applies to undeclared frameworks): {p.Origin}." );
+                            uselessDeps.Add( p.Origin );
                         }
                         else
                         {
-                            m.Error( $"Invalid Include or Version attribute on element {p.Origin}." );
+                            deps.Add( new DeclaredPackageDependency( this, p.PackageId, versionLocked, version, p.Origin, propertyDef, frameworks ) );
                         }
-                        return;
-                    }
-                    XElement propertyDef = null;
-                    if( isPropVersion )
-                    {
-                        propertyDef = FollowRefPropertyVersion( m, p, ref versionLocked, ref version );
-                        if( propertyDef == null ) return;
-                    }
-                    CKTrait frameworks = ComputeFrameworks( m, p.Origin, conditionEvaluator );
-                    if( frameworks == null ) return;
-                    if( frameworks.IsEmpty )
-                    {
-                        m.Warn( $"Useless PackageReference (applies to undeclared frameworks): {p.Origin}." );
-                        uselessDeps.Add( p.Origin );
                     }
                     else
                     {
-                        deps.Add( new DeclaredPackageDependency( this, p.PackageId, versionLocked, version, p.Origin, propertyDef, frameworks ) );
+                        m.Warn("PackageReference that are not Include are not supported and ignored.");
                     }
                 }
                 else
                 {
+                    //This is a ProjectReference.
                     string projectName = new NormalizedPath( p.PackageId ).LastPart;
                     if( !projectName.EndsWith( ".csproj" ) )
                     {

@@ -18,7 +18,7 @@ namespace CK.Env.MSBuild
         readonly Dictionary<NormalizedPath, NPMProject> _npmProjects;
         SolutionSpecialType _specialType;
         List<Solution> _secondarySolutions;
-        List<ProjectBase> _allProjects;
+        readonly List<ProjectBase> _allProjects;
         MSBuildContext.ISolutionTracker _tracker;
 
         bool _isDirty;
@@ -492,7 +492,7 @@ namespace CK.Env.MSBuild
                 {
                     if( p.ReloadProjectFile( m ) == null )
                     {
-                        m.Error( $"Error while loading project '{p}'. This may be a case sensivity issue !" );
+                        m.Error( $"Error while loading project '{p}'." );
                         return null;
                     }
                 }
