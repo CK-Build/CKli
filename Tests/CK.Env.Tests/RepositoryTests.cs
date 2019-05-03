@@ -14,12 +14,22 @@ namespace CK.Env.Tests
     [TestFixture]
     public class RepositoryTests
     {
+        class KeyStore : ISecretKeyStore
+        {
+            public string GetSecretKey( IActivityMonitor m, string name, bool throwOnEmpty, string message = null )
+            {
+                throw new NotImplementedException();
+            }
+        }
+
         readonly CommandRegister _commandRegister = new CommandRegister();
+        readonly ISecretKeyStore _keyStore = new KeyStore();
+
 
         [Test]
         public void FileSystem_sees_physical_files()
         {
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, new SimpleServiceContainer() ) )
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
                 fs.GetDirectoryContents( "" ).Select( f => $"{f.Name} - {f.IsDirectory}" )
                 .Should().Contain( "Test.xml - False" )
@@ -33,9 +43,9 @@ namespace CK.Env.Tests
         public void FileSystem_sees_Git_repo_with_a_null_PhysicalPath()
         {
             var w = new WorldMock();
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, new SimpleServiceContainer() ) )
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
-                fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository" );
+                fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
                 CheckRoot( fs.GetFileInfo( "TestGitRepository" ) );
                 CheckRoot( fs.GetFileInfo( "/TestGitRepository" ) );
                 CheckRoot( fs.GetFileInfo( "TestGitRepository/" ) );
@@ -57,9 +67,9 @@ namespace CK.Env.Tests
         public void FileSystem_sees_Git_repo_with_head_and_branches_subfolder()
         {
             var w = new WorldMock();
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, new SimpleServiceContainer() ) )
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
-                fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository" );
+                fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
                 CheckRootContent( fs.GetDirectoryContents( "TestGitRepository" ) );
                 CheckRootContent( fs.GetDirectoryContents( "/TestGitRepository" ) );
                 CheckRootContent( fs.GetDirectoryContents( "TestGitRepository/" ) );
@@ -82,9 +92,9 @@ namespace CK.Env.Tests
         public void FileSystem_sees_Git_head_as_the_PhysicalDirectory()
         {
             var w = new WorldMock();
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, new SimpleServiceContainer() ) )
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
-                fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository" );
+                fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
                 CheckHead( fs.GetFileInfo( "TestGitRepository/head" ) );
                 CheckHead( fs.GetFileInfo( "/TestGitRepository/head" ) );
                 CheckHead( fs.GetFileInfo( "TestGitRepository/head/" ) );
@@ -97,7 +107,7 @@ namespace CK.Env.Tests
                 {
                     r.IsDirectory.Should().BeTrue();
                     r.Name.Should().Be( "head" );
-                    r.PhysicalPath.Should().Be( Path.Combine( LocalTestHelper.WorldFolder, "TestGitRepository" ) );
+                    r.PhysicalPath.Should().Be( LocalTestHelper.WorldFolder.AppendPart( "TestGitRepository" ) );
                 }
 
                 CheckHeadContent( fs.GetDirectoryContents( "TestGitRepository/head" ) );
@@ -125,9 +135,9 @@ namespace CK.Env.Tests
         public void FileSystem_sees_the_branches_as_directories()
         {
             var w = new WorldMock();
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, new SimpleServiceContainer() ) )
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
-                fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository" );
+                fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
                 var f = fs.GetFileInfo( "TestGitRepository/branches" );
                 f.IsDirectory.Should().BeTrue();
                 f.Name.Should().Be( "branches" );
@@ -145,9 +155,9 @@ namespace CK.Env.Tests
         public void GitFolder_CheckCleanCommit_detects_new_deleted_and_modified_files()
         {
             var w = new WorldMock();
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, new SimpleServiceContainer() ) )
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
-                var git = fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository" );
+                var git = fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
                 git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
                 git.CurrentBranchName.Should().Be( "master" );
 
@@ -177,100 +187,15 @@ namespace CK.Env.Tests
             }
         }
 
-
-        [Test]
-        public void GitFolder_OpenProtectedScope_recursively_protects_working_directory()
-        {
-            var w = new WorldMock();
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, new SimpleServiceContainer() ) )
-            {
-                var git = fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository" );
-                var gitRoot = git.SubPath.AppendPart( "branches" ).AppendPart( "master" );
-
-                // From a clean working directory.
-                void FromACleanWorkingDirectory()
-                {
-                    git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
-
-                    using( git.OpenProtectedScope( TestHelper.Monitor ) )
-                    {
-                        // Adds a New file.
-                        fs.CopyTo( TestHelper.Monitor, "stuff...", gitRoot.AppendPart( "newFile.txt" ) );
-
-                        // Removes an existing file.
-                        fs.Delete( TestHelper.Monitor, gitRoot.AppendPart( "master.txt" ) );
-
-                        // Modifies an existing file.
-                        // Use a Guid since when reusing this test (in depth) we may reach the same content as
-                        // a parent.
-                        fs.CopyTo( TestHelper.Monitor, Guid.NewGuid().ToString(), gitRoot.Combine( "c/c2.txt" ) );
-
-                        git.CheckCleanCommit( TestHelper.Monitor ).Should().BeFalse();
-                    }
-
-                    git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
-                }
-
-                FromACleanWorkingDirectory();
-
-                // From a working directory with a modified file that is temporarily removed.
-                void WithAModifiedFileThatIsTemporarilyRemoved( Action subTest )
-                {
-                    git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
-
-                    var savedMasterContent = fs.GetFileInfo( gitRoot.AppendPart( "master.txt" ) ).AsTextFileInfo()?.TextContent;
-                    fs.CopyTo( TestHelper.Monitor, $"master is dirty. {Guid.NewGuid().ToString()}", gitRoot.AppendPart( "master.txt" ) );
-
-                    using( git.OpenProtectedScope( TestHelper.Monitor ) )
-                    {
-                        git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
-
-                        subTest?.Invoke();
-
-                        // Adds a New file.
-                        fs.CopyTo( TestHelper.Monitor, "stuff...", gitRoot.AppendPart( "newFile.txt" ) );
-
-                        // Removes the existing master.txt file.
-                        fs.Delete( TestHelper.Monitor, gitRoot.AppendPart( "master.txt" ) );
-
-                        // Modifies an existing file.
-                        fs.CopyTo( TestHelper.Monitor, Guid.NewGuid().ToString(), gitRoot.Combine( "c/c2.txt" ) );
-
-                        git.CheckCleanCommit( TestHelper.Monitor ).Should().BeFalse();
-
-                        using( git.OpenProtectedScope( TestHelper.Monitor ) )
-                        {
-                            subTest?.Invoke();
-                        }
-                    }
-                    git.CheckCleanCommit( TestHelper.Monitor ).Should().BeFalse();
-
-                    if( savedMasterContent != null ) fs.CopyTo( TestHelper.Monitor, savedMasterContent, gitRoot.AppendPart( "master.txt" ) );
-                    else fs.Delete( TestHelper.Monitor, gitRoot.AppendPart( "master.txt" ) );
-
-                    git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
-                }
-
-                WithAModifiedFileThatIsTemporarilyRemoved( null );
-                WithAModifiedFileThatIsTemporarilyRemoved( FromACleanWorkingDirectory );
-
-                git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
-                WithAModifiedFileThatIsTemporarilyRemoved( () => WithAModifiedFileThatIsTemporarilyRemoved( FromACleanWorkingDirectory ) );
-                git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
-
-            }
-        }
-
-
         [Test]
         public void FileSystem_remotes_contains_the_remote_branches()
         {
             var w = new WorldMock();
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, new SimpleServiceContainer() ) )
+            var keyStore = new CKEnvKeyVault( w, LocalTestHelper.WorldFolder, _commandRegister );
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, keyStore, new SimpleServiceContainer() ) )
             {
-                var keyStore = new CKEnvKeyVault( w, fs, _commandRegister );
                 fs.ServiceContainer.Add<ISecretKeyStore>( keyStore );
-                fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository" );
+                fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
                 var f = fs.GetFileInfo( "TestGitRepository/remotes/" );
                 f.IsDirectory.Should().BeTrue();
                 f.Name.Should().Be( "remotes" );
@@ -318,22 +243,22 @@ namespace CK.Env.Tests
         public void when_the_branch_is_the_current_one_we_have_access_to_the_physical_files()
         {
             var w = new WorldMock();
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, new SimpleServiceContainer() ) )
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
-                fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository" );
+                fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
                 fs.GitFolders[0].CurrentBranchName.Should().Be( "master", "The TestRepository must be on 'master'." );
 
                 var fA = fs.GetFileInfo( "TestGitRepository/branches/master/a" );
                 fA.IsDirectory.Should().BeTrue();
                 fA.Name.Should().Be( "a" );
                 fA.PhysicalPath.Should().NotBeNull();
-                fA.PhysicalPath.Should().Be( LocalTestHelper.WorldFolder.Combine( "TestGitRepository/a" ) );
+                new NormalizedPath( fA.PhysicalPath ).Should().Be( LocalTestHelper.WorldFolder.Combine( "TestGitRepository/a" ) );
 
                 var fMaster = fs.GetFileInfo( "TestGitRepository/branches/master/master.txt" );
                 fMaster.IsDirectory.Should().BeFalse();
                 fMaster.Name.Should().Be( "master.txt" );
                 fMaster.PhysicalPath.Should().NotBeNull();
-                fMaster.PhysicalPath.Should().Be( LocalTestHelper.WorldFolder.Combine( "TestGitRepository/master.txt" ) );
+                new NormalizedPath( fMaster.PhysicalPath ).Should().Be( LocalTestHelper.WorldFolder.Combine( "TestGitRepository/master.txt" ) );
                 using( var content = fMaster.CreateReadStream() )
                 using( var textR = new StreamReader( content ) )
                 {
@@ -362,9 +287,9 @@ namespace CK.Env.Tests
         public void once_in_a_branch_we_have_access_to_directory_content_in_read_only_or_writable_if_in_current_head()
         {
             var w = new WorldMock();
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, new SimpleServiceContainer() ) )
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
-                fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository" );
+                fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
                 fs.GitFolders[0].Checkout( TestHelper.Monitor, "alpha" ).Success.Should().BeTrue( "Go to 'alpha' branch." ); ;
 
                 var cA = fs.GetDirectoryContents( "TestGitRepository/branches/master/a" );

@@ -26,7 +26,7 @@ namespace CK.Env
         /// <summary>
         /// Gets whether this type is the default, invalid, one.
         /// </summary>
-        public bool IsDefault => Name != null;
+        public bool IsDefault => Name == null;
 
 
         static ArtifactType[] _types = Array.Empty<ArtifactType>();

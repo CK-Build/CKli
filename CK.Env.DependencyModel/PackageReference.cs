@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace CK.Env
+namespace CK.Env.DependencyModel
 {
     /// <summary>
     /// Defines a dependency to a package.
@@ -12,7 +12,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the project that owns the reference.
         /// </summary>
-        public DependentProject Owner { get; }
+        public IProject Owner { get; }
 
         /// <summary>
         /// Gets the referenced artifact instance.
@@ -25,7 +25,7 @@ namespace CK.Env
         /// </summary>
         public ProjectDependencyKind Kind { get; }
 
-        internal PackageReference( DependentProject o, ArtifactInstance t, ProjectDependencyKind kind )
+        internal PackageReference( IProject o, ArtifactInstance t, ProjectDependencyKind kind )
         {
             Owner = o;
             Target = t;

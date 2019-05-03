@@ -7,7 +7,7 @@ namespace CK.Env
     /// Root abstraction that creates repository and repository information of a certain kind.
     /// These handlers are registered in <see cref="ArtifactCenter"/>.
     /// </summary>
-    public interface IArtifactTypeFactory
+    public interface IArtifactRepositoryFactory
     {
         /// <summary>!
         /// Creates a repository information from an Xml element or returns null if the element

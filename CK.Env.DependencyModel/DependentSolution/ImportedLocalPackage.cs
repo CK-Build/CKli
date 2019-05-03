@@ -1,4 +1,4 @@
-namespace CK.Env
+namespace CK.Env.DependencyModel
 {
     /// <summary>
     /// Defines the view of a reference from a project to a package produced by another local solution.
@@ -26,7 +26,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the project name that references the <see cref="Package"/>.
         /// </summary>
-        public DependentProject Project => _dep.OriginProject;
+        public IProject Project => _dep.OriginProject;
 
         /// <summary>
         /// Gets the package name and version.

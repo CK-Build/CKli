@@ -30,7 +30,7 @@ namespace CK.NPMClient
         /// </summary>
         /// <param name="artifactType">Type of the artifact.</param>
         /// <returns>True if this repository artifact type is "NPM", false otherwise.</returns>
-        public bool HandleArtifactType( string artifactType ) => artifactType == "NPM";
+        public bool HandleArtifactType( in ArtifactType artifactType ) => artifactType == LocalNPMPackageFile.NPMType;
 
         IArtifactRepositoryInfo IArtifactRepository.Info => Info;
 

@@ -22,7 +22,7 @@ namespace CK.Env.MSBuild
         readonly Dictionary<string, NPMPackageItem> _npmPackages;
         readonly NPMProjectItem.Cache _npmProjects;
         readonly CKTrait _frameworks;
-        //ProjectDependencyResult _projectDependencies;
+        ProjectDependencyResult _projectDependencies;
 
         /// <summary>
         /// Package items are not bound to any container (solution). There is 2 kind of packages:
@@ -41,8 +41,8 @@ namespace CK.Env.MSBuild
                 _requires = new IDependentItemRef[] { localProject.Project.Solution };
                 Project = localProject.Project;
                 Version = null;
-                PackageId = Project.ProjectName;
-                FullName = Project.ProjectName;
+                PackageId = Project.Name;
+                FullName = Project.Name;
             }
 
             internal DotNetPackageItem( string packageId, SVersion v, string fullName )
@@ -57,7 +57,7 @@ namespace CK.Env.MSBuild
             /// This is null for external packages: for external package this <see cref="FullName"/> is the <see cref="ProjectBase.Name"/>
             /// and this <see cref="Version"/> is null.
             /// </summary>
-            public IP Project { get; }
+            public Project Project { get; }
 
             /// <summary>
             /// Gets the package identifier.
@@ -110,7 +110,7 @@ namespace CK.Env.MSBuild
 
             internal NPMPackageItem( NPMProjectItem localProject )
             {
-                _requires = new IDependentItemRef[] { localProject.Project.PrimarySolution };
+                _requires = new IDependentItemRef[] { localProject.Project.Solution };
                 Project = localProject.Project;
                 Version = null;
                 PackageId = Project.PackageJson.Name;
@@ -180,16 +180,16 @@ namespace CK.Env.MSBuild
 
             public class Cache
             {
-                readonly Dictionary<IP, DotNetProjectItem> _cache;
+                readonly Dictionary<Project, DotNetProjectItem> _cache;
 
                 public Cache()
                 {
-                    _cache = new Dictionary<IP, DotNetProjectItem>();
+                    _cache = new Dictionary<Project, DotNetProjectItem>();
                 }
 
-                public DotNetProjectItem this[IP p] => _cache[p];
+                public DotNetProjectItem this[Project p] => _cache[p];
 
-                public IEnumerable<IP> AllProjects => _cache.Keys;
+                public IEnumerable<Project> AllProjects => _cache.Keys;
 
                 public IEnumerable<DotNetProjectItem> AllProjectItems => _cache.Values;
 
@@ -359,7 +359,7 @@ namespace CK.Env.MSBuild
             /// </summary>
             public string FullName => IsPublished
                                         ? _p.PackageJson.Name + "/package.json"
-                                        : _p.PrimarySolution.UniqueSolutionName + '/' + _p.PackageJson.SafeName;
+                                        : _p.Solution.UniqueSolutionName + '/' + _p.PackageJson.SafeName;
 
             /// <summary>
             /// Gets the name of the package produced by this project or null when <see cref="IsPublished"/> is false.
@@ -375,7 +375,7 @@ namespace CK.Env.MSBuild
 
             IDependentItemContainerRef IDependentItem.Container => _cache.PureProjectsMode
                                                                     ? null
-                                                                    : _p.PrimarySolution;
+                                                                    : _p.Solution;
 
             IDependentItemRef IDependentItem.Generalization => null;
 
@@ -433,45 +433,56 @@ namespace CK.Env.MSBuild
         /// </summary>
         public IReadOnlyCollection<Solution> Solutions => _solutions;
 
-        ///// <summary>
-        ///// Gets project dependency information.
-        ///// </summary>
-        //public ProjectDependencyResult ProjectDependencies
-        //{
-        //    get
-        //    {
-        //        if( _projectDependencies != null ) return _projectDependencies;
+        /// <summary>
+        /// Gets project dependency information.
+        /// </summary>
+        public ProjectDependencyResult ProjectDependencies
+        {
+            get
+            {
+                if( _projectDependencies != null ) return _projectDependencies;
 
-        //        DotNetPackageItem FindPackage( DeclaredPackageDependency d )
-        //        {
-        //            // Check for a published Package.
-        //            if( !_packages.TryGetValue( d.PackageId, out DotNetPackageItem p ) )
-        //            {
-        //                // If it is not a published package, then we must find it as an external package.
-        //                p = _packages[d.Package.ToString()];
-        //            }
-        //            return p;
-        //        }
+                DotNetPackageItem FindPackage( DeclaredPackageDependency d, bool isIncludedSolutionProject )
+                {
+                    // Check for a published Package.
+                    if( _packages.TryGetValue( d.PackageId, out DotNetPackageItem p ) )
+                    {
+                        // If this published Package is from the primary solution of
+                        // the project's solution that has SpecialType=IncludedSecondarySolution, we ignore
+                        // the dependency as if the dependency was a ProjectReference instead of a PackageReference.
+                        if( isIncludedSolutionProject
+                            && p.Project.Solution == d.Owner.Solution.PrimarySolution )
+                        {
+                                p = null;
+                        }
+                    }
+                    else
+                    {
+                        // If it is not a published package, then we must find it as an external package.
+                        p = _packages[d.Package.ToString()];
+                    }
+                    return p;
+                }
 
-        //        // Computes ProjectDepencyRows (the ProjectDependencyResult.DependencyTable).
-        //        var allDeps = _projects.AllProjects.SelectMany( p => p.Deps.Packages )
-        //                            .Select( d => (Dep: d, Target: FindPackage( d )) )
-        //                            .Where( t => t.Target != null )
-        //                            .Select( t => new ProjectDependencyResult.ProjectDepencyRow(
-        //                                            t.Dep,
-        //                                            _projects[t.Dep.Owner],
-        //                                            t.Target ) )
-        //                            .ToList();
-        //        // Group by framework (the ProjectDependencyResult.PerFrameworkDependencies). 
-        //        var result = new List<ProjectDependencyResult.FrameworkDependencies>();
-        //        foreach( var f in _frameworks.AtomicTraits )
-        //        {
-        //            var fDeps = allDeps.Where( d => d.RawPackageDependency.Frameworks.Intersect( f ) == f ).ToList();
-        //            result.Add( new ProjectDependencyResult.FrameworkDependencies( f, fDeps ) );
-        //        }
-        //        return _projectDependencies = new ProjectDependencyResult( allDeps, result );
-        //    }
-        //}
+                // Computes ProjectDepencyRows (the ProjectDependencyResult.DependencyTable).
+                var allDeps = _projects.AllProjects.SelectMany( p => p.Deps.Packages )
+                                    .Select( d => (Dep: d, Target: FindPackage( d, d.Owner.Solution.SpecialType == SolutionSpecialType.IncludedSecondarySolution )) )
+                                    .Where( t => t.Target != null )
+                                    .Select( t => new ProjectDependencyResult.ProjectDepencyRow(
+                                                    t.Dep,
+                                                    _projects[t.Dep.Owner],
+                                                    t.Target ) )
+                                    .ToList();
+                // Group by framework (the ProjectDependencyResult.PerFrameworkDependencies). 
+                var result = new List<ProjectDependencyResult.FrameworkDependencies>();
+                foreach( var f in _frameworks.AtomicTraits )
+                {
+                    var fDeps = allDeps.Where( d => d.RawPackageDependency.Frameworks.Intersect( f ) == f ).ToList();
+                    result.Add( new ProjectDependencyResult.FrameworkDependencies( f, fDeps ) );
+                }
+                return _projectDependencies = new ProjectDependencyResult( allDeps, result );
+            }
+        }
 
         /// <summary>
         /// Gets the information about build projects (see <see cref="Project.IsBuildProject"/>)
@@ -588,7 +599,7 @@ namespace CK.Env.MSBuild
             IDependencySorterResult result = DependencySorter.OrderItems( m, sortables.Values, null );
             if( !result.IsComplete )
             {
-                return new SolutionDependencyContext( UniqueBranchName, strategy, result/*, ProjectDependencies*/, GetBuildProjectInfo( m ) );
+                return new SolutionDependencyContext( UniqueBranchName, strategy, result, ProjectDependencies, GetBuildProjectInfo( m ) );
             }
             // Building the list of SolutionDependencyContext.DependencyRow.
             var table = result.SortedItems
@@ -636,12 +647,12 @@ namespace CK.Env.MSBuild
                 if( current != r.Solution )
                 {
                     current = r.Solution;
-                    var newDependent = new SolutionDependencyContext.DependentSolution( current, r.Index/*, ProjectDependencies*/, table, s => indexByName[ s.UniqueSolutionName ] );
+                    var newDependent = new SolutionDependencyContext.DependentSolution( current, r.Index, ProjectDependencies, table, s => indexByName[ s.UniqueSolutionName ] );
                     depSolutions[r.Index] = newDependent;
                     indexByName.Add( current.UniqueSolutionName, newDependent );
                 }
             }
-            return new SolutionDependencyContext( UniqueBranchName, indexByName, strategy, result/*, ProjectDependencies*/, table, depSolutions, GetBuildProjectInfo( m ) );
+            return new SolutionDependencyContext( UniqueBranchName, indexByName, strategy, result, ProjectDependencies, table, depSolutions, GetBuildProjectInfo( m ) );
         }
 
         IEnumerable<IDependentItemRef> GetProjectItems( Solution s, SolutionSortStrategy content )
@@ -751,7 +762,7 @@ namespace CK.Env.MSBuild
                         // transfomed into requirements to the Project itself.
                         refTarget = target;
                         if( project.Project.Solution.SpecialType == SolutionSpecialType.IncludedSecondarySolution
-                            && target.Project.PrimarySolution == project.Project.Solution.PrimarySolution )
+                            && target.Project.Solution == project.Project.Solution.PrimarySolution )
                         {
                             refTarget = projectItems[target.Project];
                         }
@@ -789,7 +800,7 @@ namespace CK.Env.MSBuild
                             // Dependency to a Published projects from the primary solution are
                             // transfomed into requirements to the Project itself.
                             refTarget = target;
-                            if( target.Project.PrimarySolution == npmProject.Project.PrimarySolution )
+                            if( target.Project.Solution == npmProject.Project.Solution )
                             {
                                 refTarget = npmProjectItems[target.Project];
                             }

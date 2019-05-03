@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace CK.Env
+namespace CK.Env.DependencyModel
 {
     /// <summary>
     /// Captures a dependency description between one project from a <see cref="DependentSolution"/> (the <see cref="Origin"/>)
@@ -29,7 +29,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the project that references the <see cref="TargetProject"/>'s artifact.
         /// </summary>
-        public DependentProject OriginProject => _row.Origin;
+        public IProject OriginProject => _row.Origin;
 
         /// <summary>
         /// Gets the dependent solution that produces the artifact.
@@ -39,7 +39,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the target project that generate the artifact.
         /// </summary>
-        public DependentProject TargetProject => _row.Target;
+        public IProject TargetProject => _row.Target;
 
         /// <summary>
         /// Gets the artifact instance that is consumed by <see cref="OriginProject"/> and produced by <see cref="TargetProject"/>.

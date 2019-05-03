@@ -81,7 +81,7 @@ namespace CK.Env.Plugins
         }
 
         /// <summary>
-        /// Loads or reloads the primary solution and its secondary solutions.
+        /// Loads or reloads the solution.
         /// If the solution has been reloaded (under the hood), the <see cref="Solution.Current"/> is returned:
         /// this ensures that the plugins always work with an up-to-date version of the solution.
         /// Use <paramref name="reload"/> sets to true only to actually reload the solution.
@@ -276,6 +276,7 @@ namespace CK.Env.Plugins
             }
             finally
             {
+                Folder.ResetHard( monitor );
                 OnZeroBuildProject?.Invoke( this, new ZeroBuildEventArgs( monitor, false, info ) );
             }
         }
@@ -361,7 +362,7 @@ namespace CK.Env.Plugins
                         .SelectMany( p => p.Deps.Packages )
                         .Select( dep => (Dep: dep, LocalVersion: feed.GetBestVersion( monitor, dep.PackageId )) )
                         .Where( pv => pv.LocalVersion != null )
-                        .Select( pv => new UpdatePackageInfo( pv.Dep.Owner.Solution.UniqueSolutionName, pv.Dep.Owner.Name, "NuGet", pv.Dep.PackageId, pv.LocalVersion ) );
+                        .Select( pv => new UpdatePackageInfo( pv.Dep.Owner.Solution.UniqueSolutionName, pv.Dep.Owner.Name, ArtifactType.Single( "NuGet" ), pv.Dep.PackageId, pv.LocalVersion ) );
 
             if( !UpdatePackageDependencies( monitor, toUpgrade ) ) return false;
             return LocalCommit( monitor );
@@ -439,10 +440,10 @@ namespace CK.Env.Plugins
             monitor.Info( $"Version to build: '{v}'." );
 
             var nuGetPackages = allSolutions.SelectMany( s => s.PublishedProjects )
-                                            .Select( p => new ArtifactInstance( "NuGet", p.Name, v ) );
+                                            .Select( p => new ArtifactInstance( ArtifactType.Single( "NuGet" ), p.Name, v ) );
             var ckSetupComponents = allSolutions.SelectMany( s => s.CKSetupComponentProjects )
                                                 .SelectMany( p => p.TargetFrameworks.AtomicTraits
-                                                                   .Select( t => new ArtifactInstance( "CKSetup", p.Name + '/' + t.ToString(), v ) ) );
+                                                                   .Select( t => new ArtifactInstance( ArtifactType.Single( "CKSetup" ), p.Name + '/' + t.ToString(), v ) ) );
             var allArtifacts = nuGetPackages.Concat( ckSetupComponents );
             var missing = feed.GetMissing( monitor, allArtifacts );
             if( missing.Count == 0 )

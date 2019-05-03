@@ -7,19 +7,21 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 
-namespace CK.Env
+namespace CK.Env.DependencyModel
 {
     /// <summary>
     /// Root class of dependency analysis.
-    /// A DependencyAnalyzer can be created on any set of <see cref="Solution"/> thanks to the
-    /// factory method <see cref="Create(IActivityMonitor, IEnumerable{Solution})"/>.
+    /// A DependencyAnalyzer is obtained from <see cref="ISolutionContext.GetDependencyAnalyser"/>.
     /// </summary>
-    public class DependencyAnalyser
+    public class DependencyAnalyzer
     {
-        readonly PrimarySolution[] _solutions;
+        readonly ISolutionContext _solutions;
         readonly Dictionary<Artifact, LocalPackageItem> _packages;
         readonly ProjectItem.Cache _projects;
         readonly IReadOnlyList<PackageReference> _externalRefs;
+        readonly int _version;
+        readonly SolutionDependencyContext _defaultDependencyContext;
+
 
         /// <summary>
         /// Package items are not bound to any container (PrimarySolution). There is 2 kind of packages:
@@ -27,15 +29,15 @@ namespace CK.Env
         /// packages.
         /// This handles the locally produced package.
         /// </summary>
-        internal class LocalPackageItem : IDependentItem, IDependentItemRef
+        class LocalPackageItem : IDependentItem, IDependentItemRef
         {
             // This contains only the Solution of the Project for local projects (the Package -published- requires the
             // Solution that owns its source code.)
             readonly IDependentItemRef[] _requires;
 
-            internal LocalPackageItem( Artifact package, DependentProject project )
+            internal LocalPackageItem( Artifact package, IProject project )
             {
-                _requires = new IDependentItemRef[] { project.Solution };
+                _requires = new IDependentItemRef[] { (IDependentItemRef)project.Solution };
                 Project = project;
                 Package = package;
             }
@@ -43,7 +45,7 @@ namespace CK.Env
             /// <summary>
             /// Gets the local project that produces this package.
             /// </summary>
-            public DependentProject Project { get; }
+            public IProject Project { get; }
 
             /// <summary>
             /// Gets the package information (name and type).
@@ -75,27 +77,27 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// This internal class is the IDependentItem that represents a DependentProject
-        /// in a SortableSolutionFile graph.
+        /// This internal class is the IDependentItem that represents a Project
+        /// in a solution graph.
         /// </summary>
-        internal class ProjectItem : IDependentItem, IDependentItemRef
+        class ProjectItem : IDependentItem, IDependentItemRef
         {
-            readonly DependentProject _p;
+            readonly IProject _p;
             readonly List<IDependentItemRef> _requires;
             readonly Cache _cache;
 
             public class Cache
             {
-                readonly Dictionary<DependentProject, ProjectItem> _cache;
+                readonly Dictionary<IProject, ProjectItem> _cache;
 
                 public Cache()
                 {
-                    _cache = new Dictionary<DependentProject, ProjectItem>();
+                    _cache = new Dictionary<IProject, ProjectItem>();
                 }
 
-                public ProjectItem this[DependentProject p] => _cache[p];
+                public ProjectItem this[IProject p] => _cache[p];
 
-                public IEnumerable<DependentProject> AllProjects => _cache.Keys;
+                public IEnumerable<IProject> AllProjects => _cache.Keys;
 
                 public IEnumerable<ProjectItem> AllProjectItems => _cache.Values;
 
@@ -108,9 +110,9 @@ namespace CK.Env
                 /// </summary>
                 public bool PureProjectsMode { get; set; }
 
-                internal void Add( DependentProject p, ProjectItem pItem ) => _cache.Add( p, pItem );
+                internal void Add( IProject p, ProjectItem pItem ) => _cache.Add( p, pItem );
 
-                public ProjectItem Create( DependentProject p )
+                public ProjectItem Create( IProject p )
                 {
                     if( _cache.TryGetValue( p, out var item ) ) return item;
                     return new ProjectItem( p, this );
@@ -118,7 +120,7 @@ namespace CK.Env
 
             }
 
-            ProjectItem( DependentProject p, Cache cache )
+            ProjectItem( IProject p, Cache cache )
             {
                 _p = p;
                 _cache = cache;
@@ -129,7 +131,7 @@ namespace CK.Env
             /// <summary>
             /// Gets the project itself.
             /// </summary>
-            public DependentProject Project => _p;
+            public IProject Project => _p;
 
             /// <summary>
             /// Gets the full name of this project item (see <see cref="IsPublished"/>).
@@ -140,7 +142,7 @@ namespace CK.Env
 
             IDependentItemContainerRef IDependentItem.Container => _cache.PureProjectsMode
                                                                     ? null
-                                                                    : _p.Solution;
+                                                                    : (IDependentItemContainerRef)_p.Solution;
 
             IDependentItemRef IDependentItem.Generalization => null;
 
@@ -167,22 +169,31 @@ namespace CK.Env
             public override string ToString() => _p.ToString();
         }
 
-        DependencyAnalyser(
-            PrimarySolution[] solutions,
+        DependencyAnalyzer(
+            IActivityMonitor m,
+            ISolutionContext solutions,
             Dictionary<Artifact, LocalPackageItem> packages,
             ProjectItem.Cache projects,
             List<PackageReference> externalRefs )
         {
             _solutions = solutions;
+            _version = _solutions.Version;
             _packages = packages;
             _projects = projects;
             _externalRefs = externalRefs;
+            _defaultDependencyContext = CreateDependencyContext( m );
         }
 
         /// <summary>
         /// Gets the set of solutions.
         /// </summary>
-        public IReadOnlyCollection<PrimarySolution> Solutions => _solutions;
+        public ISolutionContext Solutions => _solutions;
+
+        /// <summary>
+        /// Gets whether the <see cref="Solutions"/> has changed and this analyzer is no more
+        /// up to date: a new one should be obtained from <see cref="ISolutionContext.GetDependencyAnalyser"/>.
+        /// </summary>
+        public bool IsObsolete => _version != _solutions.Version;
 
         /// <summary>
         /// Gets all the external package references.
@@ -190,7 +201,7 @@ namespace CK.Env
         public IReadOnlyList<PackageReference> ExternalReferences => _externalRefs;
 
         /// <summary>
-        /// Gets the information about build projects (see <see cref="PrimarySolution.BuildProject"/>)
+        /// Gets the information about build projects (see <see cref="Solution.BuildProject"/>)
         /// and their dependencies.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -210,15 +221,15 @@ namespace CK.Env
                 else
                 {
                     var rankedProjects = rBuildProjects.SortedItems
-                                                .Where( i => i.Item is DependentProject )
+                                                .Where( i => i.Item is Project )
                                                 .Select( i => (i.Rank,
-                                                               Project: (DependentProject)i.Item,
+                                                               Project: (Project)i.Item,
                                                                DirectDeps: i.Requires
                                                                             .Select( s => s.Item )
-                                                                            .OfType<DependentProject>(),
+                                                                            .OfType<Project>(),
                                                                AllDeps: i.GetAllRequires()
                                                                          .Select( s => s.Item )
-                                                                         .OfType<DependentProject>()) );
+                                                                         .OfType<Project>()) );
 
                     var zeroBuildProjects = rankedProjects.Select( ( p, idx ) => new ZeroBuildProjectInfo(
                                     idx,
@@ -262,20 +273,20 @@ namespace CK.Env
 
         class SolutionItem : IDependentItemContainer
         {
-            readonly PrimarySolution _solution;
+            readonly ISolution _solution;
             IEnumerable<IDependentItemRef> _projects;
 
-            internal SolutionItem( PrimarySolution f, IEnumerable<IDependentItemRef> projects )
+            internal SolutionItem( ISolution f, IEnumerable<IDependentItemRef> projects )
             {
                 _solution = f;
                 _projects = projects;
             }
 
-            public PrimarySolution Solution => _solution;
+            public ISolution Solution => _solution;
 
             string IDependentItem.FullName => _solution.Name;
 
-            IDependentItemContainerRef IDependentItem.Container => _solution;
+            IDependentItemContainerRef IDependentItem.Container => (IDependentItemContainerRef)_solution;
 
             IEnumerable<IDependentItemRef> IDependentItemGroup.Children => _projects;
 
@@ -292,22 +303,36 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Creates a new <see cref="SolutionDependencyContext"/>.
+        /// Gets the default dependency context: the one that considers all projects
+        /// except the build projects.
+        /// </summary>
+        public SolutionDependencyContext DefaultDependencyContext => _defaultDependencyContext;
+
+        /// <summary>
+        /// Creates a new <see cref="SolutionDependencyContext"/>, possibly for a different subset of projects
+        /// of the <see cref="Solutions"/> than the default set (all projects except build projects).
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="strategy">The strategy.</param>
+        /// <param name="projectFilter">
+        /// Optional project filter.
+        /// By default all projects are considered except build projects (see <see cref="Solution.BuildProject"/>).
+        /// </param>
         /// <returns>The context or null on error.</returns>
-        public SolutionDependencyContext CreateDependencyContext( IActivityMonitor m, SolutionSortStrategy strategy = SolutionSortStrategy.EverythingExceptBuildProjects )
+        public SolutionDependencyContext CreateDependencyContext( IActivityMonitor m, Func<IProject,bool> projectFilter = null )
         {
-            var sortables = new Dictionary<PrimarySolution, SolutionItem>();
+            if( projectFilter == null )
+            {
+                projectFilter = p => !p.IsBuildProject;
+            }
+            var sortables = new Dictionary<ISolution, SolutionItem>();
             foreach( var s in _solutions )
             {
-                sortables.Add( s, new SolutionItem( s, GetProjectItems( s, strategy ) ) );
+                sortables.Add( s, new SolutionItem( s, s.Projects.Where( p => projectFilter( p ) ).Select( p => _projects[p] ) ) );
             }
             IDependencySorterResult result = DependencySorter.OrderItems( m, sortables.Values, null );
             if( !result.IsComplete )
             {
-                return new SolutionDependencyContext( strategy, result, GetBuildProjectInfo( m ) );
+                return new SolutionDependencyContext( this, result, GetBuildProjectInfo( m ) );
             }
             // Building the list of SolutionDependencyContext.DependencyRow.
             var table = result.SortedItems
@@ -316,13 +341,13 @@ namespace CK.Env
                           .Select( ( sorted, idx ) =>
                                         (
                                             Index: idx,
-                                            Solution: (PrimarySolution)sorted.StartValue,
+                                            Solution: (Solution)sorted.StartValue,
                                             // The projects from this solution that reference packages that are
                                             // produced by local solutions have a direct requires to a Package
                                             // that has a local Project.
                                             // 2 - First Map: LocalRefs is a set of value tuple (Project Origin, Package Target).
                                             LocalRefs: sorted.Children
-                                                            .Select( c => (SProject: c, Project: (DependentProject)c.StartValue) )
+                                                            .Select( c => (SProject: c, Project: (Project)c.StartValue) )
                                                             .SelectMany( c => c.SProject.DirectRequires
                                                                             .Select( r => r.Item )
                                                                             .OfType<LocalPackageItem>()
@@ -346,7 +371,7 @@ namespace CK.Env
             // pure solution dependency graph.
             //
             var index = new Dictionary<object, DependentSolution>();
-            PrimarySolution current = null;
+            ISolution current = null;
             var depSolutions = new DependentSolution[sortables.Count];
             foreach( var r in table )
             {
@@ -359,38 +384,12 @@ namespace CK.Env
                     index.Add( current, newDependent );
                 }
             }
-            return new SolutionDependencyContext( index, strategy, result, table, depSolutions, GetBuildProjectInfo( m ) );
+            return new SolutionDependencyContext( this, index, result, table, depSolutions, GetBuildProjectInfo( m ) );
         }
 
-        IEnumerable<IDependentItemRef> GetProjectItems( PrimarySolution s, SolutionSortStrategy content )
-        {
-            IEnumerable<DependentProject> projects;
-            switch( content )
-            {
-                case SolutionSortStrategy.PublishedProjects:
-                    projects = s.Projects.Where( p => p.IsPublished );
-                    break;
-                case SolutionSortStrategy.PublishedAndTestsProjects:
-                    projects = s.Projects.Where( p => p.IsPublished || p.IsTestProject );
-                    break;
-                case SolutionSortStrategy.EverythingExceptBuildProjects:
-                    projects = s.Projects.Where( p => p != s.BuildProject );
-                    break;
-                default: throw new Exception( "Unsuported SolutionSortStrategy" );
-            }
-            return projects.Select( p => _projects[p] );
-        }
-
-        /// <summary>
-        /// Factory method for a <see cref="DependencyAnalyser"/>.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="solutionFiles">The set of <see cref="Solution"/> to consider.</param>
-        /// <returns>A new dependency context.</returns>
-        public static DependencyAnalyser Create( IActivityMonitor m, IEnumerable<PrimarySolution> solutionFiles )
+        internal static DependencyAnalyzer Create( IActivityMonitor m, ISolutionContext solutions )
         {
             var packages = new Dictionary<Artifact, LocalPackageItem>();
-            var solutions = solutionFiles.ToArray();
             var projectItems = new ProjectItem.Cache();
             var externalRefs = new List<PackageReference>();
 
@@ -435,11 +434,9 @@ namespace CK.Env
                 }
             }
 
-            // 3 - Create the requirements between each project and either
-            //     a Package that is bound to a Published project or to an
-            //     external Package.
-            //     For projects that belong to a secondary solution whose SpecialType is
-            //     IncludedSecondarySolution, we depends on the project instead of the published Package.
+            // 3 - Create the requirements between each project and Packages that are bound to a
+            //     Published project (the LocalPackageItem previosly created).
+            //     When PackageReferences references external Packages, we add it to the ExternalRefs.
             foreach( var project in projectItems.AllProjectItems )
             {
                 // Consider package references (Project to Project references are handled by ProjectItem constructors).
@@ -471,7 +468,8 @@ namespace CK.Env
                     }
                 }
             }
-            return new DependencyAnalyser(
+            return new DependencyAnalyzer(
+                        m,
                         solutions,
                         packages,
                         projectItems,

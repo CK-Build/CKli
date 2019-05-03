@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
-namespace CK.Env
+namespace CK.Env.DependencyModel
 {
     /// <summary>
     /// Simple model for a dependent solution with its direct, minimal and transitive requirements and impacts.
@@ -25,19 +25,19 @@ namespace CK.Env
             /// <summary>
             /// Gets the solution of the <see cref="Origin"/> project.
             /// </summary>
-            public PrimarySolution Solution { get; }
+            public ISolution Solution { get; }
 
             /// <summary>
             /// Gets the project that references the package produced by the <see cref="Target"/> project.
             /// Null if <see cref="Solution"/> does not require any other solution.
             /// </summary>
-            public DependentProject Origin { get; }
+            public IProject Origin { get; }
 
             /// <summary>
             /// Gets the targeted project by <see cref="Origin"/>.
             /// Null if <see cref="Solution"/> does not require any other solution.
             /// </summary>
-            public DependentProject Target { get; }
+            public IProject Target { get; }
 
             /// <summary>
             /// Gets the actual package references from <see cref="Origin"/> to <see cref="Target"/>.
@@ -51,7 +51,7 @@ namespace CK.Env
                                                                         .Select( d => d.Target )
                                                                     : null;
 
-            internal Row( int idx, PrimarySolution s, DependentProject o, DependentProject t )
+            internal Row( int idx, ISolution s, IProject o, IProject t )
             {
                 Debug.Assert( (o == null) == (t == null) );
                 Index = idx;
@@ -69,10 +69,10 @@ namespace CK.Env
         }
 
         internal DependentSolution(
-            PrimarySolution s,
+            ISolution s,
             int index,
             IReadOnlyList<Row> dependencyTable,
-            Func<PrimarySolution, DependentSolution> others )
+            Func<ISolution, DependentSolution> others )
         {
             Solution = s;
             Index = index;
@@ -108,7 +108,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the primary solution.
         /// </summary>
-        public PrimarySolution Solution { get; }
+        public ISolution Solution { get; }
 
         /// <summary>
         /// Gets the direct required solutions: this corresponds to the solutions that generate a package

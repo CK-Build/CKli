@@ -63,7 +63,7 @@ namespace CK.Env
             GeneratedArtifacts = e.Elements( "A" )
                                   .Select( a => (
                                             new ArtifactInstance(
-                                                    (string)a.AttributeRequired("Type"),
+                                                    ArtifactType.Single( (string)a.AttributeRequired("Type") ),
                                                     (string)a.AttributeRequired( "Name" ),
                                                     SVersion.Parse( (string)a.AttributeRequired( "Version" ) ) ),
                                             (string)a.AttributeRequired( "Solution" ),

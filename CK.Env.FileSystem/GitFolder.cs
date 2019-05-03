@@ -459,90 +459,6 @@ namespace CK.Env
             return (true, alreadyReloadNeeded || result.Status != MergeStatus.UpToDate);
         }
 
-        class RootTempBranch : IDisposable
-        {
-            readonly GitFolder _f;
-            readonly RootTempBranch _parent;
-            readonly Branch _temp;
-            readonly Commit _commit;
-            readonly IDisposableGroup _group;
-            public readonly Branch OrginalHead;
-            bool _closed;
-
-            public RootTempBranch( GitFolder f, IDisposableGroup group )
-            {
-                _f = f;
-                _group = group;
-                var s = new Signature( "CKli", "none", DateTimeOffset.Now );
-                if( f._tempBranch == null )
-                {
-                    OrginalHead = f._git.Head;
-                    _temp = f._git.CreateBranch( $"TEMP_{Guid.NewGuid()}" );
-                    Commands.Checkout( f._git, _temp );
-                }
-                else
-                {
-                    _parent = f._tempBranch;
-                    OrginalHead = _parent.OrginalHead;
-                    _temp = _parent._temp;
-                }
-                f._tempBranch = this;
-                // IncludeIgnored = true is a very heavy operation...
-                Commands.Stage( f._git, "*", new StageOptions() { IncludeIgnored = false } );
-                _commit = f._git.Commit( "Temp", s, s, new CommitOptions() { AllowEmptyCommit = true, PrettifyMessage = false } );
-            }
-
-            void Close()
-            {
-                Debug.Assert( !_closed && _f._tempBranch == this );
-                _f._git.Reset( ResetMode.Hard, _commit, new CheckoutOptions() { CheckoutModifiers = CheckoutModifiers.Force } );
-                // Since we don't IncludeIgnored, we must not clear the untracked files.
-                // _f._git.RemoveUntrackedFiles();
-
-                if( _parent == null )
-                {
-                    _f._git.Reset( ResetMode.Mixed, OrginalHead.Tip );
-                    Commands.Checkout( _f._git, OrginalHead );
-                    _f._git.Branches.Remove( _temp );
-                }
-                else
-                {
-                    _f._git.Reset( ResetMode.Mixed, _parent._commit );
-                }
-                _f._tempBranch = _parent;
-                _closed = true;
-                _group?.Dispose();
-            }
-
-            public void Dispose()
-            {
-                if( !_closed )
-                {
-                    while( _f._tempBranch != this && _f._tempBranch != null ) _f._tempBranch.Dispose();
-                    if( _f._tempBranch != null ) Close();
-                }
-            }
-        }
-
-        RootTempBranch _tempBranch;
-
-        /// <summary>
-        /// Opens a temporary branch that protects all changes.
-        /// This can be called recursively.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="message">Message of the group information. Null to not open a group.</param>
-        /// <returns>A disposable that must be disposed to restore the state of the working directory.</returns>
-        public IDisposable OpenProtectedScope( IActivityMonitor m, string message = "Opening protected scope: any file modification will be reverted." )
-        {
-            return new RootTempBranch( this, message != null ? m.OpenInfo( message ) : null );
-        }
-
-        /// <summary>
-        /// Gets whether at least one scope is currently opened (see <see cref="OpenProtectedScope"/>).
-        /// </summary>
-        public bool IsProtectedScopeOpened => _tempBranch != null;
-
         /// <summary>
         /// Gets the valid version information from a branch or null.
         /// </summary>
@@ -1659,8 +1575,7 @@ namespace CK.Env
                 sub = sub.RemoveFirstPart();
                 return true;
             }
-            if( sub.Parts.Count > 1
-                && (_tempBranch?.OrginalHead ?? _git.Head).FriendlyName == sub.Parts[1] )
+            if( sub.Parts.Count > 1 && _git.Head.FriendlyName == sub.Parts[1] )
             {
                 sub = sub.RemoveParts( 0, 2 );
                 return true;

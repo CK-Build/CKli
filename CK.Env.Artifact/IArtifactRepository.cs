@@ -27,7 +27,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="artifactType">Type of the artifact.</param>
         /// <returns>True if this repository can handle artifacts of this type, false otherwise.</returns>
-        bool HandleArtifactType( string artifactType );
+        bool HandleArtifactType( in ArtifactType artifactType );
 
         /// <summary>
         /// Pushes/transfers one or more existing local artifacts into this repository.

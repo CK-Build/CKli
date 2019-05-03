@@ -167,7 +167,7 @@ namespace CK.Env
                                                .Select( packageName => new UpdatePackageInfo(
                                                    s.UniqueSolutionName,
                                                    z.ProjectName,
-                                                   "NuGet",
+                                                   ArtifactType.Single( "NuGet" ),
                                                    packageName,
                                                    _packagesVersion[packageName] ) ) );
         }

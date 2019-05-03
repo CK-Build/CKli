@@ -2,7 +2,7 @@ using CK.Setup;
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace CK.Env
+namespace CK.Env.DependencyModel
 {
     /// <summary>
     /// Captures Build Projects information that allows to handle ZeroVersion builds and references.

@@ -9,6 +9,6 @@ namespace CK.Env.MSBuild
         /// <summary>
         /// Gets the project itself.
         /// </summary>
-        IP Project { get; }
+        Project Project { get; }
     }
 }

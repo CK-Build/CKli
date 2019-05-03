@@ -6,7 +6,7 @@ namespace CK.NuGetClient
     /// <summary>
     /// Encapsulates a NuGet feed manager.
     /// </summary>
-    public interface INuGetClient : IArtifactTypeFactory
+    public interface INuGetClient : IArtifactRepositoryFactory
     {
         /// <summary>
         /// Gets the shared <see cref="HttpClient"/> that will be used for remote access.

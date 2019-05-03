@@ -92,8 +92,8 @@ namespace CKli
             _currentWorld = null;
 
             var baseProvider = new SimpleServiceContainer();
-            _fs = new FileSystem( LocalPath, CommandRegister, baseProvider );
-            var keyStore = new CKEnvKeyVault( World, _fs, CommandRegister );
+            var keyStore = new CKEnvKeyVault( World, LocalPath, CommandRegister );
+            _fs = new FileSystem( LocalPath, CommandRegister, keyStore, baseProvider );
             baseProvider.Add<ISimpleObjectActivator>( new SimpleObjectActivator() );
             baseProvider.Add( CommandRegister );
             baseProvider.Add( _fs );

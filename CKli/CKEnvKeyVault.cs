@@ -12,20 +12,18 @@ namespace CKli
     {
         static readonly NormalizedPath _commandProviderName = new NormalizedPath("KeyVault");
 
-        readonly FileSystem _fs;
         readonly Dictionary<string, string> _keys;
         readonly IWorldName _worldName;
         string _passPhrase;
 
         public CKEnvKeyVault(
             IWorldName worldName,
-            FileSystem fs,
+            NormalizedPath rootFolder,
             CommandRegister commandRegister)
         {
             _keys = new Dictionary<string, string>();
-            _fs = fs;
             _worldName = worldName;
-            KeyVaultPath = _fs.Root.AppendPart( $"CKEnv-{_worldName.Name}-KeyVault.txt" );
+            KeyVaultPath = rootFolder.AppendPart( $"CKEnv-{_worldName.Name}-KeyVault.txt" );
             KeyVaultKeyName = $"CKENV_{_worldName.Name.ToUpperInvariant().Replace( '-', '_' )}_KEY_VAULT_SECRET_KEY";
             commandRegister.Register( this );
         }

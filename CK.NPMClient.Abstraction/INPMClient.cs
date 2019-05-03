@@ -6,7 +6,7 @@ namespace CK.NPMClient
     /// <summary>
     /// Encapsulates a NPM feed manager.
     /// </summary>
-    public interface INPMClient : IArtifactTypeFactory
+    public interface INPMClient : IArtifactRepositoryFactory
     {
         /// <summary>
         /// Gets the shared <see cref="HttpClient"/> that will be used for remote access.

@@ -11,7 +11,6 @@ using System.Linq;
 
 namespace CK.Env
 {
-
     /// <summary>
     /// <see cref="IFileProvider"/> implementation that handles Git repositories.
     /// Exposes its <see cref="ServiceContainer"/> that is the root of services
@@ -20,18 +19,22 @@ namespace CK.Env
     public class FileSystem : IFileProvider, IDisposable
     {
         readonly CommandRegister _commandRegister;
-        ISecretKeyStore _secretKeyStore;
+        readonly ISecretKeyStore _secretKeyStore;
         readonly List<GitFolder> _gits;
 
         /// <summary>
         /// Initializes a new <see cref="FileSystem"/> on a physical root path.
         /// </summary>
         /// <param name="rootPath">Physical root path.</param>
-        public FileSystem( string rootPath, CommandRegister commandRegister, IServiceProvider sp )
+        public FileSystem(
+            string rootPath,
+            CommandRegister commandRegister,
+            ISecretKeyStore keyStore,
+            IServiceProvider sp )
         {
-
             Root = new NormalizedPath( Path.GetFullPath( rootPath ) );
             _commandRegister = commandRegister;
+            _secretKeyStore = _secretKeyStore;
             _gits = new List<GitFolder>();
             ServiceContainer = new SimpleServiceContainer( sp );
             ServiceContainer.Add( this );
@@ -67,13 +70,10 @@ namespace CK.Env
         /// <param name="folderPath">
         /// The folder path is a sub path of <see cref="Root"/> and contains the .git sub folder.
         /// </param>
+        /// <param name="urlRepository">The url repository.</param>
         /// <returns>The <see cref="GitFolder"/> or null if there is not .git subfolder.</returns>
-        public GitFolder EnsureGitFolder( IActivityMonitor m, IWorldName world, NormalizedPath folderPath, string urlRepository = null )
+        public GitFolder EnsureGitFolder( IActivityMonitor m, IWorldName world, NormalizedPath folderPath, string urlRepository )
         {
-            if( _secretKeyStore == null )
-            {
-                _secretKeyStore = ServiceContainer.GetService<ISecretKeyStore>( throwOnNull: true );
-            }
             GitFolder g = GitFolders.FirstOrDefault( f => f.SubPath == folderPath );
             if( g == null )
             {
@@ -116,7 +116,7 @@ namespace CK.Env
         /// <returns>The directory content.</returns>
         public IDirectoryContents GetDirectoryContents( NormalizedPath sub )
         {
-            sub = sub.ResolveDots();
+            sub = sub.ResolveDots().With( NormalizedPathRootKind.None );
             GitFolder g = GitFolders.FirstOrDefault( f => sub.StartsWith( f.SubPath, strict: false ) );
             return g != null
                         ? g.GetDirectoryContents( sub.RemovePrefix( g.SubPath ) ) ?? NotFoundDirectoryContents.Singleton
@@ -138,7 +138,7 @@ namespace CK.Env
         /// <returns>The file info.</returns>
         public IFileInfo GetFileInfo( NormalizedPath sub )
         {
-            sub = sub.ResolveDots();
+            sub = sub.ResolveDots().With( NormalizedPathRootKind.None );
             GitFolder g = GitFolders.FirstOrDefault( f => sub.StartsWith( f.SubPath, strict: false ) );
             return g != null
                         ? g.GetFileInfo( sub.RemovePrefix( g.SubPath ) ) ?? new NotFoundFileInfo( sub.Path )

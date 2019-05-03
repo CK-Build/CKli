@@ -35,7 +35,7 @@ namespace CK.Env
                     : _keyStore.GetSecretKey( m, SecretKeyName, throwOnEmpty, $"Required to push to {Info.Name}." );
         }
 
-        public bool HandleArtifactType( string artifactType ) => artifactType == "CKSetup";
+        public bool HandleArtifactType( in ArtifactType artifactType ) => artifactType == CKSetupClient.CKSetupType;
 
         public Task<bool> PushAsync( IActivityMonitor m, IArtifactLocalSet artifacts )
         {

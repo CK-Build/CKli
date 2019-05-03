@@ -114,15 +114,6 @@ namespace CK.Env
         CommitVersionInfo GetCommitVersionInfo( IActivityMonitor m, string branchName = null );
 
         /// <summary>
-        /// Opens a temporary branch that protects all changes.
-        /// This can be called recursively.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="message">Message of the group information. Null to not open a group.</param>
-        /// <returns>A disposable that must be disposed to restore the state of the working directory.</returns>
-        IDisposable OpenProtectedScope( IActivityMonitor m, string message = "Opening protected scope: any file modification will be reverted." );
-
-        /// <summary>
         /// Gets the current branch name (name of the repository's HEAD).
         /// </summary>
         string CurrentBranchName { get; }

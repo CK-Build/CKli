@@ -78,7 +78,7 @@ namespace CKli
             public List<ArtifactInstance> GetMissing( IActivityMonitor m, IEnumerable<ArtifactInstance> artifacts )
             {
                 var missing = new List<ArtifactInstance>();
-                var ckSetup = artifacts.Where( i => i.Artifact.Type == "CKSetup" )
+                var ckSetup = artifacts.Where( i => i.Artifact.Type == CKSetupClient.CKSetupType )
                                        .Select( a => CKSetupArtifactLocalSet.ToComponentRef( a ) ).ToList();
                 if( ckSetup.Count > 0 )
                 {
@@ -95,11 +95,11 @@ namespace CKli
                 }
                 foreach( var n in artifacts )
                 {
-                    if( n.Artifact.Type == "NuGet" )
+                    if( n.Artifact.Type == LocalNuGetPackageFile.NuGetType )
                     {
                         if( GetPackageFile( m, n.Artifact.Name, n.Version ) == null ) missing.Add( n );
                     }
-                    else if( n.Artifact.Type == "NPM" )
+                    else if( n.Artifact.Type == LocalNPMPackageFile.NPMType )
                     {
                         if( GetNPMPackageFile( m, n.Artifact.Name, n.Version ) == null ) missing.Add( n );
                     }
@@ -109,7 +109,7 @@ namespace CKli
 
             public bool PushLocalArtifacts( IActivityMonitor m, IArtifactRepository target, IEnumerable<ArtifactInstance> artifacts )
             {
-                if( target.HandleArtifactType( "NuGet" ) )
+                if( target.HandleArtifactType( LocalNuGetPackageFile.NuGetType ) )
                 {
                     var locals = new List<LocalNuGetPackageFile>();
                     foreach( var a in artifacts )
@@ -124,12 +124,12 @@ namespace CKli
                     }
                     return target.PushAsync( m, new NuGetArtifactLocalSet( locals ) ).GetAwaiter().GetResult();
                 }
-                else if( target.HandleArtifactType( "CKSetup" ) )
+                else if( target.HandleArtifactType( CKSetupClient.CKSetupType ) )
                 {
                     string localStore = this.GetCKSetupStorePath();
                     return target.PushAsync( m, new CKSetupArtifactLocalSet( artifacts, localStore ) ).GetAwaiter().GetResult();
                 }
-                else if( target.HandleArtifactType( "NPM" ) )
+                else if( target.HandleArtifactType( LocalNPMPackageFile.NPMType ) )
                 {
                     var locals = new List<LocalNPMPackageFile>();
                     foreach( var a in artifacts )
@@ -153,7 +153,7 @@ namespace CKli
             public void Remove( IActivityMonitor m, IEnumerable<ArtifactInstance> artifacts )
             {
                 RemoveCKSetupComponents( m, artifacts, this.GetCKSetupStorePath() );
-                foreach( var i in artifacts.Where( i => i.Artifact.Type == "NuGet" ) )
+                foreach( var i in artifacts.Where( i => i.Artifact.Type == LocalNuGetPackageFile.NuGetType ) )
                 {
                     var f = GetPackagePath( PhysicalPath, i.Artifact.Name, i.Version );
                     if( File.Exists( f ) )
@@ -218,7 +218,7 @@ namespace CKli
         public void RemoveFromAllCaches( IActivityMonitor m, IEnumerable<ArtifactInstance> instances )
         {
             RemoveCKSetupComponents( m, instances, Facade.DefaultStorePath );
-            foreach( var i in instances.Where( i => i.Artifact.Type == "NuGet" ) )
+            foreach( var i in instances.Where( i => i.Artifact.Type == LocalNuGetPackageFile.NuGetType ) )
             {
                 RemoveFromNuGetCache( m, i.Artifact.Name, i.Version );
             }
@@ -226,7 +226,7 @@ namespace CKli
 
         private static void RemoveCKSetupComponents( IActivityMonitor m, IEnumerable<ArtifactInstance> instances, string storePath )
         {
-            var ckSetupComponents = instances.Where( i => i.Artifact.Type == "CKSetup" )
+            var ckSetupComponents = instances.Where( i => i.Artifact.Type == CKSetupClient.CKSetupType )
                                              .ToDictionary( i => i.Artifact.Name, i => i.Version );
             if( ckSetupComponents.Count > 0 )
             {

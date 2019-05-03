@@ -6,28 +6,32 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 
-namespace CK.Env
+namespace CK.Env.DependencyModel
 {
     /// <summary>
     /// Encapsulates the result of the dependencies analysis at the solution level.
-    /// This is produced by <see cref="DependencyAnalyser.CreateDependencyContext(IActivityMonitor, SolutionSortStrategy)"/>.
+    /// This is produced by <see cref="DependencyAnalyzer.CreateDependencyContext(IActivityMonitor, Func{IProject, bool})"/>.
+    /// This object doesn't hold the potential project filter that has been used to built it.
+    /// When <see cref="IsObsolete"/> is true, it must be fully rebuilt from a new <see cref="DependencyAnalyzer"/>.
     /// </summary>
     public class SolutionDependencyContext
     {
+        readonly DependencyAnalyzer _analyzer;
         readonly Dictionary<object, DependentSolution> _index;
 
         /// <summary>
         /// Error constructor.
         /// </summary>
-        /// <param name="c">The content strategy.</param>
+        /// <param name="analyzer">The analyzer.</param>
         /// <param name="rSolution">The dependency sorter result.</param>
+        /// <param name="buildProjectsInfo">Build info may be on error or not.</param>
         internal SolutionDependencyContext(
-            SolutionSortStrategy c,
+            DependencyAnalyzer analyzer,
             IDependencySorterResult rSolution,
             BuildProjectsInfo buildProjectsInfo )
         {
-            Debug.Assert( buildProjectsInfo != null && rSolution != null && !rSolution.IsComplete );
-            SolutionSortStrategy = c;
+            Debug.Assert( analyzer != null && buildProjectsInfo != null && rSolution != null && !rSolution.IsComplete );
+            _analyzer = analyzer;
             RawSolutionSorterResult = rSolution;
             BuildProjectsInfo = buildProjectsInfo;
             DependencyTable = Array.Empty<DependentSolution.Row>();
@@ -35,16 +39,16 @@ namespace CK.Env
         }
 
         internal SolutionDependencyContext(
+            DependencyAnalyzer analyzer,
             Dictionary<object, DependentSolution> index,
-            SolutionSortStrategy strategy,
             IDependencySorterResult r,
             IReadOnlyList<DependentSolution.Row> t,
             IReadOnlyList<DependentSolution> solutions,
             BuildProjectsInfo buildProjectsInfo )
         {
-            Debug.Assert( r != null && r.IsComplete && t != null && solutions != null );
+            Debug.Assert( analyzer != null && r != null && r.IsComplete && t != null && solutions != null );
+            _analyzer = analyzer;
             _index = index;
-            SolutionSortStrategy = strategy;
             RawSolutionSorterResult = r;
             BuildProjectsInfo = buildProjectsInfo;
             DependencyTable = t;
@@ -56,9 +60,15 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the kind of projects that have been considered to sort solutions.
+        /// Gets the dependency analyzer that built this dependency context.
         /// </summary>
-        public SolutionSortStrategy SolutionSortStrategy { get; }
+        public DependencyAnalyzer Analyzer => _analyzer;
+
+        /// <summary>
+        /// Gets whether the solutions or projects have changed and that a fresh dependency
+        /// context should be obtained from an up to date <see cref="Analyzer"/>.
+        /// </summary>
+        public bool IsObsolete => _analyzer.IsObsolete;
 
         /// <summary>
         /// Gets the details of the dependencies between solutions.
@@ -70,8 +80,8 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the package dependencies between solutions.
-        /// This is a somehow like the <see cref="DependencyTable"/> except that <see cref="DependentSolution"/>
-        /// are referenced (instead of <see cref="PrimarySolution"/>), that there is no row row for a solution that has
+        /// This is somehow like the <see cref="DependencyTable"/> except that <see cref="DependentSolution"/>
+        /// are referenced (instead of <see cref="Solution"/>), that there is no row row for a solution that has
         /// no dependency and that each package reference (<see cref="LocalPackageDependency.Reference"/>) appears instead
         /// of the potential multiple <see cref="DependentSolution.Row.GetReferences()"/>.
         /// </summary>
@@ -81,6 +91,20 @@ namespace CK.Env
         /// Gets the global, sorted, dependencies informations between solutions.
         /// </summary>
         public IReadOnlyList<DependentSolution> Solutions { get; }
+
+        /// <summary>
+        /// Gets the dependent solution by its name.
+        /// </summary>
+        /// <param name="name">The solution name.</param>
+        /// <returns>The dependent solution or null.</returns>
+        public DependentSolution this[string name] => _index.GetValueWithDefault( name, null );
+
+        /// <summary>
+        /// Gets the dependent solution associated to a <see cref="Solution"/>.
+        /// </summary>
+        /// <param name="s">The solution.</param>
+        /// <returns>The dependent solution or null.</returns>
+        public DependentSolution this[Solution s] => _index.GetValueWithDefault( s, null );
 
         /// <summary>
         /// Gets the <see cref="IDependencySorterResult"/> of the Solution/Project graph.

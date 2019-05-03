@@ -60,29 +60,6 @@ namespace CKli
         NormalizedPath IBranchSolutionLoader.BranchPathDefiner => FullPath;
 
         /// <summary>
-        /// Obtains the expected solution paths from this branch or from another branch.
-        /// This list is empty if there is no primary solution defined otherwise the first path is the primary solution one.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="projectToBranchName">Optional other branch for which the solution should exist.</param>
-        /// <returns>The paths. Empty if no primary solution exists.</returns>
-        public IReadOnlyList<NormalizedPath> GetAllSolutionFilePaths( IActivityMonitor m, string projectToBranchName = null )
-        {
-            if( _solutionFilePaths == null )
-            {
-                if( PrimarySolution == null ) return Array.Empty<NormalizedPath>();
-                Debug.Assert( _solutions[0] == PrimarySolution );
-                _solutionFilePaths = new NormalizedPath[_solutions.Count];
-                _solutionFilePaths[0] = PrimarySolution.GetSolutionFilePath( projectToBranchName );
-                for( int i = 1; i < _solutionFilePaths.Length; ++i )
-                {
-                    _solutionFilePaths[i] = _solutions[i].GetSolutionFilePath( projectToBranchName );
-                }
-            }
-            return _solutionFilePaths;
-        }
-
-        /// <summary>
         /// Obtains the primary solution from this branch (or from another branch) with all its existing secondary solutions
         /// available in <see cref="Solution.LoadedSecondarySolutions"/>
         /// This is null if no primary solution is defined.

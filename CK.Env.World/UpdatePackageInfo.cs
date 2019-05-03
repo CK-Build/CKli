@@ -34,7 +34,7 @@ namespace CK.Env
         /// <param name="packageType">Type of the package.</param>
         /// <param name="packageId">The package identifier.</param>
         /// <param name="version">The package version.</param>
-        public UpdatePackageInfo( string solutionName, string projectName, string packageType, string packageId, SVersion version )
+        public UpdatePackageInfo( string solutionName, string projectName, ArtifactType packageType, string packageId, SVersion version )
             : this( solutionName, projectName, new ArtifactInstance( packageType, packageId, version) )
         {
         }
@@ -48,7 +48,7 @@ namespace CK.Env
             : this( (string)e.Attribute("Solution") ?? solutionName,
                     (string)e.AttributeRequired("Project"),
                     new ArtifactInstance(
-                        (string)e.Attribute( "PackageType" ) ?? "NuGet",
+                        ArtifactType.Single( (string)e.Attribute( "PackageType" ) ),
                         (string)e.AttributeRequired( "PackageId" ),
                         SVersion.Parse( (string)e.AttributeRequired( "Version" )) ) )
         {

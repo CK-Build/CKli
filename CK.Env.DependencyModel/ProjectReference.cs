@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace CK.Env
+namespace CK.Env.DependencyModel
 {
     /// <summary>
     /// Defines a project to project dependency (inside the same solution).
@@ -12,19 +12,19 @@ namespace CK.Env
         /// <summary>
         /// Gets the project that owns the reference.
         /// </summary>
-        public DependentProject Owner { get; }
+        public IProject Owner { get; }
 
         /// <summary>
         /// Gets the referenced project.
         /// </summary>
-        public DependentProject Target { get; }
+        public IProject Target { get; }
 
         /// <summary>
         /// Gets this reference kind: this is almost always <see cref="ProjectDependencyKind.Transitive"/>.
         /// </summary>
         public ProjectDependencyKind Kind { get; }
 
-        internal ProjectReference( DependentProject o, DependentProject t, ProjectDependencyKind kind )
+        internal ProjectReference( IProject o, IProject t, ProjectDependencyKind kind )
         {
             Owner = o;
             Target = t;

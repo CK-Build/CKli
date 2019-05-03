@@ -52,12 +52,12 @@ namespace CK.NPMClient
             return feed;
         }
 
-        IArtifactRepositoryInfo IArtifactTypeFactory.CreateInfo( XElement e )
+        IArtifactRepositoryInfo IArtifactRepositoryFactory.CreateInfo( XElement e )
         {
             return NPMFeedInfo.Create( e, skipMissingType: true );
         }
 
-        IArtifactRepository IArtifactTypeFactory.FindOrCreate( IActivityMonitor m, IArtifactRepositoryInfo info )
+        IArtifactRepository IArtifactRepositoryFactory.FindOrCreate( IActivityMonitor m, IArtifactRepositoryInfo info )
         {
             if( info == null ) throw new ArgumentNullException( nameof( info ) );
             if( !(info is INPMFeedInfo fInfo) ) return null;

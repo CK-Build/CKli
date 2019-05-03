@@ -10,10 +10,15 @@ namespace CK.NPMClient
     /// </summary>
     public class LocalNPMPackageFile
     {
+        /// <summary>
+        /// Exposes the "NPM" <see cref="ArtifactType"/>. This type of artifact is installable.
+        /// </summary>
+        public static readonly ArtifactType NPMType = ArtifactType.Register( "NPM", true );
+
         public LocalNPMPackageFile( string fullPath, string id, SVersion v )
         {
             FullPath = fullPath;
-            Instance = new ArtifactInstance( "NPM", id, v );
+            Instance = new ArtifactInstance( NPMType, id, v );
         }
 
         /// <summary>

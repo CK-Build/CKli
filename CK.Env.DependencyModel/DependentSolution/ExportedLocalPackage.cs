@@ -1,4 +1,4 @@
-namespace CK.Env
+namespace CK.Env.DependencyModel
 {
     /// <summary>
     /// Defines the view of a locally produced package exported by a solution into
@@ -27,7 +27,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the project that references this package.
         /// </summary>
-        public DependentProject TargetProject => _dep.OriginProject;
+        public IProject TargetProject => _dep.OriginProject;
 
         /// <summary>
         /// Gets the type of the dependency involved (ie. "NuGet", "NPM", etc.).

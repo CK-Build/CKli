@@ -39,13 +39,13 @@ namespace CK.Env.MSBuild
             /// Gets the project that references the package produced by the <see cref="Target"/> project.
             /// Null if <see cref="Solution"/> does not require any other solution.
             /// </summary>
-            public IP Origin { get; }
+            public Project Origin { get; }
 
             /// <summary>
             /// Gets the targeted project by <see cref="Origin"/>.
             /// Null if <see cref="Solution"/> does not require any other solution.
             /// </summary>
-            public IP Target { get; }
+            public Project Target { get; }
 
             /// <summary>
             /// Gets the single version reference from <see cref="Origin"/> to <see cref="Target"/>.
@@ -56,7 +56,7 @@ namespace CK.Env.MSBuild
             /// </summary>
             public SVersion Version { get; }
 
-            internal DependencyRow( int idx, Solution s, Project o, IP t )
+            internal DependencyRow( int idx, Solution s, Project o, Project t )
             {
                 Debug.Assert( (o == null) == (t == null) );
                 Index = idx;
@@ -65,13 +65,13 @@ namespace CK.Env.MSBuild
                 Target = t;
                 if( o != null )
                 {
-                    Version = o.Deps.Packages.Single( d => d.PackageId == Target.ProjectName ).Version;
+                    Version = Origin.Deps.Packages.Single( d => d.PackageId == Target.Name ).Version;
                 }
             }
 
             public override string ToString()
             {
-                return $"{Index}|{Solution.UniqueSolutionName}|{Origin?.ProjectName}|{Target?.ProjectName}";
+                return $"{Index}|{Solution.UniqueSolutionName}|{Origin?.Name}|{Target?.Name}";
             }
         }
 
@@ -86,17 +86,21 @@ namespace CK.Env.MSBuild
                 Target = indexByName[row.Target.PrimarySolution.UniqueSolutionName];
             }
 
-            public string Type => "NuGet";
+            public ArtifactType Type => ArtifactType.Single( "NuGet" );
 
             public IDependentSolution Origin { get; }
 
-            public string OriginProjectName => _row.Origin.ProjectName;
+            public string OriginSecondarySolutionName => _row.Origin.Solution.PrimarySolution == null ? null : _row.Origin.Solution.UniqueSolutionName;
+
+            public string OriginProjectName => _row.Origin.Name;
 
             public SVersion Version => _row.Version;
 
             public IDependentSolution Target { get; }
 
-            public string TargetProjectName => _row.Target.ProjectName;
+            public string TargetSecondarySolutionName => _row.Target.Solution.PrimarySolution == null ? null : _row.Target.Solution.UniqueSolutionName;
+
+            public string TargetProjectName => _row.Target.Name;
         }
 
         /// <summary>
@@ -107,14 +111,14 @@ namespace CK.Env.MSBuild
             internal DependentSolution(
                 Solution s,
                 int index,
-                //ProjectDependencyResult projectDependencies,
+                ProjectDependencyResult projectDependencies,
                 IReadOnlyList<DependencyRow> dependencyTable,
                 Func<Solution,DependentSolution> others )
             {
                 Solution = s;
                 Index = index;
                 Requirements = dependencyTable.Where( r => r.Solution == s && r.Target != null )
-                                .Select( r => r.Target.PrimarySolution )
+                                .Select( r => r.Target.Solution )
                                 .Distinct()
                                 .Select( others )
                                 .ToList();
@@ -123,21 +127,13 @@ namespace CK.Env.MSBuild
                 Rank = MinimalRequirements.Count == 0 ? 0 : MinimalRequirements.Max( r => r.Rank ) + 1;
                 TransitiveRequirements = Requirements.SelectMany( r => r.TransitiveRequirements ).Distinct().ToList();
 
-                //PublishedRequirements = projectDependencies.DependencyTable
-                //            .Where( r => r.SourceProject.IsPublished
-                //                        && r.SourceProject.Project.PrimarySolution == Solution
-                //                        && r.TargetPackage.Project != null )
-                //            .Select( r => others( r.TargetPackage.Project.PrimarySolution ) )
-                //            .ToList();
-                //Debug.Assert( PublishedRequirements.All( d => Requirements.Contains( d ) ) );
-
-                PublishedRequirements = dependencyTable.Where( r => r.Solution == s
-                                                  && r.Target != null
-                                                  && r.Origin.IsPublished )
-                                .Select( r => r.Target.PrimarySolution )
-                                .Distinct()
-                                .Select( others )
-                                .ToList();
+                PublishedRequirements = projectDependencies.DependencyTable
+                            .Where( r => r.SourceProject.IsPublished
+                                        && r.SourceProject.Project.PrimarySolution == Solution
+                                        && r.TargetPackage.Project != null )
+                            .Select( r => others( r.TargetPackage.Project.PrimarySolution ) )
+                            .ToList();
+                Debug.Assert( PublishedRequirements.All( d => Requirements.Contains( d ) ) );
 
                 ArtifactTargetNames = s.ArtifactTargetNames.ToArray();
             }
@@ -286,12 +282,11 @@ namespace CK.Env.MSBuild
                                          .ToArray();
 
                 GeneratedPackages = Solution.PublishedProjects
-                                            .Select( p => new GeneratedArtifact( new Artifact( "NuGet", p.Name ), p.PrimarySolutionRelativeFolderPath ) )
-                                            .Concat( Solution.NPMProjects.Where( p => p.Status == NPM.NPMProjectStatus.Valid && p.PackageJson.IsPublished )
-                                                             .Select( p => new GeneratedArtifact( new Artifact("NPM", p.PackageJson.Name), p.PrimarySolutionRelativeFolderPath ) ) )
+                                            .Select( p => new GeneratedArtifact( new Artifact( ArtifactType.Single( "NuGet" ), p.Name ), p.PrimarySolutionRelativeFolderPath ) )
                                             .ToArray();
 
-                var artifacts = GeneratedPackages.Select( p => p.Artifact );
+                var artifacts = Solution.PublishedProjects
+                                            .Select( p => new Artifact( ArtifactType.Single( "NuGet" ), p.Name ) );
 
                 var ckSetupComps = Solution.CKSetupComponentProjects
                                            .SelectMany( p => p.TargetFrameworks
@@ -316,16 +311,16 @@ namespace CK.Env.MSBuild
             string uniqueBranchName,
             SolutionSortStrategy c,
             IDependencySorterResult rSolution,
-            //ProjectDependencyResult projectDeps,
+            ProjectDependencyResult projectDeps,
             BuildProjectsInfo buildProjectsInfo )
         {
-            //Debug.Assert( projectDeps != null );
+            Debug.Assert( projectDeps != null );
             Debug.Assert( buildProjectsInfo != null && rSolution != null && !rSolution.IsComplete );
             UniqueBranchName = uniqueBranchName;
             SolutionSortStrategy = c;
             RawSolutionSorterResult = rSolution;
             BuildProjectsInfo = buildProjectsInfo;
-            //ProjectDependencies = projectDeps;
+            ProjectDependencies = projectDeps;
             DependencyTable = Array.Empty<DependencyRow>();
             Solutions = Array.Empty<DependentSolution>();
         }
@@ -335,7 +330,7 @@ namespace CK.Env.MSBuild
             Dictionary<string, DependentSolution> indexByName,
             SolutionSortStrategy strategy,
             IDependencySorterResult r,
-            //ProjectDependencyResult projectDeps,
+            ProjectDependencyResult projectDeps,
             IReadOnlyList<DependencyRow> t,
             IReadOnlyList<DependentSolution> solutions,
             BuildProjectsInfo buildProjectsInfo )
@@ -345,7 +340,7 @@ namespace CK.Env.MSBuild
             _indexByName = indexByName;
             SolutionSortStrategy = strategy;
             RawSolutionSorterResult = r;
-            //ProjectDependencies = projectDeps;
+            ProjectDependencies = projectDeps;
             BuildProjectsInfo = buildProjectsInfo;
             DependencyTable = t;
             Solutions = solutions;
@@ -366,11 +361,11 @@ namespace CK.Env.MSBuild
         /// </summary>
         public SolutionSortStrategy SolutionSortStrategy { get; }
 
-        ///// <summary>
-        ///// Gets the project dependency result.
-        ///// Never null.
-        ///// </summary>
-        //public ProjectDependencyResult ProjectDependencies { get; }
+        /// <summary>
+        /// Gets the project dependency result.
+        /// Never null.
+        /// </summary>
+        public ProjectDependencyResult ProjectDependencies { get; }
 
         /// <summary>
         /// Gets the details of the dependencies between solutions.

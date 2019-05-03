@@ -16,7 +16,7 @@ namespace CK.Env.MSBuild
             CKTrait frameworks )
         {
             Owner = owner;
-            Package = new ArtifactInstance( "NuGet", packageId, version );
+            Package = new ArtifactInstance( ArtifactType.Single( "NuGet" ), packageId, version );
             OriginElement = originElement;
             PropertyVersionElement = finalDeclaration;
             Frameworks = frameworks;

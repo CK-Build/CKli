@@ -1,4 +1,4 @@
-namespace CK.Env
+namespace CK.Env.DependencyModel
 {
     /// <summary>
     /// Captures a <see cref="Artifact"/> with the project that creates it.
@@ -13,14 +13,14 @@ namespace CK.Env
         /// <summary>
         /// Gets the folder path of this project relative to the primary solution folder.
         /// </summary>
-        public DependentProject Project { get; }
+        public IProject Project { get; }
 
         /// <summary>
         /// Initializes a new <see cref="GeneratedArtifact"/>.
         /// </summary>
         /// <param name="a">The artifact.</param>
         /// <param name="project">The project.</param>
-        public GeneratedArtifact( Artifact a, DependentProject project )
+        public GeneratedArtifact( Artifact a, IProject project )
         {
             Artifact = a;
             Project = project;

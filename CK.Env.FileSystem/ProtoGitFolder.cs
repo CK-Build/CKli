@@ -10,6 +10,7 @@ namespace CK.Env
     {
         protected readonly ISecretKeyStore SecretKeyStore;
         protected readonly CommandRegister CommandRegister;
+
         public ProtoGitFolder(
             string url,
             string path,
@@ -18,7 +19,7 @@ namespace CK.Env
             FileSystem fileSystem,
             CommandRegister commandRegister )
         {
-            if( url == null ) throw new ArgumentNullException(nameof(url));
+            if( url == null ) throw new ArgumentNullException( nameof( url ) );
             if( url.IndexOf( "github.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.GitHub;
             else if( url.IndexOf( "gitlab.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.GitLab;
             else if( url.IndexOf( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.AzureDevOps;

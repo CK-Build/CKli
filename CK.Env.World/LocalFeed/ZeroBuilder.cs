@@ -51,7 +51,10 @@ namespace CK.Env
         {
             Debug.Assert( _mustBuild.Count == _depContext.BuildProjectsInfo.Count );
             ReadCurrentSha( m );
-            var scopeMap = new Dictionary<ISolutionDriver, IDisposable>();
+            Debug.Assert( IsInitialized, "ReadCurrentSha has initialized the drivers" );
+            Debug.Assert( _driverMap.Values.All( d => d.GitRepository.CheckCleanCommit( m ) ), "Repositories are clean." );
+
+            //var scopeMap = new Dictionary<ISolutionDriver, IDisposable>();
             mustReloadSolutions = false;
             try
             {
@@ -108,17 +111,17 @@ namespace CK.Env
                 else
                 {
                     mustReloadSolutions = true;
-                    using( m.OpenTrace( "Creating protected scopes." ) )
-                    {
-                        foreach( var p in _depContext.BuildProjectsInfo )
-                        {
-                            var driver = _driverMap[p.SolutionName];
-                            if( !scopeMap.ContainsKey( driver ) )
-                            {
-                                scopeMap.Add( driver, driver.GitRepository.OpenProtectedScope( m, null ) );
-                            }
-                        }
-                    }
+                    //using( m.OpenTrace( "Creating protected scopes." ) )
+                    //{
+                    //    foreach( var p in _depContext.BuildProjectsInfo )
+                    //    {
+                    //        var driver = _driverMap[p.SolutionName];
+                    //        if( !scopeMap.ContainsKey( driver ) )
+                    //        {
+                    //            scopeMap.Add( driver, driver.GitRepository.OpenProtectedScope( m, null ) );
+                    //        }
+                    //    }
+                    //}
 
                     using( m.OpenTrace( $"Build/Publish {_mustBuild.Count} build projects: {_mustBuild.Concatenate()}" ) )
                     {
@@ -148,10 +151,11 @@ namespace CK.Env
             {
                 if( mustReloadSolutions )
                 {
-                    m.Trace( "Closing protected scopes." );
-                    foreach( var scope in scopeMap.Values ) scope.Dispose();
+                    //m.Trace( "Closing protected scopes." );
+                    //foreach( var scope in scopeMap.Values ) scope.Dispose();
                     SaveShaCache( m );
                 }
+                Debug.Assert( _driverMap.Values.All( d => d.GitRepository.CheckCleanCommit( m ) ), "Repositories are clean." );
             }
         }
 

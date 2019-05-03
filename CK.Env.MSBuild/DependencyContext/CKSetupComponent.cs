@@ -50,7 +50,7 @@ namespace CK.Env
         /// <summary>
         /// Gets this CKSetupComponent as a <see cref="GeneratedArtifact"/>.
         /// </summary>
-        public Artifact GeneratedArtifact => new Artifact( "CKSetup", Name + '/' + TargetFramework );
+        public Artifact GeneratedArtifact => new Artifact( ArtifactType.Single( "CKSetup" ), Name + '/' + TargetFramework );
 
         /// <summary>
         /// Gets the full name.

@@ -11,7 +11,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the type of the dependency involved (ie. "NuGet", "NPM", etc.).
         /// </summary>
-        string Type { get; }
+        ArtifactType Type { get; }
 
         /// <summary>
         /// Gets the primary solution that references the <see cref="TargetProjectName"/> package.

@@ -8,8 +8,14 @@ using CKSetup;
 
 namespace CK.Env
 {
-    public class CKSetupClient : IArtifactTypeFactory
+    public class CKSetupClient : IArtifactRepositoryFactory
     {
+        /// <summary>
+        /// Exposes the "CKSetup" <see cref="ArtifactType"/>.
+        /// This type of artifact is not installable.
+        /// </summary>
+        public static readonly ArtifactType CKSetupType = ArtifactType.Register( "CKSetup", false );
+
         readonly HttpClient _sharedHttpClient;
         readonly ISecretKeyStore _keyStore;
         readonly Dictionary<string, Store> _stores;

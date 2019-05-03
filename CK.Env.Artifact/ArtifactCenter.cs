@@ -7,24 +7,24 @@ using CK.Core;
 namespace CK.Env
 {
     /// <summary>
-    /// Combination of <see cref="IArtifactTypeFactory"/>.
+    /// Combination of <see cref="IArtifactRepositoryFactory"/>.
     /// Actual management of repositories and infos are totally delegated to the type factories, this
     /// object doesn't track repositories or repository infos.
     /// </summary>
     public class ArtifactCenter
     {
-        readonly List<IArtifactTypeFactory> _factories;
+        readonly List<IArtifactRepositoryFactory> _factories;
 
         public ArtifactCenter()
         {
-            _factories = new List<IArtifactTypeFactory>();
+            _factories = new List<IArtifactRepositoryFactory>();
         }
 
         /// <summary>
         /// Registers a new <see cref="IArtifactRepository"/>.
         /// </summary>
         /// <param name="factory">The factory to register.</param>
-        public void Add( IArtifactTypeFactory factory )
+        public void Add( IArtifactRepositoryFactory factory )
         {
             if( factory == null ) throw new ArgumentNullException( nameof( factory ) );
             if( factory == this ) throw new ArgumentException( nameof( factory ) );
@@ -34,7 +34,7 @@ namespace CK.Env
 
         /// <summary>
         /// Creates a <see cref="IArtifactRepositoryInfo"/> from a <see cref="XElement"/>
-        /// by calling <see cref="IArtifactTypeFactory.CreateInfo(XElement)"/> on each registered
+        /// by calling <see cref="IArtifactRepositoryFactory.CreateInfo(XElement)"/> on each registered
         /// factories and returning the first one that returns a non null information object.
         /// If no factory can handle the element, an <see cref="ArgumentException"/> is thrown.
         /// <para>
@@ -86,7 +86,7 @@ namespace CK.Env
 
         /// <summary>
         /// Finds or creates a <see cref="IArtifactRepository"/> from a <see cref="IArtifactRepositoryInfo"/>.
-        /// If no registered <see cref="IArtifactTypeFactory"/> can provide a repository, an <see cref="ArgumentException"/>
+        /// If no registered <see cref="IArtifactRepositoryFactory"/> can provide a repository, an <see cref="ArgumentException"/>
         /// is thrown.
         /// </summary>
         /// <param name="m">The monitor to use.</param>

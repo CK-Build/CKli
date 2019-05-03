@@ -35,12 +35,10 @@ namespace CK.Env.Plugins.SolutionFiles
             if( e.IsStarting )
             {
                 EnsureFeed( e.Monitor, "ZeroBuild-Feed", _localFeedProvider.ZeroBuild.PhysicalPath );
+                Save( e.Monitor, true );
             }
-            else
-            {
-                RemoveFeed( e.Monitor, "ZeroBuild-Feed" );
-            }
-            Save( e.Monitor, true );
+            // Since we ResetHard, we don't need to restore the file.
+            // else RemoveFeed( e.Monitor, "ZeroBuild-Feed" );
         }
 
         void OnStartBuild( object sender, BuildStartEventArgs e )

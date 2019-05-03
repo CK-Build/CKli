@@ -29,7 +29,7 @@ namespace CK.Env
 
         public static ArtifactInstance FromComponentRef( ComponentRef c )
         {
-            return new ArtifactInstance( "CKSetup", c.Name + '/' + c.TargetFramework.ToStringFramework(), c.Version );
+            return new ArtifactInstance( CKSetupClient.CKSetupType, c.Name + '/' + c.TargetFramework.ToStringFramework(), c.Version );
         }
 
     }
