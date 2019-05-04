@@ -28,6 +28,10 @@ namespace CK.Env.MSBuild
         public struct Import
         {
             public readonly XElement ImportElement;
+
+            /// <summary>
+            /// May be null.
+            /// </summary>
             public readonly ProjectFile ImportedFile;
 
             internal Import( XElement e, ProjectFile f )
@@ -103,8 +107,12 @@ namespace CK.Env.MSBuild
             internal void Initialize()
             {
                 var start = new ProjectFile[] { this };
-                _allFiles = start.Concat( Imports.SelectMany( i => i.ImportedFile.AllFiles ) )
-                                 .Distinct().ToArray();
+                _allFiles = start
+                    .Concat(
+                        Imports.Where( i => i.ImportedFile != null )
+                        .SelectMany( i => i.ImportedFile.AllFiles ) )
+                    .Distinct()
+                    .ToArray();
             }
         }
 
@@ -264,7 +272,7 @@ namespace CK.Env.MSBuild
 
         internal ProjectFile FindOrLoadProjectFile( IActivityMonitor m, NormalizedPath path )
         {
-            if( _files.TryGetValue( path, out ProjectFile f )  )
+            if( _files.TryGetValue( path, out ProjectFile f ) )
             {
                 return f;
             }
@@ -275,7 +283,7 @@ namespace CK.Env.MSBuild
                     var fP = FileSystem.GetFileInfo( path );
                     if( !fP.Exists )
                     {
-                        m.Warn( $"Unable to find project file '{path}'. This project is ignored." );
+                        m.Warn( $"Unable to find project file '{path}'. This project is ignored. This may be a case sensivity issue !" );
                         return null;
                     }
                     XDocument content = fP.ReadAsXDocument();
@@ -287,6 +295,7 @@ namespace CK.Env.MSBuild
                                         .Select( i => (E: i, P: (string)i.Attribute( "Project" )) )
                                         .Where( i => i.P != null )
                                         .Select( i => new Import( i.E, FindOrLoadProjectFile( m, folder.Combine( i.P ).ResolveDots() ) ) ) );
+
                     f.Initialize();
                     return f;
                 }

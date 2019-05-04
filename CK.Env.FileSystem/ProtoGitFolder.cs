@@ -56,15 +56,15 @@ namespace CK.Env
             {
                 Repository.Clone( OriginUrl, FullPhysicalPath, new CloneOptions()
                 {
-                    CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, url, user, cred ),
+                    CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, url ),
                     BranchName = World.DevelopBranchName,
                     Checkout = true
                 } );
             }
-            return new GitFolder( m, SecretKeyStore, FileSystem, CommandRegister, World, FullPhysicalPath, OriginUrl );
+            return new GitFolder( SecretKeyStore, FileSystem, CommandRegister, World, FullPhysicalPath, OriginUrl );
         }
 
-        protected Credentials PATCredentialsHandler( IActivityMonitor m, string url, string user, SupportedCredentialTypes cred )
+        public Credentials PATCredentialsHandler( IActivityMonitor m, string url )
         {
             string keyName;
             switch( KnownGitProvider )

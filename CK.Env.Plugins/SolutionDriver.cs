@@ -1,14 +1,14 @@
+using CK.Core;
+using CK.Env.MSBuild;
+using CK.Env.NPM;
+using CK.Text;
+using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
-using CK.Core;
-using CK.Env.MSBuild;
-using CK.Env.NPM;
-using CK.Text;
-using CSemVer;
 
 namespace CK.Env.Plugins
 {
@@ -99,7 +99,7 @@ namespace CK.Env.Plugins
                     m.Error( $"Unable to load primary solution '{BranchPath}/{BranchPath.LastPart}.sln'." );
                 }
             }
-            else 
+            else
             {
                 var c = _solution.Current;
                 if( c == null )
@@ -407,7 +407,7 @@ namespace CK.Env.Plugins
             var primary = GetPrimarySolution( monitor );
             if( primary == null ) return false;
             var allSolutions = GetAllSolutions( monitor ).ToArray();
- 
+
             // Version is always provided by the current commit point.
             var v = Folder.ReadRepositoryVersionInfo( monitor )?.FinalNuGetVersion;
             if( v == null ) return false;
@@ -448,7 +448,7 @@ namespace CK.Env.Plugins
             var missing = feed.GetMissing( monitor, allArtifacts );
             if( missing.Count == 0 )
             {
-                monitor.Info( $"All artifacts are already available in {feed.PhysicalPath.LastPart} with version {v}: {allArtifacts.Select(a=>a.Artifact.ToString()).Concatenate()}." );
+                monitor.Info( $"All artifacts are already available in {feed.PhysicalPath.LastPart} with version {v}: {allArtifacts.Select( a => a.Artifact.ToString() ).Concatenate()}." );
                 if( !withUnitTest )
                 {
                     monitor.Info( $"No unit tests required. Build is skipped." );
@@ -506,7 +506,7 @@ namespace CK.Env.Plugins
                 }
                 ccbPath = null;
             }
-            if( (buildType&BuildType.WithZeroBuilder) != BuildType.WithZeroBuilder )
+            if( (buildType & BuildType.WithZeroBuilder) != BuildType.WithZeroBuilder )
             {
                 monitor.Info( "Using CodeCakeBuilder with source compilation (dotnet run)." );
             }
@@ -563,6 +563,31 @@ namespace CK.Env.Plugins
                 }
                 return true;
             }
+        }
+
+        [CommandMethod]
+        public bool DumpLogsBetweenDates( IActivityMonitor m, string beginning, string ending )
+        {
+            if( !DateTimeOffset.TryParse( beginning, out DateTimeOffset beginningDate ) )
+            {
+                m.Error( $"{beginning} is not a valid date" );
+                return false;
+            }
+            if( !DateTimeOffset.TryParse( ending, out DateTimeOffset endingDate ) )
+            {
+                m.Error( $"{ending} is not a valid date" );
+                return false;
+            }
+            m.Info( "Parsed beginning date: " + beginningDate.ToString() );
+            m.Info( "Parsed ending date: " + endingDate.ToString() );
+            var solution = GetPrimarySolution( m );
+            Folder.ShowLogsBetweenDates( m, beginningDate, endingDate,
+                solution.AllProjects
+                    .Select( p => p.PrimarySolutionRelativeFolderPath )
+                    .Union(
+                        solution.NPMProjects.Select( p => p.FullPath )
+                    ).ToList() );
+            return true;
         }
     }
 }

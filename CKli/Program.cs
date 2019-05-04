@@ -38,11 +38,12 @@ namespace CKli
             Console.OutputEncoding = System.Text.Encoding.Unicode;
             ActivityMonitor.DefaultFilter = LogFilter.Debug;
             var monitor = new ActivityMonitor();
-            monitor.Output.RegisterClient( new ActivityMonitorConsoleClient() );
+            var consoleClient = new ColoredActivityMonitorConsoleClient();
+            monitor.Output.RegisterClient( consoleClient );
             var xFactory = new XTypedFactory();
             xFactory.AutoRegisterFromLoadedAssemblies();
 
-            IBasicApplicationLifetime appLife = ConsoleCloseGuard.Default;
+            IBasicApplicationLifetime appLife = new FakeApplicationLifetime();
             var rootPath = GetRootPath( args );
             using( var global = new GlobalContext( monitor, xFactory, rootPath, appLife ) )
             {

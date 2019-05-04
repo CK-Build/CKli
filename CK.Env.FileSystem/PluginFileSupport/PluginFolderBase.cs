@@ -11,9 +11,11 @@ namespace CK.Env.Plugins
     public abstract class PluginFolderBase : GitBranchPluginBase, ICommandMethodsProvider
     {
         const string _csProtocol = @"cs\";
+        const string _csProtocolSlash = @"cs/";
         readonly Assembly _resourceAssembly;
         readonly string _resourcePrefix;
         readonly string _csResourcePrefix;
+        readonly string _csResourcePrefixSlash;
         readonly Dictionary<string, string> _textResources = new Dictionary<string, string>();
 
         string GetTextResourceFromPath(string path)
@@ -29,6 +31,7 @@ namespace CK.Env.Plugins
             _resourceAssembly = resourceHolder.Assembly;
             _resourcePrefix = resourceHolder.Namespace + ".Res.";
             _csResourcePrefix = _csProtocol + _resourcePrefix;
+            _csResourcePrefixSlash = _csProtocolSlash + _resourcePrefix;
         }
 
         /// <summary>
@@ -150,14 +153,19 @@ namespace CK.Env.Plugins
                 }
             }
 
-            (string ResPath, string RelativePath) ProcessTextResourceName( string resPath )
+            (string ResPath, string RelativePath) ProcessTextResourceName( string resPathText )
             {
-                if( resPath.EndsWith( ".txt" ) )
+                //NormalizedPath resPath = resPathText;
+                if( resPathText.EndsWith( ".txt" ) )
                 {
-                    if( resPath.StartsWith( _resourcePrefix ) ) return (resPath, resPath.Substring( _resourcePrefix.Length, resPath.Length - _resourcePrefix.Length - 4 ));
-                    if( resPath.StartsWith( _csResourcePrefix ) )
+                    if( resPathText.StartsWith( _resourcePrefix ) )
                     {
-                        return (resPath, resPath.Substring( _csResourcePrefix.Length, resPath.Length - _csResourcePrefix.Length - 3 ) + "cs");
+                        return (resPathText, resPathText.Substring( _resourcePrefix.Length, resPathText.Length - _resourcePrefix.Length - 4 ));
+                    }
+                    if( resPathText.StartsWith( _csResourcePrefix )
+                         || resPathText.StartsWith( _csResourcePrefixSlash ) )
+                    {
+                        return (resPathText, resPathText.Substring( _csResourcePrefix.Length, resPathText.Length - _csResourcePrefix.Length - 3 ) + "cs");
                     }
                 }
                 return (null, null);

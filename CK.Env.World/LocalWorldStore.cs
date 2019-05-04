@@ -1,10 +1,10 @@
+using CK.Core;
+using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
-using CK.Core;
-using CK.Text;
 
 namespace CK.Env
 {
@@ -45,7 +45,7 @@ namespace CK.Env
 
             string wName = name + (ltsKey != null ? '-' + ltsKey : String.Empty);
             var path = _directoryPath.AppendPart( wName + "-World.xml" );
-            if( !File.Exists( path ) ) 
+            if( !File.Exists( path ) )
             {
                 var w = new LocalWorldName( path, name, ltsKey, _localWorldRootPathMapping );
                 if( !WriteWorldDescription( m, w, content ) )
@@ -63,7 +63,7 @@ namespace CK.Env
         {
             return Directory.GetFiles( _directoryPath, "*-World.xml" )
                                 .Select( p => LocalWorldName.Parse( m, p, _localWorldRootPathMapping ) )
-                                .Where( w => w != null )
+                                .Where( w => w != null ).OrderBy( p => p.FullName )
                                 .ToList();
         }
 

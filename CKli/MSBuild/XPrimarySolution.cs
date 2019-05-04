@@ -43,7 +43,7 @@ namespace CKli
         public new XBranch Parent => (XBranch)base.Parent;
 
         /// <summary>
-        /// Gets whether <see cref="CK.Env.MSBuild.Solution.TestProjects"/> must be added to <see cref="CK.Env.MSBuild.Solution.PublishedProjects"/>.
+        /// Gets whether <see cref="Solution.TestProjects"/> must be added to <see cref="Solution.PublishedProjects"/>.
         /// </summary>
         public bool TestProjectsArePublished { get; private set; }
 

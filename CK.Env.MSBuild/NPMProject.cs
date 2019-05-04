@@ -11,13 +11,13 @@ using CK.Text;
 namespace CK.Env.MSBuild
 {
 
-    public class NPMProject : NPM.INPMProject
+    public class NPMProject : INPMProject
     {
         NPMProjectStatus _status;
         List<ProjectToProjectDependency> _projectDependencies;
-        NPM.INPMProject _p;
+        readonly INPMProject _p;
 
-        internal NPMProject( Solution s, NPM.INPMProject p )
+        internal NPMProject( Solution s, INPMProject p )
         {
             Solution = s;
             _p = p;

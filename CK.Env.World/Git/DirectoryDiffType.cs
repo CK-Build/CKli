@@ -3,7 +3,7 @@ namespace CK.Env
     /// <summary>
     /// Basic global changes in a project folder.
     /// </summary>
-    public enum PackageReleaseDiffType
+    public enum DirectoryDiffType
     {
         /// <summary>
         /// No change detected.

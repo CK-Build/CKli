@@ -17,33 +17,29 @@ namespace CK.Env
     /// Implements Git repository mapping.
     /// GitFolder are internally created (and disposed) by <see cref="FileSystem"/>.
     /// </summary>
-    public class GitFolder : ProtoGitFolder, IGitRepository, IGitHeadInfo, ICommandMethodsProvider
+    public class GitFolder : IGitRepository, IGitHeadInfo, ICommandMethodsProvider
     {
         readonly Repository _git;
         readonly RootDir _thisDir;
         readonly HeadFolder _headFolder;
         readonly BranchesFolder _branchesFolder;
         readonly RemotesFolder _remoteBranchesFolder;
-        readonly IActivityMonitor _activityMonitor;
-        readonly ISecretKeyStore _secretKeyStore;
         readonly CommandRegister _commandRegister;
         bool _branchRefreshed;
-
+        public ProtoGitFolder ProtoGitFolder { get; set; }
         internal GitFolder(
-            IActivityMonitor activityMonitor,
             ISecretKeyStore secretKeyStore,
             FileSystem fs,
             CommandRegister commandRegister,
             IWorldName world,
             string path,
-            string originUrl ) : base( originUrl, path, world, secretKeyStore, fs, commandRegister )
+            string originUrl )
         {
             if( originUrl == null ) throw new ArgumentNullException( nameof( originUrl ) );
+            ProtoGitFolder = new ProtoGitFolder( originUrl, path, world, secretKeyStore, fs, commandRegister );
             Debug.Assert( path.StartsWith( fs.Root.Path ) );
-            SubPath = FullPhysicalPath.RemovePrefix( fs.Root );
+            SubPath = ProtoGitFolder.FullPhysicalPath.RemovePrefix( fs.Root );
             if( SubPath.IsEmptyPath ) throw new InvalidOperationException( "Root path can not be a Git folder." );
-            _activityMonitor = activityMonitor;
-            _secretKeyStore = secretKeyStore;
             _git = new Repository( path );
             if( _git.Branches.Count() == 0 )
             {
@@ -105,7 +101,7 @@ namespace CK.Env
                     return null;
                 }
                 var proto = new ProtoGitFolder( url, path, world, secretKeyStore, fs, commandRegister );
-                gitFolder = gitFolder = proto.Clone( m );
+                gitFolder = proto.Clone( m );
             }
             else
             {
@@ -113,7 +109,7 @@ namespace CK.Env
                 {
                     throw new InvalidOperationException( "Git folder exist but is not a valid Repository" );
                 }
-                gitFolder = new GitFolder( m, secretKeyStore, fs, commandRegister, world, path, url );
+                gitFolder = new GitFolder( secretKeyStore, fs, commandRegister, world, path, url );
             }
             gitFolder.EnsureBranch( m, world.DevelopBranchName );
             return gitFolder;
@@ -173,6 +169,9 @@ namespace CK.Env
                                                         : (CurrentBranchName == World.DevelopBranchName
                                                             ? StandardGitStatus.Develop
                                                             : StandardGitStatus.Unknown);
+        public IWorldName World => ProtoGitFolder.World;
+
+        public KnownGitProvider KnownGitProvider => ProtoGitFolder.KnownGitProvider;
 
         /// <summary>
         /// Gets the head information.
@@ -194,50 +193,80 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the set of <see cref="PackageReleaseDiff"/> for packages from the current head.
+        /// Gets the set of <see cref="DirectoryDiff"/> for packages from the current head.
         /// </summary>
         /// <param name="m">The minitor to use.</param>
         /// <param name="previousVersionCommitSha">Previous commit.</param>
-        /// <param name="packages">Generated packages of a solution.</param>
+        /// <param name="paths">Generated packages of a solution.</param>
         /// <returns>The set of diff or null on error.</returns>
-        public IReadOnlyCollection<PackageReleaseDiff> GetReleaseDiff( IActivityMonitor m, string previousVersionCommitSha, IReadOnlyCollection<GeneratedArtifact> packages )
+        public IReadOnlyCollection<DirectoryDiff> GetPathsDiff( IActivityMonitor m, string previousVersionCommitSha, IReadOnlyCollection<NormalizedPath> paths )
         {
-            if( packages.Count == 0 ) return Array.Empty<PackageReleaseDiff>();
-            var r = new List<PackageReleaseDiff>();
             Commit commit = _git.Lookup<Commit>( previousVersionCommitSha );
-            foreach( var p in packages )
+            var commits = _git.Commits.QueryBy( new CommitFilter()
             {
-                var d = CreateDiff( m, commit, p );
-                if( d == null ) return null;
-                r.Add( d );
+                IncludeReachableFrom = _git.Head.Tip,
+                ExcludeReachableFrom = commit
+            } );
+            return GetReleaseDiff( paths, commits.ToList() );
+        }
+
+        IReadOnlyCollection<DirectoryDiff> GetReleaseDiff( IReadOnlyCollection<NormalizedPath> paths, List<Commit> commits )
+        {
+            if( paths.Count == 0 ) return Array.Empty<DirectoryDiff>();
+            var r = new List<DirectoryDiff>();
+            foreach( var p in paths )
+            {
+                r.Add( CreateDiff( commits, p ) );
             }
             return r;
         }
 
-        PackageReleaseDiff CreateDiff( IActivityMonitor m, Commit commit, GeneratedArtifact p )
+        /// <summary>
+        /// Create Diff on a single file.
+        /// </summary>
+        /// <param name="topCommit"></param>
+        /// <param name="commit"></param>
+        /// <param name="directoryPath"></param>
+        /// 
+        /// <returns></returns>
+        DirectoryDiff CreateDiff( List<Commit> commits, NormalizedPath directoryPath )
         {
-            TreeEntry newTreeEntry = _git.Head.Tip.Tree[p.PrimarySolutionRelativeFolderPath.Replace( '\\', '/' )];
-            if( newTreeEntry == null || newTreeEntry.TargetType != TreeEntryTargetType.Tree )
+            var commitsAndParents = commits.Select( s => (s, s.Parents.FirstOrDefault()) );
+            //There is a diff with the first commit and his parent, and we don't want it
+            var commitsAndDiffWithParent = commitsAndParents.Select( c => (c.s, _git.Diff.Compare<TreeChanges>( c.s.Tree, c.Item2.Tree )) );
+            var commitsThatChangedTheDirectory = commitsAndDiffWithParent.Where( p => p.Item2.Any( q => q.Path.StartsWith( directoryPath ) ) ).Select( p => p.s );
+
+            using( TreeChanges changes = _git.Diff.Compare<TreeChanges>( commits.Last().Tree, commits.First().Tree ) )
             {
-                m.Error( $"Unable to find '{p.PrimarySolutionRelativeFolderPath}'." );
-                return null;
+                var allChanges = changes.Where( p => p.Path.StartsWith( directoryPath ) ).Select( gC => new FileReleaseDiff( gC.Path, (FileReleaseDiffType)gC.Status ) ).ToList();
+                return new DirectoryDiff( directoryPath, allChanges, commitsThatChangedTheDirectory.Select( p => new CommitInfo( p.Message, p.Sha ) ).ToList() );
             }
-            TreeEntry oldTreeEntry = commit.Tree[p.PrimarySolutionRelativeFolderPath.Replace( '\\', '/' )];
-            if( oldTreeEntry == null || oldTreeEntry.TargetType != TreeEntryTargetType.Tree )
+        }
+
+        IEnumerable<Commit> GetCommitsBetweenDates( DateTimeOffset beginning, DateTimeOffset ending )
+        {
+            if( ending < beginning ) throw new ArgumentException( $"{nameof( ending )}<{nameof( beginning )}" );
+            return _git.Head.Commits.SkipWhile( p => p.Committer.When > ending ).TakeWhile( p => p.Committer.When > beginning );
+        }
+
+        public void ShowLogsBetweenDates( IActivityMonitor m, DateTimeOffset beginning, DateTimeOffset ending, IReadOnlyCollection<NormalizedPath> paths )
+        {
+            List<Commit> commits = GetCommitsBetweenDates( beginning, ending ).ToList();
+            if( !commits.Any() )
             {
-                m.Info( $"Previously {p.Name} did not exist." );
-                return new PackageReleaseDiff( p, PackageReleaseDiffType.NewPackage );
+                m.Info( "No commits between the given dates" );
             }
-            Tree oldTree = (Tree)oldTreeEntry.Target;
-            Tree newTree = (Tree)newTreeEntry.Target;
-            if( oldTree.Sha == newTree.Sha )
+            else
             {
-                return new PackageReleaseDiff( p, PackageReleaseDiffType.None );
-            }
-            using( TreeChanges changes = _git.Diff.Compare<TreeChanges>( oldTree, newTree ) )
-            {
-                var allChanges = changes.Select( gC => new FileReleaseDiff( gC.Path, (FileReleaseDiffType)gC.Status ) ).ToList();
-                return new PackageReleaseDiff( p, allChanges );
+                var diffs = GetReleaseDiff( paths, commits );
+                if( diffs.Count == 0 )
+                {
+                    m.Info( "No diffs" );
+                }
+                foreach( var d in diffs )
+                {
+                    d.DumpDiff();
+                }
             }
         }
 
@@ -302,7 +331,7 @@ namespace CK.Env
             if( b == null )
             {
                 m.Warn( $"Branch '{branchName}' does not exist. Creating local branch." );
-                b = _git.CreateBranch( branchName );
+                _ = _git.CreateBranch( branchName );
             }
         }
 
@@ -341,7 +370,7 @@ namespace CK.Env
                         IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification ).ToArray();
                         Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
                         {
-                            CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, url, user, cred ),
+                            CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m, url ),
                             TagFetchMode = TagFetchMode.All
                         }, $"Fetching remote '{remote.Name}'." );
                     }
@@ -434,13 +463,13 @@ namespace CK.Env
 
         (bool Success, bool ReloadNeeded) DoPull( IActivityMonitor m, bool alreadyReloadNeeded, MergeFileFavor mergeFileFavor )
         {
-            var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
+            var merger = _git.Config.BuildSignature( DateTimeOffset.Now ) ?? new Signature( "CKli", "none", DateTimeOffset.Now );
             var result = Commands.Pull( _git, merger, new PullOptions
             {
                 FetchOptions = new FetchOptions
                 {
                     TagFetchMode = TagFetchMode.All,
-                    CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, url, user, cred )
+                    CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m, url )
                 },
                 MergeOptions = new MergeOptions
                 {
@@ -577,7 +606,7 @@ namespace CK.Env
                     Remote remote = _git.Network.Remotes["origin"];
                     var options = new PushOptions()
                     {
-                        CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, url, user, cred )
+                        CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m, url )
                     };
 
                     var exists = _git.Tags[sv];
@@ -632,6 +661,12 @@ namespace CK.Env
         /// is not tracked or the current commit is ahead of the remote branch.
         /// </summary>
         public bool CanAmendCommit => (_git.Head.TrackingDetails.AheadBy ?? 1) > 0;
+
+        public string OriginUrl => ProtoGitFolder.OriginUrl;
+
+        public NormalizedPath FullPhysicalPath => ProtoGitFolder.FullPhysicalPath;
+
+        public FileSystem FileSystem => ProtoGitFolder.FileSystem;
 
         /// <summary>
         /// Commits any pending changes.
@@ -745,14 +780,14 @@ namespace CK.Env
             try
             {
                 if( isDirty ) m.Info( "Working Folder is dirty. Committing changes." );
-                var author = amendPreviousCommit ? _git.Head.Tip.Author : _git.Config.BuildSignature( date );
+                Signature author = amendPreviousCommit ? _git.Head.Tip.Author : _git.Config.BuildSignature( date );
                 // Let AllowEmptyCommit even when amending: this avoids creating an empty commit.
                 // If we are not amending, this is an error and we let the EmptyCommitException pops.
                 var options = new CommitOptions { AmendPreviousCommit = amendPreviousCommit };
                 var committer = new Signature( "CKli", "none", date );
                 try
                 {
-                    _git.Commit( commitMessage, author, committer, options );
+                    _git.Commit( commitMessage, author ?? committer, committer, options );
                 }
                 catch( EmptyCommitException )
                 {
@@ -777,9 +812,9 @@ namespace CK.Env
         /// Gets whether <see cref="Push(IActivityMonitor)"/> can be called:
         /// the current branch is tracked and is ahead of the remote branch.
         /// </summary>
-        /// <param name="m"></param>
+        /// 
         /// <returns></returns>
-        public bool PushEnabled( IActivityMonitor m ) => (_git.Head.TrackingDetails.AheadBy ?? 0) > 0;
+        public bool PushEnabled() => (_git.Head.TrackingDetails.AheadBy ?? 0) > 0;
 
         /// <summary>
         /// Pushes changes from the current branch to the origin.
@@ -817,7 +852,7 @@ namespace CK.Env
                     }
                     var options = new PushOptions()
                     {
-                        CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, url, user, cred )
+                        CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m, url )
                     };
                     if( created || (b.TrackingDetails.AheadBy ?? 1) > 0 )
                     {

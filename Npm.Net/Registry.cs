@@ -26,7 +26,7 @@ namespace Npm.Net
         readonly string _session = GenerateSessionId();
 
         /// <summary>
-        /// Create a registry that make unauthentified request
+        /// Create a registry that make unauthentified request.
         /// </summary>
         /// <param name="httpClient">The <see cref="HttpClient"/> used to send the requests</param>
         /// <param name="registryUri">Registry <see cref="Uri"/>, https://registry.npmjs.org/ is used if the uri is not specified </param>
@@ -71,38 +71,69 @@ namespace Npm.Net
         }
 
         /// <summary>
-        /// Simple cache storing if we know that a registry have newer api endpoint
+        /// Simple cache storing.
+        /// If we know that a registry have newer api endpoint
         /// If the registry is not in the dictionary, we did'nt tested a new endpoint.
         /// If it's it, we know if the registry is up to date or not.
         /// </summary>
-        static Dictionary<string, bool> RegistryIsUpToDate { get; set; } = new Dictionary<string, bool>()
+        static (string registryUri, bool isUpToDate)[] _registriesUpToDate = new (string registryUri, bool isUpToDate)[]
         {
-            ["registry.npmjs.org"] = true
+            ("registry.npmjs.org", true)
         };
 
+        static (string registryUri, bool isUpToDate)? GetRegistryIsUpToDate( string registryHost )
+        {
+            for( int i = 0; i < _registriesUpToDate.Length; i++ )
+            {
+                (string registryUri, bool isUpToDate) = _registriesUpToDate[i];
+                if( registryUri == registryHost )
+                {
+                    return (registryUri, isUpToDate);
+                }
+            }
+            return null;
+        }
         /// <summary>
         /// Return whether the registry is up to date. If we never tested a repository we are optimistic
         /// and think that the registry have recent endpoint
         /// </summary>
         /// <param name="registryHost"></param>
         /// <returns></returns>
-        static bool IsRegistryUpToDate( string registryHost )
+        static bool IsRegistryUpToDate( string registryHost ) => GetRegistryIsUpToDate( registryHost )?.isUpToDate ?? true;
+        static void TryAddRegistryWithStatus( IActivityMonitor m, string registryHost, bool isUpToDate )
         {
-            return RegistryIsUpToDate.ContainsKey( registryHost ) ? RegistryIsUpToDate[registryHost] : true;
+            (string registryUri, bool isUpToDate)? valueTuple = GetRegistryIsUpToDate( registryHost );
+            if( valueTuple == null )
+            {
+                Util.InterlockedAdd( ref _registriesUpToDate, (registryHost, isUpToDate) );
+                if( isUpToDate )
+                {
+                    m.Debug( "Request on recent endpoint works: I will never try legacy methods on it." );
+                }
+                else
+                {
+                    m.Debug( "This registry does not support recent endpoint. We will now stop to try to access the recent endpoints" );
+                }
+            }
+            else if( !valueTuple.Value.isUpToDate )
+            {
+                m.Error( "Repository was recorded as not up to date, but i tried to add it as up to date. " );
+            }
         }
 
         void InitRegistryUpToDate()
         {
             if( IsAzureRepository() )
             {
-                _registryIsUpToDate = false;
+                _thisRegistryIsUpToDate = false;
             }
             else
             {
-                _registryIsUpToDate = IsRegistryUpToDate( RegistryUri.Host );
+                _thisRegistryIsUpToDate = IsRegistryUpToDate( RegistryUri.Host );
             }
         }
 
+        bool _thisRegistryIsUpToDate;
         /// <summary>
         /// NPM ask a one time password, so here you have one.
         /// </summary>
@@ -115,7 +146,7 @@ namespace Npm.Net
         }
 
         /// <summary>
-        /// Uri of the registry
+        /// Gets the Uri of the registry.
         /// </summary>
         public Uri RegistryUri { get; }
 
@@ -309,7 +340,7 @@ namespace Npm.Net
             }
             //Here we know that the user specified the version
 
-            if( !_registryIsUpToDate )
+            if( !_thisRegistryIsUpToDate )
             {
                 if( IsAzureRepository() )
                 {
@@ -347,16 +378,12 @@ namespace Npm.Net
                 if( IsSuccessStatusCode( statusCode ) )
                 {
                     m.Info( "Request successful." );
-                    //We know that the registry is really up to date
-                    if( !RegistryIsUpToDate.ContainsKey( RegistryUri.Host ) )
-                    {
-                        RegistryIsUpToDate[RegistryUri.Host] = true;
-                        m.Debug( "Request on recent endpoint works: I will never try legacy methods on it." );
-                    }
+                    TryAddRegistryWithStatus( m, RegistryUri.Host, true );
+
                     return (body, true);
                 }
                 //Here the request have an error: but the repository is maybe not up to date and not in the cache !
-                if( !RegistryIsUpToDate.ContainsKey( RegistryUri.Host ) )
+                if( GetRegistryIsUpToDate( RegistryUri.Host ) == null )
                 {
                     m.Debug( "I'm not sure if this repository is up to date. Retrying with legacy endpoint" );
                     //Ok we never tested this registry and we were optimistic.
@@ -367,10 +394,10 @@ namespace Npm.Net
                         //Worst case, we don't know if the package exist and if the repository support new endpoints
                         return (filteredBody, false);
                     }
-                    m.Debug( "This registry does not support recent endpoint. We will now stop to try to access the recent endpoints" );
+
                     m.Info( "Request successful" );
-                    _registryIsUpToDate = false;
-                    RegistryIsUpToDate[RegistryUri.Host] = false;
+                    _thisRegistryIsUpToDate = false;
+                    TryAddRegistryWithStatus( m, RegistryUri.Host, false );
                     return (filteredBody, true);
                 }
                 //We know that the host is a modern registry, it should throw 404 if the versions does not exist.
