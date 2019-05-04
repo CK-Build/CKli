@@ -29,12 +29,12 @@ namespace CK.Env
         public FileSystem(
             string rootPath,
             CommandRegister commandRegister,
-            ISecretKeyStore keyStore,
+            ISecretKeyStore secretKeyStore,
             IServiceProvider sp )
         {
             Root = new NormalizedPath( Path.GetFullPath( rootPath ) );
             _commandRegister = commandRegister;
-            _secretKeyStore = _secretKeyStore;
+            _secretKeyStore = secretKeyStore;
             _gits = new List<GitFolder>();
             ServiceContainer = new SimpleServiceContainer( sp );
             ServiceContainer.Add( this );

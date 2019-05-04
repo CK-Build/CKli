@@ -2,24 +2,29 @@ using CK.Core;
 using CK.Text;
 using LibGit2Sharp;
 using System;
+using System.IO;
 using System.Text.RegularExpressions;
 
 namespace CK.Env
 {
     public class ProtoGitFolder
     {
-        protected readonly ISecretKeyStore SecretKeyStore;
-        protected readonly CommandRegister CommandRegister;
-
         public ProtoGitFolder(
             string url,
-            string path,
+            string fullPhysicalPath,
             IWorldName world,
             ISecretKeyStore secretKeyStore,
             FileSystem fileSystem,
             CommandRegister commandRegister )
         {
             if( url == null ) throw new ArgumentNullException( nameof( url ) );
+            if( fullPhysicalPath == null ) throw new ArgumentNullException( nameof( fullPhysicalPath ) );
+            if( fullPhysicalPath.Contains( ".git" ) ) throw new ArgumentException( "Path should be the repository directory and not the .git directory" );
+            if( world == null ) throw new ArgumentNullException( nameof( world ) );
+            if( secretKeyStore == null ) throw new ArgumentNullException( nameof( secretKeyStore ) );
+            if( fileSystem == null ) throw new ArgumentNullException( nameof( fileSystem ) );
+            if( commandRegister == null ) throw new ArgumentNullException( nameof( commandRegister ) );
+
             if( url.IndexOf( "github.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.GitHub;
             else if( url.IndexOf( "gitlab.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.GitLab;
             else if( url.IndexOf( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.AzureDevOps;
@@ -28,7 +33,7 @@ namespace CK.Env
             OriginUrl = url;
             World = world;
             SecretKeyStore = secretKeyStore;
-            FullPhysicalPath = path;
+            FullPhysicalPath = fullPhysicalPath;
             FileSystem = fileSystem;
             CommandRegister = commandRegister;
         }
@@ -46,22 +51,39 @@ namespace CK.Env
         public string OriginUrl { get; }
 
         /// <summary>
+        /// Gets the known Git provider.
+        /// </summary>
+        public KnownGitProvider KnownGitProvider { get; }
+
+        /// <summary>
         /// Gets the full path (that starts with the <see cref="FileSystem"/>' root path) of the Git folder.
         /// </summary>
         public NormalizedPath FullPhysicalPath { get; }
 
-        public GitFolder Clone( IActivityMonitor m )
+        public ISecretKeyStore SecretKeyStore { get; }
+
+        public CommandRegister CommandRegister { get; }
+
+        public GitFolder Ensure( IActivityMonitor m )
         {
-            using( m.OpenInfo( $"Checking out '{FullPhysicalPath}' from '{ OriginUrl }' on { World.DevelopBranchName }." ) )
+            var gitFolderPath = Path.Combine( FullPhysicalPath, ".git" );
+            if( !Directory.Exists( gitFolderPath ) )
             {
-                Repository.Clone( OriginUrl, FullPhysicalPath, new CloneOptions()
+                using( m.OpenInfo( $"Checking out '{FullPhysicalPath}' from '{OriginUrl}' on {World.DevelopBranchName}." ) )
                 {
-                    CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, url ),
-                    BranchName = World.DevelopBranchName,
-                    Checkout = true
-                } );
+                    Repository.Clone( OriginUrl, FullPhysicalPath, new CloneOptions()
+                    {
+                        CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, url ),
+                        BranchName = World.DevelopBranchName,
+                        Checkout = true
+                    } );
+                }
             }
-            return new GitFolder( SecretKeyStore, FileSystem, CommandRegister, World, FullPhysicalPath, OriginUrl );
+            else if( !Repository.IsValid( gitFolderPath ) )
+            {
+                throw new InvalidOperationException( $"Git folder {gitFolderPath} exists but is not a valid Repository" );
+            }
+            return new GitFolder( this );
         }
 
         public Credentials PATCredentialsHandler( IActivityMonitor m, string url )
@@ -90,9 +112,5 @@ namespace CK.Env
             };
         }
 
-        /// <summary>
-        /// Gets the known Git provider.
-        /// </summary>
-        public KnownGitProvider KnownGitProvider { get; }
     }
 }

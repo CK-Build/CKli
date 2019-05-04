@@ -24,43 +24,36 @@ namespace CK.Env
         readonly HeadFolder _headFolder;
         readonly BranchesFolder _branchesFolder;
         readonly RemotesFolder _remoteBranchesFolder;
-        readonly CommandRegister _commandRegister;
         bool _branchRefreshed;
-        public ProtoGitFolder ProtoGitFolder { get; set; }
-        internal GitFolder(
-            ISecretKeyStore secretKeyStore,
-            FileSystem fs,
-            CommandRegister commandRegister,
-            IWorldName world,
-            string path,
-            string originUrl )
+
+        public ProtoGitFolder ProtoGitFolder { get; }
+
+        internal GitFolder( ProtoGitFolder data )
         {
-            if( originUrl == null ) throw new ArgumentNullException( nameof( originUrl ) );
-            ProtoGitFolder = new ProtoGitFolder( originUrl, path, world, secretKeyStore, fs, commandRegister );
-            Debug.Assert( path.StartsWith( fs.Root.Path ) );
-            SubPath = ProtoGitFolder.FullPhysicalPath.RemovePrefix( fs.Root );
+            ProtoGitFolder = data;
+
+            SubPath = ProtoGitFolder.FullPhysicalPath.RemovePrefix( data.FileSystem.Root );
             if( SubPath.IsEmptyPath ) throw new InvalidOperationException( "Root path can not be a Git folder." );
-            _git = new Repository( path );
+            _git = new Repository( FullPhysicalPath );
             if( _git.Branches.Count() == 0 )
             {
                 _git.Dispose();
                 throw new InvalidDataException( "This git repository does not contain any branches." );
             }
             string remoteUrl;
-            if( !StringComparer.OrdinalIgnoreCase.Equals( (remoteUrl = _git.Network.Remotes["origin"]?.Url), originUrl ) )
+            if( !StringComparer.OrdinalIgnoreCase.Equals( (remoteUrl = _git.Network.Remotes["origin"]?.Url), data.OriginUrl ) )
             {
                 _git.Dispose();
-                throw new InvalidOperationException( $"The repository 'origin' url (ie. '{remoteUrl}') is different than the repository url specified in the world: {originUrl}" );
+                throw new InvalidOperationException( $"The repository 'origin' url (ie. '{remoteUrl}') is different than the repository url specified in the world: {ProtoGitFolder.OriginUrl}" );
             }
-            _commandRegister = commandRegister;
             _headFolder = new HeadFolder( this );
             _branchesFolder = new BranchesFolder( this, "branches", isRemote: false );
             _remoteBranchesFolder = new RemotesFolder( this );
             _thisDir = new RootDir( this, SubPath.LastPart );
             ServiceContainer = new SimpleServiceContainer( FileSystem.ServiceContainer );
             ServiceContainer.Add( this );
-            PluginManager = new GitPluginManager( ServiceContainer, commandRegister, world.DevelopBranchName, SubPath.AppendPart( "branches" ) );
-            commandRegister.Register( this );
+            PluginManager = new GitPluginManager( ServiceContainer, data.CommandRegister, data.World.DevelopBranchName, SubPath.AppendPart( "branches" ) );
+            data.CommandRegister.Register( this );
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => SubPath;
@@ -90,29 +83,9 @@ namespace CK.Env
         /// <returns>The <see cref="GitFolder"/> or null if there is not .git subfolder.</returns>
         public static GitFolder EnsureGitFolder( IActivityMonitor m, IWorldName world, ISecretKeyStore secretKeyStore, FileSystem fs, CommandRegister commandRegister, string path, string url = null )
         {
-            if( path.Contains( ".git" ) ) throw new ArgumentException( "Path should be the repository directory and not the .git directory" );
-            var gitFolderPath = Path.Combine( path, ".git" );
-            GitFolder gitFolder;
-            if( !Directory.Exists( gitFolderPath ) )
-            {
-                if( string.IsNullOrWhiteSpace( url ) )
-                {
-                    m.Warn( "Url repository is not specified. Skipping automatic clone." );
-                    return null;
-                }
-                var proto = new ProtoGitFolder( url, path, world, secretKeyStore, fs, commandRegister );
-                gitFolder = proto.Clone( m );
-            }
-            else
-            {
-                if( !Repository.IsValid( gitFolderPath ) )
-                {
-                    throw new InvalidOperationException( "Git folder exist but is not a valid Repository" );
-                }
-                gitFolder = new GitFolder( secretKeyStore, fs, commandRegister, world, path, url );
-            }
-            gitFolder.EnsureBranch( m, world.DevelopBranchName );
-            return gitFolder;
+            var g = new ProtoGitFolder( url, path, world, secretKeyStore, fs, commandRegister ).Ensure( m );
+            g.EnsureBranch( m, world.DevelopBranchName );
+            return g;
         }
 
         /// <summary>
@@ -1272,7 +1245,7 @@ namespace CK.Env
 
         internal void Dispose()
         {
-            _commandRegister.Unregister( this );
+            ProtoGitFolder.CommandRegister.Unregister( this );
             ((IDisposable)PluginManager).Dispose();
             _git.Dispose();
         }
