@@ -66,24 +66,51 @@ namespace CK.Env
 
         public GitFolder Ensure( IActivityMonitor m )
         {
-            var gitFolderPath = Path.Combine( FullPhysicalPath, ".git" );
-            if( !Directory.Exists( gitFolderPath ) )
+            using( m.OpenTrace( $"Ensuring git repository {FullPhysicalPath}" ) )
             {
-                using( m.OpenInfo( $"Checking out '{FullPhysicalPath}' from '{OriginUrl}' on {World.DevelopBranchName}." ) )
+
+                var gitFolderPath = Path.Combine( FullPhysicalPath, ".git" );
+                if( !Directory.Exists( gitFolderPath ) )
                 {
-                    Repository.Clone( OriginUrl, FullPhysicalPath, new CloneOptions()
+                    using( m.OpenInfo( $"Checking out '{FullPhysicalPath}' from '{OriginUrl}' on {World.DevelopBranchName}." ) )
                     {
-                        CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, url ),
-                        BranchName = World.DevelopBranchName,
-                        Checkout = true
-                    } );
+                        Repository.Clone( OriginUrl, FullPhysicalPath, new CloneOptions()
+                        {
+                            CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, url ),
+                            BranchName = World.DevelopBranchName,
+                            Checkout = true
+                        } );
+                    }
                 }
-            }
-            else if( !Repository.IsValid( gitFolderPath ) )
-            {
-                throw new InvalidOperationException( $"Git folder {gitFolderPath} exists but is not a valid Repository" );
+                else if( !Repository.IsValid( gitFolderPath ) )
+                {
+                    throw new InvalidOperationException( $"Git folder {gitFolderPath} exists but is not a valid Repository" );
+                }
+                else
+                {
+                    m.Trace( "Repository is checked out." );
+                }
+
+                EnsureHooks( m );
             }
             return new GitFolder( this );
+        }
+
+        void EnsureHooks( IActivityMonitor m )
+        {
+            EnsureHookFile( m, "pre_push", _hook_pre_push );
+        }
+
+        void EnsureHookFile( IActivityMonitor m, string hookName, string newHook )
+        {
+            var hookPath = Path.Combine( FullPhysicalPath, ".git", "hooks", hookName );
+
+            bool currentHookIsUpToDate = File.Exists( hookPath ) && File.OpenText( hookPath ).ReadToEnd() == newHook;
+            if( !currentHookIsUpToDate )
+            {
+                m.Info( "git " + Path.GetFileName( hookPath ) + " hook not up to date. Updating!" );
+                File.WriteAllText( hookPath, newHook );
+            }
         }
 
         public Credentials PATCredentialsHandler( IActivityMonitor m, string url )
@@ -112,5 +139,20 @@ namespace CK.Env
             };
         }
 
+
+        const string _hook_pre_push =
+@"#!/bin/sh
+# Abort push on -local branches
+
+while read local_ref local_sha remote_ref remote_sha 
+do 
+	if [[ $local_ref == *-local ]]
+	then
+		echo >&2 ""Pushing on a -local branch, aborting!""
+        exit 1
+	fi
+done
+exit 0
+";
     }
 }
