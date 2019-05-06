@@ -1,18 +1,16 @@
-using CK.Core;
-using CK.Setup;
-using CK.Text;
-using CSemVer;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Text;
 using System.Xml.Linq;
+using CK.Core;
+using CK.Text;
+using CSemVer;
 
-namespace CK.Env.MSBuild
+namespace CK.Env.MSBuildSln
 {
-    /// <summary>
-    /// Represents an actual Visual Studio project in a solution.
-    /// </summary>
-    public class Project : ProjectBase
+    public class MSProject : Project
     {
         /// <summary>
         /// Captures <see cref="DeclaredPackageDependency"/> and <see cref="ProjectToProjectDependency"/>.
@@ -75,49 +73,41 @@ namespace CK.Env.MSBuild
 
         }
 
-        readonly MSBuildContext _ctx;
-        MSBuildContext.ProjectFile _file;
+        MSProjFile _file;
         Dependencies _dependencies;
-        NormalizedPath _primarySolutionRelativeFolderPath;
 
-        internal Project( MSBuildContext ctx, string id, string name, NormalizedPath projectFilePath, string typeIdentifier )
-            : base( id, name, projectFilePath, typeIdentifier )
+        internal MSProject(
+                    SolutionFile solution,
+                    KnownProjectType type,
+                    string projectGuid,
+                    string projectName,
+                    string relativePath  )
+            : base( solution, projectGuid, type.ToGuid(), projectName, relativePath )
         {
-            _ctx = ctx;
-            FolderPath = projectFilePath.RemoveLastPart();
+            Debug.Assert( KnownType.IsVSProject() );
         }
 
         /// <summary>
         /// Gets the project file. This is loaded when the <see cref="Solution"/>
         /// is created. This is null if an error occurred while loading.
         /// </summary>
-        public MSBuildContext.ProjectFile ProjectFile => _file;
+        public MSProjFile ProjectFile => _file;
 
         /// <summary>
         /// Gets the folder path of this project. 
         /// </summary>
         public NormalizedPath FolderPath { get; }
 
-        /// <summary>
-        /// Gets the <see cref="FolderPath"/> of this project relative to the <see cref="PrimarySolution"/> folder.
-        /// </summary>
-        public NormalizedPath PrimarySolutionRelativeFolderPath
+        internal override bool Initialize( IActivityMonitor m )
         {
-            get
-            {
-                if( _primarySolutionRelativeFolderPath.IsEmptyPath )
-                {
-                    _primarySolutionRelativeFolderPath = FolderPath.RemovePrefix( PrimarySolution.SolutionFolderPath );
-                }
-                return _primarySolutionRelativeFolderPath;
-            }
+            if( !base.Initialize( m ) ) return false;
+            return ReloadProjectFile( m ) != null;
         }
 
-        internal MSBuildContext.ProjectFile ReloadProjectFile( IActivityMonitor m )
+        internal MSProjFile ReloadProjectFile( IActivityMonitor m )
         {
-            IsTestProject = false;
             _dependencies = new Dependencies();
-            _file = _ctx.FindOrLoadProjectFile( m, Path );
+            _file = Solution.VSProjContext.FindOrLoadProjectFile( m, Path );
             if( _file != null )
             {
                 Sdk = (string)_file.Document.Root.Attribute( "Sdk" );
@@ -148,21 +138,11 @@ namespace CK.Env.MSBuild
                     }
                     else
                     {
-                        TargetFrameworks = MSBuildContext.Traits.FindOrCreate( f.Value );
+                        TargetFrameworks = MSProjContext.Traits.FindOrCreate( f.Value );
 
                         LangVersion = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "LangVersion" ).FirstOrDefault()?.Value;
                         OutputType = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "OutputType" ).FirstOrDefault()?.Value;
-                        bool? isTestProject = (bool?)_file.Document.Root.Elements( "PropertyGroup" )
-                                                          .Elements( "IsTestProject" )
-                                                          .FirstOrDefault();
-                        if( !isTestProject.HasValue )
-                        {
-                            var testMarker = _file.Document.Root.Elements( "ItemGroup" )
-                                                  .Elements( "Service" )
-                                                  .FirstOrDefault( e => (string)e.Attribute( "Include" ) == "{82a7f48d-3b50-4b1e-b82e-3ada8210c358}" );
-                            isTestProject = testMarker != null;
-                        }
-                        IsTestProject = isTestProject.Value;
+
                         DoInitializeDependencies( m );
                         if( !_dependencies.IsInitialized ) _file = null;
                     }
@@ -170,13 +150,12 @@ namespace CK.Env.MSBuild
             }
             if( _file == null )
             {
-                _ctx.UnloadFile( Path );
+                Solution.VSProjContext.UnloadFile( Path );
                 Sdk = null;
-                TargetFrameworks = MSBuildContext.Traits.EmptyTrait;
+                TargetFrameworks = MSProjContext.Traits.EmptyTrait;
             }
             return _file;
         }
-
 
         /// <summary>
         /// Gets the Sdk attribute of the primary project file.
@@ -203,22 +182,6 @@ namespace CK.Env.MSBuild
         public CKTrait TargetFrameworks { get; private set; }
 
         /// <summary>
-        /// Gets whether this is a test project. Since VS 15.6.1 update the
-        /// csproj contains a Service Include="{82a7f48d-3b50-4b1e-b82e-3ada8210c358}" item.
-        /// However sometimes it is not updated or it appears in a non test project (in a
-        /// helper assembly for example): to fix this, projects can define a IsTestProject
-        /// property (sets to True or False) that is checked first. Only if IsTestProject
-        /// is not defined, Service Include is used.
-        /// </summary>
-        public bool IsTestProject { get; private set; }
-
-        /// <summary>
-        /// Gets whether this project is a build project (typically the CodeCakeBuilder project).
-        /// It is contained in this <see cref="Solution"/>'s <see cref="Solution.BuildProjects"/>.
-        /// </summary>
-        public bool IsBuildProject => Solution.BuildProjects.Contains( this );
-
-        /// <summary>
         /// Gets the dependencies.
         /// </summary>
         public Dependencies Deps => _dependencies;
@@ -231,7 +194,7 @@ namespace CK.Env.MSBuild
         public bool Save( IActivityMonitor m )
         {
             if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
-            return _file.Save( m, Solution.BuildContext.FileSystem );
+            return _file.Save( m, Solution.FileSystem );
         }
 
         /// <summary>
@@ -244,7 +207,7 @@ namespace CK.Env.MSBuild
         public bool SetTargetFrameworks( IActivityMonitor m, CKTrait frameworks )
         {
             if( frameworks?.IsEmpty ?? true ) throw new ArgumentException( "Must not be null or empty.", nameof( frameworks ) );
-            if( frameworks.Context != MSBuildContext.Traits ) throw new ArgumentException( "Must be from MSBuildContext.Traits context.", nameof( frameworks ) );
+            if( frameworks.Context != MSProjContext.Traits ) throw new ArgumentException( "Must be from VSProjContext.Traits context.", nameof( frameworks ) );
             if( _file == null ) throw new InvalidOperationException( "Invalid project file." );
             if( TargetFrameworks == frameworks ) return false;
             XElement f = _file.Document.Root
@@ -286,7 +249,7 @@ namespace CK.Env.MSBuild
             if( frameworks.IsEmpty ) throw new ArgumentException( "Must not be empty.", nameof( frameworks ) );
             var actualFrameworks = TargetFrameworks.Intersect( frameworks );
             if( actualFrameworks.IsEmpty ) throw new ArgumentException( $"No {frameworks} in {TargetFrameworks}.", nameof( frameworks ) );
-            if( throwProjectDependendencies && _dependencies.Projects.Any( p => p.TargetProject.Name == packageId ) )
+            if( throwProjectDependendencies && _dependencies.Projects.Any( p => p.TargetProject.ProjectName == packageId ) )
             {
                 throw new ArgumentException( $"Package {packageId} is already a ProjectReference.", nameof( packageId ) );
             }
@@ -470,14 +433,12 @@ namespace CK.Env.MSBuild
             {
                 throw new Exception( "Altering project files must produce valid dependencies." );
             }
-            Solution.CheckDirty( true );
+            Solution.CheckDirtyProjectFiles( true );
         }
-
-        public override string ToString() => $"{Solution}/{Name}";
 
         void DoInitializeDependencies( IActivityMonitor m )
         {
-            _dependencies = new Dependencies();
+            Debug.Assert( !_dependencies.IsInitialized );
             var packageRefs = _file.AllFiles.Select( f => f.Document.Root )
                              .SelectMany( root => root.Elements( "ItemGroup" )
                                                         .Elements()
@@ -497,8 +458,6 @@ namespace CK.Env.MSBuild
                 {
                     if( p.Origin.Attribute( "Include" ) != null )
                     {
-
-
                         bool isPropVersion;
                         bool versionLocked = false;
                         SVersion version = null;
@@ -539,7 +498,7 @@ namespace CK.Env.MSBuild
                     }
                     else
                     {
-                        m.Warn("PackageReference that are not Include are not supported and ignored.");
+                        m.Warn( "PackageReference that are not Include are not supported and ignored." );
                     }
                 }
                 else
@@ -552,7 +511,7 @@ namespace CK.Env.MSBuild
                         return;
                     }
                     projectName = projectName.Substring( 0, projectName.Length - 7 );
-                    var target = Solution.AllProjects.FirstOrDefault( pRef => pRef.Name == projectName );
+                    var target = Solution.MSProjects.FirstOrDefault( pRef => pRef.ProjectName == projectName );
                     if( target == null )
                     {
                         m.Error( $"ProjectReference '{p.PackageId}' not found in the solution. Project name '{projectName}' must exist in the solution." );
@@ -570,6 +529,12 @@ namespace CK.Env.MSBuild
                         projs.Add( new ProjectToProjectDependency( this, target, frameworks, p.Origin ) );
                     }
                 }
+            }
+            // Consider Solution level dependency as active for all TargetFrameworks.
+            if( !EnumerateSolutionLevelProjectDependencies( m,
+                    p => projs.Add( new ProjectToProjectDependency( this, p, TargetFrameworks, null ) ) ) )
+            {
+                return;
             }
             _dependencies = new Dependencies( deps, projs, uselessDeps );
         }
@@ -632,5 +597,6 @@ namespace CK.Env.MSBuild
             versionLocked = v.Locked;
             return propertyDef;
         }
+
     }
 }

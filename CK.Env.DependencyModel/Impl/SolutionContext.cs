@@ -14,7 +14,8 @@ namespace CK.Env.DependencyModel
     /// </summary>
     public class SolutionContext : IReadOnlyCollection<Solution>, ISolutionContext
     {
-        readonly Dictionary<string, Solution> _solutions;
+        readonly Dictionary<string, Solution> _index;
+        readonly List<Solution> _list;
         readonly List<Project> _allProjects;
         int _version;
         DependencyAnalyzer _analyzer;
@@ -40,7 +41,8 @@ namespace CK.Env.DependencyModel
         /// </summary>
         public SolutionContext()
         {
-            _solutions = new Dictionary<string, Solution>();
+            _index = new Dictionary<string, Solution>();
+            _list = new List<Solution>();
             _allProjects = new List<Project>();
         }
 
@@ -73,8 +75,9 @@ namespace CK.Env.DependencyModel
         public Solution AddSolution( NormalizedPath fullPath, string uniqueName )
         {
             var s = new Solution( this, fullPath, uniqueName );
-            _solutions.Add( fullPath, s );
-            _solutions.Add( uniqueName, s );
+            _index.Add( fullPath, s );
+            _index.Add( uniqueName, s );
+            _list.Add( s );
             OnSolutionAdded( s );
             return s;
         }
@@ -84,7 +87,7 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets the number of solutions.
         /// </summary>
-        public int Count => _solutions.Count;
+        public int Count => _list.Count;
 
         /// <summary>
         /// Gets the current version. This changes each time
@@ -97,13 +100,13 @@ namespace CK.Env.DependencyModel
         /// </summary>
         /// <param name="key">The solution name or full path.</param>
         /// <returns>The solution.</returns>
-        public Solution this[string key] => _solutions[key];
+        public Solution this[string key] => _index[key];
 
         /// <summary>
         /// Returns an enumerator on the solutions.
         /// </summary>
         /// <returns>The enumerator.</returns>
-        public IEnumerator<Solution> GetEnumerator() => _solutions.Values.GetEnumerator();
+        public IEnumerator<Solution> GetEnumerator() => _list.GetEnumerator();
 
         /// <summary>
         /// Gets a <see cref="DependencyAnalyzer"/> that is up to date (based on the <see cref="Version"/>).
@@ -119,7 +122,7 @@ namespace CK.Env.DependencyModel
             return _analyzer;
         }
 
-        IEnumerator<ISolution> IEnumerable<ISolution>.GetEnumerator() => _solutions.Values.GetEnumerator();
+        IEnumerator<ISolution> IEnumerable<ISolution>.GetEnumerator() => GetEnumerator();
 
         internal void OnSolutionAdded( Solution s )
         {
