@@ -18,7 +18,7 @@ namespace CK.Env.Plugins
         readonly ISolutionDriverWorld _world;
         readonly IBranchSolutionLoader _solutionLoader;
         readonly IEnvLocalFeedProvider _localFeedProvider;
-        readonly ISolutionSettings _settings;
+        readonly ICommonSolutionSpec _settings;
         Solution _solution;
 
         public SolutionDriver(
@@ -26,7 +26,7 @@ namespace CK.Env.Plugins
             ISolutionDriverWorld w,
             GitFolder f,
             NormalizedPath branchPath,
-            ISolutionSettings settings,
+            ICommonSolutionSpec settings,
             IBranchSolutionLoader solutionLoader,
             IEnvLocalFeedProvider localFeedProvider )
             : base( f, branchPath )

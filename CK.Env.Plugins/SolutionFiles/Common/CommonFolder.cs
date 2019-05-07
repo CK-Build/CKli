@@ -6,9 +6,9 @@ namespace CK.Env.Plugins.SolutionFiles
     public class CommonFolder : PluginFolderBase
     {
         readonly SolutionDriver _driver;
-        readonly ISolutionSettings _settings;
+        readonly ICommonSolutionSpec _settings;
 
-        public CommonFolder( GitFolder f, SolutionDriver driver, ISolutionSettings settings, NormalizedPath branchPath )
+        public CommonFolder( GitFolder f, SolutionDriver driver, ICommonSolutionSpec settings, NormalizedPath branchPath )
             : base( f, branchPath, "Common" )
         {
             _driver = driver;

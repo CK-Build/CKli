@@ -8,13 +8,13 @@ namespace CK.Env.Plugins.SolutionFiles
 {
     public class NugetConfigFile : XmlFilePluginBase, IDisposable, IGitBranchPlugin, ICommandMethodsProvider
     {
-        readonly ISolutionSettings _settings;
+        readonly ICommonSolutionSpec _settings;
         readonly IEnvLocalFeedProvider _localFeedProvider;
         readonly SolutionDriver _solutionDriver;
         readonly ISecretKeyStore _secretStore;
         XElement _packageSources;
 
-        public NugetConfigFile( GitFolder f, SolutionDriver driver, IEnvLocalFeedProvider localFeedProvider, ISecretKeyStore secretStore, ISolutionSettings s, NormalizedPath branchPath )
+        public NugetConfigFile( GitFolder f, SolutionDriver driver, IEnvLocalFeedProvider localFeedProvider, ISecretKeyStore secretStore, ICommonSolutionSpec s, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "NuGet.config" ) )
         {
             _localFeedProvider = localFeedProvider;

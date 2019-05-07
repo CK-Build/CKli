@@ -7,14 +7,14 @@ namespace CK.Env.Plugins.SolutionFiles
 {
     public class CKSetupStoreTestHelperConfigFile : TextFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider, IDisposable
     {
-        readonly ISolutionSettings _settings;
+        readonly ICommonSolutionSpec _settings;
         readonly SolutionDriver _solutionDriver;
         readonly IEnvLocalFeedProvider _localFeedProvider;
 
         public CKSetupStoreTestHelperConfigFile(
             GitFolder f,
             SolutionDriver solutionDriver,
-            ISolutionSettings settings,
+            ICommonSolutionSpec settings,
             IEnvLocalFeedProvider localFeedProvider,
             NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "RemoteStore.TestHelper.config" ) )

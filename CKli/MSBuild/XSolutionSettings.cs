@@ -13,18 +13,18 @@ namespace CKli
         {
             if( previous != null )
             {
-                SolutionSettings = new SolutionSettings( previous.SolutionSettings, artifactHandler.ArtifactCenter, initializer.Element );
+                SolutionSettings = new CommonSolutionSpec( previous.SolutionSettings, artifactHandler.ArtifactCenter, initializer.Element );
                 initializer.Services.Remove<XSolutionSettings>();
             }
             else
             {
-                SolutionSettings = new SolutionSettings( initializer.Element, artifactHandler.ArtifactCenter );
+                SolutionSettings = new CommonSolutionSpec( initializer.Element, artifactHandler.ArtifactCenter );
             }
 
             initializer.Services.Add( this );
         }
 
-        public ISolutionSettings SolutionSettings { get; }
+        public ICommonSolutionSpec SolutionSettings { get; }
 
     }
 }

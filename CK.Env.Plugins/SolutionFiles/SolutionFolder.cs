@@ -7,9 +7,9 @@ namespace CK.Env.Plugins.SolutionFiles
     public class SolutionFolder : PluginFolderBase
     {
         readonly SolutionDriver _driver;
-        readonly ISolutionSettings _settings;
+        readonly ICommonSolutionSpec _settings;
 
-        public SolutionFolder( GitFolder f, SolutionDriver driver, ISolutionSettings settings, NormalizedPath branchPath )
+        public SolutionFolder( GitFolder f, SolutionDriver driver, ICommonSolutionSpec settings, NormalizedPath branchPath )
             : base( f, branchPath, folderPath: String.Empty )
         {
             _driver = driver;

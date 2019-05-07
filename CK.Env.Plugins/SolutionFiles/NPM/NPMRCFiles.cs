@@ -14,11 +14,11 @@ namespace CK.Env.Plugins.SolutionFiles
     /// </summary>
     public class NPMRCFiles : GitBranchPluginBase, ICommandMethodsProvider
     {
-        readonly ISolutionSettings _settings;
+        readonly ICommonSolutionSpec _settings;
         readonly SolutionDriver _solutionDriver;
         readonly ISecretKeyStore _secretStore;
 
-        public NPMRCFiles( GitFolder f, SolutionDriver driver, ISecretKeyStore secretStore, ISolutionSettings settings, NormalizedPath branchPath )
+        public NPMRCFiles( GitFolder f, SolutionDriver driver, ISecretKeyStore secretStore, ICommonSolutionSpec settings, NormalizedPath branchPath )
             : base( f, branchPath )
         {
             _settings = settings;

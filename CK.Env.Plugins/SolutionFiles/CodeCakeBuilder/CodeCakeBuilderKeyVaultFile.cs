@@ -9,13 +9,13 @@ namespace CK.Env.Plugins.SolutionFiles
     public class CodeCakeBuilderKeyVaultFile : TextFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly CodeCakeBuilderFolder _f;
-        readonly ISolutionSettings _settings;
+        readonly ICommonSolutionSpec _settings;
         readonly ISecretKeyStore _secretStore;
         readonly ArtifactCenter _artfifacts;
 
         public CodeCakeBuilderKeyVaultFile(
             CodeCakeBuilderFolder f,
-            ISolutionSettings settings,
+            ICommonSolutionSpec settings,
             ISecretKeyStore secretStore,
             ArtifactCenter artifacts,
             NormalizedPath branchPath )

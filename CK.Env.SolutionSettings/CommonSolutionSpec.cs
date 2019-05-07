@@ -6,16 +6,17 @@ using System.Xml.Linq;
 
 namespace CK.Env
 {
-    public class SolutionSettings : ISolutionSettings
+    /// <summary>
+    /// Immutable implementation of <see cref="ICommonSolutionSpec"/>.
+    /// </summary>
+    public class CommonSolutionSpec : ICommonSolutionSpec
     {
-        public SolutionSettings( XElement e, ArtifactCenter artifacts )
+        public CommonSolutionSpec( XElement e, ArtifactCenter artifacts )
         {
             NoDotNetUnitTests = (bool?)e.Attribute( nameof( NoDotNetUnitTests ) ) ?? false;
             NoStrongNameSigning = (bool?)e.Attribute( nameof( NoStrongNameSigning ) ) ?? false;
             NoSharedPropsFile = (bool?)e.Attribute( nameof( NoSharedPropsFile ) ) ?? false;
-            UseCKSetup = (bool?)e.Attribute( nameof(UseCKSetup) ) ?? false;
             DisableSourceLink = (bool?)e.Attribute( nameof(DisableSourceLink) ) ?? false;
-            SqlServer = (string)e.Attribute( nameof( SqlServer ) );
 
             NuGetSources = e.Elements( nameof( NuGetSources ) )
                              .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Name" ), s => new NuGetSource( s ) )
@@ -37,14 +38,12 @@ namespace CK.Env
                              .Values;
         }
 
-        public SolutionSettings( ISolutionSettings other, ArtifactCenter artifacts, XElement applyConfig = null )
+        public CommonSolutionSpec( ICommonSolutionSpec other, ArtifactCenter artifacts, XElement applyConfig = null )
         {
             NoDotNetUnitTests = other.NoDotNetUnitTests;
             NoStrongNameSigning = other.NoStrongNameSigning;
             NoSharedPropsFile = other.NoSharedPropsFile;
-            UseCKSetup = other.UseCKSetup;
             DisableSourceLink = other.DisableSourceLink;
-            SqlServer = other.SqlServer;
             if( applyConfig == null )
             {
                 NuGetSources = other.NuGetSources;
@@ -65,9 +64,6 @@ namespace CK.Env
                 var disableSourceLink = (bool?)applyConfig.Attribute( nameof( DisableSourceLink ) );
                 if( disableSourceLink.HasValue ) DisableSourceLink = disableSourceLink.Value;
 
-                var produceCKSetupComponents = (bool?)applyConfig.Attribute( nameof( UseCKSetup ) );
-                if( produceCKSetupComponents.HasValue ) UseCKSetup= produceCKSetupComponents.Value;
-
                 var noUnitTests = (bool?)applyConfig.Attribute( nameof( NoDotNetUnitTests ) );
                 if( noUnitTests.HasValue ) NoDotNetUnitTests = noUnitTests.Value;
 
@@ -76,9 +72,6 @@ namespace CK.Env
 
                 var noNoSharedPropsFile = (bool?)applyConfig.Attribute( nameof( NoSharedPropsFile ) );
                 if( noNoSharedPropsFile.HasValue ) NoSharedPropsFile = noNoSharedPropsFile.Value;
-
-                var sqlServer = (string)applyConfig.Attribute( nameof( SqlServer ) );
-                if( sqlServer != null ) SqlServer = sqlServer;
 
                 NuGetSources = applyConfig.Elements( nameof( NuGetSources ) )
                                 .ApplyAddRemoveClear( nuGetSources, s => (string)s.AttributeRequired( "Name" ), s => new NuGetSource( s ) )
@@ -109,11 +102,7 @@ namespace CK.Env
 
         public bool NoSharedPropsFile { get; }
 
-        public bool UseCKSetup { get; }
-
         public bool DisableSourceLink { get; }
-
-        public string SqlServer { get; }
 
         public IReadOnlyCollection<INuGetSource> NuGetSources { get; }
 

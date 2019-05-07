@@ -10,11 +10,11 @@ namespace CK.BuildSystem.Appveyor
     public class AppveyorFile : YamlFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly SolutionDriver _driver;
-        readonly ISolutionSettings _settings;
+        readonly ICommonSolutionSpec _settings;
         readonly ISecretKeyStore _secretStore;
 
 
-        public AppveyorFile( GitFolder f, SolutionDriver driver, ISolutionSettings settings, ISecretKeyStore secretStore, NormalizedPath branchPath )
+        public AppveyorFile( GitFolder f, SolutionDriver driver, ICommonSolutionSpec settings, ISecretKeyStore secretStore, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "appveyor.yml" ) )
         {
             _driver = driver;

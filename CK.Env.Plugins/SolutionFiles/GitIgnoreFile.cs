@@ -8,9 +8,9 @@ namespace CK.Env.Plugins.SolutionFiles
 {
     public class GitIgnoreFile : TextFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
-        readonly ISolutionSettings _settings;
+        readonly ICommonSolutionSpec _settings;
 
-        public GitIgnoreFile( GitFolder f, ISolutionSettings settings, NormalizedPath branchPath )
+        public GitIgnoreFile( GitFolder f, ICommonSolutionSpec settings, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( ".gitignore" ) )
         {
             _settings = settings;

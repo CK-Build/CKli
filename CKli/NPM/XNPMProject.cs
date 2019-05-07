@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace CKli
 {
-    public class XNPMProject : XTypedObject, INPMProjectSpec
+    public class XNPMProject : XTypedObject, CK.Env.NPM.INPMProjectSpec
     {
         public XNPMProject(
                 Initializer initializer,

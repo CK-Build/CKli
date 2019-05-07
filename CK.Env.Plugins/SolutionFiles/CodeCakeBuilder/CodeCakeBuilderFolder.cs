@@ -12,9 +12,9 @@ namespace CK.Env.Plugins.SolutionFiles
     public class CodeCakeBuilderFolder : PluginFolderBase
     {
         readonly SolutionDriver _driver;
-        readonly ISolutionSettings _settings;
+        readonly ICommonSolutionSpec _settings;
 
-        public CodeCakeBuilderFolder( GitFolder f, SolutionDriver driver, ISolutionSettings settings, NormalizedPath branchPath )
+        public CodeCakeBuilderFolder( GitFolder f, SolutionDriver driver, ICommonSolutionSpec settings, NormalizedPath branchPath )
             : base( f, branchPath, "CodecakeBuilder" )
         {
             _driver = driver;

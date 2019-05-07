@@ -10,10 +10,10 @@ namespace CK.Env.Plugins.SolutionFiles
     public class CodeCakeBuilderCSProjFile : XmlFilePluginBase, ICommandMethodsProvider
     {
         readonly CodeCakeBuilderFolder _f;
-        readonly ISolutionSettings _settings;
+        readonly ICommonSolutionSpec _settings;
         readonly SolutionDriver _solutionDriver;
 
-        public CodeCakeBuilderCSProjFile( CodeCakeBuilderFolder f, ISolutionSettings settings, NormalizedPath branchPath, SolutionDriver solutionDriver )
+        public CodeCakeBuilderCSProjFile( CodeCakeBuilderFolder f, ICommonSolutionSpec settings, NormalizedPath branchPath, SolutionDriver solutionDriver )
             : base( f.Folder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" ) )
         {
             _f = f;

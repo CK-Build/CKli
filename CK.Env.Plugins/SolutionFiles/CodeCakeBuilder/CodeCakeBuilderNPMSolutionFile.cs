@@ -10,12 +10,12 @@ namespace CK.Env.Plugins.SolutionFiles
     public class CodeCakeBuilderNPMSolutionFile : XmlFilePluginBase, ICommandMethodsProvider
     {
         readonly CodeCakeBuilderFolder _f;
-        readonly ISolutionSettings _settings;
+        readonly ICommonSolutionSpec _settings;
         readonly SolutionDriver _driver;
         
         public CodeCakeBuilderNPMSolutionFile(
             CodeCakeBuilderFolder f,
-            ISolutionSettings settings,
+            ICommonSolutionSpec settings,
             SolutionDriver driver,
             NormalizedPath branchPath )
             : base( f.Folder, branchPath, f.FolderPath.AppendPart( "NPMSolution.xml" ) )
