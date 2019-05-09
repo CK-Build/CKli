@@ -1,10 +1,9 @@
-using CK.Env.MSBuild;
 using FluentAssertions;
 using NUnit.Framework;
 using System.Linq;
 using static CK.Testing.MonitorTestHelper;
 
-namespace CK.Env.Tests
+namespace CK.Env.MSBuildSln.Tests
 {
     [TestFixture]
     public class MSBuildHandlingTests

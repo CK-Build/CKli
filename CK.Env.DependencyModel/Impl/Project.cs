@@ -32,7 +32,7 @@ namespace CK.Env.DependencyModel
         {
             _solution = s;
             Type = type;
-            PrimarySolutionRelativeFolderPath = primarySolutionRelativeFolderPath;
+            SolutionRelativeFolderPath = primarySolutionRelativeFolderPath;
             FullFolderPath = fullFolderPath;
             SimpleProjectName = simpleProjecName;
             _generatedArtifacts = new List<GeneratedArtifact>();
@@ -60,13 +60,13 @@ namespace CK.Env.DependencyModel
             string name;
             if( needPath )
             {
-                if( PrimarySolutionRelativeFolderPath.LastPart == SimpleProjectName )
+                if( SolutionRelativeFolderPath.LastPart == SimpleProjectName )
                 {
-                    name = PrimarySolutionRelativeFolderPath.Path;
+                    name = SolutionRelativeFolderPath.Path;
                 }
                 else
                 {
-                    name = PrimarySolutionRelativeFolderPath.Path + '/' + SimpleProjectName;
+                    name = SolutionRelativeFolderPath.Path + '/' + SimpleProjectName;
                 }
             }
             else name = SimpleProjectName;
@@ -103,7 +103,7 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets the path to this project relative to the <see cref="Solution"/>.
         /// </summary>
-        public NormalizedPath PrimarySolutionRelativeFolderPath { get; }
+        public NormalizedPath SolutionRelativeFolderPath { get; }
 
         /// <summary>
         /// Gets the full path to this project folder that starts wiith the <see cref="Solution.FullPath"/>.
@@ -118,7 +118,7 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets the project name: it can be the <see cref="SimpleProjectName"/>, prefixed or
         /// not by the <see cref="Solution.Name"/> and automatically prefixed by (<see cref="Type"/>)
-        /// or the specified with <see cref="PrimarySolutionRelativeFolderPath"/> in case of conflicts
+        /// or the specified with <see cref="SolutionRelativeFolderPath"/> in case of conflicts
         /// with other projects in the <see cref="SolutionContext"/>.
         /// Given that the solution name is unique by design and that only one project of a given type can
         /// be defined in a folder, this name is eventually always unique. 
@@ -145,9 +145,7 @@ namespace CK.Env.DependencyModel
         }
 
         /// <summary>
-        /// Gets whether this project is published: this project can be "installed" in
-        /// dependent solutions thanks to at least one <see cref="GeneratedArtifacts"/>
-        /// that is <see cref="ArtifactType.IsInstallable"/>.
+        /// Gets or sets whether this project is a test project.
         /// </summary>
         public bool IsTestProject
         {

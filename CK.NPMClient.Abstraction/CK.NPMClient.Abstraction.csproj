@@ -6,8 +6,8 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <PackageReference Include="CSemVer" Version="5.0.0" />
-    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="11.0.3--0027-develop" />
+    <PackageReference Include="CSemVer" Version="5.0.1--0018-develop" />
+    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="11.0.3--0029-develop" />
   </ItemGroup>
   
   <ItemGroup>
