@@ -21,7 +21,11 @@ namespace CK.BuildSystem.GitLab
         {
             if( !this.CheckCurrentBranch( m ) ) return;
             YamlMapping firstMapping = GetFirstMapping( m, true );
-            if( firstMapping == null ) return;
+            if( firstMapping == null )
+            {
+                m.Error( "First mapping should not return null !" );
+                return;
+            }
             // We don't use GitLab for public repositories
             if( Folder.IsPublic )
             {
