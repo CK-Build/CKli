@@ -50,6 +50,14 @@
       </Branch>
     </GitFolder>
 
+
+    <GitFolder Name="CK-DB-Feedermarket" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/CK-DB-Feedermarket">
+      <SolutionSettings NoStrongNameSigning="true" />
+      <Branch Name="develop">
+        <PrimarySolution />
+      </Branch>
+    </GitFolder>
+
     <SolutionSettings>
       <NuGetSources>
         <add Name="Invenietis-Release" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-release/nuget/v3/index.json" />
@@ -62,11 +70,7 @@
     <!-- NuGetSources Invenietis -->
 
 
-    <GitFolder Name="CK-DB-Feedermarket" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/CK-DB-Feedermarket">
-      <Branch Name="develop">
-        <PrimarySolution />
-      </Branch>
-    </GitFolder>
+
 
     <GitFolder Name="Cofely" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Cofely">
       <Branch Name="develop">
@@ -117,7 +121,7 @@
     </GitFolder>
 
     <GitFolder Name="Feedermarket-Functions-Siradel" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions-Siradel">
-    <SolutionSettings NoStrongNameSigning="true" />
+      <SolutionSettings NoStrongNameSigning="true" />
       <Branch Name="develop">
         <PrimarySolution />
       </Branch>
