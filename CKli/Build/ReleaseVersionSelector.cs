@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Env;
+using CK.Env.DependencyModel;
 using CK.Text;
 using CSemVer;
 using System;
@@ -17,11 +18,11 @@ namespace CKli
         public void ChooseFinalVersion( IActivityMonitor m, IReleaseVersionSelectorContext c )
         {
             Console.WriteLine( "=========" );
-            Console.Write( $"======== {c.Solution.UniqueSolutionName} " );
+            Console.Write( $"======== {c.Solution.Solution.Name} " );
             if( c.PreviousVersionCommitSha != null )
             {
                 Console.Write( $" last release: {c.PreviousVersion}" );
-                var diffs = c.Solution.GitRepository.GetPathsDiff( m, c.PreviousVersionCommitSha, c.Solution.GeneratedPackages.Select( p => new NormalizedPath( p.PrimarySolutionRelativeFolderPath ) ).ToList() );
+                var diffs = c.GetProjectsDiff( m );
                 if( diffs == null )
                 {
                     c.Cancel();
@@ -29,7 +30,7 @@ namespace CKli
                 }
                 if( diffs.All( d => d.DiffType == DirectoryDiffType.None ) )
                 {
-                    Console.WriteLine( $" (No change in {c.Solution.GeneratedPackages.Select( p => p.Name ).Concatenate()})" );
+                    Console.WriteLine( $" (No change in {c.Solution.Solution.GeneratedArtifacts.Select( p => p.Artifact.Name ).Concatenate()})" );
                 }
                 else
                 {
@@ -105,10 +106,10 @@ namespace CKli
         /// <param name="version">The tagged version.</param>
         /// <param name="isContentTag">False if it the tag is on the commit point, true if the tag is a content tag.</param>
         /// <returns>True to continue, false to cancel the current session.</returns>
-        public bool OnAlreadyReleased( IActivityMonitor m, IDependentSolution solution, CSVersion version, bool isContentTag )
+        public bool OnAlreadyReleased( IActivityMonitor m, DependentSolution solution, CSVersion version, bool isContentTag )
         {
             Console.WriteLine( "=========" );
-            Console.WriteLine( $"========  {solution.UniqueSolutionName} is already released in version '{version}'." );
+            Console.WriteLine( $"========  {solution.Solution.Name} is already released in version '{version}'." );
             return true;
         }
 

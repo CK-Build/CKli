@@ -18,7 +18,7 @@ namespace CK.Env.MSBuildSln
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="ctx">The project file context.</param>
-        /// <param name="solutionPath">The path to the .sln file.</param>
+        /// <param name="solutionPath">The path to the .sln file relative to the <see cref="MSProjContext.FileSystem"/>.</param>
         /// <param name="mustExist">False to allow the file to not exist.</param>
         /// <returns>
         /// The solution file or null on error (for example when not found and <paramref name="mustExist"/> is true).

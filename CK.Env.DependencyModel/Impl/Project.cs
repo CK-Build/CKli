@@ -233,9 +233,26 @@ namespace CK.Env.DependencyModel
             CheckSolution();
             if( _projectReferences.Any( p => p.Target == target ) ) throw new InvalidOperationException( $"Project '{target}' is already referenced by '{ToString()}'." );
             if( target._solution != _solution ) throw new InvalidOperationException( $"Project '{target}' belongs to '{target._solution}' whereas {ToString()} belons to '{_solution}'." );
-            var r = new ProjectReference( this, target, kind );
-            _projectReferences.Add( r );
-            _solution.OnProjectReferenceAdded( r );
+            DoAddProjectReference( target, kind );
+        }
+
+        /// <summary>
+        /// Ensures that a new <see cref="ProjectReference"/> with the exact same target
+        /// project and kind exists.
+        /// </summary>
+        /// <param name="target">The referenced project.</param>
+        /// <param name="kind">The dependency kind.</param>
+        public void EnsureProjectReference( Project target, ProjectDependencyKind kind = ProjectDependencyKind.Transitive )
+        {
+            CheckSolution();
+            int idx = _projectReferences.IndexOf( r => r.Target == target );
+            if( idx >= 0 )
+            {
+                var exists = _projectReferences[idx];
+                if( exists.Kind == kind ) return;
+                DoRemoveProjectReferenceAt( idx );
+            }
+            DoAddProjectReference( target, kind );
         }
 
         /// <summary>
@@ -243,18 +260,30 @@ namespace CK.Env.DependencyModel
         /// </summary>
         /// <param name="target">The target project.</param>
         /// <returns>True on success, false if the project is not referenced.</returns>
-        public bool RemoveProjectReference( Project target )
+        public bool RemoveProjectReference( IProject target )
         {
             CheckSolution();
             int idx = _projectReferences.IndexOf( r => r.Target == target );
             if( idx >= 0 )
             {
-                var r = _projectReferences[idx];
-                _projectReferences.RemoveAt( idx );
-                _solution.OnProjectReferenceRemoved( r );
+                DoRemoveProjectReferenceAt( idx );
                 return true;
             }
             return false;
+        }
+
+        void DoAddProjectReference( Project target, ProjectDependencyKind kind )
+        {
+            var r = new ProjectReference( this, target, kind );
+            _projectReferences.Add( r );
+            _solution.OnProjectReferenceAdded( r );
+        }
+
+        void DoRemoveProjectReferenceAt( int idx )
+        {
+            var r = _projectReferences[idx];
+            _projectReferences.RemoveAt( idx );
+            _solution.OnProjectReferenceRemoved( r );
         }
 
         /// <summary>
@@ -271,9 +300,25 @@ namespace CK.Env.DependencyModel
         {
             CheckSolution();
             if( _packageReferences.Any( p => p.Target.Artifact == target.Artifact ) ) throw new InvalidOperationException( $"Package '{target.Artifact}' is already referenced by '{ToString()}'." );
-            var r = new PackageReference( this, target, kind );
-            _packageReferences.Add( r );
-            _solution.OnPackageReferenceAdded( r );
+            DoAddPackageReference( target, kind );
+        }
+
+        /// <summary>
+        /// Ensures that a new <see cref="PackageReference"/> with the exact same target and kind exists.
+        /// </summary>
+        /// <param name="target">The referenced package.</param>
+        /// <param name="kind">The dependency kind.</param>
+        public void EnsurePackageReference( ArtifactInstance target, ProjectDependencyKind kind )
+        {
+            CheckSolution();
+            int idx = _packageReferences.IndexOf( p => p.Target.Artifact == target.Artifact );
+            if( idx >= 0 )
+            {
+                var exists = _packageReferences[idx];
+                if( exists.Kind == kind && exists.Target == target ) return;
+                DoRemovePackageReferenceAt( idx );
+            }
+            DoAddPackageReference( target, kind );
         }
 
         /// <summary>
@@ -285,13 +330,22 @@ namespace CK.Env.DependencyModel
         {
             CheckSolution();
             int idx = _packageReferences.IndexOf( p => p.Target.Artifact == target );
-            if( idx >= 0 )
-            {
-                var r = _packageReferences[idx];
-                _packageReferences.RemoveAt( idx );
-                _solution.OnPackageReferenceRemoved( r );
-            }
+            if( idx >= 0 ) DoRemovePackageReferenceAt( idx );
             return false;
+        }
+
+        void DoAddPackageReference( ArtifactInstance target, ProjectDependencyKind kind )
+        {
+            var r = new PackageReference( this, target, kind );
+            _packageReferences.Add( r );
+            _solution.OnPackageReferenceAdded( r );
+        }
+
+        void DoRemovePackageReferenceAt( int idx )
+        {
+            var r = _packageReferences[idx];
+            _packageReferences.RemoveAt( idx );
+            _solution.OnPackageReferenceRemoved( r );
         }
 
         /// <summary>

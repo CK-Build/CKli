@@ -1,6 +1,5 @@
 using CK.Core;
 using CK.Env;
-using CK.NPMClient;
 using CK.NuGetClient;
 using CK.Text;
 using CKSetup;

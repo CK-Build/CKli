@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Env.DependencyModel;
 using CSemVer;
 using System;
 using System.Collections;
@@ -11,18 +12,21 @@ namespace CK.Env
 {
     class ReleaseSolutionInfo : IReleaseSolutionInfo
     {
+        readonly IGitRepository _repository;
         readonly CommitVersionInfo _commitVersionInfo;
         ReleaseRoadmap _releaser;
         ReleaseInfo _previouslyResolvedInfo;
         ReleaseInfo _releaseInfo;
 
         internal ReleaseSolutionInfo(
-            IDependentSolution solution,
+            IGitRepository repository,
+            DependentSolution solution,
             CommitVersionInfo versionInfo,
             XElement previous = null )
         {
-            Debug.Assert( solution != null && versionInfo != null );
+            Debug.Assert( repository != null && solution != null && versionInfo != null );
             Solution = solution;
+            _repository = repository;
             _commitVersionInfo = versionInfo;
             if( previous != null )
             {
@@ -45,7 +49,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the solution.
         /// </summary>
-        public IDependentSolution Solution { get; }
+        public DependentSolution Solution { get; }
 
         /// <summary>
         /// Gets the current <see cref="ReleaseInfo"/>: the result of the last <see cref="EnsureReleaseInfo"/> call.
@@ -152,6 +156,8 @@ namespace CK.Env
         {
             readonly ReleaseSolutionInfo _info;
             readonly PossibleVersions _possible;
+            IReadOnlyCollection<DirectoryDiff> _diffs;
+            bool _diffsComputed;
 
             public SelectorContext(
                     ReleaseSolutionInfo info,
@@ -166,7 +172,7 @@ namespace CK.Env
                                                && _possible.AllPossibleVersions.Contains( info._previouslyResolvedInfo.Version );
             }
 
-            public IDependentSolution Solution => _info.Solution;
+            public DependentSolution Solution => _info.Solution;
 
             public ReleaseInfo PreviouslyResolvedInfo => _info._previouslyResolvedInfo;
 
@@ -183,6 +189,17 @@ namespace CK.Env
             public string PreviousVersionCommitSha => _info._commitVersionInfo.PreviousVersionCommitSha;
 
             public string ReleaseNote { get => _info.ReleaseNote; set => _info.ReleaseNote = value; }
+
+            public IReadOnlyCollection<DirectoryDiff> GetProjectsDiff( IActivityMonitor m )
+            {
+                if( !_diffsComputed )
+                {
+                    _diffsComputed = true;
+                    var paths = Solution.Solution.GeneratedArtifacts.Select( g => g.Project.SolutionRelativeFolderPath );
+                    _diffs = _info._repository.GetPathsDiff( m, PreviousVersionCommitSha, paths );
+                }
+                return _diffs;
+            }
 
             internal ReleaseLevel FinalLevel;
             internal CSVersion FinalVersion;
@@ -324,8 +341,8 @@ namespace CK.Env
         internal XElement ToXml()
         {
             return new XElement( "S",
-                        new XAttribute( "Name", Solution.UniqueSolutionName ),
-                        new XAttribute( "SubPath", Solution.GitRepository.SubPath ),
+                        new XAttribute( "Name", Solution.Solution.Name ),
+                        new XAttribute( "SubPath", Solution.Solution.FullPath ),
                         new XAttribute( "CommitSha", _commitVersionInfo.CommitSha ),
                         _releaseInfo.ToXml(),
                         new XElement( "ReleaseNote", new XCData( ReleaseNote ?? String.Empty ) ));

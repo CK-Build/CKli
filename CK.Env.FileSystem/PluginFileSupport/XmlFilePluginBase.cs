@@ -3,7 +3,7 @@ using CK.Text;
 using System;
 using System.Xml.Linq;
 
-namespace CK.Env.Plugins
+namespace CK.Env.Plugin
 {
     /// <summary>
     /// Exposes a <see cref="XDocument"/> from a file.

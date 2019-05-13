@@ -106,7 +106,7 @@ namespace CK.Env.DependencyModel
         public int Index { get; }
 
         /// <summary>
-        /// Gets the primary solution.
+        /// Gets the solution itself.
         /// </summary>
         public ISolution Solution { get; }
 
@@ -167,27 +167,27 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets the global <see cref="SolutionDependencyContext"/> to which this <see cref="DependentSolution"/> belongs.
         /// </summary>
-        public SolutionDependencyContext GlobalResult { get; private set; }
+        public SolutionDependencyContext Solutions { get; private set; }
 
-        internal void Initialize( SolutionDependencyContext global )
+        internal void Initialize( SolutionDependencyContext solutions )
         {
-            GlobalResult = global;
-            Impacts = global.DependencyTable.Where( r => r.Target != null && r.Target.Solution == Solution )
+            Solutions = solutions;
+            Impacts = solutions.DependencyTable.Where( r => r.Target != null && r.Target.Solution == Solution )
                                             .Select( r => r.Solution )
                                             .Distinct()
-                                            .Select( i => global.Solutions.First( d => d.Solution == i ) )
+                                            .Select( i => solutions.Solutions.First( d => d.Solution == i ) )
                                             .ToList();
             MinimalImpacts = Impacts.Except( Impacts.SelectMany( r => r.TransitiveImpacts ) ).ToList();
             var transitive = new HashSet<DependentSolution>( Impacts );
             foreach( var i in Impacts.SelectMany( r => r.TransitiveImpacts ) ) transitive.Add( i );
             TransitiveImpacts = transitive;
 
-            ImportedLocalPackages = global.PackageDependencies
+            ImportedLocalPackages = solutions.PackageDependencies
                                      .Where( d => d.Origin == this )
                                      .Select( d => new ImportedLocalPackage( d ) )
                                      .ToArray();
 
-            ExportedLocalPackages = global.PackageDependencies
+            ExportedLocalPackages = solutions.PackageDependencies
                                      .Where( d => d.Target == this )
                                      .Select( d => new ExportedLocalPackage( d ) )
                                      .ToArray();

@@ -16,8 +16,10 @@ namespace CK.Env.DependencyModel
     {
         readonly List<Artifact> _generatedArtifacts;
         readonly List<Project> _projects;
+        readonly List<IArtifactRepository> _artifactTargets;
         SolutionContext _ctx;
         Project _buildProject;
+        int _version;
 
         internal Solution( SolutionContext ctx, NormalizedPath fullPath, string name )
         {
@@ -26,14 +28,21 @@ namespace CK.Env.DependencyModel
             Name = name;
             _generatedArtifacts = new List<Artifact>();
             _projects = new List<Project>();
+            _artifactTargets = new List<IArtifactRepository>();
         }
 
         /// <summary>
-        /// Gets the solution context.
+        /// Gets the solution context that contains this solution.
         /// </summary>
         public SolutionContext Solutions => _ctx;
 
         ISolutionContext ISolution.Solutions => _ctx;
+
+        /// <summary>
+        /// Gets the current version. This changes each time
+        /// anything changes in this solution or its projects.
+        /// </summary>
+        public int Version => _version;
 
         /// <summary>
         /// Gets the full path of this solution that must be unique across <see cref="Solutions"/>.
@@ -68,6 +77,17 @@ namespace CK.Env.DependencyModel
         IReadOnlyList<IProject> ISolution.Projects => _projects;
 
         /// <summary>
+        /// Clears the <see cref="Projects"/>.
+        /// </summary>
+        public void ClearProjects()
+        {
+            while( _projects.Count > 0 )
+            {
+                RemoveProject( _projects[_projects.Count - 1] );
+            }
+        }
+
+        /// <summary>
         /// Gets or sets the build project. Can be null.
         /// When not null, the project must belong to this <see cref="Projects"/> and both <see cref="Project.IsPublished"/>
         /// and <see cref="Project.IsTestProject"/> must be false.
@@ -96,31 +116,47 @@ namespace CK.Env.DependencyModel
         IProject ISolution.BuildProject => _buildProject;
 
         /// <summary>
-        /// Adds a new project
+        /// Appends a new project to the <see cref="Projects"/> list if no project with the
+        /// same <see cref="IProject.SimpleProjectName"/>, <see cref="IProject.Type"/>
+        /// and <see cref="IProject.FullFolderPath"/> already exists in the other <see cref="Solutions"/>.
+        /// If name clashes, an <see cref="InvalidOperationException"/> is thrown.
         /// </summary>
-        /// <param name="primarySolutionRelativeFolderPath">
+        /// <param name="solutionRelativeFolderPath">
         /// The path to the project relative to this <see cref="Solution"/>
         /// </param>
         /// <param name="type">The project type.</param>
         /// <param name="simpleProjecName">The project name.</param>
-        public Project AddProject(
-            NormalizedPath primarySolutionRelativeFolderPath,
-            string type,
-            string simpleProjecName )
+        /// <returns>The new project.</returns>
+        public Project AddProject( NormalizedPath solutionRelativeFolderPath, string type, string simpleProjecName )
+        {
+            var r = AddOrFindProject( solutionRelativeFolderPath, type, simpleProjecName );
+            if( !r.Created ) throw new InvalidOperationException( $"Project at '{solutionRelativeFolderPath}' of type '{type}' is already registered in '{ToString()}'." );
+            return r.Item1;
+        }
+
+        /// <summary>
+        /// Appends a new project to the <see cref="Projects"/> list or finds the one with the
+        /// same <see cref="IProject.SimpleProjectName"/>, <see cref="IProject.Type"/> and <see cref="IProject.FullFolderPath"/>.
+        /// </summary>
+        /// <param name="solutionRelativeFolderPath">
+        /// The path to the project relative to this <see cref="Solution"/>
+        /// </param>
+        /// <param name="type">The project type.</param>
+        /// <param name="simpleProjecName">The project name.</param>
+        /// <returns>The project and whether it has been created or not.</returns>
+        public (Project Project, bool Created) AddOrFindProject( NormalizedPath solutionRelativeFolderPath, string type, string simpleProjecName )
         {
             if( String.IsNullOrWhiteSpace( type ) ) throw new ArgumentNullException( nameof( type ) );
             if( String.IsNullOrWhiteSpace( simpleProjecName ) ) throw new ArgumentNullException( nameof( simpleProjecName ) );
-            var fullFolderPath = FullPath.Combine( primarySolutionRelativeFolderPath );
-            var newOne = new Project( this, primarySolutionRelativeFolderPath, fullFolderPath, type, simpleProjecName );
+            var fullFolderPath = FullPath.Combine( solutionRelativeFolderPath );
+            var newOne = new Project( this, solutionRelativeFolderPath, fullFolderPath, type, simpleProjecName );
             Debug.Assert( newOne.Name == null );
-            if( !_ctx.OnProjectAdding( newOne ) )
-            {
-                throw new InvalidOperationException( $"Project at '{primarySolutionRelativeFolderPath}' of type '{type}' is already registered in '{ToString()}'." );
-            }
+            var added = _ctx.OnProjectAdding( newOne );
+            if( added != newOne ) return (added, false);
             Debug.Assert( newOne.Name != null );
             _projects.Add( newOne );
-            _ctx.OnProjectAdded( newOne );
-            return newOne;
+            OnProjectAdded( newOne );
+            return (newOne, true);
         }
 
         /// <summary>
@@ -132,9 +168,40 @@ namespace CK.Env.DependencyModel
             project.CheckSolution();
             if( project.Solution != this ) throw new ArgumentException( "Solution mismatch.", nameof( project ) );
             Debug.Assert( _projects.Contains( project ) );
+            project.IsBuildProject = false;
             _projects.Remove( project );
-            _ctx.OnProjectRemoved( project );
+            // Raise event before detach so that solution's project is available.
+            OnProjectRemoved( project );
             project.Detach();
+        }
+
+        /// <summary>
+        /// Gets the repositories where produced artifacts must be pushed.
+        /// </summary>
+        public IReadOnlyCollection<IArtifactRepository> ArtifactTargets => _artifactTargets;
+
+        /// <summary>
+        /// Adds a new artifact target (that must not already belong to <see cref="ArtifactTargets"/> otherwise an
+        /// InvalidOperationException is thrown).
+        /// </summary>
+        /// <param name="newOne">New artifact target.</param>
+        public void AddArtifactTarget( IArtifactRepository newOne )
+        {
+            if( _artifactTargets.Contains( newOne ) ) throw new InvalidOperationException( $"Artifact target already registered." );
+            _artifactTargets.Add( newOne );
+            OnArtifactTargetAdded( newOne );
+        }
+
+        /// <summary>
+        /// Removes the artifact target (that must belong to <see cref="ArtifactTargets"/> otherwise an
+        /// InvalidOperationException is thrown).
+        /// </summary>
+        /// <param name="artifactTarget">The artifact target.</param>
+        public void RemoveArtifactTArget( IArtifactRepository artifactTarget )
+        {
+            if( !_artifactTargets.Contains( artifactTarget ) ) throw new InvalidOperationException( $"Artifact target not registered." );
+            _artifactTargets.Remove( artifactTarget );
+            OnArtifactTargetRemoved( artifactTarget );
         }
 
         string IDependentItemRef.FullName => Name;
@@ -147,50 +214,83 @@ namespace CK.Env.DependencyModel
         /// <returns>The solution's name.</returns>
         public override string ToString() => Name;
 
+        void OnProjectAdded( Project newOne )
+        {
+            _version++;
+            _ctx.OnProjectAdded( newOne );
+        }
+
+        void OnProjectRemoved( Project project )
+        {
+            _version++;
+            _ctx.OnProjectRemoved( project );
+        }
 
         void OnBuildProjectChanged()
         {
+            _version++;
             _ctx.OnBuildProjectChanged( this );
         }
 
         internal void OnIsTestProjectChanged( Project project )
         {
+            _version++;
             _ctx.OnIsTestProjectChanged( project );
         }
 
         internal void OnIsPublishedChange( Project project )
         {
+            _version++;
             _ctx.OnIsPublishedChange( project );
         }
 
         internal void OnArtifactAdded( Artifact a, Project project )
         {
+            _version++;
             _ctx.OnArtifactAdded( a, project );
         }
 
         internal void OnArtifactRemoved( Artifact a, Project project )
         {
+            _version++;
             _ctx.OnArtifactRemoved( a, project );
         }
 
         internal void OnPackageReferenceRemoved( PackageReference r )
         {
+            _version++;
             _ctx.OnPackageReferenceRemoved( r );
         }
 
         internal void OnPackageReferenceAdded( PackageReference r )
         {
+            _version++;
             _ctx.OnPackageReferenceAdded( r );
         }
 
         internal void OnProjectReferenceAdded( ProjectReference r )
         {
+            _version++;
             _ctx.OnProjectReferenceAdded( r );
         }
 
         internal void OnProjectReferenceRemoved( ProjectReference r )
         {
+            _version++;
             _ctx.OnProjectReferenceRemoved( r );
         }
+
+        void OnArtifactTargetAdded( IArtifactRepository newOne )
+        {
+            _version++;
+            _ctx.OnArtifactTargetAdded( this, newOne );
+        }
+
+        void OnArtifactTargetRemoved( IArtifactRepository artifactTarget )
+        {
+            _version++;
+            _ctx.OnArtifactTargetRemoved( this, artifactTarget );
+        }
+
     }
 }

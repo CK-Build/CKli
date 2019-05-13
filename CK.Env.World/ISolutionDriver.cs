@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Env.DependencyModel;
 using System.Collections.Generic;
 
 namespace CK.Env
@@ -27,13 +28,12 @@ namespace CK.Env
         ISolutionDriver GetCurrentBranchDriver();
 
         /// <summary>
-        /// Gets the set of solution names that this driver handles with the first one being
-        /// the primary solution, followed by the secondary solutions if any.
-        /// Returns null on any error that prevented the solutions to be loaded.
+        /// Gets the Solution that this driver handles.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <returns>The solution names or null on error.</returns>
-        IEnumerable<string> GetSolutionNames( IActivityMonitor monitor );
+        /// <param name="reloadSolution">The solution names or null on error.</param>
+        /// <returns>The updated sol</returns>
+        ISolution GetSolution( IActivityMonitor monitor, bool reloadSolution );
 
         /// <summary>
         /// Updates projects dependencies and saves the solution and its updated projects.

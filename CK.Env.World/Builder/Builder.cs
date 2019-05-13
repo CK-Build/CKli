@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Env.DependencyModel;
 using CSemVer;
 using System;
 using System.Collections.Generic;
@@ -11,12 +12,10 @@ namespace CK.Env
     /// </summary>
     abstract class Builder
     {
-        protected readonly Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> DriverFinder;
         protected readonly ZeroBuilder ZeroBuilder;
         readonly IEnvLocalFeedProvider _localFeedProvider;
         readonly BuildResultType _type;
-        readonly ISolutionDriver[] _drivers;
-        readonly Dictionary<string, SVersion> _packagesVersion;
+        readonly Dictionary<Artifact, SVersion> _packagesVersion;
         readonly List<UpdatePackageInfo>[] _upgrades;
         readonly SVersion[] _targetVersions;
         readonly ArtifactCenter _artifacts;
@@ -26,25 +25,22 @@ namespace CK.Env
             BuildResultType type,
             ArtifactCenter artifacts,
             IEnvLocalFeedProvider localFeedProvider,
-            IDependentSolutionContext ctx,
-            Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
+            IWorldSolutionContext ctx )
         {
             ZeroBuilder = zeroBuilder ?? throw new ArgumentNullException( nameof( zeroBuilder ) );
             _type = type;
             _artifacts = artifacts ?? throw new ArgumentNullException( nameof( artifacts ) );
             _localFeedProvider = localFeedProvider ?? throw new ArgumentNullException( nameof( localFeedProvider ) );
             DependentSolutionContext = ctx ?? throw new ArgumentNullException( nameof( ctx ) );
-            DriverFinder = driverFinder ?? throw new ArgumentNullException( nameof( driverFinder ) );
-            _packagesVersion = new Dictionary<string, SVersion>();
+            _packagesVersion = new Dictionary<Artifact, SVersion>();
             _upgrades = new List<UpdatePackageInfo>[ctx.Solutions.Count];
             _targetVersions = new SVersion[ctx.Solutions.Count];
-            _drivers = new ISolutionDriver[ctx.Solutions.Count];
         }
 
         /// <summary>
-        /// Gets the dependent solution context.
+        /// Gets the solution context.
         /// </summary>
-        public IDependentSolutionContext DependentSolutionContext { get; private set; }
+        public IWorldSolutionContext DependentSolutionContext { get; private set; }
 
         /// <summary>
         /// Runs the build. Orchestrates calls to <see cref="PrepareBuild"/> and <see cref="Build"/>.
@@ -114,7 +110,7 @@ namespace CK.Env
                     m.CloseGroup( "Failed." );
                     return null;
                 }
-                result = CreateBuildResult( m, _drivers );
+                result = CreateBuildResult( m );
                 if( result == null ) return null;
                 if( forceRebuild )
                 {
@@ -135,11 +131,10 @@ namespace CK.Env
         /// ReleaseBuilder overrides this to apply build project upgrades before its actual Build.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="drivers">The drivers for each solution.</param>
         /// <returns>The build result. Null on error.</returns>
-        protected virtual BuildResult CreateBuildResult( IActivityMonitor m, IReadOnlyList<ISolutionDriver> drivers )
+        protected virtual BuildResult CreateBuildResult( IActivityMonitor m )
         {
-            return BuildResult.Create( m, _type, _artifacts, DependentSolutionContext.Solutions, _targetVersions, GetReleaseNotes() );
+            return BuildResult.Create( m, _type, _artifacts, DependentSolutionContext, _targetVersions, GetReleaseNotes() );
         }
 
         /// <summary>
@@ -159,49 +154,42 @@ namespace CK.Env
         /// </summary>
         /// <param name="s">The solution.</param>
         /// <returns>The build project upgrades that must be applied.</returns>
-        protected IEnumerable<UpdatePackageInfo> GetBuildProjectUpgrades( IDependentSolution s )
+        protected IEnumerable<UpdatePackageInfo> GetBuildProjectUpgrades( DependentSolution s )
         {
-            return DependentSolutionContext.BuildProjectsInfo
-                                         .Where( z => z.SolutionName == s.UniqueSolutionName )
+            return DependentSolutionContext.DependencyContext.BuildProjectsInfo.ZeroBuildProjects
+                                         .Where( z => z.Project.Solution == s )
                                          .SelectMany( z => z.UpgradePackages
-                                               .Select( packageName => new UpdatePackageInfo(
-                                                   s.UniqueSolutionName,
-                                                   z.ProjectName,
-                                                   ArtifactType.Single( "NuGet" ),
-                                                   packageName,
-                                                   _packagesVersion[packageName] ) ) );
+                                               .Select( a => new UpdatePackageInfo(
+                                                   z.Project,
+                                                   a.Type,
+                                                   a.Name,
+                                                   _packagesVersion[a] ) ) );
         }
 
         bool RunPrepareBuild( IActivityMonitor m )
         {
             // Required for DevelopBuilder retry.
             _packagesVersion.Clear();
-            var solutions = DependentSolutionContext.Solutions;
-            for( int i = 0; i < solutions.Count; ++i )
+            var solutionAndDrivers = DependentSolutionContext.Solutions;
+            for( int i = 0; i < solutionAndDrivers.Count; ++i )
             {
-                var s = solutions[i];
-                var driver = _drivers[i];
-                if( driver == null )
-                {
-                    driver = _drivers[i] = DriverFinder( m, DependentSolutionContext, s.UniqueSolutionName );
-                }
-                var upgrades = s.ImportedLocalPackages
+                var s = solutionAndDrivers[i];
+                var upgrades = s.Solution.ImportedLocalPackages
                                 .Select( p => new UpdatePackageInfo(
-                                                    s.UniqueSolutionName,
-                                                    p.ProjectName,
+                                                    p.Project,
                                                     p.Package.Artifact.Type,
                                                     p.Package.Artifact.Name,
-                                                    _packagesVersion[p.Package.Artifact.Name] ) )
+                                                    _packagesVersion[p.Package.Artifact] ) )
                                 .ToList();
                 _upgrades[i] = upgrades;
                 using( m.OpenInfo( $"Preparing {s} build." ) )
                 {
-                    var pr = PrepareBuild( m, s, driver, upgrades );
+                    var pr = PrepareBuild( m, s.Solution, s.Driver, upgrades );
                     ZeroBuilder.RegisterSHAlias( m );
                     if( pr.Version == null ) return false;
                     m.CloseGroup( $"Target version: {pr.Version}{(pr.MustBuild ? "" :" (no build required)")}" );
                     _targetVersions[i] = pr.MustBuild ? pr.Version : null;
-                    _packagesVersion.AddRange( s.GeneratedPackages.Select( p => new KeyValuePair<string, SVersion>( p.Name, pr.Version ) ) );
+                    _packagesVersion.AddRange( s.Solution.Solution.GeneratedArtifacts.Select( p => new KeyValuePair<Artifact, SVersion>( p.Artifact, pr.Version ) ) );
                 }
             }
             return true;
@@ -221,18 +209,16 @@ namespace CK.Env
         BuildState RunBuild( IActivityMonitor m )
         {
             BuildState finalState = BuildState.Succeed;
-            var solutions = DependentSolutionContext.Solutions;
-            for( int i = 0; i < solutions.Count; ++i )
+            foreach( var (s,d) in DependentSolutionContext.Solutions )
             {
-                var s = solutions[i];
-                DependentSolutionContext.LogSolutions( m, s );
+                DependentSolutionContext.DependencyContext.LogSolutions( m, s );
                 IEnumerable<UpdatePackageInfo> buildProjectsUpgrade = GetBuildProjectUpgrades( s );
                 using( m.OpenInfo( $"Running {s} build." ) )
                 {
                     // _targetVersions[i] is null if build must not be done (this is for ReleaseBuilder only).
                     // We use the null version also for DevelopBuilder: 
-                    var sVersion = finalState == BuildState.MustRetry ? null : _targetVersions[i];
-                    finalState = Build( m, solutions[i], _drivers[i], _upgrades[i], sVersion, buildProjectsUpgrade );
+                    var sVersion = finalState == BuildState.MustRetry ? null : _targetVersions[s.Index];
+                    finalState = Build( m, s, d, _upgrades[s.Index], sVersion, buildProjectsUpgrade );
                     ZeroBuilder.RegisterSHAlias( m );
                     // For DevelopBuilder that returned Retry, we continue to apply the
                     // current change on subsequent solutions to minimize the number of actual builds.
@@ -252,7 +238,7 @@ namespace CK.Env
         /// <param name="driver">The solution driver.</param>
         /// <param name="upgrades">The set of required package upgrades.</param>
         /// <returns>The version (or null if an error occurred) and whether the build must be actually done or skipped.</returns>
-        protected abstract (SVersion Version, bool MustBuild) PrepareBuild( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades );
+        protected abstract (SVersion Version, bool MustBuild) PrepareBuild( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades );
 
         /// <summary>
         /// Builds the solution.
@@ -264,7 +250,7 @@ namespace CK.Env
         /// <param name="sVersion">The version computed by <see cref="PrepareBuild"/>.</param>
         /// <param name="buildProjectsUpgrade">The build projects upgrades.</param>
         /// <returns>The build state.</returns>
-        protected abstract BuildState Build( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IEnumerable<UpdatePackageInfo> buildProjectsUpgrade );
+        protected abstract BuildState Build( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IEnumerable<UpdatePackageInfo> buildProjectsUpgrade );
 
     }
 }

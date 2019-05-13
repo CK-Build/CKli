@@ -62,19 +62,19 @@
       <add Name="CKSetup:Public" />
     </ArtifactTargets>
     <Plugins>
-      <add Type="CK.Env.Plugins.SolutionDriver, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderFolder, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderCSProjFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderKeyVaultFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CommonFolder, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.SharedPropsFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CKSetupStoreTestHelperConfigFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.RepositoryXmlFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.NugetConfigFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.GitIgnoreFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.NPMRCFiles, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderNPMSolutionFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.SolutionFolder, CK.Env.Plugins" />
+      <add Type="CK.Env.Plugin.SolutionDriver, CK.Env.Plugin" />
+      <add Type="CK.Env.Plugin.SolutionFiles.CodeCakeBuilderFolder, CK.Env.Plugin" />
+      <add Type="CK.Env.Plugin.SolutionFiles.CodeCakeBuilderCSProjFile, CK.Env.Plugin" />
+      <add Type="CK.Env.Plugin.SolutionFiles.CodeCakeBuilderKeyVaultFile, CK.Env.Plugin" />
+      <add Type="CK.Env.Plugin.SolutionFiles.CommonFolder, CK.Env.Plugin" />
+      <add Type="CK.Env.Plugin.SolutionFiles.SharedPropsFile, CK.Env.Plugin" />
+      <add Type="CK.Env.Plugin.SolutionFiles.CKSetupStoreTestHelperConfigFile, CK.Env.Plugin" />
+      <add Type="CK.Env.Plugin.SolutionFiles.RepositoryXmlFile, CK.Env.Plugin" />
+      <add Type="CK.Env.Plugin.SolutionFiles.NugetConfigFile, CK.Env.Plugin" />
+      <add Type="CK.Env.Plugin.SolutionFiles.GitIgnoreFile, CK.Env.Plugin" />
+      <add Type="CK.Env.Plugin.SolutionFiles.NPMRCFiles, CK.Env.Plugin" />
+      <add Type="CK.Env.Plugin.SolutionFiles.CodeCakeBuilderNPMSolutionFile, CK.Env.Plugin" />
+      <add Type="CK.Env.Plugin.SolutionFiles.SolutionFolder, CK.Env.Plugin" />
 
       <add Type="CK.BuildSystem.Appveyor.AppveyorFile, CK.BuildSystem.Appveyor" />
       <add Type="CK.BuildSystem.GitLab.GitLabFile, CK.BuildSystem.GitLab" />

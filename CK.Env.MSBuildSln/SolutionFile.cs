@@ -68,7 +68,7 @@ namespace CK.Env.MSBuildSln
         }
 
         /// <summary>
-        /// Gets all the projects, even <see cref="SolutionFolder"/>.
+        /// Gets all the projects, including <see cref="SolutionFolder"/> projects.
         /// </summary>
         public IReadOnlyCollection<ProjectBase> AllProjects => _projectBaseList;
 
@@ -79,6 +79,7 @@ namespace CK.Env.MSBuildSln
 
         /// <summary>
         /// Gets the list of <see cref="MSProject"/>.
+        /// This is a subset of <see cref="Projects"/> that we know how to handle.
         /// </summary>
         public IReadOnlyList<MSProject> MSProjects => _projectMSList;
 

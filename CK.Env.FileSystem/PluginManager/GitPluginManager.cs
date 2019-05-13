@@ -250,7 +250,7 @@ namespace CK.Env
 
         /// <summary>
         /// Reloads the whole set of plugins or the ones of a specific branch.
-        /// Exisitng IDisposable plugins are disposed first.
+        /// Existing IDisposable plugins are disposed first.
         /// </summary>
         /// <param name="branchName">The branch name or null for all plugins.</param>
         public void Reload( string branchName = null )

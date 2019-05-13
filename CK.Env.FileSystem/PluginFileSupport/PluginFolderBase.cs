@@ -6,7 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 
-namespace CK.Env.Plugins
+namespace CK.Env.Plugin
 {
     public abstract class PluginFolderBase : GitBranchPluginBase, ICommandMethodsProvider
     {

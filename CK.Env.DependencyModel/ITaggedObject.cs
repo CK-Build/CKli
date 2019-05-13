@@ -9,40 +9,37 @@ namespace CK.Env.DependencyModel
     public interface ITaggedObject
     {
         /// <summary>
-        /// Returns the first tag object of the specified type from the list of tags
-        /// of this <see cref="TaggedObject"/>.
+        /// Gets or sets a non null tag object of the specified type.
         /// </summary>
-        /// <param name="type">The type of the tag to retrieve.</param>
+        /// <param name="type">The type of the tag to retrieve or sets.</param>
+        /// <param name="newValue">Non null value of type <paramref name="type"/> to be set as the new tag value.</param>
         /// <returns>
-        /// The first matching tag object, or null if no tag is the specified type.
+        /// When <paramref name="newValue"/> is null, fhe first tag of the type, or null if no tag is the specified type.
+        /// Otherwise, newValue is always returned.
         /// </returns>
-        object Tag( Type type );
+        object Tag( Type type, object newValue = null );
 
         /// <summary>
-        /// Returns the first tag object of the specified type from the list of tags
-        /// of this <see cref="TaggedObject"/>.
+        /// Gets or sets a non null tag object of the specified type..
         /// </summary>
-        /// <typeparam name="T">The type of the tag to retrieve.</typeparam>
+        /// <typeparam name="T">The type of the tag to retrieve or set.</typeparam>
+        /// <param name="newValue">Non null value to be set as the new tag value.</param>
         /// <returns>
-        /// The first matching tag object, or null if no tag
-        /// is the specified type.
+        /// When <paramref name="newValue"/> is null, fhe first tag of the type, or null if no tag is the specified type.
+        /// Otherwise, newValue is always returned.
         /// </returns>
-        T Tag<T>() where T : class;
+        T Tag<T>( T newValue = null ) where T : class;
 
         /// <summary>
-        /// Returns an enumerable collection of tags of the specified type
-        /// for this <see cref="TaggedObject"/>.
+        /// Removes the tags of the specified type.
         /// </summary>
-        /// <param name="type">The type of the tags to retrieve.</param>
-        /// <returns>An enumerable collection of tags for this TaggedObject.</returns>
-        IEnumerable<object> Tags( Type type );
+        /// <param name="type">The type of tags to remove.</param>
+        void RemoveTags( Type type );
 
         /// <summary>
-        /// Returns an enumerable collection of tags of the specified type
-        /// for this <see cref="TaggedObject"/>.
+        /// Removes the tags of the specified type.
         /// </summary>
-        /// <typeparam name="T">The type of the tags to retrieve.</typeparam>
-        /// <returns>An enumerable collection of tags for this TaggedObject.</returns>
-        IEnumerable<T> Tags<T>() where T : class;
+        /// <typeparam name="T">The type of tags to remove.</typeparam>
+        void RemoveTags<T>() where T : class;
     }
 }

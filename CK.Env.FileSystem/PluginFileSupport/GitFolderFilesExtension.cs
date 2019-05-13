@@ -3,7 +3,7 @@ using CK.Text;
 using Microsoft.Extensions.FileProviders;
 using System.Xml.Linq;
 
-namespace CK.Env.Plugins
+namespace CK.Env.Plugin
 {
     public static class GitFolderFilesExtension
     {

@@ -1,5 +1,5 @@
 using CK.Core;
-using CK.Env.Plugins;
+using CK.Env.Plugin;
 using CK.Text;
 using SharpYaml;
 using SharpYaml.Model;
@@ -10,7 +10,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CK.Env.Plugins
+namespace CK.Env.Plugin
 {
     public class JsonFilePluginBase : JsonFileBase, IGitBranchPlugin
     {

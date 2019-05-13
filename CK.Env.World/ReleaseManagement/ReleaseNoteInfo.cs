@@ -9,7 +9,7 @@ namespace CK.Env
     {
         internal ReleaseNoteInfo( ReleaseSolutionInfo info )
         {
-            SolutionName = info.Solution.UniqueSolutionName;
+            SolutionName = info.Solution.Solution.Name;
             PreviousVersion = info.PreviousVersion;
             Current = info.CurrentReleaseInfo;
             ReleaseNote = info.ReleaseNote;

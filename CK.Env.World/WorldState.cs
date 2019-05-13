@@ -1,7 +1,9 @@
 using CK.Core;
+using CK.Env.DependencyModel;
 using CK.Text;
 using CSemVer;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -14,14 +16,94 @@ namespace CK.Env
     /// </summary>
     public partial class WorldState : IWorldState, ISolutionDriverWorld, ICommandMethodsProvider
     {
+        class WorldBranchContext : IWorldSolutionContext
+        {
+            readonly List<ISolutionDriver> _drivers;
+            readonly SolutionContext _context;
+            readonly PairList _pairList;
+            SolutionDependencyContext _depContext;
+
+            internal WorldBranchContext( string branchName )
+            {
+                BranchName = branchName;
+                _context = new SolutionContext();
+                _drivers = new List<ISolutionDriver>();
+                _pairList = new PairList( this );
+            }
+
+            /// <summary>
+            /// Gets the branch name.
+            /// </summary>
+            public string BranchName { get; }
+
+            public SolutionDependencyContext DependencyContext => _depContext;
+
+            public IReadOnlyList<DependentSolution> DependentSolutions => _depContext.Solutions;
+
+            public IReadOnlyList<ISolutionDriver> Drivers => _drivers;
+
+            class PairList : IReadOnlyList<(DependentSolution Solution, ISolutionDriver Driver)>
+            {
+                readonly WorldBranchContext _c;
+
+                public PairList( WorldBranchContext c ) => _c = c;               
+
+                public (DependentSolution Solution, ISolutionDriver Driver) this[int index] => (_c.DependentSolutions[index], _c._drivers[index]);
+
+                public int Count => _c._drivers.Count;
+
+                public IEnumerator<(DependentSolution Solution, ISolutionDriver Driver)> GetEnumerator()
+                {
+                    return _c.DependentSolutions.Select( s => (s, _c._drivers[s.Index]) ).GetEnumerator();
+                }
+
+                IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+            }
+
+            public IReadOnlyList<(DependentSolution Solution, ISolutionDriver Driver)> Solutions => _pairList;
+
+            public bool Refresh( IActivityMonitor m, bool forceReload )
+            {
+                foreach( var d in _drivers )
+                {
+                    if( d.GetSolution( m, forceReload ) == null )
+                    {
+                        m.Error( $"Failed to load solution from '{d.GitRepository.SubPath}'." );
+                        return false;
+                    }
+                }
+                if( _depContext == null || _depContext.IsObsolete )
+                {
+                    _depContext = _context.GetDependencyAnalyser( m ).DefaultDependencyContext;
+                    Debug.Assert( _drivers.Count == _depContext.Solutions.Count );
+                    _drivers.Sort( ( d1, d2 ) => _depContext[d1.GetSolution( m, false )].Index - _depContext[d2.GetSolution( m, false )].Index );
+                }
+                return true;
+            }
+
+            internal SolutionContext OnRegisterDriver( ISolutionDriver d )
+            {
+                Debug.Assert( d != null && !_drivers.Contains( d ) );
+                _drivers.Add( d );
+                _depContext = null;
+                return _context;
+            }
+
+            internal void OnUnregisterDriver( ISolutionDriver d )
+            {
+                _drivers.Remove( d );
+                _depContext = null;
+            }
+        }
+
         readonly IWorldStore _store;
-        readonly IDependentSolutionContextLoader _solutionContextLoader;
         readonly IEnvLocalFeedProvider _localFeedProvider;
         readonly ArtifactCenter _artifacts;
 
         readonly HashSet<ISolutionDriver> _solutionDrivers;
-        readonly Dictionary<string, ISolutionDriver> _cacheBySolutionName;
+        readonly Dictionary<string, WorldBranchContext> _perBranchContext;
         readonly HashSet<IGitRepository> _gitRepositories;
+        readonly Dictionary<string, ISolutionDriver> _cacheBySolutionName;
 
         readonly IBasicApplicationLifetime _appLife;
 
@@ -36,7 +118,6 @@ namespace CK.Env
         /// <param name="artifacts">The artifact center.</param>
         /// <param name="worldName">The world name.</param>
         /// <param name="store">The store. Can not be null.</param>
-        /// <param name="solutionContextLoader">Loader of solution dependency context.</param>
         /// <param name="localFeedProvider">Local feed provider. Can not be null. (Required for the Zro builder.)</param>
         /// <param name="publisher">Artifacts publisher.</param>
         /// <param name="appLife">Application lifetime controller.</param>
@@ -45,17 +126,16 @@ namespace CK.Env
             ArtifactCenter artifacts,
             IWorldStore store,
             IWorldName worldName,
-            IDependentSolutionContextLoader solutionContextLoader,
             IEnvLocalFeedProvider localFeedProvider,
             IBasicApplicationLifetime appLife )
         {
             _artifacts = artifacts ?? throw new ArgumentNullException( nameof( artifacts ) );
             _store = store ?? throw new ArgumentNullException( nameof( store ) );
             WorldName = worldName ?? throw new ArgumentNullException( nameof( worldName ) );
-            _solutionContextLoader = solutionContextLoader ?? throw new ArgumentNullException( nameof( solutionContextLoader ) );
             _localFeedProvider = localFeedProvider ?? throw new ArgumentNullException( nameof( localFeedProvider ) );
             _appLife = appLife;
             _solutionDrivers = new HashSet<ISolutionDriver>();
+            _perBranchContext = new Dictionary<string, WorldBranchContext>();
             _cacheBySolutionName = new Dictionary<string, ISolutionDriver>();
             _gitRepositories = new HashSet<IGitRepository>();
 
@@ -67,13 +147,19 @@ namespace CK.Env
 
         bool IsInitialized => _rawState != null;
 
-        void ISolutionDriverWorld.Register( ISolutionDriver driver )
+        SolutionContext ISolutionDriverWorld.Register( ISolutionDriver driver )
         {
             if( !_solutionDrivers.Add( driver ) ) throw new InvalidOperationException( "Already registered." );
+            if( !_perBranchContext.TryGetValue( driver.BranchName, out var c ) )
+            {
+                c = new WorldBranchContext( driver.BranchName );
+                _perBranchContext.Add( driver.BranchName, c );
+            }
             if( _gitRepositories.Add( driver.GitRepository ) )
             {
                 UpdateGlobalGitStatus();
             }
+            return c.OnRegisterDriver( driver );
         }
 
         void ISolutionDriverWorld.Unregister( ISolutionDriver driver )
@@ -83,6 +169,8 @@ namespace CK.Env
             {
                 _cacheBySolutionName.Remove( k );
             }
+            _perBranchContext[driver.BranchName].OnUnregisterDriver( driver );
+
             _gitRepositories.Clear();
             _gitRepositories.AddRange( _solutionDrivers.Select( d => d.GitRepository ) );
             UpdateGlobalGitStatus();
@@ -159,71 +247,71 @@ namespace CK.Env
         /// </summary>
         public IReadOnlyCollection<ISolutionDriver> SolutionDrivers => _solutionDrivers;
 
-        /// <summary>
-        /// Finds the <see cref="ISolutionDriver"/> given a branch and a solution name that can be
-        /// a primary or a secondary solution.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="uniqueSolutionName">Solution name.</param>
-        /// <param name="branchName">Branch name.</param>
-        /// <param name="throwOnNotFound">
-        /// False to return null and log an error instead of throwing an InvalidOperatioException.
-        /// </param>
-        /// <returns>The driver or null if not found.</returns>
-        public ISolutionDriver FindSolutionDriver( IActivityMonitor monitor, string uniqueSolutionName, string branchName, bool throwOnNotFound = true )
-        {
-            if( String.IsNullOrWhiteSpace( uniqueSolutionName ) ) throw new ArgumentNullException( nameof( uniqueSolutionName ) );
-            if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
-            if( !_cacheBySolutionName.TryGetValue( branchName + ':' + uniqueSolutionName, out var driver ) )
-            {
-                string primary = uniqueSolutionName;
-                int idx = uniqueSolutionName.IndexOf( '/' );
-                if( idx == 0 ) throw new ArgumentException( "Invalid solution name.", nameof( uniqueSolutionName ) );
-                if( idx > 0 ) primary = uniqueSolutionName.Substring( 0, idx );
-                driver = _solutionDrivers.FirstOrDefault( d => d.BranchName == branchName && d.GitRepository.PrimarySolutionName == primary );
-                if( driver != null )
-                {
-                    Debug.Assert( driver.GetSolutionNames( monitor ).Contains( primary ) );
-                    foreach( var n in driver.GetSolutionNames( monitor ) )
-                    {
-                        _cacheBySolutionName.Add( branchName + ':' + n, driver );
-                    }
-                }
-                else if( throwOnNotFound )
-                {
-                    throw new InvalidOperationException( $"Unable to find driver for '{uniqueSolutionName}' in branch {branchName}." );
-                }
-            }
-            return driver;
-        }
+        ///// <summary>
+        ///// Finds the <see cref="ISolutionDriver"/> given a branch and a solution name that can be
+        ///// a primary or a secondary solution.
+        ///// </summary>
+        ///// <param name="monitor">The monitor to use.</param>
+        ///// <param name="uniqueSolutionName">Solution name.</param>
+        ///// <param name="branchName">Branch name.</param>
+        ///// <param name="throwOnNotFound">
+        ///// False to return null and log an error instead of throwing an InvalidOperatioException.
+        ///// </param>
+        ///// <returns>The driver or null if not found.</returns>
+        //public ISolutionDriver FindSolutionDriver( IActivityMonitor monitor, string uniqueSolutionName, string branchName, bool throwOnNotFound = true )
+        //{
+        //    if( String.IsNullOrWhiteSpace( uniqueSolutionName ) ) throw new ArgumentNullException( nameof( uniqueSolutionName ) );
+        //    if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
+        //    if( !_cacheBySolutionName.TryGetValue( branchName + ':' + uniqueSolutionName, out var driver ) )
+        //    {
+        //        string primary = uniqueSolutionName;
+        //        int idx = uniqueSolutionName.IndexOf( '/' );
+        //        if( idx == 0 ) throw new ArgumentException( "Invalid solution name.", nameof( uniqueSolutionName ) );
+        //        if( idx > 0 ) primary = uniqueSolutionName.Substring( 0, idx );
+        //        driver = _solutionDrivers.FirstOrDefault( d => d.BranchName == branchName && d.GitRepository.PrimarySolutionName == primary );
+        //        if( driver != null )
+        //        {
+        //            Debug.Assert( driver.GetSolutionNames( monitor ).Contains( primary ) );
+        //            foreach( var n in driver.GetSolutionNames( monitor ) )
+        //            {
+        //                _cacheBySolutionName.Add( branchName + ':' + n, driver );
+        //            }
+        //        }
+        //        else if( throwOnNotFound )
+        //        {
+        //            throw new InvalidOperationException( $"Unable to find driver for '{uniqueSolutionName}' in branch {branchName}." );
+        //        }
+        //    }
+        //    return driver;
+        //}
 
-        /// <summary>
-        /// Finds the <see cref="ISolutionDriver"/> for a <see cref="IDependentSolution"/>.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="solution">Solution.</param>
-        /// <param name="throwOnNotFound">
-        /// False to return null and log an error instead of throwing an InvalidOperatioException.
-        /// </param>
-        /// <returns>The driver or null if not found.</returns>
-        public ISolutionDriver FindSolutionDriver( IActivityMonitor monitor, IDependentSolution solution, bool throwOnNotFound = true )
-        {
-            if( solution == null ) throw new ArgumentNullException( nameof( solution ) );
-            return FindSolutionDriver( monitor, solution.UniqueSolutionName, solution.BranchName, throwOnNotFound );
-        }
+        ///// <summary>
+        ///// Finds the <see cref="ISolutionDriver"/> for a <see cref="DependentSolution"/>.
+        ///// </summary>
+        ///// <param name="monitor">The monitor to use.</param>
+        ///// <param name="solution">Solution.</param>
+        ///// <param name="throwOnNotFound">
+        ///// False to return null and log an error instead of throwing an InvalidOperatioException.
+        ///// </param>
+        ///// <returns>The driver or null if not found.</returns>
+        //public ISolutionDriver FindSolutionDriver( IActivityMonitor monitor, DependentSolution solution, bool throwOnNotFound = true )
+        //{
+        //    if( solution == null ) throw new ArgumentNullException( nameof( solution ) );
+        //    return FindSolutionDriver( monitor, solution.UniqueSolutionName, solution.BranchName, throwOnNotFound );
+        //}
 
-        /// <summary>
-        /// Helper for external components.
-        /// This throws an exception if the driver is not found.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="depContext">The current dependency context.</param>
-        /// <param name="solutionName">Solution name.</param>
-        /// <returns>The driver.</returns>
-        public ISolutionDriver DriverFinder( IActivityMonitor monitor, IDependentSolutionContext depContext, string solutionName )
-        {
-            return FindSolutionDriver( monitor, solutionName, depContext.UniqueBranchName, true );
-        }
+        ///// <summary>
+        ///// Helper for external components.
+        ///// This throws an exception if the driver is not found.
+        ///// </summary>
+        ///// <param name="monitor">The monitor to use.</param>
+        ///// <param name="depContext">The current dependency context.</param>
+        ///// <param name="solutionName">Solution name.</param>
+        ///// <returns>The driver.</returns>
+        //public ISolutionDriver DriverFinder( IActivityMonitor monitor, SolutionDependencyContext depContext, string solutionName )
+        //{
+        //    return FindSolutionDriver( monitor, solutionName, depContext.UniqueBranchName, true );
+        //}
 
         bool RunSafe( IActivityMonitor m, string message, Action<IActivityMonitor, Func<bool>> action )
         {
@@ -351,34 +439,23 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the <see cref="IDependentSolutionContext"/> after having called <see cref="UpdateGlobalGitStatus"/>
-        /// and checked that repositories are all on 'local' or 'develop' branch.
+        /// Gets an up to date <see cref="IWorldSolutionContext"/> after having checked that
+        /// repositories are all on 'local' or 'develop' branch.
         /// <see cref="CachedGlobalGitStatus"/> is up-to-date after this call.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="reloadSolutions">True to force a reload of the solutions.</param>
-        /// <returns>The dependency context or null on error.</returns>
-        IDependentSolutionContext GetSolutionDependentContext( IActivityMonitor monitor, bool reloadSolutions = false )
+        /// <returns>The context or null on error.</returns>
+        IWorldSolutionContext GetSolutionDependencyContext( IActivityMonitor monitor, bool reloadSolutions = false )
         {
             var branchName = GetCleanBranchName( monitor );
-            return branchName != null
-                    ? _solutionContextLoader.Load( monitor, _gitRepositories, branchName, reloadSolutions )
-                    : null;
+            if( branchName == null ) return null;
+            if( !_perBranchContext.TryGetValue( branchName, out var c ) )
+            {
+                throw new Exception( $"No solution context available for branch {branchName}. GitBranchPlugins are not initialized or a ISolutionDriver plugin implementation is missing." );
+            }
+            return c.Refresh( monitor, reloadSolutions ) ? c : null;
         }
-
-        /// <summary>
-        /// Ensures that all solutions are reloaded.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <returns>True on success, false on error.</returns>
-        bool ReloadSolutions( IActivityMonitor monitor )
-        {
-            var branchName = GetCleanBranchName( monitor );
-            return branchName != null
-                    ? _solutionContextLoader.ReloadSolutions( monitor, _gitRepositories, branchName )
-                    : false;
-        }
-
 
         /// <summary>
         /// Concludes the current work.
@@ -441,10 +518,10 @@ namespace CK.Env
                 UpdateGlobalGitStatus();
                 Debug.Assert( CachedGlobalGitStatus == StandardGitStatus.Local );
 
-                var depContext = GetSolutionDependentContext( m );
+                var depContext = GetSolutionDependencyContext( m );
                 if( depContext == null ) return;
 
-                if( ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, ReloadSolutions, DriverFinder, _appLife ) == null ) return;
+                if( ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, _appLife ) == null ) return;
 
                 if( !error() )
                 {
@@ -474,9 +551,9 @@ namespace CK.Env
             if( !CheckGlobalGitStatusLocalXorDevelop( monitor ) ) return false;
             return RunSafe( monitor, "Fixing Build projects.", ( m, error ) =>
             {
-                var depContext = GetSolutionDependentContext( m );
+                var depContext = GetSolutionDependencyContext( m );
                 if( depContext == null ) return;
-                ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, ReloadSolutions, DriverFinder, _appLife );
+                ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, _appLife );
             } );
         }
 
@@ -495,18 +572,18 @@ namespace CK.Env
             if( !CheckGlobalGitStatusLocalXorDevelop( monitor ) ) return false;
             return RunSafe( monitor, $"Local build.", ( m, error ) =>
             {
-                var depContext = GetSolutionDependentContext( m );
-                if( depContext == null ) return;
+                var ctx = GetSolutionDependencyContext( m );
+                if( ctx == null ) return;
 
-                ZeroBuilder zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, ReloadSolutions, DriverFinder, _appLife );
+                ZeroBuilder zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, ctx, _appLife );
                 if( zBuilder == null ) return;
 
-                depContext = GetSolutionDependentContext( m );
-                if( depContext == null ) return;
+                ctx = GetSolutionDependencyContext( m );
+                if( ctx == null ) return;
 
                 Builder builder = CachedGlobalGitStatus == StandardGitStatus.Local
-                                ? (Builder)new LocalBuilder( zBuilder, _artifacts, _localFeedProvider, depContext, DriverFinder, withUnitTest )
-                                : new DevelopBuilder( zBuilder, _artifacts, _localFeedProvider, depContext, DriverFinder, withUnitTest );
+                                ? (Builder)new LocalBuilder( zBuilder, _artifacts, _localFeedProvider, ctx, withUnitTest )
+                                : new DevelopBuilder( zBuilder, _artifacts, _localFeedProvider, ctx, withUnitTest );
                 RunBuild( m, builder, rebuildAll );
             } );
         }
@@ -564,16 +641,16 @@ namespace CK.Env
                 {
                     if( !g.SwitchLocalToDevelop( m ) ) return;
                 }
-                var depContext = GetSolutionDependentContext( m );
+                var depContext = GetSolutionDependencyContext( m );
                 if( depContext == null ) return;
 
-                var zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, ReloadSolutions, DriverFinder, _appLife );
+                var zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, _appLife );
                 if( zBuilder == null ) return;
 
-                depContext = GetSolutionDependentContext( m );
+                depContext = GetSolutionDependencyContext( m );
                 if( depContext == null ) return;
 
-                var builder = new DevelopBuilder( zBuilder, _artifacts, _localFeedProvider, depContext, DriverFinder, false );
+                var builder = new DevelopBuilder( zBuilder, _artifacts, _localFeedProvider, depContext, false );
                 if( !RunBuild( m, builder, false ) ) return;
 
                 if( !error() )
@@ -585,7 +662,7 @@ namespace CK.Env
 
         ReleaseRoadmap LoadRoadmap( IActivityMonitor monitor )
         {
-            var depContext = GetSolutionDependentContext( monitor );
+            var depContext = GetSolutionDependencyContext( monitor );
             if( depContext == null ) return null;
             var previous = GeneralState.EnsureElement( "Roadmap" );
             return ReleaseRoadmap.Create( monitor, depContext, previous );
@@ -657,7 +734,7 @@ namespace CK.Env
                     reloadNeeded |= ReloadNeeded;
                 }
             }
-            if( reloadNeeded && !ReloadSolutions( monitor ) ) return false;
+            if( reloadNeeded && GetSolutionDependencyContext( monitor, true ) == null ) return false;
 
             var roadmap = DoEditRoadmap( monitor, resetRoadmap );
             if( roadmap == null ) return false;
@@ -688,10 +765,10 @@ namespace CK.Env
                     }
                 }
 
-                var depContext = GetSolutionDependentContext( m );
+                var depContext = GetSolutionDependencyContext( m );
                 if( depContext == null ) return;
 
-                ZeroBuilder zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, ReloadSolutions, DriverFinder, _appLife );
+                ZeroBuilder zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, _appLife );
                 if( zBuilder == null ) return;
 
                 var roadmap = LoadRoadmap( monitor );
@@ -701,7 +778,7 @@ namespace CK.Env
                     return;
                 }
 
-                var b = new ReleaseBuilder( zBuilder, _artifacts, roadmap, _localFeedProvider, DriverFinder );
+                var b = new ReleaseBuilder( zBuilder, _artifacts, roadmap, _localFeedProvider );
                 if( !RunBuild( m, b, firstRun ) ) return;
 
                 if( !error() )
@@ -758,7 +835,7 @@ namespace CK.Env
                     }
                     snapshot.Remove();
                 }
-                ReloadSolutions( m );
+                GetSolutionDependencyContext( m, true );
                 _localFeedProvider.Release.RemoveAll( m );
                 if( !error() )
                 {
@@ -775,7 +852,7 @@ namespace CK.Env
                                 : "Clearing version tags." ) )
             {
                 var versions = ReleaseRoadmap.Load( GeneralState.Element( "Roadmap" ) )
-                                           .Select( e => (e.SubPath, e.Info, Git: _gitRepositories.FirstOrDefault( g => g.SubPath == e.SubPath )) );
+                                           .Select( e => (e.SubPath, e.Info, Git: _gitRepositories.FirstOrDefault( g => e.SubPath.StartsWith( g.SubPath ) ) ) );
                 foreach( var (SubPath, Info, Git) in versions )
                 {
                     if( Git == null )

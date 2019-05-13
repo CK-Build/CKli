@@ -13,9 +13,9 @@ namespace CK.Env
     {
         readonly ReleaseSolutionInfo[] _infos;
 
-        ReleaseRoadmap( IDependentSolutionContext ctx, ReleaseSolutionInfo[] infos )
+        ReleaseRoadmap( IWorldSolutionContext ctx, ReleaseSolutionInfo[] infos )
         {
-            DependentSolutionContext = ctx;
+            SolutionContext = ctx;
             _infos = infos;
             foreach( var i in infos ) i.Initialize( this );
         }
@@ -23,9 +23,9 @@ namespace CK.Env
         internal ReleaseSolutionInfo GetReleaseInfo( int idx ) => _infos[idx];
 
         /// <summary>
-        /// Gets the dependent solution context.
+        /// Gets the solution context.
         /// </summary>
-        public IDependentSolutionContext DependentSolutionContext { get; }
+        public IWorldSolutionContext SolutionContext { get; }
 
         /// <summary>
         /// Gets whether this roadmap is valid: all versions have been determined
@@ -34,7 +34,7 @@ namespace CK.Env
         public bool IsValid => _infos.All( r => r.CurrentReleaseInfo.IsValid );
 
         /// <summary>
-        /// Gets the list (in the same order as the <see cref="IDependentSolutionContext.Solutions"/>) of
+        /// Gets the list (in the same order as the <see cref="IWorldSolutionContext.Solutions"/>) of
         /// the associated <see cref="ReleaseSolutionInfo"/>.
         /// </summary>
         public IReadOnlyList<IReleaseSolutionInfo> ReleaseInfos => _infos;
@@ -91,35 +91,33 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Creates a new <see cref="ReleaseRoadmap"/> for a <see cref="IDependentSolutionContext"/>.
+        /// Creates a new <see cref="ReleaseRoadmap"/> for a <see cref="IWorldSolutionContext"/>.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="ctx">The context.</param>
         /// <returns>Null on error.</returns>
         public static ReleaseRoadmap Create(
             IActivityMonitor m,
-            IDependentSolutionContext ctx,
+            IWorldSolutionContext ctx,
             XElement previous = null,
             bool restorePreviousState = true )
         {
             if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
             ReleaseSolutionInfo[] infos = new ReleaseSolutionInfo[ctx.Solutions.Count];
-            foreach( var s in ctx.Solutions )
+            foreach( var (s,d) in ctx.Solutions )
             {
-                if( s.BranchName == null )
-                {
-                    m.Error( $"Solution {s.UniqueSolutionName} has no branch name defined." );
-                    return null;
-                }
-                var v = s.GitRepository.GetCommitVersionInfo( m, s.BranchName );
+                var v = d.GitRepository.GetCommitVersionInfo( m );
                 if( v == null )
                 {
-                    m.Error( $"Unable to get Commit version information for solution {s.UniqueSolutionName}." );
+                    m.Error( $"Unable to get Commit version information for solution {s.Solution}." );
                     return null;
                 }
-                infos[s.Index] = new ReleaseSolutionInfo( s, v, previous?
-                                                                    .Elements()
-                                                                    .FirstOrDefault( e => (string)e.Attribute( "Name" ) == s.UniqueSolutionName ) );
+                infos[s.Index] = new ReleaseSolutionInfo( d.GitRepository,
+                                                          s,
+                                                          v,
+                                                          previous?
+                                                            .Elements()
+                                                            .FirstOrDefault( e => (string)e.Attribute( "Name" ) == s.Solution.Name ) );
             }
             return new ReleaseRoadmap( ctx, infos );
         }

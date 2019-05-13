@@ -172,7 +172,7 @@ namespace CK.Env
         /// <param name="previousVersionCommitSha">Previous commit.</param>
         /// <param name="paths">Generated packages of a solution.</param>
         /// <returns>The set of diff or null on error.</returns>
-        public IReadOnlyCollection<DirectoryDiff> GetPathsDiff( IActivityMonitor m, string previousVersionCommitSha, IReadOnlyCollection<NormalizedPath> paths )
+        public IReadOnlyCollection<DirectoryDiff> GetPathsDiff( IActivityMonitor m, string previousVersionCommitSha, IEnumerable<NormalizedPath> paths )
         {
             Commit commit = _git.Lookup<Commit>( previousVersionCommitSha );
             var commits = _git.Commits.QueryBy( new CommitFilter()
@@ -183,9 +183,8 @@ namespace CK.Env
             return GetReleaseDiff( paths, commits.ToList() );
         }
 
-        IReadOnlyCollection<DirectoryDiff> GetReleaseDiff( IReadOnlyCollection<NormalizedPath> paths, List<Commit> commits )
+        IReadOnlyCollection<DirectoryDiff> GetReleaseDiff( IEnumerable<NormalizedPath> paths, List<Commit> commits )
         {
-            if( paths.Count == 0 ) return Array.Empty<DirectoryDiff>();
             var r = new List<DirectoryDiff>();
             foreach( var p in paths )
             {
@@ -222,10 +221,14 @@ namespace CK.Env
             return _git.Head.Commits.SkipWhile( p => p.Committer.When > ending ).TakeWhile( p => p.Committer.When > beginning );
         }
 
-        public void ShowLogsBetweenDates( IActivityMonitor m, DateTimeOffset beginning, DateTimeOffset ending, IReadOnlyCollection<NormalizedPath> paths )
+        public void ShowLogsBetweenDates(
+            IActivityMonitor m,
+            DateTimeOffset beginning,
+            DateTimeOffset ending,
+            IEnumerable<NormalizedPath> paths )
         {
             List<Commit> commits = GetCommitsBetweenDates( beginning, ending ).ToList();
-            if( !commits.Any() )
+            if( commits.Count == 0 )
             {
                 m.Info( "No commits between the given dates" );
             }

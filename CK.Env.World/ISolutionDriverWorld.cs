@@ -1,3 +1,5 @@
+using CK.Env.DependencyModel;
+
 namespace CK.Env
 {
     /// <summary>
@@ -12,10 +14,11 @@ namespace CK.Env
         GlobalWorkStatus? WorkStatus { get; }
 
         /// <summary>
-        /// Registers a new driver.
+        /// Registers a new driver, providing him the <see cref="SolutionContext"/> to use.
         /// </summary>
         /// <param name="driver">The driver.</param>
-        void Register( ISolutionDriver driver );
+        /// <returns>The solution context into which the solution must be created.</returns>
+        SolutionContext Register( ISolutionDriver driver );
 
         /// <summary>
         /// Unregister a previously registered driver.

@@ -27,10 +27,10 @@ namespace CK.Env.DependencyModel
         public ZeroBuildProjectInfo(
             int index,
             int rank,
-            Project project,
-            IReadOnlyCollection<Project> upgradeProjectPackages,
-            IReadOnlyCollection<Project> upgradeZeroProjects,
-            IReadOnlyCollection<Project> allDependencies )
+            IProject project,
+            IReadOnlyCollection<IProject> upgradeProjectPackages,
+            IReadOnlyCollection<IProject> upgradeZeroProjects,
+            IReadOnlyCollection<IProject> allDependencies )
         {
             if( Index < 0 ) throw new ArgumentOutOfRangeException( nameof( index ) );
             if( Rank < 0 ) throw new ArgumentOutOfRangeException( nameof( rank ) );
@@ -55,13 +55,20 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets the project.
         /// </summary>
-        public Project Project { get; }
+        public IProject Project { get; }
+
+        /// <summary>
+        /// Gets whether this project must be packed, ie. it is used as a package
+        /// by actual build projects: ant project that is not a <see cref="IProject.IsBuildProject"/>
+        /// must be packed.
+        /// </summary>
+        public bool MustPack => !Project.IsBuildProject;
 
         /// <summary>
         /// Gets all the projects for which package references to any generated artifacts must be updated.
         /// This does not contain ProjectReferences.
         /// </summary>
-        public IReadOnlyCollection<Project> UpgradeProjectPackages { get; }
+        public IReadOnlyCollection<IProject> UpgradeProjectPackages { get; }
 
         /// <summary>
         /// Gets the package references to any generated artifacts that must be updated.
@@ -74,12 +81,12 @@ namespace CK.Env.DependencyModel
         /// Caution: This is about PackageReferences as well as ProjectReferences: ProjectReferences MUST be transformed
         /// into PackageReferences to the Zero version.
         /// </summary>
-        public IReadOnlyCollection<Project> UpgradeZeroProjects { get; }
+        public IReadOnlyCollection<IProject> UpgradeZeroProjects { get; }
 
         /// <summary>
         /// Gets all the projects that are (transitively) used by this project.
         /// </summary>
-        public IReadOnlyCollection<Project> AllDependencies { get; }
+        public IReadOnlyCollection<IProject> AllDependencies { get; }
 
         /// <summary>
         /// Returns the project's name.

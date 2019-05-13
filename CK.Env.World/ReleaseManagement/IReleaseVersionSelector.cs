@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Env.DependencyModel;
 using CSemVer;
 
 namespace CK.Env
@@ -21,6 +22,6 @@ namespace CK.Env
         /// <param name="version">The tagged version.</param>
         /// <param name="isContentTag">False if it the tag is on the commit point, true if the tag is a content tag.</param>
         /// <returns>True to continue, false to cancel the current session.</returns>
-        bool OnAlreadyReleased( IActivityMonitor m, IDependentSolution solution, CSVersion version, bool isContentTag );
+        bool OnAlreadyReleased( IActivityMonitor m, DependentSolution solution, CSVersion version, bool isContentTag );
     }
 }

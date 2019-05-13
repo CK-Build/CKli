@@ -1,4 +1,5 @@
 using System;
+using CSemVer;
 
 namespace CK.Env
 {
@@ -33,6 +34,13 @@ namespace CK.Env
             Type = type;
             Name = name ?? throw new ArgumentNullException( nameof( name ) );
         }
+
+        /// <summary>
+        /// Returns a <see cref="ArtifactInstance"/>.
+        /// </summary>
+        /// <param name="v">The version.</param>
+        /// <returns>The artifact instance.</returns>
+        public ArtifactInstance WithVersion( SVersion v ) => new ArtifactInstance( this, v );
 
         /// <summary>
         /// Checks equality.
@@ -71,5 +79,6 @@ namespace CK.Env
         public static bool operator !=( in Artifact x, in Artifact y ) => !x.Equals( y );
 
         public override string ToString() => $"{Type}:{Name}";
+
     }
 }

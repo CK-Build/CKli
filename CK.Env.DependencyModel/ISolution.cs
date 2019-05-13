@@ -25,6 +25,12 @@ namespace CK.Env.DependencyModel
         string Name { get; }
 
         /// <summary>
+        /// Gets the current version. This changes each time
+        /// anything changes in this solution or its projects.
+        /// </summary>
+        int Version { get; }
+
+        /// <summary>
         /// Gets all the projects.
         /// </summary>
         IReadOnlyList<IProject> Projects { get; }
@@ -40,6 +46,12 @@ namespace CK.Env.DependencyModel
         /// and <see cref="Project.IsTestProject"/> must be false.
         /// </summary>
         IProject BuildProject { get; }
+
+        /// <summary>
+        /// Gets the repositories where produced artifacts must be pushed.
+        /// </summary>
+        IReadOnlyCollection<IArtifactRepository> ArtifactTargets { get; }
+
 
     }
 }

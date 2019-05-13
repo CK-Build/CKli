@@ -15,7 +15,7 @@ namespace CK.Env.MSBuildSln
         /// <summary>
         /// Captures <see cref="DeclaredPackageDependency"/> and <see cref="ProjectToProjectDependency"/>.
         /// </summary>
-        public struct Dependencies
+        public readonly struct Dependencies
         {
             /// <summary>
             /// Gets all the PackageReference.
@@ -92,11 +92,6 @@ namespace CK.Env.MSBuildSln
         /// is created. This is null if an error occurred while loading.
         /// </summary>
         public MSProjFile ProjectFile => _file;
-
-        /// <summary>
-        /// Gets the folder path of this project. 
-        /// </summary>
-        public NormalizedPath FolderPath { get; }
 
         internal override bool Initialize( IActivityMonitor m )
         {
@@ -185,6 +180,11 @@ namespace CK.Env.MSBuildSln
         /// Gets the dependencies.
         /// </summary>
         public Dependencies Deps => _dependencies;
+
+        /// <summary>
+        /// Gets the index of this project into the <see cref="SolutionFile.MSProjects"/> list.
+        /// </summary>
+        public int MSProjIndex => Solution.MSProjects.IndexOf( x => x == this );
 
         /// <summary>
         /// Saves all files that have been modified.

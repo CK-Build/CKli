@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using CK.Core;
+using CK.Env.DependencyModel;
 using CK.Text;
 using CSemVer;
 
@@ -17,23 +18,20 @@ namespace CK.Env
                 ZeroBuilder zeroBuilder,
                 ArtifactCenter artifacts,
                 ReleaseRoadmap roadmap,
-                IEnvLocalFeedProvider localFeedProvider,
-                Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder )
-            : base( zeroBuilder, BuildResultType.Release, artifacts, localFeedProvider, roadmap.DependentSolutionContext, driverFinder )
+                IEnvLocalFeedProvider localFeedProvider )
+            : base( zeroBuilder, BuildResultType.Release, artifacts, localFeedProvider, roadmap.SolutionContext )
         {
-            _commits = new string[roadmap.DependentSolutionContext.Solutions.Count];
+            _commits = new string[roadmap.SolutionContext.Solutions.Count];
             _roadmap = roadmap;
         }
 
 
         protected override (SVersion Version, bool MustBuild) PrepareBuild(
             IActivityMonitor m,
-            IDependentSolution s,
+            DependentSolution s,
             ISolutionDriver driver,
             IReadOnlyList<UpdatePackageInfo> upgrades )
         {
-            Debug.Assert( driver.GitRepository.CurrentBranchName == s.BranchName );
-
             IReleaseSolutionInfo info = _roadmap.ReleaseInfos[ s.Index ];
             var targetVersion = info.CurrentReleaseInfo.Version;
             if( upgrades.Count > 0 )
@@ -51,24 +49,23 @@ namespace CK.Env
             return (targetVersion, info.CurrentReleaseInfo.Level != ReleaseLevel.None);
         }
 
-        protected override BuildResult CreateBuildResult( IActivityMonitor m, IReadOnlyList<ISolutionDriver> drivers )
+        protected override BuildResult CreateBuildResult( IActivityMonitor m )
         {
-            foreach( var s in DependentSolutionContext.Solutions )
+            foreach( var (s,driver) in DependentSolutionContext.Solutions )
             {
                 var buildProjectUpgrades = GetBuildProjectUpgrades( s );
-                var driver = drivers[s.Index];
                 if( !driver.UpdatePackageDependencies( m, buildProjectUpgrades ) ) return null;
                 if( !driver.GitRepository.Commit( m, "Updated Build project dependencies.", amendIfPossible: true ) ) return null;
                 _commits[s.Index] = driver.GitRepository.Head.CommitSha;
             }
-            return base.CreateBuildResult( m, drivers );
+            return base.CreateBuildResult( m );
         }
 
         protected override IReadOnlyList<ReleaseNoteInfo> GetReleaseNotes() => _roadmap.GetReleaseNotes();
 
         protected override BuildState Build(
             IActivityMonitor m,
-            IDependentSolution s,
+            DependentSolution s,
             ISolutionDriver driver,
             IReadOnlyList<UpdatePackageInfo> upgrades,
             SVersion sVersion,
@@ -86,7 +83,7 @@ namespace CK.Env
             }
             if( sVersion == null )
             {
-                m.Info( $"Build skipped for {s.UniqueSolutionName}." );
+                m.Info( $"Build skipped for {s.Solution.Name}." );
                 return BuildState.Succeed;
             }
             else

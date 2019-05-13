@@ -1,3 +1,5 @@
+using CK.Core;
+using CK.Env.DependencyModel;
 using CSemVer;
 using System.Collections.Generic;
 
@@ -11,7 +13,7 @@ namespace CK.Env
         /// <summary>
         /// The dependent solution being released.
         /// </summary>
-        IDependentSolution Solution { get; }
+        DependentSolution Solution { get; }
 
         /// <summary>
         /// Gets the <see cref="ReleaseInfo"/> that has already been choosen: <see cref="ReleaseInfo.IsValid"/>
@@ -56,6 +58,13 @@ namespace CK.Env
         /// Gets all the distinct possible versions.
         /// </summary>
         IReadOnlyCollection<CSVersion> AllPossibleVersions { get; }
+
+        /// <summary>
+        /// Gets the set of <see cref="DirectoryDiff"/> for the project folders.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>The set of diff or null on error.</returns>
+        IReadOnlyCollection<DirectoryDiff> GetProjectsDiff( IActivityMonitor m );
 
         /// <summary>
         /// Cancels the current session. It can be restarted later.
