@@ -13,15 +13,11 @@ namespace CKli
             : base( initializer )
         {
             _shared = new HttpClient();
-            initializer.Services.Add( this );
             initializer.Services.Add( _shared );
         }
 
         public HttpClient Shared => _shared;
 
-        void IDisposable.Dispose()
-        {
-            if( _shared != null ) _shared.Dispose();
-        }
+        void IDisposable.Dispose() => _shared.Dispose();
     }
 }

@@ -81,6 +81,20 @@ namespace CK.Env.Plugin
         public event EventHandler<SolutionConfigurationEventArgs> OnSolutionConfiguration;
 
         /// <summary>
+        /// Forces the solution to be reloaded next time <see cref="GetSolution(IActivityMonitor, bool)"/> is called.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        public void SetSolutionDirty( IActivityMonitor m )
+        {
+            if( _sln != null )
+            {
+                _sln.Saved -= OnSolutionSaved;
+                m.Info( $"Solution '{Folder.SubPath}' must be reloaded." );
+                _sln = null;
+            }
+        }
+
+        /// <summary>
         /// Gets the Solution that this driver handles.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
@@ -90,59 +104,73 @@ namespace CK.Env.Plugin
         {
             if( _sln == null || reloadSolution )
             {
-                _isSolutionValid = false;
-                var expectedSolutionName = Folder.SubPath.LastPart;
-                _sln = SolutionFile.Read( monitor, _projectFileContext, BranchPath.AppendPart( expectedSolutionName + ".sln" ) );
-                if( _sln == null ) return null;
-                if( _solution == null )
+                using( monitor.OpenInfo( $"Loading solution '{Folder.SubPath}'." ) )
                 {
-                    _solution = _solutionContext.AddSolution( BranchPath, expectedSolutionName );
-                    foreach( var t in _solutionSpec.ArtifactTargets )
-                    {
-                        _solution.AddArtifactTarget( t );
-                    }
-                }
-                _solution.Tag( _sln );
-                var projectsToRemove = new HashSet<DependencyModel.Project>( _solution.Projects );
-                var orderedProjects = new DependencyModel.Project[_sln.MSProjects.Count];
-                int i = 0;
-                foreach( var p in _sln.MSProjects )
-                {
-                    if( p.ProjectName != p.SolutionRelativeFolderPath.LastPart )
-                    {
-                        monitor.Warn( $"Project named {p.ProjectName} should be in folder of the same name, not in {p.SolutionRelativeFolderPath.LastPart}." );
-                    }
-                    Debug.Assert( p.ProjectFile != null );
-                    var (project,isNewProject) = _solution.AddOrFindProject( p.SolutionRelativeFolderPath, ".Net", p.ProjectName );
-                    project.Tag( p );
-                    if( isNewProject )
-                    {
-                        ConfigureFromSpec( monitor, project, _solutionSpec );
-                    }
-                    SynchronizePackageReferences( monitor, project );
-                    projectsToRemove.Remove( project );
-                    orderedProjects[i++] = project;
-                }
-                foreach( var project in _solution.Projects )
-                {
-                    SynchronizeProjectReferences( monitor, project, msProj => orderedProjects[msProj.MSProjIndex] );
-                }
-                foreach( var noMore in projectsToRemove ) _solution.RemoveProject( noMore );
-
-                _isSolutionValid = true;
-                var h = OnSolutionConfiguration;
-                if( h != null )
-                {
-                    var e = new SolutionConfigurationEventArgs( monitor, _solution );
-                    h( this, e );
-                    if( e.ConfigurationFailed )
-                    {
-                        monitor.Error( "Solution initialization failed: " + e.FailureMessage );
-                        _isSolutionValid = false;
-                    }
+                    LoadSolution( monitor );
                 }
             }
             return _isSolutionValid ? _solution : null;
+        }
+
+        void LoadSolution( IActivityMonitor m )
+        {
+            _isSolutionValid = false;
+            var expectedSolutionName = Folder.SubPath.LastPart;
+            _sln = SolutionFile.Read( m, _projectFileContext, BranchPath.AppendPart( expectedSolutionName + ".sln" ) );
+            if( _sln == null ) return;
+            _sln.Saved += OnSolutionSaved;
+            if( _solution == null )
+            {
+                _solution = _solutionContext.AddSolution( BranchPath, expectedSolutionName );
+                foreach( var t in _solutionSpec.ArtifactTargets )
+                {
+                    _solution.AddArtifactTarget( t );
+                }
+            }
+            _solution.Tag( _sln );
+            var projectsToRemove = new HashSet<DependencyModel.Project>( _solution.Projects );
+            var orderedProjects = new DependencyModel.Project[_sln.MSProjects.Count];
+            int i = 0;
+            foreach( var p in _sln.MSProjects )
+            {
+                if( p.ProjectName != p.SolutionRelativeFolderPath.LastPart )
+                {
+                    m.Warn( $"Project named {p.ProjectName} should be in folder of the same name, not in {p.SolutionRelativeFolderPath.LastPart}." );
+                }
+                Debug.Assert( p.ProjectFile != null );
+                var (project, isNewProject) = _solution.AddOrFindProject( p.SolutionRelativeFolderPath, ".Net", p.ProjectName );
+                project.Tag( p );
+                if( isNewProject )
+                {
+                    ConfigureFromSpec( m, project, _solutionSpec );
+                }
+                SynchronizePackageReferences( m, project );
+                projectsToRemove.Remove( project );
+                orderedProjects[i++] = project;
+            }
+            foreach( var project in _solution.Projects )
+            {
+                SynchronizeProjectReferences( m, project, msProj => orderedProjects[msProj.MSProjIndex] );
+            }
+            foreach( var noMore in projectsToRemove ) _solution.RemoveProject( noMore );
+
+            _isSolutionValid = true;
+            var h = OnSolutionConfiguration;
+            if( h != null )
+            {
+                var e = new SolutionConfigurationEventArgs( m, _solution );
+                h( this, e );
+                if( e.ConfigurationFailed )
+                {
+                    m.Error( "Solution initialization failed: " + e.FailureMessage );
+                    _isSolutionValid = false;
+                }
+            }
+        }
+
+        void OnSolutionSaved( object sender, EventMonitoredArgs e )
+        {
+            SetSolutionDirty( e.Monitor );
         }
 
         static void ConfigureFromSpec( IActivityMonitor m, DependencyModel.Project project, SolutionSpec spec )

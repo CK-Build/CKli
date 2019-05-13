@@ -1,25 +1,24 @@
 using CK.Env;
 using CK.Core;
+using System.Net.Http;
 
 namespace CKli
 {
     public class XCKSetupClient : XTypedObject
     {
-        readonly XSharedHttpClient _sharedHttpClient;
-        readonly CKSetupClient _client;
+       readonly CKSetupClient _client;
 
         public XCKSetupClient(
-            XSharedHttpClient sharedHttpClient,
+            HttpClient sharedHttpClient,
             ISecretKeyStore secretKeyStore,
-            XArtifactCenter artifact,
+            ArtifactCenter artifact,
             FileSystem fs,
             Initializer initializer )
             : base( initializer )
         {
-            _sharedHttpClient = sharedHttpClient;
-            _client = new CKSetupClient( secretKeyStore, sharedHttpClient.Shared );
+            _client = new CKSetupClient( secretKeyStore, sharedHttpClient );
             fs.ServiceContainer.Add( _client );
-            artifact.ArtifactCenter.Add( _client );
+            artifact.Add( _client );
             initializer.Services.Add( this );
         }
 

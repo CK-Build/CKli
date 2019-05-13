@@ -209,11 +209,10 @@ namespace CK.Env
         public IWorldName WorldName { get; }
 
         /// <summary>
-        /// Initializes (or simply dumps) this world state.
+        /// Initializes this world state by loading the local state.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
-        [CommandMethod( confirmationRequired: false )]
         public bool Initialize( IActivityMonitor monitor )
         {
             bool alreadyInitialized = _rawState != null;
@@ -223,22 +222,7 @@ namespace CK.Env
                 SetReadonlyState();
                 _rawState.Document.Changed += RawStateChanged;
             }
-            return RunSafe( monitor, alreadyInitialized ? "World Status." : "Initializing World.", ( m, error ) =>
-             {
-                 var ev = new EventMonitoredArgs( monitor );
-                 if( alreadyInitialized )
-                 {
-                     DumpWorldStatus?.Invoke( this, ev );
-                 }
-                 else
-                 {
-                     Initializing?.Invoke( this, ev );
-                     if( !error() )
-                     {
-                         Initialized?.Invoke( this, ev );
-                     }
-                 }
-             } );
+            return true;
         }
 
         /// <summary>
@@ -246,72 +230,6 @@ namespace CK.Env
         /// Empty until <see cref="Initialize"/> has been called.
         /// </summary>
         public IReadOnlyCollection<ISolutionDriver> SolutionDrivers => _solutionDrivers;
-
-        ///// <summary>
-        ///// Finds the <see cref="ISolutionDriver"/> given a branch and a solution name that can be
-        ///// a primary or a secondary solution.
-        ///// </summary>
-        ///// <param name="monitor">The monitor to use.</param>
-        ///// <param name="uniqueSolutionName">Solution name.</param>
-        ///// <param name="branchName">Branch name.</param>
-        ///// <param name="throwOnNotFound">
-        ///// False to return null and log an error instead of throwing an InvalidOperatioException.
-        ///// </param>
-        ///// <returns>The driver or null if not found.</returns>
-        //public ISolutionDriver FindSolutionDriver( IActivityMonitor monitor, string uniqueSolutionName, string branchName, bool throwOnNotFound = true )
-        //{
-        //    if( String.IsNullOrWhiteSpace( uniqueSolutionName ) ) throw new ArgumentNullException( nameof( uniqueSolutionName ) );
-        //    if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
-        //    if( !_cacheBySolutionName.TryGetValue( branchName + ':' + uniqueSolutionName, out var driver ) )
-        //    {
-        //        string primary = uniqueSolutionName;
-        //        int idx = uniqueSolutionName.IndexOf( '/' );
-        //        if( idx == 0 ) throw new ArgumentException( "Invalid solution name.", nameof( uniqueSolutionName ) );
-        //        if( idx > 0 ) primary = uniqueSolutionName.Substring( 0, idx );
-        //        driver = _solutionDrivers.FirstOrDefault( d => d.BranchName == branchName && d.GitRepository.PrimarySolutionName == primary );
-        //        if( driver != null )
-        //        {
-        //            Debug.Assert( driver.GetSolutionNames( monitor ).Contains( primary ) );
-        //            foreach( var n in driver.GetSolutionNames( monitor ) )
-        //            {
-        //                _cacheBySolutionName.Add( branchName + ':' + n, driver );
-        //            }
-        //        }
-        //        else if( throwOnNotFound )
-        //        {
-        //            throw new InvalidOperationException( $"Unable to find driver for '{uniqueSolutionName}' in branch {branchName}." );
-        //        }
-        //    }
-        //    return driver;
-        //}
-
-        ///// <summary>
-        ///// Finds the <see cref="ISolutionDriver"/> for a <see cref="DependentSolution"/>.
-        ///// </summary>
-        ///// <param name="monitor">The monitor to use.</param>
-        ///// <param name="solution">Solution.</param>
-        ///// <param name="throwOnNotFound">
-        ///// False to return null and log an error instead of throwing an InvalidOperatioException.
-        ///// </param>
-        ///// <returns>The driver or null if not found.</returns>
-        //public ISolutionDriver FindSolutionDriver( IActivityMonitor monitor, DependentSolution solution, bool throwOnNotFound = true )
-        //{
-        //    if( solution == null ) throw new ArgumentNullException( nameof( solution ) );
-        //    return FindSolutionDriver( monitor, solution.UniqueSolutionName, solution.BranchName, throwOnNotFound );
-        //}
-
-        ///// <summary>
-        ///// Helper for external components.
-        ///// This throws an exception if the driver is not found.
-        ///// </summary>
-        ///// <param name="monitor">The monitor to use.</param>
-        ///// <param name="depContext">The current dependency context.</param>
-        ///// <param name="solutionName">Solution name.</param>
-        ///// <returns>The driver.</returns>
-        //public ISolutionDriver DriverFinder( IActivityMonitor monitor, SolutionDependencyContext depContext, string solutionName )
-        //{
-        //    return FindSolutionDriver( monitor, solutionName, depContext.UniqueBranchName, true );
-        //}
 
         bool RunSafe( IActivityMonitor m, string message, Action<IActivityMonitor, Func<bool>> action )
         {

@@ -8,18 +8,18 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace CK.Env.Plugin.SolutionFiles
+namespace CK.Env.Plugin
 {
     public class CodeCakeBuilderFolder : PluginFolderBase
     {
         readonly SolutionDriver _driver;
-        readonly ISharedSolutionSpec _settings;
+        readonly SolutionSpec _solutionSpec;
 
-        public CodeCakeBuilderFolder( GitFolder f, SolutionDriver driver, ISharedSolutionSpec settings, NormalizedPath branchPath )
+        public CodeCakeBuilderFolder( GitFolder f, SolutionDriver driver, SolutionSpec settings, NormalizedPath branchPath )
             : base( f, branchPath, "CodecakeBuilder" )
         {
             _driver = driver;
-            _settings = settings;
+            _solutionSpec = settings;
         }
 
         protected override void DoApplySettings( IActivityMonitor m )
@@ -84,7 +84,7 @@ namespace CK.Env.Plugin.SolutionFiles
                     DeleteFile( m, "dotnet/Build.NuGetHelper.cs" );
                     DeleteFile( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
                 }
-                if( _settings.NoDotNetUnitTests )
+                if( _solutionSpec.NoDotNetUnitTests )
                 {
                     m.Info( "Removing Build.StandardUnitTests since NoDotNetUnitTests is true." );
                     DeleteFile( m, "dotnet/Build.StandardUnitTests.cs" );
@@ -155,7 +155,7 @@ namespace CK.Env.Plugin.SolutionFiles
             StringBuilder b = new StringBuilder();
             b.AppendLine( "return new NuGetHelper.NuGetFeed[]{" );
             bool atLeastOne = false;
-            foreach( var info in _settings.ArtifactTargets.Select( a => a.Info ).OfType<INuGetFeedInfo>() )
+            foreach( var info in _solutionSpec.ArtifactTargets.Select( a => a.Info ).OfType<INuGetFeedInfo>() )
             {
                 b.AppendLine( atLeastOne ? "," : "" );
                 atLeastOne = true;

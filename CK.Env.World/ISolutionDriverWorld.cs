@@ -14,7 +14,7 @@ namespace CK.Env
         GlobalWorkStatus? WorkStatus { get; }
 
         /// <summary>
-        /// Registers a new driver, providing him the <see cref="SolutionContext"/> to use.
+        /// Registers a new driver and provides him the <see cref="SolutionContext"/> to use.
         /// </summary>
         /// <param name="driver">The driver.</param>
         /// <returns>The solution context into which the solution must be created.</returns>

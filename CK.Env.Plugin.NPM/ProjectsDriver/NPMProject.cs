@@ -26,6 +26,7 @@ namespace CK.Env.Plugin
             FullPath = Driver.BranchPath.Combine( spec.Folder );
             _packageFile = new PackageJsonFile( this );
             _status = RefreshStatus( m );
+            _packageFile.OnSavedOrDeleted += (s,e) => driver.SetSolutionDirty( e.Monitor );
         }
 
         /// <summary>
@@ -111,7 +112,6 @@ namespace CK.Env.Plugin
             }
         }
 
-
         internal void SynchronizePackageReferences( IActivityMonitor m )
         {
             var toRemove = new HashSet<Artifact>( _project.PackageReferences.Select( r => r.Target.Artifact ) );
@@ -153,7 +153,6 @@ namespace CK.Env.Plugin
             foreach( var noMore in toRemove ) _project.RemoveProjectReference( noMore );
             return true;
         }
-
 
         public override string ToString() => _packageFile.ToString();
     }

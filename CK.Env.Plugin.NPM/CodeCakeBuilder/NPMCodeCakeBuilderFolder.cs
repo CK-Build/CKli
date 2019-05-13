@@ -22,6 +22,12 @@ namespace CK.Env.Plugin
             _driver = driver;
         }
 
+        /// <summary>
+        /// Gets the name of this command: it is "<see cref="FolderPath"/>(NPM)".
+        /// </summary>
+        /// <returns>The command name.</returns>
+        protected override NormalizedPath GetCommandProviderName() => FolderPath.AppendPart( "(NPM)" );
+
         protected override void DoApplySettings( IActivityMonitor m )
         {
             var solution = _driver.GetSolution( m );

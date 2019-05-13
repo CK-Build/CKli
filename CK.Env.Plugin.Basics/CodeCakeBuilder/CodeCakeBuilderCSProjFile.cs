@@ -6,19 +6,19 @@ using CSemVer;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace CK.Env.Plugin.SolutionFiles
+namespace CK.Env.Plugin
 {
     public class CodeCakeBuilderCSProjFile : XmlFilePluginBase, ICommandMethodsProvider
     {
         readonly CodeCakeBuilderFolder _f;
-        readonly ISharedSolutionSpec _settings;
+        readonly SolutionSpec _solutionSpec;
         readonly SolutionDriver _solutionDriver;
 
-        public CodeCakeBuilderCSProjFile( CodeCakeBuilderFolder f, ISharedSolutionSpec settings, NormalizedPath branchPath, SolutionDriver solutionDriver )
+        public CodeCakeBuilderCSProjFile( CodeCakeBuilderFolder f, SolutionSpec solutionSpec, NormalizedPath branchPath, SolutionDriver solutionDriver )
             : base( f.Folder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" ) )
         {
             _f = f;
-            _settings = settings;
+            _solutionSpec = solutionSpec;
             _solutionDriver = solutionDriver;
         }
 
@@ -73,7 +73,7 @@ namespace CK.Env.Plugin.SolutionFiles
             DeleteProjectReference( "Code.Cake" ); //imported by SimpleGitVersion.Cake
             DeleteProjectReference( "Cake.Common" ); //imported by Code.Cake
             DeleteProjectReference( "Cake.Core" ); //imported by Cake.Common
-            if( !_settings.NoDotNetUnitTests )
+            if( !_solutionSpec.NoDotNetUnitTests )
             {
                 EnsureProjectReference( "NUnit.ConsoleRunner", "3.9.0" );
                 EnsureProjectReference( "NUnit.Runners.Net4", "2.6.4" );

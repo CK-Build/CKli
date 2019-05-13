@@ -14,14 +14,14 @@ namespace CK.Env.Plugin
     /// </summary>
     public class NPMRCFiles : GitBranchPluginBase, ICommandMethodsProvider
     {
-        readonly ISharedSolutionSpec _settings;
+        readonly SolutionSpec _solutionSpec;
         readonly NPMProjectsDriver _driver;
         readonly ISecretKeyStore _secretStore;
 
-        public NPMRCFiles( GitFolder f, NPMProjectsDriver driver, ISecretKeyStore secretStore, ISharedSolutionSpec settings, NormalizedPath branchPath )
+        public NPMRCFiles( GitFolder f, NPMProjectsDriver driver, ISecretKeyStore secretStore, SolutionSpec solutionSpec, NormalizedPath branchPath )
             : base( f, branchPath )
         {
-            _settings = settings;
+            _solutionSpec = solutionSpec;
             _driver = driver;
             _secretStore = secretStore;
         }
@@ -93,7 +93,7 @@ namespace CK.Env.Plugin
                                             : new Line( l.Value ) )
                             .ToList();
 
-            foreach( var s in _settings.NPMSources )
+            foreach( var s in _solutionSpec.NPMSources )
             {
                 EnsureLine( lines, s.Scope, "registry", s.Url );
 
@@ -127,7 +127,7 @@ namespace CK.Env.Plugin
                 }
             }
             EnsureLine( lines, "git-tag-version", "false" );
-            lines.RemoveAll( line => line.Scope != null && _settings.RemoveNPMScopeNames.Contains( line.Scope ) );
+            lines.RemoveAll( line => line.Scope != null && _solutionSpec.RemoveNPMScopeNames.Contains( line.Scope ) );
             Folder.FileSystem.CopyTo( m, lines.Select( l => l.ToString() ).Concatenate( "\r\n" ), f );
         }
 

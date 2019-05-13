@@ -59,7 +59,7 @@ namespace CK.Env.DependencyModel
 
         /// <summary>
         /// Gets whether this project must be packed, ie. it is used as a package
-        /// by actual build projects: ant project that is not a <see cref="IProject.IsBuildProject"/>
+        /// by actual build projects: any project that is not a <see cref="IProject.IsBuildProject"/>
         /// must be packed.
         /// </summary>
         public bool MustPack => !Project.IsBuildProject;

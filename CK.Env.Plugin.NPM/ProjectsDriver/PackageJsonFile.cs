@@ -114,6 +114,11 @@ namespace CK.Env.Plugin
         /// <returns>A readable string.</returns>
         public override string ToString() => IsPublished ? Name : $"{SafeName} (unpublished)";
 
+        protected override void OnSaved( IActivityMonitor m )
+        {
+            base.OnSaved( m );
+        }
+
         internal NPMProjectStatus Refresh( IActivityMonitor m )
         {
             _deps.Clear();

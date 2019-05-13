@@ -4,16 +4,16 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace CK.Env.Plugin.SolutionFiles
+namespace CK.Env.Plugin
 {
     public class GitIgnoreFile : TextFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
-        readonly ISharedSolutionSpec _settings;
+        readonly SolutionSpec _solutionSpec;
 
-        public GitIgnoreFile( GitFolder f, ISharedSolutionSpec settings, NormalizedPath branchPath )
+        public GitIgnoreFile( GitFolder f, SolutionSpec solutionSpec, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( ".gitignore" ) )
         {
-            _settings = settings;
+            _solutionSpec = solutionSpec;
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
@@ -36,7 +36,7 @@ namespace CK.Env.Plugin.SolutionFiles
             EnsureLine( GetLines(), "*.suo" );
             EnsureLine( GetLines(), "*.user" );
 
-            if( !_settings.NoDotNetUnitTests )
+            if( !_solutionSpec.NoDotNetUnitTests )
             {
                 EnsureLine( GetLines(), "Tests/**/TestResult*.xml" );
                 EnsureLine( GetLines(), "CodeCakeBuilder/UnitTestsDone.*.txt" );

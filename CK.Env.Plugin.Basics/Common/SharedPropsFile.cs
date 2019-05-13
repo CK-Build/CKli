@@ -3,18 +3,18 @@ using CK.Text;
 using System.Linq;
 using System.Xml.Linq;
 
-namespace CK.Env.Plugin.SolutionFiles
+namespace CK.Env.Plugin
 {
     public class SharedPropsFile : XmlFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly CommonFolder _commonFolder;
-        readonly ISharedSolutionSpec _settings;
+        readonly SolutionSpec _solutionSpec;
 
-        public SharedPropsFile( CommonFolder f, ISharedSolutionSpec settings, NormalizedPath branchPath )
+        public SharedPropsFile( CommonFolder f, SolutionSpec solutionSpec, NormalizedPath branchPath )
             : base( f.Folder, branchPath, f.FolderPath.AppendPart( "Shared.props" ) )
         {
             _commonFolder = f;
-            _settings = settings;
+            _solutionSpec = solutionSpec;
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => BranchPath;
@@ -24,7 +24,7 @@ namespace CK.Env.Plugin.SolutionFiles
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
         {
-            if( _settings.NoSharedPropsFile )
+            if( _solutionSpec.NoSharedPropsFile )
             {
                 Delete( m );
                 return;
@@ -73,7 +73,7 @@ namespace CK.Env.Plugin.SolutionFiles
                             new XComment( "Removes annoying Pack warning: The package version ... uses SemVer 2.0.0 or components of SemVer 1.0.0 that are not supported on legacy clients..." ),
                             new XElement( "NoWarn", "NU5105" ) );
 
-            if( !_settings.NoStrongNameSigning )
+            if( !_solutionSpec.NoStrongNameSigning )
             {
                 p.Add( new XElement( "AssemblyOriginatorKeyFile", "$(MSBuildThisFileDirectory)SharedKey.snk" ),
                        new XElement( "SignAssembly", true ),
@@ -176,7 +176,7 @@ namespace CK.Env.Plugin.SolutionFiles
 
         void HandleSourceLink( IActivityMonitor m )
         {
-            if( _settings.DisableSourceLink )
+            if( _solutionSpec.DisableSourceLink )
             {
                 XCommentSection.FindOrCreate( Document.Root, "SourceLink", false )?.Remove();
             }

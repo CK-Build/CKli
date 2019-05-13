@@ -1,5 +1,7 @@
 using CK.Core;
 using CK.Env;
+using CK.Env.NPM;
+using CK.Env.Plugin;
 using CK.NuGetClient;
 using CK.Text;
 using CKSetup;
@@ -8,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 
 namespace CKli
 {
@@ -15,17 +18,18 @@ namespace CKli
     {
         static readonly NormalizedPath _localNuGetCache = Path.GetFullPath( Environment.ExpandEnvironmentVariables( "%UserProfile%/.nuget/packages/" ) );
 
-        readonly XSharedHttpClient _http;
+        readonly HttpClient _http;
         readonly FileSystem _fs;
 
         public XLocalFeedProvider(
             Initializer initializer,
             FileSystem fs,
-            XSharedHttpClient http )
+            HttpClient http )
             : base( initializer )
         {
             _fs = fs;
             _fs.ServiceContainer.Add<IEnvLocalFeedProvider>( this );
+            initializer.Services.Add<IEnvLocalFeedProvider>( this );
             initializer.Services.Add( this );
             _http = http;
             var feedRoot = fs.Root.AppendPart( "LocalFeed" );
@@ -98,7 +102,7 @@ namespace CKli
                     {
                         if( GetPackageFile( m, n.Artifact.Name, n.Version ) == null ) missing.Add( n );
                     }
-                    else if( n.Artifact.Type == LocalNPMPackageFile.NPMType )
+                    else if( n.Artifact.Type == NPMClient.NPMType )
                     {
                         if( GetNPMPackageFile( m, n.Artifact.Name, n.Version ) == null ) missing.Add( n );
                     }
@@ -128,7 +132,7 @@ namespace CKli
                     string localStore = this.GetCKSetupStorePath();
                     return target.PushAsync( m, new CKSetupArtifactLocalSet( artifacts, localStore ) ).GetAwaiter().GetResult();
                 }
-                else if( target.HandleArtifactType( LocalNPMPackageFile.NPMType ) )
+                else if( target.HandleArtifactType( NPMClient.NPMType ) )
                 {
                     var locals = new List<LocalNPMPackageFile>();
                     foreach( var a in artifacts )
@@ -145,8 +149,7 @@ namespace CKli
                 }
                 else
                 {
-                    // throw new InvalidOperationException( $"Unhandled repository type: {target.Info.UniqueArtifactRepositoryName}" );
-                    return true;
+                    throw new InvalidOperationException( $"Unhandled repository type: {target.Info.UniqueArtifactRepositoryName}" );
                 }
             }
 

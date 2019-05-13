@@ -5,8 +5,9 @@
   <LocalFeedProvider />
   <CKEnvKeyVault />
   <NuGetClient />
+  <NPMClient />
   <CKSetupClient />
-  <SolutionCentral />
+  <WorldState />
 
   <ArtifactRepositories>
     <Repository Type="NuGetAzure"
@@ -24,7 +25,7 @@
                 CheckSecretKeyName="CKSETUPREMOTESTORE_CKENVTEST_PUSH_API_KEY" />
   </ArtifactRepositories>
 
-  <SolutionSettings>
+  <SharedSolutionSpec>
     <NuGetSources>
       <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json" >
         <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
@@ -44,74 +45,80 @@
       <add Name="CKSetup:CKEnvTest" />
     </ArtifactTargets>
     <Plugins>
-      <add Type="CK.Env.Plugin.SolutionDriver, CK.Env.Plugin" />
-      <add Type="CK.Env.Plugin.SolutionFiles.CodeCakeBuilderFolder, CK.Env.Plugin" />
-      <add Type="CK.Env.Plugin.SolutionFiles.CodeCakeBuilderCSProjFile, CK.Env.Plugin" />
-      <add Type="CK.Env.Plugin.SolutionFiles.CodeCakeBuilderKeyVaultFile, CK.Env.Plugin" />
-      <add Type="CK.Env.Plugin.SolutionFiles.CommonFolder, CK.Env.Plugin" />
-      <add Type="CK.Env.Plugin.SolutionFiles.SharedPropsFile, CK.Env.Plugin" />
-      <add Type="CK.Env.Plugin.SolutionFiles.CKSetupStoreTestHelperConfigFile, CK.Env.Plugin" />
-      <add Type="CK.Env.Plugin.SolutionFiles.RepositoryXmlFile, CK.Env.Plugin" />
-      <add Type="CK.Env.Plugin.SolutionFiles.NugetConfigFile, CK.Env.Plugin" />
-      <add Type="CK.Env.Plugin.SolutionFiles.GitIgnoreFile, CK.Env.Plugin" />
-      <add Type="CK.Env.Plugin.SolutionFiles.CodeCakeBuilderNPMSolutionFile, CK.Env.Plugin" />
-      <add Type="CK.Env.Plugin.SolutionFiles.SolutionFolder, CK.Env.Plugin" />
+      <add Type="CK.Env.Plugin.SolutionDriver, CK.Env.Plugin.SolutionDriver" />
+      
+      <add Type="CK.Env.Plugin.CodeCakeBuilderFolder, CK.Env.Plugin.Basics" />
+      <add Type="CK.Env.Plugin.CodeCakeBuilderCSProjFile, CK.Env.Plugin.Basics" />
+      <add Type="CK.Env.Plugin.CodeCakeBuilderKeyVaultFile, CK.Env.Plugin.Basics" />
+      
+      <add Type="CK.Env.Plugin.CommonFolder, CK.Env.Plugin.Basics" />
+      <add Type="CK.Env.Plugin.SharedPropsFile, CK.Env.Plugin.Basics" />
+      <add Type="CK.Env.Plugin.SolutionFolder, CK.Env.Plugin.Basics" />
+      
+      <add Type="CK.Env.Plugin.GitIgnoreFile, CK.Env.Plugin.Basics" />
+      <add Type="CK.Env.Plugin.NugetConfigFile, CK.Env.Plugin.Basics" />
+      <add Type="CK.Env.Plugin.RepositoryXmlFile, CK.Env.Plugin.Basics" />
+      
+      <add Type="CK.Env.Plugin.CKSetupStoreTestHelperConfigFile, CK.Env.Plugin.Basics" />
+      
+      <add Type="CK.Env.Plugin.NPMProjectsDriver, CK.Env.Plugin.NPM" />
+      <add Type="CK.Env.Plugin.NPMCodeCakeBuilderFolder, CK.Env.Plugin.NPM" />
+      <add Type="CK.Env.Plugin.NPMRCFiles, CK.Env.Plugin.NPM" />
+      <add Type="CK.Env.Plugin.NPMSolutionFile, CK.Env.Plugin.NPM" />
+      
 
-      <add Type="CK.BuildSystem.Appveyor.AppveyorFile, CK.BuildSystem.Appveyor" />
-      <add Type="CK.BuildSystem.GitLab.GitLabFile, CK.BuildSystem.GitLab" />
+      <add Type="CK.Env.Plugin.AppveyorFile, CK.Env.Plugin.Appveyor" />
+      <add Type="CK.Env.Plugin.GitLabFile, CK.Env.Plugin.GitLab" />
     </Plugins>
-  </SolutionSettings>
+  </SharedSolutionSpec>
 
   <Folder Name="Projects">
     
     <GitFolder Name="CK-UnitsOfMeasure" Url="https://github.com/Invenietis/CK-UnitsOfMeasure.git">
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
     
     <GitFolder Name="CodeCake" Url="https://github.com/SimpleGitVersion/CodeCake.git">
-      <SolutionSettings NoDotNetUnitTests="true" NoStrongNameSigning="true" />
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec NoDotNetUnitTests="true" NoStrongNameSigning="true" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-ActivityMonitor" Url="https://github.com/Invenietis/CK-ActivityMonitor.git">
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Monitoring" Url="https://github.com/Invenietis/CK-Monitoring.git">
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
     
     <GitFolder Name="CK-Core" Url="https://github.com/Invenietis/CK-Core.git">
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
     
     <GitFolder Name="SGV-Net" Url="https://github.com/SimpleGitVersion/SGV-Net.git">
-      <SolutionSettings DisableSourceLink="true" />
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec DisableSourceLink="true"  />
       </Branch>
     </GitFolder>
 
-
     <GitFolder Name="CK-Text" Url="https://github.com/Invenietis/CK-Text.git">
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CSemVer-Net" Url="https://github.com/SimpleGitVersion/CSemVer-Net.git">
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
 

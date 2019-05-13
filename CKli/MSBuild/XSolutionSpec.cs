@@ -15,11 +15,11 @@ namespace CKli
     /// </summary>
     public class XSolutionSpec : XPathItem
     {
-        protected XSolutionSpec(
+        public XSolutionSpec(
             Initializer initializer,
             XBranch branch,
-            XSharedSolutionSpec sharedSpec,
-            NormalizedPath branchBasedSolutionFilePath )
+            SharedSolutionSpec sharedSpec,
+            ArtifactCenter artifactCenter )
             : base( initializer,
                     branch.FileSystem,
                     FileSystemItemKind.File,
@@ -29,7 +29,7 @@ namespace CKli
 
             // The XSolutionSpec is available to siblings (ie. up to the end of the parent git branch).
             initializer.Services.Add( this );
-            SolutionSpec = new SolutionSpec( sharedSpec.SharedSpec, sharedSpec.ArtifactCenter, initializer.Element );
+            SolutionSpec = new SolutionSpec( sharedSpec, artifactCenter, initializer.Element );
             // Registers the SolutionSpec as a branch settings: the Solution specifications becomes
             // available to any of this branch plugins.
             branch.Parent.GitFolder.PluginManager.RegisterSettings( SolutionSpec, branch.Name );

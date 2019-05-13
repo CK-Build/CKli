@@ -7,34 +7,31 @@ namespace CKli
 
     /// <summary>
     /// Required shared solution specification.
-    /// The first occurrence injects a <see cref="SolutionContext"/>
+    /// The first occurrence injects a <see cref="SharedSolutionSpec"/>, subsequent occurrences
+    /// injects a modified clone.
     /// </summary>
     public class XSharedSolutionSpec : XTypedObject
     {
         public XSharedSolutionSpec(
             Initializer initializer,
-            XArtifactCenter artifactCenter,
+            ArtifactCenter artifactCenter,
             FileSystem fs,
-            XSharedSolutionSpec previous = null )
+            SharedSolutionSpec previous = null )
             : base( initializer )
         {
             if( previous != null )
             {
-                SharedSpec = new SharedSolutionSpec( previous.SharedSpec, artifactCenter.ArtifactCenter, initializer.Element );
-                initializer.Services.Remove<XSharedSolutionSpec>();
+                SharedSpec = new SharedSolutionSpec( previous, artifactCenter, initializer.Element );
+                initializer.Services.Remove<SharedSolutionSpec>();
             }
             else
             {
-                SharedSpec = new SharedSolutionSpec( initializer.Element, artifactCenter.ArtifactCenter );
-                new SolutionContext(); 
+                SharedSpec = new SharedSolutionSpec( initializer.Element, artifactCenter );
             }
-            ArtifactCenter = artifactCenter.ArtifactCenter;
-            initializer.Services.Add( this );
+            initializer.Services.Add( SharedSpec );
         }
 
-        public ArtifactCenter ArtifactCenter { get; }
-
-        public ISharedSolutionSpec SharedSpec { get; }
+        public SharedSolutionSpec SharedSpec { get; }
 
     }
 }

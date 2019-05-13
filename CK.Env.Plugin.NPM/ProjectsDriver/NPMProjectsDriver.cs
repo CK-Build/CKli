@@ -19,10 +19,17 @@ namespace CK.Env.Plugin
             : base( f, branchPath )
         {
             _driver = driver;
+            _spec = spec;
             _driver.OnSolutionConfiguration += OnSolutionConfiguration;
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => BranchPath.AppendPart( nameof( NPMProjectsDriver ) );
+
+        /// <summary>
+        /// Forces the solution to be reloaded.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        public void SetSolutionDirty( IActivityMonitor m ) => _driver.SetSolutionDirty( m );
 
         void OnSolutionConfiguration( object sender, SolutionConfigurationEventArgs e )
         {
@@ -51,49 +58,6 @@ namespace CK.Env.Plugin
                     e.PreventSolutionUse( "NPM project path relative error." );
                 }
             }
-        }
-
-        static void SynchronizePackageReferences( IActivityMonitor m, Project project )
-        {
-            var toRemove = new HashSet<Artifact>( project.PackageReferences.Select( r => r.Target.Artifact ) );
-            var p = project.Tag<NPMProject>();
-            foreach( var dep in p.PackageJson.Dependencies )
-            {
-                if( dep.MinVersion == null && dep.Type != NPMVersionDependencyType.LocalPath )
-                {
-                    m.Warn( $"Unable to handle NPM {dep.Kind.ToPackageJsonKey()} '{dep.RawDep}' in {p.PackageJson.FilePath}. Only Simple version and file: relative paths are handled." );
-                }
-                if( dep.MinVersion == null )
-                {
-                    var instance = new Artifact( NPMClient.NPMType, dep.Name ).WithVersion( dep.MinVersion );
-                    toRemove.Remove( instance.Artifact );
-                    project.EnsurePackageReference( instance, dep.Kind );
-                }
-            }
-            foreach( var noMore in toRemove ) project.RemovePackageReference( noMore );
-        }
-
-        static bool SynchronizeProjectReferences( IActivityMonitor m, Project project, Func<NormalizedPath, Project> depsFinder )
-        {
-            var p = project.Tag<NPMProject>();
-            var toRemove = new HashSet<IProject>( project.ProjectReferences.Select( r => r.Target ) );
-            foreach( var dep in p.PackageJson.Dependencies )
-            {
-                if( dep.Type == NPMVersionDependencyType.LocalPath )
-                {
-                    var path = project.SolutionRelativeFolderPath.Combine( dep.RawDep.Substring( "file:".Length ) );
-                    var mapped = depsFinder( path );
-                    if( mapped == null )
-                    {
-                        m.Error( $"Unable to resolve local reference to project '{dep.RawDep}' in {p.PackageJson}." );
-                        return false;
-                    }
-                    project.EnsureProjectReference( mapped, dep.Kind );
-                    toRemove.Remove( mapped );
-                }
-            }
-            foreach( var noMore in toRemove ) project.RemoveProjectReference( noMore );
-            return true;
         }
 
         bool ReadNPMProjects( IActivityMonitor m )

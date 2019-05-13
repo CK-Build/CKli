@@ -4,7 +4,7 @@ using CK.Text;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace CK.Env.Plugin.SolutionFiles
+namespace CK.Env.Plugin
 {
     public class CodeCakeBuilderKeyVaultFile : TextFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {

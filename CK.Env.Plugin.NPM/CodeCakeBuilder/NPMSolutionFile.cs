@@ -13,7 +13,6 @@ namespace CK.Env.Plugin
         
         public NPMSolutionFile(
             NPMCodeCakeBuilderFolder f,
-            ISharedSolutionSpec settings,
             NPMProjectsDriver driver,
             NormalizedPath branchPath )
             : base( f.Folder, branchPath, f.FolderPath.AppendPart( "NPMSolution.xml" ) )

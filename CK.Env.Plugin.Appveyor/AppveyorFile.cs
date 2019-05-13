@@ -1,16 +1,14 @@
 using CK.Core;
-using CK.Env;
-using CK.Env.Plugin;
 using CK.Text;
 using SharpYaml.Model;
 using System.Linq;
 
-namespace CK.BuildSystem.Appveyor
+namespace CK.Env.Plugin
 {
     public class AppveyorFile : YamlFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly SolutionDriver _driver;
-        readonly SolutionSpec _settings;
+        readonly SolutionSpec _solutionSpec;
         readonly ISecretKeyStore _secretStore;
 
 
@@ -18,7 +16,7 @@ namespace CK.BuildSystem.Appveyor
             : base( f, branchPath, branchPath.AppendPart( "appveyor.yml" ) )
         {
             _driver = driver;
-            _settings = settings;
+            _solutionSpec = settings;
             _secretStore = secretStore;
         }
 
@@ -66,15 +64,15 @@ namespace CK.BuildSystem.Appveyor
             env.Remove( "AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" );
             env.Remove( "AZURE_FEED_PAT" );
             env.Remove( "VSS_NUGET_EXTERNAL_FEED_ENDPOINTS" );
-            if( _settings.SqlServer != null )
+            if( _solutionSpec.SqlServer != null )
             {
-                env["SqlServer/MasterConnectionString"] = new YamlValue( $"Server=(local)\\SQL{_settings.SqlServer.ToUpperInvariant()};Database=master;User ID=sa;Password=Password12!" );
+                env["SqlServer/MasterConnectionString"] = new YamlValue( $"Server=(local)\\SQL{_solutionSpec.SqlServer.ToUpperInvariant()};Database=master;User ID=sa;Password=Password12!" );
             }
             //
             firstMapping.Remove( new YamlValue( "init" ) );
-            if( _settings.SqlServer != null )
+            if( _solutionSpec.SqlServer != null )
             {
-                firstMapping["services"] = new YamlValue( "mssql" + _settings.SqlServer.ToLowerInvariant() );
+                firstMapping["services"] = new YamlValue( "mssql" + _solutionSpec.SqlServer.ToLowerInvariant() );
             }
             var install = new YamlSequence
             {

@@ -35,11 +35,6 @@ namespace CK.Env
         void CreateBranch( IActivityMonitor m, string branchName, string commitHash );
 
         /// <summary>
-        /// Gets the name of the Git folder that is the name of the primary solution (by convention and by design).
-        /// </summary>
-        string PrimarySolutionName { get; }
-
-        /// <summary>
         /// Gets the full physical path of the Git folder.
         /// </summary>
         NormalizedPath FullPhysicalPath { get; }

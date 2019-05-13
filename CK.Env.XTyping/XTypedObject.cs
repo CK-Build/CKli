@@ -225,16 +225,20 @@ namespace CK.Env
             {
                 var c = children[i];
                 c.NextSibling = sibling;
-                c.OnSiblingsCreated( initializer.Monitor );
                 sibling = c;
             }
             Children = children;
+            foreach( var c in children )
+            {
+                c.OnSiblingsCreated( initializer.Monitor );
+            }
             return OnCreated( initializer );
         }
 
         /// <summary>
         /// Called once <see cref="NextSibling"/> is available (and all the siblings up to the last child
         /// of the <see cref="Parent"/>.
+        /// This default implementation simply returns true.
         /// </summary>
         /// <param name="monitor">Monitor that must be used to log any information.</param>
         /// <returns>Must return true on success, false if an error occured.</returns>

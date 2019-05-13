@@ -4,11 +4,12 @@ using CK.Text;
 using CK.Core;
 using SharpYaml.Model;
 
-namespace CK.BuildSystem.GitLab
+namespace CK.Env.Plugin
 {
     public class GitLabFile : YamlFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
-        public GitLabFile( GitFolder f, NormalizedPath branchPath ) : base( f, branchPath, branchPath.AppendPart( ".gitlab-ci.yml" ) )
+        public GitLabFile( GitFolder f, NormalizedPath branchPath )
+            : base( f, branchPath, branchPath.AppendPart( ".gitlab-ci.yml" ) )
         {
         }
 

@@ -4,21 +4,21 @@ using System;
 using System.Linq;
 using System.Xml.Linq;
 
-namespace CK.Env.Plugin.SolutionFiles
+namespace CK.Env.Plugin
 {
     public class NugetConfigFile : XmlFilePluginBase, IDisposable, IGitBranchPlugin, ICommandMethodsProvider
     {
-        readonly ISharedSolutionSpec _settings;
+        readonly SolutionSpec _solutionSpec;
         readonly IEnvLocalFeedProvider _localFeedProvider;
         readonly SolutionDriver _solutionDriver;
         readonly ISecretKeyStore _secretStore;
         XElement _packageSources;
 
-        public NugetConfigFile( GitFolder f, SolutionDriver driver, IEnvLocalFeedProvider localFeedProvider, ISecretKeyStore secretStore, ISharedSolutionSpec s, NormalizedPath branchPath )
+        public NugetConfigFile( GitFolder f, SolutionDriver driver, IEnvLocalFeedProvider localFeedProvider, ISecretKeyStore secretStore, SolutionSpec s, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "NuGet.config" ) )
         {
             _localFeedProvider = localFeedProvider;
-            _settings = s;
+            _solutionSpec = s;
             _solutionDriver = driver;
             _secretStore = secretStore;
             if( IsOnLocalBranch )
@@ -83,7 +83,7 @@ namespace CK.Env.Plugin.SolutionFiles
             if( !this.CheckCurrentBranch( m ) ) return;
             EnsureDocument();
             PackageSources.EnsureFirstElement( "clear" );
-            foreach( var s in _settings.NuGetSources )
+            foreach( var s in _solutionSpec.NuGetSources )
             {
                 EnsureFeed( m, s.Name, s.Url );
                 if( s.Credentials != null )
@@ -94,7 +94,7 @@ namespace CK.Env.Plugin.SolutionFiles
                     EnsureFeedCredentials( m, s.Name, s.Credentials.UserName, password );
                 }
             }
-            foreach( var name in _settings.RemoveNuGetSourceNames )
+            foreach( var name in _solutionSpec.RemoveNuGetSourceNames )
             {
                 RemoveFeed( m, name, withCredentials: true );
             }

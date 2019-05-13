@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Text;
+using System;
 
 namespace CK.Env
 {
@@ -15,6 +16,12 @@ namespace CK.Env
             FileSystem = fs;
             FilePath = filePath;
         }
+
+        /// <summary>
+        /// Fires whenever this file has been deleted or saved.
+        /// </summary>
+        public event EventHandler<EventMonitoredArgs> OnSavedOrDeleted;
+
 
         ITextFileInfo GetFile() => _file ?? (_file = FileSystem.GetFileInfo( FilePath ).AsTextFileInfo( ignoreExtension: true ));
 
@@ -45,17 +52,30 @@ namespace CK.Env
             {
                 FileSystem.Delete( m, FilePath );
                 _file = null;
+                OnDeleted( m );
             }
-            OnDeleted( m );
         }
 
         /// <summary>
         /// Called by <see cref="Delete"/> once <see cref="TextContent"/> is null
         /// and the file has been deleted from the file system.
+        /// Raises the <see cref="OnSavedOrDeleted"/> event.
         /// </summary>
-        /// <param name="m"></param>
+        /// <param name="m">The monitor to use.</param>
         protected virtual void OnDeleted( IActivityMonitor m )
         {
+            OnSavedOrDeleted?.Invoke( this, new EventMonitoredArgs( m ) );
+        }
+
+        /// <summary>
+        /// Called by <see cref="CreateOrUpdate"/> once the text file
+        /// has been updated (the file necessarily exists).
+        /// Raises the <see cref="OnSavedOrDeleted"/> event.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        protected virtual void OnSaved( IActivityMonitor m )
+        {
+            OnSavedOrDeleted?.Invoke( this, new EventMonitoredArgs( m ) );
         }
 
         /// <summary>
@@ -80,6 +100,7 @@ namespace CK.Env
             {
                 return false;
             }
+            OnSaved( m );
             _file = null;
             return true;
         }

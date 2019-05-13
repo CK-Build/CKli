@@ -2,18 +2,18 @@ using CK.Core;
 using CK.Text;
 using System;
 
-namespace CK.Env.Plugin.SolutionFiles
+namespace CK.Env.Plugin
 {
     public class SolutionFolder : PluginFolderBase
     {
         readonly SolutionDriver _driver;
-        readonly ISharedSolutionSpec _settings;
+        readonly SolutionSpec _solutionSpec;
 
-        public SolutionFolder( GitFolder f, SolutionDriver driver, ISharedSolutionSpec settings, NormalizedPath branchPath )
+        public SolutionFolder( GitFolder f, SolutionDriver driver, SolutionSpec solutionSpec, NormalizedPath branchPath )
             : base( f, branchPath, folderPath: String.Empty )
         {
             _driver = driver;
-            _settings = settings;
+            _solutionSpec = solutionSpec;
         }
 
         /// <summary>

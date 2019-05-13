@@ -2,7 +2,7 @@ using CK.Core;
 using CK.Text;
 using System.Linq;
 
-namespace CK.Env.Plugin.SolutionFiles
+namespace CK.Env.Plugin
 {
     public class CommonFolder : PluginFolderBase
     {
