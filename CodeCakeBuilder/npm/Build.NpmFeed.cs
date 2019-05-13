@@ -88,7 +88,15 @@ namespace CodeCake
 
             public string SecretKeyName { get; }
 
-            public string ResolveAPIKey() => Cake.InteractiveEnvironmentVariable( SecretKeyName );
+            public string ResolveAPIKey()
+            {
+                string output = Cake.InteractiveEnvironmentVariable( SecretKeyName );
+                if( string.IsNullOrWhiteSpace( output ) )
+                {
+                    Cake.Warning( "Missing environement variable " + SecretKeyName );
+                }
+                return output;
+            }
 
             protected abstract IDisposable TokenInjector( NPMPublishedProject project );
 

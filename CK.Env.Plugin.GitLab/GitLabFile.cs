@@ -21,13 +21,17 @@ namespace CK.BuildSystem.GitLab
         {
             if( !this.CheckCurrentBranch( m ) ) return;
             YamlMapping firstMapping = GetFirstMapping( m, true );
-            if( firstMapping == null ) return;
+            if( firstMapping == null )
+            {
+                m.Error( "First mapping should not return null !" );
+                return;
+            }
             // We don't use GitLab for public repositories
-            if( Folder.IsPublic )
+            if( Folder.IsPublic || Folder.KnownGitProvider != KnownGitProvider.GitLab )
             {
                 if( TextContent != null )
                 {
-                    m.Log( LogLevel.Info, "The project is public, so we don't use GitLab and the .gitlab-ci.yml is not needed." );
+                    m.Log( LogLevel.Info, "The project is public or the repository is not on GitLab, so we don't use GitLab and the .gitlab-ci.yml is not needed." );
                     Delete( m );
                 }
                 return;
