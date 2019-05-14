@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace CK.NuGetClient
+namespace CK.Env.NuGet
 {
     public class NuGetArtifactLocalSet : IArtifactLocalSet, IReadOnlyCollection<LocalNuGetPackageFile>
     {

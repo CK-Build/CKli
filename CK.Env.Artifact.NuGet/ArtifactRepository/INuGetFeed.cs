@@ -4,7 +4,7 @@ using CSemVer;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace CK.NuGetClient
+namespace CK.Env.NuGet
 {
     /// <summary>
     /// Defines a NuGet feed, either remote or local.

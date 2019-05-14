@@ -1,6 +1,5 @@
 using CK.Core;
 using CK.Env.DependencyModel;
-using CK.NuGetClient;
 using CK.Text;
 using System;
 using System.Diagnostics;
@@ -27,8 +26,7 @@ namespace CK.Env.Plugin
             var s = _driver.GetSolution( m );
             if( s == null ) return;
 
-            bool hasDotNetPackages = s.GeneratedArtifacts.Any( g => g.Artifact.Type.Name == "NuGet" );
-            bool needDotNetBuild = hasDotNetPackages || s.Projects.Any( p => p.Type == ".Net" && p != s.BuildProject );
+            bool needDotNetBuild = s.Projects.Any( p => p.Type == ".Net" && p != s.BuildProject );
 
             // Clean old CodeCakeBuilders files
             DeleteFile( m, "Build.NuGetHelper.cs" );
@@ -71,19 +69,6 @@ namespace CK.Env.Plugin
             if( needDotNetBuild )
             {
                 SetTextResource( m, "dotnet/Build.StandardSolutionBuild.cs" );
-                if( hasDotNetPackages )
-                {
-                    SetTextResource( m, "dotnet/Build.NuGetArtifactType.cs", AdaptBuildNugetRepositoryForPushFeeds );
-                    SetTextResource( m, "dotnet/Build.NuGetHelper.cs" );
-                    SetTextResource( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
-                }
-                else
-                {
-                    m.Info( "Removing build files related to NuGet packaging." );
-                    DeleteFile( m, "dotnet/Build.NuGetArtifactType.cs" );
-                    DeleteFile( m, "dotnet/Build.NuGetHelper.cs" );
-                    DeleteFile( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
-                }
                 if( _solutionSpec.NoDotNetUnitTests )
                 {
                     m.Info( "Removing Build.StandardUnitTests since NoDotNetUnitTests is true." );
@@ -143,40 +128,6 @@ namespace CK.Env.Plugin
             text = text.Replace( m.Value, b.ToString() );
             return text;
 
-        }
-
-        string AdaptBuildNugetRepositoryForPushFeeds( string text )
-        {
-            Match m = Regex.Match( text, @"return new NuGetHelper\.NuGetFeed\[\]{.*?};", RegexOptions.Singleline | RegexOptions.CultureInvariant );
-            if( !m.Success )
-            {
-                throw new Exception( "Expected pattern return new NuGetHelper.NuGetFeed[]{...} in Build.NugetRepository.cs." );
-            }
-            StringBuilder b = new StringBuilder();
-            b.AppendLine( "return new NuGetHelper.NuGetFeed[]{" );
-            bool atLeastOne = false;
-            foreach( var info in _solutionSpec.ArtifactTargets.Select( a => a.Info ).OfType<INuGetFeedInfo>() )
-            {
-                b.AppendLine( atLeastOne ? "," : "" );
-                atLeastOne = true;
-                switch( info )
-                {
-                    case NuGetAzureFeedInfo a:
-                        b.Append( "new SignatureVSTSFeed( this, \"" )
-                                    .Append( a.Organization ).Append( "\", \"" )
-                                    .Append( a.FeedName ).Append( "\" )" );
-                        break;
-                    case NuGetStandardFeedInfo n:
-                        b.Append( "new RemoteFeed( this, \"" )
-                                            .Append( n.Name ).Append( "\", \"" )
-                                            .Append( n.Url ).Append( "\", \"" )
-                                            .Append( n.SecretKeyName ).Append( "\" )" );
-                        break;
-                }
-            }
-            b.AppendLine().Append( "};" );
-            text = text.Replace( m.Value, b.ToString() );
-            return text;
         }
     }
 }

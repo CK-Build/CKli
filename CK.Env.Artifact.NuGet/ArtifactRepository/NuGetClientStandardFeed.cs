@@ -1,7 +1,7 @@
 using CK.Core;
 using NuGet.Configuration;
 
-namespace CK.NuGetClient
+namespace CK.Env.NuGet
 {
     /// <summary>
     /// Internal implementation that may be made public once.

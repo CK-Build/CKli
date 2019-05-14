@@ -1,7 +1,7 @@
 using NuGet.Configuration;
 using System.Collections.Generic;
 
-namespace CK.NuGetClient
+namespace CK.Env.NuGet
 {
     interface IInternalFeed : INuGetFeed
     {

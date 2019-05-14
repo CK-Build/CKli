@@ -8,7 +8,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CK.NuGetClient
+namespace CK.Env.NuGet
 {
     /// <summary>
     /// Internal implementation that may be made public once.

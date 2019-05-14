@@ -1,4 +1,4 @@
-namespace CK.NuGetClient
+namespace CK.Env.NuGet
 {
     /// <summary>
     /// Dscribes NuGet feed type that we handle.

@@ -61,6 +61,8 @@
       
       <add Type="CK.Env.Plugin.CKSetupStoreTestHelperConfigFile, CK.Env.Plugin.Basics" />
       
+      <add Type="CK.Env.Plugin.NuGetCodeCakeBuilderFolder, CK.Env.Plugin.NuGet" />
+      
       <add Type="CK.Env.Plugin.NPMProjectsDriver, CK.Env.Plugin.NPM" />
       <add Type="CK.Env.Plugin.NPMCodeCakeBuilderFolder, CK.Env.Plugin.NPM" />
       <add Type="CK.Env.Plugin.NPMRCFiles, CK.Env.Plugin.NPM" />

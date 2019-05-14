@@ -2,7 +2,6 @@ using CK.Core;
 using CK.Env;
 using CK.Env.NPM;
 using CK.Env.Plugin;
-using CK.NuGetClient;
 using CK.Text;
 using CKSetup;
 using CSemVer;
@@ -18,58 +17,42 @@ namespace CKli
     {
         static readonly NormalizedPath _localNuGetCache = Path.GetFullPath( Environment.ExpandEnvironmentVariables( "%UserProfile%/.nuget/packages/" ) );
 
-        readonly HttpClient _http;
         readonly FileSystem _fs;
+        readonly List<IEnvLocalFeedProviderArtifactHandler> _handlers;
 
         public XLocalFeedProvider(
             Initializer initializer,
-            FileSystem fs,
-            HttpClient http )
+            FileSystem fs )
             : base( initializer )
         {
             _fs = fs;
             _fs.ServiceContainer.Add<IEnvLocalFeedProvider>( this );
             initializer.Services.Add<IEnvLocalFeedProvider>( this );
             initializer.Services.Add( this );
-            _http = http;
             var feedRoot = fs.Root.AppendPart( "LocalFeed" );
-            Local = new LocalFeed( feedRoot, "Local" );
-            CI = new LocalFeed( feedRoot, "CI" );
-            Release = new LocalFeed( feedRoot, "Release" );
-            ZeroBuild = new LocalFeed( feedRoot, "ZeroBuild" );
+            Local = new LocalFeed( this, feedRoot, "Local" );
+            CI = new LocalFeed( this, feedRoot, "CI" );
+            Release = new LocalFeed( this, feedRoot, "Release" );
+            ZeroBuild = new LocalFeed( this, feedRoot, "ZeroBuild" );
+            _handlers = new List<IEnvLocalFeedProviderArtifactHandler>();
         }
 
         class LocalFeed : IEnvLocalFeed
         {
-            internal LocalFeed( NormalizedPath localFeedFolder, string part )
+            readonly XLocalFeedProvider _provider;
+
+            internal LocalFeed( XLocalFeedProvider provider, NormalizedPath localFeedFolder, string part )
             {
+                _provider = provider;
                 PhysicalPath = localFeedFolder.AppendPart( part );
                 Directory.CreateDirectory( PhysicalPath );
             }
 
-            public StandardGitStatus LogicalBranchName { get; }
-
             public NormalizedPath PhysicalPath { get; }
-
-            public IEnumerable<LocalNuGetPackageFile> GetAllPackageFiles( IActivityMonitor m )
-            {
-                return XLocalFeedProvider.GetAllPackageFiles( m, PhysicalPath );
-            }
 
             public IEnumerable<LocalNPMPackageFile> GetAllNPMPackageFiles( IActivityMonitor m )
             {
                 return XLocalFeedProvider.GetAllNPMPackageFiles( m, PhysicalPath );
-            }
-
-            public SVersion GetBestVersion( IActivityMonitor m, string packageId )
-            {
-                return GetMaxVersionFromFeed( PhysicalPath, packageId );
-            }
-
-            public LocalNuGetPackageFile GetPackageFile( IActivityMonitor m, string packageId, SVersion v )
-            {
-                var f = GetPackagePath( PhysicalPath, packageId, v );
-                return File.Exists( f ) ? new LocalNuGetPackageFile( f, packageId, v ) : null;
             }
 
             public LocalNPMPackageFile GetNPMPackageFile( IActivityMonitor m, string packageId, SVersion v )
@@ -78,9 +61,14 @@ namespace CKli
                 return File.Exists( f ) ? new LocalNPMPackageFile( f, packageId, v ) : null;
             }
 
-            public List<ArtifactInstance> GetMissing( IActivityMonitor m, IEnumerable<ArtifactInstance> artifacts )
+            public HashSet<ArtifactInstance> GetMissing( IActivityMonitor m, IEnumerable<ArtifactInstance> artifacts )
             {
-                var missing = new List<ArtifactInstance>();
+                var missing = new HashSet<ArtifactInstance>();
+                foreach( var h in _provider._handlers )
+                {
+                    h.CollectMissing( this, m, artifacts, missing );
+                }
+                // return missing;
                 var ckSetup = artifacts.Where( i => i.Artifact.Type == CKSetupClient.CKSetupType )
                                        .Select( a => CKSetupArtifactLocalSet.ToComponentRef( a ) ).ToList();
                 if( ckSetup.Count > 0 )
@@ -98,11 +86,12 @@ namespace CKli
                 }
                 foreach( var n in artifacts )
                 {
-                    if( n.Artifact.Type == LocalNuGetPackageFile.NuGetType )
-                    {
-                        if( GetPackageFile( m, n.Artifact.Name, n.Version ) == null ) missing.Add( n );
-                    }
-                    else if( n.Artifact.Type == NPMClient.NPMType )
+                    //if( n.Artifact.Type == LocalNuGetPackageFile.NuGetType )
+                    //{
+                    //    if( this.GetPackageFile( m, n.Artifact.Name, n.Version ) == null ) missing.Add( n );
+                    //}
+                    //else
+                    if( n.Artifact.Type == NPMClient.NPMType )
                     {
                         if( GetNPMPackageFile( m, n.Artifact.Name, n.Version ) == null ) missing.Add( n );
                     }
@@ -112,22 +101,23 @@ namespace CKli
 
             public bool PushLocalArtifacts( IActivityMonitor m, IArtifactRepository target, IEnumerable<ArtifactInstance> artifacts )
             {
-                if( target.HandleArtifactType( LocalNuGetPackageFile.NuGetType ) )
-                {
-                    var locals = new List<LocalNuGetPackageFile>();
-                    foreach( var a in artifacts )
-                    {
-                        var local = GetPackageFile( m, a.Artifact.Name, a.Version );
-                        if( local == null )
-                        {
-                            m.Error( $"Unable to find local package {a} in {PhysicalPath}." );
-                            return false;
-                        }
-                        locals.Add( local );
-                    }
-                    return target.PushAsync( m, new NuGetArtifactLocalSet( locals ) ).GetAwaiter().GetResult();
-                }
-                else if( target.HandleArtifactType( CKSetupClient.CKSetupType ) )
+                //if( target.HandleArtifactType( LocalNuGetPackageFile.NuGetType ) )
+                //{
+                //    var locals = new List<LocalNuGetPackageFile>();
+                //    foreach( var a in artifacts )
+                //    {
+                //        var local = GetPackageFile( m, a.Artifact.Name, a.Version );
+                //        if( local == null )
+                //        {
+                //            m.Error( $"Unable to find local package {a} in {PhysicalPath}." );
+                //            return false;
+                //        }
+                //        locals.Add( local );
+                //    }
+                //    return target.PushAsync( m, new NuGetArtifactLocalSet( locals ) ).GetAwaiter().GetResult();
+                //}
+                //else
+                if( target.HandleArtifactType( CKSetupClient.CKSetupType ) )
                 {
                     string localStore = this.GetCKSetupStorePath();
                     return target.PushAsync( m, new CKSetupArtifactLocalSet( artifacts, localStore ) ).GetAwaiter().GetResult();
@@ -156,15 +146,19 @@ namespace CKli
             public void Remove( IActivityMonitor m, IEnumerable<ArtifactInstance> artifacts )
             {
                 RemoveCKSetupComponents( m, artifacts, this.GetCKSetupStorePath() );
-                foreach( var i in artifacts.Where( i => i.Artifact.Type == LocalNuGetPackageFile.NuGetType ) )
+                foreach( var h in _provider._handlers )
                 {
-                    var f = GetPackagePath( PhysicalPath, i.Artifact.Name, i.Version );
-                    if( File.Exists( f ) )
-                    {
-                        File.Delete( f );
-                        m.Info( $"Removed {i} from {PhysicalPath}." );
-                    }
+                    h.Remove( this, m, artifacts );
                 }
+                //foreach( var i in artifacts.Where( i => i.Artifact.Type == LocalNuGetPackageFile.NuGetType ) )
+                //{
+                //    var f = GetPackagePath( PhysicalPath, i.Artifact.Name, i.Version );
+                //    if( File.Exists( f ) )
+                //    {
+                //        File.Delete( f );
+                //        m.Info( $"Removed {i} from {PhysicalPath}." );
+                //    }
+                //}
             }
 
             public bool RemoveAll( IActivityMonitor m )
@@ -174,7 +168,7 @@ namespace CKli
                     bool success = true;
                     foreach( var d in Directory.EnumerateDirectories( PhysicalPath ) )
                     {
-                        FileSystem.RawDeleteLocalDirectory( m, d );
+                        FileHelper.RawDeleteLocalDirectory( m, d );
                     }
                     foreach( var f in Directory.EnumerateFiles( PhysicalPath ) )
                     {
@@ -201,29 +195,12 @@ namespace CKli
 
         public IEnvLocalFeed ZeroBuild { get; }
 
-        public void RemoveFromNuGetCache( IActivityMonitor m, string packageId, SVersion version )
-        {
-            var packageVersion = version.AsCSVersion?.ToString( CSVersionFormat.NuGetPackage ) ?? version.NormalizedText;
-            var dirPath = _localNuGetCache.AppendPart( packageId ).AppendPart( packageVersion );
-            if( FileSystem.RawDeleteLocalDirectory( m, dirPath ) )
-            {
-                m.Info( $"Removed {packageId} package in version {version} from local NuGet cache." );
-            }
-        }
-
-        public bool ExistsInNuGetCache( IActivityMonitor m, string packageId, SVersion version )
-        {
-            var packageVersion = version.AsCSVersion?.ToString( CSVersionFormat.NuGetPackage ) ?? version.NormalizedText;
-            var dirPath = _localNuGetCache.AppendPart( packageId ).AppendPart( packageVersion );
-            return Directory.Exists( dirPath );
-        }
-
         public void RemoveFromAllCaches( IActivityMonitor m, IEnumerable<ArtifactInstance> instances )
         {
             RemoveCKSetupComponents( m, instances, Facade.DefaultStorePath );
-            foreach( var i in instances.Where( i => i.Artifact.Type == LocalNuGetPackageFile.NuGetType ) )
+            foreach( var h in _handlers )
             {
-                RemoveFromNuGetCache( m, i.Artifact.Name, i.Version );
+                h.RemoveFromAllCaches( m, instances );
             }
         }
 
@@ -250,32 +227,32 @@ namespace CKli
             return Path.Combine( path, packageId.Replace( "@", "" ).Replace( '/', '-' ) + '-' + v.ToNuGetPackageString() + ".tgz" );
         }
 
-        static IEnumerable<SVersion> GetAllVersionsFromFeed( string path, string packageId )
-        {
-            // Do not use TryParse here: pattern MUST be a version since we remove
-            // .symbols and "sub packages" (like CK.Text.Virtual for CK.Text by filtering only
-            // suffixes that start with a digit.
-            // If an error occurs here it should be an exception since this should never happen.
-            // Note: Max on reference type returns null on empty source.
-            return Directory.EnumerateFiles( path, packageId + ".*.nupkg" )
-                                .Select( p => Path.GetFileName( p ) )
-                                .Select( n => n.Substring( packageId.Length + 1, n.Length - packageId.Length - 7 ) )
-                                .Where( n => !n.EndsWith( ".symbols" ) && Char.IsDigit( n, 0 ) )
-                                .Select( v => SVersion.Parse( v ) );
-        }
+        //static IEnumerable<SVersion> GetAllVersionsFromFeed( string path, string packageId )
+        //{
+        //    // Do not use TryParse here: pattern MUST be a version since we remove
+        //    // .symbols and "sub packages" (like CK.Text.Virtual for CK.Text by filtering only
+        //    // suffixes that start with a digit.
+        //    // If an error occurs here it should be an exception since this should never happen.
+        //    // Note: Max on reference type returns null on empty source.
+        //    return Directory.EnumerateFiles( path, packageId + ".*.nupkg" )
+        //                        .Select( p => Path.GetFileName( p ) )
+        //                        .Select( n => n.Substring( packageId.Length + 1, n.Length - packageId.Length - 7 ) )
+        //                        .Where( n => !n.EndsWith( ".symbols" ) && Char.IsDigit( n, 0 ) )
+        //                        .Select( v => SVersion.Parse( v ) );
+        //}
 
-        static SVersion GetMaxVersionFromFeed( string path, string packageId )
-        {
-            // Note: Max on reference type returns null on empty source.
-            return GetAllVersionsFromFeed( path, packageId ).Max( v => v );
-        }
+        //static SVersion GetMaxVersionFromFeed( string path, string packageId )
+        //{
+        //    // Note: Max on reference type returns null on empty source.
+        //    return GetAllVersionsFromFeed( path, packageId ).Max( v => v );
+        //}
 
-        static IEnumerable<LocalNuGetPackageFile> GetAllPackageFiles( IActivityMonitor m, string feedPath )
-        {
-            return Directory.EnumerateFiles( feedPath, "*.nupkg" )
-                            .Where( f => !f.EndsWith( ".symbols.nupkg" ) )
-                            .Select( f => LocalNuGetPackageFile.Parse( f ) );
-        }
+        //static IEnumerable<LocalNuGetPackageFile> GetAllPackageFiles( IActivityMonitor m, string feedPath )
+        //{
+        //    return Directory.EnumerateFiles( feedPath, "*.nupkg" )
+        //                    .Where( f => !f.EndsWith( ".symbols.nupkg" ) )
+        //                    .Select( f => LocalNuGetPackageFile.Parse( f ) );
+        //}
 
         static IEnumerable<LocalNPMPackageFile> GetAllNPMPackageFiles( IActivityMonitor m, string feedPath )
         {
@@ -283,28 +260,14 @@ namespace CKli
                             .Select( f => LocalNPMPackageFile.Parse( f ) );
         }
 
-        static SVersion SafeParse( IActivityMonitor m, string path )
+        /// <summary>
+        /// Registers a new handler.
+        /// </summary>
+        /// <param name="handler">New artifact handler.</param>
+        public void Register( IEnvLocalFeedProviderArtifactHandler handler )
         {
-            SVersion v = null;
-            int idx = path.LastIndexOf( Path.DirectorySeparatorChar );
-            if( idx < 0 )
-            {
-                m.Error( $"Invalid path '{path}' for package." );
-            }
-            else if( !(v = SVersion.TryParse( path.Substring( idx ) )).IsValid )
-            {
-                m.Error( $"Invalid SemVer in '{path}' for package." );
-            }
-            return v;
-        }
-
-        static SVersion GetBestVersionFromNuGetCache( IActivityMonitor m, string packageId )
-        {
-            // Max on reference type returns null on empty source.
-            return Directory.GetDirectories( _localNuGetCache.AppendPart( packageId ) )
-                .Select( p => SafeParse( m, p ) )
-                .Where( v => v != null )
-                .Max( v => v );
+            if( _handlers.Contains( handler ) ) throw new InvalidOperationException();
+            _handlers.Add( handler );
         }
     }
 }

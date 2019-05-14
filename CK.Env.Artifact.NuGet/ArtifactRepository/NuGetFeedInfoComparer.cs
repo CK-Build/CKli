@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace CK.NuGetClient
+namespace CK.Env.NuGet
 {
     /// <summary>
     /// Implements comparison of <see cref="INuGetFeedInfo"/> based on <see cref="INuGetFeedInfo.Name"/>.

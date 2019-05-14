@@ -1,13 +1,14 @@
 using CK.Core;
+using NuGet.Common;
 using System.Threading.Tasks;
 
-namespace CK.NuGetClient
+namespace CK.Env.NuGet
 {
     /// <summary>
     /// It is hard to say whether the NuGet logger is used concurrency or not.
     /// In doubt, we serialize with a basic lock.
     /// </summary>
-    class NuGetLoggerAdapter : NuGet.Common.ILogger
+    class NuGetLoggerAdapter : ILogger
     {
         readonly object _lock;
 
@@ -27,19 +28,19 @@ namespace CK.NuGetClient
         public void LogError( string data ) { lock( _lock ) Monitor.Error( $"NuGet: {data}" ); }
         public void LogSummary( string data ) { lock( _lock ) Monitor.Info( $"NuGet: {data}" ); }
         public void LogInformationSummary( string data ) { lock( _lock ) Monitor.Info( $"NuGet: {data}" ); }
-        public void Log( NuGet.Common.LogLevel level, string data ) { lock( _lock ) Monitor.Info( $"NuGet ({level}): {data}" ); }
-        public Task LogAsync( NuGet.Common.LogLevel level, string data )
+        public void Log( global::NuGet.Common.LogLevel level, string data ) { lock( _lock ) Monitor.Info( $"NuGet ({level}): {data}" ); }
+        public Task LogAsync( global::NuGet.Common.LogLevel level, string data )
         {
             Log( level, data );
             return Task.CompletedTask;
         }
 
-        public void Log( NuGet.Common.ILogMessage message )
+        public void Log( ILogMessage message )
         {
             lock( _lock ) Monitor.Info( $"NuGet ({message.Level}) - Code: {message.Code} - Project: {message.ProjectPath} - {message.Message}" );
         }
 
-        public Task LogAsync( NuGet.Common.ILogMessage message )
+        public Task LogAsync( ILogMessage message )
         {
             Log( message );
             return Task.CompletedTask;

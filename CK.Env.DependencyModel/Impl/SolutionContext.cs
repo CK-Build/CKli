@@ -190,12 +190,12 @@ namespace CK.Env.DependencyModel
 
         internal void OnArtifactTargetAdded( Solution solution, IArtifactRepository newOne )
         {
-            throw new NotImplementedException();
+            ++_version;
         }
 
         internal void OnArtifactTargetRemoved( Solution solution, IArtifactRepository artifactTarget )
         {
-            throw new NotImplementedException();
+            ++_version;
         }
     }
 }

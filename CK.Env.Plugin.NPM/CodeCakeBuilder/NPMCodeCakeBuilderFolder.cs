@@ -1,7 +1,6 @@
 using CK.Core;
 using CK.Env.DependencyModel;
 using CK.Env.NPM;
-using CK.NuGetClient;
 using CK.Text;
 using System;
 using System.Linq;

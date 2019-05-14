@@ -226,8 +226,23 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the solution drivers.
-        /// Empty until <see cref="Initialize"/> has been called.
+        /// Asks this world state to be dumped (in the monitor or anywhere lese) by
+        /// raising <see cref="DumpWorldStatus"/> event.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <returns>True on success, false on error.</returns>
+        [CommandMethod( confirmationRequired: false )]
+        public bool DumpWorldState( IActivityMonitor monitor )
+        {
+            return RunSafe( monitor, "World Status.", ( m, error ) =>
+            {
+                var ev = new EventMonitoredArgs( monitor );
+                DumpWorldStatus?.Invoke( this, ev );
+            } );
+        }
+
+        /// <summary>
+        /// Gets the registered solution drivers.
         /// </summary>
         public IReadOnlyCollection<ISolutionDriver> SolutionDrivers => _solutionDrivers;
 
@@ -881,6 +896,7 @@ namespace CK.Env
                 }
             } );
         }
+
         public bool CanGenerateLTSWorld => WorldName.LTSKey == null && !IsDirty;
 
         [CommandMethod( confirmationRequired: true )]

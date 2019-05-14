@@ -63,7 +63,7 @@ namespace CKli
                 string rep = Console.ReadLine().Trim();
                 if( rep.Length == 0 )
                 {
-                    global.CommandRegister["World/Initialize"].Execute( monitor, null );
+                    global.CommandRegister["World/DumpWorldState"].Execute( monitor, null );
                     continue;
                 }
                 if( rep == "cls" )

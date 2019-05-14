@@ -10,7 +10,7 @@ namespace CK.Env.Plugin
         readonly SolutionSpec _solutionSpec;
 
         public SolutionFolder( GitFolder f, SolutionDriver driver, SolutionSpec solutionSpec, NormalizedPath branchPath )
-            : base( f, branchPath, folderPath: String.Empty )
+            : base( f, branchPath, subFolderPath: String.Empty )
         {
             _driver = driver;
             _solutionSpec = solutionSpec;

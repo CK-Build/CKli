@@ -23,10 +23,24 @@ namespace CK.Env.Plugin
             return _textResources[path.Replace( '/', '.' ).Replace('\\','.')];
         }
 
-        public PluginFolderBase( GitFolder f, NormalizedPath branchPath, string folderPath, Type resourceHolder = null )
+        /// <summary>
+        /// Initializes a new <see cref="PluginFolderBase"/> on a folder path inside a branch path.
+        /// </summary>
+        /// <param name="f">The folder.</param>
+        /// <param name="branchPath">The actual branch path (relative to the <see cref="FileSystem"/>).</param>
+        /// <param name="folderPath">The actual sub folder path ('CodeCakeBuilder').</param>
+        /// <param name="resourcePrefix">
+        /// Optional resource prefix: defaults to <paramref name="resourceHolder"/>.Namespace + ".Res.".
+        /// When not null, this path prafix totally replaces the one based on resourceHolder.
+        /// </param>
+        /// <param name="resourceHolder">
+        /// Optional type used to locate resources.
+        /// By default it is the actual type of this folder object: the defining assembly and namespace are used.
+        /// </param>
+        public PluginFolderBase( GitFolder f, NormalizedPath branchPath, string subFolderPath, string resourcePrefix = null, Type resourceHolder = null )
             : base( f, branchPath )
         {
-            FolderPath = branchPath.Combine( folderPath ).ResolveDots( branchPath.Parts.Count );
+            FolderPath = branchPath.Combine( subFolderPath ).ResolveDots( branchPath.Parts.Count );
             if( resourceHolder == null ) resourceHolder = GetType();
             _resourceAssembly = resourceHolder.Assembly;
             _resourcePrefix = resourceHolder.Namespace + ".Res.";

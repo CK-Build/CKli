@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.1</TargetFramework>
@@ -20,9 +20,9 @@
     <ProjectReference Include="..\CK.Env.DependencyModel\CK.Env.DependencyModel.csproj" />
     <ProjectReference Include="..\CK.Env.Plugin.Basics\CK.Env.Plugin.Basics.csproj" />
     <ProjectReference Include="..\CK.Env.Plugin.NPM\CK.Env.Plugin.NPM.csproj" />
+    <ProjectReference Include="..\CK.Env.Plugin.NuGet\CK.Env.Plugin.NuGet.csproj" />
     <ProjectReference Include="..\CK.Env.Sys\CK.Env.Sys.csproj" />
     <ProjectReference Include="..\CK.Env.XTyping\CK.Env.XTyping.csproj" />
-    <ProjectReference Include="..\CK.NuGetClient\CK.NuGetClient.csproj" />
   </ItemGroup>
   
   <ItemGroup>

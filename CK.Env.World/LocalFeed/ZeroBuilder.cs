@@ -85,7 +85,10 @@ namespace CK.Env
                                 m.Info( $"ReasonToBuild#3: Rebuild dependencies are {_mustBuild.Intersect( p.AllDependencies.Select( dep => dep.FullFolderPath.Path ) ).Concatenate()}." );
                             }
                             else if( p.MustPack
-                                     && _localFeedProvider.ZeroBuild.GetPackageFile( m, p.Project.SimpleProjectName, SVersion.ZeroVersion ) == null )
+                                     && !System.IO.File.Exists(
+                                            System.IO.Path.Combine(
+                                                _localFeedProvider.ZeroBuild.PhysicalPath,
+                                                p.Project.SimpleProjectName + ".0.0.0-0.nupkg" ) ) )
                             {
                                 m.Info( $"ReasonToBuild#4: {p.Project.SimpleProjectName}.0.0.0-0 does not exist in in Zero build feed." );
                             }

@@ -1,7 +1,7 @@
 using CK.Core;
 using System.Xml.Linq;
 
-namespace CK.NuGetClient
+namespace CK.Env.NuGet
 {
     /// <summary>
     /// Immutable implementation of <see cref="INuGetFeedInfo"/> for standard feeds

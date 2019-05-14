@@ -3,7 +3,7 @@ using CK.Env;
 using System;
 using System.Xml.Linq;
 
-namespace CK.NuGetClient
+namespace CK.Env.NuGet
 {
     public abstract class NuGetFeedInfo : INuGetFeedInfo
     {

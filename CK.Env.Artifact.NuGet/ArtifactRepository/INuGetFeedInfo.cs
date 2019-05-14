@@ -1,6 +1,6 @@
 using CK.Env;
 
-namespace CK.NuGetClient
+namespace CK.Env.NuGet
 {
     /// <summary>
     /// Generalizes different type of feed descriptions.

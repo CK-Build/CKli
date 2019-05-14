@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Env.DependencyModel;
+using CK.Env;
 using CK.Env.NPM;
 using CK.Text;
 using System;

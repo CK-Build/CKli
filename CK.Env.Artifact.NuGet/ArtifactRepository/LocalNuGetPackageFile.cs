@@ -3,7 +3,7 @@ using CSemVer;
 using System.IO;
 using System.Text.RegularExpressions;
 
-namespace CK.NuGetClient
+namespace CK.Env.NuGet
 {
     /// <summary>
     /// Simple local package description.

@@ -16,9 +16,9 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace CK.NuGetClient
+namespace CK.Env.NuGet
 {
-    public class NuGetClient : INuGetClient, IDisposable
+    public class NuGetClient : IArtifactRepositoryFactory, IDisposable
     {
         internal static readonly List<Lazy<INuGetResourceProvider>> Providers;
 
@@ -81,7 +81,7 @@ namespace CK.NuGetClient
                         using( logger.Monitor.OpenInfo( "Installing the Azure Artifact Credential provider (https://github.com/Microsoft/artifacts-credprovider)." ) )
                         {
                             var a = System.Reflection.Assembly.GetExecutingAssembly();
-                            using( var r = new StreamReader( a.GetManifestResourceStream( "CK.NuGetClient.Res.InstallCredentialProvider.ps1.txt" ) ) )
+                            using( var r = new StreamReader( a.GetManifestResourceStream( "CK.Env.NuGet.Res.InstallCredentialProvider.ps1.txt" ) ) )
                             {
                                 var tempPath = Path.GetTempPath();
                                 var installer = Guid.NewGuid().ToString() + ".ps1";

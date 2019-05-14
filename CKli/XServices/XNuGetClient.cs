@@ -1,7 +1,7 @@
 using CK.Env;
 using System;
 using CK.Core;
-using CK.NuGetClient;
+using CK.Env.NuGet;
 using System.Net.Http;
 
 namespace CKli
@@ -14,14 +14,16 @@ namespace CKli
             HttpClient sharedHttpClient,
             ISecretKeyStore secretKeyStore,
             ArtifactCenter artifact,
+            IEnvLocalFeedProvider localFeedProvider,
             FileSystem fs,
             Initializer initializer )
             : base( initializer )
         {
             _nuGetClient = new NuGetClient( sharedHttpClient, secretKeyStore );
-            fs.ServiceContainer.Add<INuGetClient>( _nuGetClient );
+            localFeedProvider.Register( new EnvLocalFeedProviderNuGetHandler() );
+            fs.ServiceContainer.Add( _nuGetClient );
             artifact.Add( _nuGetClient );
-            initializer.Services.Add( this );
+           initializer.Services.Add( this );
         }
 
         void IDisposable.Dispose()

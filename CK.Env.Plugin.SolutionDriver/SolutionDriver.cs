@@ -356,8 +356,8 @@ namespace CK.Env.Plugin
             args += commonArgs + versionArgs;
 
             var path = Folder.FileSystem.GetFileInfo( msP.Path.RemoveLastPart() ).PhysicalPath;
-            FileSystem.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "bin" ) );
-            FileSystem.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "obj" ) );
+            FileHelper.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "bin" ) );
+            FileHelper.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "obj" ) );
 
             OnZeroBuildProject?.Invoke( this, new ZeroBuildEventArgs( monitor, true, info ) );
             try

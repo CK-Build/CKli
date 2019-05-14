@@ -106,11 +106,14 @@ namespace CKli
                 var byActiveBranch = gitFolders.GroupBy( g => g.CurrentBranchName );
                 if( byActiveBranch.Count() > 1 )
                 {
-                    using( m.OpenInfo( $"{byActiveBranch.Count()} different branches:" ) )
+                    using( m.OpenWarn( $"{byActiveBranch.Count()} different branches:" ) )
                     {
                         foreach( var b in byActiveBranch )
                         {
-                            m.Info( $"Branch '{b.Key}': {b.Select( g => g.SubPath.Path ).Concatenate()}" );
+                            using( m.OpenInfo( $"Branch '{b.Key}':" ) )
+                            {
+                                m.Info( b.Select( g => g.SubPath.Path ).Concatenate() );
+                            }
                         }
                     }
                 }
