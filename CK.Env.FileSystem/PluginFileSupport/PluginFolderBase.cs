@@ -28,22 +28,31 @@ namespace CK.Env.Plugin
         /// </summary>
         /// <param name="f">The folder.</param>
         /// <param name="branchPath">The actual branch path (relative to the <see cref="FileSystem"/>).</param>
-        /// <param name="folderPath">The actual sub folder path ('CodeCakeBuilder').</param>
+        /// <param name="folderPath">
+        /// The actual sub folder path (ie. 'CodeCakeBuilder') where resources must be updated.</param>
         /// <param name="resourcePrefix">
-        /// Optional resource prefix: defaults to <paramref name="resourceHolder"/>.Namespace + ".Res.".
-        /// When not null, this path prafix totally replaces the one based on resourceHolder.
+        /// Optional resource prfix that defaults to <paramref name="resourceHolder"/>.Namespace + ".Res.".
+        /// When not null, this path prefix is combined withe the namespace of the resourceHolder.
         /// </param>
         /// <param name="resourceHolder">
         /// Optional type used to locate resources.
         /// By default it is the actual type of this folder object: the defining assembly and namespace are used.
         /// </param>
-        public PluginFolderBase( GitFolder f, NormalizedPath branchPath, string subFolderPath, string resourcePrefix = null, Type resourceHolder = null )
+        public PluginFolderBase( GitFolder f, NormalizedPath branchPath, NormalizedPath subFolderPath, NormalizedPath? resourcePrefix = null, Type resourceHolder = null )
             : base( f, branchPath )
         {
             FolderPath = branchPath.Combine( subFolderPath ).ResolveDots( branchPath.Parts.Count );
             if( resourceHolder == null ) resourceHolder = GetType();
             _resourceAssembly = resourceHolder.Assembly;
-            _resourcePrefix = resourceHolder.Namespace + ".Res.";
+            if( !resourcePrefix.HasValue )
+            {
+                _resourcePrefix = resourceHolder.Namespace + ".Res.";
+            }
+            else
+            {
+                NormalizedPath p = resourceHolder.Namespace.Replace( '.', '/' );
+                _resourcePrefix = p.Combine( resourcePrefix.Value ).ResolveDots().Path.Replace( '/', '.' ) + '.';
+            }
             _csResourcePrefix = _csProtocol + _resourcePrefix;
             _csResourcePrefixSlash = _csProtocolSlash + _resourcePrefix;
         }
@@ -169,7 +178,6 @@ namespace CK.Env.Plugin
 
             (string ResPath, string RelativePath) ProcessTextResourceName( string resPathText )
             {
-                //NormalizedPath resPath = resPathText;
                 if( resPathText.EndsWith( ".txt" ) )
                 {
                     if( resPathText.StartsWith( _resourcePrefix ) )

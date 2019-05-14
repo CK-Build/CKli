@@ -15,7 +15,7 @@ namespace CK.Env.Plugin
         readonly SolutionSpec _solutionSpec;
 
         public CodeCakeBuilderFolder( GitFolder f, SolutionDriver driver, SolutionSpec settings, NormalizedPath branchPath )
-            : base( f, branchPath, "CodecakeBuilder" )
+            : base( f, branchPath, "CodecakeBuilder", "Basics/Res" )
         {
             _driver = driver;
             _solutionSpec = settings;

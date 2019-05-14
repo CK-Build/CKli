@@ -15,6 +15,7 @@ namespace CK.Env.MSBuildSln
         None,
         SolutionFolder,
         CSharp,
+        CSharpCore,
         VisualBasic,
         FSharp,
         Unknown
@@ -35,6 +36,7 @@ namespace CK.Env.MSBuildSln
                 case KnownProjectType.None: return "{00000000-0000-0000-0000-000000000000}";
                 case KnownProjectType.SolutionFolder: return "{2150E333-8FDC-42A3-9474-1A3956D46DE8}";
                 case KnownProjectType.CSharp: return "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}";
+                case KnownProjectType.CSharpCore: return "{9A19103F-16F7-4668-BE54-9A1E7A4F7556}";
                 case KnownProjectType.VisualBasic: return "{F184B08F-C81C-45F6-A57F-5ABD9991F28F}";
                 case KnownProjectType.FSharp: return "{F2A71F9B-5D33-465A-A702-920D77279786}";
                 default: throw new ArgumentException();
@@ -48,7 +50,10 @@ namespace CK.Env.MSBuildSln
         /// <returns>Whether standard xml MSBuild project format is used.</returns>
         public static bool IsVSProject( this KnownProjectType @this )
         {
-            return @this == KnownProjectType.CSharp || @this == KnownProjectType.FSharp || @this == KnownProjectType.VisualBasic;
+            return @this == KnownProjectType.CSharp
+                    || @this == KnownProjectType.CSharpCore
+                    || @this == KnownProjectType.FSharp
+                    || @this == KnownProjectType.VisualBasic;
         }
 
         /// <summary>
@@ -62,6 +67,7 @@ namespace CK.Env.MSBuildSln
             {
                 case "{00000000-0000-0000-0000-000000000000}": return KnownProjectType.None;
                 case "{2150E333-8FDC-42A3-9474-1A3956D46DE8}": return KnownProjectType.SolutionFolder;
+                case "{9A19103F-16F7-4668-BE54-9A1E7A4F7556}": return KnownProjectType.CSharpCore;
                 case "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}": return KnownProjectType.CSharp;
                 case "{F184B08F-C81C-45F6-A57F-5ABD9991F28F}": return KnownProjectType.VisualBasic;
                 case "{F2A71F9B-5D33-465A-A702-920D77279786}": return KnownProjectType.FSharp;

@@ -170,6 +170,7 @@ namespace CK.Env.MSBuildSln
             }
             else
             {
+                r.Monitor.Warn( $"Project Type {projectTypeGuid} is unhandled for {relativePath} in {s.FilePath}." );
                 result = new Project( s, projectGuid, projectTypeGuid, projectName, relativePath );
             }
             while( r.Forward() && !r.MatchLineStartingWith( "EndProject" ) )
