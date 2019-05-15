@@ -18,18 +18,25 @@ namespace CKli
 
         public CKEnvKeyVault(
             IWorldName worldName,
-            NormalizedPath rootFolder,
+            NormalizedPath localWorldPath,
             CommandRegister commandRegister)
         {
             _keys = new Dictionary<string, string>();
             _worldName = worldName;
-            KeyVaultPath = rootFolder.AppendPart( $"CKEnv-{_worldName.Name}-KeyVault.txt" );
+            KeyVaultPath = localWorldPath.AppendPart( $"CKEnv-{_worldName.Name}-KeyVault.txt" );
             KeyVaultKeyName = $"CKENV_{_worldName.Name.ToUpperInvariant().Replace( '-', '_' )}_KEY_VAULT_SECRET_KEY";
             commandRegister.Register( this );
         }
 
+        /// <summary>
+        /// Gets the key vault file path.
+        /// </summary>
         string KeyVaultPath { get; }
 
+        /// <summary>
+        /// Gets the name of the primary secret required to open the key vault.
+        /// This is built from the <see cref="IWorldName.Name"/> (CKENV_XXX_KEY_VAULT_SECRET_KEY).
+        /// </summary>
         string KeyVaultKeyName { get; }
 
         bool KeyVaultFileExists => File.Exists( KeyVaultPath );

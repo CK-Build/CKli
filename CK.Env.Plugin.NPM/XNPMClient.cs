@@ -14,13 +14,15 @@ namespace CKli
             HttpClient sharedHttpClient,
             ISecretKeyStore secretKeyStore,
             ArtifactCenter artifact,
+            IEnvLocalFeedProvider localFeedProvider,
             FileSystem fs,
             Initializer initializer)
             : base( initializer )
         {
             _npmClient = new NPMClient( sharedHttpClient, secretKeyStore, initializer.Monitor );
+            artifact.Register( _npmClient );
             fs.ServiceContainer.Add( _npmClient );
-            artifact.Add( _npmClient );
+            localFeedProvider.Register( new EnvLocalFeedProviderNPMHandler() );
             initializer.Services.Add( this );
         }
 

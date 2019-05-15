@@ -11,6 +11,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.gitignore = .gitignore
 		A1Test-World.xml = A1Test-World.xml
 		A2Test-World.xml = A2Test-World.xml
+		A2TestPrivate-World.xml = A2TestPrivate-World.xml
 		CK-World.xml = CK-World.xml
 		LocalWorldRootPathMapping.txt = LocalWorldRootPathMapping.txt
 		nuget.config = nuget.config
@@ -46,7 +47,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.Basics", "CK.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Artifact", "CK.Env.Artifact\CK.Env.Artifact.csproj", "{722E1459-AF6C-41BF-AFCB-7878F33E0CF5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.CKSetup", "CK.Env.CKSetup\CK.Env.CKSetup.csproj", "{73F50D14-C21A-476B-B150-6BFC962F862F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.CKSetup", "CK.Env.Plugin.CKSetup\CK.Env.Plugin.CKSetup.csproj", "{73F50D14-C21A-476B-B150-6BFC962F862F}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.SolutionSpec", "CK.Env.SolutionSpec\CK.Env.SolutionSpec.csproj", "{ADBC3160-6149-4F73-AAF0-07636E8E83A5}"
 EndProject

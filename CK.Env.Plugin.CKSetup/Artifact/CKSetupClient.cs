@@ -6,7 +6,7 @@ using System.Xml.Linq;
 using CK.Core;
 using CKSetup;
 
-namespace CK.Env
+namespace CK.Env.CKSetup
 {
     public class CKSetupClient : IArtifactRepositoryFactory
     {

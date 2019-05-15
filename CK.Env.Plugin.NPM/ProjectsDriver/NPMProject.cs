@@ -121,7 +121,7 @@ namespace CK.Env.Plugin
                 {
                     m.Warn( $"Unable to handle NPM {dep.Kind.ToPackageJsonKey()} '{dep.RawDep}' in {PackageJson.FilePath}. Only Simple version and file: relative paths are handled." );
                 }
-                if( dep.MinVersion == null )
+                if( dep.MinVersion != null )
                 {
                     var instance = new Artifact( NPMClient.NPMType, dep.Name ).WithVersion( dep.MinVersion );
                     toRemove.Remove( instance.Artifact );

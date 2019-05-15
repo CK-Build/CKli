@@ -1,8 +1,10 @@
 using CK.Core;
+using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Xml.Linq;
 using System.Xml.XPath;
 
@@ -19,14 +21,23 @@ namespace CK.Env
             _typeRegister = new Dictionary<XName, Type>();
         }
 
-        public bool RegisterName( XName n, Type t, bool throwOnConflict = true )
+        public bool RegisterName( IActivityMonitor monitor, XName n, Type t, bool throwOnConflict = true )
         {
             if( n == null ) throw new ArgumentNullException( nameof( n ) );
             if( t == null ) throw new ArgumentNullException( nameof( t ) );
-            return DoRegister( n, t, throwOnConflict );
+            return DoRegister( monitor, n, t, throwOnConflict );
         }
 
-        public void RegisterNames( IEnumerable<Type> types, Func<Type, IEnumerable<XName>> namer, bool throwOnConflict = true )
+        /// <summary>
+        /// Registers a set of <see cref="XTypedObject"/> types that must not be abstract.
+        /// Xml enlement names are produced by the <paramref name="namer"/>.
+        /// Default "namer" is <see cref="AutoNamesFromType"/>.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="types">Set of type to register.</param>
+        /// <param name="namer">Functions that associates one or more element names to a type.</param>
+        /// <param name="throwOnConflict">False to ignore name conflicts.</param>
+        public void RegisterNames( IActivityMonitor monitor, IEnumerable<Type> types, Func<Type, IEnumerable<XName>> namer, bool throwOnConflict = true )
         {
             if( types == null ) throw new ArgumentNullException( nameof( types ) );
             if( namer == null ) throw new ArgumentNullException( nameof( namer ) );
@@ -37,18 +48,27 @@ namespace CK.Env
                 {
                     foreach( var name in n )
                     {
-                        if( name != null ) RegisterName( name, t, throwOnConflict );
+                        if( name != null ) RegisterName( monitor, name, t, throwOnConflict );
                     }
                 }
             }
         }
 
-        public void AutoRegisterFromLoadedAssemblies()
+        public void AutoRegisterFromLoadedAssemblies( IActivityMonitor monitor )
         {
-            var allTypes = AppDomain.CurrentDomain.GetAssemblies()
-                                .SelectMany( a => a.ExportedTypes )
-                                .Where( t => !t.IsAbstract && typeof( XTypedObject ).IsAssignableFrom( t ) );
-            RegisterNames( allTypes, AutoNamesFromType );
+            AutoRegisterFromdAssemblies( monitor, AppDomain.CurrentDomain.GetAssemblies() );
+        }
+
+        public void AutoRegisterFromdAssemblies( IActivityMonitor monitor, IEnumerable<Assembly> a )
+        {
+            foreach( var one in a ) AutoRegisterFromdAssembly( monitor, one );
+        }
+
+        public void AutoRegisterFromdAssembly( IActivityMonitor monitor, Assembly a )
+        {
+            var allTypes = a.ExportedTypes
+                            .Where( t => !t.IsAbstract && typeof( XTypedObject ).IsAssignableFrom( t ) );
+            RegisterNames( monitor, allTypes, AutoNamesFromType );
         }
 
         public IEnumerable<XName> AutoNamesFromType( Type t )
@@ -61,24 +81,26 @@ namespace CK.Env
             return new XName[] { t.Name[0] == 'X' ? t.Name.Substring( 1 ) : t.Name };
         }
 
-        bool DoRegister( XName n, Type t, bool throwOnConflict )
+        bool DoRegister( IActivityMonitor monitor, XName n, Type t, bool throwOnConflict )
         {
             if( _typeRegister.TryGetValue( n, out var exists ) )
             {
                 if( exists != t )
                 {
+                    var msg = $"Cannot register name '{n}' mapping to type '{t}' since it is already mapped to '{exists}'.";
                     if( throwOnConflict )
                     {
-                        throw new ArgumentException( $"Cannot register name '{n}' mapping to type '{t}' since it is already mapped to '{exists}'." );
+                        throw new ArgumentException( msg );
                     }
+                    monitor.Warn( msg );
                     return false;
                 }
             }
             else
             {
+                monitor.Info( $"Element '{n}' mapped to '{t}'." );
                 _typeRegister.Add( n, t );
             }
-
             return true;
         }
 
@@ -91,7 +113,12 @@ namespace CK.Env
             return t;
         }
 
-        public Type GetMappping( XElement e ) => GetNameMappping( e.Name );
+        public Type GetMappping( IActivityMonitor m, XElement e, ISet<XElement> handledElements )
+        {
+            var t = GetNameMappping( e.Name );
+            if( t == null && !handledElements.Contains( e ) ) m.Warn( $"Unmapped element {e.Name}." );
+            return t;
+        }
 
         public T CreateInstance<T>( IActivityMonitor monitor, XElement e, IServiceProvider baseProvider = null ) where T : XTypedObject
         {
@@ -104,46 +131,66 @@ namespace CK.Env
             {
                 if( e == null ) throw new ArgumentNullException( nameof( e ) );
                 if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
-                if( _typeRegister.Count == 0 ) AutoRegisterFromLoadedAssemblies();
+                if( _typeRegister.Count == 0 ) AutoRegisterFromLoadedAssemblies( monitor );
+
+                var handledElements = new HashSet<XElement>();
 
                 e.Changing += PreventAnyChangesToXElement;
-                var typedRoot = TypedXml.Create( e, GetMappping, type );
-                var rootConfig = new XTypedObject.Initializer( monitor, typedRoot, baseProvider );
-                var root = (XTypedObject)baseProvider.SimpleObjectCreate( monitor, typedRoot.Type, rootConfig );
+                if( type == null ) type = GetMappping( monitor, e, handledElements );
+                var rootConfig = new XTypedObject.Initializer( this, monitor, handledElements, e, baseProvider );
+                var root = (XTypedObject)baseProvider.SimpleObjectCreate( monitor, type, rootConfig );
                 return root != null && CreateChildren( root, rootConfig ) ? root : null;
             }
         }
 
-        private void PreventAnyChangesToXElement( object sender, XObjectChangeEventArgs e )
+        void PreventAnyChangesToXElement( object sender, XObjectChangeEventArgs e )
         {
             throw new InvalidOperationException( "An XElement that is bound to a TypedObject must not be changed." );
         }
 
         static bool CreateChildren( XTypedObject parent, XTypedObject.Initializer parentConfig )
         {
-            SimpleServiceContainer cChild = new SimpleServiceContainer( parentConfig.ChildServices );
-            int count = parentConfig.TypedXml.TypedChildren.Count;
-            var created = new XTypedObject[count];
-            for( int i = 0; i < count; ++i )
+            SimpleServiceContainer cChild = null;
+            List<XTypedObject> created = null;
+            XTypedFactory typeFactory = null;
+            var eParent = parent.XElement;
+            foreach( var child in eParent.Elements() )
             {
-                var c = parentConfig.TypedXml.TypedChildren[i];
-                var config = new XTypedObject.Initializer( parentConfig.Monitor, parent, c, cChild );
-                var o = created[i] = (XTypedObject)cChild.SimpleObjectCreate( parentConfig.Monitor, c.Type, config );
-                if( o == null || !CreateChildren( o, config ) ) return false;
+                if( typeFactory == null ) typeFactory = parentConfig.ChildServices.GetService<XTypedFactory>();
+                var tChild = typeFactory.GetMappping( parentConfig.Monitor, child, parentConfig.HandledElements );
+                if( tChild != null )
+                {
+                    if( cChild == null ) cChild = new SimpleServiceContainer( parentConfig.ChildServices );
+                    var config = new XTypedObject.Initializer( parentConfig.Monitor, parentConfig.HandledElements, parent, child, cChild );
+                    var o = (XTypedObject)cChild.SimpleObjectCreate( parentConfig.Monitor, tChild, config );
+                    if( created == null ) created = new List<XTypedObject>();
+                    created.Add( o );
+                    if( o == null || !CreateChildren( o, config ) ) return false;
+                }
             }
-            return parent.OnChildrenCreated( parentConfig, created );
+            return parent.OnChildrenCreated( parentConfig, (IReadOnlyList<XTypedObject>)created ?? Array.Empty<XTypedObject>() );
         }
 
+        /// <summary>
+        /// Enacapsulates <see cref="Errors"/> and <see cref="Result"/> of <see cref="PreProcess(IActivityMonitor, XElement)"/>.
+        /// </summary>
         public struct PreProcessResult
         {
-            public PreProcessResult( IReadOnlyList<ActivityMonitorSimpleCollector.Entry> errors, XElement result )
+            internal PreProcessResult( IReadOnlyList<ActivityMonitorSimpleCollector.Entry> errors, XElement result )
             {
                 Errors = errors ?? Array.Empty<ActivityMonitorSimpleCollector.Entry>();
                 Result = errors != null ? null : result;
             }
 
+            /// <summary>
+            /// Gets the preprocessed result.
+            /// This can be available even if there are errors.
+            /// </summary>
             public XElement Result { get; }
 
+            /// <summary>
+            /// Gets the potential errors or warnings.
+            /// </summary>
             public IReadOnlyList<ActivityMonitorSimpleCollector.Entry> Errors { get; }
         }
 

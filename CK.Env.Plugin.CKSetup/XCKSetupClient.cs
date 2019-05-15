@@ -2,27 +2,27 @@ using CK.Env;
 using CK.Core;
 using System.Net.Http;
 
-namespace CKli
+namespace CK.Env.CKSetup
 {
     public class XCKSetupClient : XTypedObject
     {
-       readonly CKSetupClient _client;
-
         public XCKSetupClient(
             HttpClient sharedHttpClient,
             ISecretKeyStore secretKeyStore,
             ArtifactCenter artifact,
+            IEnvLocalFeedProvider localFeedProvider,
             FileSystem fs,
             Initializer initializer )
             : base( initializer )
         {
-            _client = new CKSetupClient( secretKeyStore, sharedHttpClient );
-            fs.ServiceContainer.Add( _client );
-            artifact.Add( _client );
+            Client = new CKSetupClient( secretKeyStore, sharedHttpClient );
+            fs.ServiceContainer.Add( Client );
+            artifact.Register( Client );
+            localFeedProvider.Register( new EnvLocalFeedProviderCKSetupHandler() );
             initializer.Services.Add( this );
         }
 
-        public CKSetupClient CKSetupClient => _client;       
+        public CKSetupClient Client { get; }       
 
     }
 }

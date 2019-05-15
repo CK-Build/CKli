@@ -1,18 +1,15 @@
 using CK.Core;
+using CK.Env.Plugin;
 using CKSetup;
 using System;
-using System.IO;
+using System.Linq;
+using System.Collections.Generic;
+using CK.Env.CKSetup;
 
-namespace CK.Env.Plugin
+namespace CK.Env
 {
-    public static class CKSetupLocalFeedProviderExtension
+    public static class CKSetupEnvLocalFeedProviderExtension
     {
-        public const string CKSetupStoreName = "CKSetupStore";
-
-        public static string GetCKSetupStorePath( this IEnvLocalFeed @this )
-        {
-            return @this.PhysicalPath.AppendPart( CKSetupStoreName );
-        }
 
         public static string GetCKSetupStorePath( this IEnvLocalFeedProvider @this, IActivityMonitor m, BuildType buildType )
         {
@@ -29,7 +26,7 @@ namespace CK.Env.Plugin
                 string EnsureStore( IEnvLocalFeed feed, Uri prototypeUrl )
                 {
                     string path = feed.PhysicalPath.AppendPart( "CKSetupStore" );
-                    if( !Directory.Exists( path ) ) Directory.CreateDirectory( path );
+                    if( !System.IO.Directory.Exists( path ) ) System.IO.Directory.CreateDirectory( path );
                     using( var s = LocalStore.OpenOrCreate( m, path ) )
                     {
                         s.PrototypeStoreUrl = prototypeUrl;
@@ -48,5 +45,17 @@ namespace CK.Env.Plugin
             }
         }
 
+        internal static void RemoveCKSetupComponents( IActivityMonitor m, IEnumerable<ArtifactInstance> instances, string storePath )
+        {
+            var ckSetupComponents = instances.Where( i => i.Artifact.Type == CKSetupClient.CKSetupType )
+                                             .ToDictionary( i => i.Artifact.Name, i => i.Version );
+            if( ckSetupComponents.Count > 0 )
+            {
+                using( var cache = LocalStore.OpenOrCreate( m, storePath ) )
+                {
+                    cache.RemoveComponents( c => ckSetupComponents.TryGetValue( c.Name, out var v ) && c.Version == v );
+                }
+            }
+        }
     }
 }

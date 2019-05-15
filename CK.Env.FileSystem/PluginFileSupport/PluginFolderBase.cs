@@ -107,7 +107,7 @@ namespace CK.Env.Plugin
         }
 
         /// <summary>
-        /// Ensures that a text file exists and initializes its content: exisitng content is preserved.
+        /// Ensures that a text file exists and initializes its content: existing content is preserved.
         /// The embedded resource name must have a ".txt" suffix appended.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -118,8 +118,8 @@ namespace CK.Env.Plugin
         {
             var fs = Folder.FileSystem;
             var target = FolderPath.Combine( path );
-            var currentText = fs.GetFileInfo( target ).AsTextFileInfo()?.TextContent;
-            var final = transformer != null ? transformer( currentText ?? GetTextResourceFromPath(path) ) : GetTextResourceFromPath(path);
+            var currentText = fs.GetFileInfo( target ).AsTextFileInfo()?.TextContent ?? GetTextResourceFromPath( path );
+            var final = transformer != null ? transformer( currentText ) : currentText;
             return final != currentText ? fs.CopyTo( m, final, target ) : true;
         }
 

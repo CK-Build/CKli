@@ -30,7 +30,7 @@ namespace CK.Env.Plugin
             var solution = _driver.GetSolution( m );
             if( solution == null ) return;
 
-            bool hasDotNetPackages = solution.GeneratedArtifacts.Any( g => g.Artifact.Type == LocalNuGetPackageFile.NuGetType );
+            bool hasDotNetPackages = solution.GeneratedArtifacts.Any( g => g.Artifact.Type == NuGetClient.NuGetType );
 
             if( hasDotNetPackages )
             {

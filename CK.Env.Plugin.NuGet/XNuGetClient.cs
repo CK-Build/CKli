@@ -22,7 +22,7 @@ namespace CKli
             _nuGetClient = new NuGetClient( sharedHttpClient, secretKeyStore );
             localFeedProvider.Register( new EnvLocalFeedProviderNuGetHandler() );
             fs.ServiceContainer.Add( _nuGetClient );
-            artifact.Add( _nuGetClient );
+            artifact.Register( _nuGetClient );
            initializer.Services.Add( this );
         }
 

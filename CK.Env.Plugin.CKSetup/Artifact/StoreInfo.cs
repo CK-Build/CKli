@@ -1,6 +1,6 @@
 using System;
 
-namespace CK.Env
+namespace CK.Env.CKSetup
 {
     class StoreInfo : ICKSetupStoreInfo
     {

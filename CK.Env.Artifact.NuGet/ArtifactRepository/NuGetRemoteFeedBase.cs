@@ -47,7 +47,7 @@ namespace CK.Env.NuGet
         /// </summary>
         /// <param name="artifactType">Type of the artifact.</param>
         /// <returns>True if this repository artifact type is "NuGet", false otherwise.</returns>
-        public bool HandleArtifactType( in ArtifactType artifactType ) => artifactType == LocalNuGetPackageFile.NuGetType;
+        public bool HandleArtifactType( in ArtifactType artifactType ) => artifactType == NuGetClient.NuGetType;
 
         IArtifactRepositoryInfo IArtifactRepository.Info => Info;
 

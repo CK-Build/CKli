@@ -41,7 +41,7 @@ namespace CKli
             var consoleClient = new ColoredActivityMonitorConsoleClient();
             monitor.Output.RegisterClient( consoleClient );
             var xFactory = new XTypedFactory();
-            xFactory.AutoRegisterFromLoadedAssemblies();
+            xFactory.AutoRegisterFromLoadedAssemblies( monitor );
 
             IBasicApplicationLifetime appLife = new FakeApplicationLifetime();
             var rootPath = GetRootPath( args );

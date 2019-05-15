@@ -34,7 +34,6 @@ namespace CK.Env.Plugin
             if( !_f.EnsureDirectory( m ) ) return;
             var solution = _solutionDriver.GetSolution( m );
             if( solution == null ) return;
-            bool produceCKSetupComponents = solution.GeneratedArtifacts.Any( g => g.Artifact.Type == CKSetupClient.CKSetupType );
 
             var framework = MSProjContext.Traits.FindOrCreate( "netcoreapp2.1" );
 
@@ -82,6 +81,10 @@ namespace CK.Env.Plugin
             {
                 EnsureProjectReference( "SimpleGitVersion.Cake", "0.37.3" );
 
+                // This should NOT BE HERE.
+                // This should actually not be at all since configuring
+                // the project reference like this is clearly awful.
+                bool produceCKSetupComponents = solution.GeneratedArtifacts.Any( g => g.Artifact.Type.Name == "CKSetup" );
                 if( produceCKSetupComponents == true )
                 {
                     EnsureProjectReference( "CKSetup.Cake", "9.0.0" );

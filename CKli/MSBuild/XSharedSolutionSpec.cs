@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Env;
 using CK.Env.DependencyModel;
+using System.Linq;
 
 namespace CKli
 {
@@ -28,7 +29,21 @@ namespace CKli
             {
                 SharedSpec = new SharedSolutionSpec( initializer.Element, artifactCenter );
             }
+            RemoveElementWarnings( initializer );
             initializer.Services.Add( SharedSpec );
+        }
+
+        static internal void RemoveElementWarnings( Initializer initializer )
+        {
+            var s = nameof( SharedSolutionSpec.NuGetSources );
+            initializer.HandledElements.AddRange( initializer
+                                                    .Element.Elements()
+                                                    .Where( c => c.Name.LocalName == nameof( SharedSolutionSpec.NuGetSources )
+                                                                 || c.Name.LocalName == nameof( SharedSolutionSpec.RemoveNuGetSourceNames )
+                                                                 || c.Name.LocalName == nameof( SharedSolutionSpec.NPMSources )
+                                                                 || c.Name.LocalName == nameof( SharedSolutionSpec.RemoveNPMScopeNames )
+                                                                 || c.Name.LocalName == nameof( SharedSolutionSpec.ArtifactTargets )
+                                                                 || c.Name.LocalName == nameof( SharedSolutionSpec.ExcludedPlugins ) ) );
         }
 
         public SharedSolutionSpec SharedSpec { get; }

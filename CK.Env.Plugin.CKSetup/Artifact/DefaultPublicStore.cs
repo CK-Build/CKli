@@ -1,7 +1,7 @@
 using System;
 using CKSetup;
 
-namespace CK.Env
+namespace CK.Env.CKSetup
 {
     class DefaultPublicStore : ICKSetupStoreInfo
     {

@@ -17,6 +17,7 @@ namespace CK.Env
         {
             UseCKSetup = (bool?)e.Attribute( nameof( UseCKSetup ) ) ?? false;
             SqlServer = (string)e.Attribute( nameof( SqlServer ) );
+            TestProjectsArePublished = (bool?)e.Attribute( nameof( TestProjectsArePublished ) ) ?? false;
 
             NPMProjects = e.Elements( nameof( NPMProjects ) )
                 .ApplyAddRemoveClear( p => (string)p.AttributeRequired( "Folder" ), p => new NPMProjectSpec( p ) )
@@ -28,7 +29,6 @@ namespace CK.Env
             PublishedProjects = e.Elements( nameof( PublishedProjects ) )
                             .ApplyAddRemoveClear( s => new NormalizedPath( (string)s.AttributeRequired( "Folder" ) ) );
 
-            TestProjectsArePublished = (bool?)e.Attribute( nameof( TestProjectsArePublished ) ) ?? false;
 
             NotPublishedProjects = e.Elements( nameof( NotPublishedProjects ) )
                             .ApplyAddRemoveClear( s => new NormalizedPath( (string)s.AttributeRequired( "Folder" ) ) );
@@ -51,6 +51,13 @@ namespace CK.Env
         public string SqlServer { get; }
 
         /// <summary>
+        /// Gets whether .Net Test projects (all projects with a name that ends with ".Tests") of the actual
+        /// solution must be published as NuGet packages.
+        /// Defaults to false.
+        /// </summary>
+        public bool TestProjectsArePublished { get; }
+
+        /// <summary>
         /// Gets the list of npm projects specifications.
         /// </summary>
         public IReadOnlyCollection<INPMProjectSpec> NPMProjects { get; }
@@ -71,12 +78,6 @@ namespace CK.Env
         /// </summary>
         public IReadOnlyCollection<NormalizedPath> PublishedProjects { get; }
 
-        /// <summary>
-        /// Gets whether .Net Test projects (all projects with a name that ends with ".Tests") of the actual
-        /// solution must be published as NuGet packages.
-        /// Defaults to false.
-        /// </summary>
-        public bool TestProjectsArePublished { get; }
 
         /// <summary>
         /// Gets the optional set of .Net project folders that must not be published.

@@ -7,7 +7,7 @@ using CK.Core;
 using CK.Text;
 using CKSetup;
 
-namespace CK.Env
+namespace CK.Env.CKSetup
 {
     class Store : IArtifactRepository
     {

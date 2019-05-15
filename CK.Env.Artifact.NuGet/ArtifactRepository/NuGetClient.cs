@@ -20,6 +20,11 @@ namespace CK.Env.NuGet
 {
     public class NuGetClient : IArtifactRepositoryFactory, IDisposable
     {
+        /// <summary>
+        /// Exposes the "NuGet" <see cref="ArtifactType"/>. This type of artifact is installable.
+        /// </summary>
+        public static readonly ArtifactType NuGetType;
+
         internal static readonly List<Lazy<INuGetResourceProvider>> Providers;
 
         readonly Dictionary<string, IInternalFeed> _feeds;
@@ -185,6 +190,8 @@ namespace CK.Env.NuGet
 
         static NuGetClient()
         {
+            NuGetType = ArtifactType.Register( "NuGet", true );
+
             // Workaround for dev/NuGet.Client\src\NuGet.Core\NuGet.Protocol\Plugins\PluginFactory.cs line 161:
             // FileName = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH"),
             // This line should be:

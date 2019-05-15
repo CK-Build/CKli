@@ -70,9 +70,10 @@ namespace CK.Env
         IReadOnlyCollection<IArtifactRepository> ArtifactTargets { get; }
 
         /// <summary>
-        /// Defines the set of Git or GitBranch plugins that must apply.
+        /// Defines the set of Git or GitBranch plugins that must NOT be activated.
+        /// By default, all available Git plugins are active.
         /// </summary>
-        IReadOnlyCollection<Type> Plugins { get; }
+        IReadOnlyCollection<Type> ExcludedPlugins { get; }
 
     }
 }

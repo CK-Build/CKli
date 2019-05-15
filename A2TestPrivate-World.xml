@@ -1,31 +1,40 @@
 <A2TestPrivate>
 
+  <LoadLibrary Name="CK.Env.Plugin.SolutionDriver" />
+  <LoadLibrary Name="CK.Env.Plugin.Appveyor" />
+  <LoadLibrary Name="CK.Env.Plugin.GitLab" />
+  <LoadLibrary Name="CK.Env.Plugin.NPM" />
+  <LoadLibrary Name="CK.Env.Plugin.CKSetup" />
+  <LoadLibrary Name="CK.Env.Plugin.NuGet" />
+
   <SharedHttpClient />
   <ArtifactCenter />
   <LocalFeedProvider />
-  <CKEnvKeyVault />
   <NuGetClient />
   <NPMClient />
   <CKSetupClient />
-  <SolutionCentral />
-  <NPMProjectCenter />
+  <WorldState />
 
   <ArtifactRepositories>
-    <Repository Type="NPMAzure" NPMScope="@signature-code" Organization="Signature-Code" FeedName="CKEnvTest3" CheckName="NPMAzure:@signature-code->Signature-Code-CKEnvTest3" CheckSecretKeyName="AZURE_FEED_SIGNATURE_CODE_PAT" />
-  <Repository Type="NuGetAzure"
-                Organization="Signature-Code"
-                FeedName="CKEnvTest3"
-                CheckName="NuGetAzure:Signature-Code-CKEnvTest3"
+    
+    <Repository Type="NPMAzure" Organization="Signature-Code" FeedName="CKEnvTest3"
+                NPMScope="@signature-code"
+                CheckName="NPMAzure:@signature-code->Signature-Code-CKEnvTest3"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_CODE_PAT" />
+    
+    <Repository Type="NuGetAzure" Organization="Signature-Code" FeedName="CKEnvTest3"
+                  CheckName="NuGetAzure:Signature-Code-CKEnvTest3"
+                  CheckSecretKeyName="AZURE_FEED_SIGNATURE_CODE_PAT" />
+    
   </ArtifactRepositories>
 
-  <SolutionSettings>
+  <SharedSolutionSpec>
     <NuGetSources>
       <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json">
-        <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
       </add>
       <add Name="Open-Source-CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/CKEnvTest3/nuget/v3/index.json">
-        <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
       </add>
       <add Name="Code-CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/CKEnvTest3/nuget/v3/index.json" />
     </NuGetSources>
@@ -46,32 +55,17 @@
         <Credentials UserName="SignatureCode" PasswordSecretKeyName="SIGNATURE_CODE_READ_PAT" />
       </add>
     </NPMSources>
-    <Plugins>
-      <add Type="CK.Env.Plugins.SolutionDriver, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderFolder, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderCSProjFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderKeyVaultFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CommonFolder, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.SharedPropsFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CKSetupStoreTestHelperConfigFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.RepositoryXmlFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.NugetConfigFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.GitIgnoreFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.NPMRCFiles, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderNPMSolutionFile, CK.Env.Plugins" />
-      <add Type="CK.BuildSystem.Appveyor.AppveyorFile, CK.BuildSystem.Appveyor" />
-    </Plugins>
-  </SolutionSettings>
-
+  </SharedSolutionSpec>
 
   <Folder Name="Projects">
 
-
     <GitFolder Name="CK-Observable-Domain" Url="https://gitlab.com/Signature-Code/CK-Observable-Domain.git">
-      <SolutionSettings NoStrongNameSigning="True"/>
       <Branch Name="develop">
-        <PrimarySolution />
-        <NPMProject Folder="js" PackageName="@signature-code/ck-observable-domain" />
+        <SolutionSpec NoStrongNameSigning="True" >
+          <NPMProjects>
+            <add  Folder="js" PackageName="@signature-code/ck-observable-domain" />
+          </NPMProjects>
+        </SolutionSpec>
       </Branch>
     </GitFolder>
 

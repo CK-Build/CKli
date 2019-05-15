@@ -2,6 +2,7 @@ using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Xml.Linq;
 
 namespace CK.Env
@@ -40,7 +41,7 @@ namespace CK.Env
             ArtifactTargets = e.Elements( nameof( ArtifactTargets ) )
                              .ApplyAddRemoveClear( s => a.Find( (string)s.AttributeRequired( "Name" ) ) );
 
-            Plugins = e.Elements( nameof( Plugins ) )
+            ExcludedPlugins = e.Elements( nameof( ExcludedPlugins ) )
                              .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Type" ), s => SimpleTypeFinder.WeakResolver( (string)s.Attribute( "Type" ), true ) )
                              .Values;
         }
@@ -68,7 +69,7 @@ namespace CK.Env
                 NPMSources = other.NPMSources;
                 RemoveNPMScopeNames = other.RemoveNPMScopeNames;
                 ArtifactTargets = other.ArtifactTargets;
-                Plugins = other.Plugins;
+                ExcludedPlugins = other.ExcludedPlugins;
             }
             else
             {
@@ -109,8 +110,8 @@ namespace CK.Env
                 ArtifactTargets = e.Elements( nameof( ArtifactTargets ) )
                                     .ApplyAddRemoveClear( artifactTargets, eF => a.Find( (string)eF.AttributeRequired( "Name" ) ) );
 
-                Plugins = e.Elements( nameof( Plugins ) )
-                     .ApplyAddRemoveClear( new HashSet<Type>( other.Plugins ), eF => SimpleTypeFinder.WeakResolver( (string)eF.AttributeRequired( "Type" ), true ) );
+                ExcludedPlugins = e.Elements( nameof( ExcludedPlugins ) )
+                     .ApplyAddRemoveClear( new HashSet<Type>( other.ExcludedPlugins ), eF => SimpleTypeFinder.WeakResolver( (string)eF.AttributeRequired( "Type" ), true ) );
             }
         }
 
@@ -160,8 +161,8 @@ namespace CK.Env
         public IReadOnlyCollection<IArtifactRepository> ArtifactTargets { get; }
 
         /// <summary>
-        /// <see cref="ISharedSolutionSpec.Plugins"/>.
+        /// <see cref="ISharedSolutionSpec.ExcludedPlugins"/>.
         /// </summary>
-        public IReadOnlyCollection<Type> Plugins { get; }
+        public IReadOnlyCollection<Type> ExcludedPlugins { get; }
     }
 }

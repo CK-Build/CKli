@@ -388,7 +388,7 @@ namespace CK.Env.Plugin
             var toUpgrade = solution.Projects
                         .Where( p => upgradeBuildProjects || !p.IsBuildProject )
                         .SelectMany( p => p.PackageReferences )
-                        .Select( dep => (Dep: dep, LocalVersion: feed.GetBestVersion( monitor, dep.Target.Artifact.Name )) )
+                        .Select( dep => (Dep: dep, LocalVersion: feed.GetBestNuGetVersion( monitor, dep.Target.Artifact.Name )) )
                         .Where( pv => pv.LocalVersion != null )
                         .Select( pv => new UpdatePackageInfo( pv.Dep.Owner, NuGetType, pv.Dep.Target.Artifact.Name, pv.LocalVersion ) );
 

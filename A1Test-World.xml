@@ -1,12 +1,17 @@
 <A1Test>
 
+  <!-- There is only pure NuGet projects in this A1-Test world. -->
+  <LoadLibrary Name="CK.Env.Plugin.SolutionDriver" />
+  <LoadLibrary Name="CK.Env.Plugin.Appveyor" />
+  <LoadLibrary Name="CK.Env.Plugin.GitLab" />
+  <!--<LoadLibrary Name="CK.Env.Plugin.NPM" />-->
+  <!--<LoadLibrary Name="CK.Env.Plugin.CKSetup" />-->
+  <LoadLibrary Name="CK.Env.Plugin.NuGet" />
+
   <SharedHttpClient />
   <ArtifactCenter />
   <LocalFeedProvider />
-  <CKEnvKeyVault />
   <NuGetClient />
-  <NPMClient />
-  <CKSetupClient />
   <WorldState />
 
   <ArtifactRepositories>
@@ -15,23 +20,15 @@
                 FeedName="CKEnvTest3"
                 CheckName="NuGetAzure:Signature-OpenSource-CKEnvTest3"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
-    <Repository Type="CKSetup"
-                CheckName="CKSetup:Public"
-                CheckSecretKeyName="CKSETUPREMOTESTORE_PUSH_API_KEY" />
-    <Repository Type="CKSetup"
-                Name="CKEnvTest"
-                Url="https://ckenvtest.cksetup.invenietis.net"
-                CheckName="CKSetup:CKEnvTest"
-                CheckSecretKeyName="CKSETUPREMOTESTORE_CKENVTEST_PUSH_API_KEY" />
   </ArtifactRepositories>
 
   <SharedSolutionSpec>
     <NuGetSources>
       <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json" >
-        <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
       </add>
       <add Name="CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/CKEnvTest3/nuget/v3/index.json" >
-        <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
       </add>
     </NuGetSources>
     <RemoveNuGetSourceNames>
@@ -42,36 +39,7 @@
     </RemoveNuGetSourceNames>
     <ArtifactTargets>
       <add Name="NuGetAzure:Signature-OpenSource-CKEnvTest3" />
-      <add Name="CKSetup:CKEnvTest" />
     </ArtifactTargets>
-    <Plugins>
-      <add Type="CK.Env.Plugin.SolutionDriver, CK.Env.Plugin.SolutionDriver" />
-      
-      <add Type="CK.Env.Plugin.CodeCakeBuilderFolder, CK.Env.Plugin.Basics" />
-      <add Type="CK.Env.Plugin.CodeCakeBuilderCSProjFile, CK.Env.Plugin.Basics" />
-      <add Type="CK.Env.Plugin.CodeCakeBuilderKeyVaultFile, CK.Env.Plugin.Basics" />
-      
-      <add Type="CK.Env.Plugin.CommonFolder, CK.Env.Plugin.Basics" />
-      <add Type="CK.Env.Plugin.SharedPropsFile, CK.Env.Plugin.Basics" />
-      <add Type="CK.Env.Plugin.SolutionFolder, CK.Env.Plugin.Basics" />
-      
-      <add Type="CK.Env.Plugin.GitIgnoreFile, CK.Env.Plugin.Basics" />
-      <add Type="CK.Env.Plugin.NugetConfigFile, CK.Env.Plugin.Basics" />
-      <add Type="CK.Env.Plugin.RepositoryXmlFile, CK.Env.Plugin.Basics" />
-      
-      <add Type="CK.Env.Plugin.CKSetupStoreTestHelperConfigFile, CK.Env.Plugin.Basics" />
-      
-      <add Type="CK.Env.Plugin.NuGetCodeCakeBuilderFolder, CK.Env.Plugin.NuGet" />
-      
-      <add Type="CK.Env.Plugin.NPMProjectsDriver, CK.Env.Plugin.NPM" />
-      <add Type="CK.Env.Plugin.NPMCodeCakeBuilderFolder, CK.Env.Plugin.NPM" />
-      <add Type="CK.Env.Plugin.NPMRCFiles, CK.Env.Plugin.NPM" />
-      <add Type="CK.Env.Plugin.NPMSolutionFile, CK.Env.Plugin.NPM" />
-      
-
-      <add Type="CK.Env.Plugin.AppveyorFile, CK.Env.Plugin.Appveyor" />
-      <add Type="CK.Env.Plugin.GitLabFile, CK.Env.Plugin.GitLab" />
-    </Plugins>
   </SharedSolutionSpec>
 
   <Folder Name="Projects">

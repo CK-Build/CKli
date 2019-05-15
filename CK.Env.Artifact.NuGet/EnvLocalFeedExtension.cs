@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Env;
 using CK.Env.NuGet;
+using CK.Text;
 using CSemVer;
 using System;
 using System.Collections.Generic;
@@ -17,7 +18,7 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="packageId">The package name.</param>
         /// <returns>The version or null if not found.</returns>
-        public static SVersion GetBestVersion( this IEnvLocalFeed @this, IActivityMonitor m, string packageId )
+        public static SVersion GetBestNuGetVersion( this IEnvLocalFeed @this, IActivityMonitor m, string packageId )
         {
             return EnvLocalFeedProviderExtension.GetMaxVersionFromFeed( @this.PhysicalPath, packageId );
         }
@@ -29,7 +30,7 @@ namespace CK.Env
         /// <param name="packageId">The package name.</param>
         /// <param name="v">The package version.</param>
         /// <returns>The local package file or null if not found.</returns>
-        public static LocalNuGetPackageFile GetPackageFile( this IEnvLocalFeed @this, IActivityMonitor m, string packageId, SVersion v )
+        public static LocalNuGetPackageFile GetNuGetPackageFile( this IEnvLocalFeed @this, IActivityMonitor m, string packageId, SVersion v )
         {
             var f = GetPackagePath( @this.PhysicalPath, packageId, v );
             return System.IO.File.Exists( f ) ? new LocalNuGetPackageFile( f, packageId, v ) : null;
@@ -40,7 +41,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The package files.</returns>
-        public static IEnumerable<LocalNuGetPackageFile> GetAllPackageFiles( this IEnvLocalFeed @this, IActivityMonitor m )
+        public static IEnumerable<LocalNuGetPackageFile> GetAllNuGetPackageFiles( this IEnvLocalFeed @this, IActivityMonitor m )
         {
             return System.IO.Directory
                             .EnumerateFiles( @this.PhysicalPath, "*.nupkg" )

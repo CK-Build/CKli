@@ -1,11 +1,7 @@
-using System;
 using CK.Core;
-using CK.Text;
-using System.Linq;
-using System.Xml.Linq;
-using CK.Env.NPM;
-using System.Collections.Generic;
 using CK.Env;
+using System;
+using System.Linq;
 
 namespace CKli
 {
@@ -30,10 +26,19 @@ namespace CKli
             // The XSolutionSpec is available to siblings (ie. up to the end of the parent git branch).
             initializer.Services.Add( this );
             SolutionSpec = new SolutionSpec( sharedSpec, artifactCenter, initializer.Element );
+
+            XSharedSolutionSpec.RemoveElementWarnings( initializer );
+            initializer.HandledElements.AddRange( initializer
+                                                    .Element.Elements()
+                                                    .Where( c => c.Name.LocalName == nameof( SolutionSpec.NPMProjects )
+                                                                 || c.Name.LocalName == nameof( SolutionSpec.PublishedProjects )
+                                                                 || c.Name.LocalName == nameof( SolutionSpec.NotPublishedProjects )
+                                                                 || c.Name.LocalName == nameof( SolutionSpec.CKSetupComponentProjects ) ) );
+
             // Registers the SolutionSpec as a branch settings: the Solution specifications becomes
             // available to any of this branch plugins.
-            branch.Parent.GitFolder.PluginManager.RegisterSettings( SolutionSpec, branch.Name );
-            foreach( var type in SolutionSpec.Plugins )
+            branch.Parent.GitFolder.PluginManager.RegisterSettings( SolutionSpec, branch.Name );           
+            foreach( var type in GitPluginManager.GlobalRegister.GetAllGitPlugins().Except( SolutionSpec.ExcludedPlugins ) )
             {
                 branch.Parent.GitFolder.PluginManager.Register( type, branch.Name, allowGitPlugin: true );
             }

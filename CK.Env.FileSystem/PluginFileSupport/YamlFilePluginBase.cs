@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace CK.Env.Plugin
 {
-    public class YamlFilePluginBase : YamlFileBase, IGitBranchPlugin
+    public abstract class YamlFilePluginBase : YamlFileBase, IGitBranchPlugin
     {
         readonly GitBranchPluginImpl _pluginImpl;
 

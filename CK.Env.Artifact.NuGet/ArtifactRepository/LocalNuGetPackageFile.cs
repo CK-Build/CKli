@@ -10,15 +10,10 @@ namespace CK.Env.NuGet
     /// </summary>
     public class LocalNuGetPackageFile
     {
-        /// <summary>
-        /// Exposes the "NuGet" <see cref="ArtifactType"/>. This type of artifact is installable.
-        /// </summary>
-        public static readonly ArtifactType NuGetType = ArtifactType.Register( "NuGet", true );
-
         public LocalNuGetPackageFile( string fullPath, string id, SVersion v )
         {
             FullPath = fullPath;
-            Instance = new ArtifactInstance( NuGetType, id, v );
+            Instance = new ArtifactInstance( NuGetClient.NuGetType, id, v );
         }
 
         /// <summary>

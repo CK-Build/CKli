@@ -24,7 +24,7 @@ namespace CK.Env
         /// Registers a new <see cref="IArtifactRepository"/>.
         /// </summary>
         /// <param name="factory">The factory to register.</param>
-        public void Add( IArtifactRepositoryFactory factory )
+        public void Register( IArtifactRepositoryFactory factory )
         {
             if( factory == null ) throw new ArgumentNullException( nameof( factory ) );
             if( factory == this ) throw new ArgumentException( nameof( factory ) );
