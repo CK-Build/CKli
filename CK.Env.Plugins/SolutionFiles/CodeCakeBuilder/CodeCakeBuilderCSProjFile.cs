@@ -79,7 +79,7 @@ namespace CK.Env.Plugins.SolutionFiles
             }
             if( PluginBranch != StandardGitStatus.Local || _f.Folder.World.Name != "CK-World" )
             {
-                EnsureProjectReference( "SimpleGitVersion.Cake", "0.37.3" );
+                EnsureProjectReference( "SimpleGitVersion.Cake", "0.37.4--0022-develop" );
 
                 if( produceCKSetupComponents == true )
                 {

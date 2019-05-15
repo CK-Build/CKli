@@ -2,10 +2,20 @@
 <ENGIE-WORLD>
 
   <SharedHttpClient />
+  <ArtifactCenter />
   <LocalFeedProvider />
   <CKEnvKeyVault />
-  <ArtifactCenter />
+  <NuGetClient />
+  <NPMClient />
+  <CKSetupClient />
+  <NPMProjectCenter />
   <SolutionCentral />
+
+  <ArtifactRepositories>
+
+    <Repository Type="NuGetAzure" Organization="invenietis" FeedName="engie" CheckName="NuGetAzure:invenietis-engie" CheckSecretKeyName="AZURE_FEED_INVENIETIS_PAT" />
+  </ArtifactRepositories>
+
   <SolutionSettings>
     <NuGetSources>
       <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json">
@@ -37,6 +47,24 @@
   </SolutionSettings>
   <!-- NuGetSources Signature-OpenSource  -->
   <Folder Name="ENGIE">
+    <SolutionSettings>
+      <ArtifactTargets>
+        <add Name="NuGetAzure:invenietis-engie" />
+      </ArtifactTargets>
+    </SolutionSettings>
+
+    <GitFolder Name="CK-DB-Feedermarket" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/CK-DB-Feedermarket">
+      <SolutionSettings NoStrongNameSigning="true" />
+      <Branch Name="develop">
+        <PrimarySolution />
+      </Branch>
+    </GitFolder>
+    
+    <SolutionSettings>
+      <ArtifactTargets>
+        <remove Name="NuGetAzure:invenietis-engie" />
+      </ArtifactTargets>
+    </SolutionSettings>
     <GitFolder Name="Feedermarket-Auth" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Auth">
       <Branch Name="develop">
         <PrimarySolution />
@@ -51,12 +79,7 @@
     </GitFolder>
 
 
-    <GitFolder Name="CK-DB-Feedermarket" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/CK-DB-Feedermarket">
-      <SolutionSettings NoStrongNameSigning="true" />
-      <Branch Name="develop">
-        <PrimarySolution />
-      </Branch>
-    </GitFolder>
+
 
     <SolutionSettings>
       <NuGetSources>
@@ -97,6 +120,7 @@
     </GitFolder>
 
     <GitFolder Name="Feedermarket-Functions" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions">
+      <SolutionSettings NoStrongNameSigning="true" />
       <Branch Name="develop">
         <PrimarySolution />
       </Branch>
