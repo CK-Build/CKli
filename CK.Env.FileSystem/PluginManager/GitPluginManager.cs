@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using CK.Core;
 using CK.Text;
 
@@ -21,6 +22,34 @@ namespace CK.Env
         readonly string _defaultBranchName;
         readonly PluginCollection<IGitPlugin> _plugins;
         readonly Branches _branches;
+
+        /// <summary>
+        /// Static helper that registers all the <see cref="IGitPlugin"/> concrete types
+        /// available in the currently loaded assemblies.
+        /// </summary>
+        public static class GlobalRegister
+        {
+            static readonly HashSet<Assembly> _analyzed = new HashSet<Assembly>();
+            static readonly List<Type> _plugins = new List<Type>();
+
+            /// <summary>
+            /// Gets the list of all the <see cref="IGitPlugin"/> concrete types
+            /// available in the currently loaded assemblies.
+            /// </summary>
+            /// <returns>The Git plugin types.</returns>
+            public static IReadOnlyList<Type> GetAllGitPlugins()
+            {
+                foreach( var a in AppDomain.CurrentDomain.GetAssemblies() )
+                {
+                    if( _analyzed.Add( a ) )
+                    {
+                        _plugins.AddRange( a.ExportedTypes.Where( t => !t.IsAbstract && typeof( IGitPlugin ).IsAssignableFrom( t ) ) );
+                    }
+                }
+                return _plugins;
+            }
+
+        }
 
         class Branches : IGitBranchPluginCollection, IDisposable
         {
@@ -250,7 +279,7 @@ namespace CK.Env
 
         /// <summary>
         /// Reloads the whole set of plugins or the ones of a specific branch.
-        /// Exisitng IDisposable plugins are disposed first.
+        /// Existing IDisposable plugins are disposed first.
         /// </summary>
         /// <param name="branchName">The branch name or null for all plugins.</param>
         public void Reload( string branchName = null )

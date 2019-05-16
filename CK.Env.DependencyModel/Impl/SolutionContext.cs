@@ -46,14 +46,14 @@ namespace CK.Env.DependencyModel
             _allProjects = new List<Project>();
         }
 
-        internal bool OnProjectAdding( Project newOne )
+        internal Project OnProjectAdding( Project newOne )
         {
             int idx = _allProjects.BinarySearch( newOne, ProjectNameComparer.Comparer );
-            if( idx >= 0 ) return false;
+            if( idx >= 0 ) return _allProjects[idx];
             idx = ~idx;
             _allProjects.Insert( idx, newOne );
             HandleHomonymsAround( newOne.SimpleProjectName, idx, false );
-            return true;
+            return newOne;
         }
 
         void HandleHomonymsAround( string simpleName, int idx, bool removed )
@@ -129,7 +129,6 @@ namespace CK.Env.DependencyModel
             ++_version;
         }
 
-
         internal void OnProjectAdded( Project p )
         {
             ++_version;
@@ -185,6 +184,16 @@ namespace CK.Env.DependencyModel
         }
 
         internal void OnProjectReferenceRemoved( ProjectReference r )
+        {
+            ++_version;
+        }
+
+        internal void OnArtifactTargetAdded( Solution solution, IArtifactRepository newOne )
+        {
+            ++_version;
+        }
+
+        internal void OnArtifactTargetRemoved( Solution solution, IArtifactRepository artifactTarget )
         {
             ++_version;
         }

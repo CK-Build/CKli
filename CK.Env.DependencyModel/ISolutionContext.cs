@@ -5,6 +5,8 @@ namespace CK.Env.DependencyModel
 {
     /// <summary>
     /// Solution context handles a set of solutions and their projects.
+    /// The centralized <see cref="Version"/> enables any derived information
+    /// from these solutions to handle synchronization.
     /// </summary>
     public interface ISolutionContext : IReadOnlyCollection<ISolution>
     {

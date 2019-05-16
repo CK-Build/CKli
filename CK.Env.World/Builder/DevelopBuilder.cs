@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using CK.Core;
+using CK.Env.DependencyModel;
 using CK.Text;
 using CSemVer;
 
@@ -17,18 +18,16 @@ namespace CK.Env
             ZeroBuilder zeroBuilder,
             ArtifactCenter artifacts,
             IEnvLocalFeedProvider localFeedProvider,
-            IDependentSolutionContext ctx,
-            Func<IActivityMonitor, IDependentSolutionContext, string, ISolutionDriver> driverFinder,
+            IWorldSolutionContext ctx,
             bool withUnitTest )
-            : base( zeroBuilder, BuildResultType.CI, artifacts, localFeedProvider, ctx, driverFinder )
+            : base( zeroBuilder, BuildResultType.CI, artifacts, localFeedProvider, ctx )
         {
             _commits = new string[ctx.Solutions.Count];
             _withUnitTest = withUnitTest;
         }
 
-        protected override (SVersion Version, bool MustBuild) PrepareBuild( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades )
+        protected override (SVersion Version, bool MustBuild) PrepareBuild( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades )
         {
-            Debug.Assert( driver.GitRepository.CurrentBranchName == s.BranchName );
             if( !driver.UpdatePackageDependencies( m, upgrades ) ) return (null,false);
 
             // A commit is not necessarily created here if the dependencies have not changed!
@@ -37,12 +36,11 @@ namespace CK.Env
             var msg = $"CI build: Upgrading dependencies: {upText}.";
             if( !driver.GitRepository.Commit( m, msg ) ) return (null,false);
             _commits[s.Index] = driver.GitRepository.Head.CommitSha;
-            return (driver.GitRepository.GetCommitVersionInfo( m, s.BranchName ).AssemblyBuildInfo.NuGetVersion, true);
+            return (driver.GitRepository.GetCommitVersionInfo( m ).AssemblyBuildInfo.NuGetVersion, true);
         }
 
-        protected override BuildState Build( IActivityMonitor m, IDependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IEnumerable<UpdatePackageInfo> buildProjectsUpgrade )
+        protected override BuildState Build( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IEnumerable<UpdatePackageInfo> buildProjectsUpgrade )
         {
-            Debug.Assert( driver.GitRepository.CurrentBranchName == s.BranchName );
             if( _commits[s.Index] != driver.GitRepository.Head.CommitSha )
             {
                 m.Error( $"Commit changed between PrepareBuild call and this Build. Build canceled." );

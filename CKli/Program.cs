@@ -41,7 +41,7 @@ namespace CKli
             var consoleClient = new ColoredActivityMonitorConsoleClient();
             monitor.Output.RegisterClient( consoleClient );
             var xFactory = new XTypedFactory();
-            xFactory.AutoRegisterFromLoadedAssemblies();
+            xFactory.AutoRegisterFromLoadedAssemblies( monitor );
 
             IBasicApplicationLifetime appLife = new FakeApplicationLifetime();
             var rootPath = GetRootPath( args );
@@ -63,7 +63,7 @@ namespace CKli
                 string rep = Console.ReadLine().Trim();
                 if( rep.Length == 0 )
                 {
-                    global.CommandRegister["World/Initialize"].Execute( monitor, null );
+                    global.CommandRegister["World/DumpWorldState"].Execute( monitor, null );
                     continue;
                 }
                 if( rep == "cls" )

@@ -110,7 +110,6 @@ namespace CKli
             _root = _factory.CreateInstance<XTypedObject>( _monitor, expanded.Result, baseProvider );
             if( _root == null ) return false;
             _currentWorld = World;
-            CommandRegister["World/Initialize"].Execute( _monitor, null );
             CurrentWorldChanged?.Invoke( this, EventArgs.Empty );
             return true;
         }

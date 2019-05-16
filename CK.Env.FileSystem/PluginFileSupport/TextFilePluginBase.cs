@@ -1,8 +1,7 @@
-using CK.Core;
 using CK.Text;
 using System;
 
-namespace CK.Env.Plugins
+namespace CK.Env.Plugin
 {
     /// <summary>
     /// Basic base class for text files.

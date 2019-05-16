@@ -6,20 +6,14 @@ namespace CKli
 {
     public class XGitFolder : XPathItem
     {
-        readonly XSolutionCentral _central;
         readonly List<XBranch> _branches;
 
-        public XGitFolder(
-            Initializer initializer,
-            XPathItem parent,
-            XSolutionCentral central )
+        public XGitFolder( Initializer initializer, XPathItem parent, IWorldName world )
             : base( initializer, parent.FileSystem, parent )
         {
             _branches = new List<XBranch>();
-            _central = central;
-            central.Register( this );
             initializer.ChildServices.Add( this );
-            GitFolder = FileSystem.EnsureGitFolder( initializer.Monitor, central.World, FullPath, Url );
+            GitFolder = FileSystem.EnsureGitFolder( initializer.Monitor, world, FullPath, Url );
             GitFolder.IsPublic = IsPublic;
         }
 
@@ -27,11 +21,6 @@ namespace CKli
         /// Gets the GitFolder object that encapsulates the Git repoistory.
         /// </summary>
         public GitFolder GitFolder { get; }
-
-        /// <summary>
-        /// Gets the solution central.
-        /// </summary>
-        public XSolutionCentral SolutionCentral => _central;
 
         /// <summary>
         /// Gets the url of the remote repository.
@@ -56,7 +45,7 @@ namespace CKli
         internal void Register( XBranch b )
         {
             _branches.Add( b );
-            if( b.Name == SolutionCentral.World.DevelopBranchName )
+            if( b.Name == GitFolder.World.DevelopBranchName )
             {
                 DevelopBranch = b;
             }

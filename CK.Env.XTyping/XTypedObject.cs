@@ -12,29 +12,75 @@ namespace CK.Env
         {
             Dictionary<object, object> _initializationState;
 
-            internal Initializer( IActivityMonitor monitor, XTypedObject parent, TypedXml e, SimpleServiceContainer services )
+            /// <summary>
+            /// Constructor for child objects.
+            /// </summary>
+            /// <param name="monitor">The monitor to use.</param>
+            /// <param name="handledElements">The set of handled elements (to avoid warnings).</param>
+            /// <param name="parent">The parent object. Never null.</param>
+            /// <param name="e">The element. Never null.</param>
+            /// <param name="services">The available services.</param>
+            internal Initializer(
+                IActivityMonitor monitor,
+                ISet<XElement> handledElements,
+                XTypedObject parent,
+                XElement e,
+                SimpleServiceContainer services )
             {
-                TypedXml = e;
+                HandledElements = handledElements;
+                Element = e;
                 Parent = parent;
                 Monitor = monitor;
                 Services = services;
                 ChildServices = new SimpleServiceContainer( Services );
             }
 
-            internal Initializer( IActivityMonitor monitor, TypedXml e, IServiceProvider baseProvider )
+            /// <summary>
+            /// Constructor for the root.
+            /// </summary>
+            /// <param name="root">Root factory.</param>
+            /// <param name="handledElements">The set of handled elements (to avoid warnings).</param>
+            /// <param name="monitor">The monitor to use.</param>
+            /// <param name="e">The element. Never null.</param>
+            /// <param name="baseProvider">Can be null.</param>
+            internal Initializer(
+                XTypedFactory root,
+                IActivityMonitor monitor,
+                ISet<XElement> handledElements,
+                XElement e,
+                IServiceProvider baseProvider )
             {
-                TypedXml = e;
+                Element = e;
+                HandledElements = handledElements;
                 Monitor = monitor;
                 Services = new SimpleServiceContainer( baseProvider );
+                Services.Add( root );
                 ChildServices = new SimpleServiceContainer( Services );
             }
 
-            internal TypedXml TypedXml { get; }
-
+            /// <summary>
+            /// Gets the monitor to use.
+            /// </summary>
             public IActivityMonitor Monitor { get; }
 
-            public XElement Element => TypedXml.Element;
+            /// <summary>
+            /// Gets the raw <see cref="XElement"/>.
+            /// Unfortunaltely, there is no read-only view of XElement, this should not be mutated
+            /// otherwise an InvalidOperationException is thrown.
+            /// </summary>
+            public XElement Element { get; }
 
+            /// <summary>
+            /// Gets a mutable state of elements that have been handled by the object.
+            /// <see cref="Element"/>'s children that will not be registered here once
+            /// the <see cref="XTypedObject(Initializer)"/> constructor has ended will
+            /// trigger a warning.
+            /// </summary>
+            public ISet<XElement> HandledElements { get; }
+
+            /// <summary>
+            /// Gets the parent typed object.
+            /// </summary>
             public XTypedObject Parent { get; }
 
             /// <summary>
@@ -49,6 +95,9 @@ namespace CK.Env
             /// </summary>
             public ISimpleServiceContainer ChildServices { get; }
 
+            /// <summary>
+            /// Optional 
+            /// </summary>
             public IDictionary<object, object> InitializationState
             {
                 get
@@ -225,16 +274,20 @@ namespace CK.Env
             {
                 var c = children[i];
                 c.NextSibling = sibling;
-                c.OnSiblingsCreated( initializer.Monitor );
                 sibling = c;
             }
             Children = children;
+            foreach( var c in children )
+            {
+                c.OnSiblingsCreated( initializer.Monitor );
+            }
             return OnCreated( initializer );
         }
 
         /// <summary>
         /// Called once <see cref="NextSibling"/> is available (and all the siblings up to the last child
         /// of the <see cref="Parent"/>.
+        /// This default implementation simply returns true.
         /// </summary>
         /// <param name="monitor">Monitor that must be used to log any information.</param>
         /// <returns>Must return true on success, false if an error occured.</returns>

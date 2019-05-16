@@ -1,28 +1,29 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <CK-World>
 
+  <LoadLibrary Name="CK.Env.Plugin.SolutionDriver" />
+  <LoadLibrary Name="CK.Env.Plugin.Appveyor" />
+  <LoadLibrary Name="CK.Env.Plugin.GitLab" />
+  <LoadLibrary Name="CK.Env.Plugin.NPM" />
+  <LoadLibrary Name="CK.Env.Plugin.CKSetup" />
+  <LoadLibrary Name="CK.Env.Plugin.NuGet" />
+
   <SharedHttpClient />
   <ArtifactCenter />
   <LocalFeedProvider />
-  <CKEnvKeyVault />
   <NuGetClient />
   <NPMClient />
   <CKSetupClient />
-  <NPMProjectCenter />
-  <SolutionCentral />
+  <WorldState />
 
   <ArtifactRepositories>
 
-    <Repository Type="NuGetAzure"
-                Organization="Signature-OpenSource"
-                FeedName="Default"
+    <Repository Type="NuGetAzure" Organization="Signature-OpenSource" FeedName="Default"
                 CheckName="NuGetAzure:Signature-OpenSource-Default"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
 
-    <Repository Type="NPMAzure"
+    <Repository Type="NPMAzure" Organization="Signature-OpenSource" FeedName="Default"
                 NPMScope="@signature"
-                Organization="Signature-OpenSource"
-                FeedName="Default"
                 CheckName="NPMAzure:@signature->Signature-OpenSource-Default"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
 
@@ -31,8 +32,8 @@
                 CheckSecretKeyName="CKSETUPREMOTESTORE_PUSH_API_KEY" />
 
   </ArtifactRepositories>
-  
-  <SolutionSettings>
+
+  <SharedSolutionSpec>
     <NuGetSources>
       <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json" >
         <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
@@ -55,47 +56,29 @@
       <add Name="NuGetAzure:Signature-OpenSource-Default" />
       <add Name="CKSetup:Public" />
     </ArtifactTargets>
-    <Plugins>
-      <add Type="CK.Env.Plugins.SolutionDriver, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderFolder, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderCSProjFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderKeyVaultFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderNPMSolutionFile, CK.Env.Plugins" />
-      
-      <add Type="CK.Env.Plugins.SolutionFiles.CommonFolder, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.SharedPropsFile, CK.Env.Plugins" />
-      
-      <add Type="CK.Env.Plugins.SolutionFiles.SolutionFolder, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CKSetupStoreTestHelperConfigFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.RepositoryXmlFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.NugetConfigFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.GitIgnoreFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.NPMRCFiles, CK.Env.Plugins" />
-
-      <add Type="CK.BuildSystem.Appveyor.AppveyorFile, CK.BuildSystem.Appveyor" />
-      <add Type="CK.BuildSystem.GitLab.GitLabFile, CK.BuildSystem.GitLab" />
-    </Plugins>
-  </SolutionSettings>
+  </SharedSolutionSpec>
   
   <Folder Name="CK-AspNet-Projects">
 
     <GitFolder Name="CK-AspNet" Url="https://github.com/Invenietis/CK-AspNet.git" IsPublic="True" >
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-AspNet-Auth" Url="https://github.com/Invenietis/CK-AspNet-Auth.git" IsPublic="True">
-      <SolutionSettings SqlServer="2016" UseCKSetup="true" />
       <Branch Name="develop">
-        <PrimarySolution />
-        <NPMProject Folder="Clients/webfrontauth" PackageName="@signature/webfrontauth"/>
+        <SolutionSpec SqlServer="2016" UseCKSetup="true">
+          <NPMProjects>
+            <add Folder="Clients/webfrontauth" PackageName="@signature/webfrontauth" />
+          </NPMProjects>
+        </SolutionSpec>
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-AspNet-Tester" Url="https://github.com/Invenietis/CK-AspNet-Tester.git" IsPublic="True">
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
 
@@ -104,86 +87,84 @@
   <Folder Name="CK-Core-Projects">
 
     <GitFolder Name ="json-graph-serializer" Url="https://github.com/Invenietis/json-graph-serializer.git" IsPublic="True" >
-      <SolutionSettings NoSharedPropsFile="True" NoDotNetUnitTests="True" />
       <Branch Name="develop">
-        <PrimarySolution />
-        <NPMProject PackageName="@signature/json-graph-serializer" />
+        <SolutionSpec NoSharedPropsFile="True" NoDotNetUnitTests="True" >
+          <NPMProjects>
+            <add Folder="" PackageName="@signature/json-graph-serializer" />
+          </NPMProjects>
+        </SolutionSpec>
       </Branch>
     </GitFolder>
     
     <GitFolder Name="CK-ActivityMonitor" Url="https://github.com/Invenietis/CK-ActivityMonitor.git" IsPublic="True" >
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Auth-Abstractions" Url="https://github.com/Invenietis/CK-Auth-Abstractions.git" IsPublic="True" >
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Core" Url="https://github.com/Invenietis/CK-Core.git" IsPublic="True" >
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-SqlServer" Url="https://github.com/Invenietis/CK-SqlServer.git" IsPublic="True" >
-      <SolutionSettings SqlServer="2016" />
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec SqlServer="2016" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-SqlServer-Dapper" Url="https://github.com/Invenietis/CK-SqlServer-Dapper.git" IsPublic="True" >
-      <SolutionSettings SqlServer="2016" />
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec SqlServer="2016"/>
       </Branch>
     </GitFolder>
     
     <GitFolder Name="CK-Monitoring" Url="https://github.com/Invenietis/CK-Monitoring.git" IsPublic="True" >
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Reflection" Url="https://github.com/Invenietis/CK-Reflection.git" IsPublic="True" >
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Testing" Url="https://github.com/Invenietis/CK-Testing.git" IsPublic="True" >
-      <SolutionSettings SqlServer="2016" />
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec SqlServer="2016" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Text" Url="https://github.com/Invenietis/CK-Text.git" IsPublic="True" >
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-MicroBenchmark" Url="https://github.com/Invenietis/CK-MicroBenchmark.git" IsPublic="True" >
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
     
     <GitFolder Name="CK-UnitsOfMeasure" Url="https://github.com/Invenietis/CK-UnitsOfMeasure.git" IsPublic="True" >
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-WeakAssemblyNameResolver" Url="https://github.com/Invenietis/CK-WeakAssemblyNameResolver.git" IsPublic="True" >
-      <SolutionSettings NoDotNetUnitTests="true" />
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec NoDotNetUnitTests="true" />
       </Branch>
     </GitFolder>
     
@@ -193,105 +174,115 @@
 
     <GitFolder Name="CK-CodeGen" Url="https://github.com/Invenietis/CK-CodeGen.git" IsPublic="True" >
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Database" Url="https://gitlab.com/Signature-Code/CK-Database.git" IsPublic="True" >
-      <SolutionSettings SqlServer="2016" UseCKSetup="true" />
       <Branch Name="develop">
-        <PrimarySolution CKSetupComponentProjects="CK.StObj.Model;CK.StObj.Runtime;CK.StObj.Engine;CK.Setupable.Model;CK.Setupable.Runtime;CK.Setupable.Engine;CK.SqlServer.Setup.Model;CK.SqlServer.Setup.Runtime;CK.SqlServer.Setup.Engine"  />
+        <SolutionSpec SqlServer="2016" UseCKSetup="true" >
+          <CKSetupComponentProjects>
+            <add Name="CK.StObj.Model;CK.StObj.Runtime" />
+            <add Name="CK.StObj.Engine;CK.Setupable.Model" />
+            <add Name="CK.Setupable.Runtime" />
+            <add Name="CK.Setupable.Engine" />
+            <add Name="CK.SqlServer.Setup.Model" />
+            <add Name="CK.SqlServer.Setup.Runtime" />
+            <add Name="CK.SqlServer.Setup.Engine" />
+          </CKSetupComponentProjects>
+        </SolutionSpec>
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-DB" Url="https://github.com/Invenietis/CK-DB.git" IsPublic="True" >
-      <SolutionSettings SqlServer="2016" UseCKSetup="true"/>
       <Branch Name="develop">
-        <PrimarySolution TestProjectsArePublished="True" />
+        <SolutionSpec TestProjectsArePublished="True" SqlServer="2016" UseCKSetup="true" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-DB-GitHub" Url="https://github.com/Invenietis/CK-DB-GitHub.git" IsPublic="True" >
-      <SolutionSettings SqlServer="2016" UseCKSetup="true"/>
       <Branch Name="develop">
-        <PrimarySolution TestProjectsArePublished="True" />
+        <SolutionSpec TestProjectsArePublished="True" SqlServer="2016" UseCKSetup="true" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-DB-Actor-ActorEMail" Url="https://github.com/Invenietis/CK-DB-Actor-ActorEMail.git" IsPublic="True" >
-      <SolutionSettings SqlServer="2016" UseCKSetup="true"/>
       <Branch Name="develop">
-        <PrimarySolution TestProjectsArePublished="True" />
+        <SolutionSpec TestProjectsArePublished="True" SqlServer="2016" UseCKSetup="true" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-DB-SqlCKTrait" Url="https://github.com/Invenietis/CK-DB-SqlCKTrait.git" IsPublic="True" >
-      <SolutionSettings SqlServer="2016" UseCKSetup="true"/>
       <Branch Name="develop">
-        <PrimarySolution TestProjectsArePublished="True" />
+        <SolutionSpec TestProjectsArePublished="True" SqlServer="2016" UseCKSetup="true" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-DB-TokenStore" Url="https://github.com/Invenietis/CK-DB-TokenStore.git" IsPublic="True" >
-      <SolutionSettings SqlServer="2016" UseCKSetup="true"/>
       <Branch Name="develop">
-        <PrimarySolution TestProjectsArePublished="True" />
+        <SolutionSpec TestProjectsArePublished="True" SqlServer="2016" UseCKSetup="true" />
       </Branch>
     </GitFolder>
     
     <GitFolder Name="CK-DB-User-SimpleInvitation" Url="https://github.com/Invenietis/CK-DB-User-SimpleInvitation.git" IsPublic="True" >
-      <SolutionSettings SqlServer="2016" UseCKSetup="true"/>
       <Branch Name="develop">
-        <PrimarySolution TestProjectsArePublished="True" />
+        <SolutionSpec TestProjectsArePublished="True"  SqlServer="2016" UseCKSetup="true" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-DB-User-UserPassword" Url="https://github.com/Invenietis/CK-DB-User-UserPassword.git" IsPublic="True" >
-      <SolutionSettings SqlServer="2016" UseCKSetup="true"/>
       <Branch Name="develop">
-        <PrimarySolution TestProjectsArePublished="True" />
+        <SolutionSpec TestProjectsArePublished="True" SqlServer="2016" UseCKSetup="true" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Setup" Url="https://gitlab.com/Signature-Code/CK-Setup.git" IsPublic="True" >
-      <SolutionSettings UseCKSetup="true" />
-      <Branch Name="develop">
-        <PrimarySolution CKSetupComponentProjects="CKSetup.Runner;CKSetup" />
+$      <Branch Name="develop">
+        <SolutionSpec UseCKSetup="true" >
+          <CKSetupComponentProjects>
+            <add Name="CKSetup.Runner" />
+            <add Name="CKSetup" />
+          </CKSetupComponentProjects>
+        </SolutionSpec>
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Setup-Dependency" Url="https://github.com/Invenietis/CK-Setup-Dependency.git" IsPublic="True" >
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CKSetupRemoteStore" Url="https://gitlab.com/Signature-Code/CKSetupRemoteStore.git" IsPublic="True" >
-      <SolutionSettings UseCKSetup="true" />
       <Branch Name="develop">
-        <PrimarySolution
-              NotPublishedProjects="CKSetupRemoteStore;CKSetupInstaller"
-              CKSetupComponentProjects="CKSetupInstaller" />
+        <SolutionSpec UseCKSetup="true" >
+          <NotPublishedProjects>
+            <add Folder="CKSetupRemoteStore" />
+          </NotPublishedProjects>
+        </SolutionSpec>
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-Sqlite" Url="https://github.com/Invenietis/CK-Sqlite.git" IsPublic="True" >
-      <SolutionSettings UseCKSetup="true" />
       <Branch Name="develop">
-        <PrimarySolution CKSetupComponentProjects="CK.Sqlite.Setup.Model;CK.Sqlite.Setup.Runtime" />
+        <SolutionSpec UseCKSetup="true">
+          <CKSetupComponentProjects>
+            <add Name="CK.Sqlite.Setup.Model" />
+            <add Name="CK.Sqlite.Setup.Runtime" />
+          </CKSetupComponentProjects> 
+        </SolutionSpec>
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-SqlServer-Parser" Url="https://gitlab.com/Signature-Code/CK-SqlServer-Parser.git" IsPublic="True" >
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CK-SqlServer-Parser-Model" Url="https://gitlab.com/Signature-Code/CK-SqlServer-Parser-Model.git" IsPublic="True" >
-      <SolutionSettings NoDotNetUnitTests="true" />
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec NoDotNetUnitTests="True" />
       </Branch>
     </GitFolder>
 
@@ -301,7 +292,7 @@
 
     <GitFolder Name="Yodii-Script" Url="https://github.com/Invenietis/yodii-script.git" IsPublic="True" >
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
 
@@ -310,22 +301,20 @@
   <Folder Name="SimpleGitVersion">
 
     <GitFolder Name="CodeCake" Url="https://github.com/SimpleGitVersion/CodeCake.git" IsPublic="True" >
-      <SolutionSettings NoDotNetUnitTests="true" NoStrongNameSigning="true" />
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec NoDotNetUnitTests="true" NoStrongNameSigning="true" />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="CSemVer-Net" Url="https://github.com/SimpleGitVersion/CSemVer-Net.git" IsPublic="True" >
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec />
       </Branch>
     </GitFolder>
 
     <GitFolder Name="SGV-Net" Url="https://github.com/SimpleGitVersion/SGV-Net.git" IsPublic="True" >
-      <SolutionSettings DisableSourceLink="true" />
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec DisableSourceLink="true" />
       </Branch>
     </GitFolder>
 

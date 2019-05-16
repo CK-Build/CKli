@@ -10,9 +10,9 @@ namespace CKli
             FileSystem fs )
             : base( initializer )
         {
-            initializer.Services.Add( this );
             ArtifactCenter = new ArtifactCenter();
             fs.ServiceContainer.Add( ArtifactCenter );
+            initializer.Services.Add( ArtifactCenter );
             // Quick & dirty registration.
             ArtifactType.Register( "NuGet", true );
             ArtifactType.Register( "NPM", true );

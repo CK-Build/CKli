@@ -1,46 +1,46 @@
 <A2Test>
 
+  <LoadLibrary Name="CK.Env.Plugin.SolutionDriver" />
+  <LoadLibrary Name="CK.Env.Plugin.Appveyor" />
+  <LoadLibrary Name="CK.Env.Plugin.GitLab" />
+  <LoadLibrary Name="CK.Env.Plugin.NPM" />
+  <LoadLibrary Name="CK.Env.Plugin.CKSetup" />
+  <LoadLibrary Name="CK.Env.Plugin.NuGet" />
+
   <SharedHttpClient />
   <ArtifactCenter />
   <LocalFeedProvider />
-  <CKEnvKeyVault />
   <NuGetClient />
+  <NPMClient />
   <CKSetupClient />
-  <SolutionCentral />
-  <NPMProjectCenter />
-
+  <WorldState />
+  
   <ArtifactRepositories>
 
-    <Repository Type="NuGetAzure"
-                Organization="Signature-Code"
-                FeedName="CKEnvTest3"
-                CheckName="NuGetAzure:Signature-Code-CKEnvTest3"
-                CheckSecretKeyName="AZURE_FEED_SIGNATURE_CODE_PAT" />
-
-    <Repository Type="NuGetAzure"
-                Organization="Signature-OpenSource"
-                FeedName="CKEnvTest3"
+    <Repository Type="NuGetAzure" Organization="Signature-OpenSource" FeedName="CKEnvTest3"
                 CheckName="NuGetAzure:Signature-OpenSource-CKEnvTest3"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
     
-    <Repository Type="CKSetup"
-                CheckName="CKSetup:Public"
-                CheckSecretKeyName="CKSETUPREMOTESTORE_PUSH_API_KEY" />
+    <Repository Type="NPMAzure" Organization="Signature-OpenSource" FeedName="CKEnvTest3"
+                NPMScope="@signature"
+                CheckName="NPMAzure:@signature->Signature-OpenSource-CKEnvTest3"
+                CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
     
     <Repository Type="CKSetup"
                 Name="CKEnvTest"
                 Url="https://ckenvtest.cksetup.invenietis.net"
                 CheckName="CKSetup:CKEnvTest"
                 CheckSecretKeyName="CKSETUPREMOTESTORE_CKENVTEST_PUSH_API_KEY" />
+    
   </ArtifactRepositories>
 
-  <SolutionSettings>
+  <SharedSolutionSpec>
     <NuGetSources>
       <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json" >
-        <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
       </add>
-      <add Name="Open-Source-CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/CKEnvTest3/nuget/v3/index.json" >
-        <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
+      <add Name="CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/CKEnvTest3/nuget/v3/index.json" >
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
       </add>
     </NuGetSources>
     <RemoveNuGetSourceNames>
@@ -50,47 +50,49 @@
       <add Name="Invenietis - CI" />
     </RemoveNuGetSourceNames>
     <ArtifactTargets>
-      <add Name="NPMAzure:@signature-code->CKEnvTest3" />
+      <add Name="NuGetAzure:Signature-OpenSource-CKEnvTest3" />
+      <add Name="NPMAzure:@signature->Signature-OpenSource-CKEnvTest3" />
+      <add Name="CKSetup:CKEnvTest" />
     </ArtifactTargets>
-    <Plugins>
-      <add Type="CK.Env.Plugins.SolutionDriver, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderFolder, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderCSProjFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderKeyVaultFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CommonFolder, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.SharedPropsFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CKSetupStoreTestHelperConfigFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.RepositoryXmlFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.NugetConfigFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.GitIgnoreFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.CodeCakeBuilderNPMSolutionFile, CK.Env.Plugins" />
-      <add Type="CK.Env.Plugins.SolutionFiles.SolutionFolder, CK.Env.Plugins" />
-      
-      <add Type="CK.BuildSystem.Appveyor.AppveyorFile, CK.BuildSystem.Appveyor" />
-      <add Type="CK.BuildSystem.GitLab.GitLabFile, CK.BuildSystem.GitLab" />
-    </Plugins>
-  </SolutionSettings>
+
+  </SharedSolutionSpec>
 
 
   <Folder Name="Projects">
 
     <GitFolder Name="CK-SqlServer" Url="https://github.com/Invenietis/CK-SqlServer.git" IsPublic="True">
-      <SolutionSettings SqlServer="2016" />
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec SqlServer="2016" />
       </Branch>
     </GitFolder>
     
     <GitFolder Name="CK-SqlServer-Dapper" Url="https://github.com/Invenietis/CK-SqlServer-Dapper.git" IsPublic="True">
-      <SolutionSettings SqlServer="2016" />
       <Branch Name="develop">
-        <PrimarySolution />
+        <SolutionSpec SqlServer="2017" />
       </Branch>
     </GitFolder>
 
-  
+    <GitFolder Name ="json-graph-serializer" Url="https://github.com/Invenietis/json-graph-serializer.git" IsPublic="True" >
+      <Branch Name="develop">
+        <SolutionSpec NoSharedPropsFile="True" NoDotNetUnitTests="True">
+          <NPMProjects>
+            <add Folder="" PackageName="@signature/json-graph-serializer" />
+          </NPMProjects>
+        </SolutionSpec>
+      </Branch>
+    </GitFolder>
 
-
+    <GitFolder Name="CK-Sqlite" Url="https://github.com/Invenietis/CK-Sqlite.git" IsPublic="True" >
+      <Branch Name="develop">
+        <SolutionSpec UseCKSetup="true" >
+          <CKSetupComponentProjects>
+            <add Name="CK.Sqlite.Setup.Model" />
+            <add Name="CK.Sqlite.Setup.Runtime" />
+          </CKSetupComponentProjects>           
+        </SolutionSpec>
+      </Branch>
+    </GitFolder>
+    
   </Folder>
     
-  </A2Test>
+</A2Test>

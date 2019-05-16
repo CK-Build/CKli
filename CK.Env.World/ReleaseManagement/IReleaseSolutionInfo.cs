@@ -1,3 +1,5 @@
+using CK.Env.DependencyModel;
+
 namespace CK.Env
 {
     /// <summary>
@@ -8,7 +10,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the dependent solution.
         /// </summary>
-        IDependentSolution Solution { get; }
+        DependentSolution Solution { get; }
 
         /// <summary>
         /// Gets the current <see cref="ReleaseInfo"/>. May not be valid.
@@ -19,8 +21,5 @@ namespace CK.Env
         /// Gets or sets the release note.
         /// </summary>
         string ReleaseNote { get; set; }
-
-
-
     }
 }

@@ -36,12 +36,15 @@ namespace CK.SimpleKeyVault
         /// <summary>
         /// Decrypts a list of key value pairs previously encrypted by <see cref="EncryptValuesToString"/>.
         /// </summary>
-        /// <param name="crypted">The crypted string.</param>
+        /// <param name="crypted">The crypted string. Can be null or empty.</param>
         /// <param name="passPhrase">Secret to use. Must not be null, empty or white space.</param>
         /// <returns>The list of key value pairs.</returns>
         public static Dictionary<string, string> DecryptValues( string crypted, string passPhrase )
         {
             var keys = new HashSet<string>();
+            var result = new Dictionary<string,string>();
+            if( String.IsNullOrWhiteSpace( crypted ) ) return result;
+
             string[] lines = crypted.Split( new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries );
             foreach( var l in lines )
             {
@@ -54,7 +57,6 @@ namespace CK.SimpleKeyVault
                     using( var read = new CryptoStream( mem, algo.CreateDecryptor(), CryptoStreamMode.Read ) )
                     using( var r = new BinaryReader( read ) )
                     {
-                        var result = new Dictionary<string,string>();
                         int count = r.ReadInt32();
                         for( int i = 0; i < count; ++i )
                         {

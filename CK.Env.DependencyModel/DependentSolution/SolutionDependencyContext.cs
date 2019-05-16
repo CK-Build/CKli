@@ -104,7 +104,7 @@ namespace CK.Env.DependencyModel
         /// </summary>
         /// <param name="s">The solution.</param>
         /// <returns>The dependent solution or null.</returns>
-        public DependentSolution this[Solution s] => _index.GetValueWithDefault( s, null );
+        public DependentSolution this[ISolution s] => _index.GetValueWithDefault( s, null );
 
         /// <summary>
         /// Gets the <see cref="IDependencySorterResult"/> of the Solution/Project graph.
@@ -123,6 +123,43 @@ namespace CK.Env.DependencyModel
         /// </summary>
         public BuildProjectsInfo BuildProjectsInfo { get; }
 
+        /// <summary>
+        /// Dumps the <see cref="Solutions"/> order by their index along with optional details.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="current">The current solution (a star will precede its name).</param>
+        /// <param name="solutionLineDetail">Optional details to be appended on the information, header, line.</param>
+        /// <param name="solutionDetail">
+        /// Optional detailed log generator.
+        /// When not null, a group is opened by solution and this is called.
+        /// </param>
+        public void LogSolutions(
+            IActivityMonitor m,
+            DependentSolution current = null,
+            Func<DependentSolution, string> solutionLineDetail = null,
+            Action<IActivityMonitor, DependentSolution> solutionDetail = null )
+        {
+            int rank = -1;
+            foreach( var s in Solutions )
+            {
+                if( rank != s.Rank )
+                {
+                    rank = s.Rank;
+                    m.Info( $" -- Rank {rank}" );
+                }
+                if( solutionDetail != null )
+                {
+                    using( m.OpenInfo( $"{(s == current ? '*' : ' ')}   {s.Index} - {s} {solutionLineDetail?.Invoke( s )}" ) )
+                    {
+                        solutionDetail( m, s );
+                    }
+                }
+                else
+                {
+                    m.Info( $"{(s == current ? '*' : ' ')}   {s.Index} - {s} {solutionLineDetail?.Invoke( s )}" );
+                }
+            }
+        }
     }
 
 }

@@ -11,6 +11,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.gitignore = .gitignore
 		A1Test-World.xml = A1Test-World.xml
 		A2Test-World.xml = A2Test-World.xml
+		A2TestPrivate-World.xml = A2TestPrivate-World.xml
 		CK-World.xml = CK-World.xml
 		LocalWorldRootPathMapping.txt = LocalWorldRootPathMapping.txt
 		nuget.config = nuget.config
@@ -26,13 +27,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Tests", "Tests\CK.En
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.XTyping", "CK.Env.XTyping\CK.Env.XTyping.csproj", "{06A5A730-C435-45AB-999C-CDC382445739}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.MSBuild", "CK.Env.MSBuild\CK.Env.MSBuild.csproj", "{AC05468B-369F-4D66-AD22-59B22BD16E49}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.MSBuildSln.Tests", "Tests\CK.Env.MSBuildSln.Tests\CK.Env.MSBuildSln.Tests.csproj", "{49349794-CE5E-468D-BAA1-726D59F21F64}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.NuGetClient", "CK.NuGetClient\CK.NuGetClient.csproj", "{D581E3F6-C9AE-4C74-B373-C0B803524DC9}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.NuGetClient.Abstraction", "CK.NuGetClient.Abstraction\CK.NuGetClient.Abstraction.csproj", "{004D69E1-868E-4BA7-B3CA-F8D46EF8E0D2}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Xml.Linq.Extension", "CK.Xml.Linq.Extension\CK.Xml.Linq.Extension.csproj", "{6778C7DC-9331-4802-99F2-80EC41D6CE70}"
 EndProject
@@ -46,25 +41,21 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Command", "CK.Env.Co
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Xml.Linq.Extension.Tests", "Tests\CK.Xml.Linq.Extension.Tests\CK.Xml.Linq.Extension.Tests.csproj", "{D886832F-7FC3-424E-B85F-7427DA304896}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.BuildSystem.Appveyor", "CK.BuildSystem.Appveyor\CK.BuildSystem.Appveyor.csproj", "{8446F2F2-1C84-44A2-BB79-1BF064312CA6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.Appveyor", "CK.Env.Plugin.Appveyor\CK.Env.Plugin.Appveyor.csproj", "{8446F2F2-1C84-44A2-BB79-1BF064312CA6}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugins", "CK.Env.Plugins\CK.Env.Plugins.csproj", "{C162156D-AA8F-4592-A31E-1D3BC66F050E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.Basics", "CK.Env.Plugin.Basics\CK.Env.Plugin.Basics.csproj", "{C162156D-AA8F-4592-A31E-1D3BC66F050E}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Artifact", "CK.Env.Artifact\CK.Env.Artifact.csproj", "{722E1459-AF6C-41BF-AFCB-7878F33E0CF5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.CKSetup", "CK.Env.CKSetup\CK.Env.CKSetup.csproj", "{73F50D14-C21A-476B-B150-6BFC962F862F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.CKSetup", "CK.Env.Plugin.CKSetup\CK.Env.Plugin.CKSetup.csproj", "{73F50D14-C21A-476B-B150-6BFC962F862F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.SolutionSettings", "CK.Env.SolutionSettings\CK.Env.SolutionSettings.csproj", "{ADBC3160-6149-4F73-AAF0-07636E8E83A5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.SolutionSpec", "CK.Env.SolutionSpec\CK.Env.SolutionSpec.csproj", "{ADBC3160-6149-4F73-AAF0-07636E8E83A5}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Sys", "CK.Env.Sys\CK.Env.Sys.csproj", "{DB371EAB-DEAE-4532-9C40-90B6F82F10CE}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.BuildSystem.GitLab", "CK.BuildSystem.GitLab\CK.BuildSystem.GitLab.csproj", "{1BD159BE-E582-4B58-A3FE-3CE8298EDC46}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.GitLab", "CK.Env.Plugin.GitLab\CK.Env.Plugin.GitLab.csproj", "{1BD159BE-E582-4B58-A3FE-3CE8298EDC46}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.NPM", "CK.Env.NPM\CK.Env.NPM.csproj", "{37F6F284-C220-4E99-BD9E-7985E41FCEBF}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.NPMClient.Abstraction", "CK.NPMClient.Abstraction\CK.NPMClient.Abstraction.csproj", "{512D088F-9668-482E-A698-22371B972765}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.NPMClient", "CK.NPMClient\CK.NPMClient.csproj", "{E8B40C94-EEB7-4292-A107-7002F20A70EB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.NPM", "CK.Env.Plugin.NPM\CK.Env.Plugin.NPM.csproj", "{37F6F284-C220-4E99-BD9E-7985E41FCEBF}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeCakeBuilder", "CodeCakeBuilder\CodeCakeBuilder.csproj", "{370AB245-9A08-48B0-AD43-74661EECB54D}"
 EndProject
@@ -75,6 +66,12 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.DependencyModel.Tests", "Tests\CK.Env.DependencyModel.Tests\CK.Env.DependencyModel.Tests.csproj", "{8B5CF461-7D41-4BFD-AC5B-B46CA295B38B}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.MSBuildSln", "CK.Env.MSBuildSln\CK.Env.MSBuildSln.csproj", "{C7F4C7A4-35C4-4E38-B102-0DD3F480780C}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.SolutionDriver", "CK.Env.Plugin.SolutionDriver\CK.Env.Plugin.SolutionDriver.csproj", "{C260F99F-92CB-463B-8797-632BAB700BAB}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.NuGet", "CK.Env.Plugin.NuGet\CK.Env.Plugin.NuGet.csproj", "{3EC8F673-3DB7-439B-8760-8C44C9410190}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Artifact.NuGet", "CK.Env.Artifact.NuGet\CK.Env.Artifact.NuGet.csproj", "{EE57B61B-EE50-4400-9959-7B41ADB27430}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -98,22 +95,10 @@ Global
 		{06A5A730-C435-45AB-999C-CDC382445739}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{06A5A730-C435-45AB-999C-CDC382445739}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{06A5A730-C435-45AB-999C-CDC382445739}.Release|Any CPU.Build.0 = Release|Any CPU
-		{AC05468B-369F-4D66-AD22-59B22BD16E49}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{AC05468B-369F-4D66-AD22-59B22BD16E49}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{AC05468B-369F-4D66-AD22-59B22BD16E49}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{AC05468B-369F-4D66-AD22-59B22BD16E49}.Release|Any CPU.Build.0 = Release|Any CPU
 		{49349794-CE5E-468D-BAA1-726D59F21F64}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{49349794-CE5E-468D-BAA1-726D59F21F64}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{49349794-CE5E-468D-BAA1-726D59F21F64}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{49349794-CE5E-468D-BAA1-726D59F21F64}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D581E3F6-C9AE-4C74-B373-C0B803524DC9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D581E3F6-C9AE-4C74-B373-C0B803524DC9}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D581E3F6-C9AE-4C74-B373-C0B803524DC9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D581E3F6-C9AE-4C74-B373-C0B803524DC9}.Release|Any CPU.Build.0 = Release|Any CPU
-		{004D69E1-868E-4BA7-B3CA-F8D46EF8E0D2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{004D69E1-868E-4BA7-B3CA-F8D46EF8E0D2}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{004D69E1-868E-4BA7-B3CA-F8D46EF8E0D2}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{004D69E1-868E-4BA7-B3CA-F8D46EF8E0D2}.Release|Any CPU.Build.0 = Release|Any CPU
 		{6778C7DC-9331-4802-99F2-80EC41D6CE70}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{6778C7DC-9331-4802-99F2-80EC41D6CE70}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6778C7DC-9331-4802-99F2-80EC41D6CE70}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -170,14 +155,6 @@ Global
 		{37F6F284-C220-4E99-BD9E-7985E41FCEBF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{37F6F284-C220-4E99-BD9E-7985E41FCEBF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{37F6F284-C220-4E99-BD9E-7985E41FCEBF}.Release|Any CPU.Build.0 = Release|Any CPU
-		{512D088F-9668-482E-A698-22371B972765}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{512D088F-9668-482E-A698-22371B972765}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{512D088F-9668-482E-A698-22371B972765}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{512D088F-9668-482E-A698-22371B972765}.Release|Any CPU.Build.0 = Release|Any CPU
-		{E8B40C94-EEB7-4292-A107-7002F20A70EB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E8B40C94-EEB7-4292-A107-7002F20A70EB}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{E8B40C94-EEB7-4292-A107-7002F20A70EB}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{E8B40C94-EEB7-4292-A107-7002F20A70EB}.Release|Any CPU.Build.0 = Release|Any CPU
 		{370AB245-9A08-48B0-AD43-74661EECB54D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{370AB245-9A08-48B0-AD43-74661EECB54D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{370AB245-9A08-48B0-AD43-74661EECB54D}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -198,6 +175,18 @@ Global
 		{C7F4C7A4-35C4-4E38-B102-0DD3F480780C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C7F4C7A4-35C4-4E38-B102-0DD3F480780C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C7F4C7A4-35C4-4E38-B102-0DD3F480780C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C260F99F-92CB-463B-8797-632BAB700BAB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C260F99F-92CB-463B-8797-632BAB700BAB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C260F99F-92CB-463B-8797-632BAB700BAB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C260F99F-92CB-463B-8797-632BAB700BAB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3EC8F673-3DB7-439B-8760-8C44C9410190}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3EC8F673-3DB7-439B-8760-8C44C9410190}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3EC8F673-3DB7-439B-8760-8C44C9410190}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3EC8F673-3DB7-439B-8760-8C44C9410190}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EE57B61B-EE50-4400-9959-7B41ADB27430}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EE57B61B-EE50-4400-9959-7B41ADB27430}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EE57B61B-EE50-4400-9959-7B41ADB27430}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EE57B61B-EE50-4400-9959-7B41ADB27430}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

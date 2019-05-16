@@ -77,7 +77,7 @@ namespace CK.Env.MSBuildSln
                     dep( p );
                 }
             }
-            return false;
+            return true;
         }
 
         public override string ToString() => $"Project '{SolutionRelativeLogicalFolderPath}'";

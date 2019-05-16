@@ -8,15 +8,25 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CK.BuildSystem.Appveyor\CK.BuildSystem.Appveyor.csproj" />
-    <ProjectReference Include="..\CK.BuildSystem.GitLab\CK.BuildSystem.GitLab.csproj" />
-    <ProjectReference Include="..\CK.Env.NPM\CK.Env.NPM.csproj" />
-    <ProjectReference Include="..\CK.Env.Plugins\CK.Env.Plugins.csproj" />
-    <ProjectReference Include="..\CK.Env.Sys\CK.Env.Sys.csproj" />
+    <Compile Remove="MSBuild\XPrimarySolution.cs" />
+    <Compile Remove="MSBuild\XSecondarySolution.cs" />
+    <Compile Remove="MSBuild\XSolutionBase.cs" />
+    <Compile Remove="MSBuild\XSolutionCentral.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CK.Env.DependencyModel\CK.Env.DependencyModel.csproj" />
+    <ProjectReference Include="..\CK.Env.FileSystem\CK.Env.FileSystem.csproj" />
+    <ProjectReference Include="..\CK.Env.Plugin.Appveyor\CK.Env.Plugin.Appveyor.csproj" />
+    <ProjectReference Include="..\CK.Env.Plugin.Basics\CK.Env.Plugin.Basics.csproj" />
+    <ProjectReference Include="..\CK.Env.Plugin.CKSetup\CK.Env.Plugin.CKSetup.csproj" />
+    <ProjectReference Include="..\CK.Env.Plugin.GitLab\CK.Env.Plugin.GitLab.csproj" />
+    <ProjectReference Include="..\CK.Env.Plugin.NPM\CK.Env.Plugin.NPM.csproj" />
+    <ProjectReference Include="..\CK.Env.Plugin.NuGet\CK.Env.Plugin.NuGet.csproj" />
+    <ProjectReference Include="..\CK.Env.Plugin.SolutionDriver\CK.Env.Plugin.SolutionDriver.csproj" />
+    <ProjectReference Include="..\CK.Env.SolutionSpec\CK.Env.SolutionSpec.csproj" />
+    <ProjectReference Include="..\CK.Env.World\CK.Env.World.csproj" />
     <ProjectReference Include="..\CK.Env.XTyping\CK.Env.XTyping.csproj" />
-    <ProjectReference Include="..\CK.Env.MSBuild\CK.Env.MSBuild.csproj" />
-    <ProjectReference Include="..\CK.NPMClient\CK.NPMClient.csproj" />
-    <ProjectReference Include="..\CK.NuGetClient\CK.NuGetClient.csproj" />
     <ProjectReference Include="..\CK.SimpleKeyVault\CK.SimpleKeyVault.csproj" />
   </ItemGroup>
   

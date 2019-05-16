@@ -7,19 +7,17 @@ namespace CKli
 {
     public class XSharedHttpClient : XTypedObject, IDisposable
     {
-        HttpClient _shared;
+        readonly HttpClient _shared;
 
         public XSharedHttpClient( Initializer initializer )
             : base( initializer )
         {
-            initializer.Services.Add( this );
+            _shared = new HttpClient();
+            initializer.Services.Add( _shared );
         }
 
-        public HttpClient Shared => _shared ?? (_shared = new HttpClient());
+        public HttpClient Shared => _shared;
 
-        void IDisposable.Dispose()
-        {
-            if( _shared != null ) _shared.Dispose();
-        }
+        void IDisposable.Dispose() => _shared.Dispose();
     }
 }
