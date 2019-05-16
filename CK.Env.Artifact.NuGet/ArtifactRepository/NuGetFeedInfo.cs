@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Env;
+using CSemVer;
 using System;
 using System.Xml.Linq;
 
@@ -7,6 +8,11 @@ namespace CK.Env.NuGet
 {
     public abstract class NuGetFeedInfo : INuGetFeedInfo
     {
+        protected NuGetFeedInfo( XElement e )
+        {
+            QualityFilter = new PackageQualityFilter( (string)e.Attribute( "QualityFilter" ) );
+        }
+
         /// <summary>
         /// Gets the type of feed.
         /// </summary>
@@ -19,6 +25,11 @@ namespace CK.Env.NuGet
         /// </summary>
         public abstract string Name { get; }
 
+        /// <summary>
+        /// Gets the range of package quality that is accepted by this feed.
+        /// </summary>
+        public PackageQualityFilter QualityFilter { get; }
+
         string IArtifactRepositoryInfo.UniqueArtifactRepositoryName => ToString();
 
         /// <summary>
@@ -26,12 +37,14 @@ namespace CK.Env.NuGet
         /// </summary>
         public abstract string SecretKeyName { get; }
 
+
         /// <summary>
         /// Overridden to return the <see cref="Type"/> and <see cref="Name"/>.
         /// This is the <see cref="IArtifactRepositoryInfo.UniqueArtifactRepositoryName"/>.
         /// </summary>
         /// <returns>A readble string.</returns>
         public override string ToString() => $"{Type}:{Name}";
+
 
         /// <summary>
         /// Creates a <see cref="INuGetFeedInfo"/> from a <see cref="XElement"/>.

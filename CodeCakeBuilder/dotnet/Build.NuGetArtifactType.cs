@@ -56,9 +56,7 @@ namespace CodeCake
             /// <returns>The set of remote NuGet feeds (in practice at most one).</returns>
             protected override IEnumerable<ArtifactFeed> GetRemoteFeeds()
             {
-                return new NuGetHelper.NuGetFeed[]{
-                    new SignatureVSTSFeed( this, "Signature-Code", "CKEnvTest3" ),
-                };
+                yield return new SignatureVSTSFeed( this, "Signature-Code", "CKEnvTest3" );
             }
 
             /// <summary>

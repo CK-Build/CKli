@@ -196,7 +196,15 @@ namespace CK.Env.NuGet
                     m.Error( $"Invalid artifact local set for NuGet feed." );
                     return false;
                 }
-                await PushPackagesAsync( m, locals );
+                var accepted = locals.Where( l => Info.QualityFilter.Accepts( l.Version.PackageQuality ) ).ToList();
+                if( accepted.Count == 0 )
+                {
+                    m.Info( $"No packages accpeted by {Info.QualityFilter} filter for {Info}." );
+                }
+                else
+                {
+                    await PushPackagesAsync( m, accepted );
+                }
             }
             return success;
         }

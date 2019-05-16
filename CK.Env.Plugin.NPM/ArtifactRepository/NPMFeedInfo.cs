@@ -7,6 +7,11 @@ namespace CK.Env.NPM
 {
     public abstract class NPMFeedInfo : INPMFeedInfo
     {
+        protected NPMFeedInfo( XElement e )
+        {
+            QualityFilter = new PackageQualityFilter( (string)e.Attribute( "QualityFilter" ) );
+        }
+
         /// <summary>
         /// Gets the type of feed.
         /// </summary>
@@ -18,6 +23,12 @@ namespace CK.Env.NPM
         /// (See <see cref="NPMFeedInfoComparer"/>.)
         /// </summary>
         public abstract string Name { get; }
+
+
+        /// <summary>
+        /// Gets the range of package quality that is accepted by this feed.
+        /// </summary>
+        public PackageQualityFilter QualityFilter { get; }
 
         string IArtifactRepositoryInfo.UniqueArtifactRepositoryName => ToString();
 

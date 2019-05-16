@@ -10,6 +10,7 @@ namespace CK.Env.NuGet
     public class NuGetStandardFeedInfo : NuGetFeedInfo
     {
         public NuGetStandardFeedInfo( XElement e )
+            : base( e )
         {
             Name = (string)e.AttributeRequired( "Name" );
             Url = (string)e.AttributeRequired( "Url" );

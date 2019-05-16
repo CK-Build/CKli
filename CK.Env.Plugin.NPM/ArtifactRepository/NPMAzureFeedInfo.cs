@@ -12,6 +12,7 @@ namespace CK.Env.NPM
         readonly string _name;
 
         public NPMAzureFeedInfo( XElement e )
+            : base( e )
         {
             Organization = (string)e.AttributeRequired( "Organization" );
             FeedName = (string)e.AttributeRequired( "FeedName" );

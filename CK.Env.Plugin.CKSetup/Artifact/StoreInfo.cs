@@ -16,6 +16,8 @@ namespace CK.Env.CKSetup
 
         public string Name { get; }
 
+        public PackageQualityFilter QualityFilter { get; }
+
         public Uri Url { get; }
 
         string IArtifactRepositoryInfo.UniqueArtifactRepositoryName => $"CKSetup:{Name}";

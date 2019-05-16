@@ -11,6 +11,7 @@ namespace CK.Env.NuGet
         readonly string _name;
 
         public NuGetAzureFeedInfo( XElement e )
+            : base( e )
         {
             Organization = (string)e.AttributeRequired( "Organization" );
             FeedName = (string)e.AttributeRequired( "FeedName" );
