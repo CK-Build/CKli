@@ -59,7 +59,14 @@
         <PrimarySolution />
       </Branch>
     </GitFolder>
-    
+
+    <GitFolder Name="Feedermarket-Functions" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions">
+      <SolutionSettings NoStrongNameSigning="true" />
+      <Branch Name="develop">
+        <PrimarySolution />
+      </Branch>
+    </GitFolder>
+
     <SolutionSettings>
       <ArtifactTargets>
         <remove Name="NuGetAzure:invenietis-engie" />
@@ -92,18 +99,14 @@
     </SolutionSettings>
     <!-- NuGetSources Invenietis -->
 
-
-
-
     <GitFolder Name="Cofely" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Cofely">
+      <SolutionSettings NoStrongNameSigning="true" />
       <Branch Name="develop">
         <PrimarySolution />
+        <NPMProject Folder="CFLY.Intranet.Web/Content/" PackageName="cofely-intranet"/>
+        <NPMProject Folder="CFLY.Web/Content/vue/" PackageName="backoffice"/>
       </Branch>
     </GitFolder>
-
-
-
-
 
     <GitFolder Name="Feedermarket-Buildings" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Buildings">
       <SolutionSettings NoStrongNameSigning="true" />
@@ -119,12 +122,7 @@
       </Branch>
     </GitFolder>
 
-    <GitFolder Name="Feedermarket-Functions" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions">
-      <SolutionSettings NoStrongNameSigning="true" />
-      <Branch Name="develop">
-        <PrimarySolution />
-      </Branch>
-    </GitFolder>
+
 
     <GitFolder Name="Feedermarket-Functions-ACP" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions-ACP">
       <Branch Name="develop">
