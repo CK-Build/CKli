@@ -49,16 +49,23 @@ namespace CK.Env.CKSetup
                 }
                 else
                 {
-                    var secret = ResolveSecret( m, true );
-                    var all = new HashSet<ComponentRef>( local.ComponentRefs );
-                    using( LocalStore store = LocalStore.OpenOrCreate( m, local.StorePath ) )
+                    var all = new HashSet<ComponentRef>( local.ComponentRefs.Where( c => Info.QualityFilter.Accepts( c.Version.PackageQuality ) ) );
+                    if( all.Count == 0 )
                     {
-                        success &= store != null && store.PushComponents( c => all.Remove( c.GetRef() ), Info.Url, secret );
+                        m.Info( $"No packages accepted by {Info.QualityFilter} filter for {Info}." );
                     }
-                    if( all.Count > 0 )
+                    else
                     {
-                        m.Error( $"Local store '{local.StorePath}' does not contain CKSetup components: ${all.Select( c => c.ToString() ).Concatenate()}." );
-                        success = false;
+                        var secret = ResolveSecret( m, true );
+                        using( LocalStore store = LocalStore.OpenOrCreate( m, local.StorePath ) )
+                        {
+                            success &= store != null && store.PushComponents( c => all.Remove( c.GetRef() ), Info.Url, secret );
+                        }
+                        if( all.Count > 0 )
+                        {
+                            m.Error( $"Local store '{local.StorePath}' does not contain CKSetup components: ${all.Select( c => c.ToString() ).Concatenate()}." );
+                            success = false;
+                        }
                     }
                 }
             }

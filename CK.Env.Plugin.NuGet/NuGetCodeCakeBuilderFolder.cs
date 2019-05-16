@@ -50,34 +50,51 @@ namespace CK.Env.Plugin
 
         string AdaptBuildNugetRepositoryForPushFeeds( string text, ISolution solution )
         {
-            Match m = Regex.Match( text, @"return new NuGetHelper\.NuGetFeed\[\]{.*?};", RegexOptions.Singleline | RegexOptions.CultureInvariant );
+            Match m = Regex.Match( text, @"yield return new SignatureVSTSFeed\( this,.*?;", RegexOptions.Singleline | RegexOptions.CultureInvariant );
             if( !m.Success )
             {
-                throw new Exception( "Expected pattern return new NuGetHelper.NuGetFeed[]{...} in Build.NugetRepository.cs." );
+                throw new Exception( "Expected pattern yield return new SignatureVSTSFeed( this, ...); in Build.NuGetArtifactType.cs." );
             }
             StringBuilder b = new StringBuilder();
-            b.AppendLine( "return new NuGetHelper.NuGetFeed[]{" );
             bool atLeastOne = false;
             foreach( var info in solution.ArtifactTargets.Select( a => a.Info ).OfType<INuGetFeedInfo>() )
             {
-                b.AppendLine( atLeastOne ? "," : "" );
                 atLeastOne = true;
+                if( info.QualityFilter.HasMin || info.QualityFilter.HasMax )
+                {
+                    b.Append( "if( " );
+                    if( info.QualityFilter.HasMin )
+                    {
+                        b.Append( "GlobalInfo.Version.PackageQuality >= PackageQuality." )
+                         .Append( info.QualityFilter.Min.ToString() )
+                         .Append( ' ' );
+                    }
+                    if( info.QualityFilter.HasMax )
+                    {
+                        b.Append( "GlobalInfo.Version.PackageQuality <= PackageQuality." )
+                         .Append( info.QualityFilter.Max.ToString() )
+                         .Append( ' ' );
+                    }
+                    b.Append( ") " );
+                }
                 switch( info )
                 {
                     case NuGetAzureFeedInfo a:
-                        b.Append( "new SignatureVSTSFeed( this, \"" )
-                                    .Append( a.Organization ).Append( "\", \"" )
-                                    .Append( a.FeedName ).Append( "\" )" );
+                        b.Append( "yield return new SignatureVSTSFeed( this, \"" )
+                            .Append( a.Organization ).Append( "\", \"" )
+                            .Append( a.FeedName )
+                            .AppendLine( "\" );" );
                         break;
                     case NuGetStandardFeedInfo n:
-                        b.Append( "new RemoteFeed( this, \"" )
-                                            .Append( n.Name ).Append( "\", \"" )
-                                            .Append( n.Url ).Append( "\", \"" )
-                                            .Append( n.SecretKeyName ).Append( "\" )" );
+                        b.Append( "yield return new RemoteFeed( this, \"" )
+                            .Append( n.Name ).Append( "\", \"" )
+                            .Append( n.Url ).Append( "\", \"" )
+                            .Append( n.SecretKeyName )
+                            .AppendLine( "\" );" );
                         break;
                 }
             }
-            b.AppendLine().Append( "};" );
+            if( !atLeastOne ) b.AppendLine().Append( "yield break;" );
             text = text.Replace( m.Value, b.ToString() );
             return text;
         }

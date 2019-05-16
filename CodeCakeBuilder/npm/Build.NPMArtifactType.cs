@@ -11,7 +11,6 @@ using System.Threading.Tasks;
 
 namespace CodeCake
 {
-
     public static class StandardGlobalInfoNPMExtension
     {
         /// <summary>
@@ -65,6 +64,12 @@ namespace CodeCake
 
             protected override IEnumerable<ILocalArtifact> GetLocalArtifacts() => Solution.PublishedProjects;
 
+
+            protected override IEnumerable<ArtifactFeed> GetRemoteFeeds()
+            {
+                yield return new AzureNPMFeed( this, "Signature-Code", "Default" );
+            }
+
             protected override IEnumerable<ArtifactFeed> GetLocalFeeds()
             {
                 return new ArtifactFeed[] {
@@ -72,12 +77,6 @@ namespace CodeCake
                 };
             }
 
-            protected override IEnumerable<ArtifactFeed> GetRemoteFeeds()
-            {
-                return new NPMRemoteFeedBase[]{
-                        new AzureNPMFeed( this, "Signature-Code", "Default" )
-                };
-            }
 
         }
 

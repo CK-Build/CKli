@@ -10,6 +10,7 @@ namespace CK.Env.NPM
     public class NPMStandardFeedInfo : NPMFeedInfo
     {
         public NPMStandardFeedInfo( XElement e )
+            : base( e )
         {
             Name = (string)e.AttributeRequired( "Name" );
             Url = (string)e.AttributeRequired( "Url" );

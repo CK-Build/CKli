@@ -1,3 +1,5 @@
+using CSemVer;
+
 namespace CK.Env
 {
     /// <summary>
@@ -22,5 +24,10 @@ namespace CK.Env
         /// A null or empty SecretKeyName means that the repository does not require any protection.
         /// </summary>
         string SecretKeyName { get; }
+
+        /// <summary>
+        /// Gets the range of package quality that is accepted by this feed.
+        /// </summary>
+        PackageQualityFilter QualityFilter { get; }
     }
 }

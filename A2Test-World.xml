@@ -20,12 +20,22 @@
     <Repository Type="NuGetAzure" Organization="Signature-OpenSource" FeedName="CKEnvTest3"
                 CheckName="NuGetAzure:Signature-OpenSource-CKEnvTest3"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
-    
+
     <Repository Type="NPMAzure" Organization="Signature-OpenSource" FeedName="CKEnvTest3"
                 NPMScope="@signature"
                 CheckName="NPMAzure:@signature->Signature-OpenSource-CKEnvTest3"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
-    
+
+    <Repository Type="NuGetStandard" Name="nuget.org" Url="https://www.nuget.org/api/v2/package"
+                CheckName="NuGetStandard:nuget.org"
+                QualityFilter="ReleaseCandidate,Release"
+                SecretKeyName="NUGET_ORG_PUSH_API_KEY" />
+
+    <Repository Type="NPMStandard" Name="npmjs.org" Url="https://registry.npmjs.org/"
+                QualityFilter="ReleaseCandidate,Release"
+                CheckName="NPMStandard:npmjs.org"
+                SecretKeyName="NPMJS_ORG_PUSH_PAT" />
+
     <Repository Type="CKSetup"
                 Name="CKEnvTest"
                 Url="https://ckenvtest.cksetup.invenietis.net"
@@ -51,7 +61,9 @@
     </RemoveNuGetSourceNames>
     <ArtifactTargets>
       <add Name="NuGetAzure:Signature-OpenSource-CKEnvTest3" />
+      <add Name="NuGetStandard:nuget.org" />
       <add Name="NPMAzure:@signature->Signature-OpenSource-CKEnvTest3" />
+      <add Name="NPMStandard:npmjs.org" />
       <add Name="CKSetup:CKEnvTest" />
     </ArtifactTargets>
 

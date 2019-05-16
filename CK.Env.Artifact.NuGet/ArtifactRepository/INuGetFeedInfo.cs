@@ -20,5 +20,6 @@ namespace CK.Env.NuGet
         /// (See <see cref="NuGetFeedInfoComparer"/>.)
         /// </summary>
         string Name { get; }
+
     }
 }

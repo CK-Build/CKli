@@ -22,6 +22,8 @@ namespace CK.Env.CKSetup
 
         public string Name => "Public";
 
+        public PackageQualityFilter QualityFilter { get; }
+
         public Uri Url => Facade.DefaultStoreUrl;
     }
 }

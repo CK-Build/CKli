@@ -15,7 +15,7 @@ namespace CK.Env.Plugin
         readonly SolutionDriver _driver;
 
         public NPMCodeCakeBuilderFolder( GitFolder f, NPMProjectsDriver npmDriver, SolutionDriver driver, NormalizedPath branchPath )
-            : base( f, branchPath, "CodecakeBuilder" )
+            : base( f, branchPath, "CodecakeBuilder", "NPM/Res" )
         {
             _npmDriver = npmDriver;
             _driver = driver;
@@ -62,37 +62,53 @@ namespace CK.Env.Plugin
 
         string AdaptBuildNPMArtifactForPushFeeds( string text, ISolution s )
         {
-            Match m = Regex.Match( text, @"return new NPMRemoteFeedBase\[\]{.*?};", RegexOptions.Singleline | RegexOptions.CultureInvariant );
+            Match m = Regex.Match( text, @"yield return new AzureNPMFeed\( this,.*?;", RegexOptions.Singleline | RegexOptions.CultureInvariant );
             if( !m.Success )
             {
-                throw new Exception( "Expected pattern return new NPMRemoteFeedBase[]{...} in Build.NPMArtifactType.cs." );
+                throw new Exception( "Expected pattern yield return new AzureNPMFeed( this, ...); in Build.NPMArtifactType.cs." );
             }
             StringBuilder b = new StringBuilder();
-            b.AppendLine( "return new NPMRemoteFeedBase[]{" );
             bool atLeastOne = false;
             foreach( var info in s.ArtifactTargets.Select( a => a.Info ).OfType<INPMFeedInfo>() )
             {
-                b.AppendLine( atLeastOne ? "," : "" );
                 atLeastOne = true;
+                if( info.QualityFilter.HasMin || info.QualityFilter.HasMax )
+                {
+                    b.Append( "if( " );
+                    if( info.QualityFilter.HasMin )
+                    {
+                        b.Append( "GlobalInfo.Version.PackageQuality >= PackageQuality." )
+                         .Append( info.QualityFilter.Min.ToString() )
+                         .Append( ' ' );
+                    }
+                    if( info.QualityFilter.HasMax )
+                    {
+                        b.Append( "GlobalInfo.Version.PackageQuality <= PackageQuality." )
+                         .Append( info.QualityFilter.Max.ToString() )
+                         .Append( ' ' );
+                    }
+                    b.Append( ") " );
+                }
                 switch( info )
                 {
                     case NPMAzureFeedInfo a:
-                        b.Append( "new AzureNPMFeed( this, \"" )
+                        b.Append( "yield return new AzureNPMFeed( this, \"" )
                             .Append( a.Organization ).Append( "\", \"" )
-                            .Append( a.FeedName ).Append( "\" )" );
+                            .Append( a.FeedName )
+                            .AppendLine( "\" );" );
                         break;
                     case NPMStandardFeedInfo n:
-                        b.Append( "new NPMRemoteFeed( this, " )
+                        b.Append( "yield return new NPMRemoteFeed( this, \"" )
                             .Append( n.SecretKeyName )
                             .Append( "\", \"" )
                             .Append( n.Url )
                             .Append( "\", " )
-                            .Append( n.UsePassword )
-                            .Append( " )" );
+                            .Append( n.UsePassword ? "true" : "false" )
+                            .AppendLine( " );" );
                         break;
                 }
             }
-            b.AppendLine().Append( "};" );
+            if( !atLeastOne ) b.AppendLine().Append( "yield break;" );
             text = text.Replace( m.Value, b.ToString() );
             return text;
         }

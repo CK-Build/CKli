@@ -61,7 +61,11 @@ namespace CKli
                 bool success = true;
                 foreach( var h in _provider._handlers )
                 {
-                    success &= h.PushLocalArtifacts( this, m, target, artifacts );
+                    if( !h.PushLocalArtifacts( this, m, target, artifacts ) )
+                    {
+                        m.Error( $"Push to '{target}' by handler '{h}' failed." );
+                        success = false;
+                    }
                 }
                 return success;
             }
