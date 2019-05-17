@@ -33,10 +33,10 @@ namespace CK.Env
         public bool HasMax => Max != PackageQuality.None && Max != PackageQuality.Release;
 
         /// <summary>
-        /// Gets whether this filter allows the ginven quality.
+        /// Gets whether this filter allows the specified quality.
         /// </summary>
-        /// <param name="q">The quality to test. <see cref="PackageQuality.None"/> is never accepted.</param>
-        /// <returns>True if <paramref name="q"/> is compatible.</returns>
+        /// <param name="q">The quality to challenge. <see cref="PackageQuality.None"/> is never accepted.</param>
+        /// <returns>Whether <paramref name="q"/> is accepted or not.</returns>
         public bool Accepts( PackageQuality q ) => q != PackageQuality.None
                                                     && (!HasMin || q >= Min)
                                                     && (!HasMax || q <= Max);

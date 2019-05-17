@@ -10,24 +10,22 @@ namespace CK.Env
     {
         public class Initializer
         {
-            Dictionary<object, object> _initializationState;
-
             /// <summary>
             /// Constructor for child objects.
             /// </summary>
             /// <param name="monitor">The monitor to use.</param>
-            /// <param name="handledElements">The set of handled elements (to avoid warnings).</param>
+            /// <param name="handledObjects">The set of handled xml objects (to avoid warnings).</param>
             /// <param name="parent">The parent object. Never null.</param>
             /// <param name="e">The element. Never null.</param>
             /// <param name="services">The available services.</param>
             internal Initializer(
                 IActivityMonitor monitor,
-                ISet<XElement> handledElements,
+                HashSet<XObject> handledObjects,
                 XTypedObject parent,
                 XElement e,
                 SimpleServiceContainer services )
             {
-                HandledElements = handledElements;
+                HandledObjects = handledObjects;
                 Element = e;
                 Parent = parent;
                 Monitor = monitor;
@@ -39,19 +37,19 @@ namespace CK.Env
             /// Constructor for the root.
             /// </summary>
             /// <param name="root">Root factory.</param>
-            /// <param name="handledElements">The set of handled elements (to avoid warnings).</param>
+            /// <param name="handledObjects">The set of handled xml objects (to avoid warnings).</param>
             /// <param name="monitor">The monitor to use.</param>
             /// <param name="e">The element. Never null.</param>
             /// <param name="baseProvider">Can be null.</param>
             internal Initializer(
                 XTypedFactory root,
                 IActivityMonitor monitor,
-                ISet<XElement> handledElements,
+                HashSet<XObject> handledObjects,
                 XElement e,
                 IServiceProvider baseProvider )
             {
                 Element = e;
-                HandledElements = handledElements;
+                HandledObjects = handledObjects;
                 Monitor = monitor;
                 Services = new SimpleServiceContainer( baseProvider );
                 Services.Add( root );
@@ -71,12 +69,26 @@ namespace CK.Env
             public XElement Element { get; }
 
             /// <summary>
-            /// Gets a mutable state of elements that have been handled by the object.
-            /// <see cref="Element"/>'s children that will not be registered here once
+            /// Simple helper to get a required <see cref="Element"/>'s attribute and
+            /// adds it into the <see cref="HandledObjects"/>.
+            /// </summary>
+            /// <param name="name">The attribute name that must exist.</param>
+            /// <returns>The attribute.</returns>
+            public XAttribute HandleRequiredAttribute( XName name )
+            {
+                var a = Element.Attribute( name );
+                if( a == null ) throw new System.Xml.XmlException( $"Required attribute '{name}'{XTypedFactory.GetMarkedLineColumnString( Element )}." );
+                HandledObjects.Add( a );
+                return a;
+            }
+
+            /// <summary>
+            /// Gets a mutable state of Xml objects (elements or attributes) that have been handled by the object.
+            /// <see cref="Element"/>'s children and attributes that will not be registered here once
             /// the <see cref="XTypedObject(Initializer)"/> constructor has ended will
             /// trigger a warning.
             /// </summary>
-            public ISet<XElement> HandledElements { get; }
+            public HashSet<XObject> HandledObjects { get; }
 
             /// <summary>
             /// Gets the parent typed object.
@@ -95,23 +107,14 @@ namespace CK.Env
             /// </summary>
             public ISimpleServiceContainer ChildServices { get; }
 
-            /// <summary>
-            /// Optional 
-            /// </summary>
-            public IDictionary<object, object> InitializationState
-            {
-                get
-                {
-                    if( _initializationState == null )
-                    {
-                        _initializationState = new Dictionary<object, object>();
-                    }
-                    return _initializationState;
-                }
-            }
-
         }
 
+        /// <summary>
+        /// Initializes a new <see cref="XTypedObject"/> from a <see cref="Initializer"/> that
+        /// exposes the <see cref="Initializer.Element"/> and other build services such as
+        /// the <see cref="Initializer.Monitor"/> to use.
+        /// </summary>
+        /// <param name="initializer">The initializer context.</param>
         public XTypedObject( Initializer initializer )
         {
             Parent = initializer.Parent;
@@ -140,7 +143,7 @@ namespace CK.Env
                     {
                         v = Convert.ChangeType( a.Value, p.PropertyType );
                     }
-
+                    initializer.HandledObjects.Add( a );
                     p.SetValue( this, v );
                 }
                 a = a.NextAttribute;
@@ -170,7 +173,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="predicate">Filter condition. When successful, children nodes are skipped.</param>
         /// <returns>The set of descendants that match the predicate in document order regardless of their depth.</returns>
-        /// <param name="withSelf">True to consider <paramref name="this"/> element. Defaults to consider only the element children.</param>
+        /// <param name="withSelf">True to consider <paramref name="this"/> element. Defaults to consider only the  children elements.</param>
         public IEnumerable<XTypedObject> TopDescendants( Func<XTypedObject, bool> predicate, bool withSelf = false )
         {
             if( predicate == null ) throw new ArgumentNullException( nameof( predicate ) );
@@ -209,7 +212,6 @@ namespace CK.Env
             }
         }
 
-
         /// <summary>
         /// Gets the next sibling.
         /// Null if this is the last children of the <see cref="Parent"/>.
@@ -234,8 +236,8 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the raw <see cref="XElement"/>.
-        /// Unfortunaltely, there is no read-only view of XElement, this should not be mutated
-        /// otherwise an InvalidOperationException is thrown.
+        /// Unfortunaltely, there is no read-only view of XElement, so the check is at runtime:
+        /// this should not be mutated otherwise an InvalidOperationException is thrown.
         /// </summary>
         public XElement XElement { get; }
 

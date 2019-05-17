@@ -64,7 +64,14 @@ namespace CK.Env
 
         public CommandRegister CommandRegister { get; }
 
-        public GitFolder Ensure( IActivityMonitor m )
+        /// <summary>
+        /// Ensures that the Git working folder actually exists and creates a
+        /// GitFolder instance.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="isPublic">Whether <see cref="GitFolder.IsPublic"/> is true.</param>
+        /// <returns>The GitFolder instance.</returns>
+        public GitFolder CreateGitFolder( IActivityMonitor m, bool isPublic )
         {
             using( m.OpenTrace( $"Ensuring git repository {FullPhysicalPath}" ) )
             {
@@ -93,7 +100,7 @@ namespace CK.Env
 
                 EnsureHooks( m );
             }
-            return new GitFolder( this );
+            return new GitFolder( this, isPublic );
         }
 
         void EnsureHooks( IActivityMonitor m )

@@ -9,12 +9,6 @@ namespace CK.Env
     public interface IGitRepository
     {
         /// <summary>
-        /// Gets whether the Git repository is public or private.
-        /// Defaults to false.
-        /// </summary>
-        bool IsPublic { get; }
-
-        /// <summary>
         /// Gets the Origin URL of the Git repository
         /// </summary>
         string OriginUrl { get; }

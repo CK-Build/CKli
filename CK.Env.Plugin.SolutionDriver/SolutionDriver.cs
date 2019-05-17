@@ -19,6 +19,7 @@ namespace CK.Env.Plugin
         readonly ISecretKeyStore _keyStore;
         readonly ISolutionDriverWorld _world;
         readonly IEnvLocalFeedProvider _localFeedProvider;
+        readonly ArtifactCenter _artifactCenter;
         readonly SolutionSpec _solutionSpec;
         readonly SolutionContext _solutionContext;
         readonly MSProjContext _projectFileContext;
@@ -31,6 +32,7 @@ namespace CK.Env.Plugin
                 ISecretKeyStore keyStore,
                 ISolutionDriverWorld w,
                 GitFolder f,
+                ArtifactCenter artifactCenter,
                 NormalizedPath branchPath,
                 SolutionSpec spec,
                 IEnvLocalFeedProvider localFeedProvider )
@@ -38,6 +40,7 @@ namespace CK.Env.Plugin
         {
             _solutionContext = w.Register( this );
             _world = w;
+            _artifactCenter = artifactCenter;
             _keyStore = keyStore;
             _solutionSpec = spec;
             _localFeedProvider = localFeedProvider;
@@ -122,9 +125,9 @@ namespace CK.Env.Plugin
             if( _solution == null )
             {
                 _solution = _solutionContext.AddSolution( BranchPath, expectedSolutionName );
-                foreach( var t in _solutionSpec.ArtifactTargets )
+                foreach( var uniqueRepositoryName in _solutionSpec.ArtifactTargets )
                 {
-                    _solution.AddArtifactTarget( t );
+                    _solution.AddArtifactTarget( _artifactCenter.Find( uniqueRepositoryName ) );
                 }
             }
             _solution.Tag( _sln );
