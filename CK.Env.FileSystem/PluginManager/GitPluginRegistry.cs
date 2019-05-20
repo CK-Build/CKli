@@ -191,7 +191,7 @@ namespace CK.Env
             {
                 if( i == desc.BranchParameterIdx )
                 {
-                    parameters[i] = _branchesPath.AppendPart( branchName );
+                    parameters[i] = _branchesPath.Combine( branchName );
                 }
                 else
                 {
