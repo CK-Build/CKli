@@ -174,25 +174,39 @@ namespace CK.Env.Plugin
                 m.Error( $"Unable to handle what seems to be a url dependency '{value}' for {depNameKind}/{name}." );
                 return (null, NPMVersionDependencyType.None);
             }
-            if( value.Length == 0 || value == "*" ) return (null, NPMVersionDependencyType.AllVersions);
+            if( value.Length == 0 || value == "*" ) return (SVersion.ZeroVersion, NPMVersionDependencyType.AllVersions);
             if( value.IndexOf( " - " ) >= 0
                 || value.IndexOf( "||" ) >= 0
-                || value.IndexOf( '<' ) >= 0
-                || value.IndexOf( '^' ) >= 0
-                || value.IndexOf( '~' ) >= 0
-                || SVersion.TryParse( value ).IsValid )
+                || value.IndexOf( '<' ) >= 0 )
             {
                 return (null, NPMVersionDependencyType.OtherVersionSpec);
             }
-            if( value.StartsWith( ">=" ) )
+            string cleaned = value;
+            bool mustBeVersion = false;
+            if( cleaned.StartsWith( ">=" ) )
             {
-                var v = SVersion.TryParse( value );
-                if( !v.IsValid )
-                {
-                    m.Error( $"Invalid version for {depNameKind}/{name} '{value}': {v.ErrorMessage}" );
-                    return (null, NPMVersionDependencyType.None);
-                }
+                cleaned = cleaned.Substring( 2 );
+                mustBeVersion = true;
+            }
+            else if( cleaned[0] == '^' )
+            {
+                cleaned = cleaned.Substring( 1 );
+                mustBeVersion = true;
+            }
+            else if( cleaned[0] == '~' )
+            {
+                cleaned = cleaned.Substring( 1 );
+                mustBeVersion = true;
+            }
+            var v = SVersion.TryParse( cleaned );
+            if( v.IsValid )
+            {
                 return (v, NPMVersionDependencyType.MinVersion);
+            }
+            if( mustBeVersion )
+            {
+                m.Error( $"Invalid version for {depNameKind}/{name} '{value}': {v.ErrorMessage}" );
+                return (null, NPMVersionDependencyType.None);
             }
             if( Regex.IsMatch( value, "\\w+/\\w+" ) ) return (null, NPMVersionDependencyType.GitHub);
             if( Regex.IsMatch( value, "\\w+" ) ) return (null, NPMVersionDependencyType.Tag);

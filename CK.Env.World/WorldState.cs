@@ -117,6 +117,7 @@ namespace CK.Env
         /// <param name="commandRegister">The command register.</param>
         /// <param name="artifacts">The artifact center.</param>
         /// <param name="worldName">The world name.</param>
+        /// <param name="isPublicWorld">Whether this world is public or private.</param>
         /// <param name="store">The store. Can not be null.</param>
         /// <param name="localFeedProvider">Local feed provider. Can not be null. (Required for the Zro builder.)</param>
         /// <param name="publisher">Artifacts publisher.</param>
@@ -126,6 +127,7 @@ namespace CK.Env
             ArtifactCenter artifacts,
             IWorldStore store,
             IWorldName worldName,
+            bool isPublicWorld,
             IEnvLocalFeedProvider localFeedProvider,
             IBasicApplicationLifetime appLife )
         {
@@ -133,6 +135,7 @@ namespace CK.Env
             _store = store ?? throw new ArgumentNullException( nameof( store ) );
             WorldName = worldName ?? throw new ArgumentNullException( nameof( worldName ) );
             _localFeedProvider = localFeedProvider ?? throw new ArgumentNullException( nameof( localFeedProvider ) );
+            IsPublicWorld = isPublicWorld;
             _appLife = appLife;
             _solutionDrivers = new HashSet<ISolutionDriver>();
             _perBranchContext = new Dictionary<string, WorldBranchContext>();
@@ -181,6 +184,11 @@ namespace CK.Env
             _isStateDirty = true;
             SetReadonlyState();
         }
+
+        /// <summary>
+        /// Gets whether this world is public.
+        /// </summary>
+        public bool IsPublicWorld { get; }
 
         /// <summary>
         /// Gets whether this state is dirty.

@@ -12,9 +12,11 @@ namespace CK.Env
     /// </summary>
     public class SolutionSpec : SharedSolutionSpec
     {
-        public SolutionSpec( ISharedSolutionSpec other, ArtifactCenter artifactCenter, XElement e = null )
-            : base( other, artifactCenter, e )
+        public SolutionSpec( SharedSolutionSpec shared, XTypedObject.Initializer r )
+            : base( shared, r )
         {
+            var e = r.Element;
+
             UseCKSetup = (bool?)e.Attribute( nameof( UseCKSetup ) ) ?? false;
             SqlServer = (string)e.Attribute( nameof( SqlServer ) );
             TestProjectsArePublished = (bool?)e.Attribute( nameof( TestProjectsArePublished ) ) ?? false;

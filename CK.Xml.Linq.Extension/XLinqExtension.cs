@@ -330,6 +330,14 @@ namespace System.Xml.Linq
 
         #endregion
 
+        /// <summary>
+        /// Creates a new set of items.
+        /// </summary>
+        /// <typeparam name="T">The item's type.</typeparam>
+        /// <param name="this">This Xmle element.</param>
+        /// <param name="builder">The builder function that must create an item from its xml representation.</param>
+        /// <param name="comparer">The item's comparer.</param>
+        /// <returns>A set of items, unique in the sense of the <paramref name="comparer"/>.</returns>
         public static HashSet<T> ApplyAddRemoveClear<T>(
             this XElement @this,
             Func<XElement, T> builder,

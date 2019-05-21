@@ -113,11 +113,22 @@ namespace CK.Env
             return t;
         }
 
-        public Type GetMappping( IActivityMonitor m, XElement e, ISet<XElement> handledElements )
+        public Type GetMappping( IActivityMonitor m, XElement e, ISet<XObject> handledNodes )
         {
             var t = GetNameMappping( e.Name );
-            if( t == null && !handledElements.Contains( e ) ) m.Warn( $"Unmapped element {e.Name}." );
+            if( t == null && !handledNodes.Contains( e ) ) m.Warn( $"Unmapped element '{e.Name}'{GetMarkedLineColumnString(e)}." );
             return t;
+        }
+
+        static void WarnUnhandledAttributes( IActivityMonitor monitor, XElement e, HashSet<XObject> handledNodes )
+        {
+            foreach( var a in e.Attributes() )
+            {
+                if( !handledNodes.Contains( a ) )
+                {
+                    monitor.Warn( $"Unhandled attribute '{a.Name}'{GetMarkedLineColumnString(a)}." );
+                }
+            }
         }
 
         public T CreateInstance<T>( IActivityMonitor monitor, XElement e, IServiceProvider baseProvider = null ) where T : XTypedObject
@@ -133,15 +144,18 @@ namespace CK.Env
                 if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
                 if( _typeRegister.Count == 0 ) AutoRegisterFromLoadedAssemblies( monitor );
 
-                var handledElements = new HashSet<XElement>();
+                var handledNodes = new HashSet<XObject>();
 
                 e.Changing += PreventAnyChangesToXElement;
-                if( type == null ) type = GetMappping( monitor, e, handledElements );
-                var rootConfig = new XTypedObject.Initializer( this, monitor, handledElements, e, baseProvider );
+                if( type == null ) type = GetMappping( monitor, e, handledNodes );
+                var rootConfig = new XTypedObject.Initializer( this, monitor, handledNodes, e, baseProvider );
                 var root = (XTypedObject)baseProvider.SimpleObjectCreate( monitor, type, rootConfig );
-                return root != null && CreateChildren( root, rootConfig ) ? root : null;
+                var result = root != null && CreateChildren( root, rootConfig ) ? root : null;
+                if( result != null ) WarnUnhandledAttributes( monitor, e, handledNodes );
+                return result;
             }
         }
+
 
         void PreventAnyChangesToXElement( object sender, XObjectChangeEventArgs e )
         {
@@ -157,15 +171,16 @@ namespace CK.Env
             foreach( var child in eParent.Elements() )
             {
                 if( typeFactory == null ) typeFactory = parentConfig.ChildServices.GetService<XTypedFactory>();
-                var tChild = typeFactory.GetMappping( parentConfig.Monitor, child, parentConfig.HandledElements );
+                var tChild = typeFactory.GetMappping( parentConfig.Monitor, child, parentConfig.HandledObjects );
                 if( tChild != null )
                 {
                     if( cChild == null ) cChild = new SimpleServiceContainer( parentConfig.ChildServices );
-                    var config = new XTypedObject.Initializer( parentConfig.Monitor, parentConfig.HandledElements, parent, child, cChild );
+                    var config = new XTypedObject.Initializer( parentConfig.Monitor, parentConfig.HandledObjects, parent, child, cChild );
                     var o = (XTypedObject)cChild.SimpleObjectCreate( parentConfig.Monitor, tChild, config );
                     if( created == null ) created = new List<XTypedObject>();
                     created.Add( o );
                     if( o == null || !CreateChildren( o, config ) ) return false;
+                    WarnUnhandledAttributes( parentConfig.Monitor, child, parentConfig.HandledObjects );
                 }
             }
             return parent.OnChildrenCreated( parentConfig, (IReadOnlyList<XTypedObject>)created ?? Array.Empty<XTypedObject>() );
@@ -327,8 +342,23 @@ namespace CK.Env
                     r.Parent.Add( (string)e.AttributeRequired( "Name" ), children.ToList(), replace, @override );
                     return Enumerable.Empty<XElement>();
                 }
-                return new[] { new XElement( e.Name, e.Attributes(), children ) };
+                var attr = e.Attributes().Select( a => MarkLineColumn( new XAttribute( a ), a ) );
+                return new[] { MarkLineColumn( new XElement( e.Name, attr, children ), e ) };
             }
         }
+
+        static T MarkLineColumn<T>( T o, System.Xml.IXmlLineInfo info ) where T : XObject
+        {
+            if( info.HasLineInfo() ) o.AddAnnotation( info );
+            return o;
+        }
+
+        internal static string GetMarkedLineColumnString( XObject o )
+        {
+            return o.GetLineColumnString()
+                   ?? o.Annotation<System.Xml.IXmlLineInfo>()?.GetLineColumnString();
+
+        }
+
     }
 }

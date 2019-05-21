@@ -15,19 +15,17 @@ namespace CKli
     {
         public XSharedSolutionSpec(
             Initializer initializer,
-            ArtifactCenter artifactCenter,
-            FileSystem fs,
             SharedSolutionSpec previous = null )
             : base( initializer )
         {
             if( previous != null )
             {
-                SharedSpec = new SharedSolutionSpec( previous, artifactCenter, initializer.Element );
+                SharedSpec = new SharedSolutionSpec( previous, initializer );
                 initializer.Services.Remove<SharedSolutionSpec>();
             }
             else
             {
-                SharedSpec = new SharedSolutionSpec( initializer.Element, artifactCenter );
+                SharedSpec = new SharedSolutionSpec( initializer );
             }
             RemoveElementWarnings( initializer );
             initializer.Services.Add( SharedSpec );
@@ -35,8 +33,7 @@ namespace CKli
 
         static internal void RemoveElementWarnings( Initializer initializer )
         {
-            var s = nameof( SharedSolutionSpec.NuGetSources );
-            initializer.HandledElements.AddRange( initializer
+            initializer.HandledObjects.AddRange( initializer
                                                     .Element.Elements()
                                                     .Where( c => c.Name.LocalName == nameof( SharedSolutionSpec.NuGetSources )
                                                                  || c.Name.LocalName == nameof( SharedSolutionSpec.RemoveNuGetSourceNames )

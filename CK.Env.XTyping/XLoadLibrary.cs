@@ -22,7 +22,7 @@ namespace CK.Env
 
         void Load( XTypedFactory factory, IActivityMonitor m )
         {
-            using( m.OpenInfo( Optional ? $"Loading assembly '{Name}'." : $"Loading optional assembly '{Name}'." ) )
+            using( m.OpenInfo( Optional ? $"Loading library '{Name}'." : $"Loading optional library '{Name}'." ) )
             {
                 try
                 {

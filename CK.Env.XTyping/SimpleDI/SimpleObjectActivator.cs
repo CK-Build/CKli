@@ -74,6 +74,11 @@ namespace CK.Core
                 }
                 return longestCtor.Ctor.Invoke( longestCtor.Mapped );
             }
+            catch( TargetInvocationException ex )
+            {
+                monitor.Error( $"While instanciating {t.FullName}.", ex.InnerException );
+                return null;
+            }
             catch( Exception ex )
             {
                 monitor.Error( $"While instanciating {t.FullName}.", ex );

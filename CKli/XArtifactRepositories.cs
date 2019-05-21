@@ -13,7 +13,7 @@ namespace CKli
         {
             initializer.Services.Add( this );
             var repositories = initializer.Element.Elements( "Repository" ).ToList();
-            initializer.HandledElements.AddRange( repositories );
+            initializer.HandledObjects.AddRange( repositories );
             artifactCenter.InstanciateRepositories( initializer.Monitor, repositories );
         }
     }

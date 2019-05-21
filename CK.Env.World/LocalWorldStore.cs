@@ -85,7 +85,7 @@ namespace CK.Env
 
         public XDocument ReadWorldDescription( IActivityMonitor m, IWorldName w )
         {
-            return XDocument.Load( ToLocal( w ).XmlDescriptionFilePath );
+            return XDocument.Load( ToLocal( w ).XmlDescriptionFilePath, LoadOptions.SetLineInfo );
         }
 
         public bool WriteWorldDescription( IActivityMonitor m, IWorldName w, XDocument content )

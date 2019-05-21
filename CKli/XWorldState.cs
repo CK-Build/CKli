@@ -8,6 +8,11 @@ using System.Linq;
 
 namespace CKli
 {
+    /// <summary>
+    /// Required element that defines the whole world.
+    /// A world is public (ie. Open Source) or not. We decided to consider that mixing public/private repositories 
+    /// inside the same world (even if it is technically possible) was not a good idea.
+    /// </summary>
     public class XWorldState : XTypedObject
     {
         readonly IWorldName _world;
@@ -31,13 +36,13 @@ namespace CKli
             _worldStore = worldStore;
             _localFeeds = localFeeds;
             _commandRegister = commandRegister;
-
-            _worldState = new WorldState( commandRegister, artifacts, worldStore, world, _localFeeds, appLife )
+            bool isPublic = (bool)initializer.HandleRequiredAttribute( "IsPublic" );
+            _worldState = new WorldState( commandRegister, artifacts, worldStore, world, isPublic, _localFeeds, appLife )
             {
                 VersionSelector = new ReleaseVersionSelector()
             };
             _worldState.DumpWorldStatus += ( o, e ) => OnDumpWorldStatus( e.Monitor );
-            fileSystem.ServiceContainer.Add( _worldState );
+            initializer.Services.Add( _worldState );
             fileSystem.ServiceContainer.Add<ISolutionDriverWorld>( _worldState );
         }
 
@@ -45,6 +50,7 @@ namespace CKli
         /// Gets the current world.
         /// </summary>
         public IWorldName World => _world;
+
 
         /// <summary>
         /// Initializes this world..

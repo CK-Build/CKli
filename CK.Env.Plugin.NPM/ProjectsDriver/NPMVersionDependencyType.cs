@@ -48,7 +48,9 @@ namespace CK.Env.Plugin
         AllVersions,
 
         /// <summary>
-        /// The only version kind we handle inside a stack ('>=1.2.3').
+        /// The only version range we handle inside a stack is the notion of "minimal
+        /// version" regardless of other subtleties.
+        /// It can be '>=1.2.3', '1.0.4', '~3.9.1', '^2.0.0'.
         /// </summary>
         MinVersion,
 

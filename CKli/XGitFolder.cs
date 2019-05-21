@@ -8,13 +8,12 @@ namespace CKli
     {
         readonly List<XBranch> _branches;
 
-        public XGitFolder( Initializer initializer, XPathItem parent, IWorldName world )
+        public XGitFolder( Initializer initializer, XPathItem parent, WorldState world )
             : base( initializer, parent.FileSystem, parent )
         {
             _branches = new List<XBranch>();
             initializer.ChildServices.Add( this );
-            GitFolder = FileSystem.EnsureGitFolder( initializer.Monitor, world, FullPath, Url );
-            GitFolder.IsPublic = IsPublic;
+            GitFolder = FileSystem.EnsureGitFolder( initializer.Monitor, world.WorldName, FullPath, Url, world.IsPublicWorld );
         }
 
         /// <summary>
@@ -26,11 +25,6 @@ namespace CKli
         /// Gets the url of the remote repository.
         /// </summary>
         public string Url { get; private set; }
-
-        /// <summary>
-        /// Gets whether this repository is public (Open Source) or not.
-        /// </summary>
-        public bool IsPublic { get; private set; }
 
         /// <summary>
         /// Gets the develop branch (<see cref="IWorldName.DevelopBranchName"/>).

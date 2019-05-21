@@ -28,9 +28,10 @@ namespace CK.Env
 
         public ProtoGitFolder ProtoGitFolder { get; }
 
-        internal GitFolder( ProtoGitFolder data )
+        internal GitFolder( ProtoGitFolder data, bool isPublic )
         {
             ProtoGitFolder = data;
+            IsPublic = isPublic;
 
             SubPath = ProtoGitFolder.FullPhysicalPath.RemovePrefix( data.FileSystem.Root );
             if( SubPath.IsEmptyPath ) throw new InvalidOperationException( "Root path can not be a Git folder." );
@@ -59,10 +60,9 @@ namespace CK.Env
         NormalizedPath ICommandMethodsProvider.CommandProviderName => SubPath;
 
         /// <summary>
-        /// Gets or sets whether the Git repository is public or private.
-        /// Defaults to false.
+        /// Gets whether the Git repository is public or private.
         /// </summary>
-        public bool IsPublic { get; set; }
+        public bool IsPublic { get; }
 
         /// <summary>
         /// Gets the service container for this GitFolder.
@@ -74,19 +74,6 @@ namespace CK.Env
         /// </summary>
         public GitPluginManager PluginManager { get; }
 
-        /// <summary>
-        /// Ensures that the Git folder is loaded.
-        /// </summary>
-        /// <param name="folderPath">
-        /// The folder path is a sub path of <see cref="Root"/> and contains the .git sub folder.
-        /// </param>
-        /// <returns>The <see cref="GitFolder"/> or null if there is not .git subfolder.</returns>
-        public static GitFolder EnsureGitFolder( IActivityMonitor m, IWorldName world, ISecretKeyStore secretKeyStore, FileSystem fs, CommandRegister commandRegister, string path, string url = null )
-        {
-            var g = new ProtoGitFolder( url, path, world, secretKeyStore, fs, commandRegister ).Ensure( m );
-            g.EnsureBranch( m, world.DevelopBranchName );
-            return g;
-        }
 
         /// <summary>
         /// Ensures that plugins are loaded for the <see cref="CurrentBranchName"/>.

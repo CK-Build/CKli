@@ -12,7 +12,7 @@
   <ArtifactCenter />
   <LocalFeedProvider />
   <NuGetClient />
-  <WorldState />
+  <WorldState IsPublic="True" />
 
   <ArtifactRepositories>
     <Repository Type="NuGetAzure"

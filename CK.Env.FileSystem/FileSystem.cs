@@ -72,13 +72,14 @@ namespace CK.Env
         /// </param>
         /// <param name="urlRepository">The url repository.</param>
         /// <returns>The <see cref="GitFolder"/> or null if there is not .git subfolder.</returns>
-        public GitFolder EnsureGitFolder( IActivityMonitor m, IWorldName world, NormalizedPath folderPath, string urlRepository )
+        public GitFolder EnsureGitFolder( IActivityMonitor m, IWorldName world, NormalizedPath folderPath, string urlRepository, bool isPublic = false )
         {
             GitFolder g = GitFolders.FirstOrDefault( f => f.SubPath == folderPath );
             if( g == null )
             {
                 folderPath = Root.Combine( folderPath );
-                g = GitFolder.EnsureGitFolder( m, world, _secretKeyStore, this, _commandRegister, folderPath, urlRepository );
+                g = new ProtoGitFolder( urlRepository, folderPath, world, _secretKeyStore, this, _commandRegister ).CreateGitFolder( m, isPublic );
+                g.EnsureBranch( m, world.DevelopBranchName );
                 _gits.Add( g );
             }
             return g;
