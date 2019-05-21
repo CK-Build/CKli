@@ -194,8 +194,10 @@
       <Branch Name="develop">
         <SolutionSpec SqlServer="2016" UseCKSetup="true" >
           <CKSetupComponentProjects>
-            <add Name="CK.StObj.Model;CK.StObj.Runtime" />
-            <add Name="CK.StObj.Engine;CK.Setupable.Model" />
+            <add Name="CK.StObj.Model" />
+            <add Name="CK.StObj.Runtime" />
+            <add Name="CK.StObj.Engine" />
+            <add Name="CK.Setupable.Model" />
             <add Name="CK.Setupable.Runtime" />
             <add Name="CK.Setupable.Engine" />
             <add Name="CK.SqlServer.Setup.Model" />

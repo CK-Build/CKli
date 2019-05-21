@@ -10,12 +10,12 @@ namespace CK.Env
     public interface IArtifactRepositoryFactory
     {
         /// <summary>!
-        /// Creates a repository information from an Xml element or returns null if the element
+        /// Creates a repository information from a <see cref="XElementReader"/> or returns null if the element
         /// cannnot be handled.
         /// </summary>
-        /// <param name="e">The xml element. The <see cref="XElement.Name"/> must be ignored (can be anything).</param>
+        /// <param name="r">The element reader. The Elemnt's <see cref="XElement.Name"/> must be ignored (it can be anything).</param>
         /// <returns>The repository info or null.</returns>
-        IArtifactRepositoryInfo CreateInfo( XElement e );
+        IArtifactRepositoryInfo CreateInfo( in XElementReader r );
 
         /// <summary>
         /// Finds or creates a feed from a feed information if actual information type is handled or null.

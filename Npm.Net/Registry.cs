@@ -20,7 +20,6 @@ namespace Npm.Net
 {
     public class Registry
     {
-        bool _registryIsUpToDate;
         readonly HttpClient _httpClient;
         readonly AuthenticationHeaderValue _authHeader;
         readonly string _session = GenerateSessionId();

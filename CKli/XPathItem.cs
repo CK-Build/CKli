@@ -39,7 +39,7 @@ namespace CKli
                     initializer.Element.Name == "File"
                             ? FileSystemItemKind.File
                             : FileSystemItemKind.Directory,
-                    parentPath.AppendPart( (string)initializer.HandleRequiredAttribute( "Name" ) ) )
+                    parentPath.AppendPart( initializer.Reader.HandleRequiredAttribute<string>( "Name" ) ) )
         {
         }
 

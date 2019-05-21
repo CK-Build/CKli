@@ -7,6 +7,137 @@ namespace System.Xml.Linq
 {
     public static class XLinqExtension
     {
+        #region IXmlLineInfo support.
+
+        /// <summary>
+        /// Public class that is is used as an annotation on any <see cref="XObject"/> to
+        /// associate its line information.
+        /// <para>
+        /// A similar class is internally defined and used to implement <see cref="System.Xml.IXmlLineInfo"/> on
+        /// all <see cref="XObject"/>. This one is publicly assumed and supports <see cref="GetLineColumnString(XObject, string, string)"/>,
+        /// <see cref="SetLineColumnInfo{T}(T, int, int)"/>, <see cref="SetLineColumnInfo{T}(T, System.Xml.IXmlLineInfo)"/>, <see cref="SetNoLineColumnInfo{T}(T)"/>
+        /// and <see cref="GetLineColumnString(XObject, string, string)"/>.
+        /// </para>
+        /// </summary>
+        public class LineInfoAnnotation : System.Xml.IXmlLineInfo
+        {
+            class NoInfo : System.Xml.IXmlLineInfo
+            {
+                public int LineNumber => 0;
+
+                public int LinePosition => 0;
+
+                public bool HasLineInfo() => false;
+            }
+
+            /// <summary>
+            /// Gets a IXmlLineInfo That has no line/column information (<see cref="System.Xml.IXmlLineInfo.HasLineInfo()"/> is false).
+            /// </summary>
+            public static readonly System.Xml.IXmlLineInfo None = new NoInfo();
+
+            /// <summary>
+            /// Initializes a new information.
+            /// </summary>
+            /// <param name="lineNumber">The line number.</param>
+            /// <param name="linePosition">The position in the line (the column number).</param>
+            public LineInfoAnnotation( int lineNumber, int linePosition )
+            {
+                LineNumber = lineNumber;
+                LinePosition = linePosition;
+            }
+
+            /// <summary>
+            /// The line number.
+            /// </summary>
+            public int LineNumber { get; }
+
+            /// <summary>
+            /// The line position.
+            /// </summary>
+            public int LinePosition { get; }
+
+            /// <summary>
+            /// Always true. Use <see cref="None"/> for an "empty" information.
+            /// </summary>
+            /// <returns>Always true.</returns>
+            public bool HasLineInfo() => true;
+        }
+
+        /// <summary>
+        /// Sets a line/column information that is the one from another <see cref="System.Xml.IXmlLineInfo"/>
+        /// objects (it can be any <see cref="XObject"/> since XObject implements IXmlLineInfo).
+        /// </summary>
+        /// <typeparam name="T">This element type.</typeparam>
+        /// <param name="this">This XObject.</param>
+        /// <param name="info">The exisitng line info.</param>
+        /// <returns>This object (fluent syntax).</returns>
+        public static T SetLineColumnInfo<T>( this T @this, System.Xml.IXmlLineInfo info ) where T : XObject
+        {
+            @this.RemoveAnnotations<System.Xml.IXmlLineInfo>();
+            @this.AddAnnotation( info );
+            return @this;
+        }
+
+        /// <summary>
+        /// Sets a line/column information.
+        /// </summary>
+        /// <typeparam name="T">This element type.</typeparam>
+        /// <param name="this">This XObject.</param>
+        /// <param name="line">Line number.</param>
+        /// <param name="column">Column number.</param>
+        /// <returns>This object (fluent syntax).</returns>
+        public static T SetLineColumnInfo<T>( this T @this, int line, int column ) where T : XObject
+        {
+            @this.RemoveAnnotations<System.Xml.IXmlLineInfo>();
+            @this.AddAnnotation( new LineInfoAnnotation( line, column ) );
+            return @this;
+        }
+
+        /// <summary>
+        /// Sets the empty line/column information: <see cref="LineInfoAnnotation.None"/>.
+        /// </summary>
+        /// <typeparam name="T">This element type.</typeparam>
+        /// <param name="this">This XObject.</param>
+        /// <returns>This object (fluent syntax).</returns>
+        public static T SetNoLineColumnInfo<T>( this T @this ) where T : XObject
+        {
+            @this.RemoveAnnotations<System.Xml.IXmlLineInfo>();
+            @this.AddAnnotation( LineInfoAnnotation.None );
+            return @this;
+        }
+
+
+        /// <summary>
+        /// Gets a line/column information that may be an empty one (<see cref="System.Xml.IXmlLineInfo.HasLineInfo()"/> is
+        /// false) if this information is not known.
+        /// </summary>
+        /// <typeparam name="T">This element type.</typeparam>
+        /// <param name="this">This XObject.</param>
+        /// <returns>The associated information.</returns>
+        public static System.Xml.IXmlLineInfo GetLineColumnInfo( this XObject @this )
+        {
+            return @this.Annotation<System.Xml.IXmlLineInfo>() ?? (System.Xml.IXmlLineInfo)@this;
+        }
+
+        /// <summary>
+        /// Gets line and column information (if it exists) as a string from any <see cref="XObject"/> (such
+        /// as <see cref="XAttribute"/> or <see cref="XElement"/>).
+        /// </summary>
+        /// <param name="this">This <see cref="XObject"/>.</param>
+        /// <param name="format">Default format is "- {0},{1}" where {0} is the line and {1} is the column number.</param>
+        /// <param name="noLineInformation">Defaults to a null string.</param>
+        /// <returns>A string based on <paramref name="format"/> or the <paramref name="noLineInformation"/>.</returns>
+        public static string GetLineColumnString( this XObject @this, string format = "- @{0},{1}", string noLineInformation = null )
+        {
+            var info = GetLineColumnInfo( @this );
+            return info.HasLineInfo() ? String.Format( format, info.LineNumber, info.LinePosition ) : noLineInformation;
+        }
+
+
+        #endregion
+
+        #region Xml Beautify
+
         static readonly XName _xmlSpace = XName.Get( "xml", "space" );
 
         /// <summary>
@@ -17,9 +148,9 @@ namespace System.Xml.Linq
         /// </summary>
         /// <param name="this">This document.</param>
         /// <param name="actualTextProcessor">
-        /// Optional transformer for texts that are not entirely white spaces and white spaces are not preserved.
-        /// The function is called with the current start line and the <see cref="StringBuilder"/> that can be
-        /// changed and must return true if the content of the StringBuilder must be considered.
+        /// Optional transformer for texts that are not entirely white spaces and for which white spaces
+        /// are not preserved. The function is called with the current start line and the <see cref="StringBuilder"/>
+        /// that can be changed: the function must return true if the content of the StringBuilder must be considered.
         /// </param>
         /// <returns>This document.</returns>
         public static XDocument Beautify( this XDocument @this, Func<string, StringBuilder, bool> actualTextProcessor = null )
@@ -147,6 +278,13 @@ namespace System.Xml.Linq
             }
         }
 
+        #endregion
+
+        /// <summary>
+        /// Very simple process that removes any namespace: all <see cref="XElement.Name"/> are
+        /// set to their respective <see cref="XName.LocalName"/>.
+        /// </summary>
+        /// <param name="this">This element.</param>
         public static void RemoveAllNamespaces( this XElement @this )
         {
             @this.Name = @this.Name.LocalName;
@@ -157,6 +295,12 @@ namespace System.Xml.Linq
             }
         }
 
+        /// <summary>
+        /// Ensures that at least one named chiled element exist and returns it.
+        /// </summary>
+        /// <param name="this">This parent element.</param>
+        /// <param name="name">The name of the element to find or create.</param>
+        /// <returns>The element fonud or created.</returns>
         public static XElement EnsureElement( this XElement @this, XName name )
         {
             XElement e = @this.Element( name );
@@ -168,14 +312,12 @@ namespace System.Xml.Linq
             return e;
         }
 
-        public static XElement ReplaceElementByName( this XElement @this, XElement e )
-        {
-            XElement c = @this.Element( e.Name );
-            if( c == null ) @this.Add( e );
-            else c.ReplaceWith( e );
-            return e;
-        }
-
+        /// <summary>
+        /// Ensures that a named element is the first child.
+        /// </summary>
+        /// <param name="this">This parent element.</param>
+        /// <param name="name">The element's name that must be the first one.</param>
+        /// <returns>The first element that may have been moved or inserted.</returns>
         public static XElement EnsureFirstElement( this XElement @this, XName name )
         {
             XElement e = @this.Element( name );
@@ -185,6 +327,26 @@ namespace System.Xml.Linq
             return e;
         }
 
+        /// <summary>
+        /// Replaces the first element with the same name or adds a new element.
+        /// </summary>
+        /// <param name="this">This parent element.</param>
+        /// <param name="e">The element wthat will replace its first homonym or be added.</param>
+        /// <returns>This element.</returns>
+        public static XElement ReplaceElementByName( this XElement @this, XElement e )
+        {
+            XElement c = @this.Element( e.Name );
+            if( c == null ) @this.Add( e );
+            else c.ReplaceWith( e );
+            return e;
+        }
+
+        /// <summary>
+        /// Clears any <see cref="XComment"/> or <see cref="XText"/> nodes before
+        /// this one.
+        /// </summary>
+        /// <param name="this">This element.</param>
+        /// <returns>This element (fluent syntax).</returns>
         public static XElement ClearCommentsBefore( this XElement @this )
         {
             bool hasNewLine = false;
@@ -198,6 +360,12 @@ namespace System.Xml.Linq
             return @this;
         }
 
+        /// <summary>
+        /// Handles following <see cref="XText"/> elements anc ompacts them into one XText
+        /// from wich any leading empty lines are removed.
+        /// </summary>
+        /// <param name="this">This element.</param>
+        /// <returns>This element (fluent syntax).</returns>
         public static XElement ClearNewLineAfter( this XElement @this )
         {
             var textElements = @this.NodesAfterSelf().TakeWhile( n => n is XText ).Cast<XText>().ToList();
@@ -228,6 +396,12 @@ namespace System.Xml.Linq
             return @this;
         }
 
+        /// <summary>
+        /// Calls <see cref="ClearCommentsBefore(XElement)"/> and <see cref="ClearNewLineAfter(XElement)"/>
+        /// on this element.
+        /// </summary>
+        /// <param name="this">This element.</param>
+        /// <returns>This element (fluent syntax).</returns>
         public static XElement ClearCommentsBeforeAndNewLineAfter( this XElement @this ) => @this.ClearCommentsBefore().ClearNewLineAfter();
 
         /// <summary>
@@ -255,17 +429,6 @@ namespace System.Xml.Linq
             }
         }
 
-
-        #region ApplyAddRemoveClear on Dictionary whith a Func<XElement, string> keyReader.
-
-        public static Dictionary<string, T> ApplyAddRemoveClear<T>(
-            this XElement @this,
-            Func<XElement, string> keyReader,
-            Func<XElement, T> builder )
-        {
-            return ApplyAddRemoveClear( @this, new Dictionary<string, T>(), keyReader, builder );
-        }
-
         public static Dictionary<string, T> ApplyAddRemoveClear<T>(
             this XElement @this,
             Dictionary<string, T> map,
@@ -291,61 +454,6 @@ namespace System.Xml.Linq
             }
             return map;
         }
-
-        #endregion
-
-        #region ApplyAddRemoveClear on Dictionary<string,T> whith a Func<T, string> keySelector.
-
-        public static Dictionary<string, T> ApplyAddRemoveClear<T>(
-            this XElement @this,
-            Func<XElement, T> builder,
-            Func<T, string> keySelector)
-        {
-            return ApplyAddRemoveClear(@this, new Dictionary<string, T>(), builder, keySelector);
-        }
-
-        public static Dictionary<string, T> ApplyAddRemoveClear<T>(
-            this XElement @this,
-            Dictionary<string, T> map,
-            Func<XElement, T> builder,
-            Func<T, string> keySelector)
-        {
-            foreach( var e in @this.Elements() )
-            {
-                switch( e.Name.LocalName )
-                {
-                    case "clear": map.Clear(); break;
-                    case "remove": map.Remove( keySelector( builder( e ) ) ); break;
-                    case "add":
-                        {
-                            var item = builder( e );
-                            map.Add( keySelector( item ), item );
-                            break;
-                        }
-                    default: throw new Exception( $"Expected only <add>, <remove> or <clear/> element in {@this}." );
-                }
-            }
-            return map;
-        }
-
-        #endregion
-
-        /// <summary>
-        /// Creates a new set of items.
-        /// </summary>
-        /// <typeparam name="T">The item's type.</typeparam>
-        /// <param name="this">This Xmle element.</param>
-        /// <param name="builder">The builder function that must create an item from its xml representation.</param>
-        /// <param name="comparer">The item's comparer.</param>
-        /// <returns>A set of items, unique in the sense of the <paramref name="comparer"/>.</returns>
-        public static HashSet<T> ApplyAddRemoveClear<T>(
-            this XElement @this,
-            Func<XElement, T> builder,
-            IEqualityComparer<T> comparer = null )
-        {
-            return ApplyAddRemoveClear( @this, new HashSet<T>( comparer ), builder );
-        }
-
 
         public static HashSet<T> ApplyAddRemoveClear<T>(
             this XElement @this,
@@ -389,27 +497,6 @@ namespace System.Xml.Linq
             foreach( var e in @this )
             {
                 ApplyAddRemoveClear( e, map, keyReader, builder );
-            }
-            return map;
-        }
-
-        public static Dictionary<string, T> ApplyAddRemoveClear<T>(
-            this IEnumerable<XElement> @this,
-            Func<XElement, T> builder,
-            Func<T, string> keySelector)
-        {
-            return ApplyAddRemoveClear(@this, new Dictionary<string, T>(), builder, keySelector);
-        }
-
-        public static Dictionary<string, T> ApplyAddRemoveClear<T>(
-            this IEnumerable<XElement> @this,
-            Dictionary<string, T> map,
-            Func<XElement, T> builder,
-            Func<T, string> keySelector)
-        {
-            foreach( var e in @this )
-            {
-                ApplyAddRemoveClear(e, map, builder, keySelector);
             }
             return map;
         }

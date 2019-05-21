@@ -43,44 +43,41 @@ namespace CK.Env
         /// an <see cref="ArgumentException"/> is thrown.
         /// </para>
         /// </summary>
-        /// <param name="e">The xml element.</param>
+        /// <param name="r">The xml reader element.</param>
         /// <returns>The mapped repository info.</returns>
-        IArtifactRepositoryInfo CreateInfo( XElement e )
+        IArtifactRepositoryInfo CreateInfo( in XElementReader r )
         {
-            if( e == null ) throw new ArgumentNullException( nameof( e ) );
             foreach( var f in _factories )
             {
-                var info = f.CreateInfo( e );
+                var info = f.CreateInfo( r );
                 if( info != null )
                 {
-                    var checkName = (string)e.Attribute( "CheckName" );
-                    if( checkName != null
-                        && checkName != info.UniqueArtifactRepositoryName )
+                    var checkName = r.HandleOptionalAttribute<string>( "CheckName", null );
+                    if( checkName != null && checkName != info.UniqueArtifactRepositoryName )
                     {
                         throw new ArgumentException( $"Invalid check for name: CheckName is '{checkName}' but the actual repository name is '{info.UniqueArtifactRepositoryName}'." );
                     }
-                    var checkSecretKeyName = (string)e.Attribute( "CheckSecretKeyName" );
-                    if( checkSecretKeyName != null
-                        && checkSecretKeyName != info.SecretKeyName )
+                    var checkSecretKeyName = r.HandleOptionalAttribute<string>( "CheckSecretKeyName", null );
+                    if( checkSecretKeyName != null && checkSecretKeyName != info.SecretKeyName )
                     {
                         throw new ArgumentException( $"Invalid check for secret key name: CheckSecretKeyName is '{checkSecretKeyName}' but the actual repository secret key name is '{info.SecretKeyName}'." );
                     }
                     return info;
                 }
             }
-            throw new ArgumentException( "Unable to map Xml element to an ArtifactRepositoryInfo: " + e.ToString() );
+            throw new ArgumentException( "Unable to map Xml element to an ArtifactRepositoryInfo: " + r.ToString() );
         }
 
         /// <summary>
         /// Ensure that repositories are created from a set of xml info elements.
         /// </summary>
-        /// <param name="xmlInfos">The info elements.</param>
-        public void InstanciateRepositories( IActivityMonitor m, IEnumerable<XElement> xmlInfos )
+        /// <param name="infoReaders">Set of info reader.</param>
+        public void InstanciateRepositories( IEnumerable<XElementReader> infoReaders )
         {
-            foreach( var xInfo in xmlInfos )
+            foreach( var r in infoReaders )
             {
-                var info = CreateInfo( xInfo );
-                FindOrCreate( m, info );
+                var info = CreateInfo( r );
+                FindOrCreate( r.Monitor, info );
             }
         }
 
