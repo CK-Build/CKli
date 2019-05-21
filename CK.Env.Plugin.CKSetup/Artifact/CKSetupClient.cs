@@ -27,15 +27,15 @@ namespace CK.Env.CKSetup
             _stores = new Dictionary<string, Store>();
         }
 
-        public IArtifactRepositoryInfo CreateInfo( XElement e )
+        public IArtifactRepositoryInfo CreateInfo( in XElementReader r )
         {
-            string type = (string)e.Attribute( "Type" );
+            string type = r.HandleOptionalAttribute<string>( "Type", null );
             if( type == "CKSetup" )
             {
-                string url = (string)e.Attribute( "Url" );
+                string url = r.HandleOptionalAttribute<string>( "Url", null );
                 if( url == null || url == Facade.DefaultStorePath ) return DefaultPublicStore.Default;
 
-                string name = (string)e.AttributeRequired( "Name" );
+                string name = r.HandleRequiredAttribute<string>( "Name" );
                 if( !Regex.IsMatch( name, "^\\w+$", RegexOptions.CultureInvariant ) )
                 {
                     throw new ArgumentException( $"Invalid name. Must be an identifier ('^\\w+$' regex)." );

@@ -9,12 +9,12 @@ namespace CK.Env.NuGet
     /// </summary>
     public class NuGetStandardFeedInfo : NuGetFeedInfo
     {
-        public NuGetStandardFeedInfo( XElement e )
-            : base( e )
+        public NuGetStandardFeedInfo( in XElementReader r )
+            : base( r )
         {
-            Name = (string)e.AttributeRequired( "Name" );
-            Url = (string)e.AttributeRequired( "Url" );
-            SecretKeyName = (string)e.AttributeRequired( "SecretKeyName" );
+            Name = r.HandleRequiredAttribute<string>( "Name" );
+            Url = r.HandleRequiredAttribute<string>( "Url" );
+            SecretKeyName = r.HandleRequiredAttribute<string>( "SecretKeyName" );
         }
 
         public override NuGetFeedType Type => NuGetFeedType.NuGetStandard;

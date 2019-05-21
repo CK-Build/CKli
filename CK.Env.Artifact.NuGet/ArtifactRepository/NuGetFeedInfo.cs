@@ -8,9 +8,9 @@ namespace CK.Env.NuGet
 {
     public abstract class NuGetFeedInfo : INuGetFeedInfo
     {
-        protected NuGetFeedInfo( XElement e )
+        protected NuGetFeedInfo( in XElementReader r )
         {
-            QualityFilter = new PackageQualityFilter( (string)e.Attribute( "QualityFilter" ) );
+            QualityFilter = new PackageQualityFilter( r.HandleOptionalAttribute<string>( "QualityFilter", null ) );
         }
 
         /// <summary>
@@ -49,21 +49,21 @@ namespace CK.Env.NuGet
         /// <summary>
         /// Creates a <see cref="INuGetFeedInfo"/> from a <see cref="XElement"/>.
         /// </summary>
-        /// <param name="e">The xml element.</param>
+        /// <param name="r">The xml element reader.</param>
         /// <param name="skipMissingType">
         /// True to silently ignore an element that doesn't have a Type attribute whose value is one of <see cref="NuGetFeedType"/>
         /// and returns null.
         /// When false (the default), an exception is thrown.
         /// </param>
         /// <returns>The info or null.</returns>
-        public static INuGetFeedInfo Create( XElement e, bool skipMissingType = false )
+        public static INuGetFeedInfo Create( in XElementReader r, bool skipMissingType = false )
         {
-            switch( e.AttributeEnum( "Type", NuGetFeedType.None ) )
+            switch( r.Element.AttributeEnum( "Type", NuGetFeedType.None ) )
             {
-                case NuGetFeedType.NuGetAzure: return new NuGetAzureFeedInfo( e );
-                case NuGetFeedType.NuGetStandard: return new NuGetStandardFeedInfo( e );
+                case NuGetFeedType.NuGetAzure: return new NuGetAzureFeedInfo( r );
+                case NuGetFeedType.NuGetStandard: return new NuGetStandardFeedInfo( r );
                 default:
-                    if( !skipMissingType ) throw new Exception( $"Not a NuGetFeedInfo element: {e}." );
+                    if( !skipMissingType ) throw new Exception( $"Not a NuGetFeedInfo element: {r}." );
                     return null;
             }
         }

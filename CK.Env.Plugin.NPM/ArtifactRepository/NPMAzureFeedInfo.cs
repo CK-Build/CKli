@@ -11,15 +11,15 @@ namespace CK.Env.NPM
     {
         readonly string _name;
 
-        public NPMAzureFeedInfo( XElement e )
-            : base( e )
+        public NPMAzureFeedInfo( in XElementReader r )
+            : base( r )
         {
-            Organization = (string)e.AttributeRequired( "Organization" );
-            FeedName = (string)e.AttributeRequired( "FeedName" );
-            NPMScope = (string)e.AttributeRequired( "NPMScope" );
+            Organization = r.HandleRequiredAttribute<string>( "Organization" );
+            FeedName = r.HandleRequiredAttribute<string>( "FeedName" );
+            NPMScope = r.HandleRequiredAttribute<string>( "NPMScope" );
             if( NPMScope.Length <= 1 || NPMScope[0] != '@' )
             {
-                throw new Exception( $"'{e}': invalid NPScope '{NPMScope}' (must start with a @)." );
+                throw new Exception( $"'{r.Element.Name}'{r.Element.GetLineColumnString()}: invalid NPScope '{NPMScope}' (must start with a @)." );
             }
             _name = $"{NPMScope}->{Organization}-{FeedName}";
         }

@@ -248,7 +248,7 @@ namespace CK.Env.NuGet
             SourceCache.Dispose();
         }
 
-        IArtifactRepositoryInfo IArtifactRepositoryFactory.CreateInfo( XElement e )
+        IArtifactRepositoryInfo IArtifactRepositoryFactory.CreateInfo( in XElementReader e )
         {
             return NuGetFeedInfo.Create( e, skipMissingType: true );
         }

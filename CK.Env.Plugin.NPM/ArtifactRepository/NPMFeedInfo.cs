@@ -7,9 +7,9 @@ namespace CK.Env.NPM
 {
     public abstract class NPMFeedInfo : INPMFeedInfo
     {
-        protected NPMFeedInfo( XElement e )
+        protected NPMFeedInfo( in XElementReader r )
         {
-            QualityFilter = new PackageQualityFilter( (string)e.Attribute( "QualityFilter" ) );
+            QualityFilter = new PackageQualityFilter( r.HandleOptionalAttribute<string>( "QualityFilter", null ) );
         }
 
         /// <summary>
@@ -47,21 +47,21 @@ namespace CK.Env.NPM
         /// <summary>
         /// Creates a <see cref="INPMFeedInfo"/> from a <see cref="XElement"/>.
         /// </summary>
-        /// <param name="e">The xml element.</param>
+        /// <param name="r">The xml element reader.</param>
         /// <param name="skipMissingType">
         /// True to silently ignore an element that doesn't have a Type attribute whose value is one of <see cref="NPMFeedType"/>
         /// and returns null.
         /// When false (the default), an exception is thrown.
         /// </param>
         /// <returns>The info or null.</returns>
-        public static INPMFeedInfo Create( XElement e, bool skipMissingType = false )
+        public static INPMFeedInfo Create( in XElementReader r, bool skipMissingType = false )
         {
-            switch( e.AttributeEnum( "Type", NPMFeedType.None ) )
+            switch( r.Element.AttributeEnum( "Type", NPMFeedType.None ) )
             {
-                case NPMFeedType.NPMAzure: return new NPMAzureFeedInfo( e );
-                case NPMFeedType.NPMStandard: return new NPMStandardFeedInfo( e );
+                case NPMFeedType.NPMAzure: return new NPMAzureFeedInfo( r );
+                case NPMFeedType.NPMStandard: return new NPMStandardFeedInfo( r );
                 default:
-                    if( !skipMissingType ) throw new Exception( $"Not a NPMFeedInfo element: {e}." );
+                    if( !skipMissingType ) throw new Exception( $"Not a NPMFeedInfo element: {r}." );
                     return null;
             }
         }

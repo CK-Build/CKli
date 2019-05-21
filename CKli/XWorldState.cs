@@ -36,7 +36,7 @@ namespace CKli
             _worldStore = worldStore;
             _localFeeds = localFeeds;
             _commandRegister = commandRegister;
-            bool isPublic = (bool)initializer.HandleRequiredAttribute( "IsPublic" );
+            bool isPublic = initializer.Reader.HandleRequiredAttribute<bool>( "IsPublic" );
             _worldState = new WorldState( commandRegister, artifacts, worldStore, world, isPublic, _localFeeds, appLife )
             {
                 VersionSelector = new ReleaseVersionSelector()

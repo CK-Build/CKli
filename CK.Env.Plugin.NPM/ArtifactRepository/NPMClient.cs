@@ -74,9 +74,9 @@ namespace CK.Env.NPM
             return feed;
         }
 
-        IArtifactRepositoryInfo IArtifactRepositoryFactory.CreateInfo( XElement e )
+        IArtifactRepositoryInfo IArtifactRepositoryFactory.CreateInfo( in XElementReader r )
         {
-            return NPMFeedInfo.Create( e, skipMissingType: true );
+            return NPMFeedInfo.Create( r, skipMissingType: true );
         }
 
         IArtifactRepository IArtifactRepositoryFactory.FindOrCreate( IActivityMonitor m, IArtifactRepositoryInfo info )

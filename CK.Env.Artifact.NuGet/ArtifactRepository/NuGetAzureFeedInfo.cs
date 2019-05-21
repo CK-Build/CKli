@@ -10,12 +10,12 @@ namespace CK.Env.NuGet
     {
         readonly string _name;
 
-        public NuGetAzureFeedInfo( XElement e )
-            : base( e )
+        public NuGetAzureFeedInfo( in XElementReader r )
+            : base( r )
         {
-            Organization = (string)e.AttributeRequired( "Organization" );
-            FeedName = (string)e.AttributeRequired( "FeedName" );
-            var label = (string)e.Attribute( "Label" );
+            Organization = r.HandleRequiredAttribute<string>( "Organization" );
+            FeedName = r.HandleRequiredAttribute<string>( "FeedName" );
+            var label = r.HandleOptionalAttribute<string>( "Label", null );
             _name = Organization + '-' + FeedName;
             if( label != null ) _name += '-' + label;
             if( label != null ) label = "@" + label;

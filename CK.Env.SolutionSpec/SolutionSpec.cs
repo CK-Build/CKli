@@ -12,14 +12,14 @@ namespace CK.Env
     /// </summary>
     public class SolutionSpec : SharedSolutionSpec
     {
-        public SolutionSpec( SharedSolutionSpec shared, XTypedObject.Initializer r )
+        public SolutionSpec( SharedSolutionSpec shared, in XElementReader r )
             : base( shared, r )
         {
             var e = r.Element;
 
-            UseCKSetup = (bool?)e.Attribute( nameof( UseCKSetup ) ) ?? false;
-            SqlServer = (string)e.Attribute( nameof( SqlServer ) );
-            TestProjectsArePublished = (bool?)e.Attribute( nameof( TestProjectsArePublished ) ) ?? false;
+            UseCKSetup = r.HandleOptionalAttribute( nameof( UseCKSetup ), false );
+            SqlServer = r.HandleOptionalAttribute<string>( nameof( SqlServer ), null );
+            TestProjectsArePublished = r.HandleOptionalAttribute( nameof( TestProjectsArePublished ), false );
 
             NPMProjects = e.Elements( nameof( NPMProjects ) )
                 .ApplyAddRemoveClear( p => (string)p.AttributeRequired( "Folder" ), p => new NPMProjectSpec( p ) )

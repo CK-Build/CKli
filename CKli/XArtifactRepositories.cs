@@ -12,9 +12,10 @@ namespace CKli
             : base( initializer )
         {
             initializer.Services.Add( this );
-            var repositories = initializer.Element.Elements( "Repository" ).ToList();
-            initializer.HandledObjects.AddRange( repositories );
-            artifactCenter.InstanciateRepositories( initializer.Monitor, repositories );
+            var readers = initializer.Element
+                            .Elements( "Repository" )
+                            .Select( e => initializer.Reader.WithElement( e ) );
+            artifactCenter.InstanciateRepositories( readers );
         }
     }
 }

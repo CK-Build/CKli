@@ -9,13 +9,13 @@ namespace CK.Env.NPM
     /// </summary>
     public class NPMStandardFeedInfo : NPMFeedInfo
     {
-        public NPMStandardFeedInfo( XElement e )
-            : base( e )
+        public NPMStandardFeedInfo( in XElementReader r )
+            : base( r )
         {
-            Name = (string)e.AttributeRequired( "Name" );
-            Url = (string)e.AttributeRequired( "Url" );
-            SecretKeyName = (string)e.AttributeRequired( "SecretKeyName" );
-            UsePassword = (bool?)e.Attribute( "UsePassword" ) ?? false;
+            Name = r.HandleRequiredAttribute<string>( "Name" );
+            Url = r.HandleRequiredAttribute<string>( "Url" );
+            SecretKeyName = r.HandleRequiredAttribute<string>( "SecretKeyName" );
+            UsePassword = r.HandleOptionalAttribute( "UsePassword", false );
         }
 
         public override NPMFeedType Type => NPMFeedType.NPMStandard;

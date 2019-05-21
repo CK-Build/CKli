@@ -13,22 +13,16 @@ namespace CK.Env
             /// <summary>
             /// Constructor for child objects.
             /// </summary>
-            /// <param name="monitor">The monitor to use.</param>
-            /// <param name="handledObjects">The set of handled xml objects (to avoid warnings).</param>
             /// <param name="parent">The parent object. Never null.</param>
-            /// <param name="e">The element. Never null.</param>
+            /// <param name="eReader">The element reader.</param>
             /// <param name="services">The available services.</param>
             internal Initializer(
-                IActivityMonitor monitor,
-                HashSet<XObject> handledObjects,
                 XTypedObject parent,
-                XElement e,
+                in XElementReader eReader,
                 SimpleServiceContainer services )
             {
-                HandledObjects = handledObjects;
-                Element = e;
                 Parent = parent;
-                Monitor = monitor;
+                Reader = eReader;
                 Services = services;
                 ChildServices = new SimpleServiceContainer( Services );
             }
@@ -37,58 +31,35 @@ namespace CK.Env
             /// Constructor for the root.
             /// </summary>
             /// <param name="root">Root factory.</param>
-            /// <param name="handledObjects">The set of handled xml objects (to avoid warnings).</param>
-            /// <param name="monitor">The monitor to use.</param>
-            /// <param name="e">The element. Never null.</param>
+            /// <param name="eReader">The element reader.</param>
             /// <param name="baseProvider">Can be null.</param>
             internal Initializer(
                 XTypedFactory root,
-                IActivityMonitor monitor,
-                HashSet<XObject> handledObjects,
-                XElement e,
+                in XElementReader eReader,
                 IServiceProvider baseProvider )
             {
-                Element = e;
-                HandledObjects = handledObjects;
-                Monitor = monitor;
+                Reader = eReader;
                 Services = new SimpleServiceContainer( baseProvider );
                 Services.Add( root );
                 ChildServices = new SimpleServiceContainer( Services );
             }
 
             /// <summary>
+            /// Gets the element reader.
+            /// </summary>
+            public XElementReader Reader { get; }
+
+            /// <summary>
             /// Gets the monitor to use.
             /// </summary>
-            public IActivityMonitor Monitor { get; }
+            public IActivityMonitor Monitor => Reader.Monitor;
 
             /// <summary>
             /// Gets the raw <see cref="XElement"/>.
             /// Unfortunaltely, there is no read-only view of XElement, this should not be mutated
             /// otherwise an InvalidOperationException is thrown.
             /// </summary>
-            public XElement Element { get; }
-
-            /// <summary>
-            /// Simple helper to get a required <see cref="Element"/>'s attribute and
-            /// adds it into the <see cref="HandledObjects"/>.
-            /// </summary>
-            /// <param name="name">The attribute name that must exist.</param>
-            /// <returns>The attribute.</returns>
-            public XAttribute HandleRequiredAttribute( XName name )
-            {
-                var a = Element.Attribute( name );
-                if( a == null ) throw new System.Xml.XmlException( $"Required attribute '{name}'{XTypedFactory.GetMarkedLineColumnString( Element )}." );
-                HandledObjects.Add( a );
-                return a;
-            }
-
-            /// <summary>
-            /// Gets a mutable state of Xml objects (elements or attributes) that have been handled by the object.
-            /// <see cref="Element"/>'s children and attributes that will not be registered here once
-            /// the <see cref="XTypedObject(Initializer)"/> constructor has ended will
-            /// trigger a warning.
-            /// </summary>
-            public HashSet<XObject> HandledObjects { get; }
+            public XElement Element => Reader.Element;
 
             /// <summary>
             /// Gets the parent typed object.
@@ -119,35 +90,7 @@ namespace CK.Env
         {
             Parent = initializer.Parent;
             XElement = initializer.Element;
-            var a = initializer.Element.FirstAttribute;
-            while( a != null )
-            {
-                var pInh = GetType().GetProperty( a.Name.LocalName );
-                var p = pInh?.DeclaringType.GetProperty( pInh.Name );
-                if( p != null && p.CanWrite )
-                {
-                    object v;
-                    if( p.PropertyType == typeof( NormalizedPath ) )
-                    {
-                        v = new NormalizedPath( a.Value );
-                    }
-                    else if( p.PropertyType == typeof( Uri ) )
-                    {
-                        v = new Uri( a.Value );
-                    }
-                    else if( p.PropertyType.IsEnum )
-                    {
-                        v = Enum.Parse( p.PropertyType, a.Value );
-                    }
-                    else
-                    {
-                        v = Convert.ChangeType( a.Value, p.PropertyType );
-                    }
-                    initializer.HandledObjects.Add( a );
-                    p.SetValue( this, v );
-                }
-                a = a.NextAttribute;
-            }
+            initializer.Reader.SetPropertiesFromAttributes( this );
             XElement.AddAnnotation( this );
         }
 

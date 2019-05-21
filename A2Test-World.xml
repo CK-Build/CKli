@@ -13,7 +13,7 @@
   <NuGetClient />
   <NPMClient />
   <CKSetupClient />
-  <WorldState  />
+  <WorldState IsPublic="True" />
   
   <ArtifactRepositories>
 

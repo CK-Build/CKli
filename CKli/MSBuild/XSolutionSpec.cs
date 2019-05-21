@@ -19,15 +19,15 @@ namespace CKli
 
             // The XSolutionSpec is available to siblings (ie. up to the end of the parent git branch).
             initializer.Services.Add( this );
-            SolutionSpec = new SolutionSpec( sharedSpec, initializer );
+            SolutionSpec = new SolutionSpec( sharedSpec, initializer.Reader );
 
             XSharedSolutionSpec.RemoveElementWarnings( initializer );
-            initializer.HandledObjects.AddRange( initializer
-                                                    .Element.Elements()
-                                                    .Where( c => c.Name.LocalName == nameof( SolutionSpec.NPMProjects )
-                                                                 || c.Name.LocalName == nameof( SolutionSpec.PublishedProjects )
-                                                                 || c.Name.LocalName == nameof( SolutionSpec.NotPublishedProjects )
-                                                                 || c.Name.LocalName == nameof( SolutionSpec.CKSetupComponentProjects ) ) );
+            initializer.Reader.Handle( initializer
+                                        .Element.Elements()
+                                        .Where( c => c.Name.LocalName == nameof( SolutionSpec.NPMProjects )
+                                                        || c.Name.LocalName == nameof( SolutionSpec.PublishedProjects )
+                                                        || c.Name.LocalName == nameof( SolutionSpec.NotPublishedProjects )
+                                                        || c.Name.LocalName == nameof( SolutionSpec.CKSetupComponentProjects ) ) );
 
             // Registers the SolutionSpec as a branch settings: the Solution specifications becomes
             // available to any of this branch plugins.
