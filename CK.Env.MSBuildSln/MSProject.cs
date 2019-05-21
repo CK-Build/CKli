@@ -101,7 +101,6 @@ namespace CK.Env.MSBuildSln
 
         internal MSProjFile ReloadProjectFile( IActivityMonitor m )
         {
-            _dependencies = new Dependencies();
             _file = Solution.VSProjContext.FindOrLoadProjectFile( m, Path );
             if( _file != null )
             {
@@ -438,7 +437,7 @@ namespace CK.Env.MSBuildSln
 
         void DoInitializeDependencies( IActivityMonitor m )
         {
-            Debug.Assert( !_dependencies.IsInitialized );
+            //Debug.Assert( !_dependencies.IsInitialized );
             var packageRefs = _file.AllFiles.Select( f => f.Document.Root )
                              .SelectMany( root => root.Elements( "ItemGroup" )
                                                         .Elements()

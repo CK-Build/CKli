@@ -151,7 +151,7 @@ namespace CK.Env.Plugin
                 projectsToRemove.Remove( project );
                 orderedProjects[i++] = project;
             }
-            foreach( var project in _solution.Projects )
+            foreach( var project in _solution.Projects.Where(p=>p.Tag<MSProject>() != null) )
             {
                 SynchronizeProjectReferences( m, project, msProj => orderedProjects[msProj.MSProjIndex] );
             }

@@ -25,5 +25,7 @@ namespace CK.Env.DependencyModel
             Artifact = a;
             Project = project;
         }
+
+        public override string ToString() => $"{Project}->{Artifact}";
     }
 }

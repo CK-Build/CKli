@@ -15,7 +15,7 @@
   <NuGetClient />
   <NPMClient />
   <CKSetupClient />
-  <WorldState />
+  <WorldState IsPublic="False"/>
 
 
   <ArtifactRepositories>
@@ -51,13 +51,13 @@
 
     <GitFolder Name="CK-DB-Feedermarket" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/CK-DB-Feedermarket">
       <Branch Name="develop">
-        <SolutionSpec NoStrongNameSigning="true"/>
+        <SolutionSpec/>
       </Branch>
     </GitFolder>
 
     <GitFolder Name="Feedermarket-Functions" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions">
       <Branch Name="develop">
-        <SolutionSpec NoStrongNameSigning="true" />
+        <SolutionSpec/>
       </Branch>
     </GitFolder>
 
@@ -75,11 +75,19 @@
 
     <GitFolder Name="Feedermarket-Content" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Content">
       <Branch Name="develop">
-        <SolutionSpec NoStrongNameSigning="true"/>
+        <SolutionSpec NoStrongNameSigning="True"/>
       </Branch>
     </GitFolder>
 
-
+    <GitFolder Name="Engie-DataWeather-Sdk" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Engie-DataWeatherSdk">
+      <Branch Name="develop">
+        <SolutionSpec>
+          <NPMProjects>
+            <add Folder="js/" PackageName="@engie/data-weather-sdk" />
+          </NPMProjects>
+        </SolutionSpec>
+      </Branch>
+    </GitFolder>
 
 
     <SharedSolutionSpec>
@@ -95,7 +103,7 @@
 
     <GitFolder Name="Cofely" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Cofely">
       <Branch Name="develop">
-        <SolutionSpec NoStrongNameSigning="true">
+        <SolutionSpec>
           <NPMProjects>
             <add Folder="CFLY.Intranet.Web/Content/" PackageName="cofely-intranet" IsPrivate="True" />
             <add Folder="CFLY.Web/Content/vue/" PackageName="backoffice" IsPrivate="True" />
@@ -106,13 +114,13 @@
 
     <GitFolder Name="Feedermarket-Buildings" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Buildings">
       <Branch Name="develop">
-        <SolutionSpec NoStrongNameSigning="true"/>
+        <SolutionSpec NoStrongNameSigning="True"/>
       </Branch>
     </GitFolder>
 
     <GitFolder Name="Feedermarket-Client" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Client">
       <Branch Name="develop">
-        <SolutionSpec NoStrongNameSigning="true"/>
+        <SolutionSpec NoStrongNameSigning="True"/>
       </Branch>
     </GitFolder>
 
@@ -120,25 +128,25 @@
 
     <GitFolder Name="Feedermarket-Functions-ACP" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions-ACP">
       <Branch Name="develop">
-        <SolutionSpec />
+        <SolutionSpec/>
       </Branch>
     </GitFolder>
 
     <GitFolder Name="Feedermarket-Functions-FM" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions-FM">
       <Branch Name="develop">
-        <SolutionSpec />
+        <SolutionSpec/>
       </Branch>
     </GitFolder>
 
     <GitFolder Name="Feedermarket-Functions-Optimum" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions-Optimum">
       <Branch Name="develop">
-        <SolutionSpec />
+        <SolutionSpec/>
       </Branch>
     </GitFolder>
 
     <GitFolder Name="Feedermarket-Functions-Siradel" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions-Siradel">
       <Branch Name="develop">
-        <SolutionSpec NoStrongNameSigning="true" />
+        <SolutionSpec/>
       </Branch>
     </GitFolder>
 
@@ -155,11 +163,6 @@
         <SolutionSpec />
       </Branch>
     </GitFolder>
-    <GitFolder Name="Feedermarket-Platform" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Platform">
-      <Branch Name="develop">
-        <SolutionSpec />
-      </Branch>
-    </GitFolder>
 
     <GitFolder Name="Feedermarket-Utils" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Utils">
       <Branch Name="develop">
@@ -171,21 +174,13 @@
       <Branch Name="develop">
         <SolutionSpec />
       </Branch>
-    </GitFolder>  
+    </GitFolder>
 
     <GitFolder Name="Feedermarket-MarketOptimum" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-MarketOptimum">
       <Branch Name="develop">
       </Branch>
     </GitFolder>
 
-    <GitFolder Name="Engie-DataWeather-Sdk" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Engie-DataWeatherSdk">
-      <Branch Name="develop">
-        <SolutionSpec NoStrongNameSigning="true">
-          <NPMProjects>
-            <add Folder="js/" PackageName="@engie/data-weather-sdk" />
-          </NPMProjects>
-        </SolutionSpec>
-      </Branch>
-    </GitFolder>
+
   </Folder>
 </ENGIE-WORLD>

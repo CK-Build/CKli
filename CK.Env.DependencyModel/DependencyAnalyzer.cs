@@ -56,7 +56,7 @@ namespace CK.Env.DependencyModel
             /// Gets <see cref="PackageId"/>/<see cref="Version"/> for external packages
             /// and the versionless package identifier if the project is locally published.
             /// </summary>
-            public string FullName { get; }
+            public string FullName => Package.Name;
 
             public override string ToString() => Project.ToString();
 
