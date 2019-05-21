@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ENGIE-WORLD>
 
+  <LoadLibrary Name="CK.Env.Plugin.Basics"/>
   <LoadLibrary Name="CK.Env.Plugin.SolutionDriver" />
   <LoadLibrary Name="CK.Env.Plugin.Appveyor" />
   <LoadLibrary Name="CK.Env.Plugin.GitLab" />
@@ -95,10 +96,10 @@
     <GitFolder Name="Cofely" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Cofely">
       <Branch Name="develop">
         <SolutionSpec NoStrongNameSigning="true">
-          <NPMProject>
-            <add Folder="CFLY.Intranet.Web/Content/" PackageName="cofely-intranet" />
-            <add Folder="CFLY.Web/Content/vue/" PackageName="backoffice" />
-          </NPMProject>
+          <NPMProjects>
+            <add Folder="CFLY.Intranet.Web/Content/" PackageName="cofely-intranet" IsPrivate="True" />
+            <add Folder="CFLY.Web/Content/vue/" PackageName="backoffice" IsPrivate="True" />
+          </NPMProjects>
         </SolutionSpec>
       </Branch>
     </GitFolder>
@@ -170,7 +171,7 @@
       <Branch Name="develop">
         <SolutionSpec />
       </Branch>
-    </GitFolder>
+    </GitFolder>  
 
     <GitFolder Name="Feedermarket-MarketOptimum" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-MarketOptimum">
       <Branch Name="develop">
@@ -179,6 +180,11 @@
 
     <GitFolder Name="Engie-DataWeather-Sdk" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Engie-DataWeatherSdk">
       <Branch Name="develop">
+        <SolutionSpec NoStrongNameSigning="true">
+          <NPMProjects>
+            <add Folder="js/" PackageName="@engie/data-weather-sdk" />
+          </NPMProjects>
+        </SolutionSpec>
       </Branch>
     </GitFolder>
   </Folder>
