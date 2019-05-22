@@ -20,6 +20,7 @@ namespace CKli
         readonly IEnvLocalFeedProvider _localFeeds;
         readonly WorldState _worldState;
         readonly CommandRegister _commandRegister;
+        readonly IActivityMonitorFilteredClient _userMonitorFilter;
 
         public XWorldState(
             FileSystem fileSystem,
@@ -37,7 +38,9 @@ namespace CKli
             _localFeeds = localFeeds;
             _commandRegister = commandRegister;
             bool isPublic = initializer.Reader.HandleRequiredAttribute<bool>( "IsPublic" );
-            _worldState = new WorldState( commandRegister, artifacts, worldStore, world, isPublic, _localFeeds, appLife )
+            _userMonitorFilter = initializer.Monitor.Output.Clients.OfType<IActivityMonitorFilteredClient>().FirstOrDefault();
+            if( _userMonitorFilter == null ) throw new InvalidOperationException();
+            _worldState = new WorldState( commandRegister, artifacts, worldStore, world, isPublic, _localFeeds, _userMonitorFilter, appLife )
             {
                 VersionSelector = new ReleaseVersionSelector()
             };
@@ -53,14 +56,14 @@ namespace CKli
 
 
         /// <summary>
-        /// Initializes this world..
+        /// Initializes this world.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
         protected override bool OnSiblingsCreated( IActivityMonitor monitor )
         {
             var folders = Parent.Descendants<XGitFolder>().Select( g => g.GitFolder );
-            return DumpGitFolders( monitor, folders ) && _worldState.Initialize( monitor );
+            return _worldState.Initialize( monitor ) && DumpGitFolders( monitor, folders );
         }
 
         void OnDumpWorldStatus( IActivityMonitor m )
@@ -69,8 +72,18 @@ namespace CKli
             DumpGitFolders( m, gitFolders );
         }
 
-        static bool DumpGitFolders( IActivityMonitor m, IEnumerable<GitFolder> gitFolders )
+        bool DumpGitFolders( IActivityMonitor m, IEnumerable<GitFolder> gitFolders )
         {
+            bool isLogFilterDefault = false;
+            LogFilter final = m.ActualFilter;
+            if( final == LogFilter.Undefined )
+            {
+                final = ActivityMonitor.DefaultFilter;
+                isLogFilterDefault = true;
+            }
+            var msg = $"Monitor filters: User:'{_userMonitorFilter.MinimalFilter}', Monitor.MinimalFilter:'{m.MinimalFilter}' => Final:'{final}'{(isLogFilterDefault ? "(AppDomain's default)" : "")}.";
+            m.UnfilteredLog( ActivityMonitor.Tags.Empty, LogLevel.Info, msg, m.NextLogTime(), null );
+
             int gitFoldersCount = 0;
             bool hasPluginInitError = false;
             var dirty = new List<string>();

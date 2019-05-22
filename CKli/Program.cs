@@ -36,7 +36,6 @@ namespace CKli
         static void Main( string[] args )
         {
             Console.OutputEncoding = System.Text.Encoding.Unicode;
-            ActivityMonitor.DefaultFilter = LogFilter.Debug;
             var monitor = new ActivityMonitor();
             var consoleClient = new ColoredActivityMonitorConsoleClient();
             monitor.Output.RegisterClient( consoleClient );
@@ -227,6 +226,48 @@ namespace CKli
                     int? i = ReadPositiveNumber();
                     if( i.HasValue ) f.SetValue( i.Value );
                     else if( !f.HasDefaultValue ) return false;
+                }
+                else if( f.Type == typeof( LogFilter ) )
+                {
+                    Console.WriteLine( "Enter number (or enter to cancel):" );
+                    Console.WriteLine( "   0 - Undefined, 1 - Debug, 2 - Trace, 3 - Verbose, 4 - Monitor, 5 - Terse, 6 - Release" );
+                    int? i = ReadPositiveNumber();
+                    if( i.HasValue )
+                    {
+                        switch( i.Value )
+                        {
+                            case 0: f.SetValue( LogFilter.Undefined ); break;
+                            case 1: f.SetValue( LogFilter.Debug ); break;
+                            case 2: f.SetValue( LogFilter.Trace ); break;
+                            case 3: f.SetValue( LogFilter.Verbose ); break;
+                            case 4: f.SetValue( LogFilter.Monitor ); break;
+                            case 5: f.SetValue( LogFilter.Terse ); break;
+                            case 6: f.SetValue( LogFilter.Release ); break;
+                            default:
+                                monitor.Error( $"Invalid choice." );
+                                return false;
+                        }
+                    }
+                    else if( !f.HasDefaultValue ) return false;
+                }
+                else if( f.Type.IsEnum )
+                {
+                    bool isFlags = f.Type.GetCustomAttributes( typeof( FlagsAttribute ), false ).Length > 0;
+                    Console.Write( isFlags ? "Combinable flags:" : "Values:" );
+                    Console.WriteLine( Enum.GetNames( f.Type ).Concatenate() );
+                    var s = ReadNullableString();
+                    if( s == null )
+                    {
+                        return f.HasDefaultValue;
+                    }
+                    if( Enum.TryParse( f.Type, s, out var value ) )
+                    {
+                        f.SetValue( value );
+                    }
+                    else
+                    {
+                        monitor.Error( $"Unable to parse: '{s}' as {f.Type.Name} enum." );
+                    }
                 }
                 else
                 {

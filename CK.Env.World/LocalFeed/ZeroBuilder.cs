@@ -246,7 +246,7 @@ namespace CK.Env
             var zeroProjects = context.DependencyContext.BuildProjectsInfo.ZeroBuildProjects;
             if( zeroProjects.Count == 0 )
             {
-                m.Error( "No Build Project exist." );
+                m.Error( context.DependencyContext.HasError ? "Invalid dependency analysis." : "No Build Project exist." );
                 return null;
             }
             var mustBuild = new HashSet<string>( zeroProjects.Select( p => p.Project.FullFolderPath.Path ) );

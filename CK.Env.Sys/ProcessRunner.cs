@@ -11,13 +11,23 @@ namespace CK.Env
     /// </summary>
     public static class ProcessRunner
     {
-
+        /// <summary>
+        /// Runs a .ps1 file by running "Powershell.exe" that must be in the path.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="workingDir">The working directory.</param>
+        /// <param name="scriptFileName">The script file name.</param>
+        /// <param name="arguments">The script arguments.</param>
+        /// <param name="stdErrorLevel">Trace level of Standard Error stream.</param>
+        /// <param name="environmentVariables">Optional environment variables for the child process.</param>
+        /// <returns>True on success, false on error.</returns>
         public static bool RunPowerShell(
-                 IActivityMonitor m,
-                 string workingDir,
-                 string scriptFileName,
-                 IEnumerable<string> arguments,
-                 IEnumerable<(string, string)> environmentVariables = null )
+                IActivityMonitor m,
+                string workingDir,
+                string scriptFileName,
+                IEnumerable<string> arguments,
+                LogLevel stdErrorLevel = LogLevel.Warn,
+                IEnumerable<(string, string)> environmentVariables = null )
         {
             if( !Path.IsPathRooted( scriptFileName ) && scriptFileName[0] != '.' )
             {
@@ -28,7 +38,7 @@ namespace CK.Env
             {
                 a += " " + arg; 
             }
-            return Run( m, workingDir, "Powershell.exe", a, environmentVariables );
+            return Run( m, workingDir, "Powershell.exe", a, stdErrorLevel, environmentVariables );
         }
 
         /// <summary>
@@ -38,6 +48,7 @@ namespace CK.Env
         /// <param name="workingDir">The working directory.</param>
         /// <param name="fileName">The file name to run.</param>
         /// <param name="arguments">Command arguments.</param>
+        /// <param name="stdErrorLevel">Trace level of Standard Error stream.</param>
         /// <param name="environmentVariables">Optional environment variables for the child process.</param>
         /// <returns>True on success, false on error.</returns>
         public static bool Run(
@@ -45,6 +56,7 @@ namespace CK.Env
                  string workingDir,
                  string fileName,
                  string arguments,
+                 LogLevel stdErrorLevel = LogLevel.Warn,
                  IEnumerable<(string, string)> environmentVariables = null )
         {
             ProcessStartInfo cmdStartInfo = new ProcessStartInfo
@@ -75,8 +87,10 @@ namespace CK.Env
                 cmdProcess.WaitForExit();
                 if( errorCapture.Length > 0 )
                 {
-                    m.Error( "Received errors on <StdErr>:" );
-                    m.Error( errorCapture.ToString() );
+                    using( m.OpenGroup( stdErrorLevel, "Received errors on <StdErr>:" ) )
+                    {
+                        m.Log( stdErrorLevel, errorCapture.ToString() );
+                    }
                 }
                 if( cmdProcess.ExitCode != 0 )
                 {

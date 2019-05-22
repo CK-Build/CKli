@@ -15,7 +15,7 @@ namespace CK.Env.Plugin
         readonly SolutionSpec _solutionSpec;
 
         public CodeCakeBuilderFolder( GitFolder f, SolutionDriver driver, SolutionSpec settings, NormalizedPath branchPath )
-            : base( f, branchPath, "CodecakeBuilder", "Basics/Res" )
+            : base( f, branchPath, "CodeCakeBuilder", "Basics/Res" )
         {
             _driver = driver;
             _solutionSpec = settings;
@@ -89,44 +89,6 @@ namespace CK.Env.Plugin
                 DeleteFile( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
                 DeleteFile( m, "dotnet/Build.StandardUnitTests.cs" );
             }
-
-            bool produceCKSetupComponents = s.GeneratedArtifacts.Any( g => g.Artifact.Type.Name == "CKSetup" );
-            if( produceCKSetupComponents == true )
-            {
-                m.Info( "Adding Build.StandardPushCKSetupComponents.cs since CKSetup components are produced." );
-                SetTextResource( m, "Build.StandardPushCKSetupComponents.cs", text => AdaptStandardStandardPushCKSetupComponents( m, s, text ) );
-            }
-            else
-            {
-                DeleteFile( m, "Build.StandardPushCKSetupComponents.cs" );
-            }
-        }
-
-        string AdaptStandardStandardPushCKSetupComponents( IActivityMonitor monitor, ISolution solution, string text )
-        {
-            Match m = Regex.Match( text, @"return new CKSetupComponent\[\]{.*?};", RegexOptions.Singleline | RegexOptions.CultureInvariant );
-            if( !m.Success )
-            {
-                throw new Exception( "Expected pattern return new CKSetupComponent[]{...} in Build.StandardPushCKSetupComponents.cs." );
-            }
-            var comps = solution.GeneratedArtifacts.Where( g => g.Artifact.Type.Name == "CKSetup" );
-            Debug.Assert( comps.Any() );
-            StringBuilder b = new StringBuilder();
-            b.AppendLine( "return new CKSetupComponent[]{" );
-            bool atLeastOne = false;
-            foreach( var c in comps )
-            {
-                b.AppendLine( atLeastOne ? "," : "" );
-                atLeastOne = true;
-                b.Append( "new CKSetupComponent( \"" )
-                        .Append( c.Project.SolutionRelativeFolderPath )
-                        .Append( "\", \"" )
-                        .Append( c.Artifact.Name.Split( '/' )[1] )
-                        .Append( "\" )" );
-            }
-            b.AppendLine().Append( "};" );
-            text = text.Replace( m.Value, b.ToString() );
-            return text;
 
         }
     }

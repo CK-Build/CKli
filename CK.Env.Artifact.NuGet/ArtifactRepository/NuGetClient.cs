@@ -96,7 +96,9 @@ namespace CK.Env.NuGet
                                     logger.Monitor,
                                     tempPath,
                                     installer,
-                                    new[] { "-AddNetfx" }, new[] { ("PSExecutionPolicyPreference", "Bypass") } );
+                                    new[] { "-AddNetfx" },
+                                    Core.LogLevel.Error,
+                                    new[] { ("PSExecutionPolicyPreference", "Bypass") } );
                                 File.Delete( installerPath );
                             }
                         }

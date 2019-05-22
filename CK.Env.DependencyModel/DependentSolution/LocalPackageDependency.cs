@@ -17,8 +17,8 @@ namespace CK.Env.DependencyModel
         {
             _row = row;
             _reference = r;
-            Origin = index[row.Origin];
-            Target = index[row.Target];
+            Origin = index[row.Origin.Solution];
+            Target = index[row.Target.Solution];
         }
 
         /// <summary>
