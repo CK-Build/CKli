@@ -53,10 +53,9 @@ namespace CK.Env.DependencyModel
             public Artifact Package { get; }
 
             /// <summary>
-            /// Gets <see cref="PackageId"/>/<see cref="Version"/> for external packages
-            /// and the versionless package identifier if the project is locally published.
+            /// Gets the <see cref="Package"/>'s <see cref="Artifact.TypedName"/>.
             /// </summary>
-            public string FullName => Package.Name;
+            public string FullName => Package.TypedName;
 
             public override string ToString() => Project.ToString();
 
@@ -174,14 +173,15 @@ namespace CK.Env.DependencyModel
             ISolutionContext solutions,
             Dictionary<Artifact, LocalPackageItem> packages,
             ProjectItem.Cache projects,
-            List<PackageReference> externalRefs )
+            List<PackageReference> externalRefs,
+            bool traceGraphDetails )
         {
             _solutions = solutions;
             _version = _solutions.Version;
             _packages = packages;
             _projects = projects;
             _externalRefs = externalRefs;
-            _defaultDependencyContext = CreateDependencyContext( m );
+            _defaultDependencyContext = CreateDependencyContext( m, traceGraphDetails );
         }
 
         /// <summary>
@@ -205,64 +205,70 @@ namespace CK.Env.DependencyModel
         /// and their dependencies.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
+        /// <param name="traceGraphDetails">True to trace the details of the input and output (sorted) graphs.</param>
         /// <returns>The build projects information.</returns>
-        BuildProjectsInfo GetBuildProjectInfo( IActivityMonitor m )
+        BuildProjectsInfo GetBuildProjectInfo( IActivityMonitor m, bool traceGraphDetails )
         {
             Debug.Assert( !_projects.PureProjectsMode );
             _projects.PureProjectsMode = true;
             try
             {
-                IDependencySorterResult rBuildProjects = DependencySorter.OrderItems( m, _projects.AllProjectItems.Where( p => p.Project.IsBuildProject ), null );
-                if( !rBuildProjects.IsComplete )
+                using( m.OpenTrace( $"Creating Build Projects information." ) )
                 {
-                    rBuildProjects.LogError( m );
-                    return new BuildProjectsInfo( rBuildProjects, null );
-                }
-                else
-                {
-                    var rankedProjects = rBuildProjects.SortedItems
-                                                .Where( i => i.Item is Project )
-                                                .Select( i => (i.Rank,
-                                                               Project: (Project)i.Item,
-                                                               DirectDeps: i.Requires
-                                                                            .Select( s => s.Item )
-                                                                            .OfType<Project>(),
-                                                               AllDeps: i.GetAllRequires()
-                                                                         .Select( s => s.Item )
-                                                                         .OfType<Project>()) );
+                    IDependencySorterResult rBuildProjects = DependencySorter.OrderItems( m, _projects.AllProjectItems.Where( p => p.Project.IsBuildProject ), null );
+                    if( !rBuildProjects.IsComplete )
+                    {
+                        rBuildProjects.LogError( m );
+                        return new BuildProjectsInfo( rBuildProjects, null );
+                    }
+                    else
+                    {
+                        var rankedProjects = rBuildProjects.SortedItems
+                                                    .Where( i => i.Item is ProjectItem )
+                                                    .Select( i => (i.Rank,
+                                                                   Project: ((ProjectItem)i.Item).Project,
+                                                                   DirectDeps: i.Requires
+                                                                                .Select( s => s.Item )
+                                                                                .OfType<ProjectItem>()
+                                                                                .Select( p => p.Project ),
+                                                                   AllDeps: i.GetAllRequires()
+                                                                             .Select( s => s.Item )
+                                                                             .OfType<ProjectItem>()
+                                                                             .Select( p => p.Project )) );
 
-                    var zeroBuildProjects = rankedProjects.Select( ( p, idx ) => new ZeroBuildProjectInfo(
-                                    idx,
-                                    p.Rank,
-                                    p.Project,
-                                    // UpgradePackages: Among direct dependencies, consider only the
-                                    //                  published projects and the ones who are actually referenced
-                                    //                  as a package (ignores ProjectReference).
-                                    p.DirectDeps
-                                        .Where( d => d.IsPublished
-                                                     && p.Project.PackageReferences.Any( r => d.GeneratedArtifacts
-                                                                                               .Select( a => a.Artifact )
-                                                                                               .Contains( r.Target.Artifact ) ) )
-                                        .ToArray(),
-                                    // UpgradeZeroProjects: Among direct dependencies, consider all the
-                                    //                      published projects, the ones who are actually referenced
-                                    //                      as a package AND the ones that are ProjectReference.
-                                    //                      ProjectReference MUST be transformed into PackageReference
-                                    //                      during ZeroBuild.
-                                    p.DirectDeps
-                                        .Where( d => d.IsPublished )
-                                        .ToArray(),
+                        var zeroBuildProjects = rankedProjects.Select( ( p, idx ) => new ZeroBuildProjectInfo(
+                                        idx,
+                                        p.Rank,
+                                        p.Project,
+                                        // UpgradePackages: Among direct dependencies, consider only the
+                                        //                  published projects and the ones who are actually referenced
+                                        //                  as a package (ignores ProjectReference).
+                                        p.DirectDeps
+                                            .Where( d => d.IsPublished
+                                                         && p.Project.PackageReferences.Any( r => d.GeneratedArtifacts
+                                                                                                   .Select( a => a.Artifact )
+                                                                                                   .Contains( r.Target.Artifact ) ) )
+                                            .ToArray(),
+                                        // UpgradeZeroProjects: Among direct dependencies, consider all the
+                                        //                      published projects, the ones who are actually referenced
+                                        //                      as a package AND the ones that are ProjectReference.
+                                        //                      ProjectReference MUST be transformed into PackageReference
+                                        //                      during ZeroBuild.
+                                        p.DirectDeps
+                                            .Where( d => d.IsPublished )
+                                            .ToArray(),
 
-                                    // Dependencies: Considers all the projects. 
-                                    p.AllDeps.ToArray()
+                                        // Dependencies: Considers all the projects. 
+                                        p.AllDeps.ToArray()
 
-                                    ) )
-                        .ToArray();
+                                        ) )
+                            .ToArray();
 
-                    Debug.Assert( zeroBuildProjects.Select( z => z.Rank ).IsSortedLarge() );
-                    Debug.Assert( zeroBuildProjects.Select( z => z.Index ).IsSortedStrict() );
+                        Debug.Assert( zeroBuildProjects.Select( z => z.Rank ).IsSortedLarge() );
+                        Debug.Assert( zeroBuildProjects.Select( z => z.Index ).IsSortedStrict() );
 
-                    return new BuildProjectsInfo( rBuildProjects, zeroBuildProjects );
+                        return new BuildProjectsInfo( rBuildProjects, zeroBuildProjects );
+                    }
                 }
             }
             finally
@@ -286,7 +292,7 @@ namespace CK.Env.DependencyModel
 
             string IDependentItem.FullName => _solution.Name;
 
-            IDependentItemContainerRef IDependentItem.Container => (IDependentItemContainerRef)_solution;
+            IDependentItemContainerRef IDependentItem.Container => null;
 
             IEnumerable<IDependentItemRef> IDependentItemGroup.Children => _projects;
 
@@ -313,12 +319,13 @@ namespace CK.Env.DependencyModel
         /// of the <see cref="Solutions"/> than the default set (all projects except build projects).
         /// </summary>
         /// <param name="m">The monitor to use.</param>
+        /// <param name="traceGraphDetails">True to trace the details of the input and output (sorted) graphs.</param>
         /// <param name="projectFilter">
         /// Optional project filter.
         /// By default all projects are considered except build projects (see <see cref="Solution.BuildProject"/>).
         /// </param>
         /// <returns>The context or null on error.</returns>
-        public SolutionDependencyContext CreateDependencyContext( IActivityMonitor m, Func<IProject,bool> projectFilter = null )
+        public SolutionDependencyContext CreateDependencyContext( IActivityMonitor m, bool traceGraphDetails, Func<IProject, bool> projectFilter = null )
         {
             if( projectFilter == null )
             {
@@ -329,10 +336,17 @@ namespace CK.Env.DependencyModel
             {
                 sortables.Add( s, new SolutionItem( s, s.Projects.Where( p => projectFilter( p ) ).Select( p => _projects[p] ) ) );
             }
-            IDependencySorterResult result = DependencySorter.OrderItems( m, sortables.Values, null );
+            var options = new DependencySorterOptions();
+            if( traceGraphDetails )
+            {
+                options.HookInput = i => i.Trace( m );
+                options.HookOutput = i => i.Trace( m );
+            }
+            IDependencySorterResult result = DependencySorter.OrderItems( m, sortables.Values, null, options );
             if( !result.IsComplete )
             {
-                return new SolutionDependencyContext( this, result, GetBuildProjectInfo( m ) );
+                result.LogError( m );
+                return new SolutionDependencyContext( this, result, GetBuildProjectInfo( m, traceGraphDetails ) );
             }
             // Building the list of SolutionDependencyContext.DependencyRow.
             var table = result.SortedItems
@@ -384,10 +398,10 @@ namespace CK.Env.DependencyModel
                     index.Add( current, newDependent );
                 }
             }
-            return new SolutionDependencyContext( this, index, result, table, depSolutions, GetBuildProjectInfo( m ) );
+            return new SolutionDependencyContext( this, index, result, table, depSolutions, GetBuildProjectInfo( m, traceGraphDetails ) );
         }
 
-        internal static DependencyAnalyzer Create( IActivityMonitor m, ISolutionContext solutions )
+        internal static DependencyAnalyzer Create( IActivityMonitor m, ISolutionContext solutions, bool traceGraphDetails )
         {
             var packages = new Dictionary<Artifact, LocalPackageItem>();
             var projectItems = new ProjectItem.Cache();
@@ -473,7 +487,8 @@ namespace CK.Env.DependencyModel
                         solutions,
                         packages,
                         projectItems,
-                        externalRefs );
+                        externalRefs,
+                        traceGraphDetails );
         }
 
     }

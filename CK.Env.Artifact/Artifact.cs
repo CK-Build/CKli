@@ -19,20 +19,30 @@ namespace CK.Env
         public string Name { get; }
 
         /// <summary>
-        /// Gets whether this Artifact is the default, invalid, one.
+        /// Gets the "Type:Name" string.
+        /// This should be used as the identifier for the actual artifact since structurally
+        /// nothing prevents a NPM package to be named like a NuGet package or a NuGet package to
+        /// also be published as a "Zipped artifact" or any other kind of production.
         /// </summary>
-        public bool IsDefault => Type.IsDefault;
+        public string TypedName => $"{Type}:{Name}";
+
+        /// <summary>
+        /// Gets whether this Artifact is valid: its type is defined and its
+        /// name is not empty.
+        /// </summary>
+        public bool IsValid => !Type.IsDefault;
 
         /// <summary>
         /// Initializes a new <see cref="Artifact"/>.
         /// </summary>
-        /// <param name="type">Artifact type.</param>
-        /// <param name="name">Artifact name.</param>
+        /// <param name="type">Artifact type. <see cref="ArtifactType.IsDefault"/> must be false.</param>
+        /// <param name="name">Artifact name. Must not be empty.</param>
         public Artifact( in ArtifactType type, string name )
         {
             if( type.IsDefault ) throw new ArgumentException( "Unspecified type.", nameof( type ) );
+            if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
             Type = type;
-            Name = name ?? throw new ArgumentNullException( nameof( name ) );
+            Name = name; 
         }
 
         /// <summary>
@@ -78,7 +88,11 @@ namespace CK.Env
         /// <returns>True if they are not equal.</returns>
         public static bool operator !=( in Artifact x, in Artifact y ) => !x.Equals( y );
 
-        public override string ToString() => $"{Type}:{Name}";
+        /// <summary>
+        /// Overridden to return the <see cref="TypedName"/>.
+        /// </summary>
+        /// <returns>A readable string.</returns>
+        public override string ToString() => TypedName;
 
     }
 }

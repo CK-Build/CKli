@@ -27,7 +27,7 @@ namespace CK.Env.Plugin
             _solutionSpec = solutionSpec;
        }
 
-        NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath.AppendPart( "(CKSetup)" );
 
         public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
 

@@ -31,5 +31,11 @@ namespace CK.Env.DependencyModel
             Target = t;
             Kind = kind;
         }
+
+        /// <summary>
+        /// Dumps "Owner => Target (Kind)" string.
+        /// </summary>
+        /// <returns>A readable string.</returns>
+        public override string ToString() => $"{Owner} -> {Target} ({Kind})";
     }
 }

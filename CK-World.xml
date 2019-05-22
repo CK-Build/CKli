@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <CK-World>
 
+  <LoadLibrary Name="CK.Env.Plugin.Basics"/>
   <LoadLibrary Name="CK.Env.Plugin.SolutionDriver" />
   <LoadLibrary Name="CK.Env.Plugin.Appveyor" />
   <LoadLibrary Name="CK.Env.Plugin.GitLab" />

@@ -14,8 +14,9 @@ namespace CK.Env.DependencyModel
         /// Gets a <see cref="DependencyAnalyzer"/> that is up to date (based on the <see cref="Version"/>).
         /// </summary>
         /// <param name="m">The monitor to use.</param>
+        /// <param name="traceGraphDetails">True to trace the details of the input and output (sorted) graphs.</param>
         /// <returns>The up to date dependency context.</returns>
-        DependencyAnalyzer GetDependencyAnalyser( IActivityMonitor m );
+        DependencyAnalyzer GetDependencyAnalyser( IActivityMonitor m, bool traceGraphDetails );
 
         /// <summary>
         /// Gets the current version. This changes each time

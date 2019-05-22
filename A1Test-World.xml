@@ -1,9 +1,10 @@
 <A1Test>
 
-  <!-- There is only pure NuGet projects in this A1-Test world. -->
+  <LoadLibrary Name="CK.Env.Plugin.Basics"/>
   <LoadLibrary Name="CK.Env.Plugin.SolutionDriver" />
   <LoadLibrary Name="CK.Env.Plugin.Appveyor" />
   <LoadLibrary Name="CK.Env.Plugin.GitLab" />
+  <!-- There is only pure NuGet projects in this A1-Test world. -->
   <!--<LoadLibrary Name="CK.Env.Plugin.NPM" />-->
   <!--<LoadLibrary Name="CK.Env.Plugin.CKSetup" />-->
   <LoadLibrary Name="CK.Env.Plugin.NuGet" />

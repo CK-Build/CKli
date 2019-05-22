@@ -72,11 +72,16 @@ namespace CK.Env
                         return false;
                     }
                 }
-                if( _depContext == null || _depContext.IsObsolete )
+                if( _depContext == null || _depContext.HasError || _depContext.IsObsolete )
                 {
-                    _depContext = _context.GetDependencyAnalyser( m ).DefaultDependencyContext;
-                    Debug.Assert( _drivers.Count == _depContext.Solutions.Count );
-                    _drivers.Sort( ( d1, d2 ) => _depContext[d1.GetSolution( m, false )].Index - _depContext[d2.GetSolution( m, false )].Index );
+                    LogFilter final = m.ActualFilter;
+                    if( final == LogFilter.Undefined ) final = ActivityMonitor.DefaultFilter;
+                    _depContext = _context.GetDependencyAnalyser( m, final == LogFilter.Debug ).DefaultDependencyContext;
+                    if( !_depContext.HasError )
+                    {
+                        Debug.Assert( _drivers.Count == _depContext.Solutions.Count );
+                        _drivers.Sort( ( d1, d2 ) => _depContext[d1.GetSolution( m, false )].Index - _depContext[d2.GetSolution( m, false )].Index );
+                    }
                 }
                 return true;
             }
@@ -104,6 +109,7 @@ namespace CK.Env
         readonly Dictionary<string, WorldBranchContext> _perBranchContext;
         readonly HashSet<IGitRepository> _gitRepositories;
         readonly Dictionary<string, ISolutionDriver> _cacheBySolutionName;
+        readonly IActivityMonitorFilteredClient _userMonitorClient;
 
         readonly IBasicApplicationLifetime _appLife;
 
@@ -116,11 +122,10 @@ namespace CK.Env
         /// </summary>
         /// <param name="commandRegister">The command register.</param>
         /// <param name="artifacts">The artifact center.</param>
+        /// <param name="store">The store. Can not be null.</param>
         /// <param name="worldName">The world name.</param>
         /// <param name="isPublicWorld">Whether this world is public or private.</param>
-        /// <param name="store">The store. Can not be null.</param>
         /// <param name="localFeedProvider">Local feed provider. Can not be null. (Required for the Zro builder.)</param>
-        /// <param name="publisher">Artifacts publisher.</param>
         /// <param name="appLife">Application lifetime controller.</param>
         public WorldState(
             CommandRegister commandRegister,
@@ -129,12 +134,14 @@ namespace CK.Env
             IWorldName worldName,
             bool isPublicWorld,
             IEnvLocalFeedProvider localFeedProvider,
+            IActivityMonitorFilteredClient userMonitorClient,
             IBasicApplicationLifetime appLife )
         {
             _artifacts = artifacts ?? throw new ArgumentNullException( nameof( artifacts ) );
             _store = store ?? throw new ArgumentNullException( nameof( store ) );
             WorldName = worldName ?? throw new ArgumentNullException( nameof( worldName ) );
             _localFeedProvider = localFeedProvider ?? throw new ArgumentNullException( nameof( localFeedProvider ) );
+            _userMonitorClient = userMonitorClient;
             IsPublicWorld = isPublicWorld;
             _appLife = appLife;
             _solutionDrivers = new HashSet<ISolutionDriver>();
@@ -227,6 +234,8 @@ namespace CK.Env
             if( !alreadyInitialized )
             {
                 _rawState = _store.GetOrCreateLocalState( monitor, WorldName );
+                LogFilter.TryParse( (string)_rawState.GeneralState.Attribute( "UserLogFilter" ) ?? "", out var logFilter );
+                DoSetUserLogFilter( monitor, logFilter, false );
                 SetReadonlyState();
                 _rawState.Document.Changed += RawStateChanged;
             }
@@ -357,13 +366,19 @@ namespace CK.Env
             return Save( m );
         }
 
-        /// <summary>
-        /// Gets whether the <see cref="WorkStatus"/> is not <see cref="GlobalWorkStatus.Idle"/>
-        /// nor <see cref="GlobalWorkStatus.WaitingReleaseConfirmation"/>.
-        /// </summary>
-        public bool IsConcludeCurrentWorkEnabled => IsInitialized
-                                                    && WorkStatus != GlobalWorkStatus.Idle
-                                                    && WorkStatus != GlobalWorkStatus.WaitingReleaseConfirmation;
+        [CommandMethod(confirmationRequired: false)]
+        public void SetUserLogFilter( IActivityMonitor m, LogFilter filter ) => DoSetUserLogFilter( m, filter, true );
+        
+        void DoSetUserLogFilter( IActivityMonitor m, LogFilter filter, bool saveOnChange )
+        {
+            if( _userMonitorClient.MinimalFilter != filter )
+            {
+                _userMonitorClient.MinimalFilter = filter;
+                _rawState.GeneralState.SetAttributeValue( "UserLogFilter", filter.ToString() );
+                m.UnfilteredLog( ActivityMonitor.Tags.Empty, LogLevel.Info, $"User Log Filter level set to '{filter}' (actual filter is '{m.ActualFilter}').", m.NextLogTime(), null );
+                if( saveOnChange ) Save( m );
+            }
+        }
 
         string GetCleanBranchName( IActivityMonitor monitor )
         {
@@ -397,6 +412,14 @@ namespace CK.Env
             }
             return c.Refresh( monitor, reloadSolutions ) ? c : null;
         }
+
+        /// <summary>
+        /// Gets whether the <see cref="WorkStatus"/> is not <see cref="GlobalWorkStatus.Idle"/>
+        /// nor <see cref="GlobalWorkStatus.WaitingReleaseConfirmation"/>.
+        /// </summary>
+        public bool IsConcludeCurrentWorkEnabled => IsInitialized
+                                                    && WorkStatus != GlobalWorkStatus.Idle
+                                                    && WorkStatus != GlobalWorkStatus.WaitingReleaseConfirmation;
 
         /// <summary>
         /// Concludes the current work.

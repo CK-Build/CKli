@@ -597,7 +597,7 @@ namespace CK.Env.Plugin
                     args += " -PushToRemote=" + (ev.WithPushToRemote ? 'Y' : 'N');
                     if( !ev.BuildIsRequired ) args += " -target=\"Unit-Testing\" -exclusiveOptional -IgnoreNoArtifactsToProduce=Y";
                     if( !ev.WithUnitTest ) args += " -RunUnitTests=N";
-                    if( !ProcessRunner.Run( m, ev.SolutionPhysicalPath, "dotnet", args, ev.EnvironmentVariables ) )
+                    if( !ProcessRunner.Run( m, ev.SolutionPhysicalPath, "dotnet", args, LogLevel.Warn, ev.EnvironmentVariables ) )
                     {
                         return false;
                     }
