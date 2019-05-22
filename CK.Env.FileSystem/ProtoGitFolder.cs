@@ -103,23 +103,6 @@ namespace CK.Env
             return new GitFolder( this, isPublic );
         }
 
-        void EnsureHooks( IActivityMonitor m )
-        {
-            EnsureHookFile( m, "pre_push", _hook_pre_push );
-        }
-
-        void EnsureHookFile( IActivityMonitor m, string hookName, string newHook )
-        {
-            var hookPath = Path.Combine( FullPhysicalPath, ".git", "hooks", hookName );
-
-            bool currentHookIsUpToDate = File.Exists( hookPath ) && File.OpenText( hookPath ).ReadToEnd() == newHook;
-            if( !currentHookIsUpToDate )
-            {
-                m.Info( "git " + Path.GetFileName( hookPath ) + " hook not up to date. Updating!" );
-                File.WriteAllText( hookPath, newHook );
-            }
-        }
-
         public Credentials PATCredentialsHandler( IActivityMonitor m, string url )
         {
             string keyName;
@@ -147,7 +130,89 @@ namespace CK.Env
         }
 
 
-        const string _hook_pre_push =
+        #region GitHooks
+
+
+        bool CheckHookDispatcherVersion( string scriptString )
+        {
+            string[] lines = scriptString.Split( '\n' );
+            if( lines.Length <= 2 ) return false;
+            if( lines[1].Contains( "#script-dispatcher-0.0.0" ) ) return true;
+            if( lines[1].Contains( "script-dispatcher" ) )
+            {
+                throw new NotImplementedException( "Upgrade version of hook dispatcher is not implemented yet." );
+            }
+            return false;
+        }
+
+        void EnsureHooks( IActivityMonitor m )
+        {
+            const string prepush = "pre_push";
+            EnsureHookDispatcher( m, "pre_push" );
+            EnsureHookFile( m, prepush, "check_not_local_branch", _hook_check_not_local );
+            EnsureHookFile( m, prepush, "check_no_commit_nopush", _hook_check_no_commit_nopush );
+        }
+
+        string GetHooksDir => Path.Combine( FullPhysicalPath, ".git", "hooks" );
+
+        string GetHookPath( string hookName ) => Path.Combine( GetHooksDir, hookName );
+
+        string GetMultiHooksDir( string hookName ) => Path.Combine( GetHooksDir, hookName + "_scripts/" );
+
+        void EnsureHookDispatcher( IActivityMonitor m, string hookName )
+        {
+            string hookPath = GetHookPath( hookName );
+            string multiHookDirectory = GetMultiHooksDir( hookName );
+            bool hookPresent = File.Exists( hookPath );
+            Directory.CreateDirectory( multiHookDirectory );
+            if( hookPresent )
+            {
+                string currentScript = File.ReadAllText( hookPath );
+                if( currentScript == _hook_check_not_local )
+                {
+                    m.Info( "Detected our old prepush script. It's not an userscript, we can remove it." );
+                    File.Delete( hookPath );
+                    hookPresent = false;
+                }
+                else
+                {
+                    //replacing the hook dispatcher on a new version is not implemented yet, we just save the script to not destroy user hooks.
+                    if( !CheckHookDispatcherVersion( currentScript ) )
+                    {
+                        File.Move( hookPath, Path.Combine( multiHookDirectory, hookName ) );
+                        m.Info( $"Git hook {hookName} was not the dispatcher. Moved user hook to {multiHookDirectory}." );
+                        hookPresent = false;
+                    }
+                    else
+                    {
+                        m.Trace( $"The current {hookName} hook is our dispatcher." );
+                    }
+                }
+            }
+            //Now hook file may not exist event if it did.
+            if( !hookPresent )
+            {
+                File.WriteAllText( hookPath, HookPrePushScript( hookName ) );
+                m.Info( $"Created dispatcher for {hookName} hooks" );
+            }
+        }
+
+        void EnsureHookFile( IActivityMonitor m, string hookName, string scriptName, string script )
+        {
+            var hookPath = Path.Combine( GetMultiHooksDir( hookName ), scriptName );
+            bool currentHookIsUpToDate = File.Exists( hookPath ) && File.ReadAllText( hookPath ) == script;
+            if( !currentHookIsUpToDate )
+            {
+                m.Info( "git " + Path.GetFileName( hookPath ) + " hook not up to date. Updating!" );
+                File.WriteAllText( hookPath, script );
+            }
+            else
+            {
+                m.Trace( $"The script {hookName}_scripts/{scriptName} is up to date." );
+            }
+        }
+
+        const string _hook_check_not_local =
 @"#!/bin/sh
 # Abort push on -local branches
 
@@ -161,5 +226,72 @@ do
 done
 exit 0
 ";
+        const string _hook_check_no_commit_nopush =
+@"#!/bin/sh
+# inspired from https://github.com/bobgilmore/githooks/blob/master/pre-push
+# Hook stopping the push if we find a [NOPUSH] commit.
+remote=""$1""
+url=""$2""
+
+z40=0000000000000000000000000000000000000000
+
+echo ""Checking if a commit contain NOPUSH...""
+while read local_ref local_sha remote_ref remote_sha
+do
+	if [ ""$local_sha"" = $z40 ]
+	then
+		echo ""Deleting files, OK.""
+	else
+		if [ ""$remote_sha"" = $z40 ]
+		then
+			# New branch, examine all commits
+			range=""$local_sha""
+		else
+			# Update to existing branch, examine new commits
+			range=""$remote_sha..$local_sha""
+		fi
+
+		# Check for foo commit
+		commit=`git rev-list -n 1 --grep 'NOPUSH' ""$range""`
+    echo $commit
+		if [ -n ""$commit"" ]
+		then
+			echo >&2 ""ERROR: Found commit message containing 'NOPUSH' in $local_ref so you should not push this commit !!!""
+      echo >&2 ""Commit containing the message: $commit""
+			exit 1
+		fi
+	fi
+done
+echo ""No commit found with NOPUSH. Push can continue.""
+exit 1
+";
+        string HookPrePushScript( string hookName ) =>
+$@"#!/bin/sh
+#script-dispatcher-0.0.0
+# Hook that execute all scripts in a directory
+
+remote=""$1"";
+url=""$2"";
+hook_directory="".git/hooks""
+search_dir=""{hookName}_scripts""
+
+search_path=""$hook_directory/$search_dir""
+i=0
+for scriptFile in ""$search_path""/*; do
+  i=$((i+=1))
+  echo ""Running script $scriptFile"";
+  exitCode=exec ""$scriptFile"" ""$@"" || break;  # execute successfully or break
+  # Or more explicitly: if this execution fails, then stop the `for`:
+   if ! bash ""$scriptFile""; then
+   >&2 echo ""Script $scriptFile failed. Aborting push."";
+   exit $exitCode;
+   break;
+   fi
+done
+echo ""Executed successfully $i scripts.""
+exit 1
+";
+
+        #endregion GitHooks
     }
 }
