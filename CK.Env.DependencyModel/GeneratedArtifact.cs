@@ -1,3 +1,6 @@
+using CK.Text;
+using System.Collections.Generic;
+
 namespace CK.Env.DependencyModel
 {
     /// <summary>
@@ -11,19 +14,28 @@ namespace CK.Env.DependencyModel
         public Artifact Artifact { get; }
 
         /// <summary>
-        /// Gets the folder path of this project relative to the primary solution folder.
+        /// Gets the project that generates this artifact.
         /// </summary>
         public IProject Project { get; }
+
+        /// <summary>
+        /// Gets a set of full paths (folder or files) that are "sources" for this project.
+        /// By default, <see cref="IProject.ProjectSources"/> is returned but this may be an independent
+        /// set if required.
+        /// </summary>
+        IReadOnlyCollection<NormalizedPath> ArtifactSources { get; }
 
         /// <summary>
         /// Initializes a new <see cref="GeneratedArtifact"/>.
         /// </summary>
         /// <param name="a">The artifact.</param>
         /// <param name="project">The project.</param>
-        public GeneratedArtifact( Artifact a, IProject project )
+        /// <param name="sources">Optional explicit sources that differ from <see cref="IProject.ProjectSources"/>.</param>
+        public GeneratedArtifact( Artifact a, IProject project, IReadOnlyCollection<NormalizedPath> sources = null )
         {
             Artifact = a;
             Project = project;
+            ArtifactSources = sources ?? project.ProjectSources;
         }
 
         public override string ToString() => $"{Project}->{Artifact}";

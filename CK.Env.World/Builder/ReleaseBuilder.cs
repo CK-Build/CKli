@@ -9,6 +9,9 @@ using CSemVer;
 
 namespace CK.Env
 {
+    /// <summary>
+    /// Release buider: versions are totally driven by the provided <see cref="ReleaseRoadmap"/>.
+    /// </summary>
     class ReleaseBuilder : Builder
     {
         readonly string[] _commits;

@@ -200,7 +200,7 @@ namespace Npm.Net
                 do
                 {
                     using( entry = await tarBallReader.GetEntryAsync() )
-                    using( StreamReader reader = new StreamReader( entry ) )
+                    using( StreamReader reader = new StreamReader( entry.Stream ) )
                     {
                         if( entry.Header.Name == "package/package.json" )
                         {

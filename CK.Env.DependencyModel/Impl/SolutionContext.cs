@@ -82,6 +82,11 @@ namespace CK.Env.DependencyModel
             return s;
         }
 
+        /// <summary>
+        /// Gets all the generated artifacts from all the solutions.
+        /// </summary>
+        public IEnumerable<GeneratedArtifact> GeneratedArtifacts => _list.SelectMany( p => p.GeneratedArtifacts );
+
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
         /// <summary>
