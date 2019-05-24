@@ -20,7 +20,7 @@ namespace CK.Env
         /// <param name="c">The change.</param>
         public DirectoryDiff( NormalizedPath p, DirectoryDiffType c )
         {
-            Path = p;
+            DiffName = p;
             DiffType = c;
             Changes = Array.Empty<FileReleaseDiff>();
         }
@@ -28,40 +28,52 @@ namespace CK.Env
         /// <summary>
         /// Initializes an new <see cref="DirectoryDiff"/> with a change set.
         /// </summary>
-        /// <param name="p">The package name.</param>
+        /// <param name="name">The package name.</param>
         /// <param name="changes">The changes.</param>
-        public DirectoryDiff( NormalizedPath p, IReadOnlyCollection<FileReleaseDiff> changes, IReadOnlyCollection<CommitInfo> commits )
+        public DirectoryDiff( string name, IReadOnlyCollection<FileReleaseDiff> changes, IReadOnlyCollection<CommitInfo> commits )
         {
-            Path = p;
+            DiffName = name;
             DiffType = changes.Count == 0 ? DirectoryDiffType.None : DirectoryDiffType.Changed;
             Changes = changes;
             _commits = commits;
         }
 
-        public void DumpDiff()
+        public void DumpDiff( IActivityMonitor m )
         {
-            Console.WriteLine( $"=    => {Path}: {DiffType}" );
-            foreach( CommitInfo commit in _commits )
+            using( m.OpenInfo( $"=    => {DiffName}: {DiffType}" ) )
             {
-                Console.Write( $"{commit.Sha.Take( 5 )}: {commit.Message}" );
-            }
-            if( DiffType == DirectoryDiffType.Changed )
-            {
-                foreach( var fC in Changes.GroupBy( fC => fC.DiffType ) )
+                if( DiffType == DirectoryDiffType.Changed || DiffType == DirectoryDiffType.NewPackage )
                 {
-                    Console.WriteLine( $"=       - {fC.Key}" );
-                    foreach( var f in fC )
+                    using( m.OpenInfo( "Commit with diffs that changed the path:" ) )
                     {
-                        Console.WriteLine( $"               {f.FilePath}" );
+                        foreach( CommitInfo commit in _commits )
+                        {
+                            m.Info( $"{commit.Sha.Substring(0,5)}: {commit.Message}" );
+                        }
+                    }
+                    using( m.OpenInfo( "Impacted files:" ) )
+                    {
+
+                        foreach( var fC in Changes.GroupBy( fC => fC.DiffType ) )
+                        {
+                            using( m.OpenInfo( fC.Key.ToString() ) )
+                            {
+                                foreach( var f in fC )
+                                {
+                                    m.Info( $"{f.FilePath}" );
+                                }
+                            }
+
+                        }
                     }
                 }
             }
         }
 
         /// <summary>
-        /// Gets the package.
+        /// Diff name
         /// </summary>
-        public NormalizedPath Path { get; }
+        public string DiffName { get; }
 
         /// <summary>
         /// Gets the global change type that occured in the folder.

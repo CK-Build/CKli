@@ -175,8 +175,10 @@ namespace CK.Env
             var r = new List<DirectoryDiff>();
             foreach( var p in paths )
             {
-                r.Add( CreateDiff( commits, p ) );
+                r.Add( CreateDiff( commits, p, path => path.Path.StartsWith( p ) ) );
             }
+            r.Add( CreateDiff( commits, "Other changes", path => !paths.Any( p => p.StartsWith( path.Path ) ) ) );
+
             return r;
         }
 
@@ -185,20 +187,20 @@ namespace CK.Env
         /// </summary>
         /// <param name="topCommit"></param>
         /// <param name="commit"></param>
-        /// <param name="directoryPath"></param>
+        /// <param name="diffName"></param>
         /// 
         /// <returns></returns>
-        DirectoryDiff CreateDiff( List<Commit> commits, NormalizedPath directoryPath )
+        DirectoryDiff CreateDiff( List<Commit> commits, string diffName, Func<TreeEntryChanges, bool> includeInDiffPredicate )
         {
             var commitsAndParents = commits.Select( s => (s, s.Parents.FirstOrDefault()) );
             //There is a diff with the first commit and his parent, and we don't want it
             var commitsAndDiffWithParent = commitsAndParents.Select( c => (c.s, _git.Diff.Compare<TreeChanges>( c.s.Tree, c.Item2.Tree )) );
-            var commitsThatChangedTheDirectory = commitsAndDiffWithParent.Where( p => p.Item2.Any( q => q.Path.StartsWith( directoryPath ) ) ).Select( p => p.s );
+            var commitsThatChangedTheDirectory = commitsAndDiffWithParent.Where( p => p.Item2.Any( includeInDiffPredicate ) ).Select( p => p.s );
 
             using( TreeChanges changes = _git.Diff.Compare<TreeChanges>( commits.Last().Tree, commits.First().Tree ) )
             {
-                var allChanges = changes.Where( p => p.Path.StartsWith( directoryPath ) ).Select( gC => new FileReleaseDiff( gC.Path, (FileReleaseDiffType)gC.Status ) ).ToList();
-                return new DirectoryDiff( directoryPath, allChanges, commitsThatChangedTheDirectory.Select( p => new CommitInfo( p.Message, p.Sha ) ).ToList() );
+                var allChanges = changes.Where( includeInDiffPredicate ).Select( gC => new FileReleaseDiff( gC.Path, (FileReleaseDiffType)gC.Status ) ).ToList();
+                return new DirectoryDiff( diffName, allChanges, commitsThatChangedTheDirectory.Select( p => new CommitInfo( p.Message, p.Sha ) ).ToList() );
             }
         }
 
@@ -217,18 +219,21 @@ namespace CK.Env
             List<Commit> commits = GetCommitsBetweenDates( beginning, ending ).ToList();
             if( commits.Count == 0 )
             {
-                m.Info( "No commits between the given dates" );
+                m.Info( "No commits between the given dates." );
             }
             else
             {
                 var diffs = GetReleaseDiff( paths, commits );
                 if( diffs.Count == 0 )
                 {
-                    m.Info( "No diffs" );
+                    m.Info( "No diffs." );
                 }
-                foreach( var d in diffs )
+                using( m.OpenInfo( "Diffs detected: " ) )
                 {
-                    d.DumpDiff();
+                    foreach( var d in diffs )
+                    {
+                        d.DumpDiff( m );
+                    }
                 }
             }
         }
