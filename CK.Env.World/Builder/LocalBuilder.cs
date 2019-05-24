@@ -7,6 +7,10 @@ using CSemVer;
 
 namespace CK.Env
 {
+    /// <summary>
+    /// Builder in CI for develop-local.
+    /// Versions are time-based and commits are always amended if possible.
+    /// </summary>
     class LocalBuilder : Builder
     {
         readonly DateTimeOffset[] _commitTimes;

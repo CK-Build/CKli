@@ -118,8 +118,8 @@ namespace CK.Env.Plugin
         void LoadSolution( IActivityMonitor m )
         {
             _isSolutionValid = false;
-            var expectedSolutionName = Folder.SubPath.LastPart;
-            _sln = SolutionFile.Read( m, _projectFileContext, BranchPath.AppendPart( expectedSolutionName + ".sln" ) );
+            var expectedSolutionName = Folder.SubPath.LastPart + ".sln" ;
+            _sln = SolutionFile.Read( m, _projectFileContext, BranchPath.AppendPart( expectedSolutionName ) );
             if( _sln == null ) return;
             _sln.Saved += OnSolutionSaved;
             if( _solution == null )

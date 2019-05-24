@@ -9,6 +9,13 @@ using CSemVer;
 
 namespace CK.Env
 {
+    /// <summary>
+    /// BUilder for CI in develop.
+    /// Versions are based on the number of commits from head to the last actual release.
+    /// Builds may be rtried whenever an update of the build chain is required and the commit
+    /// cannot be amended (fresh checkout or right after a push).
+    /// This is a edge case that does'nt happen often.
+    /// </summary>
     class DevelopBuilder : Builder
     {
         readonly string[] _commits;
@@ -30,7 +37,7 @@ namespace CK.Env
         {
             if( !driver.UpdatePackageDependencies( m, upgrades ) ) return (null,false);
 
-            // A commit is not necessarily created here if the dependencies have not changed!
+            // Note that a commit is not necessarily created here if the dependencies have not changed!
             // (When working folder is up-to-date.)
             var upText = upgrades.Select( u => u.PackageUpdate.ToString() ).Concatenate();
             var msg = $"CI build: Upgrading dependencies: {upText}.";

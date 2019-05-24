@@ -17,7 +17,7 @@ namespace CK.Env.DependencyModel
         ISolution Solution { get; }
 
         /// <summary>
-        /// Gets the full path to this project folder that starts wiith the <see cref="Solution.FullPath"/>.
+        /// Gets the full path to this project folder that starts with the <see cref="Solution.FullPath"/>.
         /// </summary>
         NormalizedPath FullFolderPath { get; }
 
@@ -25,6 +25,15 @@ namespace CK.Env.DependencyModel
         /// Gets the path to this project relative to the <see cref="Solution"/>.
         /// </summary>
         NormalizedPath SolutionRelativeFolderPath { get; }
+
+        /// <summary>
+        /// Gets a set of full paths (folder or files) that are "sources" for this project.
+        /// By default, <see cref="FullFolderPath"/> is systematically added to this set.
+        /// Any file and or folder that are outside the project folder should be added to this
+        /// set (typically files or folders shared accross multiple projects).
+        /// This is used to detect changes for project (typically thanks to Git history).
+        /// </summary>
+        IReadOnlyCollection<NormalizedPath> ProjectSources { get; }
 
         /// <summary>
         /// Gets the simple project name that may be ambiguous: see <see cref="Name"/>.

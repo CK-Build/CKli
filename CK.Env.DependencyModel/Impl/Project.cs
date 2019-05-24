@@ -18,6 +18,7 @@ namespace CK.Env.DependencyModel
         readonly List<GeneratedArtifact> _generatedArtifacts;
         readonly List<ProjectReference> _projectReferences;
         readonly List<PackageReference> _packageReferences;
+        readonly List<NormalizedPath> _projectSources;
         Solution _solution;
         string _name;
         bool _isPublished;
@@ -38,6 +39,8 @@ namespace CK.Env.DependencyModel
             _generatedArtifacts = new List<GeneratedArtifact>();
             _projectReferences = new List<ProjectReference>();
             _packageReferences = new List<PackageReference>();
+            _projectSources = new List<NormalizedPath>();
+            _projectSources.Add( FullFolderPath );
         }
 
         internal void NormalizeName( IReadOnlyList<Project> homonyms )
@@ -183,6 +186,8 @@ namespace CK.Env.DependencyModel
 
         /// <summary>
         /// Adds a new generated artifact.
+        /// Throws a <see cref="InvalidOperationException"/> if the artifact already appears in generated artifatcs
+        /// of all the projetcs of this <see cref="Solution"/> (same <see cref="Artifact.TypedName"/>).
         /// </summary>
         /// <param name="a">The artifact to add.</param>
         public void AddGeneratedArtifacts( Artifact a )
@@ -217,6 +222,18 @@ namespace CK.Env.DependencyModel
         /// Gets the project type.
         /// </summary>
         public string Type { get; }
+
+        /// <summary>
+        /// Gets a set of full paths (folder or files) that are "sources" for this project.
+        /// By default, <see cref="FullFolderPath"/> is systematically added to this set.
+        /// Any file and or folder that are outside the project folder should be added to this
+        /// set (typically files or folders shared accross multiple projects).
+        /// This is used as the default for <see cref="GeneratedArtifact.ArtifactSources"/>
+        /// in <see cref="GeneratedArtifacts"/>.
+        /// </summary>
+        public IReadOnlyCollection<NormalizedPath> ProjectSources => _projectSources;
+
+
 
         /// <summary>
         /// Gets the references to local projects.

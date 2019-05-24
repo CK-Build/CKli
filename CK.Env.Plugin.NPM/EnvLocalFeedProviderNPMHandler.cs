@@ -26,13 +26,16 @@ namespace CK.Env
             var locals = new List<LocalNPMPackageFile>();
             foreach( var a in artifacts )
             {
-                var local = feed.GetNPMPackageFile( m, a.Artifact.Name, a.Version );
-                if( local == null )
+                if( target.Info.QualityFilter.Accepts( a.Version.PackageQuality ) )
                 {
-                    m.Error( $"Unable to find local NPM package {a} in {feed.PhysicalPath}." );
-                    return false;
+                    var local = feed.GetNPMPackageFile( m, a.Artifact.Name, a.Version );
+                    if( local == null )
+                    {
+                        m.Error( $"Unable to find local NPM package {a} in '{feed.PhysicalPath}'." );
+                        return false;
+                    }
+                    locals.Add( local );
                 }
-                locals.Add( local );
             }
             return target.PushAsync( m, new NPMArtifactLocalSet( locals ) ).GetAwaiter().GetResult();
         }

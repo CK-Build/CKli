@@ -86,7 +86,7 @@ namespace CK.Env.NuGet
                         using( logger.Monitor.OpenInfo( "Installing the Azure Artifact Credential provider (https://github.com/Microsoft/artifacts-credprovider)." ) )
                         {
                             var a = System.Reflection.Assembly.GetExecutingAssembly();
-                            using( var r = new StreamReader( a.GetManifestResourceStream( "CK.Env.NuGet.Res.InstallCredentialProvider.ps1.txt" ) ) )
+                            using( var r = new StreamReader( a.GetManifestResourceStream( "CK.Env.Artifact.NuGet.Res.InstallCredentialProvider.ps1.txt" ) ) )
                             {
                                 var tempPath = Path.GetTempPath();
                                 var installer = Guid.NewGuid().ToString() + ".ps1";
