@@ -437,7 +437,6 @@ namespace CK.Env.MSBuildSln
 
         void DoInitializeDependencies( IActivityMonitor m )
         {
-            //Debug.Assert( !_dependencies.IsInitialized );
             var packageRefs = _file.AllFiles.Select( f => f.Document.Root )
                              .SelectMany( root => root.Elements( "ItemGroup" )
                                                         .Elements()

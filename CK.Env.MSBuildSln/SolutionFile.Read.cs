@@ -25,25 +25,28 @@ namespace CK.Env.MSBuildSln
         /// </returns>
         public static SolutionFile Read( IActivityMonitor m, MSProjContext ctx, NormalizedPath solutionPath, bool mustExist = true )
         {
-            var file = ctx.FileSystem.GetFileInfo( solutionPath );
-            if( !file.Exists )
+            using( m.OpenInfo( $"Reading '{solutionPath}'." ) )
             {
-                if( mustExist )
+                var file = ctx.FileSystem.GetFileInfo( solutionPath );
+                if( !file.Exists )
                 {
-                    m.Error( $"File '{solutionPath}' not found. Unable to read the solution." );
-                    return null;
+                    if( mustExist )
+                    {
+                        m.Error( $"File '{solutionPath}' not found. Unable to read the solution." );
+                        return null;
+                    }
+                    m.Warn( $"File '{solutionPath}' not found. Creating an empty solution." );
                 }
-                m.Warn( $"File '{solutionPath}' not found. Creating an empty solution." );
-            }
-            var s = new SolutionFile( ctx, solutionPath );
-            if( file.Exists )
-            {
-                using( var r = new Reader( m, file.CreateReadStream() ) )
+                var s = new SolutionFile( ctx, solutionPath );
+                if( file.Exists )
                 {
-                    if( s.Read( r ) ) return s;
+                    using( var r = new Reader( m, file.CreateReadStream() ) )
+                    {
+                        if( s.Read( r ) ) return s;
+                    }
                 }
+                return null;
             }
-            return null;
         }
 
         class Reader : IDisposable

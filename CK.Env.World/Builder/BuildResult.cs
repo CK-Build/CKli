@@ -33,17 +33,22 @@ namespace CK.Env
             IReadOnlyList<ReleaseNoteInfo> releaseNotes)
         {
             var result = new List<(ArtifactInstance Artifact, string SolutionName, string TargetName)>();
-            foreach( var row in ctx.DependentSolutions.Where( s => versions[s.Index] != null )
-                                         .SelectMany( s => s.Solution.GeneratedArtifacts.Select( a => (a, s, versions[s.Index]) ) ) )
+            foreach( var row in ctx.DependentSolutions
+                                   .Where( s => versions[s.Index] != null )
+                                   .SelectMany( s => s.Solution.GeneratedArtifacts.Select( a => (a: a.Artifact.WithVersion( versions[s.Index] ), s) ) ) )
             {
-                IArtifactRepository handler = row.s.Solution.ArtifactTargets
-                                                    .FirstOrDefault( r => r.HandleArtifactType( row.a.Artifact.Type ) );
-                if( handler == null )
+                IArtifactRepository[] handlers = row.s.Solution.ArtifactTargets
+                                                     .Where( r => r.Accepts( row.a ) )
+                                                     .ToArray();
+                if( handlers.Length == 0 )
                 {
                     m.Error( $"Unable to find a target artifact repository for {row.a}." );
                     return null;
                 }
-                result.Add( (new ArtifactInstance( row.a.Artifact, versions[row.s.Index] ), row.s.Solution.Name, handler.Info.UniqueArtifactRepositoryName) );
+                foreach( var h in handlers )
+                {
+                    result.Add( (row.a, row.s.Solution.Name, h.Info.UniqueArtifactRepositoryName) );
+                }
             }
             return new BuildResult( type, result, releaseNotes );
         }
