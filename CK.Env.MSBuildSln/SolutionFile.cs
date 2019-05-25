@@ -177,7 +177,7 @@ namespace CK.Env.MSBuildSln
 
         internal void CheckDirtyProjectFiles( bool shouldBeDirty )
         {
-            WatchDirty( () =>
+            DebounceDirtyChanged( () =>
             {
                 if( _isDirtyProjectFiles != shouldBeDirty )
                 {
@@ -188,10 +188,10 @@ namespace CK.Env.MSBuildSln
 
         internal void SetDirtyStructure( bool dirty )
         {
-            WatchDirty( () => _isDirtyStructure = dirty );
+            DebounceDirtyChanged( () => _isDirtyStructure = dirty );
         }
 
-        void WatchDirty( Action a )
+        void DebounceDirtyChanged( Action a )
         {
             bool d = IsDirty;
             a();

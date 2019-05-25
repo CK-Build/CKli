@@ -46,7 +46,7 @@ namespace CK.Env
             return (driver.GitRepository.GetCommitVersionInfo( m ).AssemblyBuildInfo.NuGetVersion, true);
         }
 
-        protected override BuildState Build( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IEnumerable<UpdatePackageInfo> buildProjectsUpgrade )
+        protected override BuildState Build( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade )
         {
             if( _commits[s.Index] != driver.GitRepository.Head.CommitSha )
             {

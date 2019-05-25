@@ -286,23 +286,47 @@ namespace CK.Env.Plugin
             return true;
         }
 
+
+        /// <summary>
+        /// Fires whenever a package reference version must be upgraded.
+        /// </summary>
+        public event EventHandler<UpdatePackageDependencyEventArgs> OnUpdatePackageDependency;
+
         /// <summary>
         /// Updates projects dependencies and saves the solution and its updated projects.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="packageInfos">The packages to update.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool UpdatePackageDependencies( IActivityMonitor monitor, IEnumerable<UpdatePackageInfo> packageInfos )
+        public bool UpdatePackageDependencies( IActivityMonitor monitor, IReadOnlyCollection<UpdatePackageInfo> packageInfos )
         {
             var solution = GetSolution( monitor );
             if( solution == null ) return false;
+            Debug.Assert( packageInfos.All( p => p.Project.Solution == solution ) );
             bool mustSave = false;
-            foreach( var update in packageInfos.Where( p => p.Project.Solution == solution ) )
+            foreach( var update in packageInfos )
             {
                 var p = update.Project.Tag<MSProject>();
-                int changes = p.SetPackageReferenceVersion( monitor, p.TargetFrameworks, update.PackageUpdate.Artifact.Name, update.PackageUpdate.Version );
-                mustSave |= changes != 0;
+                if( p != null )
+                {
+                    int changes = p.SetPackageReferenceVersion( monitor, p.TargetFrameworks, update.PackageUpdate.Artifact.Name, update.PackageUpdate.Version );
+                    mustSave |= changes != 0;
+                }
             }
+            bool error = false;
+            using( monitor.OnError( () => error = true ) )
+            {
+                try
+                {
+                    var e = new UpdatePackageDependencyEventArgs( monitor, packageInfos );
+                    OnUpdatePackageDependency?.Invoke( this, e );
+                }
+                catch( Exception ex )
+                {
+                    monitor.Error( "While updating dependencies.", ex );
+                }
+            }
+            if( error ) return false;
             return mustSave ? _sln.Save( monitor ) : true;
         }
 
@@ -391,7 +415,8 @@ namespace CK.Env.Plugin
                         .SelectMany( p => p.PackageReferences )
                         .Select( dep => (Dep: dep, LocalVersion: feed.GetBestNuGetVersion( monitor, dep.Target.Artifact.Name )) )
                         .Where( pv => pv.LocalVersion != null )
-                        .Select( pv => new UpdatePackageInfo( pv.Dep.Owner, NuGetType, pv.Dep.Target.Artifact.Name, pv.LocalVersion ) );
+                        .Select( pv => new UpdatePackageInfo( pv.Dep.Owner, NuGetType, pv.Dep.Target.Artifact.Name, pv.LocalVersion ) )
+                        .ToList();
 
             if( !UpdatePackageDependencies( monitor, toUpgrade ) ) return false;
             return LocalCommit( monitor );

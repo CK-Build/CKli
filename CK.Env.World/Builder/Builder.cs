@@ -154,7 +154,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="s">The solution.</param>
         /// <returns>The build project upgrades that must be applied.</returns>
-        protected IEnumerable<UpdatePackageInfo> GetBuildProjectUpgrades( DependentSolution s )
+        protected IReadOnlyCollection<UpdatePackageInfo> GetBuildProjectUpgrades( DependentSolution s )
         {
             return DependentSolutionContext.DependencyContext.BuildProjectsInfo.ZeroBuildProjects
                                          .Where( z => z.Project.Solution == s )
@@ -163,7 +163,8 @@ namespace CK.Env
                                                    z.Project,
                                                    a.Type,
                                                    a.Name,
-                                                   _packagesVersion[a] ) ) );
+                                                   _packagesVersion[a] ) ) )
+                                         .ToList();
         }
 
         bool RunPrepareBuild( IActivityMonitor m )
@@ -212,7 +213,7 @@ namespace CK.Env
             foreach( var (s,d) in DependentSolutionContext.Solutions )
             {
                 DependentSolutionContext.DependencyContext.LogSolutions( m, s );
-                IEnumerable<UpdatePackageInfo> buildProjectsUpgrade = GetBuildProjectUpgrades( s );
+                IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade = GetBuildProjectUpgrades( s );
                 using( m.OpenInfo( $"Running {s} build." ) )
                 {
                     // _targetVersions[i] is null if build must not be done (this is for ReleaseBuilder only).
@@ -250,7 +251,7 @@ namespace CK.Env
         /// <param name="sVersion">The version computed by <see cref="PrepareBuild"/>.</param>
         /// <param name="buildProjectsUpgrade">The build projects upgrades.</param>
         /// <returns>The build state.</returns>
-        protected abstract BuildState Build( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IEnumerable<UpdatePackageInfo> buildProjectsUpgrade );
+        protected abstract BuildState Build( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade );
 
     }
 }

@@ -41,7 +41,7 @@ namespace CK.Env
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="packageInfos">The updates.</param>
         /// <returns>True on success, false on error.</returns>
-        bool UpdatePackageDependencies( IActivityMonitor monitor, IEnumerable<UpdatePackageInfo> packageInfos );
+        bool UpdatePackageDependencies( IActivityMonitor monitor, IReadOnlyCollection<UpdatePackageInfo> packageInfos );
 
         /// <summary>
         /// Builds the solution from its file state.

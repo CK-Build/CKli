@@ -34,21 +34,6 @@ namespace CK.Env
         {
         }
 
-        ///// <summary>
-        ///// Initializes a new <see cref="UpdatePackageInfo"/>.
-        ///// </summary>
-        ///// <param name="e">Xml element. Must not be null.</param>
-        ///// <param name="solutionName">Solution name. Will be used if the element has no "Solution" attribute.</param>
-        //public UpdatePackageInfo( XElement e, string solutionName = null )
-        //    : this( (string)e.Attribute("Solution") ?? solutionName,
-        //            (string)e.AttributeRequired("Project"),
-        //            new ArtifactInstance(
-        //                ArtifactType.Single( (string)e.Attribute( "PackageType" ) ),
-        //                (string)e.AttributeRequired( "PackageId" ),
-        //                SVersion.Parse( (string)e.AttributeRequired( "Version" )) ) )
-        //{
-        //}
-
         /// <summary>
         /// Gets the project that must be updated.
         /// </summary>
@@ -59,19 +44,5 @@ namespace CK.Env
         /// </summary>
         public ArtifactInstance PackageUpdate { get; }
 
-        /// <summary>
-        /// Exports this <see cref="UpdatePackageInfo"/> in Xml format.
-        /// </summary>
-        /// <param name="withSolutionName">When true, adds the "Solution" attribute.</param>
-        /// <returns>The Xml.</returns>
-        public XElement ToXml( bool withSolutionName )
-        {
-            return new XElement( "PackageUdate",
-                        withSolutionName ? new XAttribute( "Solution", Project.Solution.Name ) : null,
-                        new XAttribute( "Project", Project.SimpleProjectName+'|'+Project.Type+'|'+Project.SolutionRelativeFolderPath ),
-                        new XAttribute( "PackageType", PackageUpdate.Artifact.Type ),
-                        new XAttribute( "PackageId", PackageUpdate.Artifact.Name ),
-                        new XAttribute( "Version", PackageUpdate.Version ) );
-        }
     }
 }

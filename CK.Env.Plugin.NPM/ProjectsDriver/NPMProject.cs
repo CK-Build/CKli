@@ -94,6 +94,11 @@ namespace CK.Env.Plugin
 
         }
 
+        /// <summary>
+        /// This is used to generate the CodeCakeBuilder/NPMSolution.xml file that lists
+        /// all the NPM projects that CodeCakeBuilder must handle.
+        /// </summary>
+        /// <returns>The Xml element.</returns>
         public XElement ToXml()
         {
             return new XElement( "Project",
@@ -112,6 +117,11 @@ namespace CK.Env.Plugin
             }
         }
 
+        /// <summary>
+        /// Synchronizes these <see cref="PackageJsonFile.Dependencies"/> that have a non null <see cref="NPMDep.MinVersion"/>
+        /// to the associated <see cref="DependencyModel.Project"/> instance's <see cref="IProject.PackageReferences"/>.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
         internal void SynchronizePackageReferences( IActivityMonitor m )
         {
             var toRemove = new HashSet<Artifact>( _project.PackageReferences.Select( r => r.Target.Artifact ) );
@@ -119,7 +129,7 @@ namespace CK.Env.Plugin
             {
                 if( dep.MinVersion == null && dep.Type != NPMVersionDependencyType.LocalPath )
                 {
-                    m.Warn( $"Unable to handle NPM {dep.Kind.ToPackageJsonKey()} '{dep.RawDep}' in {PackageJson.FilePath}. Only Simple version and file: relative paths are handled." );
+                    m.Warn( $"Unable to handle NPM {dep.Kind.ToPackageJsonKey()} '{dep.RawDep}' in {PackageJson.FilePath}. Only simple minimal version and 'file:' relative paths are handled." );
                 }
                 if( dep.MinVersion != null )
                 {
@@ -131,6 +141,11 @@ namespace CK.Env.Plugin
             foreach( var noMore in toRemove ) _project.RemovePackageReference( noMore );
         }
 
+        /// <summary>
+        /// Synchronizes these <see cref="PackageJsonFile.Dependencies"/> that are <see cref="NPMVersionDependencyType.LocalPath"/>
+        /// to the associated <see cref="DependencyModel.Project"/> instance's <see cref="IProject.ProjectReferences"/>.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
         internal bool SynchronizeProjectReferences( IActivityMonitor m )
         {
             var toRemove = new HashSet<IProject>( _project.ProjectReferences.Select( r => r.Target ) );
