@@ -4,6 +4,7 @@ using CSemVer;
 using Npm.Net;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -102,14 +103,12 @@ namespace CK.Env.NPM
             {
                 foreach( LocalNPMPackageFile file in files )
                 {
-                    using( Stream fileStream = File.OpenRead( file.FullPath ) )
+                    var tags = file.Version.PackageQuality.GetLabels().Select( p => p.ToString() ).ToList();
+                    Debug.Assert( tags.Count > 0 );
+                    await Registry.PublishAsync( m, file.FullPath, tags[0] );
+                    foreach( string tag in tags.Skip( 1 ) )
                     {
-                        var tags = file.Version.PackageQuality.GetLabels().Select( p => p.ToString() ).ToList();
-                        await Registry.Publish( m, fileStream, tags.First() );
-                        foreach( string tag in tags.Skip( 1 ) )
-                        {
-                            await Registry.AddDistTag( m, file.PackageId, file.Version, tag );
-                        }
+                        await Registry.AddDistTag( m, file.PackageId, file.Version, tag );
                     }
                 }
             }
@@ -118,23 +117,24 @@ namespace CK.Env.NPM
         public async Task<bool> PushAsync( IActivityMonitor m, IArtifactLocalSet artifacts )
         {
             bool success = true;
-            using( m.OnError( () => success = false ) )
-            {
-                if( !(artifacts is IEnumerable<LocalNPMPackageFile> locals) )
-                {
-                    m.Error( $"Invalid artifact local set for NPM feed." );
-                    return false;
-                }
-                var accepted = locals.Where( l => Info.QualityFilter.Accepts( l.Version.PackageQuality ) ).ToList();
-                if( accepted.Count == 0 )
-                {
-                    m.Info( $"No packages accpeted by {Info.QualityFilter} filter for {Info}." );
-                }
-                else
-                {
-                    await PushPackagesAsync( m, accepted );
-                }
-            }
+            m.Warn( $"Pushing NPM packages is temporarily disabled..." );
+            //using( m.OnError( () => success = false ) )
+            //{
+            //    if( !(artifacts is IEnumerable<LocalNPMPackageFile> locals) )
+            //    {
+            //        m.Error( $"Invalid artifact local set for NPM feed." );
+            //        return false;
+            //    }
+            //    var accepted = locals.Where( l => Info.QualityFilter.Accepts( l.Version.PackageQuality ) ).ToList();
+            //    if( accepted.Count == 0 )
+            //    {
+            //        m.Info( $"No packages accpeted by {Info.QualityFilter} filter for {Info}." );
+            //    }
+            //    else
+            //    {
+            //        await PushPackagesAsync( m, accepted );
+            //    }
+            //}
             return success;
         }
     }

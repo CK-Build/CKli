@@ -1,6 +1,5 @@
 using CK.Core;
 using CSemVer;
-using dotnettar;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -191,54 +190,79 @@ namespace Npm.Net
             }
         }
 
-        async Task<JObject> GetPackageJsonFromTarball( IActivityMonitor m, Stream tarball )
+        static JObject ExtractPackageJson( IActivityMonitor m, MemoryStream tarball )
         {
-            using( GZipStream dezippedStream = new GZipStream( tarball, CompressionMode.Decompress ) )
-            using( TarBallReader tarBallReader = new TarBallReader( dezippedStream ) )
+            var buffer = new byte[100];
+            while( true )
             {
-                TarFileReader entry = null;
-                do
+                tarball.Read( buffer, 0, 100 );
+                var name = Encoding.ASCII.GetString( buffer ).Trim( ' ', '\0' );
+                if( String.IsNullOrWhiteSpace( name ) )
                 {
-                    using( entry = await tarBallReader.GetEntryAsync() )
-                    using( StreamReader reader = new StreamReader( entry.Stream ) )
-                    {
-                        if( entry.Header.Name == "package/package.json" )
-                        {
-                            m.Info( "Found package.json in tarball" );
-                            return JObject.Parse( await reader.ReadToEndAsync() );
-                        }
-                    }
-                } while( entry != null );
-                throw new InvalidDataException( "There no package.json in the tarball" );
+                    m.Error( "Tar entry 'package/packae.json' not found." );
+                    return null;
+                }
+                tarball.Seek( 24, SeekOrigin.Current );
+                tarball.Read( buffer, 0, 12 );
+                var size = Convert.ToInt64( Encoding.ASCII.GetString( buffer, 0, 12 ).Trim( ' ', '\0' ), 8 );
+                tarball.Seek( 376L, SeekOrigin.Current );
+                if( name == "package/package.json" )
+                {
+                    m.Info( "Found 'package/package.json' in tarball" );
+                    var bytes = new Byte[size];
+                    tarball.Read( bytes, 0, bytes.Length );
+                    var s = Encoding.UTF8.GetString( bytes );
+                    return JObject.Parse( s );
+                }
+                else
+                {
+                    tarball.Seek( size, SeekOrigin.Current );
+                }
+                var pos = tarball.Position;
+                var offset = 512 - (pos % 512);
+                if( offset == 512 ) offset = 0;
+                tarball.Seek( offset, SeekOrigin.Current );
             }
         }
+
         /// <summary>
         /// Publish a package to the repository
         /// </summary>
-        /// <param name="m"></param>
+        /// <param name="m">The monitor to use.</param>
         /// <param name="packageJson">The package.json of the package to push</param>
-        /// <param name="tarball">This stream must be Seek-able. <see cref="Stream"/> of the tarball of the package to push.</param>
-        /// <param name="distTag"></param>
-        /// <returns></returns>
-        public async Task Publish( IActivityMonitor m, Stream tarball, string distTag = null )
+        /// <param name="packagePathTarGz">
+        /// Physical file path to the package tar gz file to push.
+        /// </param>
+        /// <param name="distTag">First optional tag to be associated to the package.</param>
+        /// <returns>The awaitable.</returns>
+        public async Task PublishAsync( IActivityMonitor m, string packagePathTarGz, string distTag = null )
         {
-            if( !tarball.CanSeek ) throw new ArgumentException( "I need to do two pass on this stream" );
-            JObject packageJson = await GetPackageJsonFromTarball( m, tarball );
-            using( HttpRequestMessage req = NpmRequestMessage( m, packageJson["name"].ToString(), HttpMethod.Put ) )
-            using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream( m, RegistryUri, packageJson, tarball, distTag ) )
+            using( var tarball = new MemoryStream() )
             {
-                req.Content = metadataStream;
-                /**
-                 * npm does more things than we do:
-                 * if the first request return 409: conflict, npm fetch the versions availables in the registry.
-                 * With these versions npm patch the metadata and resend a packet.
-                 * We think it's probably for legacy reason, the simple request works on Azure Devops and Verdaccio
-                 * https://github.com/npm/npm-registry-client/commit/e9fbeb8b67f249394f735c74ef11fe4720d46ca0
-                 * TL;DR: The legacy npm publish is not implemented.
-                 **/
-                using( var response = await _httpClient.SendAsync( req ) )
+                using( var file = File.OpenRead( packagePathTarGz ) )
+                using( var gz = new GZipStream( file, CompressionMode.Decompress ) )
                 {
-                    await LogResponse( m, response );
+                    await gz.CopyToAsync( tarball );
+                    tarball.Position = 0;
+                }
+                JObject packageJson = ExtractPackageJson( m, tarball );
+                if( packageJson == null ) return;
+                using( HttpRequestMessage req = NpmRequestMessage( m, packageJson["name"].ToString(), HttpMethod.Put ) )
+                using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream( m, RegistryUri, packageJson, tarball, distTag ) )
+                {
+                    req.Content = metadataStream;
+                    /**
+                     * npm does more things than we do:
+                     * if the first request return 409: conflict, npm fetch the versions availables in the registry.
+                     * With these versions npm patch the metadata and resend a packet.
+                     * We think it's probably for legacy reason, the simple request works on Azure Devops and Verdaccio
+                     * https://github.com/npm/npm-registry-client/commit/e9fbeb8b67f249394f735c74ef11fe4720d46ca0
+                     * TL;DR: The legacy npm publish is not implemented.
+                     **/
+                    using( var response = await _httpClient.SendAsync( req ) )
+                    {
+                        await LogResponse( m, response );
+                    }
                 }
             }
         }
