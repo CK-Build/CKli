@@ -36,7 +36,7 @@ namespace CK.Env
             return (driver.GitRepository.GetCommitVersionInfo( m ).AssemblyBuildInfo.NuGetVersion,true);
         }
 
-        protected override BuildState Build( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IEnumerable<UpdatePackageInfo> buildProjectsUpgrade )
+        protected override BuildState Build( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade )
         {
             if( !driver.UpdatePackageDependencies( m, buildProjectsUpgrade ) ) return BuildState.Failed;
             if( !driver.GitRepository.AmendCommit( m, null, date => _commitTimes[s.Index] ) ) return BuildState.Failed;

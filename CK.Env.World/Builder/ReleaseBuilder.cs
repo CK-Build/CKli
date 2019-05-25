@@ -72,7 +72,7 @@ namespace CK.Env
             ISolutionDriver driver,
             IReadOnlyList<UpdatePackageInfo> upgrades,
             SVersion sVersion,
-            IEnumerable<UpdatePackageInfo> buildProjectsUpgrade )
+            IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade )
         {
             IReleaseSolutionInfo info = _roadmap.ReleaseInfos[s.Index];
             Debug.Assert( (sVersion == null) == (info.CurrentReleaseInfo.Level == ReleaseLevel.None) );
