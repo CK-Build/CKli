@@ -23,11 +23,11 @@ namespace CK.Env.MSBuildSln
         /// <returns>
         /// The solution file or null on error (for example when not found and <paramref name="mustExist"/> is true).
         /// </returns>
-        public static SolutionFile Read( IActivityMonitor m, MSProjContext ctx, NormalizedPath solutionPath, bool mustExist = true )
+        public static SolutionFile Read( FileSystem fs, IActivityMonitor m, NormalizedPath solutionPath, bool mustExist = true )
         {
             using( m.OpenInfo( $"Reading '{solutionPath}'." ) )
             {
-                var file = ctx.FileSystem.GetFileInfo( solutionPath );
+                var file = fs.GetFileInfo( solutionPath );
                 if( !file.Exists )
                 {
                     if( mustExist )
@@ -37,7 +37,7 @@ namespace CK.Env.MSBuildSln
                     }
                     m.Warn( $"File '{solutionPath}' not found. Creating an empty solution." );
                 }
-                var s = new SolutionFile( ctx, solutionPath );
+                var s = new SolutionFile( fs, solutionPath );
                 if( file.Exists )
                 {
                     using( var r = new Reader( m, file.CreateReadStream() ) )
@@ -134,10 +134,11 @@ namespace CK.Env.MSBuildSln
                 r.Monitor.Fatal( $"Invalid line read on line #{r.LineNumber}. Found: {r.Line}. Expected: A line beginning with 'Project(' or 'Global'." );
                 return false;
             }
+            var cache = new Dictionary<NormalizedPath, MSProjFile>();
             bool hasError = false;
             foreach( var p in AllProjects )
             {
-                hasError |= !p.Initialize( r.Monitor );
+                hasError |= !p.Initialize( FileSystem, r.Monitor, cache );
             }
             // Note that the project files may be dirty when they are cached
             // and not saved.

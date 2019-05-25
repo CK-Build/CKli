@@ -35,7 +35,7 @@ namespace CK.Env.Plugin
             var solution = _solutionDriver.GetSolution( m );
             if( solution == null ) return;
 
-            var framework = MSProjContext.Traits.FindOrCreate( "netcoreapp2.1" );
+            var framework = MSProject.Traits.FindOrCreate( "netcoreapp2.1" );
 
             var slnFile = solution.Tag<SolutionFile>();
             MSProject ccbProject = slnFile.MSProjects.SingleOrDefault( p => p.ProjectName == "CodeCakeBuilder" );

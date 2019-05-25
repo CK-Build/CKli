@@ -22,7 +22,6 @@ namespace CK.Env.Plugin
         readonly ArtifactCenter _artifactCenter;
         readonly SolutionSpec _solutionSpec;
         readonly SolutionContext _solutionContext;
-        readonly MSProjContext _projectFileContext;
 
         Solution _solution;
         SolutionFile _sln;
@@ -44,7 +43,6 @@ namespace CK.Env.Plugin
             _keyStore = keyStore;
             _solutionSpec = spec;
             _localFeedProvider = localFeedProvider;
-            _projectFileContext = new MSProjContext( f.FileSystem );
         }
 
         void IDisposable.Dispose()
@@ -119,7 +117,7 @@ namespace CK.Env.Plugin
         {
             _isSolutionValid = false;
             var expectedSolutionName = Folder.SubPath.LastPart + ".sln" ;
-            _sln = SolutionFile.Read( m, _projectFileContext, BranchPath.AppendPart( expectedSolutionName ) );
+            _sln = SolutionFile.Read( Folder.FileSystem,  m, BranchPath.AppendPart( expectedSolutionName ) );
             if( _sln == null ) return;
             _sln.Saved += OnSolutionSaved;
             if( _solution == null )

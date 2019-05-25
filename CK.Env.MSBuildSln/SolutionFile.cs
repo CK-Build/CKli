@@ -18,9 +18,9 @@ namespace CK.Env.MSBuildSln
         bool _isDirtyProjectFiles;
         bool _isDirtyStructure;
 
-        public SolutionFile( MSProjContext ctx, NormalizedPath filePath )
+        public SolutionFile( FileSystem fs, NormalizedPath filePath )
         {
-            VSProjContext = ctx;
+            FileSystem = fs;
             FilePath = filePath;
             SolutionFolderPath = FilePath.RemoveLastPart();
             _headers = new List<string>();
@@ -31,14 +31,9 @@ namespace CK.Env.MSBuildSln
         }
 
         /// <summary>
-        /// Gets the central project context.
-        /// </summary>
-        public MSProjContext VSProjContext { get; }
-
-        /// <summary>
         /// Gets the file system object.
         /// </summary>
-        public FileSystem FileSystem => VSProjContext.FileSystem;
+        public FileSystem FileSystem { get; }
 
         /// <summary>
         /// Gets the .sln path (relative to the <see cref="FileSystem"/>).

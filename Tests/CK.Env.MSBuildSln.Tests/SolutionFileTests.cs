@@ -28,8 +28,7 @@ namespace CK.Env.MSBuildSln.Tests
         {
             using( var fs = new FileSystem( TestHelper.SolutionFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
-                var ctx = new MSProjContext( fs );
-                var s = SolutionFile.Read( TestHelper.Monitor, ctx, "CK-Env.sln", true );
+                var s = SolutionFile.Read( fs, TestHelper.Monitor, "CK-Env.sln", true );
 
                 s.Children.Should().HaveCount( 26, "There must be 26 projects!" );
                 var folders = s.Children.OfType<SolutionFolder>();
