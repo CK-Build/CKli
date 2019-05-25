@@ -193,7 +193,7 @@ namespace Npm.Net
 
         async Task<JObject> GetPackageJsonFromTarball( IActivityMonitor m, Stream tarball )
         {
-            using( GZipStream dezippedStream = new GZipStream( tarball, CompressionMode.Decompress ) )
+            using( GZipStream dezippedStream = new GZipStream( tarball, CompressionMode.Decompress, true ) )
             using( TarBallReader tarBallReader = new TarBallReader( dezippedStream ) )
             {
                 TarFileReader entry = null;
