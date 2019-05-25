@@ -238,17 +238,18 @@ namespace Npm.Net
         public async Task PublishAsync( IActivityMonitor m, string packagePathTarGz, string distTag = null )
         {
             using( var tarball = new MemoryStream() )
+            using( var file = File.OpenRead( packagePathTarGz ) )
             {
-                using( var file = File.OpenRead( packagePathTarGz ) )
-                using( var gz = new GZipStream( file, CompressionMode.Decompress ) )
+                using( var gz = new GZipStream( file, CompressionMode.Decompress, leaveOpen:true ) )
                 {
                     await gz.CopyToAsync( tarball );
                     tarball.Position = 0;
                 }
+                file.Position = 0;
                 JObject packageJson = ExtractPackageJson( m, tarball );
                 if( packageJson == null ) return;
                 using( HttpRequestMessage req = NpmRequestMessage( m, packageJson["name"].ToString(), HttpMethod.Put ) )
-                using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream( m, RegistryUri, packageJson, tarball, distTag ) )
+                using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream( m, RegistryUri, packageJson, file, distTag ) )
                 {
                     req.Content = metadataStream;
                     /**

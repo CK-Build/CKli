@@ -117,24 +117,23 @@ namespace CK.Env.NPM
         public async Task<bool> PushAsync( IActivityMonitor m, IArtifactLocalSet artifacts )
         {
             bool success = true;
-            m.Warn( $"Pushing NPM packages is temporarily disabled..." );
-            //using( m.OnError( () => success = false ) )
-            //{
-            //    if( !(artifacts is IEnumerable<LocalNPMPackageFile> locals) )
-            //    {
-            //        m.Error( $"Invalid artifact local set for NPM feed." );
-            //        return false;
-            //    }
-            //    var accepted = locals.Where( l => Info.QualityFilter.Accepts( l.Version.PackageQuality ) ).ToList();
-            //    if( accepted.Count == 0 )
-            //    {
-            //        m.Info( $"No packages accpeted by {Info.QualityFilter} filter for {Info}." );
-            //    }
-            //    else
-            //    {
-            //        await PushPackagesAsync( m, accepted );
-            //    }
-            //}
+            using( m.OnError( () => success = false ) )
+            {
+                if( !(artifacts is IEnumerable<LocalNPMPackageFile> locals) )
+                {
+                    m.Error( $"Invalid artifact local set for NPM feed." );
+                    return false;
+                }
+                var accepted = locals.Where( l => Info.QualityFilter.Accepts( l.Version.PackageQuality ) ).ToList();
+                if( accepted.Count == 0 )
+                {
+                    m.Info( $"No packages accpeted by {Info.QualityFilter} filter for {Info}." );
+                }
+                else
+                {
+                    await PushPackagesAsync( m, accepted );
+                }
+            }
             return success;
         }
     }
