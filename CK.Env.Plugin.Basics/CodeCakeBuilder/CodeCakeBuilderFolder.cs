@@ -55,7 +55,7 @@ namespace CK.Env.Plugin
             SetTextResource( m, "StandardGlobalInfo.cs" );
             SetTextResource( m, "Build.CreateStandardGlobalInfo.cs" );
 
-            UpdateTextResource( m, "Build.cs" );
+            UpdateTextResource( m, "Build.cs", t => AdaptBuild( m, s, t ) );
 
             // Abstractions files
             SetTextResource( m, "Abstractions/Artifact.cs" );
@@ -91,5 +91,17 @@ namespace CK.Env.Plugin
             }
 
         }
+
+        string AdaptBuild( IActivityMonitor m, ISolution s, string text )
+        {
+            if( !s.Projects.Any( p => p.Type == "js" ) )
+            {
+                text = text.Replace( "using Cake.Npm;", "" );
+                text = text.Replace( "using Cake.Npm.Install;", "" );
+                text = text.Replace( "using Cake.Npm.RunScript;", "" );
+            }
+            return text;
+        }
+
     }
 }
