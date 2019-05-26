@@ -24,7 +24,7 @@ namespace Npm.Net
         readonly string _session = GenerateSessionId();
 
         /// <summary>
-        /// Create a registry that make unauthentified request.
+        /// Create a registry that make unauthenticated request.
         /// </summary>
         /// <param name="httpClient">The <see cref="HttpClient"/> used to send the requests</param>
         /// <param name="registryUri">Registry <see cref="Uri"/>, https://registry.npmjs.org/ is used if the uri is not specified </param>
@@ -40,7 +40,7 @@ namespace Npm.Net
         }
 
         /// <summary>
-        /// Create a registry that make unauthentified request
+        /// Create a registry that make authenticated request
         /// </summary>
         /// <param name="httpClient">The <see cref="HttpClient"/> used to send the requests</param>
         /// <param name="registryUri">Registry <see cref="Uri"/>, https://registry.npmjs.org/ is used if the uri is not specified </param>
@@ -52,7 +52,7 @@ namespace Npm.Net
         }
 
         /// <summary>
-        /// Create a registry that make unauthentified request
+        /// Create a registry that make authenticated request
         /// </summary>
         /// <param name="httpClient">The <see cref="HttpClient"/> used to send the requests</param>
         /// <param name="registryUri">Registry <see cref="Uri"/>, https://registry.npmjs.org/ is used if the uri is not specified </param>
@@ -91,6 +91,7 @@ namespace Npm.Net
             }
             return null;
         }
+
         /// <summary>
         /// Return whether the registry is up to date. If we never tested a repository we are optimistic
         /// and think that the registry have recent endpoint
@@ -98,6 +99,7 @@ namespace Npm.Net
         /// <param name="registryHost"></param>
         /// <returns></returns>
         static bool IsRegistryUpToDate( string registryHost ) => GetRegistryIsUpToDate( registryHost )?.isUpToDate ?? true;
+
         static void TryAddRegistryWithStatus( IActivityMonitor m, string registryHost, bool isUpToDate )
         {
             (string registryUri, bool isUpToDate)? valueTuple = GetRegistryIsUpToDate( registryHost );
@@ -132,6 +134,7 @@ namespace Npm.Net
         }
 
         bool _thisRegistryIsUpToDate;
+
         /// <summary>
         /// NPM ask a one time password, so here you have one.
         /// </summary>
@@ -139,7 +142,7 @@ namespace Npm.Net
         static string GenerateSessionId()
         {
             byte[] bytes = new byte[8];
-            RandomNumberGenerator.Create().GetBytes( bytes );
+            using( var r = RandomNumberGenerator.Create() ) r.GetBytes( bytes );
             return BitConverter.ToString( bytes ).Replace( "-", "" ).ToLower();
         }
 
@@ -149,7 +152,7 @@ namespace Npm.Net
         public Uri RegistryUri { get; }
 
         /// <summary>
-        /// Gets or Sets wether we are running in CI or not.
+        /// Gets or sets wether we are running in CI or not.
         /// The fields is automatically set based on the environement variables with the same behavior as npm.
         /// </summary>
         public bool NpmInCi { get; set; }
@@ -297,7 +300,7 @@ namespace Npm.Net
             }
             m.Info( "This registry does not have implemented the endpoint to get info on the specific version. " +
                 "I fetched all the versions and filtered the output for you." );
-            //Here the request is successful so we should have valid json.
+            // Here the request is successful so we should have valid json.
             JObject fullData = JObject.Parse( body );
             JToken versions = fullData["versions"];
             JToken specificVersion = versions[version];

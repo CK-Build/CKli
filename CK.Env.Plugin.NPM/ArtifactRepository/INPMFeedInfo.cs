@@ -17,7 +17,6 @@ namespace CK.Env.NPM
         /// <summary>
         /// Gets the name of this feed.
         /// Name is used as the feed identifier: it must be unique accross a set of NPM feeds.
-        /// (See <see cref="NPMFeedInfoComparer"/>.)
         /// </summary>
         string Name { get; }
     }

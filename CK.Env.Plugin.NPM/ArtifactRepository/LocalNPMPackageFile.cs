@@ -22,16 +22,6 @@ namespace CK.Env.NPM
         public string FullPath { get; }
 
         /// <summary>
-        /// Gets the package name.
-        /// </summary>
-        public string PackageId => Instance.Artifact.Name;
-
-        /// <summary>
-        /// Gets the package version.
-        /// </summary>
-        public SVersion Version => Instance.Version;
-
-        /// <summary>
         /// Gets the artifact instance.
         /// </summary>
         public ArtifactInstance Instance { get; }
@@ -40,7 +30,7 @@ namespace CK.Env.NPM
         /// Returns the "<see cref="PackageId"/>@<see cref="Version"/>" string.
         /// </summary>
         /// <returns>The package and version.</returns>
-        public override string ToString() => $"{PackageId}@{Version}";
+        public override string ToString() => $"{Instance.Artifact.Name}@{Instance.Version}";
 
         /// <summary>
         /// Parses a full path and extracts a <see cref="LocalNPMPackageFile"/>.

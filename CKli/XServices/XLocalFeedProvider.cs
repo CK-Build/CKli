@@ -61,7 +61,7 @@ namespace CKli
                 bool success = true;
                 foreach( var h in _provider._handlers )
                 {
-                    using( m.OpenTrace( $"Pushing to type handler '{h}'." ) )
+                    using( m.OpenTrace( $"Pushing for type handler '{h}'." ) )
                     {
                         if( !h.PushLocalArtifacts( this, m, target, artifacts ) )
                         {

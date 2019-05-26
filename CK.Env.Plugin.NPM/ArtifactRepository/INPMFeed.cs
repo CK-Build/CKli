@@ -24,14 +24,5 @@ namespace CK.Env.NPM
         /// <param name="v">The version.</param>
         /// <returns>True if found, false otherwise.</returns>
         Task<bool> ExistsAsync( IActivityMonitor m, string packageId, SVersion v );
-
-        /// <summary>
-        /// Pushes a set of packages.
-        /// </summary>
-        /// <param name="ctx">The monitor to use.</param>
-        /// <param name="files">The set of packages to push.</param>
-        /// <param name="timeoutSeconds">Timeout in seconds.</param>
-        /// <returns>The awaitable.</returns>
-        Task PushPackagesAsync( IActivityMonitor m, IEnumerable<LocalNPMPackageFile> files, int timeoutSeconds = 20 );
     }
 }
