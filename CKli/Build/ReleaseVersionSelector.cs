@@ -38,7 +38,7 @@ namespace CKli
                 }
                 foreach( var d in diffs )
                 {
-                    d.DumpDiff();
+                    d.DumpDiff(m);
                 }
             }
             else

@@ -80,7 +80,7 @@ namespace CK.Env.Plugin
             }
 
             public override string ToString() => VoidLine ?? $"{FullKey} = {Value}";
-            
+
         }
 
         void ApplySettings( IActivityMonitor m, NormalizedPath f )
@@ -92,6 +92,9 @@ namespace CK.Env.Plugin
                                             ? new Line( l.Groups[1].Value, l.Groups[2].Value )
                                             : new Line( l.Value ) )
                             .ToList();
+
+
+            lines.RemoveAll( p => p.FullKey == "scope" );//remove all keyvalues scopes.
 
             foreach( var s in _solutionSpec.NPMSources )
             {
@@ -125,7 +128,7 @@ namespace CK.Env.Plugin
                     lines.RemoveAll( line => line.FullKey == scopeUrl + ":always-auth" );
                     lines.RemoveAll( line => line.FullKey == scopeUrl + ":_password" );
                 }
-            }
+            };
             EnsureLine( lines, "git-tag-version", "false" );
             lines.RemoveAll( line => line.Scope != null && _solutionSpec.RemoveNPMScopeNames.Contains( line.Scope ) );
             Folder.FileSystem.CopyTo( m, lines.Select( l => l.ToString() ).Concatenate( "\r\n" ), f );
@@ -141,6 +144,10 @@ namespace CK.Env.Plugin
             int idx = lines.IndexOf( line => line.FullKey == key );
             if( idx < 0 ) lines.Add( new Line( key, value ) );
             else lines[idx] = new Line( key, value );
+        }
+
+        void RemoveLineWithKey( List<Line> lines, string key )
+        {
         }
 
     }
