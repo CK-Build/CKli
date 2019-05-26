@@ -43,7 +43,7 @@ namespace CK.Env
             Console.WriteLine( $"=    => {Path}: {DiffType}" );
             foreach( CommitInfo commit in _commits )
             {
-                Console.Write( $"{commit.Sha.Take( 5 )}: {commit.Message}" );
+                Console.Write( $"{commit.Sha.Substring(0,5)}: {commit.Message}" );
             }
             if( DiffType == DirectoryDiffType.Changed )
             {
