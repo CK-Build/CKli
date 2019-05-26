@@ -21,7 +21,7 @@ namespace Npm.Net
     {
         readonly HttpClient _httpClient;
         readonly AuthenticationHeaderValue _authHeader;
-        readonly string _session = GenerateSessionId();
+        readonly string _session;
 
         /// <summary>
         /// Create a registry that make unauthenticated request.
@@ -37,6 +37,7 @@ namespace Npm.Net
             }
             InitRegistryUpToDate();
             _httpClient = httpClient;
+            _session = GenerateSessionId();
         }
 
         /// <summary>
@@ -240,37 +241,39 @@ namespace Npm.Net
         /// <returns>The awaitable.</returns>
         public async Task PublishAsync( IActivityMonitor m, string packagePathTarGz, string distTag = null )
         {
-            using( var tarball = new MemoryStream() )
-            using( var file = File.OpenRead( packagePathTarGz ) )
+            using( m.OpenInfo( $"Pushing {packagePathTarGz} {(distTag != null ? $"with disTag='{distTag}'" : "")} to '{RegistryUri}'." ) )
             {
-                using( var gz = new GZipStream( file, CompressionMode.Decompress, leaveOpen:true ) )
+                using( var tarball = new MemoryStream() )
+                using( var file = File.OpenRead( packagePathTarGz ) )
                 {
-                    await gz.CopyToAsync( tarball );
-                    tarball.Position = 0;
-                }
-                file.Position = 0;
-                JObject packageJson = ExtractPackageJson( m, tarball );
-                if( packageJson == null ) return;
-                using( HttpRequestMessage req = NpmRequestMessage( m, packageJson["name"].ToString(), HttpMethod.Put ) )
-                using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream( m, RegistryUri, packageJson, file, distTag ) )
-                {
-                    req.Content = metadataStream;
-                    /**
-                     * npm does more things than we do:
-                     * if the first request return 409: conflict, npm fetch the versions availables in the registry.
-                     * With these versions npm patch the metadata and resend a packet.
-                     * We think it's probably for legacy reason, the simple request works on Azure Devops and Verdaccio
-                     * https://github.com/npm/npm-registry-client/commit/e9fbeb8b67f249394f735c74ef11fe4720d46ca0
-                     * TL;DR: The legacy npm publish is not implemented.
-                     **/
-                    using( var response = await _httpClient.SendAsync( req ) )
+                    using( var gz = new GZipStream( file, CompressionMode.Decompress, leaveOpen: true ) )
                     {
-                        await LogResponse( m, response );
+                        await gz.CopyToAsync( tarball );
+                        tarball.Position = 0;
+                    }
+                    file.Position = 0;
+                    JObject packageJson = ExtractPackageJson( m, tarball );
+                    if( packageJson == null ) return;
+                    using( HttpRequestMessage req = NpmRequestMessage( m, packageJson["name"].ToString(), HttpMethod.Put ) )
+                    using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream( m, RegistryUri, packageJson, file, distTag ) )
+                    {
+                        req.Content = metadataStream;
+                        /**
+                         * npm does more things than we do:
+                         * if the first request return 409: conflict, npm fetch the versions availables in the registry.
+                         * With these versions npm patch the metadata and resend a packet.
+                         * We think it's probably for legacy reason, the simple request works on Azure Devops and Verdaccio
+                         * https://github.com/npm/npm-registry-client/commit/e9fbeb8b67f249394f735c74ef11fe4720d46ca0
+                         * TL;DR: The legacy npm publish is not implemented.
+                         **/
+                        using( var response = await _httpClient.SendAsync( req ) )
+                        {
+                            await LogResponse( m, response );
+                        }
                     }
                 }
             }
         }
-
 
         async Task<(string body, HttpStatusCode statusCode)> ViewRequest( IActivityMonitor m, string endpoint, bool abreviated )
         {
@@ -455,6 +458,7 @@ namespace Npm.Net
         /// <param name="projectScope"></param>
         /// <returns></returns>
         HttpRequestMessage NpmRequestMessage( IActivityMonitor m, string endpoint, HttpMethod method ) => NpmRequestMessage( m, new Uri( RegistryUri + endpoint ), method );
+
         HttpRequestMessage NpmRequestMessage( IActivityMonitor m, Uri fullUri, HttpMethod method )
         {
             var req = new HttpRequestMessage
@@ -596,5 +600,7 @@ namespace Npm.Net
             }
             return true;
         }
+
+        public override string ToString() => RegistryUri.ToString();
     }
 }

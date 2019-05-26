@@ -27,10 +27,10 @@ namespace CK.Env.NPM
         public ArtifactInstance Instance { get; }
 
         /// <summary>
-        /// Returns the "<see cref="PackageId"/>@<see cref="Version"/>" string.
+        /// Returns the <see cref="Instance"/> string.
         /// </summary>
         /// <returns>The package and version.</returns>
-        public override string ToString() => $"{Instance.Artifact.Name}@{Instance.Version}";
+        public override string ToString() => Instance.ToString();
 
         /// <summary>
         /// Parses a full path and extracts a <see cref="LocalNPMPackageFile"/>.

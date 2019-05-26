@@ -101,7 +101,11 @@ namespace CK.Env.NPM
             {
                 foreach( LocalNPMPackageFile file in files )
                 {
-                    if( !await Registry.ExistAsync( m, file.Instance.Artifact.Name, file.Instance.Version ) )
+                    if( await Registry.ExistAsync( m, file.Instance.Artifact.Name, file.Instance.Version ) )
+                    {
+                        m.Info( $"Package '{file.Instance}' already in '{ToString()}'. Push skipped." );
+                    }
+                    else
                     {
                         var tags = file.Instance.Version.PackageQuality.GetLabels().Select( p => p.ToString() ).ToList();
                         Debug.Assert( tags.Count > 0 );
