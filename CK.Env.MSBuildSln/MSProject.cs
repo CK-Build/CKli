@@ -12,6 +12,14 @@ namespace CK.Env.MSBuildSln
 {
     public class MSProject : Project
     {
+
+        /// <summary>
+        /// Traits are used to manage framework names.
+        /// The <see cref="CKTraitContext.Separator"/> is the ';' to match the one used by csproj (parsing and
+        /// string representation becomes straightforward).
+        /// </summary>
+        public static readonly CKTraitContext Traits = new CKTraitContext( "MSBuild", ';' );
+
         /// <summary>
         /// Captures <see cref="DeclaredPackageDependency"/> and <see cref="ProjectToProjectDependency"/>.
         /// </summary>
@@ -93,15 +101,18 @@ namespace CK.Env.MSBuildSln
         /// </summary>
         public MSProjFile ProjectFile => _file;
 
-        internal override bool Initialize( IActivityMonitor m )
+        internal override bool Initialize(
+            FileSystem fs,
+            IActivityMonitor m,
+            Dictionary<NormalizedPath, MSProjFile> cache )
         {
-            if( !base.Initialize( m ) ) return false;
-            return ReloadProjectFile( m ) != null;
+            if( !base.Initialize( fs, m, cache ) ) return false;
+            return ReloadProjectFile( fs, m, cache ) != null;
         }
 
-        internal MSProjFile ReloadProjectFile( IActivityMonitor m )
+        MSProjFile ReloadProjectFile( FileSystem fs, IActivityMonitor m, Dictionary<NormalizedPath, MSProjFile> cache )
         {
-            _file = Solution.VSProjContext.FindOrLoadProjectFile( m, Path );
+            _file = MSProjFile.FindOrLoadProjectFile( fs, m, Path, cache );
             if( _file != null )
             {
                 Sdk = (string)_file.Document.Root.Attribute( "Sdk" );
@@ -132,7 +143,7 @@ namespace CK.Env.MSBuildSln
                     }
                     else
                     {
-                        TargetFrameworks = MSProjContext.Traits.FindOrCreate( f.Value );
+                        TargetFrameworks = Traits.FindOrCreate( f.Value );
 
                         LangVersion = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "LangVersion" ).FirstOrDefault()?.Value;
                         OutputType = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "OutputType" ).FirstOrDefault()?.Value;
@@ -144,9 +155,8 @@ namespace CK.Env.MSBuildSln
             }
             if( _file == null )
             {
-                Solution.VSProjContext.UnloadFile( Path );
                 Sdk = null;
-                TargetFrameworks = MSProjContext.Traits.EmptyTrait;
+                TargetFrameworks = Traits.EmptyTrait;
             }
             return _file;
         }
@@ -206,7 +216,7 @@ namespace CK.Env.MSBuildSln
         public bool SetTargetFrameworks( IActivityMonitor m, CKTrait frameworks )
         {
             if( frameworks?.IsEmpty ?? true ) throw new ArgumentException( "Must not be null or empty.", nameof( frameworks ) );
-            if( frameworks.Context != MSProjContext.Traits ) throw new ArgumentException( "Must be from VSProjContext.Traits context.", nameof( frameworks ) );
+            if( frameworks.Context != Traits ) throw new ArgumentException( "Must be from MSProject.Traits context.", nameof( frameworks ) );
             if( _file == null ) throw new InvalidOperationException( "Invalid project file." );
             if( TargetFrameworks == frameworks ) return false;
             XElement f = _file.Document.Root

@@ -41,13 +41,63 @@ namespace CK.Env.MSBuildSln
         IReadOnlyList<MSProjFile> _allFiles;
         bool _hasChanged;
 
-        internal MSProjFile( NormalizedPath p, XDocument d, List<Import> imports )
+        MSProjFile( NormalizedPath p, XDocument d, List<Import> imports )
         {
             Path = p;
             Document = d;
             Imports = imports;
             Document.Changed += OnDocumentChanged;
         }
+
+        /// <summary>
+        /// Finds from the cache or loads a Xml project file.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="path">The file path relative to the <see cref="FileSystem"/>.</param>
+        /// <param name="cache">Cache by path.</param>
+        /// <returns>The file or null if unable to load it.</returns>
+        public static MSProjFile FindOrLoadProjectFile(
+            FileSystem fs,
+            IActivityMonitor m,
+            NormalizedPath path,
+            Dictionary<NormalizedPath, MSProjFile> cache )
+        {
+            if( cache.TryGetValue( path, out MSProjFile f ) )
+            {
+                return f;
+            }
+            using( m.OpenTrace( $"Loading project file {path}." ) )
+            {
+                try
+                {
+                    var fP = fs.GetFileInfo( path );
+                    if( !fP.Exists )
+                    {
+                        m.Warn( $"Unable to find project file '{path}'. This project is ignored. This may be a case sensivity issue!" );
+                        return null;
+                    }
+                    XDocument content = fP.ReadAsXDocument();
+                    var imports = new List<MSProjFile.Import>();
+                    f = new MSProjFile( path, content, imports );
+                    cache[path] = f;
+                    var folder = path.RemoveLastPart();
+                    imports.AddRange( content.Root.Descendants( "Import" )
+                                        .Select( i => (E: i, P: (string)i.Attribute( "Project" )) )
+                                        .Where( i => i.P != null )
+                                        .Select( i => new Import( i.E, FindOrLoadProjectFile( fs, m, folder.Combine( i.P ).ResolveDots(), cache ) ) ) );
+
+                    f.Initialize();
+                    return f;
+                }
+                catch( Exception ex )
+                {
+                    m.Error( ex );
+                    cache.Remove( path );
+                    return null;
+                }
+            }
+        }
+
 
         /// <summary>
         /// Gets the file path in the <see cref="FileSystem"/>.
@@ -106,6 +156,8 @@ namespace CK.Env.MSBuildSln
                 .Distinct()
                 .ToArray();
         }
+
+
     }
 
 }

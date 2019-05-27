@@ -37,6 +37,7 @@ namespace CK.Env.Plugin
 
         /// <summary>
         /// Gets the name.
+        /// When there is no <see cref="Name"/>, the folder's name is returned: this SafeName always exists.
         /// </summary>
         public string SafeName => Name ?? FilePath.Parts[FilePath.Parts.Count - 2];
 
@@ -80,16 +81,24 @@ namespace CK.Env.Plugin
         /// <summary>
         /// Sets a minimum version for a dependency that must exist, regardless of it current status.
         /// </summary>
+        /// <param name="m">The monitor to use.</param>
         /// <param name="name">The dependency name that must appear in <see cref="Dependencies"/>.</param>
         /// <param name="v">The minimal version. Must not be null.</param>
-        public void SetDependencyMinVersion( string name, SVersion v )
+        /// <returns>True if the version has been chenged, false it was the same version.</returns>
+        internal bool SetDependencyMinVersion( IActivityMonitor m, string name, SVersion v )
         {
             var idx = _deps.FindIndex( dep => dep.Name == name );
             if( idx < 0 ) throw new ArgumentException( $"Dependency '{name}' not found.", nameof( name ) );
             var dOrig = _deps[idx];
-            var d = new NPMDep( dOrig.Name, dOrig.Kind, v );
-            Root[d.Kind.ToPackageJsonKey()][d.Name] = d.RawDep;
-            _deps[idx] = d;
+            if( dOrig.MinVersion != v )
+            {
+                m.Info( $"Updated dependency {dOrig.ToString()} to version {v}." );
+                var d = new NPMDep( dOrig.Name, dOrig.Kind, v );
+                Root[d.Kind.ToPackageJsonKey()][d.Name] = d.RawDep;
+                _deps[idx] = d;
+                return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -113,11 +122,6 @@ namespace CK.Env.Plugin
         /// </summary>
         /// <returns>A readable string.</returns>
         public override string ToString() => IsPublished ? Name : $"{SafeName} (unpublished)";
-
-        protected override void OnSaved( IActivityMonitor m )
-        {
-            base.OnSaved( m );
-        }
 
         internal NPMProjectStatus Refresh( IActivityMonitor m )
         {

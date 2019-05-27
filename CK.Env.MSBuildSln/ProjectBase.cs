@@ -149,7 +149,10 @@ namespace CK.Env.MSBuildSln
                                                                         ? ParentFolder.SolutionRelativeLogicalFolderPath.AppendPart( ProjectName )
                                                                         : new NormalizedPath( ProjectName );
 
-        internal virtual bool Initialize( IActivityMonitor m )
+        internal virtual bool Initialize(
+            FileSystem fs,
+            IActivityMonitor m,
+            Dictionary<NormalizedPath, MSProjFile> cache )
         {
             if( ParentFolderGuid != null
                 && (ParentFolder = Solution.FindProjectByGuid<SolutionFolder>( m, ParentFolderGuid )) == null )

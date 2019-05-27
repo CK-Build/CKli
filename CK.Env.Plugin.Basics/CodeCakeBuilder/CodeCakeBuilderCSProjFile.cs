@@ -35,7 +35,7 @@ namespace CK.Env.Plugin
             var solution = _solutionDriver.GetSolution( m );
             if( solution == null ) return;
 
-            var framework = MSProjContext.Traits.FindOrCreate( "netcoreapp2.1" );
+            var framework = MSProject.Traits.FindOrCreate( "netcoreapp2.1" );
 
             var slnFile = solution.Tag<SolutionFile>();
             MSProject ccbProject = slnFile.MSProjects.SingleOrDefault( p => p.ProjectName == "CodeCakeBuilder" );
@@ -64,9 +64,16 @@ namespace CK.Env.Plugin
                 ccbProject.RemoveDependencies( m, ccbProject.Deps.Packages.Where( p => p.PackageId == packageId ).ToList() );
             }
 
-            EnsureProjectReference( "NuGet.Credentials", "5.0.0" );
-            EnsureProjectReference( "NuGet.Protocol", "5.0.0" );
-            EnsureProjectReference( "Cake.Npm", "0.16.0" );
+            EnsureProjectReference( "NuGet.Credentials", "5.1.0" );
+            EnsureProjectReference( "NuGet.Protocol", "5.1.0" );
+            if( solution.Projects.Any( p => p.Type == "js" ) )
+            {
+                EnsureProjectReference( "Cake.Npm", "0.16.0" );
+            }
+            else
+            {
+                DeleteProjectReference( "Cake.Npm" );
+            }
             EnsureProjectReference( "CK.Text", "8.0.2" );
             DeleteProjectReference( "SimpleGitVersion.Core" ); //imported by SimpleGitVersion.Cake
             DeleteProjectReference( "Code.Cake" ); //imported by SimpleGitVersion.Cake

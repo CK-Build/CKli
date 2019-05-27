@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Diagnostics;
 
 namespace CK.Env.Plugin
 {
@@ -22,6 +23,7 @@ namespace CK.Env.Plugin
             _driver = driver;
             _spec = spec;
             _driver.OnSolutionConfiguration += OnSolutionConfiguration;
+            _driver.OnUpdatePackageDependency += OnUpdatePackageDependency;
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => BranchPath.AppendPart( nameof( NPMProjectsDriver ) );
@@ -82,5 +84,24 @@ namespace CK.Env.Plugin
         {
             return _driver.GetSolution( m ) != null ? _npmProjects : null;
         }
+
+        void OnUpdatePackageDependency( object sender, UpdatePackageDependencyEventArgs e )
+        {
+            bool mustSave = false;
+            foreach( var update in e.UpdateInfo )
+            {
+                var p = update.Project.Tag<NPMProject>();
+                if( p != null )
+                {
+                    Debug.Assert( _npmProjects.Contains( p ) );
+                    mustSave |= p.PackageJson.SetDependencyMinVersion( e.Monitor, update.PackageUpdate.Artifact.Name, update.PackageUpdate.Version );
+                }
+            }
+            if( mustSave )
+            {
+                foreach( var p in _npmProjects ) p.PackageJson.Save( e.Monitor );
+            }
+        }
+
     }
 }

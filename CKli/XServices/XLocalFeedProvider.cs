@@ -61,10 +61,13 @@ namespace CKli
                 bool success = true;
                 foreach( var h in _provider._handlers )
                 {
-                    if( !h.PushLocalArtifacts( this, m, target, artifacts ) )
+                    using( m.OpenTrace( $"Pushing for type handler '{h}'." ) )
                     {
-                        m.Error( $"Push to '{target}' by handler '{h}' failed." );
-                        success = false;
+                        if( !h.PushLocalArtifacts( this, m, target, artifacts ) )
+                        {
+                            m.CloseGroup( "Failed." );
+                            success = false;
+                        }
                     }
                 }
                 return success;

@@ -1,6 +1,5 @@
 using CK.Core;
 using CSemVer;
-using dotnettar;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -22,10 +21,10 @@ namespace Npm.Net
     {
         readonly HttpClient _httpClient;
         readonly AuthenticationHeaderValue _authHeader;
-        readonly string _session = GenerateSessionId();
+        readonly string _session;
 
         /// <summary>
-        /// Create a registry that make unauthentified request.
+        /// Create a registry that make unauthenticated request.
         /// </summary>
         /// <param name="httpClient">The <see cref="HttpClient"/> used to send the requests</param>
         /// <param name="registryUri">Registry <see cref="Uri"/>, https://registry.npmjs.org/ is used if the uri is not specified </param>
@@ -38,10 +37,11 @@ namespace Npm.Net
             }
             InitRegistryUpToDate();
             _httpClient = httpClient;
+            _session = GenerateSessionId();
         }
 
         /// <summary>
-        /// Create a registry that make unauthentified request
+        /// Create a registry that make authenticated request
         /// </summary>
         /// <param name="httpClient">The <see cref="HttpClient"/> used to send the requests</param>
         /// <param name="registryUri">Registry <see cref="Uri"/>, https://registry.npmjs.org/ is used if the uri is not specified </param>
@@ -53,7 +53,7 @@ namespace Npm.Net
         }
 
         /// <summary>
-        /// Create a registry that make unauthentified request
+        /// Create a registry that make authenticated request
         /// </summary>
         /// <param name="httpClient">The <see cref="HttpClient"/> used to send the requests</param>
         /// <param name="registryUri">Registry <see cref="Uri"/>, https://registry.npmjs.org/ is used if the uri is not specified </param>
@@ -92,6 +92,7 @@ namespace Npm.Net
             }
             return null;
         }
+
         /// <summary>
         /// Return whether the registry is up to date. If we never tested a repository we are optimistic
         /// and think that the registry have recent endpoint
@@ -99,6 +100,7 @@ namespace Npm.Net
         /// <param name="registryHost"></param>
         /// <returns></returns>
         static bool IsRegistryUpToDate( string registryHost ) => GetRegistryIsUpToDate( registryHost )?.isUpToDate ?? true;
+
         static void TryAddRegistryWithStatus( IActivityMonitor m, string registryHost, bool isUpToDate )
         {
             (string registryUri, bool isUpToDate)? valueTuple = GetRegistryIsUpToDate( registryHost );
@@ -133,6 +135,7 @@ namespace Npm.Net
         }
 
         bool _thisRegistryIsUpToDate;
+
         /// <summary>
         /// NPM ask a one time password, so here you have one.
         /// </summary>
@@ -140,7 +143,7 @@ namespace Npm.Net
         static string GenerateSessionId()
         {
             byte[] bytes = new byte[8];
-            RandomNumberGenerator.Create().GetBytes( bytes );
+            using( var r = RandomNumberGenerator.Create() ) r.GetBytes( bytes );
             return BitConverter.ToString( bytes ).Replace( "-", "" ).ToLower();
         }
 
@@ -150,7 +153,7 @@ namespace Npm.Net
         public Uri RegistryUri { get; }
 
         /// <summary>
-        /// Gets or Sets wether we are running in CI or not.
+        /// Gets or sets wether we are running in CI or not.
         /// The fields is automatically set based on the environement variables with the same behavior as npm.
         /// </summary>
         public bool NpmInCi { get; set; }
@@ -191,58 +194,86 @@ namespace Npm.Net
             }
         }
 
-        async Task<JObject> GetPackageJsonFromTarball( IActivityMonitor m, Stream tarball )
+        static JObject ExtractPackageJson( IActivityMonitor m, MemoryStream tarball )
         {
-            using( GZipStream dezippedStream = new GZipStream( tarball, CompressionMode.Decompress, true ) )
-            using( TarBallReader tarBallReader = new TarBallReader( dezippedStream ) )
+            var buffer = new byte[100];
+            while( true )
             {
-                TarFileReader entry = null;
-                do
+                tarball.Read( buffer, 0, 100 );
+                var name = Encoding.ASCII.GetString( buffer ).Trim( ' ', '\0' );
+                if( String.IsNullOrWhiteSpace( name ) )
                 {
-                    using( entry = await tarBallReader.GetEntryAsync() )
-                    using( StreamReader reader = new StreamReader( entry.Stream ) )
-                    {
-                        if( entry.Header.Name == "package/package.json" )
-                        {
-                            m.Info( "Found package.json in tarball" );
-                            return JObject.Parse( await reader.ReadToEndAsync() );
-                        }
-                    }
-                } while( entry != null );
-                throw new InvalidDataException( "There no package.json in the tarball" );
-            }
-        }
-        /// <summary>
-        /// Publish a package to the repository
-        /// </summary>
-        /// <param name="m"></param>
-        /// <param name="packageJson">The package.json of the package to push</param>
-        /// <param name="tarball">This stream must be Seek-able. <see cref="Stream"/> of the tarball of the package to push.</param>
-        /// <param name="distTag"></param>
-        /// <returns></returns>
-        public async Task Publish( IActivityMonitor m, Stream tarball, string distTag = null )
-        {
-            if( !tarball.CanSeek ) throw new ArgumentException( "I need to do two pass on this stream" );
-            JObject packageJson = await GetPackageJsonFromTarball( m, tarball );
-            using( HttpRequestMessage req = NpmRequestMessage( m, packageJson["name"].ToString(), HttpMethod.Put ) )
-            using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream( m, RegistryUri, packageJson, tarball, distTag ) )
-            {
-                req.Content = metadataStream;
-                /**
-                 * npm does more things than we do:
-                 * if the first request return 409: conflict, npm fetch the versions availables in the registry.
-                 * With these versions npm patch the metadata and resend a packet.
-                 * We think it's probably for legacy reason, the simple request works on Azure Devops and Verdaccio
-                 * https://github.com/npm/npm-registry-client/commit/e9fbeb8b67f249394f735c74ef11fe4720d46ca0
-                 * TL;DR: The legacy npm publish is not implemented.
-                 **/
-                using( var response = await _httpClient.SendAsync( req ) )
-                {
-                    await LogResponse( m, response );
+                    m.Error( "Tar entry 'package/packae.json' not found." );
+                    return null;
                 }
+                tarball.Seek( 24, SeekOrigin.Current );
+                tarball.Read( buffer, 0, 12 );
+                var size = Convert.ToInt64( Encoding.ASCII.GetString( buffer, 0, 12 ).Trim( ' ', '\0' ), 8 );
+                tarball.Seek( 376L, SeekOrigin.Current );
+                if( name == "package/package.json" )
+                {
+                    m.Info( "Found 'package/package.json' in tarball" );
+                    var bytes = new Byte[size];
+                    tarball.Read( bytes, 0, bytes.Length );
+                    var s = Encoding.UTF8.GetString( bytes );
+                    return JObject.Parse( s );
+                }
+                else
+                {
+                    tarball.Seek( size, SeekOrigin.Current );
+                }
+                var pos = tarball.Position;
+                var offset = 512 - (pos % 512);
+                if( offset == 512 ) offset = 0;
+                tarball.Seek( offset, SeekOrigin.Current );
             }
         }
 
+        /// <summary>
+        /// Publish a package to the repository
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="packageJson">The package.json of the package to push</param>
+        /// <param name="packagePathTarGz">
+        /// Physical file path to the package tar gz file to push.
+        /// </param>
+        /// <param name="distTag">First optional tag to be associated to the package.</param>
+        /// <returns>The awaitable.</returns>
+        public async Task PublishAsync( IActivityMonitor m, string packagePathTarGz, string distTag = null )
+        {
+            using( m.OpenInfo( $"Pushing {packagePathTarGz} {(distTag != null ? $"with disTag='{distTag}'" : "")} to '{RegistryUri}'." ) )
+            {
+                using( var tarball = new MemoryStream() )
+                using( var file = File.OpenRead( packagePathTarGz ) )
+                {
+                    using( var gz = new GZipStream( file, CompressionMode.Decompress, leaveOpen: true ) )
+                    {
+                        await gz.CopyToAsync( tarball );
+                        tarball.Position = 0;
+                    }
+                    file.Position = 0;
+                    JObject packageJson = ExtractPackageJson( m, tarball );
+                    if( packageJson == null ) return;
+                    using( HttpRequestMessage req = NpmRequestMessage( m, packageJson["name"].ToString(), HttpMethod.Put ) )
+                    using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream( m, RegistryUri, packageJson, file, distTag ) )
+                    {
+                        req.Content = metadataStream;
+                        /**
+                         * npm does more things than we do:
+                         * if the first request return 409: conflict, npm fetch the versions availables in the registry.
+                         * With these versions npm patch the metadata and resend a packet.
+                         * We think it's probably for legacy reason, the simple request works on Azure Devops and Verdaccio
+                         * https://github.com/npm/npm-registry-client/commit/e9fbeb8b67f249394f735c74ef11fe4720d46ca0
+                         * TL;DR: The legacy npm publish is not implemented.
+                         **/
+                        using( var response = await _httpClient.SendAsync( req ) )
+                        {
+                            await LogResponse( m, response );
+                        }
+                    }
+                }
+            }
+        }
 
         async Task<(string body, HttpStatusCode statusCode)> ViewRequest( IActivityMonitor m, string endpoint, bool abreviated )
         {
@@ -272,7 +303,7 @@ namespace Npm.Net
             }
             m.Info( "This registry does not have implemented the endpoint to get info on the specific version. " +
                 "I fetched all the versions and filtered the output for you." );
-            //Here the request is successful so we should have valid json.
+            // Here the request is successful so we should have valid json.
             JObject fullData = JObject.Parse( body );
             JToken versions = fullData["versions"];
             JToken specificVersion = versions[version];
@@ -427,6 +458,7 @@ namespace Npm.Net
         /// <param name="projectScope"></param>
         /// <returns></returns>
         HttpRequestMessage NpmRequestMessage( IActivityMonitor m, string endpoint, HttpMethod method ) => NpmRequestMessage( m, new Uri( RegistryUri + endpoint ), method );
+
         HttpRequestMessage NpmRequestMessage( IActivityMonitor m, Uri fullUri, HttpMethod method )
         {
             var req = new HttpRequestMessage
@@ -568,5 +600,7 @@ namespace Npm.Net
             }
             return true;
         }
+
+        public override string ToString() => RegistryUri.ToString();
     }
 }

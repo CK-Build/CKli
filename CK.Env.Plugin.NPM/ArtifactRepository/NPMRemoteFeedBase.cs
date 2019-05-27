@@ -4,6 +4,7 @@ using CSemVer;
 using Npm.Net;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -88,27 +89,30 @@ namespace CK.Env.NPM
             return Registry.ExistAsync( m, packageId, version );
         }
 
-
         /// <summary>
         /// Pushes a set of packages.
         /// </summary>
         /// <param name="ctx">The monitor to use.</param>
         /// <param name="files">The set of packages to push.</param>
-        /// <param name="timeoutSeconds">Timeout in seconds.</param>
         /// <returns>The awaitable.</returns>
-        public async Task PushPackagesAsync( IActivityMonitor m, IEnumerable<LocalNPMPackageFile> files, int timeoutSeconds = 20 )
+        public async Task PushPackagesAsync( IActivityMonitor m, IEnumerable<LocalNPMPackageFile> files )
         {
             using( var a = m.OpenInfo( "Pushing packages..." ) )
             {
                 foreach( LocalNPMPackageFile file in files )
                 {
-                    using( Stream fileStream = File.OpenRead( file.FullPath ) )
+                    if( await Registry.ExistAsync( m, file.Instance.Artifact.Name, file.Instance.Version ) )
                     {
-                        var tags = file.Version.PackageQuality.GetLabels().Select( p => p.ToString() ).ToList();
-                        await Registry.Publish( m, fileStream, tags.First() );
+                        m.Info( $"Package '{file.Instance}' already in '{ToString()}'. Push skipped." );
+                    }
+                    else
+                    {
+                        var tags = file.Instance.Version.PackageQuality.GetLabels().Select( p => p.ToString() ).ToList();
+                        Debug.Assert( tags.Count > 0 );
+                        await Registry.PublishAsync( m, file.FullPath, tags[0] );
                         foreach( string tag in tags.Skip( 1 ) )
                         {
-                            await Registry.AddDistTag( m, file.PackageId, file.Version, tag );
+                            await Registry.AddDistTag( m, file.Instance.Artifact.Name, file.Instance.Version, tag );
                         }
                     }
                 }
@@ -125,10 +129,10 @@ namespace CK.Env.NPM
                     m.Error( $"Invalid artifact local set for NPM feed." );
                     return false;
                 }
-                var accepted = locals.Where( l => Info.QualityFilter.Accepts( l.Version.PackageQuality ) ).ToList();
+                var accepted = locals.Where( l => Info.QualityFilter.Accepts( l.Instance.Version.PackageQuality ) ).ToList();
                 if( accepted.Count == 0 )
                 {
-                    m.Info( $"No packages accpeted by {Info.QualityFilter} filter for {Info}." );
+                    m.Info( $"No packages accepted by '{Info.QualityFilter}' filter for '{Info}'." );
                 }
                 else
                 {
