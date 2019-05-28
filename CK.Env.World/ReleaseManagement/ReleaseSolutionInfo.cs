@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Env.DependencyModel;
+using CK.Env.Diff;
 using CSemVer;
 using System;
 using System.Collections;
@@ -156,7 +157,7 @@ namespace CK.Env
         {
             readonly ReleaseSolutionInfo _info;
             readonly PossibleVersions _possible;
-            IReadOnlyCollection<DirectoryDiff> _diffs;
+            IDiffResult _diffResult;
             bool _diffsComputed;
 
             public SelectorContext(
@@ -190,15 +191,15 @@ namespace CK.Env
 
             public string ReleaseNote { get => _info.ReleaseNote; set => _info.ReleaseNote = value; }
 
-            public IReadOnlyCollection<DirectoryDiff> GetProjectsDiff( IActivityMonitor m )
+            public IDiffResult GetProjectsDiff( IActivityMonitor m )
             {
                 if( !_diffsComputed )
                 {
                     _diffsComputed = true;
-                    var paths = Solution.Solution.GeneratedArtifacts.Select( g => g.Project.SolutionRelativeFolderPath );
-                    _diffs = _info._repository.GetPathsDiff( m, PreviousVersionCommitSha, paths );
+                    var diffRoots = Solution.Solution.GeneratedArtifacts.Select( g => new DiffRoot( g.Project.Name, g.Project.ProjectSources ));
+                    _diffResult = _info._repository.GetDiff( m, PreviousVersionCommitSha, diffRoots );
                 }
-                return _diffs;
+                return _diffResult;
             }
 
             internal ReleaseLevel FinalLevel;

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Xml.Linq;
 using CK.Core;
 using CK.Env.DependencyModel;
+using CK.Env.Diff;
 using CK.Env.MSBuildSln;
 using CK.Text;
 using CSemVer;
@@ -116,8 +117,8 @@ namespace CK.Env.Plugin
         void LoadSolution( IActivityMonitor m )
         {
             _isSolutionValid = false;
-            var expectedSolutionName = Folder.SubPath.LastPart + ".sln" ;
-            _sln = SolutionFile.Read( Folder.FileSystem,  m, BranchPath.AppendPart( expectedSolutionName ) );
+            var expectedSolutionName = Folder.SubPath.LastPart + ".sln";
+            _sln = SolutionFile.Read( Folder.FileSystem, m, BranchPath.AppendPart( expectedSolutionName ) );
             if( _sln == null ) return;
             _sln.Saved += OnSolutionSaved;
             if( _solution == null )
@@ -149,7 +150,7 @@ namespace CK.Env.Plugin
                 projectsToRemove.Remove( project );
                 orderedProjects[i++] = project;
             }
-            foreach( var project in _solution.Projects.Where(p=>p.Tag<MSProject>() != null) )
+            foreach( var project in _solution.Projects.Where( p => p.Tag<MSProject>() != null ) )
             {
                 SynchronizeProjectReferences( m, project, msProj => orderedProjects[msProj.MSProjIndex] );
             }
@@ -205,7 +206,7 @@ namespace CK.Env.Plugin
                     foreach( var name in project.Tag<MSProject>()
                                                 .TargetFrameworks.AtomicTraits
                                                 .Select( t => new Artifact( CKSetupType, project.SimpleProjectName + '/' + t.ToString() ) ) )
-                    project.AddGeneratedArtifacts( name );
+                        project.AddGeneratedArtifacts( name );
                 }
             }
         }
@@ -282,7 +283,7 @@ namespace CK.Env.Plugin
                 return false;
             }
             m.Info( $"Parsed date range: {beginningDate} => {endingDate}" );
-            Folder.ShowLogsBetweenDates( m, beginningDate, endingDate, solution.Projects.Select( p => p.SolutionRelativeFolderPath ) );
+            Folder.ShowLogsBetweenDates( m, beginningDate, endingDate, solution.Projects.Select( proj => new DiffRoot( solution.Name, proj.ProjectSources ) ) );
             return true;
         }
 

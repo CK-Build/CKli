@@ -1,9 +1,9 @@
-namespace CK.Env
+namespace CK.Env.Diff
 {
     /// <summary>
     /// Basic global changes in a project folder.
     /// </summary>
-    public enum DirectoryDiffType
+    public enum DiffRootResultType
     {
         /// <summary>
         /// No change detected.

@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Env;
 using CK.Env.DependencyModel;
+using CK.Env.Diff;
 using CK.Text;
 using CSemVer;
 using System;
@@ -22,13 +23,13 @@ namespace CKli
             if( c.PreviousVersionCommitSha != null )
             {
                 Console.Write( $" last release: {c.PreviousVersion}" );
-                var diffs = c.GetProjectsDiff( m );
-                if( diffs == null )
+                var diffResult = c.GetProjectsDiff( m );
+                if( diffResult == null )
                 {
                     c.Cancel();
                     return;
                 }
-                if( diffs.All( d => d.DiffType == DirectoryDiffType.None ) )
+                if( diffResult.Diffs.All(d=>d.DiffType== DiffRootResultType.None ) && diffResult.Others.DiffType == DiffRootResultType.None )
                 {
                     Console.WriteLine( $" (No change in {c.Solution.Solution.GeneratedArtifacts.Select( p => p.Artifact.Name ).Concatenate()})" );
                 }
@@ -36,9 +37,9 @@ namespace CKli
                 {
                     Console.WriteLine( ", changes:" );
                 }
-                foreach( var d in diffs )
+                foreach( var d in diffResult.Diffs )
                 {
-                    d.DumpDiff(m);
+                    Console.WriteLine( d.ToString() );
                 }
             }
             else

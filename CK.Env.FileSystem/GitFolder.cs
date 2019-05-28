@@ -17,7 +17,7 @@ namespace CK.Env
     /// Implements Git repository mapping.
     /// GitFolder are internally created (and disposed) by <see cref="FileSystem"/>.
     /// </summary>
-    public class GitFolder : IGitRepository, IGitHeadInfo, ICommandMethodsProvider
+    public partial class GitFolder : IGitRepository, IGitHeadInfo, ICommandMethodsProvider
     {
         readonly Repository _git;
         readonly RootDir _thisDir;
@@ -150,92 +150,6 @@ namespace CK.Env
             if( path.Length == 0 ) return _git.Head.Tip.Tree.Sha;
             var e = _git.Head.Tip.Tree[path];
             return e?.Target.Sha;
-        }
-
-        /// <summary>
-        /// Gets the set of <see cref="DirectoryDiff"/> for packages from the current head.
-        /// </summary>
-        /// <param name="m">The minitor to use.</param>
-        /// <param name="previousVersionCommitSha">Previous commit.</param>
-        /// <param name="paths">Generated packages of a solution.</param>
-        /// <returns>The set of diff or null on error.</returns>
-        public IReadOnlyCollection<DirectoryDiff> GetPathsDiff( IActivityMonitor m, string previousVersionCommitSha, IEnumerable<NormalizedPath> paths )
-        {
-            Commit commit = _git.Lookup<Commit>( previousVersionCommitSha );
-            var commits = _git.Commits.QueryBy( new CommitFilter()
-            {
-                IncludeReachableFrom = _git.Head.Tip,
-                ExcludeReachableFrom = commit
-            } );
-            return GetReleaseDiff( paths, commits.ToList() );
-        }
-
-        IReadOnlyCollection<DirectoryDiff> GetReleaseDiff( IEnumerable<NormalizedPath> paths, List<Commit> commits )
-        {
-            var r = new List<DirectoryDiff>();
-            foreach( var p in paths )
-            {
-                r.Add( CreateDiff( commits, p, path => path.Path.StartsWith( p ) ) );
-            }
-            r.Add( CreateDiff( commits, "Other changes", path => !paths.Any( p => p.StartsWith( path.Path ) ) ) );
-
-            return r;
-        }
-
-        /// <summary>
-        /// Create Diff on a single file.
-        /// </summary>
-        /// <param name="topCommit"></param>
-        /// <param name="commit"></param>
-        /// <param name="diffName"></param>
-        /// 
-        /// <returns></returns>
-        DirectoryDiff CreateDiff( List<Commit> commits, string diffName, Func<TreeEntryChanges, bool> includeInDiffPredicate )
-        {
-            var commitsAndParents = commits.Select( s => (s, s.Parents.FirstOrDefault()) );
-            //There is a diff with the first commit and his parent, and we don't want it
-            var commitsAndDiffWithParent = commitsAndParents.Select( c => (c.s, _git.Diff.Compare<TreeChanges>( c.s.Tree, c.Item2.Tree )) );
-            var commitsThatChangedTheDirectory = commitsAndDiffWithParent.Where( p => p.Item2.Any( includeInDiffPredicate ) ).Select( p => p.s );
-
-            using( TreeChanges changes = _git.Diff.Compare<TreeChanges>( commits.Last().Tree, commits.First().Tree ) )
-            {
-                var allChanges = changes.Where( includeInDiffPredicate ).Select( gC => new FileReleaseDiff( gC.Path, (FileReleaseDiffType)gC.Status ) ).ToList();
-                return new DirectoryDiff( diffName, allChanges, commitsThatChangedTheDirectory.Select( p => new CommitInfo( p.Message, p.Sha ) ).ToList() );
-            }
-        }
-
-        IEnumerable<Commit> GetCommitsBetweenDates( DateTimeOffset beginning, DateTimeOffset ending )
-        {
-            if( ending < beginning ) throw new ArgumentException( $"{nameof( ending )}<{nameof( beginning )}" );
-            return _git.Head.Commits.SkipWhile( p => p.Committer.When > ending ).TakeWhile( p => p.Committer.When > beginning );
-        }
-
-        public void ShowLogsBetweenDates(
-            IActivityMonitor m,
-            DateTimeOffset beginning,
-            DateTimeOffset ending,
-            IEnumerable<NormalizedPath> paths )
-        {
-            List<Commit> commits = GetCommitsBetweenDates( beginning, ending ).ToList();
-            if( commits.Count == 0 )
-            {
-                m.Info( "No commits between the given dates." );
-            }
-            else
-            {
-                var diffs = GetReleaseDiff( paths, commits );
-                if( diffs.Count == 0 )
-                {
-                    m.Info( "No diffs." );
-                }
-                using( m.OpenInfo( "Diffs detected: " ) )
-                {
-                    foreach( var d in diffs )
-                    {
-                        d.DumpDiff( m );
-                    }
-                }
-            }
         }
 
         /// <summary>

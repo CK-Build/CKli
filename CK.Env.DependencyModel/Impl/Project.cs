@@ -40,7 +40,8 @@ namespace CK.Env.DependencyModel
             _projectReferences = new List<ProjectReference>();
             _packageReferences = new List<PackageReference>();
             _projectSources = new List<NormalizedPath>();
-            _projectSources.Add( FullFolderPath );
+
+            _projectSources.Add( SolutionRelativeFolderPath );
         }
 
         internal void NormalizeName( IReadOnlyList<Project> homonyms )

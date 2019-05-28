@@ -28,7 +28,7 @@ namespace CK.Env.DependencyModel
 
         /// <summary>
         /// Gets a set of full paths (folder or files) that are "sources" for this project.
-        /// By default, <see cref="FullFolderPath"/> is systematically added to this set.
+        /// By default, <see cref="SolutionRelativeFolderPath"/> is systematically added to this set.
         /// Any file and or folder that are outside the project folder should be added to this
         /// set (typically files or folders shared accross multiple projects).
         /// This is used to detect changes for project (typically thanks to Git history).

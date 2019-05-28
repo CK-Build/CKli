@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Env.Diff;
 using CK.Text;
 using CSemVer;
 using System;
@@ -64,7 +65,7 @@ namespace CK.Env
         /// <param name="previousVersionCommitSha">Previous commit.</param>
         /// <param name="solutionRelativeFolders">Folders for which diffs must be computed.</param>
         /// <returns>The set of diff or null on error.</returns>
-        IReadOnlyCollection<DirectoryDiff> GetPathsDiff( IActivityMonitor m, string previousVersionCommitSha, IEnumerable<NormalizedPath> solutionRelativeFolders );
+        IDiffResult GetDiff( IActivityMonitor m, string previousVersionCommitSha, IEnumerable<IDiffRoot> solutionRelativeFolders );
 
         /// <summary>
         /// Commits any pending changes.

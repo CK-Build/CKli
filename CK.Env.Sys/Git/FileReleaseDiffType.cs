@@ -1,9 +1,9 @@
-namespace CK.Env
+namespace CK.Env.Diff
 {
     /// <summary>
     /// Direst definition of Git ChangeKind with all its possibilities.
     /// This is intended to show all kind of changes, and to take no risk, even the ones that should
-    /// not appear in <see cref="DirectoryDiff"/>. 
+    /// not appear in <see cref="IDiffRootResult"/>. 
     /// </summary>
     public enum FileReleaseDiffType
     {

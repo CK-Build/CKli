@@ -19,7 +19,7 @@ namespace CK.Env.DependencyModel
         public IProject Project { get; }
 
         /// <summary>
-        /// Gets a set of full paths (folder or files) that are "sources" for this project.
+        /// Gets a set of full paths (folder or files) that are "sources" for this artifact.
         /// By default, <see cref="IProject.ProjectSources"/> is returned but this may be an independent
         /// set if required.
         /// </summary>
