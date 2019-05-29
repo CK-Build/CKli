@@ -265,7 +265,7 @@
     </GitFolder>
 
     <GitFolder Name="CK-Setup" Url="https://gitlab.com/Signature-Code/CK-Setup.git" >
-$      <Branch Name="develop">
+       <Branch Name="develop">
         <SolutionSpec UseCKSetup="true" >
           <CKSetupComponentProjects>
             <add Name="CKSetup.Runner" />
