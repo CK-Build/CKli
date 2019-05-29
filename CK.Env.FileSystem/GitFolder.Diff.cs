@@ -28,38 +28,15 @@ namespace CK.Env
             return GetReleaseDiff( m, roots, commits.ToList() );
         }
 
-        /// <summary>
-        /// Create Diff on a single file.
-        /// </summary>
-        /// <param name="topCommit"></param>
-        /// <param name="commit"></param>
-        /// <param name="diffName"></param>
-        /// 
-        /// <returns></returns>
-        internal DiffRootResult CreateDiff( IActivityMonitor m, IDiffRoot root, List<Commit> commits, Func<TreeEntryChanges, bool> includeInDiffPredicate )
-        {
-            var commitsAndParents = commits.Select( s => (s, s.Parents.FirstOrDefault()) );
-            //There is a diff with the first commit and his parent, and we don't want it
-            var commitsAndDiffWithParent = commitsAndParents.Select( c => (c.s, _git.Diff.Compare<TreeChanges>( c.s.Tree, c.Item2.Tree )) );
-            List<Commit> commitsThatChangedTheDirectory = commitsAndDiffWithParent.Where( p => p.Item2.Any( includeInDiffPredicate ) ).Select( p => p.s ).ToList();
-            m.Debug( $"Found {commitsThatChangedTheDirectory.Count} commits that satisfy the predicate." );
-            using( TreeChanges changes = _git.Diff.Compare<TreeChanges>( commits.Last().Tree, commits.First().Tree ) )
-            {
-                List<FileReleaseDiff> allChanges = changes.Where( includeInDiffPredicate ).Select( gC => new FileReleaseDiff( gC.Path, (FileReleaseDiffType)gC.Status ) ).ToList();
-                m.Debug( $"Found {allChanges.Count} file or directory changes that satisfy the predicate." );
-                return new DiffRootResult( root, allChanges, commitsThatChangedTheDirectory.Select( p => new CommitInfo( p.Message, p.Sha ) ).ToList() );
-            }
-        }
-
         DiffResult GetReleaseDiff( IActivityMonitor m, IEnumerable<IDiffRoot> roots, List<Commit> commits )
         {
-            var results = new List<DiffRootResult>();
-            foreach( var root in roots )
-            {
-                results.Add( CreateDiff( m, root, commits, changes => root.Paths.Any( path => changes.Path.StartsWith( path ) ) ) );
-            }
-            var other = CreateDiff( m, new DiffRoot( "Other changes", new List<NormalizedPath>() ), commits, changes => !roots.Any( root => root.Paths.Any( path => changes.Path.StartsWith( path ) ) ) );
-            return new DiffResult( true, results, other );
+            DiffResultBuilder builder = new DiffResultBuilder(
+                _git,
+                roots.Select(
+                    r => new DiffRootResultBuilder( r ) ).ToList(),
+                    new DiffRootResultBuilderOther(new DiffRoot("Others", new List<NormalizedPath>()) )
+            );
+            return builder.BuildDiffResult( m, commits );
         }
 
         IEnumerable<Commit> GetCommitsBetweenDates( DateTimeOffset beginning, DateTimeOffset ending )

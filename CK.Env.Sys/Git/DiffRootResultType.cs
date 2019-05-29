@@ -1,4 +1,4 @@
-namespace CK.Env.Diff
+namespace CK.Env
 {
     /// <summary>
     /// Basic global changes in a project folder.

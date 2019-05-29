@@ -1,4 +1,3 @@
-using CK.Env.Diff;
 using System.Collections.Generic;
 
 namespace CK.Env
@@ -15,11 +14,6 @@ namespace CK.Env
         /// </summary>
         DiffRootResultType DiffType { get; }
 
-        /// <summary>
-        /// Gets the file change set.
-        /// Never null.
-        /// </summary>
-        IReadOnlyCollection<IFileReleaseDiff> Changes { get; }
 
     }
 }

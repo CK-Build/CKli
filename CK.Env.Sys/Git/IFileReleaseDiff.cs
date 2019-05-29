@@ -1,4 +1,3 @@
-using CK.Env.Diff;
 
 namespace CK.Env
 {

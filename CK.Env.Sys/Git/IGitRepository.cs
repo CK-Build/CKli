@@ -1,5 +1,4 @@
 using CK.Core;
-using CK.Env.Diff;
 using CK.Text;
 using CSemVer;
 using System;

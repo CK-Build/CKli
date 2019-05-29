@@ -1,4 +1,4 @@
-namespace CK.Env.Diff
+namespace CK.Env
 {
     /// <summary>
     /// Direst definition of Git ChangeKind with all its possibilities.
