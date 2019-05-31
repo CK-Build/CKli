@@ -287,6 +287,21 @@ namespace CK.Env.Plugin
             return true;
         }
 
+        [CommandMethod]
+        public void ShowSolutionExternalDependencies( IActivityMonitor m )
+        {
+            var packages = _solutionContext.GetDependencyAnalyser( m, m.ActualFilter == LogFilter.Debug ).ExternalReferences;
+            if( packages.Count == 0 )
+            {
+                Console.WriteLine( "This Solution don't have any external references." );
+            }
+
+            Console.WriteLine( $"External dependency of the Solution {GetSolution(m).Name}:" );
+            foreach( PackageReference externalRef in packages )
+            {
+                Console.WriteLine( "====|" + externalRef.ToString() );
+            }
+        }
 
         /// <summary>
         /// Fires whenever a package reference version must be upgraded.
@@ -634,6 +649,5 @@ namespace CK.Env.Plugin
                 return true;
             }
         }
-
     }
 }

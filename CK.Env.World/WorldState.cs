@@ -46,7 +46,7 @@ namespace CK.Env
             {
                 readonly WorldBranchContext _c;
 
-                public PairList( WorldBranchContext c ) => _c = c;               
+                public PairList( WorldBranchContext c ) => _c = c;
 
                 public (DependentSolution Solution, ISolutionDriver Driver) this[int index] => (_c.DependentSolutions[index], _c._drivers[index]);
 
@@ -366,9 +366,9 @@ namespace CK.Env
             return Save( m );
         }
 
-        [CommandMethod(confirmationRequired: false)]
+        [CommandMethod( confirmationRequired: false )]
         public void SetUserLogFilter( IActivityMonitor m, LogFilter filter ) => DoSetUserLogFilter( m, filter, true );
-        
+
         void DoSetUserLogFilter( IActivityMonitor m, LogFilter filter, bool saveOnChange )
         {
             if( _userMonitorClient.MinimalFilter != filter )
@@ -465,6 +465,8 @@ namespace CK.Env
             return DoSwitchToLocal( monitor );
         }
 
+
+
         bool DoSwitchToLocal( IActivityMonitor monitor )
         {
             Debug.Assert( WorkStatus == GlobalWorkStatus.SwitchingToLocal );
@@ -493,6 +495,46 @@ namespace CK.Env
                 }
             } );
         }
+
+
+        [CommandMethod]
+        public void ShowWorldExternalDependencies( IActivityMonitor m )
+        {
+
+            List<ISolution> solutions = SolutionDrivers.Select( s => s.GetSolution( m, false ) ).ToList();
+            List<GeneratedArtifact> generatedArtifacts = solutions.SelectMany( s => s.GeneratedArtifacts ).ToList();
+
+            var externals = GetSolutionDependencyContext( m ).DependencyContext.Analyzer.ExternalReferences;
+            if( externals.Count == 0 )
+            {
+                Console.WriteLine( "This World don't have any external references." );
+            }
+            var groupedExternals = externals.GroupBy( g => g.Target.Artifact.Name );
+
+            Console.WriteLine( $"External dependency of the World:" );
+            foreach( var grouppedExternalRef in groupedExternals )
+            {
+                Console.WriteLine( $"    |{grouppedExternalRef.Key}" );
+                ConsoleColor prevColor = Console.ForegroundColor;
+                int i = 0;
+                foreach( var versionGroupped in grouppedExternalRef.GroupBy( s => s.Target.Version ) )
+                {
+                    if(i>0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                    }
+                    i++;
+                    Console.WriteLine( "    |    |" + versionGroupped.Key );
+                    foreach( var project in versionGroupped )
+                    {
+                        Console.WriteLine( "    |    |    |" + project.Owner.Name );
+                    }
+                }
+                Console.ForegroundColor = prevColor;
+
+            }
+        }
+
 
         /// <summary>
         /// Gets whether <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/> and <see cref="CachedGlobalGitStatus"/>
@@ -816,7 +858,7 @@ namespace CK.Env
                                 : "Clearing version tags." ) )
             {
                 var versions = ReleaseRoadmap.Load( GeneralState.Element( "Roadmap" ) )
-                                           .Select( e => (e.SubPath, e.Info, Git: _gitRepositories.FirstOrDefault( g => e.SubPath.StartsWith( g.SubPath ) ) ) );
+                                           .Select( e => (e.SubPath, e.Info, Git: _gitRepositories.FirstOrDefault( g => e.SubPath.StartsWith( g.SubPath ) )) );
                 foreach( var (SubPath, Info, Git) in versions )
                 {
                     if( Git == null )

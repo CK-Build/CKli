@@ -31,6 +31,7 @@ namespace CK.Env.Diff
             {
                 sb.Append( diff.ToString() );
             }
+            sb.AppendLine(Others.ToString());
             return sb.ToString();
 
         }

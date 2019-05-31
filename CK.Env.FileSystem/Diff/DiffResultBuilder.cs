@@ -42,7 +42,7 @@ namespace CK.Env.Diff
                 throw new ArgumentException( "Unchronological commits order." );
             }
             m.Debug( $"Diffing between {firstCommit.Sha} and {lastCommit.Sha}" );
-            var fullDiff = _git.Diff.Compare<TreeChanges>( firstCommit.Tree, lastCommit.Tree );
+            var fullDiff = _git.Diff.Compare<TreeChanges>( lastCommit.Tree, firstCommit.Tree );
 
             using( m.OpenDebug( "Finding commits that impacted changes." ) )
             {

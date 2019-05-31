@@ -20,21 +20,18 @@ namespace CK.Env.Diff
 
         public override bool Accept( IActivityMonitor m, AddedDiff createdDiff )
         {
-            m.Trace( "This builder accepted the added diff." );
             AddedDiffs.Add( createdDiff );
             return true;
         }
 
         public override bool Accept( IActivityMonitor m, DeletedDiff deletedDiff )
         {
-            m.Trace( "This builder accepted the added diff." );
             DeletedDiffs.Add( deletedDiff );
             return true;
         }
 
         public override bool Accept( IActivityMonitor m, ModifiedDiff modifiedDiff )
         {
-            m.Trace( "This builder accepted the modified diff." );
             ModifiedDiffs.Add( modifiedDiff );
             return true;
         }
