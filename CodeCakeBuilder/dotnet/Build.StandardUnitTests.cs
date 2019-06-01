@@ -20,7 +20,7 @@ namespace CodeCake
 
             void WriteTestDone( Cake.Core.IO.FilePath test )
             {
-                System.IO.File.AppendAllLines( memoryFilePath, new[] { test.ToString() } );
+                if( globalInfo.GitInfo.IsValid ) System.IO.File.AppendAllLines( memoryFilePath, new[] { test.ToString() } );
             }
 
             bool CheckTestDone( Cake.Core.IO.FilePath test )
@@ -28,7 +28,15 @@ namespace CodeCake
                 bool done = System.IO.File.Exists( memoryFilePath )
                             ? System.IO.File.ReadAllLines( memoryFilePath ).Contains( test.ToString() )
                             : false;
-                if( done ) Cake.Information( "Test already done on this commit." );
+                if( done ) 
+                {
+                    if( !globalInfo.GitInfo.IsValid )
+                    {
+                        Cake.Information( "Dirty commit: tests are run again (base commit tests were successful)." );
+                        done = false;
+                    }
+                    else Cake.Information( "Test already successful on this commit." );
+                }
                 return done;
             }
 
