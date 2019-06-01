@@ -27,7 +27,7 @@
                 CheckName="NPMAzure:@signature->Signature-OpenSource-CKEnvTest3"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
 
-    <Repository Type="NuGetStandard" Name="nuget.org" Url="https://www.nuget.org/api/v2/package"
+    <Repository Type="NuGetStandard" Name="nuget.org" Url="https://api.nuget.org/v3/index.json"
                 CheckName="NuGetStandard:nuget.org"
                 QualityFilter="ReleaseCandidate,Release"
                 SecretKeyName="NUGET_ORG_PUSH_API_KEY" />

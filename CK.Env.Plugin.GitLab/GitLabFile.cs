@@ -15,7 +15,7 @@ namespace CK.Env.Plugin
 
         public NormalizedPath CommandProviderName => FilePath;
 
-        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+        public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
@@ -28,7 +28,7 @@ namespace CK.Env.Plugin
                 return;
             }
             // We don't use GitLab for public repositories
-            if( Folder.IsPublic || Folder.KnownGitProvider != KnownGitProvider.GitLab )
+            if( GitFolder.IsPublic || GitFolder.KnownGitProvider != KnownGitProvider.GitLab )
             {
                 if( TextContent != null )
                 {

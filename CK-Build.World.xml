@@ -1,28 +1,23 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<CK-World>
+<CK-Build>
     <LoadLibrary Name="CK.Env.Plugin.Basics"/>
     <LoadLibrary Name="CK.Env.Plugin.SolutionDriver" />
     <LoadLibrary Name="CK.Env.Plugin.Appveyor" />
     <LoadLibrary Name="CK.Env.Plugin.GitLab" />
-    <LoadLibrary Name="CK.Env.Plugin.CKSetup" />
     <LoadLibrary Name="CK.Env.Plugin.NuGet" />
     <SharedHttpClient />
     <ArtifactCenter />
     <LocalFeedProvider />
     <NuGetClient />
-    <CKSetupClient />
     <WorldState IsPublic="True" />
     <ArtifactRepositories>
         <Repository Type="NuGetAzure" Organization="Signature-OpenSource" FeedName="Default"
                 CheckName="NuGetAzure:Signature-OpenSource-Default"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
-        <Repository Type="NuGetStandard" Name="nuget.org" Url="https://www.nuget.org/api/v2/package"
+        <Repository Type="NuGetStandard" Name="nuget.org" Url="https://api.nuget.org/v3/index.json"
                 CheckName="NuGetStandard:nuget.org"
                 QualityFilter="ReleaseCandidate,Release"
                 SecretKeyName="NUGET_ORG_PUSH_API_KEY" />
-        <Repository Type="CKSetup"
-                CheckName="CKSetup:Public"
-                CheckSecretKeyName="CKSETUPREMOTESTORE_PUSH_API_KEY" />
     </ArtifactRepositories>
     <SharedSolutionSpec>
         <NuGetSources>
@@ -40,7 +35,6 @@
         <ArtifactTargets>
             <add Name="NuGetStandard:nuget.org" />
             <add Name="NuGetAzure:Signature-OpenSource-Default" />
-            <add Name="CKSetup:Public" />
         </ArtifactTargets>
     </SharedSolutionSpec>
     <Folder Name="CK-Core-Projects">
@@ -77,4 +71,4 @@
             </Branch>
         </GitFolder>
     </Folder>
-</CK-World>
+</CK-Build>

@@ -15,7 +15,8 @@ namespace CK.Env.DependencyModel
     /// </summary>
     public class DependencyAnalyzer
     {
-        readonly ISolutionContext _solutions;
+        readonly IReadOnlyCollection<ISolution> _solutions;
+        readonly ISolutionContext _solutionContext;
         readonly Dictionary<Artifact, LocalPackageItem> _packages;
         readonly ProjectItem.Cache _projects;
         readonly IReadOnlyList<PackageReference> _externalRefs;
@@ -170,14 +171,16 @@ namespace CK.Env.DependencyModel
 
         DependencyAnalyzer(
             IActivityMonitor m,
-            ISolutionContext solutions,
+            IReadOnlyCollection<ISolution> solutions,
+            ISolutionContext solutionCtx,
             Dictionary<Artifact, LocalPackageItem> packages,
             ProjectItem.Cache projects,
             List<PackageReference> externalRefs,
             bool traceGraphDetails )
         {
             _solutions = solutions;
-            _version = _solutions.Version;
+            _solutionContext = solutionCtx;
+            _version = _solutionContext?.Version ?? 0;
             _packages = packages;
             _projects = projects;
             _externalRefs = externalRefs;
@@ -187,13 +190,13 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets the set of solutions.
         /// </summary>
-        public ISolutionContext Solutions => _solutions;
+        public IReadOnlyCollection<ISolution> Solutions => _solutions;
 
         /// <summary>
         /// Gets whether the <see cref="Solutions"/> has changed and this analyzer is no more
         /// up to date: a new one should be obtained from <see cref="ISolutionContext.GetDependencyAnalyser"/>.
         /// </summary>
-        public bool IsObsolete => _version != _solutions.Version;
+        public bool IsObsolete => _solutionContext == null ? true : _version != _solutionContext.Version;
 
         /// <summary>
         /// Gets all the external package references.
@@ -401,7 +404,12 @@ namespace CK.Env.DependencyModel
             return new SolutionDependencyContext( this, index, result, table, depSolutions, GetBuildProjectInfo( m, traceGraphDetails ) );
         }
 
-        internal static DependencyAnalyzer Create( IActivityMonitor m, ISolutionContext solutions, bool traceGraphDetails )
+        public static DependencyAnalyzer Create( IActivityMonitor m, IReadOnlyCollection<ISolution> solutions, bool traceGraphDetails )
+        {
+            return Create( m, solutions, traceGraphDetails, null );
+        }
+
+        internal static DependencyAnalyzer Create( IActivityMonitor m, IReadOnlyCollection<ISolution> solutions, bool traceGraphDetails, ISolutionContext solutionCtx )
         {
             var packages = new Dictionary<Artifact, LocalPackageItem>();
             var projectItems = new ProjectItem.Cache();
@@ -485,6 +493,7 @@ namespace CK.Env.DependencyModel
             return new DependencyAnalyzer(
                         m,
                         solutions,
+                        solutionCtx,
                         packages,
                         projectItems,
                         externalRefs,

@@ -20,7 +20,7 @@ namespace CK.Env.Plugin
         readonly List<NPMDep> _deps;
 
         internal PackageJsonFile( NPMProject p )
-            : base( p.Driver.Folder.FileSystem, p.FullPath.AppendPart( "package.json" ) )
+            : base( p.Driver.GitFolder.FileSystem, p.FullPath.AppendPart( "package.json" ) )
         {
             _deps = new List<NPMDep>();
         }

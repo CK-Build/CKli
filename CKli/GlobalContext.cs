@@ -40,7 +40,7 @@ namespace CKli
                         .Where( p => p.Length == 2 )
                         .Select( p => (p[0].Trim(), p[1].Trim()) )
                         .Where( p => p.Item1.Length > 0 && p.Item2.Length > 0 )
-                        .ToDictionary( p => p.Item1, p => new NormalizedPath(p.Item2) )
+                        .ToDictionary( p => p.Item1, p => new NormalizedPath( p.Item2 ) )
                         : new Dictionary<string, NormalizedPath>();
                 if( !_map.ContainsKey( "CK" ) )
                 {
@@ -59,7 +59,7 @@ namespace CKli
                 {
                     p = p.AppendPart( w.FullName );
                     Directory.CreateDirectory( p );
-                    File.WriteAllText( Path.Combine( p, "CK-World.htm" ), "<html></html>" );
+                    File.WriteAllText( Path.Combine( p, "CKli-World.htm" ), "<html></html>" );
                 }
                 return p;
             }
@@ -125,7 +125,16 @@ namespace CKli
                     Console.WriteLine( $"- {g.Key}" );
                     foreach( var (Idx, World, LocalPath) in g )
                     {
-                        Console.WriteLine( $"   > {Idx + 1} - {World.LTSKey ?? "<Current>"} => { LocalPath ?? "(No local mapping)"}" );
+                        string key;
+                        if( World.LTSKey == null )
+                        {
+                            key = "  <Current>";
+                        }
+                        else
+                        {
+                            key = $"[{World.LTSKey}]";
+                        }
+                        Console.WriteLine( $"   > {Idx + 1}{key} => { LocalPath ?? "(No local mapping)"}" );
                     }
                 }
                 Console.WriteLine( "   > x - Exit" );

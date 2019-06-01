@@ -72,10 +72,10 @@ namespace CK.Env.Plugin
 
         public bool EnsureDirectory( IActivityMonitor m )
         {
-            return this.CheckCurrentBranch( m ) && Folder.FileSystem.EnsureDirectory( m, FolderPath );
+            return this.CheckCurrentBranch( m ) && GitFolder.FileSystem.EnsureDirectory( m, FolderPath );
         }
 
-        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+        public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
@@ -103,7 +103,7 @@ namespace CK.Env.Plugin
         /// <returns>True on success, false on error.</returns>
         protected bool DeleteFile( IActivityMonitor m, NormalizedPath filePath )
         {
-            return Folder.FileSystem.Delete( m, FolderPath.Combine( filePath ).ResolveDots( FolderPath.Parts.Count ) );
+            return GitFolder.FileSystem.Delete( m, FolderPath.Combine( filePath ).ResolveDots( FolderPath.Parts.Count ) );
         }
 
         /// <summary>
@@ -116,7 +116,7 @@ namespace CK.Env.Plugin
         /// <returns>True on success, false on error.</returns>
         protected bool UpdateTextResource( IActivityMonitor m, NormalizedPath path, Func<string, string> transformer = null )
         {
-            var fs = Folder.FileSystem;
+            var fs = GitFolder.FileSystem;
             var target = FolderPath.Combine( path );
             var currentText = fs.GetFileInfo( target ).AsTextFileInfo()?.TextContent ?? GetTextResourceFromPath( path );
             var final = transformer != null ? transformer( currentText ) : currentText;
@@ -136,7 +136,7 @@ namespace CK.Env.Plugin
         /// <returns>True on success, false on error.</returns>
         protected bool SetTextResource( IActivityMonitor m, NormalizedPath path, Func<string, string> transformer = null )
         {
-            var fs = Folder.FileSystem;
+            var fs = GitFolder.FileSystem;
             var target = FolderPath.Combine(path);
             var text = GetTextResourceFromPath(path);
             var final = transformer != null ? transformer( text ) : text;
@@ -158,7 +158,7 @@ namespace CK.Env.Plugin
         /// <returns>True on success, false on error.</returns>
         protected bool SetBinaryResource( IActivityMonitor m, string name )
         {
-            var fs = Folder.FileSystem;
+            var fs = GitFolder.FileSystem;
             var target = FolderPath.AppendPart( name );
             using( var s = _resourceAssembly.GetManifestResourceStream( _resourcePrefix + name + ".bin" ) )
             {

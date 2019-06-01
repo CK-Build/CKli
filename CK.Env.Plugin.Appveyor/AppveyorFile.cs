@@ -22,7 +22,7 @@ namespace CK.Env.Plugin
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
-        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+        public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
@@ -30,11 +30,11 @@ namespace CK.Env.Plugin
             if( !this.CheckCurrentBranch( m ) ) return;
             YamlMapping firstMapping = GetFirstMapping( m, true );
             if( firstMapping == null ) return;
-            var s = _driver.GetSolution( m );
-            if( s == null ) return;
+            var solution = _driver.GetSolution( m );
+            if( solution == null ) return;
 
             // We don't use AppVeyor for private repositories.
-            if( !Folder.IsPublic ) 
+            if( !GitFolder.IsPublic ) 
             {
                 if( TextContent != null )
                 {
@@ -79,7 +79,7 @@ namespace CK.Env.Plugin
                 CreateKeyValue( "ps", "./CodeCakeBuilder/InstallCredentialProvider.ps1" )
             };
             // Temporary: installs the 6.9.0 of npm.
-            if( s.GeneratedArtifacts.Any( g => g.Artifact.Type.Name == "NPM" ) )
+            if( solution.GeneratedArtifacts.Any( g => g.Artifact.Type.Name == "NPM" ) )
             {
                 install.Add( CreateKeyValue( "cmd", "npm install -g npm@6.9.0" ) );
             }
@@ -87,7 +87,7 @@ namespace CK.Env.Plugin
 
             firstMapping["version"] = new YamlValue( "build{build}" );
             firstMapping["image"] = new YamlValue( "Visual Studio 2017" );
-            firstMapping["clone_folder"] = new YamlValue( "C:\\CK-World\\" + Folder.SubPath.Path.Replace( '/', '\\' ) );
+            firstMapping["clone_folder"] = new YamlValue( "C:\\CKli-World\\" + GitFolder.SubPath.Path.Replace( '/', '\\' ) );
             EnsureDefaultBranches( firstMapping );
             EnsureSequence( firstMapping, "build_script", "dotnet run --project CodeCakeBuilder -nointeraction" );
             firstMapping["test"] = new YamlValue( "off" );

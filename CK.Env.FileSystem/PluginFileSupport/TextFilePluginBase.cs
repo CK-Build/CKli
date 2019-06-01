@@ -22,7 +22,7 @@ namespace CK.Env.Plugin
         /// Its <see cref="GitFolder.CurrentBranchName"/> can be different from
         /// the branch of the plugin (see <see cref="BranchPath"/>).
         /// </summary>
-        public GitFolder Folder => _pluginImpl.Folder;
+        public GitFolder GitFolder => _pluginImpl.Folder;
 
         /// <summary>
         /// Gets the branch path (relative to the <see cref="FileSystem"/>) into

@@ -15,7 +15,7 @@ namespace CK.Env.Plugin
         readonly SolutionDriver _solutionDriver;
 
         public CodeCakeBuilderCSProjFile( CodeCakeBuilderFolder f, SolutionSpec solutionSpec, NormalizedPath branchPath, SolutionDriver solutionDriver )
-            : base( f.Folder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" ) )
+            : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" ) )
         {
             _f = f;
             _solutionSpec = solutionSpec;
@@ -24,7 +24,7 @@ namespace CK.Env.Plugin
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
-        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+        public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
 
        
 
@@ -84,7 +84,7 @@ namespace CK.Env.Plugin
                 EnsureProjectReference( "NUnit.ConsoleRunner", "3.9.0" );
                 EnsureProjectReference( "NUnit.Runners.Net4", "2.6.4" );
             }
-            if( PluginBranch != StandardGitStatus.Local || _f.Folder.World.Name != "CK-World" )
+            if( PluginBranch != StandardGitStatus.Local )
             {
                 EnsureProjectReference( "SimpleGitVersion.Cake", "0.37.4--0022-develop" );
 

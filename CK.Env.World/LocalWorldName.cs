@@ -27,17 +27,18 @@ namespace CK.Env
 
         internal static LocalWorldName Parse( IActivityMonitor m, string filePath, ILocalWorldRootPathMapping localMap )
         {
-            Debug.Assert( filePath.EndsWith( "-World.xml" ) );
+            Debug.Assert( filePath.EndsWith( ".World.xml" ) );
             try
             {
                 var fName = Path.GetFileName( filePath );
-                fName = fName.Substring( 0, fName.Length - 10 );
-                int idx = fName.IndexOf( '-' );
+                fName = fName.Substring( 0, fName.Length - 10 );//remove .World.xml
+                int idx = fName.IndexOf( '[' );
                 if( idx < 0 )
                 {
                     return new LocalWorldName( filePath, fName, null, localMap );
                 }
-                return new LocalWorldName( filePath, fName.Substring( 0, idx ), fName.Substring( idx + 1 ), localMap );
+                int ltsLength = fName.IndexOf( ']' ) - idx;
+                return new LocalWorldName( filePath, fName.Substring( 0, idx ), fName.Substring( idx + 1, ltsLength ), localMap );
             }
             catch( Exception ex )
             {

@@ -36,7 +36,7 @@ namespace CK.Env
         string LocalBranchName { get; }
 
         /// <summary>
-        /// Gets the <see cref="Name"/> or <see cref="Name"/>-<see cref="LTSKey"/> if the key is not null.
+        /// Gets the <see cref="Name"/> or <see cref="Name"/>[<see cref="LTSKey"/>] if the key is not null.
         /// </summary>
         string FullName { get; }
     }

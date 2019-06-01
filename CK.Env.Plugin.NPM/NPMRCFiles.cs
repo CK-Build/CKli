@@ -29,7 +29,7 @@ namespace CK.Env.Plugin
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => _driver.BranchPath.AppendPart( nameof( NPMRCFiles ) );
 
-        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+        public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
@@ -85,7 +85,7 @@ namespace CK.Env.Plugin
 
         void ApplySettings( IActivityMonitor m, NormalizedPath f )
         {
-            var text = Folder.FileSystem.GetFileInfo( f ).AsTextFileInfo( ignoreExtension: true )?.TextContent ?? String.Empty;
+            var text = GitFolder.FileSystem.GetFileInfo( f ).AsTextFileInfo( ignoreExtension: true )?.TextContent ?? String.Empty;
             var lines = _rLine.Matches( text )
                             .Cast<Match>()
                             .Select( l => l.Groups[2].Length > 0
@@ -131,7 +131,7 @@ namespace CK.Env.Plugin
             };
             EnsureLine( lines, "git-tag-version", "false" );
             lines.RemoveAll( line => line.Scope != null && _solutionSpec.RemoveNPMScopeNames.Contains( line.Scope ) );
-            Folder.FileSystem.CopyTo( m, lines.Select( l => l.ToString() ).Concatenate( "\r\n" ), f );
+            GitFolder.FileSystem.CopyTo( m, lines.Select( l => l.ToString() ).Concatenate( "\r\n" ), f );
         }
 
         void EnsureLine( IList<Line> lines, string scope, string key, string value )

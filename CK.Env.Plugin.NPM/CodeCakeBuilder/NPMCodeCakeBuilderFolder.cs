@@ -115,7 +115,7 @@ namespace CK.Env.Plugin
 
         string AdaptBuild( string text )
         {
-            var name = Folder.SubPath.LastPart;
+            var name = GitFolder.SubPath.LastPart;
             Regex r = new Regex(
                   "(?<1>const\\s+string\\s+solutionName\\s*=\\s*\").*?(?<2>\";\\s*//\\s*!Transformable)",
                   RegexOptions.ExplicitCapture | RegexOptions.CultureInvariant );

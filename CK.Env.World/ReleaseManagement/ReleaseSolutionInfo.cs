@@ -196,7 +196,7 @@ namespace CK.Env
                 if( !_diffsComputed )
                 {
                     _diffsComputed = true;
-                    var diffRoots = Solution.Solution.GeneratedArtifacts.Select( g => new DiffRoot( g.Project.Name, g.Project.ProjectSources ));
+                    var diffRoots = Solution.Solution.GeneratedArtifacts.Select( g => new DiffRoot( g.Artifact.TypedName, g.Project.ProjectSources ));
                     _diffResult = _info._repository.GetDiff( m, PreviousVersionCommitSha, diffRoots );
                 }
                 return _diffResult;
