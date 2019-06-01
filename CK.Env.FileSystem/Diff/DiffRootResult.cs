@@ -33,7 +33,7 @@ namespace CK.Env.Diff
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.AppendLine( $"=> {Definition}: {DiffType}" );
+            sb.AppendLine( $"=> {Definition.Name}: {DiffType}" );
             if( DiffType == DiffRootResultType.Changed || DiffType == DiffRootResultType.NewPackage )
             {
                 sb.AppendLine( "=    => Impacted files:" );
@@ -73,7 +73,7 @@ namespace CK.Env.Diff
                     sb.AppendLine( $"=    =    =>Modified({ModifiedDiffs.Count}):" );
                     foreach( var f in ModifiedDiffs )
                     {
-                        sb.Append( $"=    =    =|  " );
+                        sb.Append( $"=    =    =|" );
                         if( f.NewPath != f.OldPath )
                         {
                             sb.Append( f.OldPath )

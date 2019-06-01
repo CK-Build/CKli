@@ -38,9 +38,9 @@ namespace CK.Env
         /// <returns>True if this plugin is on the same branch as the Git folder, false otherwise.</returns>
         public static bool CheckCurrentBranch( this IGitBranchPlugin @this, IActivityMonitor m, bool traceError = true )
         {
-            if( @this.BranchPath.LastPart != @this.Folder.CurrentBranchName )
+            if( @this.BranchPath.LastPart != @this.GitFolder.CurrentBranchName )
             {
-                if( traceError ) m.Error( $"[{@this.GetType().Name}] Current branch is {@this.Folder.CurrentBranchName}. Must be in {@this.BranchPath.LastPart}." );
+                if( traceError ) m.Error( $"[{@this.GetType().Name}] Current branch is {@this.GitFolder.CurrentBranchName}. Must be in {@this.BranchPath.LastPart}." );
                 return false;
             }
             return true;

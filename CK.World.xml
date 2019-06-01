@@ -28,7 +28,7 @@
                 CheckName="NPMAzure:@signature->Signature-OpenSource-Default"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
 
-    <Repository Type="NuGetStandard" Name="nuget.org" Url="https://www.nuget.org/api/v2/package"
+    <Repository Type="NuGetStandard" Name="nuget.org" Url="https://api.nuget.org/v3/index.json"
                 CheckName="NuGetStandard:nuget.org"
                 QualityFilter="ReleaseCandidate,Release"
                 SecretKeyName="NUGET_ORG_PUSH_API_KEY" />
@@ -121,12 +121,6 @@
       </Branch>
     </GitFolder>
 
-    <GitFolder Name="CK-Core" Url="https://github.com/Invenietis/CK-Core.git" >
-      <Branch Name="develop">
-        <SolutionSpec />
-      </Branch>
-    </GitFolder>
-
     <GitFolder Name="CK-SqlServer" Url="https://github.com/Invenietis/CK-SqlServer.git" >
       <Branch Name="develop">
         <SolutionSpec SqlServer="2016" />
@@ -154,18 +148,6 @@
     <GitFolder Name="CK-Testing" Url="https://github.com/Invenietis/CK-Testing.git" >
       <Branch Name="develop">
         <SolutionSpec SqlServer="2016" />
-      </Branch>
-    </GitFolder>
-
-    <GitFolder Name="CK-Text" Url="https://github.com/Invenietis/CK-Text.git" >
-      <Branch Name="develop">
-        <SolutionSpec />
-      </Branch>
-    </GitFolder>
-
-    <GitFolder Name="CK-MicroBenchmark" Url="https://github.com/Invenietis/CK-MicroBenchmark.git" >
-      <Branch Name="develop">
-        <SolutionSpec />
       </Branch>
     </GitFolder>
     
@@ -325,27 +307,4 @@
     </GitFolder>
 
   </Folder>
-
-  <Folder Name="SimpleGitVersion">
-
-    <GitFolder Name="CodeCake" Url="https://github.com/SimpleGitVersion/CodeCake.git" >
-      <Branch Name="develop">
-        <SolutionSpec NoDotNetUnitTests="true" NoStrongNameSigning="true" />
-      </Branch>
-    </GitFolder>
-
-    <GitFolder Name="CSemVer-Net" Url="https://github.com/SimpleGitVersion/CSemVer-Net.git" >
-      <Branch Name="develop">
-        <SolutionSpec />
-      </Branch>
-    </GitFolder>
-
-    <GitFolder Name="SGV-Net" Url="https://github.com/SimpleGitVersion/SGV-Net.git" >
-      <Branch Name="develop">
-        <SolutionSpec DisableSourceLink="true" />
-      </Branch>
-    </GitFolder>
-
-  </Folder>
-
 </CK-World>

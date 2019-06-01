@@ -18,7 +18,7 @@ namespace CK.Env.Plugin
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
-        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+        public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )

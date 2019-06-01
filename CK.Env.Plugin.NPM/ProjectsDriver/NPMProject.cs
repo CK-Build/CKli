@@ -67,7 +67,7 @@ namespace CK.Env.Plugin
             {
                 if( _packageFile.Root == null )
                 {
-                    return Driver.Folder.FileSystem.GetDirectoryContents( FullPath ).Exists
+                    return Driver.GitFolder.FileSystem.GetDirectoryContents( FullPath ).Exists
                         ? Error( NPMProjectStatus.ErrorMissingPackageJson )
                         : Error( NPMProjectStatus.FatalInitializationError );
                 }

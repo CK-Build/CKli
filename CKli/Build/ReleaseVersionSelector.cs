@@ -29,6 +29,7 @@ namespace CKli
                     c.Cancel();
                     return;
                 }
+
                 if( diffResult.Diffs.All(d=>d.DiffType== DiffRootResultType.None ) && diffResult.Others.DiffType == DiffRootResultType.None )
                 {
                     Console.WriteLine( $" (No change in {c.Solution.Solution.GeneratedArtifacts.Select( p => p.Artifact.Name ).Concatenate()})" );
@@ -37,10 +38,8 @@ namespace CKli
                 {
                     Console.WriteLine( ", changes:" );
                 }
-                foreach( var d in diffResult.Diffs )
-                {
-                    Console.WriteLine( d.ToString() );
-                }
+
+                Console.WriteLine( diffResult.ToString() );
             }
             else
             {

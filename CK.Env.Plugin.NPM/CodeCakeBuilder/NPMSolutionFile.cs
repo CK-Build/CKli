@@ -15,7 +15,7 @@ namespace CK.Env.Plugin
             NPMCodeCakeBuilderFolder f,
             NPMProjectsDriver driver,
             NormalizedPath branchPath )
-            : base( f.Folder, branchPath, f.FolderPath.AppendPart( "NPMSolution.xml" ) )
+            : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "NPMSolution.xml" ) )
         {
             _f = f;
             _driver = driver;
@@ -23,7 +23,7 @@ namespace CK.Env.Plugin
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
-        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+        public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )

@@ -123,7 +123,7 @@ namespace CK.Env.DependencyModel
         {
             if( _analyzer == null || _analyzer.IsObsolete )
             {
-                _analyzer = DependencyAnalyzer.Create( m, this, traceGraphDetails );
+                _analyzer = DependencyAnalyzer.Create( m, this, traceGraphDetails, this );
             }
             return _analyzer;
         }

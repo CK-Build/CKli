@@ -54,17 +54,17 @@ namespace CK.Env.Plugin
 
         void IDisposable.Dispose()
         {
-            Folder.OnLocalBranchEntered -= OnLocalBranchEntered;
-            Folder.OnLocalBranchLeaving -= OnLocalBranchLeaving;
+            GitFolder.OnLocalBranchEntered -= OnLocalBranchEntered;
+            GitFolder.OnLocalBranchLeaving -= OnLocalBranchLeaving;
         }
 
-        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+        public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
-            EnsureBranchMapping( m, Folder.World.DevelopBranchName, "develop" );
+            EnsureBranchMapping( m, GitFolder.World.DevelopBranchName, "develop" );
             if( PluginBranch == StandardGitStatus.Local )
             {
                 EnsureLocalBranch( m );
@@ -150,13 +150,13 @@ namespace CK.Env.Plugin
         /// <see cref="IWorldName.LocalBranchName"/> is mapped to "local".
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        void EnsureLocalBranch( IActivityMonitor m ) => EnsureBranchMapping( m, Folder.World.LocalBranchName, "local", true );
+        void EnsureLocalBranch( IActivityMonitor m ) => EnsureBranchMapping( m, GitFolder.World.LocalBranchName, "local", true );
 
         /// <summary>
         /// Removes the <see cref="IWorldName.LocalBranchName"/> branch mapping if it exists.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        void RemoveLocalBranch( IActivityMonitor m ) => RemoveBranchMapping( m, Folder.World.LocalBranchName );
+        void RemoveLocalBranch( IActivityMonitor m ) => RemoveBranchMapping( m, GitFolder.World.LocalBranchName );
 
     }
 }

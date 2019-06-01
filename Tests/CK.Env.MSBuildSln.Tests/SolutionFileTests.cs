@@ -40,12 +40,12 @@ namespace CK.Env.MSBuildSln.Tests
                     .Should().BeEquivalentTo(
                         ".editorconfig",
                         ".gitignore",
-                        "A1Test-World.xml",
-                        "A2Test-World.xml",
-                        "CK-World.xml",
+                        "A1Test.World.xml",
+                        "A2Test.World.xml",
+                        "CK.World.xml",
                         "LocalWorldRootPathMapping.txt",
                         "nuget.config",
-                        "SC-World.xml",
+                        "SC.World.xml",
                         "Common/SharedKey.snk" );
 
                 using( var w = new System.IO.StringWriter() )

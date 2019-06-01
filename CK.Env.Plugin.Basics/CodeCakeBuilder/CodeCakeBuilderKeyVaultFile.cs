@@ -22,7 +22,7 @@ namespace CK.Env.Plugin
             ISecretKeyStore secretStore,
             ArtifactCenter artifacts,
             NormalizedPath branchPath )
-            : base( f.Folder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilderKeyVault.txt" ) )
+            : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilderKeyVault.txt" ) )
         {
             _f = f;
             _driver = driver;
@@ -33,7 +33,7 @@ namespace CK.Env.Plugin
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
-        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+        public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )

@@ -11,7 +11,7 @@ namespace CK.Env.Plugin
         readonly SolutionSpec _solutionSpec;
 
         public SharedPropsFile( CommonFolder f, SolutionSpec solutionSpec, NormalizedPath branchPath )
-            : base( f.Folder, branchPath, f.FolderPath.AppendPart( "Shared.props" ) )
+            : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "Shared.props" ) )
         {
             _commonFolder = f;
             _solutionSpec = solutionSpec;
@@ -19,7 +19,7 @@ namespace CK.Env.Plugin
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => BranchPath;
 
-        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+        public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
@@ -64,8 +64,8 @@ namespace CK.Env.Plugin
                 section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
             }
             var p = new XElement( "PropertyGroup",
-                            new XElement( "RepositoryUrl", Folder.OriginUrl ),
-                            new XElement( "ProductName", Folder.World.FullName ),
+                            new XElement( "RepositoryUrl", GitFolder.OriginUrl ),
+                            new XElement( "ProductName", GitFolder.World.FullName ),
                             new XElement( "Company", "Signature Code" ),
                             new XElement( "Authors", "Signature Code" ),
                             new XElement( "Copyright", @"Copyright Signature-Code 2007-$([System.DateTime]::UtcNow.ToString(""yyyy""))" ),
@@ -138,7 +138,7 @@ namespace CK.Env.Plugin
             if( section == null )
             {
                 // Removes previously non sectioned property group.
-                Document.Root.Elements( "PropertyGroup" ).Where( e => e.Element( "CKWorldPath" ) != null )
+                Document.Root.Elements( "PropertyGroup" ).Where( e => e.Element( "CKliWorldPath" ) != null )
                     .Select( e => e.ClearCommentsBeforeAndNewLineAfter() )
                     .Remove();
                 section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
@@ -148,9 +148,9 @@ namespace CK.Env.Plugin
                 XElement.Parse(
 @"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
   <Deterministic>true</Deterministic>
-  <!-- Finds the CK-World.htm that must exist at the root of the development directory. This is path to map to C:\CK-World. -->
-  <CKWorldPath>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), CK-World.htm))</CKWorldPath>
-  <PathMap Condition="" '$(CKWorldPath)' != '' "">$(CKWorldPath)=C:\CK-World</PathMap>
+  <!-- Finds the CKli-World.htm that must exist at the root of the development directory. This is path to map to C:\CKli-World. -->
+  <CKliWorldPath>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), CKli-World.htm))</CKliWorldPath>
+  <PathMap Condition="" '$(CKliWorldPath)' != '' "">$(CKliWorldPath)=C:\CKli-World</PathMap>
 </PropertyGroup>" ) );
         }
 
@@ -190,10 +190,10 @@ namespace CK.Env.Plugin
         {
             var linkNames = new string[] { null, "GitHub", "GitLab", "Vsts.Git", "Bitbucket.Git" };
 
-            var linkName = linkNames[(int)Folder.KnownGitProvider];
+            var linkName = linkNames[(int)GitFolder.KnownGitProvider];
             if( linkName == null )
             {
-                m.Error( $"SourceLink is not supported on {Folder} ({Folder.KnownGitProvider})." );
+                m.Error( $"SourceLink is not supported on {GitFolder} ({GitFolder.KnownGitProvider})." );
                 return false;
             }
             var section = XCommentSection.FindOrCreate( Document.Root, "SourceLink", true );

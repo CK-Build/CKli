@@ -11,7 +11,7 @@ namespace CK.Env
     /// <summary>
     /// Implementation of a local <see cref="IWorldStore"/> in a directory on the file system.
     /// Worlds are stored as simple xml document that contains their description.
-    /// Their state are stored (suffixed by "-State") in the world directory mapped ny a <see cref="ILocalWorldRootPathMapping"/>.
+    /// Their state are stored (suffixed by ".State") in the world directory mapped ny a <see cref="ILocalWorldRootPathMapping"/>.
     /// </summary>
     public class LocalWorldStore : IWorldStore
     {
@@ -34,7 +34,7 @@ namespace CK.Env
         string ToStateFilePath( IWorldName w )
         {
             var p = _localWorldRootPathMapping.GetRootPath( w );
-            return Path.Combine( p, w.FullName + "-World-State.xml" );
+            return Path.Combine( p, w.FullName + ".World.State.xml" );
         }
 
         public IWorldName CreateNew( IActivityMonitor m, string name, string ltsKey, XDocument content )
@@ -43,8 +43,8 @@ namespace CK.Env
             if( content == null ) throw new ArgumentNullException( nameof( content ) );
             if( String.IsNullOrWhiteSpace( ltsKey ) ) ltsKey = null;
 
-            string wName = name + (ltsKey != null ? '-' + ltsKey : String.Empty);
-            var path = _directoryPath.AppendPart( wName + "-World.xml" );
+            string wName = name + (ltsKey != null ? '[' + ltsKey + ']' : String.Empty);
+            var path = _directoryPath.AppendPart( wName + ".World.xml" );
             if( !File.Exists( path ) )
             {
                 var w = new LocalWorldName( path, name, ltsKey, _localWorldRootPathMapping );
@@ -61,7 +61,7 @@ namespace CK.Env
 
         public IReadOnlyList<IWorldName> ReadWorlds( IActivityMonitor m )
         {
-            return Directory.GetFiles( _directoryPath, "*-World.xml" )
+            return Directory.GetFiles( _directoryPath, "*.World.xml" )
                                 .Select( p => LocalWorldName.Parse( m, p, _localWorldRootPathMapping ) )
                                 .Where( w => w != null ).OrderBy( p => p.FullName )
                                 .ToList();
