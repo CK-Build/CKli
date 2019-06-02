@@ -519,53 +519,48 @@ namespace CK.Env
             } );
         }
 
-
         [CommandMethod]
-        public void ShowWorldExternalDependencies( IActivityMonitor m, bool showOnlyMultipleVersions = false )
+        public void ShowExternalDependencies( IActivityMonitor m, bool onlyMultipleVersions = false )
         {
             var ctx = GetSolutionDependencyContextOnCurrentBranches( m );
             if( ctx == null ) return;
 
-            List<ISolution> solutions = ctx.Solutions.Select( s => s.Solution.Solution ).ToList();
-            List<GeneratedArtifact> generatedArtifacts = solutions.SelectMany( s => s.GeneratedArtifacts ).ToList();
-
             var externals = ctx.DependencyContext.Analyzer.ExternalReferences;
             if( externals.Count == 0 )
             {
-                Console.WriteLine( "This World don't have any external references." );
+                m.Warn( "This World don't have any external references." );
             }
-            var groupedExternals = externals.GroupBy( g => g.Target.Artifact.Name );
-
-            Console.WriteLine( $"External dependency of the World:" );
-            foreach( var grouppedExternalRef in groupedExternals )
+            ConsoleColor stdForeColor = Console.ForegroundColor;
+            ConsoleColor stdBackColor = Console.BackgroundColor;
+            foreach( var byType in externals.GroupBy( g => g.Target.Artifact.Type ).OrderBy( g => g.Key.Name ) )
             {
-                var groupped = grouppedExternalRef.GroupBy( s => s.Target.Version );
-                if( !showOnlyMultipleVersions || groupped.Count() > 1 )
+                Console.ForegroundColor = ConsoleColor.DarkRed;
+                Console.BackgroundColor = ConsoleColor.White;
+                Console.WriteLine( $"{byType.Key} external dependencies:" );
+                Console.ForegroundColor = stdForeColor;
+                Console.BackgroundColor = stdBackColor;
+                foreach( var byName in byType.GroupBy( g => g.Target.Artifact.Name ).OrderBy( g => g.Key ) )
                 {
-                    Console.WriteLine( $"    |{grouppedExternalRef.Key}" );
-                    ConsoleColor prevColor = Console.ForegroundColor;
-                    if( groupped.Count() > 1 )
+                    var byVersion = byName.GroupBy( s => s.Target.Version );
+                    if( !onlyMultipleVersions || byVersion.Count() > 1 )
                     {
-                        Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    }
-
-
-                    foreach( var versionGroupped in groupped )
-                    {
-
-                        Console.WriteLine( "    |    |" + versionGroupped.Key );
-                        foreach( var solutionGrouped in versionGroupped.GroupBy( q => q.Owner.Solution ) )
+                        Console.WriteLine( $"    |{byName.Key}" );
+                        if( byVersion.Count() > 1 ) Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        foreach( var versionGrouped in byVersion )
                         {
-                            Console.WriteLine( "    |    |    |" + solutionGrouped.Key.Name + ":" );
-                            foreach( var project in solutionGrouped )
+                            Console.WriteLine( "    |    |" + versionGrouped.Key );
+                            foreach( var solutionGrouped in versionGrouped.GroupBy( q => q.Owner.Solution ) )
                             {
-                                Console.WriteLine( "    |    |    |    |" + project.Owner.Name );
+                                Console.WriteLine( "    |    |    |" + solutionGrouped.Key.Name + ":" );
+                                foreach( var project in solutionGrouped )
+                                {
+                                    Console.WriteLine( "    |    |    |    |" + project.Owner.Name );
+                                }
                             }
                         }
+                        Console.ForegroundColor = stdForeColor;
                     }
-                    Console.ForegroundColor = prevColor;
                 }
-
             }
         }
 
@@ -603,8 +598,6 @@ namespace CK.Env
                     return;
                 }
             }
-            Artifact artifact = artifactUses.First().Target.Artifact;
-
             var artifactToUpgrade = artifactUses.Where( p => p.Target.Version != version ).ToList();
             if( artifactToUpgrade.Count == 0 )
             {
