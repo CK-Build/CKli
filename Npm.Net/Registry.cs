@@ -289,6 +289,10 @@ namespace Npm.Net
                 "I fetched all the versions and filtered the output for you." );
             // Here the request is successful so we should have valid json.
             JObject fullData = JObject.Parse( body );
+            if(!fullData.ContainsKey("versions"))
+            {
+                return (body, false);
+            }
             JToken versions = fullData["versions"];
             JToken specificVersion = versions[version];
             return (specificVersion?.ToString() ?? "", specificVersion != null);
