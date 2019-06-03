@@ -244,6 +244,13 @@ namespace Npm.Net
                     using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream( m, RegistryUri, packageJson, file, distTag ) )
                     {
                         req.Content = metadataStream;
+
+                        //var mem = new MemoryStream();
+                        //await metadataStream.CopyToAsync( mem );
+                        //var json = Encoding.UTF8.GetString( mem.ToArray() );
+
+                        //req.Content = new StringContent( json );
+
                         /**
                          * npm does more things than we do:
                          * if the first request return 409: conflict, npm fetch the versions availables in the registry.
