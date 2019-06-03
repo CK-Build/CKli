@@ -1040,18 +1040,19 @@ namespace CK.Env
         bool DoPushArtifacts( IActivityMonitor monitor, BuildResult buildResults )
         {
             Debug.Assert( buildResults.Type == BuildResultType.Release || buildResults.Type == BuildResultType.CI );
-            var local = _localFeedProvider.GetFeed( buildResults.Type );
+            IEnvLocalFeed local = _localFeedProvider.GetFeed( buildResults.Type );
             return RunSafe( monitor, $"Publishing Artifacts from local '{local.PhysicalPath}'.", ( m, error ) =>
             {
-                foreach( var a in buildResults.GeneratedArtifacts.GroupBy( a => a.TargetName ) )
+                var byTargetRepository = buildResults.GeneratedArtifacts.GroupBy( a => a.TargetName );
+                foreach( var a in byTargetRepository.Reverse() )
                 {
                     using( m.OpenInfo( $"Publishing to target: {a.Key}." ) )
                     {
-                        var h = _artifacts.Find( a.Key );
+                        IArtifactRepository h = _artifacts.Find( a.Key );
                         if( !local.PushLocalArtifacts( m, h, a.Select( p => p.Artifact ) ) )
                         {
                             Debug.Assert( error(), "An error must have been logged." );
-                            return;
+                            m.Warn( "Continuing push process despite the error to maximize the number of pushed artifacts." );
                         }
                     }
                 }

@@ -19,22 +19,28 @@ namespace Npm.Net
 {
     public class Registry
     {
+        static readonly Uri _npmjs = new Uri( "https://registry.npmjs.org/" );
         readonly HttpClient _httpClient;
         readonly AuthenticationHeaderValue _authHeader;
         readonly string _session;
+
+        bool _thisRegistryIsModern;
+        /// <summary>
+        /// Simple cache that knows that a registry have newer api endpoint or not.
+        /// </summary>
+        static (string registryHost, bool isUpToDate)[] _modernRegistries = new (string registryHost, bool isUpToDate)[]
+        {
+            (_npmjs.Host, true)
+        };
 
         /// <summary>
         /// Create a registry that make unauthenticated request.
         /// </summary>
         /// <param name="httpClient">The <see cref="HttpClient"/> used to send the requests</param>
-        /// <param name="registryUri">Registry <see cref="Uri"/>, https://registry.npmjs.org/ is used if the uri is not specified </param>
+        /// <param name="registryUri">Registry url, https://registry.npmjs.org/ is used if the uri is not specified </param>
         public Registry( HttpClient httpClient, Uri registryUri = null )
         {
-            RegistryUri = registryUri;
-            if( RegistryUri == null )
-            {
-                RegistryUri = new Uri( "https://registry.npmjs.org/" );
-            }
+            RegistryUri = registryUri ?? _npmjs;
             InitRegistryUpToDate();
             _httpClient = httpClient;
             _session = GenerateSessionId();
@@ -44,8 +50,8 @@ namespace Npm.Net
         /// Create a registry that make authenticated request
         /// </summary>
         /// <param name="httpClient">The <see cref="HttpClient"/> used to send the requests</param>
-        /// <param name="registryUri">Registry <see cref="Uri"/>, https://registry.npmjs.org/ is used if the uri is not specified </param>
-        /// <param name="token">Bearer token used to authenticate </param>
+        /// <param name="registryUri">Registry url, https://registry.npmjs.org/ is used if the uri is not specified </param>
+        /// <param name="token">Bearer token used to authenticate.</param>
         public Registry( HttpClient httpClient, string token, Uri registryUri = null )
             : this( httpClient, registryUri )
         {
@@ -69,44 +75,23 @@ namespace Npm.Net
             _authHeader = new AuthenticationHeaderValue( "Basic", basic );
         }
 
-        /// <summary>
-        /// Simple cache storing.
-        /// If we know that a registry have newer api endpoint
-        /// If the registry is not in the dictionary, we did'nt tested a new endpoint.
-        /// If it's it, we know if the registry is up to date or not.
-        /// </summary>
-        static (string registryUri, bool isUpToDate)[] _registriesUpToDate = new (string registryUri, bool isUpToDate)[]
-        {
-            ("registry.npmjs.org", true)
-        };
 
-        static (string registryUri, bool isUpToDate)? GetRegistryIsUpToDate( string registryHost )
-        {
-            for( int i = 0; i < _registriesUpToDate.Length; i++ )
-            {
-                (string registryUri, bool isUpToDate) = _registriesUpToDate[i];
-                if( registryUri == registryHost )
-                {
-                    return (registryUri, isUpToDate);
-                }
-            }
-            return null;
-        }
+        static (string registryUri, bool isUpToDate)? GetModernRegistry( string registryHost ) => _modernRegistries.FirstOrDefault( e => e.registryHost == registryHost );
 
         /// <summary>
         /// Return whether the registry is up to date. If we never tested a repository we are optimistic
-        /// and think that the registry have recent endpoint
+        /// and consider that the registry have recent endpoint
         /// </summary>
         /// <param name="registryHost"></param>
         /// <returns></returns>
-        static bool IsRegistryUpToDate( string registryHost ) => GetRegistryIsUpToDate( registryHost )?.isUpToDate ?? true;
+        static bool IsModernRegistry( string registryHost ) => GetModernRegistry( registryHost )?.isUpToDate ?? true;
 
         static void TryAddRegistryWithStatus( IActivityMonitor m, string registryHost, bool isUpToDate )
         {
-            (string registryUri, bool isUpToDate)? valueTuple = GetRegistryIsUpToDate( registryHost );
+            (string registryUri, bool isUpToDate)? valueTuple = GetModernRegistry( registryHost );
             if( valueTuple == null )
             {
-                Util.InterlockedAdd( ref _registriesUpToDate, (registryHost, isUpToDate) );
+                Util.InterlockedAdd( ref _modernRegistries, (registryHost, isUpToDate) );
                 if( isUpToDate )
                 {
                     m.Debug( "Request on recent endpoint works: I will never try legacy methods on it." );
@@ -126,15 +111,14 @@ namespace Npm.Net
         {
             if( IsAzureRepository() )
             {
-                _thisRegistryIsUpToDate = false;
+                _thisRegistryIsModern = false;
             }
             else
             {
-                _thisRegistryIsUpToDate = IsRegistryUpToDate( RegistryUri.Host );
+                _thisRegistryIsModern = IsModernRegistry( RegistryUri.Host );
             }
         }
 
-        bool _thisRegistryIsUpToDate;
 
         /// <summary>
         /// NPM ask a one time password, so here you have one.
@@ -363,14 +347,14 @@ namespace Npm.Net
         {
             if( version == null )
             {
-                //We can't optimise it unless we know the fallback feed, and we can't know with azure because the api ask for a version.
-                m.Debug( "You asked for ALL the versions of the package." );
+                // We can't optimise it unless we know the fallback feed, and we can't know with azure because the api ask for a version.
+                m.Debug( "Getting all the versions of the package." );
                 (string body, HttpStatusCode statusCode) = await ViewRequest( m, packageName, abbreviatedResponse );
                 return (body, IsSuccessStatusCode( statusCode ));
             }
-            //Here we know that the user specified the version
 
-            if( !_thisRegistryIsUpToDate )
+            // Here we know that the user specified the version
+            if( !_thisRegistryIsModern )
             {
                 if( IsAzureRepository() )
                 {
@@ -387,7 +371,7 @@ namespace Npm.Net
                             .Where(
                             p => p["sourceType"]?.ToString() == "public"
                             && Uri.TryCreate( p["location"]?.ToString(), UriKind.Absolute, out Uri result )
-                            && IsRegistryUpToDate( result.Host ) ).ToList();
+                            && IsModernRegistry( result.Host ) ).ToList();
                         if( validRepository.Count == 1 )
                         {
                             var sourceRepository = new Registry( _httpClient, validRepository.Single()["location"].ToString() );
@@ -397,12 +381,17 @@ namespace Npm.Net
                         //We won't try if we get multiple source feeds, knowing where is the package is up to azure.
                     }
                 }
-                m.Debug( "I know the registry is not up to date, so i use Legacy methods." );
+                m.Debug( "Registry is not modern, using Legacy methods." );
                 return await LegacyViewWithVersion( m, packageName, version, abbreviatedResponse );
             }
             else
             {
-                //Registry is probably up to date.
+                if( RegistryUri.Host == _npmjs.Host )
+                {
+                    m.Debug( $"{_npmjs.Host} doesn't support /version queries, using Legacy methods." );
+                    return await LegacyViewWithVersion( m, packageName, version, abbreviatedResponse );
+                }
+                // Registry is probably up to date.
                 string uriWithVersion = packageName += "/" + version;
                 (string body, HttpStatusCode statusCode) = await ViewRequest( m, uriWithVersion, abbreviatedResponse );
                 if( IsSuccessStatusCode( statusCode ) )
@@ -412,11 +401,11 @@ namespace Npm.Net
 
                     return (body, true);
                 }
-                //Here the request have an error: but the repository is maybe not up to date and not in the cache !
-                if( GetRegistryIsUpToDate( RegistryUri.Host ) == null )
+                // Here the request have an error: but the repository is maybe not up to date and not in the cache!
+                if( GetModernRegistry( RegistryUri.Host ) == null )
                 {
-                    m.Debug( "I'm not sure if this repository is up to date. Retrying with legacy endpoint" );
-                    //Ok we never tested this registry and we were optimistic.
+                    m.Debug( "Unsure if repository is up to date. Retrying with legacy endpoint" );
+                    // Ok we never tested this registry and we were optimistic.
                     (string filteredBody, bool foundPackage) = await LegacyViewWithVersion( m, packageName, version, abbreviatedResponse );
                     if( !foundPackage )
                     {
@@ -426,7 +415,7 @@ namespace Npm.Net
                     }
 
                     m.Info( "Request successful" );
-                    _thisRegistryIsUpToDate = false;
+                    _thisRegistryIsModern = false;
                     TryAddRegistryWithStatus( m, RegistryUri.Host, false );
                     return (filteredBody, true);
                 }
