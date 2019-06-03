@@ -39,7 +39,10 @@ namespace Tests
                 var packageJson = Registry.ExtractPackageJson( m, tarball );
                 packageJson.Should().NotBeNull();
                 var metadataStream = MetadataStream.LegacyMetadataStream( m, new Uri( "https://Registry.Uri" ), packageJson, tarFile );
+                long? length = metadataStream.Headers.ContentLength;
+                length.Should().NotBeNull();
                 string result = await metadataStream.ReadAsStringAsync();
+                result.Length.Should().Equals( (int)length.Value );
                 var json = JObject.Parse( result );//Throw if we generated bad json.
                 var dist = json["dist"];
                 dist["shasum"].ToString().Should().Be( sHA1Value.ToString() );

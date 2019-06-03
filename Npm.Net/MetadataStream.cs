@@ -24,12 +24,12 @@ namespace Npm.Net
         readonly Stream _tarballStream;
         readonly Stream _lastPartStream;
 
-        MetadataStream( IActivityMonitor m, MergeStream mergeStream, string lastPart, Base64StreamLength tarballStream, SHA512Stream sHA512Stream, SHA1Stream sHA1Stream )
+        MetadataStream( IActivityMonitor m, MergeStream mergeStream, string lastPart, Base64StreamLength tarballStream, SHA512Stream sHA512Stream, SHA1Stream sHA1Stream, MemoryStream lastPartStream )
         {
             _m = m ?? throw new NullReferenceException();
             _mergeStream = mergeStream ?? throw new NullReferenceException();
             _lastPart = lastPart;
-            _lastPartStream = new MemoryStream( Encoding.UTF8.GetBytes( _lastPart ) );
+            _lastPartStream = lastPartStream;
             _tarballStream = tarballStream;
             _sHA512Stream = sHA512Stream;
             _sHA1Stream = sHA1Stream;
@@ -66,7 +66,9 @@ namespace Npm.Net
             m.Info( $"Replacing length placeholder by {lengthString}." );
             string lastJsonPart = splittedJson[1];
             lastJsonPart = lastJsonPart.Replace( _tarballLengthString, lengthString ); //so we put the length in the last part of the json.
-            var output = new MetadataStream( m, mergeStream, lastJsonPart, tarball64, sHA512Stream, sHA1Stream );
+            var lastPartStream = new MemoryStream( Encoding.UTF8.GetBytes( lastJsonPart) );
+            mergeStream.AddStream( lastPartStream );
+            var output = new MetadataStream( m, mergeStream, lastJsonPart, tarball64, sHA512Stream, sHA1Stream, lastPartStream );
             mergeStream.OnNextStream += output.MergeStream_OnNextStream;//This allow us to write the hash later.
             return output;
         }
@@ -80,7 +82,7 @@ namespace Npm.Net
                 var sha512 = _sHA512Stream.GetFinalResult();
                 string replaced = _lastPart.Replace( _tarballSha1String, sha1.ToString() );
                 replaced = replaced.Replace( _tarballSha512String, "sha512-" + Convert.ToBase64String( sha512.GetBytes().ToArray() ) );
-                _mergeStream.AddStream( new MemoryStream( Encoding.UTF8.GetBytes( replaced ) ) );
+                _mergeStream.ReplaceStream(_lastPartStream, new MemoryStream( Encoding.UTF8.GetBytes( replaced ) ) );
             }
         }
 
