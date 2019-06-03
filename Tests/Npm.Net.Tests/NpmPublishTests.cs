@@ -38,16 +38,22 @@ namespace Tests
                 tarFile.Position = 0;
                 var packageJson = Registry.ExtractPackageJson( m, tarball );
                 packageJson.Should().NotBeNull();
-                var metadataStream = MetadataStream.LegacyMetadataStream( m, new Uri( "https://Registry.Uri" ), packageJson, tarFile );
+                var metadataStream = MetadataStream.LegacyMetadataStream( m, new Uri( "https://Registry.Uri" ), packageJson, tarFile, "test");
                 long? length = metadataStream.Headers.ContentLength;
                 length.Should().NotBeNull();
                 string result = await metadataStream.ReadAsStringAsync();
                 result.Length.Should().Equals( (int)length.Value );
                 var json = JObject.Parse( result );//Throw if we generated bad json.
-                var dist = json["dist"];
-                dist["shasum"].ToString().Should().Be( sHA1Value.ToString() );
-                dist["integrity"].ToString().Should().Be( "sha512-" + Convert.ToBase64String( sHA512Value.GetBytes().ToArray() ) );
             }
+        }
+        [Test]
+        public async Task PublishOnNpm()
+        {
+            string pat = "PATGOESHERE";
+            var registry = new Registry( new HttpClient(), pat );
+            var m = new ActivityMonitor();
+            bool success = await registry.PublishAsync( m, "testpackagethatnooneshoulduse-6.42.1-ci.tgz", "dist-tag-test" );
+            success.Should().BeTrue();
         }
     }
 }

@@ -9,11 +9,11 @@ namespace Npm.Net
     class Base64StreamLength : Stream
     {
         readonly Stream _stream;
-        readonly long _baseStreamLength;
-        public Base64StreamLength( long length, Stream tarball)
+        long _baseStreamLength;
+        public Base64StreamLength( Stream stream )
         {
-            _baseStreamLength = length;
-            _stream =  new CryptoStream( tarball, new ToBase64Transform(), CryptoStreamMode.Read );
+            _baseStreamLength = stream.Length;
+            _stream = new CryptoStream( stream, new ToBase64Transform(), CryptoStreamMode.Read );
         }
 
         public override bool CanRead => _stream.CanRead;
@@ -46,10 +46,6 @@ namespace Npm.Net
         public override void Write( byte[] buffer, int offset, int count )
         {
             _stream.Write( buffer, offset, count );
-        }
-        protected override void Dispose( bool disposing )
-        {
-            _stream.Dispose();
         }
     }
 }

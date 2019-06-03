@@ -227,35 +227,41 @@ namespace Npm.Net
         /// <returns>True on success, false on error.</returns>
         public async Task<bool> PublishAsync( IActivityMonitor m, string packagePathTarGz, string distTag = null )
         {
+            JObject packageJson;
+            using( MemoryStream tarball = new MemoryStream() )
+            using( var file = File.OpenRead( packagePathTarGz ) )
+            using( var gz = new GZipStream( file, CompressionMode.Decompress, leaveOpen: true ) )
+            {
+                await gz.CopyToAsync( tarball );
+                tarball.Position = 0;
+                packageJson = ExtractPackageJson( m, tarball );
+            }
+
             using( m.OpenInfo( $"Pushing {packagePathTarGz} {(distTag != null ? $"with disTag='{distTag}'" : "")} to '{RegistryUri}'." ) )
             {
                 using( var tarball = new MemoryStream() )
-                using( var file = File.OpenRead( packagePathTarGz ) )
+                using( FileStream file = File.OpenRead( packagePathTarGz ) )
+                using( var gz = new GZipStream( file, CompressionMode.Decompress, leaveOpen: true ) )
                 {
-                    using( var gz = new GZipStream( file, CompressionMode.Decompress, leaveOpen: true ) )
+                    await gz.CopyToAsync( tarball );
+                }
+                if( packageJson == null ) return false;
+                using( FileStream file = File.OpenRead( packagePathTarGz ) )
+                using( HttpRequestMessage req = NpmRequestMessage( m, packageJson["name"].ToString(), HttpMethod.Put ) )
+                using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream( m, RegistryUri, packageJson, file, distTag ) )
+                {
+                    req.Content = metadataStream;
+                    /**
+                     * npm does more things than we do:
+                     * if the first request return 409: conflict, npm fetch the versions availables in the registry.
+                     * With these versions npm patch the metadata and resend a packet.
+                     * We think it's probably for legacy reason, the simple request works on Azure Devops and Verdaccio
+                     * https://github.com/npm/npm-registry-client/commit/e9fbeb8b67f249394f735c74ef11fe4720d46ca0
+                     * TL;DR: The legacy npm publish is not implemented.
+                     **/
+                    using( var response = await _httpClient.SendAsync( req ) )
                     {
-                        await gz.CopyToAsync( tarball );
-                        tarball.Position = 0;
-                    }
-                    file.Position = 0;
-                    JObject packageJson = ExtractPackageJson( m, tarball );
-                    if( packageJson == null ) return false;
-                    using( HttpRequestMessage req = NpmRequestMessage( m, packageJson["name"].ToString(), HttpMethod.Put ) )
-                    using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream( m, RegistryUri, packageJson, file, distTag ) )
-                    {
-                        req.Content = metadataStream;
-                        /**
-                         * npm does more things than we do:
-                         * if the first request return 409: conflict, npm fetch the versions availables in the registry.
-                         * With these versions npm patch the metadata and resend a packet.
-                         * We think it's probably for legacy reason, the simple request works on Azure Devops and Verdaccio
-                         * https://github.com/npm/npm-registry-client/commit/e9fbeb8b67f249394f735c74ef11fe4720d46ca0
-                         * TL;DR: The legacy npm publish is not implemented.
-                         **/
-                        using( var response = await _httpClient.SendAsync( req ) )
-                        {
-                            return await LogResponse( m, response );
-                        }
+                        return await LogResponse( m, response );
                     }
                 }
             }
