@@ -26,7 +26,7 @@ namespace Npm.Net
         public void ReplaceStream(Stream streamToReplace, Stream newStream)
         {
             int index = Streams.IndexOf( streamToReplace );
-            if( index >= _streamIndex ) throw new InvalidOperationException( "This stream was already sent" );
+            if( index <= _streamIndex ) throw new InvalidOperationException( "This stream was already sent" );
             Streams[index] = newStream;
         }
 

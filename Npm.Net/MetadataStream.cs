@@ -10,9 +10,9 @@ using System.Threading.Tasks;
 
 namespace Npm.Net
 {
-    class MetadataStream : HttpContent, IDisposable
+    public class MetadataStream : HttpContent, IDisposable
     {
-        const string _tarballContentString = "TARBALL_DATA_TO_REPLACE";
+        const string _tarballContentPlaceholderString = "TARBALL_DATA_TO_REPLACE";
         const string _tarballLengthString = "TARBALL_LENGTH_TO_REPLACE";
         const string _tarballSha512String = "sha512-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000==";
         const string _tarballSha1String = "111111111111111111111111111111111111111";
@@ -24,13 +24,12 @@ namespace Npm.Net
         readonly Stream _tarballStream;
         readonly Stream _lastPartStream;
 
-        MetadataStream( IActivityMonitor m, MergeStream mergeStream, string lastPart, Stream tarballStream, SHA512Stream sHA512Stream, SHA1Stream sHA1Stream )
+        MetadataStream( IActivityMonitor m, MergeStream mergeStream, string lastPart, Base64StreamLength tarballStream, SHA512Stream sHA512Stream, SHA1Stream sHA1Stream )
         {
             _m = m ?? throw new NullReferenceException();
             _mergeStream = mergeStream ?? throw new NullReferenceException();
             _lastPart = lastPart;
             _lastPartStream = new MemoryStream( Encoding.UTF8.GetBytes( _lastPart ) );
-            mergeStream.AddStream( _lastPartStream );
             _tarballStream = tarballStream;
             _sHA512Stream = sHA512Stream;
             _sHA1Stream = sHA1Stream;
@@ -52,23 +51,26 @@ namespace Npm.Net
         static MetadataStream FromMetadata( IActivityMonitor m, JObject metadata, Stream tarball )
         {
             string json = metadata.ToString();
-            string[] splittedJson = json.Split( new string[] { _tarballContentString }, StringSplitOptions.None );
+            string[] splittedJson = json.Split( new string[] { _tarballContentPlaceholderString }, StringSplitOptions.None );
+            //We split the json in half where the content should go.
             if( splittedJson.Length != 2 ) throw new InvalidOperationException( "The author of this method is stupid" );
-            string lastJsonPart = splittedJson[1];
             var mergeStream = new MergeStream();
-            mergeStream.AddStream( new MemoryStream( Encoding.UTF8.GetBytes( splittedJson[0] ) ) );
-            var tarball64 = new Base64StreamLength( tarball );
-            mergeStream.AddStream( tarball64 );
-            string lengthString = tarball64.Length.ToString();
-            m.Info( $"Replacing length placeholder by {lengthString}." );
-            lastJsonPart = lastJsonPart.Replace( _tarballLengthString, lengthString );
+
+            mergeStream.AddStream( new MemoryStream( Encoding.UTF8.GetBytes( splittedJson[0] ) ) );//We send the first half of the json.
             SHA1Stream sHA1Stream = new SHA1Stream( tarball, true, false );
-            SHA512Stream sHA512Stream = new SHA512Stream( sHA1Stream , true, false);
-            var output = new MetadataStream( m, mergeStream, lastJsonPart,tarball, sHA512Stream, sHA1Stream );
-            var lastPartStream = new MemoryStream( Encoding.UTF8.GetBytes( output._lastPart ) );
-            mergeStream.AddStream( lastPartStream );
+            SHA512Stream sHA512Stream = new SHA512Stream( sHA1Stream, true, false );
+            var tarball64 = new Base64StreamLength( tarball.Length, sHA512Stream );
+            mergeStream.AddStream( tarball64 ); //Then the tarball
+
+            string lengthString = tarball64.Length.ToString(); //Now, we know the length of the tarball
+            m.Info( $"Replacing length placeholder by {lengthString}." );
+            string lastJsonPart = splittedJson[1];
+            lastJsonPart = lastJsonPart.Replace( _tarballLengthString, lengthString ); //so we put the length in the last part of the json.
+            var output = new MetadataStream( m, mergeStream, lastJsonPart, tarball64, sHA512Stream, sHA1Stream );
+            mergeStream.OnNextStream += output.MergeStream_OnNextStream;//This allow us to write the hash later.
             return output;
         }
+
 
         void MergeStream_OnNextStream( object sender, Stream e )
         {
@@ -78,21 +80,17 @@ namespace Npm.Net
                 var sha512 = _sHA512Stream.GetFinalResult();
                 string replaced = _lastPart.Replace( _tarballSha1String, sha1.ToString() );
                 replaced = replaced.Replace( _tarballSha512String, "sha512-" + Convert.ToBase64String( sha512.GetBytes().ToArray() ) );
-                _mergeStream.ReplaceStream( _lastPartStream, new MemoryStream( Encoding.UTF8.GetBytes( replaced ) ));
+                _mergeStream.AddStream( new MemoryStream( Encoding.UTF8.GetBytes( replaced ) ) );
             }
         }
 
         static JObject LegacyMetadataJson( IActivityMonitor m, Uri registryUri, JObject packageJson, Stream tarball, string distTag )
         {
             string checkJson = packageJson.ToString();
-            if( checkJson.Contains( _tarballContentString ) ) throw new ArgumentException( "Please don't put the string 'TARBALL_DATA_TO_REPLACE' in the packageJson" );
+            if( checkJson.Contains( _tarballContentPlaceholderString ) ) throw new ArgumentException( "Please don't put the string 'TARBALL_DATA_TO_REPLACE' in the packageJson" );
             if( checkJson.Contains( _tarballLengthString ) ) throw new ArgumentException( "Please don't put the string 'TARBALL_LENGTH_TO_REPLACE' in the packageJson" );
-            string integrity;
-            string shasum;
-            integrity = _tarballSha512String;
-            m.Debug( $"Placeholder sha512:{integrity}." );
-            shasum = _tarballSha1String;
-            m.Debug( $"Placeholder sha1:{shasum}." );
+            m.Debug( $"Placeholder sha512:{_tarballSha512String}." );
+            m.Debug( $"Placeholder sha1:{_tarballSha1String}." );
             tarball.Position = 0;
             m.Debug( "Stream position set to 0." );
             string name = packageJson["name"] + "@" + packageJson["version"];
@@ -101,25 +99,18 @@ namespace Npm.Net
             string tbName = packageJson["name"] + "-" + packageJson["version"] + ".tgz";
             string tbUri = new Uri( registryUri, packageJson["name"] + "/-/" + tbName ).ToString().Replace( "https", "http" );
             m.Debug( $"legacy tarball uri: {tbUri}." );
-            packageJson["dist"] = null;
+            JObject distTags = new JObject();
             if( distTag != null )
             {
-                packageJson["dist"] = new JObject()
-                {
-                    ["integrity"] = integrity,
-                    ["shasum"] = shasum,
-                    ["tarball"] = tbUri
-                };
+                distTags[distTag] = packageJson["version"];
             }
-            return new JObject()
+
+            JObject output = new JObject
             {
                 ["_id"] = packageJson["name"],
                 ["name"] = packageJson["name"],
                 ["description"] = packageJson["name"],
-                ["dist-tags"] = new JObject
-                {
-                    [distTag] = packageJson["version"]
-                },
+                ["dist-tags"] = distTags,
                 ["versions"] = new JObject
                 {
                     [packageJson["version"].ToString()] = packageJson
@@ -130,22 +121,18 @@ namespace Npm.Net
                     [tbName] = new JObject()
                     {
                         ["content_type"] = "application/octet-stream",
-                        ["data"] = _tarballContentString,
+                        ["data"] = _tarballContentPlaceholderString,
                         ["length"] = _tarballLengthString
                     }
-
+                },
+                ["dist"] = new JObject()
+                {
+                    ["integrity"] = _tarballSha512String,
+                    ["shasum"] = _tarballSha1String,
+                    ["tarball"] = tbUri
                 }
             };
-        }
-
-        static (SHA1Value sha1, byte[] sha512) CalculateIntegrity( Stream stream )
-        {
-            using( SHA1Stream shaStream = new SHA1Stream( stream, true, true ) )
-            using( SHA512 sha512 = SHA512.Create() )
-            {
-                byte[] output = sha512.ComputeHash( shaStream );
-                return (shaStream.GetFinalResult(), output);
-            }
+            return output;
         }
 
         protected override async Task SerializeToStreamAsync( Stream stream, TransportContext context )

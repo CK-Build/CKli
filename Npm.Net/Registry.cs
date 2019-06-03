@@ -180,7 +180,7 @@ namespace Npm.Net
             return true;
         }
 
-        static JObject ExtractPackageJson( IActivityMonitor m, MemoryStream tarball )
+        public static JObject ExtractPackageJson( IActivityMonitor m, MemoryStream tarball )
         {
             var buffer = new byte[100];
             while( true )
