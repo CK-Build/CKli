@@ -52,7 +52,6 @@ namespace CK.Env.NPM
         /// <returns>The awaitable.</returns>
         protected override Task OnAllPackagesPushed( IActivityMonitor m, IReadOnlyList<LocalNPMPackageFile> skipped, IReadOnlyList<LocalNPMPackageFile> pushed )
         {
-            return Task.CompletedTask;
             string personalAccessToken = ResolveSecret( m );
             var packages = skipped.Concat( pushed ).Select( i => i.Instance );
             return AzureDevOpsAPIHelper.PromotePackagesAync( m, Client.HttpClient, Info.Organization, Info.FeedName, personalAccessToken, packages, true );
