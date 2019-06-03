@@ -778,10 +778,11 @@ namespace CK.Env
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>The roadmap.</returns>
         [CommandMethod]
-        public bool EditRoadmap( IActivityMonitor monitor )
+        public bool EditRoadmap( IActivityMonitor monitor, bool pull = true )
         {
             if( !CanEditRoadmap ) throw new InvalidOperationException( nameof( CanEditRoadmap ) );
             if( !CheckGlobalGitStatus( monitor, StandardGitStatus.Develop ) ) return false;
+            if( !CheckAndPullReposAndReloadIfNeeded( monitor, pull ) ) return false;
             return DoEditRoadmap( monitor, false ) != null;
         }
 
@@ -804,6 +805,23 @@ namespace CK.Env
                                   && WorkStatus == GlobalWorkStatus.Idle
                                   && CachedGlobalGitStatus == StandardGitStatus.Develop;
 
+        bool CheckAndPullReposAndReloadIfNeeded( IActivityMonitor m, bool pull )
+        {
+            bool reloadNeeded = false;
+            foreach( var g in _gitRepositories )
+            {
+                if( !g.CheckCleanCommit( m ) ) return false;
+                if( pull )
+                {
+                    var (Success, ReloadNeeded) = g.Pull( m );
+                    if( !Success ) return false;
+                    reloadNeeded |= ReloadNeeded;
+                }
+            }
+            if( reloadNeeded && GetWorldSolutionContext( m, true ) == null ) return false;
+            return true;
+        }
+
         /// <summary>
         /// Starts a release after an optional pull, using the current <see cref="VersionSelector"/>.
         /// </summary>
@@ -817,18 +835,7 @@ namespace CK.Env
             if( !CanRelease ) throw new InvalidOperationException( nameof( CanRelease ) );
             if( !CheckGlobalGitStatus( monitor, StandardGitStatus.Develop ) ) return false;
 
-            bool reloadNeeded = false;
-            foreach( var g in _gitRepositories )
-            {
-                if( !g.CheckCleanCommit( monitor ) ) return false;
-                if( pull )
-                {
-                    var (Success, ReloadNeeded) = g.Pull( monitor );
-                    if( !Success ) return false;
-                    reloadNeeded |= ReloadNeeded;
-                }
-            }
-            if( reloadNeeded && GetWorldSolutionContext( monitor, true ) == null ) return false;
+            if( !CheckAndPullReposAndReloadIfNeeded( monitor, pull ) ) return false;
 
             var roadmap = DoEditRoadmap( monitor, resetRoadmap );
             if( roadmap == null ) return false;
