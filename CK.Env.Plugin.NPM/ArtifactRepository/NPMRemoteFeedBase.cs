@@ -94,30 +94,61 @@ namespace CK.Env.NPM
         /// </summary>
         /// <param name="ctx">The monitor to use.</param>
         /// <param name="files">The set of packages to push.</param>
-        /// <returns>The awaitable.</returns>
-        public async Task PushPackagesAsync( IActivityMonitor m, IEnumerable<LocalNPMPackageFile> files )
+        /// <returns>True on success, false on error..</returns>
+        async Task<bool> PushPackagesAsync( IActivityMonitor m, IEnumerable<LocalNPMPackageFile> files )
         {
+            bool success = true;
             using( var a = m.OpenInfo( "Pushing packages..." ) )
             {
+                var skipped = new List<LocalNPMPackageFile>();
+                var pushed = new List<LocalNPMPackageFile>();
                 foreach( LocalNPMPackageFile file in files )
                 {
                     if( await Registry.ExistAsync( m, file.Instance.Artifact.Name, file.Instance.Version ) )
                     {
                         m.Info( $"Package '{file.Instance}' already in '{ToString()}'. Push skipped." );
+                        skipped.Add( file );
                     }
                     else
                     {
-                        var tags = file.Instance.Version.PackageQuality.GetLabels().Select( p => p.ToString() ).ToList();
-                        Debug.Assert( tags.Count > 0 );
-                        await Registry.PublishAsync( m, file.FullPath, tags[0] );
-                        foreach( string tag in tags.Skip( 1 ) )
+                        string firstDistTag = file.Instance.Version.PackageQuality.GetLabels()[0].ToString();
+                        if( await Registry.PublishAsync( m, file.FullPath, firstDistTag ) )
                         {
-                            await Registry.AddDistTag( m, file.Instance.Artifact.Name, file.Instance.Version, tag );
+                            pushed.Add( file );
                         }
+                        else success = false;
+                    }
+                }
+                if( success )
+                {
+                    foreach( var file in pushed.Concat( skipped ) )
+                    {
+                        foreach( var label in file.Instance.Version.PackageQuality.GetLabels().Skip( 1 ) )
+                        {
+                            success &= await Registry.AddDistTag( m, file.Instance.Artifact.Name, file.Instance.Version, label.ToString() );
+                        }
+                    }
+                    if( success )
+                    {
+                        await OnAllPackagesPushed( m, skipped, pushed );
                     }
                 }
             }
+            return success;
         }
+
+        /// <summary>
+        /// Called even if no package has been pushed.
+        /// </summary>
+        /// <param name="m">The monitor.</param>
+        /// <param name="skipped">The set of packages skipped because they already exist in the feed.</param>
+        /// <param name="pushed">The set of packages pushed.</param>
+        /// <returns>The awaitable.</returns>
+        protected virtual Task OnAllPackagesPushed( IActivityMonitor m, IReadOnlyList<LocalNPMPackageFile> skipped, IReadOnlyList<LocalNPMPackageFile> pushed )
+        {
+            return Task.CompletedTask;
+        }
+
 
         public async Task<bool> PushAsync( IActivityMonitor m, IArtifactLocalSet artifacts )
         {
@@ -136,7 +167,7 @@ namespace CK.Env.NPM
                 }
                 else
                 {
-                    await PushPackagesAsync( m, accepted );
+                    success &= await PushPackagesAsync( m, accepted );
                 }
             }
             return success;

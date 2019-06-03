@@ -1,5 +1,12 @@
 using CK.Core;
+using CSemVer;
 using Npm.Net;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace CK.Env.NPM
 {
@@ -31,9 +38,24 @@ namespace CK.Env.NPM
         /// <param name="point">The API point (after the /NPM/).</param>
         /// <param name="version">The API version.</param>
         /// <returns>The url.</returns>
-        protected string GetAzureDevOpsUrlAPI( string point = "packagesBatch", string version = "api-version=5.0" )
+        protected string GetAzureDevOpsUrlAPI( string point = "packagesBatch", string version = "api-version=5.0-preview.1" )
         {
-            return $"https://pkgs.dev.azure.com/{Info.Organization}/_apis/packaging/feeds/{Info.FeedName}/NPM/{point}?{version}";
+            return AzureDevOpsAPIHelper.GetUrl( Info.Organization, Info.FeedName, true, point, version );
+        }
+
+        /// <summary>
+        /// Implements Package promotion in @CI, @Exploratory, @Preview, @Latest and @Stable views.
+        /// </summary>
+        /// <param name="m">The logger.</param>
+        /// <param name="skipped">The set of packages skipped because they already exist in the feed.</param>
+        /// <param name="pushed">The set of packages pushed.</param>
+        /// <returns>The awaitable.</returns>
+        protected override Task OnAllPackagesPushed( IActivityMonitor m, IReadOnlyList<LocalNPMPackageFile> skipped, IReadOnlyList<LocalNPMPackageFile> pushed )
+        {
+            return Task.CompletedTask;
+            string personalAccessToken = ResolveSecret( m );
+            var packages = skipped.Concat( pushed ).Select( i => i.Instance );
+            return AzureDevOpsAPIHelper.PromotePackagesAync( m, Client.HttpClient, Info.Organization, Info.FeedName, personalAccessToken, packages, true );
         }
 
     }

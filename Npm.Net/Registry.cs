@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Text;
 using CSemVer;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -163,7 +164,7 @@ namespace Npm.Net
             }
         }
 
-        public async Task AddDistTag( IActivityMonitor m, string packageName, SVersion version, string tagName )
+        public async Task<bool> AddDistTag( IActivityMonitor m, string packageName, SVersion version, string tagName )
         {
             using( HttpRequestMessage req = NpmRequestMessage( m, $"/-/package/{packageName}/dist-tags/{tagName}", HttpMethod.Put ) )
             {
@@ -173,9 +174,10 @@ namespace Npm.Net
                 req.Content.Headers.ContentType.CharSet = "";
                 using( HttpResponseMessage response = await _httpClient.SendAsync( req ) )
                 {
-                    await LogResponse( m, response );
+                    if( !await LogResponse( m, response ) ) return false;
                 }
             }
+            return true;
         }
 
         static JObject ExtractPackageJson( IActivityMonitor m, MemoryStream tarball )
@@ -222,8 +224,8 @@ namespace Npm.Net
         /// Physical file path to the package tar gz file to push.
         /// </param>
         /// <param name="distTag">First optional tag to be associated to the package.</param>
-        /// <returns>The awaitable.</returns>
-        public async Task PublishAsync( IActivityMonitor m, string packagePathTarGz, string distTag = null )
+        /// <returns>True on success, false on error.</returns>
+        public async Task<bool> PublishAsync( IActivityMonitor m, string packagePathTarGz, string distTag = null )
         {
             using( m.OpenInfo( $"Pushing {packagePathTarGz} {(distTag != null ? $"with disTag='{distTag}'" : "")} to '{RegistryUri}'." ) )
             {
@@ -237,7 +239,7 @@ namespace Npm.Net
                     }
                     file.Position = 0;
                     JObject packageJson = ExtractPackageJson( m, tarball );
-                    if( packageJson == null ) return;
+                    if( packageJson == null ) return false;
                     using( HttpRequestMessage req = NpmRequestMessage( m, packageJson["name"].ToString(), HttpMethod.Put ) )
                     using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream( m, RegistryUri, packageJson, file, distTag ) )
                     {
@@ -252,7 +254,7 @@ namespace Npm.Net
                          **/
                         using( var response = await _httpClient.SendAsync( req ) )
                         {
-                            await LogResponse( m, response );
+                            return await LogResponse( m, response );
                         }
                     }
                 }
@@ -285,17 +287,12 @@ namespace Npm.Net
             {
                 return (body, false);
             }
-            m.Info( "This registry does not have implemented the endpoint to get info on the specific version. " +
-                "I fetched all the versions and filtered the output for you." );
+            m.Info( $"This registry doesn't implement the /version endpoint. Looking for {version} in all the versions." );
+            m.Debug( body );
             // Here the request is successful so we should have valid json.
             JObject fullData = JObject.Parse( body );
-            if(!fullData.ContainsKey("versions"))
-            {
-                return (body, false);
-            }
-            JToken versions = fullData["versions"];
-            JToken specificVersion = versions[version];
-            return (specificVersion?.ToString() ?? "", specificVersion != null);
+            var v = fullData["versions"][version.ToNuGetPackageString()];
+            return (v?.ToString() ?? "", v != null);
         }
 
         (string organization, string feedId) GetAzureInfoFromUri()
@@ -480,118 +477,110 @@ namespace Npm.Net
             }
         }
 
-        async Task<bool> LogResponse( IActivityMonitor m, HttpResponseMessage res, bool failOnWarning = false )
+        async Task<bool> LogResponse( IActivityMonitor m, HttpResponseMessage res )
         {
             m.Info( "Checking response" );
             HttpResponseHeaders headers = res.Headers;
             if( headers.Contains( "npm-notice" ) && !headers.Contains( "x-local-cache" ) )
             {
-                List<string> notices = headers.GetValues( "npm-notice" ).ToList();
-                m.Log( LogLevel.Info, string.Join( ",", notices ) );
+                m.Info( $"npm-notice headers: {headers.GetValues( "npm-notice" ).Concatenate()}" );
             }
-            bool fail = false;
-            if( LogWarnings( m, headers ) && failOnWarning ) fail = true;
-            if( await LogErrors( m, res ) ) fail = true;
-            return !fail;
+            DumpWarnings( m, headers );
+            return await LogErrors( m, res );
         }
 
 
         /// <summary>
-        /// 
+        /// Logs potential errors. Returns true if no error occured, false on error.
         /// </summary>
         /// <param name="m"></param>
         /// <param name="res"></param>
-        /// <returns><see langword="true"/> if there is an error</returns>
+        /// <returns>True on success, false on error.</returns>
         async Task<bool> LogErrors( IActivityMonitor m, HttpResponseMessage res )
         {
-            string body = await res.Content.ReadAsStringAsync();
-            bool successCode = res.IsSuccessStatusCode;
-            if( !successCode )
+            if( res.StatusCode == HttpStatusCode.Unauthorized )
             {
-                m.Error( "Response status code is not a success code: " + res.ReasonPhrase );
-                m.Error( body );
+                using( m.OpenError( "Unauthorized Status Code" ) )
+                {
+                    if( res.Headers.Contains( "www-authenticate" ) )
+                    {
+                        List<string> auth = res.Headers.GetValues( "www-authenticate" ).ToList();
+                        if( auth.Contains( "ipaddress" ) )
+                        {
+                            m.Error( "Login is not allowed from your IP address" );
+                        }
+                        else if( auth.Contains( "otp" ) )
+                        {
+                            m.Error( "OTP required for authentication" );
+                        }
+                        else
+                        {
+                            m.Error( "Unable to authenticate, need: " + string.Join( ",", auth ) );
+                        }
+                    }
+                    else
+                    {
+                        if( (await res.Content.ReadAsStringAsync()).Contains( "one-time pass" ) )
+                        {
+                            m.Error( "OTP required for authentication." );
+                        }
+                        else
+                        {
+                            m.Error( "Unknown error." );
+                        }
+                    }
+                }
+                return false;
+            }
+            if( !res.IsSuccessStatusCode )
+            {
+                using( m.OpenError( $"Response status code is not a success code: '{res.ReasonPhrase}'." ) )
+                {
+                    m.Trace( await res.Content.ReadAsStringAsync() );
+                }
+                return false;
             }
             else
             {
-                m.Trace( "Response status code is a success status code." );
-            }
-
-            if( res.StatusCode == HttpStatusCode.Unauthorized )
-            {
-                m.Error( "Unauthorized Status Code" );
-
-                if( res.Headers.Contains( "www-authenticate" ) )
-                {
-                    List<string> auth = res.Headers.GetValues( "www-authenticate" ).ToList();
-                    if( auth.Contains( "ipaddress" ) )
-                    {
-                        m.Error( "Login is not allowed from your IP address" );
-                    }
-                    else if( auth.Contains( "otp" ) )
-                    {
-                        m.Error( "OTP required for authentication" );
-                    }
-                    else
-                    {
-                        m.Error( "Unable to authenticate, need: " + string.Join( ",", auth ) );
-                    }
-                }
-                else
-                {
-                    if( body.Contains( "one-time pass" ) )
-                    {
-                        m.Error( "OTP required for authentication." );
-                    }
-                    else
-                    {
-                        m.Error( "Unknown error." );
-                    }
-                }
-                return true;
-            }
-            return successCode;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="m"></param>
-        /// <param name="responseHeaders"></param>
-        /// <returns><see langword="true"/> if there is a warning</returns>
-        bool LogWarnings( IActivityMonitor m, HttpResponseHeaders responseHeaders )
-        {
-            if( !responseHeaders.Contains( "warning" ) ) return false;
-            var warningsHeader = responseHeaders.GetValues( "warning" ).ToList();
-            foreach( string warning in warningsHeader )
-            {
-                var match = Regex.Match( warning, @"/^\s*(\d{3})\s+(\S+)\s+""(.*)""\s+""([^""]+)""/" );
-                if( !int.TryParse( match.Groups[1].Value, out int code ) )
-                {
-                    m.Error( "Incorrect warning header format." );
-                }
-                string host = match.Groups[2].Value;
-                string message = match.Groups[3].Value;
-                DateTime date = JsonConvert.DeserializeObject<DateTime>( match.Groups[4].Value );
-
-                if( code == 199 )
-                {
-                    if( message.Contains( "ENOTFOUND" ) )
-                    {
-                        m.Warn( $"registry: Using stale data from {RegistryUri.ToString()} because the host is inaccessible -- are you offline?" );
-                        m.Error( "Npm.Net is not using any caches, so you should not see the previous warning." );
-                    }
-                    else
-                    {
-                        m.Warn( $"Unexpected warning for {RegistryUri.ToString()}: {message}" );
-                    }
-                }
-
-                if( code == 111 )
-                {
-                    m.Warn( $"Using stale data from {RegistryUri.ToString()} due to a request error during revalidation." );
-                }
+                m.Debug( "Response status code is a success status code." );
             }
             return true;
+        }
+
+        void DumpWarnings( IActivityMonitor m, HttpResponseHeaders responseHeaders )
+        {
+            if( responseHeaders.Contains( "warning" ) )
+            {
+                foreach( string warning in responseHeaders.GetValues( "warning" ) )
+                {
+                    m.Warn( $"NPM warning: {warning}" );
+                    var match = Regex.Match( warning, @"/^\s*(\d{3})\s+(\S+)\s+""(.*)""\s+""([^""]+)""/" );
+                    if( !int.TryParse( match.Groups[1].Value, out int code ) )
+                    {
+                        m.Error( "Incorrect warning header format." );
+                        continue;
+                    }
+                    string host = match.Groups[2].Value;
+                    string message = match.Groups[3].Value;
+                    DateTime date = JsonConvert.DeserializeObject<DateTime>( match.Groups[4].Value );
+                    if( code == 199 )
+                    {
+                        if( message.Contains( "ENOTFOUND" ) )
+                        {
+                            m.Warn( $"registry: Using stale data from {RegistryUri.ToString()} because the host is inaccessible -- are you offline?" );
+                            m.Error( "Npm.Net is not using any caches, so you should not see the previous warning." );
+                        }
+                        else
+                        {
+                            m.Warn( $"Unexpected warning for {RegistryUri.ToString()}: {message}" );
+                        }
+                    }
+                    else if( code == 111 )
+                    {
+                        m.Warn( $"Using stale data from {RegistryUri.ToString()} due to a request error during revalidation." );
+                    }
+                }
+            }
         }
 
         public override string ToString() => RegistryUri.ToString();

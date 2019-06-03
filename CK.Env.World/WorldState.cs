@@ -1044,7 +1044,7 @@ namespace CK.Env
             return RunSafe( monitor, $"Publishing Artifacts from local '{local.PhysicalPath}'.", ( m, error ) =>
             {
                 var byTargetRepository = buildResults.GeneratedArtifacts.GroupBy( a => a.TargetName );
-                foreach( var a in byTargetRepository.Reverse() )
+                foreach( var a in byTargetRepository )
                 {
                     using( m.OpenInfo( $"Publishing to target: {a.Key}." ) )
                     {
@@ -1052,6 +1052,7 @@ namespace CK.Env
                         if( !local.PushLocalArtifacts( m, h, a.Select( p => p.Artifact ) ) )
                         {
                             Debug.Assert( error(), "An error must have been logged." );
+                            return;
                             m.Warn( "Continuing push process despite the error to maximize the number of pushed artifacts." );
                         }
                     }
