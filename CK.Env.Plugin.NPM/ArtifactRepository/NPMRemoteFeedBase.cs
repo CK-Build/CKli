@@ -101,7 +101,7 @@ namespace CK.Env.NPM
         /// <param name="ctx">The monitor to use.</param>
         /// <param name="files">The set of packages to push.</param>
         /// <returns>True on success, false on error..</returns>
-        async Task<bool> PushPackagesAsync( IActivityMonitor m, IEnumerable<LocalNPMPackageFile> files )
+        async Task<bool> PushPackagesAsync( IActivityMonitor m, IEnumerable<LocalNPMPackageFile> files, bool arePublicArtifacts )
         {
             bool success = true;
             using( var a = m.OpenInfo( "Pushing packages..." ) )
@@ -179,7 +179,7 @@ namespace CK.Env.NPM
                 }
                 else
                 {
-                    success &= await PushPackagesAsync( m, accepted );
+                    success &= await PushPackagesAsync( m, accepted, artifacts.ArePublicArtifacts );
                 }
             }
             return success;

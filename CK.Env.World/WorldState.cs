@@ -1056,7 +1056,7 @@ namespace CK.Env
                     using( m.OpenInfo( $"Publishing to target: {a.Key}." ) )
                     {
                         IArtifactRepository h = _artifacts.Find( a.Key );
-                        if( !local.PushLocalArtifacts( m, h, a.Select( p => p.Artifact ) ) )
+                        if( !local.PushLocalArtifacts( m, h, a.Select( p => p.Artifact ), IsPublicWorld ) )
                         {
                             Debug.Assert( error(), "An error must have been logged." );
                             m.Warn( "Continuing push process despite the error to maximize the number of pushed artifacts." );

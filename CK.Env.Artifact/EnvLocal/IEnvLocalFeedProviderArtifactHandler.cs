@@ -41,8 +41,12 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="target">The repository target.</param>
         /// <param name="artifacts">Set of artifact instances.</param>
+        /// <param name="arePublicArtifacts">
+        /// True if the artifacts are public and can be pushed to public repositories (no authentication required to download them).
+        /// False to forbid these artifacts to eventually be available from any public repositories.
+        /// </param>
         /// <returns>True on success, false on error.</returns>
-        bool PushLocalArtifacts( IEnvLocalFeed feed, IActivityMonitor m, IArtifactRepository target, IEnumerable<ArtifactInstance> artifacts );
+        bool PushLocalArtifacts( IEnvLocalFeed feed, IActivityMonitor m, IArtifactRepository target, IEnumerable<ArtifactInstance> artifacts, bool arePublicArtifacts );
 
     }
 }
