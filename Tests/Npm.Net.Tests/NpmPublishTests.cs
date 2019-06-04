@@ -1,19 +1,17 @@
 using CK.Core;
+using CK.Env.Tests;
 using FluentAssertions;
 using Newtonsoft.Json.Linq;
-using Npm.Net;
 using NUnit.Framework;
 using System;
 using System.IO;
 using System.IO.Compression;
-using System.Net;
-using System.Net.Http;
-using System.Net.Sockets;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
-namespace Tests
+
+namespace Npm.Net.Tests
 {
-    public class Tests
+    public class NpmPublishTests
     {
 
         [Test]
@@ -48,7 +46,7 @@ namespace Tests
         public async Task PublishOnNpm()
         {
             string pat = "";
-            var registry = new Registry( new HttpClient(), pat );
+            var registry = new Registry( TestHelperHttpClient.HttpClient, pat );
             using( FileStream stream = File.OpenRead( "testpackagethatnooneshoulduse-6.42.5-ci.tgz" ) )
             {
                 bool success = await registry.PublishAsync( TestHelper.Monitor, stream, "dist-tag-test" );
