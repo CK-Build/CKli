@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Env;
+using CK.Text;
 using CSemVer;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -20,11 +21,13 @@ namespace Npm.Net
 {
     public class Registry
     {
+        static readonly Uri _npmjs = new Uri( "https://registry.npmjs.org/" );
         readonly HttpClient _httpClient;
-        readonly string _password;
-        readonly string _username;
         readonly AuthenticationHeaderValue _authHeader;
         readonly string _session = GenerateSessionId();
+
+        readonly string _password;
+        readonly string _username;
 
         /// <summary>
         /// NPM ask a one time password, so here you have one.
@@ -44,13 +47,8 @@ namespace Npm.Net
         /// <param name="uri"></param>
         public Registry( HttpClient httpClient, Uri uri = null )
         {
-            RegistryUri = uri;
-            if( RegistryUri == null )
-            {
-                RegistryUri = new Uri( "https://registry.npmjs.org/" );
-            }
+            RegistryUri = uri ?? _npmjs;
             _httpClient = httpClient;
-            _authHeader = null;
         }
 
         /// <summary>
@@ -60,13 +58,8 @@ namespace Npm.Net
         /// <param name="token"></param>
         /// <param name="uri">if null the Uri is https://registry.npmjs.org/ </param>
         public Registry( HttpClient httpClient, string token, Uri uri = null )
+            : this( httpClient, uri )
         {
-            RegistryUri = uri;
-            if( RegistryUri == null )
-            {
-                RegistryUri = new Uri( "https://registry.npmjs.org/" );
-            }
-            _httpClient = httpClient;
             _authHeader = new AuthenticationHeaderValue( "Bearer", token );
         }
 
@@ -78,13 +71,8 @@ namespace Npm.Net
         /// <param name="password"></param>
         /// <param name="uri">if null the Uri is https://registry.npmjs.org/ </param>
         public Registry( HttpClient httpClient, string username, string password, Uri uri = null )
+            : this( httpClient, uri )
         {
-            RegistryUri = uri;
-            if( RegistryUri == null )
-            {
-                RegistryUri = new Uri( "https://registry.npmjs.org/" );
-            }
-            _httpClient = httpClient;
             _username = username;
             _password = password;
             string basic = Convert.ToBase64String( Encoding.ASCII.GetBytes( $"{username}:{password}" ) );
@@ -95,6 +83,7 @@ namespace Npm.Net
         /// Uri of the registry
         /// </summary>
         public Uri RegistryUri { get; }
+
         /// <summary>
         /// Gets or Sets wether we are running in CI or not.
         /// The fields is automatically setted based on the environement variables with the same bahavior of npm.
@@ -105,27 +94,35 @@ namespace Npm.Net
             Environment.GetEnvironmentVariable( "bamboo.buildKey" ) != null ||
             Environment.GetEnvironmentVariable( "GO_PIPELINE_NAME" ) != null;
 
+        /// <summary>
+        /// Gets the dist tags for the package.
+        /// </summary>
+        /// <param name="m">The monitor.</param>
+        /// <param name="packageName">The package name.</param>
+        /// <returns>The raw JSON object.</returns>
         public async Task<string> GetDistTags( IActivityMonitor m, string packageName )
         {
             using( HttpRequestMessage req = NpmRequestMessage( m, $"/-/package/{packageName}/dist-tags", HttpMethod.Get ) )
             using( HttpResponseMessage response = await _httpClient.SendAsync( req ) )
             {
-                await CheckResponse( m, response );
-                return await response.Content.ReadAsStringAsync();
+                return await HandleResponse( m, response )
+                        ? await response.Content.ReadAsStringAsync()
+                        : null;
             }
         }
 
         public async Task<bool> AddDistTag( IActivityMonitor m, string packageName, SVersion version, string tagName )
         {
+            if( String.IsNullOrWhiteSpace( tagName ) ) throw new ArgumentNullException( nameof( tagName ) );
+            tagName = tagName.ToLowerInvariant();
             using( HttpRequestMessage req = NpmRequestMessage( m, $"/-/package/{packageName}/dist-tags/{tagName}", HttpMethod.Put ) )
             {
-                string a = "\"" + version.ToString() + "\"";
-                req.Content = new StringContent( "\"" + version.ToString() + "\"" );
+                req.Content = new StringContent( "\"" + version.ToNuGetPackageString() + "\"" );
                 req.Content.Headers.ContentType.MediaType = "application/json";
                 req.Content.Headers.ContentType.CharSet = "";
                 using( HttpResponseMessage response = await _httpClient.SendAsync( req ) )
                 {
-                    return await CheckResponse( m, response );
+                    return await HandleResponse( m, response );
                 }
             }
         }
@@ -152,10 +149,10 @@ namespace Npm.Net
                     uglyDecompressedBuffer.Position = 0;
                     packageJson = ExtractPackageJson( m, uglyDecompressedBuffer );
                 }
-                uglyBuffer.Position = 0;
                 string packageName = packageJson["name"].ToString();
                 try
                 {
+                    uglyBuffer.Position = 0;
                     using( HttpRequestMessage req = NpmRequestMessage( m, packageName, HttpMethod.Put ) )
                     using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream( m, RegistryUri, packageJson, uglyBuffer, distTag ) )
                     {
@@ -170,62 +167,82 @@ namespace Npm.Net
                          **/
                         using( var response = await _httpClient.SendAsync( req ) )
                         {
-                            if( !await CheckResponse( m, response ) ) throw new InvalidOperationException("Fallback trigger");
-                            return true;
+                            return await HandleResponse( m, response )
+                                    || PublishViaNPMProcess( m, uglyBuffer, packageName, distTag );
                         }
                     }
                 }
                 catch( Exception e )
                 {
-                    uglyBuffer.Position = 0;
-                    m.Error( e );
-                    m.Info( "Falling back on npm publish." );
-
-                    string tempDirectory = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
-                    Directory.CreateDirectory( tempDirectory );
-
-                    using( StreamWriter w = File.CreateText( Path.Combine( tempDirectory, ".npmrc" ) ) )
-                    {
-                        string uriString = RegistryUri.ToString();
-                        await w.WriteLineAsync( $"registry={uriString}" );
-                        string uriConfig = uriString.Remove( 0, uriString.IndexOf( '/' ));
-
-                        if( _authHeader == null ) throw new InvalidOperationException( "No credentials to publish." );
-                        if( _authHeader.Scheme == "Basic" )
-                        {
-                            await w.WriteLineAsync( $"{uriConfig}:always-auth=true" );
-                            await w.WriteLineAsync( $"{uriConfig}:_password={_password}" );
-                            await w.WriteLineAsync( $"{uriConfig}:username={_username}" );
-                        }
-                        else if( _authHeader.Scheme == "Bearer" )
-                        {
-                            await w.WriteLineAsync( $"{uriConfig}:always-auth=true" );
-                            await w.WriteLineAsync( $"{uriConfig}:_authToken={_authHeader.Parameter}" );
-                        }
-
-                        if( packageName.Contains( "@" ) )
-                        {
-                            await w.WriteLineAsync( packageName.Substring( 0, packageName.IndexOf( '/' ) ) + $":registry={RegistryUri.ToString()}" );
-                        }
-                    }
-                    using( Stream stream = File.Create( Path.Combine( tempDirectory, "tarball.tgz" ) ) )
-                    {
-                        uglyBuffer.CopyTo( stream );
-                    }
-                    m.Info( "Running npm publish..." );
-                    string distTagArg = "";
-                    if(distTag != null)
-                    {
-                        distTagArg = $"--tag {distTag}";
-                    }
-                    bool output = ProcessRunner.Run( m, tempDirectory, "cmd.exe", $"/C npm publish tarball.tgz {distTagArg}", LogLevel.Debug );
-                    Directory.Delete( tempDirectory, true );
-                    return output;
+                    m.Error( "While publishing via the API.", e );
+                    return PublishViaNPMProcess( m, uglyBuffer, packageName, distTag );
                 }
             }
 
         }
 
+        bool PublishViaNPMProcess( IActivityMonitor m, MemoryStream uglyBuffer, string packageName, string distTag )
+        {
+            string tempDirectory = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
+            using( m.OpenInfo( "Falling back on 'npm publish' external process." ) )
+            {
+                try
+                {
+                    Directory.CreateDirectory( tempDirectory );
+                    using( StreamWriter w = File.CreateText( Path.Combine( tempDirectory, ".npmrc" ) ) )
+                    {
+                        string uriString = RegistryUri.ToString();
+                        w.WriteLine( $"registry={uriString}" );
+                        string uriConfig = uriString.Remove( 0, uriString.IndexOf( '/' ) );
+
+                        if( _authHeader == null )
+                        {
+                            m.Error( "Missing credentials to configure npm.rc file." );
+                            return false;
+                        }
+                        if( _authHeader.Scheme == "Basic" )
+                        {
+                            w.WriteLine( $"{uriConfig}:always-auth=true" );
+                            w.WriteLine( $"{uriConfig}:_password={_password}" );
+                            w.WriteLine( $"{uriConfig}:username={_username}" );
+                        }
+                        else if( _authHeader.Scheme == "Bearer" )
+                        {
+                            w.WriteLine( $"{uriConfig}:always-auth=true" );
+                            w.WriteLine( $"{uriConfig}:_authToken={_authHeader.Parameter}" );
+                        }
+
+                        if( packageName.Contains( "@" ) )
+                        {
+                            w.WriteLine( packageName.Substring( 0, packageName.IndexOf( '/' ) ) + $":registry={RegistryUri.ToString()}" );
+                        }
+                    }
+                    using( Stream stream = File.Create( Path.Combine( tempDirectory, "tarball.tgz" ) ) )
+                    {
+                        uglyBuffer.Position = 0;
+                        uglyBuffer.CopyTo( stream );
+                    }
+                    string distTagArg = distTag != null ? $"--tag {distTag.ToLowerInvariant()}" : "";
+                    return ProcessRunner.Run( m, tempDirectory, "cmd.exe", $"/C npm publish tarball.tgz {distTagArg}", LogLevel.Debug );
+                }
+                catch( Exception ex )
+                {
+                    m.Error( ex );
+                    return false;
+                }
+                finally
+                {
+                    try
+                    {
+                        Directory.Delete( tempDirectory, true );
+                    }
+                    catch( Exception ex )
+                    {
+                        m.Warn( $"While destroying temporary folder: {tempDirectory}", ex );
+                    }
+                }
+            }
+        }
 
         async Task<(string body, HttpStatusCode statusCode)> ViewRequest( IActivityMonitor m, string endpoint, bool abreviated )
         {
@@ -239,11 +256,12 @@ namespace Npm.Net
                 }
                 using( var response = await _httpClient.SendAsync( req ) )
                 {
-                    await CheckResponse( m, response );
-                    return (await response.Content.ReadAsStringAsync(), response.StatusCode);
+                    await HandleResponse( m, response );
+                    var body = await response.Content.ReadAsStringAsync();
+                    m.Debug( body );
+                    return (body, response.StatusCode);
                 }
             }
-
         }
 
         async Task<(string, bool)> LegacyViewWithVersion( IActivityMonitor m, string packageName, SVersion version, bool abreviated )
@@ -253,13 +271,10 @@ namespace Npm.Net
             {
                 return (body, false);
             }
-            m.Info( "This registry does not have implemented the endpoint to get info on the specific version. " +
-                "I fetched all the versions and filtered the output for you." );
-            //Here the request is successful so we should have valid json.
+            // Here the request is successful so we should have valid json.
             JObject fullData = JObject.Parse( body );
-            JToken versions = fullData["versions"];
-            JToken specificVersion = versions[version];
-            return (specificVersion?.ToString() ?? "", specificVersion != null);
+            var v = fullData["versions"][version.ToNuGetPackageString()];
+            return (v?.ToString() ?? "", v != null);
         }
 
         (string organization, string feedId) GetAzureInfoFromUri()
@@ -290,22 +305,11 @@ namespace Npm.Net
             }
         }
 
-        public async Task<bool> Exist( IActivityMonitor m, string packageName, SVersion version )
-        {
-            if( IsAzureRepository() )
-            {
-                (_, bool found) = await AzureSpecialVersionRequest( m, packageName, version.ToString() );
-                return found;
-            }
-            (_, bool exist) = await View( m, packageName, version );
-            return exist;
-        }
-
         public async Task<bool> ExistAsync( IActivityMonitor m, string packageName, SVersion version )
         {
             if( IsAzureRepository() )
             {
-                (_, bool found) = await AzureSpecialVersionRequest( m, packageName, version.ToString() );
+                (_, bool found) = await AzureSpecialVersionRequest( m, packageName, version.ToNuGetPackageString() );
                 return found;
             }
             (_, bool exist) = await View( m, packageName, version );
@@ -326,38 +330,12 @@ namespace Npm.Net
         {
             if( version == null )
             {
-                //We can't optimise it unless we know the fallback feed, and we can't know with azure because the api ask for a version.
-                m.Debug( "You asked for ALL the versions of the package." );
+                // We can't optimise it unless we know the fallback feed, and we can't know with azure because the api ask for a version.
+                m.Debug( "Getting all the versions of the package." );
                 (string body, HttpStatusCode statusCode) = await ViewRequest( m, packageName, abbreviatedResponse );
                 return (body, IsSuccessStatusCode( statusCode ));
             }
-            //Here we know that the user specified the version
-
-            if( IsAzureRepository() )
-            {
-                (string body, bool found) = await AzureSpecialVersionRequest( m, packageName, version.ToString() );
-                if( !found )
-                {
-                    m.Info( "Azure API indicated that this version does not exist" );
-                    return ("", false);
-                }
-                JObject json = JObject.Parse( body );
-                if( json["sourceChain"] is JArray sourceChain )
-                {
-                    List<JToken> validRepository = sourceChain.Values()
-                        .Where(
-                        p => p["sourceType"]?.ToString() == "public"
-                        && Uri.TryCreate( p["location"]?.ToString(), UriKind.Absolute, out Uri result )).ToList();
-                    if( validRepository.Count == 1 )
-                    {
-                        var sourceRepository = new Registry( _httpClient, validRepository.Single()["location"].ToString() );
-                        m.Debug( "Source repository have probably an api more up to date than azure, we ask it the data" );
-                        return await sourceRepository.View( m, packageName, version );
-                    }
-                    //We won't try if we get multiple source feeds, knowing where is the package is up to azure.
-                }
-            }
-            m.Debug( "I know the registry is not up to date, so i use Legacy methods." );
+            // Here we know that the user specified the version
             return await LegacyViewWithVersion( m, packageName, version, abbreviatedResponse );
         }
 
@@ -375,6 +353,7 @@ namespace Npm.Net
         /// <param name="projectScope"></param>
         /// <returns></returns>
         HttpRequestMessage NpmRequestMessage( IActivityMonitor m, string endpoint, HttpMethod method ) => NpmRequestMessage( m, new Uri( RegistryUri + endpoint ), method );
+
         HttpRequestMessage NpmRequestMessage( IActivityMonitor m, Uri fullUri, HttpMethod method )
         {
             var req = new HttpRequestMessage
@@ -403,118 +382,112 @@ namespace Npm.Net
             }
         }
 
-        async Task<bool> CheckResponse( IActivityMonitor m, HttpResponseMessage res, bool failOnWarning = false )
+        async Task<bool> HandleResponse( IActivityMonitor m, HttpResponseMessage res )
         {
-            m.Info( "Checking response" );
             HttpResponseHeaders headers = res.Headers;
             if( headers.Contains( "npm-notice" ) && !headers.Contains( "x-local-cache" ) )
             {
-                List<string> notices = headers.GetValues( "npm-notice" ).ToList();
-                m.Log( LogLevel.Info, string.Join( ",", notices ) );
+                m.Info( $"npm-notice headers: {headers.GetValues( "npm-notice" ).Concatenate()}" );
             }
-            bool fail = false;
-            if( CheckWarnings( m, headers ) && failOnWarning ) fail = true;
-            if( await CheckErrors( m, res ) ) fail = true;
-            return !fail;
+            DumpWarnings( m, headers );
+            return await LogErrors( m, res );
         }
+
+
         /// <summary>
-        /// 
+        /// Logs potential errors. Returns true if no error occured, false on error.
         /// </summary>
         /// <param name="m"></param>
         /// <param name="res"></param>
-        /// <returns><see langword="true"/> if there is an error</returns>
-        async Task<bool> CheckErrors( IActivityMonitor m, HttpResponseMessage res )
+        /// <returns>True on success, false on error.</returns>
+        async Task<bool> LogErrors( IActivityMonitor m, HttpResponseMessage res )
         {
-            string body = await res.Content.ReadAsStringAsync();
-            bool successCode = res.IsSuccessStatusCode;
-            if( !successCode )
+            if( res.StatusCode == HttpStatusCode.Unauthorized )
             {
-                m.Error( "Response status code is not a success code: " + res.ReasonPhrase );
-                m.Error( body );
+                using( m.OpenError( "Unauthorized Status Code" ) )
+                {
+                    if( res.Headers.Contains( "www-authenticate" ) )
+                    {
+                        List<string> auth = res.Headers.GetValues( "www-authenticate" ).ToList();
+                        if( auth.Contains( "ipaddress" ) )
+                        {
+                            m.Error( "Login is not allowed from your IP address" );
+                        }
+                        else if( auth.Contains( "otp" ) )
+                        {
+                            m.Error( "OTP required for authentication" );
+                        }
+                        else
+                        {
+                            m.Error( "Unable to authenticate, need: " + string.Join( ",", auth ) );
+                        }
+                    }
+                    else
+                    {
+                        if( (await res.Content.ReadAsStringAsync()).Contains( "one-time pass" ) )
+                        {
+                            m.Error( "OTP required for authentication." );
+                        }
+                        else
+                        {
+                            m.Error( "Unknown error." );
+                        }
+                    }
+                }
+                return false;
+            }
+            if( !res.IsSuccessStatusCode )
+            {
+                using( m.OpenError( $"Response status code is not a success code: '{res.ReasonPhrase}'." ) )
+                {
+                    m.Trace( await res.Content.ReadAsStringAsync() );
+                }
+                return false;
             }
             else
             {
-                m.Trace( "Response status code is a success status code." );
-            }
-
-            if( res.StatusCode == HttpStatusCode.Unauthorized )
-            {
-                m.Error( "Unauthorized Status Code" );
-
-                if( res.Headers.Contains( "www-authenticate" ) )
-                {
-                    List<string> auth = res.Headers.GetValues( "www-authenticate" ).ToList();
-                    if( auth.Contains( "ipaddress" ) )
-                    {
-                        m.Error( "Login is not allowed from your IP address" );
-                    }
-                    else if( auth.Contains( "otp" ) )
-                    {
-                        m.Error( "OTP required for authentication" );
-                    }
-                    else
-                    {
-                        m.Error( "Unable to authenticate, need: " + string.Join( ",", auth ) );
-                    }
-                }
-                else
-                {
-                    if( body.Contains( "one-time pass" ) )
-                    {
-                        m.Error( "OTP required for authentication." );
-                    }
-                    else
-                    {
-                        m.Error( "Unknown error." );
-                    }
-                }
-                return true;
-            }
-            return successCode;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="m"></param>
-        /// <param name="responseHeaders"></param>
-        /// <returns><see langword="true"/> if there is a warning</returns>
-        bool CheckWarnings( IActivityMonitor m, HttpResponseHeaders responseHeaders )
-        {
-            if( !responseHeaders.Contains( "warning" ) ) return false;
-            var warningsHeader = responseHeaders.GetValues( "warning" ).ToList();
-            foreach( string warning in warningsHeader )
-            {
-                var match = Regex.Match( warning, @"/^\s*(\d{3})\s+(\S+)\s+""(.*)""\s+""([^""]+)""/" );
-                if( !int.TryParse( match.Groups[1].Value, out int code ) )
-                {
-                    m.Error( "Incorrect warning header format." );
-                }
-                string host = match.Groups[2].Value;
-                string message = match.Groups[3].Value;
-                DateTime date = JsonConvert.DeserializeObject<DateTime>( match.Groups[4].Value );
-
-                if( code == 199 )
-                {
-                    if( message.Contains( "ENOTFOUND" ) )
-                    {
-                        m.Warn( $"registry: Using stale data from {RegistryUri.ToString()} because the host is inaccessible -- are you offline?" );
-                        m.Error( "Npm.Net is not using any caches, so you should not see the previous warning." );
-                    }
-                    else
-                    {
-                        m.Warn( $"Unexpected warning for {RegistryUri.ToString()}: {message}" );
-                    }
-                }
-
-                if( code == 111 )
-                {
-                    m.Warn( $"Using stale data from {RegistryUri.ToString()} due to a request error during revalidation." );
-                }
+                m.Debug( "Response status code is a success status code." );
             }
             return true;
         }
 
+        void DumpWarnings( IActivityMonitor m, HttpResponseHeaders responseHeaders )
+        {
+            if( responseHeaders.Contains( "warning" ) )
+            {
+                foreach( string warning in responseHeaders.GetValues( "warning" ) )
+                {
+                    m.Warn( $"NPM warning: {warning}" );
+                    var match = Regex.Match( warning, @"/^\s*(\d{3})\s+(\S+)\s+""(.*)""\s+""([^""]+)""/" );
+                    if( !int.TryParse( match.Groups[1].Value, out int code ) )
+                    {
+                        m.Error( "Incorrect warning header format." );
+                        continue;
+                    }
+                    string host = match.Groups[2].Value;
+                    string message = match.Groups[3].Value;
+                    DateTime date = JsonConvert.DeserializeObject<DateTime>( match.Groups[4].Value );
+                    if( code == 199 )
+                    {
+                        if( message.Contains( "ENOTFOUND" ) )
+                        {
+                            m.Warn( $"registry: Using stale data from {RegistryUri.ToString()} because the host is inaccessible -- are you offline?" );
+                            m.Error( "Npm.Net is not using any caches, so you should not see the previous warning." );
+                        }
+                        else
+                        {
+                            m.Warn( $"Unexpected warning for {RegistryUri.ToString()}: {message}" );
+                        }
+                    }
+                    else if( code == 111 )
+                    {
+                        m.Warn( $"Using stale data from {RegistryUri.ToString()} due to a request error during revalidation." );
+                    }
+                }
+            }
+        }
+
+        public override string ToString() => RegistryUri.ToString();
         public static JObject ExtractPackageJson( IActivityMonitor m, MemoryStream tarball )
         {
             var buffer = new byte[100];

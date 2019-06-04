@@ -1059,7 +1059,6 @@ namespace CK.Env
                         if( !local.PushLocalArtifacts( m, h, a.Select( p => p.Artifact ) ) )
                         {
                             Debug.Assert( error(), "An error must have been logged." );
-                            return;
                             m.Warn( "Continuing push process despite the error to maximize the number of pushed artifacts." );
                         }
                     }
