@@ -19,22 +19,23 @@ namespace Npm.Net
         const string _tarbalLengthString = "TARBALL_LENGTH_TO_REPLACE";
         readonly IActivityMonitor _m;
         readonly MergeStream _mergeStream;
-
+        public readonly string PackageName;
         MetadataStream( IActivityMonitor m, MergeStream mergeStream )
         {
             _m = m ?? throw new NullReferenceException();
             _mergeStream = mergeStream ?? throw new NullReferenceException();
-            Headers.Add( "content-type", "application/json" );
         }
 
         public static MetadataStream LegacyMetadataStream(
             IActivityMonitor m,
             Uri registryUri,
             JObject packageJson,
-            Stream tarball,
-            string distTag )
+            MemoryStream tarball,
+            string distTag,
+            bool isPublic,
+            string packageName )
         {
-            JObject json = LegacyMetadataJson( m, registryUri, packageJson, tarball, distTag );
+            JObject json = LegacyMetadataJson( m, registryUri, packageJson, tarball, distTag, isPublic );
             return FromMetadata( m, json, tarball );
         }
 
@@ -58,7 +59,7 @@ namespace Npm.Net
             return output;
         }
 
-        static JObject LegacyMetadataJson( IActivityMonitor m, Uri registryUri, JObject packageJson, Stream tarball, string distTag )
+        static JObject LegacyMetadataJson( IActivityMonitor m, Uri registryUri, JObject packageJson, Stream tarball, string distTag, bool isPublic )
         {
             if( distTag == null ) distTag = "latest"; else distTag = distTag.ToLowerInvariant();
             if( !tarball.CanSeek ) throw new ArgumentException( "I need two pass on this stream" );
@@ -84,6 +85,7 @@ namespace Npm.Net
             string tbName = packageJson["name"] + "-" + packageJson["version"] + ".tgz";
             string tbUri = new Uri( registryUri, packageJson["name"] + "/-/" + tbName ).ToString().Replace( "https", "http" );
             m.Debug( $"legacy tarball uri: {tbUri}." );
+
             packageJson["dist"] = new JObject()
             {
                 ["integrity"] = integrity,
@@ -94,7 +96,7 @@ namespace Npm.Net
             {
                 ["_id"] = packageJson["name"],
                 ["name"] = packageJson["name"],
-                ["description"] = packageJson["name"],
+                ["description"] = packageJson["description"] ?? "",
                 ["dist-tags"] = new JObject
                 {
                     [distTag] = packageJson["version"]
@@ -104,6 +106,7 @@ namespace Npm.Net
                     [packageJson["version"].ToString()] = packageJson
                 },
                 ["readme"] = packageJson["readme"] ?? "",
+                ["access"] = isPublic ? "public" : "restricted",
                 ["_attachments"] = new JObject
                 {
                     [tbName] = new JObject()

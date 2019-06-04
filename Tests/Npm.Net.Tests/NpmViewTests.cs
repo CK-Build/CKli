@@ -36,5 +36,7 @@ namespace Npm.Net.Tests
             json["version"].ToString().Should().Be( "0.0.1" );
             json["name"].ToString().Should().Be( "@signature/json-graph-serializer" );
         }
+
+        
     }
 }

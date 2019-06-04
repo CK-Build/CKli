@@ -138,24 +138,18 @@ namespace Npm.Net
         /// <returns></returns>
         public async Task<bool> PublishAsync( IActivityMonitor m, Stream tarball, string distTag = null )
         {
+            bool isPublic = RegistryUri == _npmjs;
             JObject packageJson;
             using( MemoryStream uglyBuffer = new MemoryStream() )
             {
                 await tarball.CopyToAsync( uglyBuffer );
                 uglyBuffer.Position = 0;
-                using( GZipStream decompressed = new GZipStream( uglyBuffer, CompressionMode.Decompress, true ) )
-                using( MemoryStream uglyDecompressedBuffer = new MemoryStream() )
-                {
-                    decompressed.CopyTo( uglyDecompressedBuffer );
-                    uglyDecompressedBuffer.Position = 0;
-                    packageJson = ExtractPackageJson( m, uglyDecompressedBuffer );
-                }
-                string packageName = packageJson["name"].ToString();
+
                 try
                 {
                     uglyBuffer.Position = 0;
-                    using( HttpRequestMessage req = NpmRequestMessage( m, packageName, HttpMethod.Put ) )
-                    using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream( m, RegistryUri, packageJson, uglyBuffer, distTag ) )
+                    using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream( m, RegistryUri, uglyBuffer, distTag, isPublic ) )
+                    using( HttpRequestMessage req = NpmRequestMessage( m, WebUtility.UrlEncode( packageName ), HttpMethod.Put ) )
                     {
                         req.Content = metadataStream;
                         /**
@@ -169,21 +163,31 @@ namespace Npm.Net
                         using( var response = await _httpClient.SendAsync( req ) )
                         {
                             return await HandleResponse( m, response )
-                                    || PublishViaNPMProcess( m, uglyBuffer, packageName, distTag );
+                                    || PublishViaNPMProcess( m, uglyBuffer, distTag, isPublic ); ;
                         }
                     }
                 }
                 catch( Exception e )
                 {
+
                     m.Error( "While publishing via the API.", e );
-                    return PublishViaNPMProcess( m, uglyBuffer, packageName, distTag );
+                    return PublishViaNPMProcess( m, uglyBuffer, distTag, isPublic );
                 }
             }
 
         }
 
-        bool PublishViaNPMProcess( IActivityMonitor m, MemoryStream uglyBuffer, string packageName, string distTag )
+        bool PublishViaNPMProcess( IActivityMonitor m, MemoryStream uglyBuffer, string distTag, bool isPublic )
         {
+            JObject packageJson;
+            using( GZipStream decompressed = new GZipStream( uglyBuffer, CompressionMode.Decompress, true ) )
+            using( MemoryStream uglyDecompressedBuffer = new MemoryStream() )
+            {
+                decompressed.CopyTo( uglyDecompressedBuffer );
+                uglyDecompressedBuffer.Position = 0;
+                packageJson = ExtractPackageJson( m, uglyDecompressedBuffer );
+            }
+            string packageName = packageJson["name"].ToString();
             string tempDirectory = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
             using( m.OpenInfo( "Falling back on 'npm publish' external process." ) )
             {
@@ -224,7 +228,8 @@ namespace Npm.Net
                         uglyBuffer.CopyTo( stream );
                     }
                     string distTagArg = distTag != null ? $"--tag {distTag.ToLowerInvariant()}" : "";
-                    return ProcessRunner.Run( m, tempDirectory, "cmd.exe", $"/C npm publish tarball.tgz {distTagArg}", LogLevel.Debug );
+                    string access = isPublic ? "public" : "private";
+                    return ProcessRunner.Run( m, tempDirectory, "cmd.exe", $"/C npm publish tarball.tgz --access {access} {distTagArg}", LogLevel.Debug );
                 }
                 catch( Exception ex )
                 {
@@ -489,39 +494,6 @@ namespace Npm.Net
         }
 
         public override string ToString() => RegistryUri.ToString();
-        public static JObject ExtractPackageJson( IActivityMonitor m, MemoryStream tarball )
-        {
-            var buffer = new byte[100];
-            while( true )
-            {
-                tarball.Read( buffer, 0, 100 );
-                var name = Encoding.ASCII.GetString( buffer ).Trim( ' ', '\0' );
-                if( String.IsNullOrWhiteSpace( name ) )
-                {
-                    m.Error( "Tar entry 'package/packae.json' not found." );
-                    return null;
-                }
-                tarball.Seek( 24, SeekOrigin.Current );
-                tarball.Read( buffer, 0, 12 );
-                var size = Convert.ToInt64( Encoding.ASCII.GetString( buffer, 0, 12 ).Trim( ' ', '\0' ), 8 );
-                tarball.Seek( 376L, SeekOrigin.Current );
-                if( name == "package/package.json" )
-                {
-                    m.Info( "Found 'package/package.json' in tarball" );
-                    var bytes = new Byte[size];
-                    tarball.Read( bytes, 0, bytes.Length );
-                    var s = Encoding.UTF8.GetString( bytes );
-                    return JObject.Parse( s );
-                }
-                else
-                {
-                    tarball.Seek( size, SeekOrigin.Current );
-                }
-                var pos = tarball.Position;
-                var offset = 512 - (pos % 512);
-                if( offset == 512 ) offset = 0;
-                tarball.Seek( offset, SeekOrigin.Current );
-            }
-        }
+        
     }
 }
