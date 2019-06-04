@@ -43,6 +43,12 @@ namespace CK.Env.NPM
         public Registry Registry { get; }
 
         /// <summary>
+        /// Overridden to return the <see cref="Info"/> string.
+        /// </summary>
+        /// <returns>A readable string.</returns>
+        public override string ToString() => Info.ToString();
+
+        /// <summary>
         /// Must resolve the push API key.
         /// The push API key is not necessarily the secret behind <see cref="SecretKeyName"/>.
         /// </summary>

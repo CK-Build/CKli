@@ -115,6 +115,7 @@ namespace Npm.Net
         {
             if( String.IsNullOrWhiteSpace( tagName ) ) throw new ArgumentNullException( nameof( tagName ) );
             tagName = tagName.ToLowerInvariant();
+            packageName = WebUtility.UrlEncode( packageName );
             using( HttpRequestMessage req = NpmRequestMessage( m, $"/-/package/{packageName}/dist-tags/{tagName}", HttpMethod.Put ) )
             {
                 req.Content = new StringContent( "\"" + version.ToNuGetPackageString() + "\"" );
