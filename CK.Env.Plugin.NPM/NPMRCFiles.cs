@@ -145,10 +145,5 @@ namespace CK.Env.Plugin
             if( idx < 0 ) lines.Add( new Line( key, value ) );
             else lines[idx] = new Line( key, value );
         }
-
-        void RemoveLineWithKey( List<Line> lines, string key )
-        {
-        }
-
     }
 }

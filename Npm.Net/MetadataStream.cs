@@ -60,6 +60,7 @@ namespace Npm.Net
 
         static JObject LegacyMetadataJson( IActivityMonitor m, Uri registryUri, JObject packageJson, Stream tarball, string distTag )
         {
+            if( distTag == null ) distTag = "latest";
             if( !tarball.CanSeek ) throw new ArgumentException( "I need two pass on this stream" );
             string checkJson = packageJson.ToString();
 

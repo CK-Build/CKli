@@ -112,11 +112,17 @@ namespace CK.Env.NPM
                     else
                     {
                         string firstDistTag = file.Instance.Version.PackageQuality.GetLabels()[0].ToString();
-                        if( await Registry.PublishAsync( m, file.FullPath, firstDistTag ) )
+                        using( FileStream fileStream = File.OpenRead( file.FullPath ) )
                         {
-                            pushed.Add( file );
+                            if( await Registry.PublishAsync( m, fileStream, firstDistTag ) )
+                            {
+                                pushed.Add( file );
+                            }
+                            else
+                            {
+                                success = false;
+                            }
                         }
-                        else success = false;
                     }
                 }
                 if( success )

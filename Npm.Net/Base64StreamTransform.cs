@@ -10,10 +10,10 @@ namespace Npm.Net
     {
         readonly Stream _stream;
         long _baseStreamLength;
-        public Base64StreamLength( Stream stream )
+        public Base64StreamLength( Stream stream)
         {
             _baseStreamLength = stream.Length;
-            _stream = new CryptoStream( stream, new ToBase64Transform(), CryptoStreamMode.Read );
+            _stream =  new CryptoStream( stream, new ToBase64Transform(), CryptoStreamMode.Read );
         }
 
         public override bool CanRead => _stream.CanRead;

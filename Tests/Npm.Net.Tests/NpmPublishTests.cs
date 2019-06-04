@@ -10,7 +10,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Threading.Tasks;
-
+using static CK.Testing.MonitorTestHelper;
 namespace Tests
 {
     public class Tests
@@ -21,8 +21,6 @@ namespace Tests
         {
             using( var tarFile = File.OpenRead( "signature-json-graph-serializer-0.0.4.tgz" ) )
             {
-                ActivityMonitor m = new ActivityMonitor();
-
                 var tarball = new MemoryStream();
                 SHA1Value sHA1Value;
                 SHA512Value sHA512Value;
@@ -36,9 +34,9 @@ namespace Tests
                 }
                 tarball.Position = 0;
                 tarFile.Position = 0;
-                var packageJson = Registry.ExtractPackageJson( m, tarball );
+                var packageJson = Registry.ExtractPackageJson( TestHelper.Monitor, tarball );
                 packageJson.Should().NotBeNull();
-                var metadataStream = MetadataStream.LegacyMetadataStream( m, new Uri( "https://Registry.Uri" ), packageJson, tarFile, "test");
+                var metadataStream = MetadataStream.LegacyMetadataStream( TestHelper.Monitor, new Uri( "https://Registry.Uri" ), packageJson, tarFile, "test" );
                 long? length = metadataStream.Headers.ContentLength;
                 length.Should().NotBeNull();
                 string result = await metadataStream.ReadAsStringAsync();
@@ -49,11 +47,13 @@ namespace Tests
         [Test]
         public async Task PublishOnNpm()
         {
-            string pat = "PATGOESHERE";
+            string pat = "";
             var registry = new Registry( new HttpClient(), pat );
-            var m = new ActivityMonitor();
-            bool success = await registry.PublishAsync( m, "testpackagethatnooneshoulduse-6.42.1-ci.tgz", "dist-tag-test" );
-            success.Should().BeTrue();
+            using( FileStream stream = File.OpenRead( "testpackagethatnooneshoulduse-6.42.5-ci.tgz" ) )
+            {
+                bool success = await registry.PublishAsync( TestHelper.Monitor, stream, "dist-tag-test" );
+                success.Should().BeTrue();
+            }
         }
     }
 }
