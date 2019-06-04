@@ -156,7 +156,6 @@ namespace Npm.Net
                 string packageName = packageJson["name"].ToString();
                 try
                 {
-                    throw new InvalidOperationException();
                     using( HttpRequestMessage req = NpmRequestMessage( m, packageName, HttpMethod.Put ) )
                     using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream( m, RegistryUri, packageJson, uglyBuffer, distTag ) )
                     {
@@ -171,7 +170,7 @@ namespace Npm.Net
                          **/
                         using( var response = await _httpClient.SendAsync( req ) )
                         {
-                            if( !await CheckResponse( m, response ) ) throw new InvalidOperationException();
+                            if( !await CheckResponse( m, response ) ) throw new InvalidOperationException("Fallback trigger");
                             return true;
                         }
                     }
