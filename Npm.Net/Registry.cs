@@ -139,7 +139,7 @@ namespace Npm.Net
         public async Task<bool> PublishAsync( IActivityMonitor m, Stream tarball, string distTag = null )
         {
             bool isPublic = RegistryUri == _npmjs;
-            JObject packageJson;
+           
             using( MemoryStream uglyBuffer = new MemoryStream() )
             {
                 await tarball.CopyToAsync( uglyBuffer );
@@ -147,8 +147,10 @@ namespace Npm.Net
 
                 try
                 {
+                    JObject modifiedPackageJson = TarReader.ExtractModifiedPackageJson( m, uglyBuffer );
+                    string packageName = modifiedPackageJson["name"].ToString();
                     uglyBuffer.Position = 0;
-                    using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream( m, RegistryUri, uglyBuffer, distTag, isPublic ) )
+                    using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream(m, RegistryUri, modifiedPackageJson, uglyBuffer, distTag, isPublic))
                     using( HttpRequestMessage req = NpmRequestMessage( m, WebUtility.UrlEncode( packageName ), HttpMethod.Put ) )
                     {
                         req.Content = metadataStream;
@@ -185,7 +187,7 @@ namespace Npm.Net
             {
                 decompressed.CopyTo( uglyDecompressedBuffer );
                 uglyDecompressedBuffer.Position = 0;
-                packageJson = ExtractPackageJson( m, uglyDecompressedBuffer );
+                packageJson = TarReader.ExtractPackageJson( m, uglyDecompressedBuffer );
             }
             string packageName = packageJson["name"].ToString();
             string tempDirectory = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );

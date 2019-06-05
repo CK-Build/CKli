@@ -30,10 +30,9 @@ namespace Npm.Net
             IActivityMonitor m,
             Uri registryUri,
             JObject packageJson,
-            MemoryStream tarball,
+            Stream tarball,
             string distTag,
-            bool isPublic,
-            string packageName )
+            bool isPublic)
         {
             JObject json = LegacyMetadataJson( m, registryUri, packageJson, tarball, distTag, isPublic );
             return FromMetadata( m, json, tarball );
@@ -52,7 +51,7 @@ namespace Npm.Net
             var tarball64 = new Base64StreamLength( tarball );
             mergeStream.AddStream( tarball64 );
             string lengthString = tarball64.Length.ToString();
-            string lastPart = lastJsonPart.Replace( _tarbalLengthString, lengthString );
+            string lastPart = lastJsonPart.Replace( "\""+_tarbalLengthString+"\"", lengthString );
             m.Info( $"Replacing length placeholder by {lengthString}." );
             var lastPartStream = new MemoryStream( Encoding.UTF8.GetBytes( lastPart ) );
             mergeStream.AddStream( lastPartStream );
