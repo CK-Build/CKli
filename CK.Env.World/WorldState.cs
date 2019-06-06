@@ -335,11 +335,11 @@ namespace CK.Env
         bool CheckGlobalGitStatusLocalXorDevelop( IActivityMonitor monitor )
         {
             var s = UpdateGlobalGitStatus();
-            //if( s != StandardGitStatus.Local && s != StandardGitStatus.Develop )
-            //{
-            //    monitor.Error( $"Repositories must all be on '{WorldName.LocalBranchName}' or '{WorldName.DevelopBranchName}' (current status: {s})." );
-            //    return false;
-            //}
+            if( s != StandardGitStatus.Local && s != StandardGitStatus.Develop )
+            {
+                monitor.Error( $"Repositories must all be on '{WorldName.LocalBranchName}' or '{WorldName.DevelopBranchName}' (current status: {s})." );
+                return false;
+            }
             return true;
         }
 
@@ -415,7 +415,7 @@ namespace CK.Env
         {
             var branchName = GetCleanBranchName( monitor );
             if( branchName == null ) return null;
-            if( !_perBranchContext.TryGetValue( "refactoring", out var c ) )
+            if( !_perBranchContext.TryGetValue( branchName, out var c ) )
             {
                 throw new Exception( $"No solution context available for branch {branchName}. GitBranchPlugins are not initialized or a ISolutionDriver plugin implementation is missing." );
             }
@@ -655,9 +655,9 @@ namespace CK.Env
         /// Gets whether <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/> and <see cref="CachedGlobalGitStatus"/>
         /// is on <see cref="StandardGitStatus.Local"/> or <see cref="StandardGitStatus.Develop"/>.
         /// </summary>
-        public bool CanAllBuild => WorkStatus == GlobalWorkStatus.Idle;
-                                   //&& (CachedGlobalGitStatus == StandardGitStatus.Local
-                                   //    || CachedGlobalGitStatus == StandardGitStatus.Develop);
+        public bool CanAllBuild => WorkStatus == GlobalWorkStatus.Idle
+                                   && (CachedGlobalGitStatus == StandardGitStatus.Local
+                                       || CachedGlobalGitStatus == StandardGitStatus.Develop);
 
         [CommandMethod]
         public bool AllBuild( IActivityMonitor monitor, bool rebuildAll = false, bool withUnitTest = true )
