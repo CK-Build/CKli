@@ -29,5 +29,13 @@ namespace CK.Env
         /// Gets the commit message.
         /// </summary>
         DateTimeOffset CommitDate { get; }
+
+        /// <summary>
+        /// Gets the number of commit that are ahead of the origin.
+        /// 0 mean that there a no commit ahead of origin.
+        /// null if there is no origin.
+        /// </summary>
+        int? AheadOriginCommitCount { get; }
+
     }
 }

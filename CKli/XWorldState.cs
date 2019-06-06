@@ -90,7 +90,8 @@ namespace CKli
             foreach( var git in gitFolders )
             {
                 ++gitFoldersCount;
-                using( m.OpenInfo( $"{git.SubPath} - branch: {git.CurrentBranchName}." ) )
+                string commitAhead = git.AheadOriginCommitCount != null ? $"{git.AheadOriginCommitCount} commits ahead origin" : "Untracked";
+                using( m.OpenInfo( $"{git.SubPath} - branch: {git.CurrentBranchName} ({commitAhead})." ) )
                 {
                     string pluginInfo;
                     if( !git.EnsureCurrentBranchPlugins( m ) )

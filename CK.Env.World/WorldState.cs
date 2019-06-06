@@ -1066,7 +1066,10 @@ namespace CK.Env
             } );
         }
 
-        public bool CanGenerateLTSWorld => WorldName.LTSKey == null && !IsDirty;
+        public bool CanGenerateLTSWorld => WorldName.LTSKey == null
+                            && WorkStatus == GlobalWorkStatus.Idle
+                            && (CachedGlobalGitStatus == StandardGitStatus.Local
+                            || CachedGlobalGitStatus == StandardGitStatus.Develop);
 
         [CommandMethod( confirmationRequired: true )]
         public bool GenerateLTSWorld( IActivityMonitor m, string LTSKey )
