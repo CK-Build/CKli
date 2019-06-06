@@ -17,7 +17,7 @@ namespace CK.Env
             }
         }
 
-        public bool PushLocalArtifacts( IEnvLocalFeed feed, IActivityMonitor m, IArtifactRepository target, IEnumerable<ArtifactInstance> artifacts )
+        public bool PushLocalArtifacts( IEnvLocalFeed feed, IActivityMonitor m, IArtifactRepository target, IEnumerable<ArtifactInstance> artifacts, bool arePublicArtifacts )
         {
             if( !target.HandleArtifactType( NPMClient.NPMType ) ) return true;
             var locals = new List<LocalNPMPackageFile>();
@@ -34,7 +34,7 @@ namespace CK.Env
                     locals.Add( local );
                 }
             }
-            return target.PushAsync( m, new NPMArtifactLocalSet( locals ) ).GetAwaiter().GetResult();
+            return target.PushAsync( m, new NPMArtifactLocalSet( locals, arePublicArtifacts ) ).GetAwaiter().GetResult();
         }
 
         public void Remove( IEnvLocalFeed feed, IActivityMonitor m, IEnumerable<ArtifactInstance> artifacts )

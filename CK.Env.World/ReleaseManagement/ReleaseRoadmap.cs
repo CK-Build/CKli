@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -85,9 +86,9 @@ namespace CK.Env
         /// </summary>
         /// <param name="e">The Roadmap element.</param>
         /// <returns>Solutions, Git path and <see cref="ReleaseInfo"/>.</returns>
-        public static IEnumerable<(string SolutionName, string SubPath, ReleaseInfo Info)> Load( XElement e )
+        public static IEnumerable<(string SolutionName, NormalizedPath SubPath, ReleaseInfo Info)> Load( XElement e )
         {
-            return e.Elements().Select( s => ((string)s.AttributeRequired( "Name" ), (string)s.AttributeRequired( "SubPath" ), new ReleaseInfo( s.Element( "ReleaseInfo" ) ) ) );
+            return e.Elements().Select( s => ((string)s.AttributeRequired( "Name" ), new NormalizedPath( (string)s.AttributeRequired( "SubPath" ) ), new ReleaseInfo( s.Element( "ReleaseInfo" ) ) ) );
         }
 
         /// <summary>

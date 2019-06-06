@@ -8,12 +8,15 @@ namespace CK.Env.NuGet
     {
         readonly IReadOnlyCollection<LocalNuGetPackageFile> _locals;
 
-        public NuGetArtifactLocalSet( IReadOnlyCollection<LocalNuGetPackageFile> locals )
+        public NuGetArtifactLocalSet( IReadOnlyCollection<LocalNuGetPackageFile> locals, bool arePublicArtifacts )
         {
             _locals = locals;
+            ArePublicArtifacts = arePublicArtifacts;
         }
 
         public IEnumerable<ArtifactInstance> Instances => _locals.Select( l => l.Instance );
+
+        public bool ArePublicArtifacts { get; }
 
         public int Count => _locals.Count;
 
