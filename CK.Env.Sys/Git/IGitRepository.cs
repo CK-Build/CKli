@@ -14,19 +14,11 @@ namespace CK.Env
         string OriginUrl { get; }
 
         /// <summary>
-        /// Create a local branch in the repository
+        /// Ensures that a local branch exists.
         /// </summary>
-        /// <param name="m"></param>
-        /// <param name="branchName"></param>
-        void CreateBranch( IActivityMonitor m, string branchName );
-
-        /// <summary>
-        /// Create a local branch pointing on the given commitin the repository.
-        /// </summary>
-        /// <param name="m"></param>
-        /// <param name="branchName"></param>
-        /// <param name="commitHash"></param>
-        void CreateBranch( IActivityMonitor m, string branchName, string commitHash );
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="branchName">The branch name.</param>
+        void EnsureBranch( IActivityMonitor m, string branchName );
 
         /// <summary>
         /// Gets the full physical path of the Git folder.

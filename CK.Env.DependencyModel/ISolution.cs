@@ -52,6 +52,10 @@ namespace CK.Env.DependencyModel
         /// </summary>
         IReadOnlyCollection<IArtifactRepository> ArtifactTargets { get; }
 
-
+        /// <summary>
+        /// Gets the artifact sources.
+        /// </summary>
+        IReadOnlyCollection<IArtifactSource> ArtifactSources { get; }
+       
     }
 }

@@ -29,10 +29,10 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="name">The name of the world. See <see cref="IWorldName"/>.</param>
-        /// <param name="ltsKey">The long-term support key. See <see cref="IWorldName"/>.</param>
+        /// <param name="parallelWorld">The long-term support key. See <see cref="IWorldName"/>.</param>
         /// <param name="content">The initial content. Must not be null.</param>
         /// <returns>The new world or null on error.</returns>
-        IWorldName CreateNew( IActivityMonitor m, string name, string ltsKey, XDocument content );
+        IWorldName CreateNew( IActivityMonitor m, string name, string parallelWorld, XDocument content );
 
         /// <summary>
         /// Updates the world description to this store.

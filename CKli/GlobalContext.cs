@@ -126,13 +126,13 @@ namespace CKli
                     foreach( var (Idx, World, LocalPath) in g )
                     {
                         string key;
-                        if( World.LTSKey == null )
+                        if( World.ParallelName == null )
                         {
                             key = "  <Current>";
                         }
                         else
                         {
-                            key = $"[{World.LTSKey}]";
+                            key = $"[{World.ParallelName}]";
                         }
                         Console.WriteLine( $"   > {Idx + 1}{key} => { LocalPath ?? "(No local mapping)"}" );
                     }

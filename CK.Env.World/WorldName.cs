@@ -5,14 +5,14 @@ namespace CK.Env
     public class WorldName : IWorldName
     {
         /// <summary>
-        /// Gets the name of this world.
+        /// Gets the base name of this world: this is the name of the "Stack".
         /// </summary>
         public string Name { get; }
 
         /// <summary>
-        /// Gets the LTS key. Normalized to null for current.
+        /// Gets the parallel name. Normalized to null for default world.
         /// </summary>
-        public string LTSKey { get; }
+        public string ParallelName { get; }
 
         /// <summary>
         /// Gets the develop branch name.
@@ -30,7 +30,7 @@ namespace CK.Env
         public string LocalBranchName { get; }
 
         /// <summary>
-        /// Gets the <see cref="Name"/> or <see cref="Name"/>-<see cref="LTSKey"/> if the key is not null.
+        /// Gets the <see cref="Name"/> or <see cref="Name"/>[<see cref="ParallelName"/>] if the ParallelName is not null.
         /// </summary>
         public string FullName { get; }
 
@@ -44,18 +44,18 @@ namespace CK.Env
         /// Initializes a new <see cref="WorldName"/> instance.
         /// </summary>
         /// <param name="worldName">The name. Must not be null or empty.</param>
-        /// <param name="ltsKey">The Long Term Support key. Can be null or empty.</param>
-        public WorldName( string worldName, string ltsKey )
+        /// <param name="parallelName">The parallel world. Can be null or empty.</param>
+        public WorldName( string worldName, string parallelName )
         {
             if( String.IsNullOrWhiteSpace( worldName ) ) throw new ArgumentNullException( nameof( worldName ) );
             if( worldName.IndexOf( '.' ) >= 0 ) throw new ArgumentException( nameof( worldName ) + " can't contain a '.' character" );
             Name = worldName;
-            if( !String.IsNullOrWhiteSpace( ltsKey ) )
+            if( !String.IsNullOrWhiteSpace( parallelName ) )
             {
-                LTSKey = ltsKey;
-                MasterBranchName = "master-" + ltsKey;
-                DevelopBranchName = "develop-" + ltsKey;
-                FullName = Name + '[' + ltsKey + ']';
+                ParallelName = parallelName;
+                MasterBranchName = $"master[{parallelName}]";
+                DevelopBranchName = $"develop[{parallelName}]";
+                FullName = Name + '[' + parallelName + ']';
             }
             else
             {

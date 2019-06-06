@@ -272,7 +272,7 @@ namespace CK.Env.Tests
         {
             public string Name => "World";
 
-            public string LTSKey => null;
+            public string ParallelName => null;
 
             public string DevelopBranchName => "develop";
 

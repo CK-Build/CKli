@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.28922.388
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.271
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CKli", "CKli\CKli.csproj", "{21EE2C7F-2467-4929-B0E8-18B4D6E4F2CF}"
 EndProject
@@ -78,6 +78,8 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Artifact.NuGet", "CK.Env.Artifact.NuGet\CK.Env.Artifact.NuGet.csproj", "{EE57B61B-EE50-4400-9959-7B41ADB27430}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Npm.Net.Tests", "Tests\Npm.Net.Tests\Npm.Net.Tests.csproj", "{3A9F2DC4-65AE-4DD1-9E68-298AA4451718}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.PackageSource", "CK.Env.PackageSource\CK.Env.PackageSource.csproj", "{F2769A66-EC11-4365-BB3F-C1FDBBC53ED2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -197,6 +199,10 @@ Global
 		{3A9F2DC4-65AE-4DD1-9E68-298AA4451718}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3A9F2DC4-65AE-4DD1-9E68-298AA4451718}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3A9F2DC4-65AE-4DD1-9E68-298AA4451718}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F2769A66-EC11-4365-BB3F-C1FDBBC53ED2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F2769A66-EC11-4365-BB3F-C1FDBBC53ED2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F2769A66-EC11-4365-BB3F-C1FDBBC53ED2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F2769A66-EC11-4365-BB3F-C1FDBBC53ED2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
