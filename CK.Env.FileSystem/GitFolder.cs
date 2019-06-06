@@ -217,20 +217,6 @@ namespace CK.Env
             }
         }
 
-        public void CreateBranch( IActivityMonitor m, string branchName )
-        {
-            if( string.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
-            m.Info( $"Creating Branch {branchName} in repository {PrimarySolutionName}" );
-            _git.CreateBranch( branchName );
-        }
-
-        public void CreateBranch( IActivityMonitor m, string branchName, string commitHash )
-        {
-            if( string.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
-            if( string.IsNullOrWhiteSpace( commitHash ) ) throw new ArgumentNullException( nameof( commitHash ) );
-            m.Info( $"Creating Branch {branchName} in repository {PrimarySolutionName} on commit {commitHash}" );
-            _git.CreateBranch( branchName, commitHash );
-        }
 
         /// <summary>
         /// Fetches 'origin' (or all remotes) branches into this repository.

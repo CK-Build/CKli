@@ -23,7 +23,7 @@ namespace CK.Env.DependencyModel
         /// By default, <see cref="IProject.ProjectSources"/> is returned but this may be an independent
         /// set if required.
         /// </summary>
-        IReadOnlyCollection<NormalizedPath> ArtifactSources { get; }
+        public IReadOnlyCollection<NormalizedPath> ArtifactSources { get; }
 
         /// <summary>
         /// Initializes a new <see cref="GeneratedArtifact"/>.

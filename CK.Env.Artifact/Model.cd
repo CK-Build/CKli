@@ -53,9 +53,9 @@
       <FileName>EnvLocal\IEnvLocalFeedProvider.cs</FileName>
     </TypeIdentifier>
     <ShowAsAssociation>
+      <Property Name="Local" />
       <Property Name="CI" />
       <Property Name="Release" />
-      <Property Name="Local" />
       <Property Name="ZeroBuild" />
     </ShowAsAssociation>
   </Interface>
@@ -81,6 +81,13 @@
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAAAkAAAAAAAAAAAAAAAAAQAAAAAAAAAAA=</HashCode>
       <FileName>IArtifactRepositoryInfo.cs</FileName>
+    </TypeIdentifier>
+  </Interface>
+  <Interface Name="CK.Env.IArtifactRepositoryFactory">
+    <Position X="0.5" Y="6" Width="2.25" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAQAAAAAA=</HashCode>
+      <FileName>IArtifactRepositoryFactory.cs</FileName>
     </TypeIdentifier>
   </Interface>
   <Font Name="Segoe UI" Size="9" />

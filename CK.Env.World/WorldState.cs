@@ -1066,21 +1066,13 @@ namespace CK.Env
             } );
         }
 
-        public bool CanGenerateLTSWorld => WorldName.LTSKey == null && !IsDirty;
+        public bool CanGenerateParallelWorld => WorldName.ParallelName == null && !IsDirty;
 
         [CommandMethod( confirmationRequired: true )]
-        public bool GenerateLTSWorld( IActivityMonitor m, string LTSKey )
+        public bool GenerateParallelWorld( IActivityMonitor m, string parallelName )
         {
-            if( !CanGenerateLTSWorld )
-            {
-                if( !CanGenerateLTSWorld ) throw new InvalidOperationException( nameof( CanGenerateLTSWorld ) );
-            }
-            return CreateParallelWorld( m, LTSKey );
-        }
-
-
-        public bool CreateParallelWorld( IActivityMonitor m, string branchName )
-        {
+            if( !CanGenerateParallelWorld ) throw new InvalidOperationException( nameof( CanGenerateParallelWorld ) );
+            if( String.IsNullOrWhiteSpace( parallelName ) ) throw new ArgumentException( "Must not be nul or white space.", nameof( parallelName ) );
             m.Info( "Fetching all branches." );
             foreach( var repo in _gitRepositories )
             {
@@ -1092,37 +1084,28 @@ namespace CK.Env
             }
             var worldData = _store.ReadWorldDescription( m, WorldName );
             var worldRoot = worldData.Root;
-            string newWorldName = WorldName.Name + '[' + branchName + "].World";
-            worldRoot.Name = newWorldName;
-            using( m.OpenInfo( $"Changing XML root element from '{worldRoot.Name} to {newWorldName}" ) )
+            var newWorldName = new WorldName( WorldName.Name, parallelName );
+
+            using( m.OpenInfo( $"Changing the xml world definition." ) )
             {
+                worldRoot.Name = newWorldName.FullName + ".World";
+                m.Trace( $"Setting root element name to '{worldRoot.Name}'." );
                 foreach( XElement branch in worldData.Root.Descendants( "Branch" ) )
                 {
-                    XAttribute oldBranchAttribute = branch.Attribute( "Name" );
-                    string oldBranchName = oldBranchAttribute?.Value;
-                    if( oldBranchAttribute != null
-                        && (oldBranchName == "master"
-                            || oldBranchName == "develop"
-                            || oldBranchName.StartsWith( "master-" )
-                            || oldBranchName.StartsWith( "develop-" )
-                           )
-                      )
+                    var oldBranch = branch.AttributeRequired( "Name" );
+                    string oldBranchName = (string)oldBranch;
+                    if( oldBranchName == WorldName.MasterBranchName || oldBranchName == WorldName.DevelopBranchName )
                     {
-                        string newName = oldBranchName + "-" + branchName;
-                        string repoUri = branch.Parent.Attribute( "Url" ).Value;
-                        var repo = _gitRepositories.Single( p => StringComparer.OrdinalIgnoreCase.Equals( repoUri, p.OriginUrl ) );
-                        m.Info( "Creating branch " + newName );
-                        repo.CreateBranch( m, newName );
-                        m.Info( "Pushing branch" );
-                        repo.Push( m, newName );
-                        m.Info( $"Changing Branch from {oldBranchName} to {newName}" );
-                        oldBranchAttribute.Value = newName;
+                        string url = (string)branch.Parent.AttributeRequired( "Url" );
+                        var repo = _gitRepositories.Single( p => url == p.OriginUrl );
+                        var branchName = oldBranchName == WorldName.MasterBranchName ? newWorldName.MasterBranchName : newWorldName.DevelopBranchName;
+                        repo.EnsureBranch( m, branchName );
+                        m.Trace( $"Branch '{oldBranchName}' renamed to '{branchName}'." );
+                        oldBranch.Value = branchName;
                     }
                 }
             }
-            m.Info( $"Creating new World {newWorldName}" );
-            _store.CreateNew( m, WorldName.Name, branchName, worldData );
-            return true;
+            return _store.CreateNew( m, WorldName.Name, parallelName, worldData ) != null;
         }
 
         #region Read only State

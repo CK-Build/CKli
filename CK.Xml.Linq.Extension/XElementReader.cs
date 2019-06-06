@@ -14,7 +14,7 @@ namespace System.Xml.Linq
         readonly HashSet<XObject> _handled;
 
         /// <summary>
-        /// Inirializes a new reader bound to an <see cref="Element"/>.
+        /// Initializes a new reader bound to an <see cref="Element"/>.
         /// </summary>
         /// <param name="m">The monitor that must be used.</param>
         /// <param name="element">The read element.</param>
