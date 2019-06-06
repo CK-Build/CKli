@@ -118,7 +118,11 @@ namespace CK.Env.NPM
                         string firstDistTag = file.Instance.Version.PackageQuality.GetLabels()[0].ToString();
                         using( FileStream fileStream = File.OpenRead( file.FullPath ) )
                         {
-                            if( await Registry.Publish( m, file.FullPath, firstDistTag ) )
+                            if( Registry.Publish( m,
+                                    tarballPath: file.FullPath,
+                                    isPublic: arePublicArtifacts,
+                                    scope: file.PackageScope,
+                                    distTag:firstDistTag ) )
                             {
                                 pushed.Add( file );
                             }

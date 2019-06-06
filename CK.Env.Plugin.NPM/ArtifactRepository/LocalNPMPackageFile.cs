@@ -20,6 +20,8 @@ namespace CK.Env.NPM
         /// </summary>
         public string FullPath { get; }
 
+        public string PackageScope => Instance.Artifact.Name.Substring( 0, Instance.Artifact.Name.IndexOf( '/' ) );
+
         /// <summary>
         /// Gets the artifact instance.
         /// </summary>
