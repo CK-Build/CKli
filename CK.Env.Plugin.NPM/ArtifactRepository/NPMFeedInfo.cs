@@ -1,5 +1,4 @@
 using CK.Core;
-using CK.Env;
 using System;
 using System.Xml.Linq;
 

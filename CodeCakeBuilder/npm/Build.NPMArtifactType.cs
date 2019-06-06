@@ -1,13 +1,6 @@
-using Cake.Core;
-using CK.Text;
 using CodeCake.Abstractions;
-using CSemVer;
-using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace CodeCake
 {

@@ -1,7 +1,6 @@
 using Cake.Common.Diagnostics;
 using Cake.Npm;
 using CK.Text;
-using CodeCake.Abstractions;
 using CSemVer;
 using Newtonsoft.Json.Linq;
 using System;

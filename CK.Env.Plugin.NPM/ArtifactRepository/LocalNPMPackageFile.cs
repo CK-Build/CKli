@@ -1,4 +1,3 @@
-using CK.Env;
 using CSemVer;
 using System.IO;
 using System.Text.RegularExpressions;

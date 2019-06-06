@@ -1,9 +1,3 @@
-using CK.Core;
-using CK.Env;
-using CSemVer;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-
 namespace CK.Env.NuGet
 {
     /// <summary>

@@ -1,5 +1,4 @@
 using CK.Core;
-using CK.Env;
 using CK.Text;
 using NuGet.Common;
 using NuGet.Configuration;

@@ -1,4 +1,3 @@
-using CK.Core;
 using System.Xml.Linq;
 
 namespace CK.Env.NPM

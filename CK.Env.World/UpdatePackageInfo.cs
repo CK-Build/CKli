@@ -1,8 +1,5 @@
-using CK.Core;
 using CK.Env.DependencyModel;
 using CSemVer;
-using System;
-using System.Xml.Linq;
 
 namespace CK.Env
 {

@@ -1,11 +1,9 @@
 using CK.Core;
 using CK.Text;
-using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 
 namespace CK.Env.DependencyModel
 {

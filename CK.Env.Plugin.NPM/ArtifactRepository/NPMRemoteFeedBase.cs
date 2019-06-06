@@ -1,10 +1,8 @@
 using CK.Core;
-using CK.Env;
 using CSemVer;
 using Npm.Net;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -120,7 +118,7 @@ namespace CK.Env.NPM
                         string firstDistTag = file.Instance.Version.PackageQuality.GetLabels()[0].ToString();
                         using( FileStream fileStream = File.OpenRead( file.FullPath ) )
                         {
-                            if( await Registry.PublishAsync( m, fileStream, firstDistTag ) )
+                            if( await Registry.Publish( m, file.FullPath, firstDistTag ) )
                             {
                                 pushed.Add( file );
                             }

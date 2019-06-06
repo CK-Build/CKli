@@ -1,5 +1,3 @@
-using CSemVer;
-
 namespace CK.Env
 {
     /// <summary>

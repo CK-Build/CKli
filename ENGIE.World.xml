@@ -95,11 +95,21 @@
 
     <SharedSolutionSpec>
       <NuGetSources>
-        <add Name="Invenietis-Release" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-release/nuget/v3/index.json" />
-        <add Name="Invenietis-Preview" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-preview/nuget/v3/index.json" />
-        <add Name="Invenietis-CI" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-ci/nuget/v3/index.json" />
-        <add Name="Engie" Url="https://pkgs.dev.azure.com/invenietis/_packaging/Engie/nuget/v3/index.json" />
-        <add Name="Engie-CI" Url="https://pkgs.dev.azure.com/invenietis/_packaging/Engie-CI/nuget/v3/index.json" />
+        <add Name="Invenietis-Release" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-release/nuget/v3/index.json">
+          <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
+        </add>
+        <add Name="Invenietis-Preview" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-preview/nuget/v3/index.json">
+          <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
+        </add>
+        <add Name="Invenietis-CI" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-ci/nuget/v3/index.json">
+          <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
+        </add>
+        <add Name="Engie" Url="https://pkgs.dev.azure.com/invenietis/_packaging/Engie/nuget/v3/index.json">
+          <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
+        </add>
+        <add Name="Engie-CI" Url="https://pkgs.dev.azure.com/invenietis/_packaging/Engie-CI/nuget/v3/index.json">
+         <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
+        </add>
       </NuGetSources>
     </SharedSolutionSpec>
     <!-- NuGetSources Invenietis -->

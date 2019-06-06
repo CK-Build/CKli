@@ -1,4 +1,3 @@
-using CK.Env;
 using CK.Core;
 using System.Net.Http;
 

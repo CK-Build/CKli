@@ -1,9 +1,6 @@
 using CK.Core;
-using CK.Env;
 using CK.Env.NPM;
-using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace CK.Env
 {

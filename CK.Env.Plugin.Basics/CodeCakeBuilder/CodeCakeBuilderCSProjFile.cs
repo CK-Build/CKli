@@ -1,6 +1,5 @@
 using CK.Core;
 using CK.Env.MSBuildSln;
-using CK.Env.Plugin;
 using CK.Text;
 using CSemVer;
 using System.Collections.Generic;

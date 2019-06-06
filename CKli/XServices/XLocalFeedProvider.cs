@@ -1,13 +1,9 @@
 using CK.Core;
 using CK.Env;
-using CK.Env.Plugin;
 using CK.Text;
-using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Net.Http;
 
 namespace CKli
 {

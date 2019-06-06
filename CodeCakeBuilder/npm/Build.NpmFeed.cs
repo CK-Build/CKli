@@ -8,9 +8,7 @@ using Newtonsoft.Json.Linq;
 using System.IO;
 using System.Threading.Tasks;
 using CSemVer;
-using Cake.Core;
 using CodeCake.Abstractions;
-using SimpleGitVersion;
 using Cake.Common.Diagnostics;
 using CK.Text;
 

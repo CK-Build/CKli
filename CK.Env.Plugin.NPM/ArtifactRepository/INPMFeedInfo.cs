@@ -1,5 +1,3 @@
-using CK.Env;
-
 namespace CK.Env.NPM
 {
     /// <summary>

@@ -1,7 +1,5 @@
 using CK.Core;
 using CK.Setup;
-using CK.Text;
-using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -219,6 +217,7 @@ namespace CK.Env.DependencyModel
                 using( m.OpenTrace( $"Creating Build Projects information." ) )
                 {
                     IDependencySorterResult rBuildProjects = DependencySorter.OrderItems( m, _projects.AllProjectItems.Where( p => p.Project.IsBuildProject ), null );
+                    var test = rBuildProjects.SortedItems.Select( p => (p.Rank, p) );
                     if( !rBuildProjects.IsComplete )
                     {
                         rBuildProjects.LogError( m );

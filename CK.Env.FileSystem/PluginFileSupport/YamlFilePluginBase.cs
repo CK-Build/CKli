@@ -1,14 +1,5 @@
-using CK.Core;
-using CK.Env.Plugin;
 using CK.Text;
-using SharpYaml;
-using SharpYaml.Model;
 using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CK.Env.Plugin
 {

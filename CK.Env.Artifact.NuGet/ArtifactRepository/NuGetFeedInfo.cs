@@ -1,6 +1,4 @@
 using CK.Core;
-using CK.Env;
-using CSemVer;
 using System;
 using System.Xml.Linq;
 

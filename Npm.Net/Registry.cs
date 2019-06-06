@@ -136,60 +136,8 @@ namespace Npm.Net
         /// <param name="tarball">This stream must be Seek-able. <see cref="Stream"/> of the tarball of the package to push.</param>
         /// <param name="distTag"></param>
         /// <returns></returns>
-        public async Task<bool> PublishAsync( IActivityMonitor m, Stream tarball, string distTag = null )
+        public bool Publish( IActivityMonitor m, NormalizedPath tarballPath, bool isPublic, string scope = null, string distTag = null )
         {
-            bool isPublic = RegistryUri == _npmjs;
-           
-            using( MemoryStream uglyBuffer = new MemoryStream() )
-            {
-                await tarball.CopyToAsync( uglyBuffer );
-                uglyBuffer.Position = 0;
-
-                try
-                {
-                    JObject modifiedPackageJson = TarReader.ExtractModifiedPackageJson( m, uglyBuffer );
-                    string packageName = modifiedPackageJson["name"].ToString();
-                    uglyBuffer.Position = 0;
-                    using( MetadataStream metadataStream = MetadataStream.LegacyMetadataStream(m, RegistryUri, modifiedPackageJson, uglyBuffer, distTag, isPublic))
-                    using( HttpRequestMessage req = NpmRequestMessage( m, WebUtility.UrlEncode( packageName ), HttpMethod.Put ) )
-                    {
-                        req.Content = metadataStream;
-                        /**
-                         * npm does more things than we does:
-                         * if the first request return 409: conflict, npm fetch the versions availables in the registry.
-                         * With these versions npm patch the metadata and resend a packet.
-                         * We think it's probably for legacy reason, the simple request works on Azure Devops and Verdaccio
-                         * https://github.com/npm/npm-registry-client/commit/e9fbeb8b67f249394f735c74ef11fe4720d46ca0
-                         * TL;DR: The legacy npm publish is not implemented.
-                         **/
-                        using( var response = await _httpClient.SendAsync( req ) )
-                        {
-                            return await HandleResponse( m, response )
-                                    || PublishViaNPMProcess( m, uglyBuffer, distTag, isPublic ); ;
-                        }
-                    }
-                }
-                catch( Exception e )
-                {
-
-                    m.Error( "While publishing via the API.", e );
-                    return PublishViaNPMProcess( m, uglyBuffer, distTag, isPublic );
-                }
-            }
-
-        }
-
-        bool PublishViaNPMProcess( IActivityMonitor m, MemoryStream uglyBuffer, string distTag, bool isPublic )
-        {
-            JObject packageJson;
-            using( GZipStream decompressed = new GZipStream( uglyBuffer, CompressionMode.Decompress, true ) )
-            using( MemoryStream uglyDecompressedBuffer = new MemoryStream() )
-            {
-                decompressed.CopyTo( uglyDecompressedBuffer );
-                uglyDecompressedBuffer.Position = 0;
-                packageJson = TarReader.ExtractPackageJson( m, uglyDecompressedBuffer );
-            }
-            string packageName = packageJson["name"].ToString();
             string tempDirectory = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
             using( m.OpenInfo( "Falling back on 'npm publish' external process." ) )
             {
@@ -219,19 +167,15 @@ namespace Npm.Net
                             w.WriteLine( $"{uriConfig}:_authToken={_authHeader.Parameter}" );
                         }
 
-                        if( packageName.Contains( "@" ) )
+                        if( !string.IsNullOrWhiteSpace(scope) )
                         {
-                            w.WriteLine( packageName.Substring( 0, packageName.IndexOf( '/' ) ) + $":registry={RegistryUri.ToString()}" );
+                            w.WriteLine( scope + $":registry={RegistryUri.ToString()}" );
                         }
                     }
-                    using( Stream stream = File.Create( Path.Combine( tempDirectory, "tarball.tgz" ) ) )
-                    {
-                        uglyBuffer.Position = 0;
-                        uglyBuffer.CopyTo( stream );
-                    }
+                    string tarPath = Path.GetFullPath( tarballPath );
                     string distTagArg = distTag != null ? $"--tag {distTag.ToLowerInvariant()}" : "";
                     string access = isPublic ? "public" : "private";
-                    return ProcessRunner.Run( m, tempDirectory, "cmd.exe", $"/C npm publish tarball.tgz --access {access} {distTagArg}", LogLevel.Debug );
+                    return ProcessRunner.Run( m, tempDirectory, "cmd.exe", $"/C npm publish \"{tarPath}\" --access {access} {distTagArg}", LogLevel.Debug );
                 }
                 catch( Exception ex )
                 {
@@ -496,6 +440,6 @@ namespace Npm.Net
         }
 
         public override string ToString() => RegistryUri.ToString();
-        
+
     }
 }

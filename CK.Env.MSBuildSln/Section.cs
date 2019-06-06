@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Text;
-using System.Text.RegularExpressions;
 
 namespace CK.Env.MSBuildSln
 {

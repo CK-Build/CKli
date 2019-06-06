@@ -2,7 +2,6 @@ using CK.Core;
 using CK.Env.CKSetup;
 using CK.SimpleKeyVault;
 using CK.Text;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 

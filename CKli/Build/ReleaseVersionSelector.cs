@@ -1,7 +1,6 @@
 using CK.Core;
 using CK.Env;
 using CK.Env.DependencyModel;
-using CK.Env.Diff;
 using CK.Text;
 using CSemVer;
 using System;

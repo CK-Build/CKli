@@ -146,11 +146,9 @@ namespace CK.Env.Plugin
             section.StartComment = ": See http://blog.paranoidcoding.com/2016/04/05/deterministic-builds-in-roslyn.html.";
             section.SetContent(
                 XElement.Parse(
-@"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
+$@"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
   <Deterministic>true</Deterministic>
-  <!-- Finds the CKli-World.htm that must exist at the root of the development directory. This is path to map to C:\CKli-World. -->
-  <CKliWorldPath>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), CKli-World.htm))</CKliWorldPath>
-  <PathMap Condition="" '$(CKliWorldPath)' != '' "">$(CKliWorldPath)=C:\CKli-World</PathMap>
+  <PathMap>$(SolutionDir)=C:\CKli-World\{GitFolder.SubPath.Path.Replace( '/', '\\' )}</PathMap>
 </PropertyGroup>" ) );
         }
 

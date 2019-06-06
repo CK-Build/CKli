@@ -1,11 +1,7 @@
 using CK.Env.Tests;
 using CSemVer;
 using FluentAssertions;
-using Newtonsoft.Json.Linq;
 using NUnit.Framework;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
 namespace Npm.Net.Tests
