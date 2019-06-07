@@ -69,7 +69,7 @@ namespace CK.Env.Plugin
             }
             StringBuilder b = new StringBuilder();
             bool atLeastOne = false;
-            foreach( var info in s.ArtifactTargets.Select( a => a.Info ).OfType<INPMFeedInfo>() )
+            foreach( var info in s.ArtifactTargets.Select( a => a.Info ).OfType<INPMArtifactRepositoryInfo>() )
             {
                 atLeastOne = true;
                 if( info.QualityFilter.HasMin || info.QualityFilter.HasMax )

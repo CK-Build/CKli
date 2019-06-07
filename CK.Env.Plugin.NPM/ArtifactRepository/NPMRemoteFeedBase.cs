@@ -12,12 +12,12 @@ namespace CK.Env.NPM
     /// <summary>
     /// Internal implementation that may be made public once.
     /// </summary>
-    abstract class NPMRemoteFeedBase : INPMFeed
+    abstract class NPMRemoteFeedBase : INPMArtifactRepository
     {
         protected readonly NPMClient Client;
         string _secret;
 
-        internal NPMRemoteFeedBase( NPMClient c, INPMFeedInfo info, Registry registry )
+        internal NPMRemoteFeedBase( NPMClient c, INPMArtifactRepositoryInfo info, Registry registry )
         {
             Info = info;
             Registry = registry;
@@ -36,7 +36,7 @@ namespace CK.Env.NPM
         /// <summary>
         /// Gets the info of this feed.
         /// </summary>
-        public INPMFeedInfo Info { get; }
+        public INPMArtifactRepositoryInfo Info { get; }
 
         public Registry Registry { get; }
 

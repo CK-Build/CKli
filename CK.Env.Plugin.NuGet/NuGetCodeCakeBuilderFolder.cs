@@ -57,7 +57,7 @@ namespace CK.Env.Plugin
             }
             StringBuilder b = new StringBuilder();
             bool atLeastOne = false;
-            foreach( var info in solution.ArtifactTargets.Select( a => a.Info ).OfType<INuGetFeedInfo>() )
+            foreach( var info in solution.ArtifactTargets.Select( a => a.Info ).OfType<INuGetRepositoryInfo>() )
             {
                 atLeastOne = true;
                 if( info.QualityFilter.HasMin || info.QualityFilter.HasMax )

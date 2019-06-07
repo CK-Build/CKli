@@ -5,12 +5,12 @@ namespace CK.Env.NPM
     /// Only <see cref="Name"/> appears. Url or source is hidden since
     /// some feed implementation may not have one (composite feed for instance).
     /// </summary>
-    public interface INPMFeedInfo : IArtifactRepositoryInfo
+    public interface INPMArtifactRepositoryInfo : IArtifactRepositoryInfo
     {
         /// <summary>
         /// Gets the type of feed.
         /// </summary>
-        NPMFeedType Type { get; }
+        NPMFRepositoryType Type { get; }
 
         /// <summary>
         /// Gets the name of this feed.

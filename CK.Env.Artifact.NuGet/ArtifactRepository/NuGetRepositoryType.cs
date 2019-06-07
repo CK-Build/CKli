@@ -1,9 +1,9 @@
 namespace CK.Env.NuGet
 {
     /// <summary>
-    /// Dscribes NuGet feed type that we handle.
+    /// Describes NuGet feed type that we handle.
     /// </summary>
-    public enum NuGetFeedType
+    public enum NuGetRepositoryType
     {
         /// <summary>
         /// Not applicable.

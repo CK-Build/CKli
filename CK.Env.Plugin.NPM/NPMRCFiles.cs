@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Env.NPM;
 using CK.Text;
 using System;
 using System.Collections.Generic;
@@ -16,11 +17,13 @@ namespace CK.Env.Plugin
     {
         readonly SolutionSpec _solutionSpec;
         readonly NPMProjectsDriver _driver;
+        readonly SolutionDriver _solutionDriver;
         readonly ISecretKeyStore _secretStore;
 
-        public NPMRCFiles( GitFolder f, NPMProjectsDriver driver, ISecretKeyStore secretStore, SolutionSpec solutionSpec, NormalizedPath branchPath )
+        public NPMRCFiles( GitFolder f, NPMProjectsDriver driver, SolutionDriver solutionDriver, ISecretKeyStore secretStore, SolutionSpec solutionSpec, NormalizedPath branchPath )
             : base( f, branchPath )
         {
+            _solutionDriver = solutionDriver;
             _solutionSpec = solutionSpec;
             _driver = driver;
             _secretStore = secretStore;
@@ -85,6 +88,9 @@ namespace CK.Env.Plugin
 
         void ApplySettings( IActivityMonitor m, NormalizedPath f )
         {
+            var s = _solutionDriver.GetSolution( m );
+            if( s == null ) return;
+
             var text = GitFolder.FileSystem.GetFileInfo( f ).AsTextFileInfo( ignoreExtension: true )?.TextContent ?? String.Empty;
             var lines = _rLine.Matches( text )
                             .Cast<Match>()
@@ -96,26 +102,26 @@ namespace CK.Env.Plugin
 
             lines.RemoveAll( p => p.FullKey == "scope" );//remove all keyvalues scopes.
 
-            foreach( var s in _solutionSpec.NPMSources )
+            foreach( var p in s.ArtifactSources.OfType<INPMFeed>() )
             {
-                EnsureLine( lines, s.Scope, "registry", s.Url );
+                EnsureLine( lines, p.Scope, "registry", p.Url );
 
                 // Scope doesn't carry auth info:
-                lines.RemoveAll( line => line.FullKey == s.Scope + ":username" );
-                lines.RemoveAll( line => line.FullKey == s.Scope + ":always-auth" );
-                lines.RemoveAll( line => line.FullKey == s.Scope + ":_password" );
+                lines.RemoveAll( line => line.FullKey == p.Scope + ":username" );
+                lines.RemoveAll( line => line.FullKey == p.Scope + ":always-auth" );
+                lines.RemoveAll( line => line.FullKey == p.Scope + ":_password" );
 
                 // Auth is carried by registry url (from which 'https:' prefix is removed).
-                if( !s.Url.StartsWith( "https://" ) ) throw new Exception( $"NPM registry url must start with 'https://': {s.Url}" );
-                var scopeUrl = s.Url.Substring( "https:".Length );
-                if( s.Credentials != null )
+                if( !p.Url.StartsWith( "https://" ) ) throw new Exception( $"NPM registry url must start with 'https://': {p.Url}" );
+                var scopeUrl = p.Url.Substring( "https:".Length );
+                if( p.Credentials != null )
                 {
-                    EnsureLine( lines, scopeUrl, "username", s.Credentials.UserName );
+                    EnsureLine( lines, scopeUrl, "username", p.Credentials.UserName );
                     EnsureLine( lines, scopeUrl, "always-auth", "true" );
-                    string password = s.Credentials.IsSecretKeyName
-                                        ? _secretStore.GetSecretKey( m, s.Credentials.PasswordOrSecretKeyName, throwOnEmpty: true )
-                                        : s.Credentials.PasswordOrSecretKeyName;
-                    if( s.Url.IndexOf( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) >= 0 )
+                    string password = p.Credentials.IsSecretKeyName
+                                        ? _secretStore.GetSecretKey( m, p.Credentials.PasswordOrSecretKeyName, throwOnEmpty: true )
+                                        : p.Credentials.PasswordOrSecretKeyName;
+                    if( p.Url.IndexOf( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) >= 0 )
                     {
                         password = Convert.ToBase64String( Encoding.UTF8.GetBytes( password ) );
                     }

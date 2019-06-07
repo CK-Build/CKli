@@ -7,15 +7,29 @@ namespace CK.Env
     /// Root abstraction that creates repository and repository information of a certain kind.
     /// These handlers are registered in <see cref="ArtifactCenter"/>.
     /// </summary>
-    public interface IArtifactRepositoryFactory
+    public interface IArtifactTypeHandler
     {
+        /// <summary>
+        /// Creates a source from a <see cref="XElementReader"/> or returns null if the element cannot be handled.
+        /// </summary>
+        /// <param name="r">The element reader. The Element's <see cref="XElement.Name"/> must be ignored (it can be anything).</param>
+        /// <returns>The artifact feed or null.</returns>
+        IArtifactFeed CreateFeed( in XElementReader r );
+
+        /// <summary>
+        /// Finds a feed from its name <see cref="IArtifactFeed.TypedName"/>.
+        /// </summary>
+        /// <param name="uniqueTypedName">The <see cref="IArtifactFeed.TypedName"/>.</param>
+        /// <returns>The artifact feed or null.</returns>
+        IArtifactFeed FindFeed( string uniqueTypedName );
+
         /// <summary>!
         /// Creates a repository information from a <see cref="XElementReader"/> or returns null if the element
-        /// cannnot be handled.
+        /// cannot be handled.
         /// </summary>
-        /// <param name="r">The element reader. The Elemnt's <see cref="XElement.Name"/> must be ignored (it can be anything).</param>
+        /// <param name="r">The element reader. The Element's <see cref="XElement.Name"/> must be ignored (it can be anything).</param>
         /// <returns>The repository info or null.</returns>
-        IArtifactRepositoryInfo CreateInfo( in XElementReader r );
+        IArtifactRepositoryInfo ReadRepositoryInfo( in XElementReader r );
 
         /// <summary>
         /// Finds or creates a feed from a feed information if actual information type is handled or null.
@@ -33,7 +47,6 @@ namespace CK.Env
         /// </summary>
         /// <param name="uniqueRepositoryName">The unique repository name.</param>
         /// <returns>The repository or null.</returns>
-        IArtifactRepository Find( string uniqueRepositoryName );
-
+        IArtifactRepository FindRepository( string uniqueRepositoryName );
     }
 }

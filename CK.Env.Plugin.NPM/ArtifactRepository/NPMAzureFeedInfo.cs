@@ -5,9 +5,9 @@ using System.Xml.Linq;
 namespace CK.Env.NPM
 {
     /// <summary>
-    /// Immutable implementation of <see cref="INPMFeedInfo"/> for Azure feeds.
+    /// Immutable implementation of <see cref="INPMArtifactRepositoryInfo"/> for Azure feeds.
     /// </summary>
-    public class NPMAzureFeedInfo : NPMFeedInfo
+    public class NPMAzureFeedInfo : NPMArtifactRepositoryInfo
     {
         readonly string _name;
 
@@ -24,7 +24,7 @@ namespace CK.Env.NPM
             _name = $"{NPMScope}->{Organization}-{FeedName}";
         }
 
-        public override NPMFeedType Type => NPMFeedType.NPMAzure;
+        public override NPMFRepositoryType Type => NPMFRepositoryType.NPMAzure;
 
         /// <summary>
         /// Gets the name of this feed:

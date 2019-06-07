@@ -30,16 +30,16 @@ namespace CK.Env
         /// Gets whether this Artifact is valid: its type is defined and its
         /// name is not empty.
         /// </summary>
-        public bool IsValid => !Type.IsDefault;
+        public bool IsValid => Type.IsValid;
 
         /// <summary>
         /// Initializes a new <see cref="Artifact"/>.
         /// </summary>
-        /// <param name="type">Artifact type. <see cref="ArtifactType.IsDefault"/> must be false.</param>
+        /// <param name="type">Artifact type. <see cref="ArtifactType.IsValid"/> must be true.</param>
         /// <param name="name">Artifact name. Must not be empty.</param>
         public Artifact( in ArtifactType type, string name )
         {
-            if( type.IsDefault ) throw new ArgumentException( "Unspecified type.", nameof( type ) );
+            if( !type.IsValid ) throw new ArgumentException( "Invalid type.", nameof( type ) );
             if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
             Type = type;
             Name = name; 

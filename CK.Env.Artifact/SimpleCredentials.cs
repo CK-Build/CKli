@@ -30,21 +30,31 @@ namespace CK.Env
         /// Initializes a new <see cref="SimpleCredentials"/> from its xml representation
         /// that must have a UserName attribute and Password or PasswordSecretKeyName (but not both). 
         /// </summary>
-        /// <param name="e">The xml element.</param>
-        public SimpleCredentials( XElement e )
+        /// <param name="e">The xml element reader.</param>
+        public SimpleCredentials( XElementReader r )
         {
-            UserName = (string)e.AttributeRequired( "UserName" );
-            var p = (string)e.Attribute( "Password" );
-            var k = (string)e.Attribute( "PasswordSecretKeyName" );
+            UserName = r.HandleRequiredAttribute<string>( "UserName" );
+            var p = r.HandleOptionalAttribute<string>( "Password", null );
+            var k = r.HandleOptionalAttribute<string>( "PasswordSecretKeyName", null );
             bool hasP = !String.IsNullOrEmpty( p );
             bool hasK = !String.IsNullOrEmpty( k );
-            if( hasP && hasK ) throw new ArgumentException( $"Credential element '{e}' can not specify both Password and PasswordSecretKeyName attributes." );
+            if( hasP && hasK ) throw new ArgumentException( $"Credential element '{r.Element}' can not specify both Password and PasswordSecretKeyName attributes." );
             if( hasP || hasK )
             {
                 PasswordOrSecretKeyName = hasP ? p : k;
                 IsSecretKeyName = hasK;
             }
+            r.WarnUnhandled();
         }
+
+        /// <summary>
+        /// Gets the Xml representation of this credentials.
+        /// </summary>
+        public XElement ToXml() => new XElement( "Credentials",
+                                        new XAttribute( "UserName", UserName ),
+                                            PasswordOrSecretKeyName == null
+                                                ? null
+                                                : new XAttribute( IsSecretKeyName ? "PasswordSecretKeyName" : "Password", PasswordOrSecretKeyName ) );
 
         /// <summary>
         /// User name.

@@ -3,10 +3,10 @@ using System.Xml.Linq;
 namespace CK.Env.NuGet
 {
     /// <summary>
-    /// Immutable implementation of <see cref="INuGetFeedInfo"/> for standard feeds
+    /// Immutable implementation of <see cref="INuGetRepositoryInfo"/> for standard feeds
     /// where a secret push API key is required.
     /// </summary>
-    public class NuGetStandardFeedInfo : NuGetFeedInfo
+    public class NuGetStandardFeedInfo : NuGetRepositoryInfo
     {
         public NuGetStandardFeedInfo( in XElementReader r )
             : base( r )
@@ -16,7 +16,7 @@ namespace CK.Env.NuGet
             SecretKeyName = r.HandleRequiredAttribute<string>( "SecretKeyName" );
         }
 
-        public override NuGetFeedType Type => NuGetFeedType.NuGetStandard;
+        public override NuGetRepositoryType Type => NuGetRepositoryType.NuGetStandard;
 
         public override string Name { get; }
 

@@ -124,13 +124,20 @@ namespace CK.Env.Plugin
             var expectedSolutionName = GitFolder.SubPath.LastPart + ".sln";
             _sln = SolutionFile.Read( GitFolder.FileSystem, m, BranchPath.AppendPart( expectedSolutionName ) );
             if( _sln == null ) return;
+
             _sln.Saved += OnSolutionSaved;
+            bool newSolution = false;
             if( _solution == null )
             {
+                newSolution = true;
                 _solution = _solutionContext.AddSolution( BranchPath, expectedSolutionName );
-                foreach( var uniqueRepositoryName in _solutionSpec.ArtifactTargets )
+                foreach( var targetName in _solutionSpec.ArtifactTargets )
                 {
-                    _solution.AddArtifactTarget( _artifactCenter.Find( uniqueRepositoryName ) );
+                    _solution.AddArtifactTarget( _artifactCenter.FindRepository( targetName ) );
+                }
+                foreach( var sourceName in _solutionSpec.ArtifactSources )
+                {
+                    _solution.AddArtifactSource( _artifactCenter.FindFeed( sourceName ) );
                 }
             }
             _solution.Tag( _sln );
@@ -164,7 +171,7 @@ namespace CK.Env.Plugin
             var h = OnSolutionConfiguration;
             if( h != null )
             {
-                var e = new SolutionConfigurationEventArgs( m, _solution );
+                var e = new SolutionConfigurationEventArgs( m, _solution, newSolution, _solutionSpec );
                 h( this, e );
                 if( e.ConfigurationFailed )
                 {

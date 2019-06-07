@@ -9,7 +9,7 @@ namespace CK.Env.NPM
     /// <summary>
     /// Internal implementation that may be made public once.
     /// </summary>
-    class NPMClientAzureFeed : NPMRemoteFeedBase, INPMFeed
+    class NPMClientAzureFeed : NPMRemoteFeedBase, INPMArtifactRepository
     {
         internal NPMClientAzureFeed( NPMClient c, NPMAzureFeedInfo info, string pat )
             : base( c, info, new Registry(c.HttpClient, "", pat, new System.Uri( info.Url)) )

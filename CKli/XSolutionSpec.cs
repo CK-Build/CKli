@@ -21,7 +21,7 @@ namespace CKli
             initializer.Services.Add( this );
             SolutionSpec = new SolutionSpec( sharedSpec, initializer.Reader );
 
-            XSharedSolutionSpec.RemoveElementWarnings( initializer );
+            //XSharedSolutionSpec.RemoveElementWarnings( initializer );
             initializer.Reader.Handle( initializer
                                         .Element.Elements()
                                         .Where( c => c.Name.LocalName == nameof( SolutionSpec.NPMProjects )

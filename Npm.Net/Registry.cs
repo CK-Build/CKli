@@ -139,7 +139,7 @@ namespace Npm.Net
         public bool Publish( IActivityMonitor m, NormalizedPath tarballPath, bool isPublic, string scope = null, string distTag = null )
         {
             string tempDirectory = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
-            using( m.OpenInfo( "Falling back on 'npm publish' external process." ) )
+            using( m.OpenInfo( "Using 'npm publish'." ) )
             {
                 try
                 {

@@ -14,7 +14,7 @@ namespace CK.Env.DependencyModel
     {
         readonly List<Project> _projects;
         readonly List<IArtifactRepository> _artifactTargets;
-        readonly List<IArtifactSource> _artifactSources;
+        readonly List<IArtifactFeed> _artifactSources;
         SolutionContext _ctx;
         Project _buildProject;
         int _version;
@@ -26,7 +26,7 @@ namespace CK.Env.DependencyModel
             Name = name;
             _projects = new List<Project>();
             _artifactTargets = new List<IArtifactRepository>();
-            _artifactSources = new List<IArtifactSource>();
+            _artifactSources = new List<IArtifactFeed>();
         }
 
         /// <summary>
@@ -205,14 +205,14 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets the artifacts sources.
         /// </summary>
-        public IReadOnlyCollection<IArtifactSource> ArtifactSources => _artifactSources;
+        public IReadOnlyCollection<IArtifactFeed> ArtifactSources => _artifactSources;
 
         /// <summary>
         /// Adds a new artifact source (that must not already belong to <see cref="ArtifactSources"/> otherwise an
         /// InvalidOperationException is thrown).
         /// </summary>
         /// <param name="newOne">New artifact source.</param>
-        public void AddArtifactSource( IArtifactSource newOne )
+        public void AddArtifactSource( IArtifactFeed newOne )
         {
             if( _artifactSources.Contains( newOne ) ) throw new InvalidOperationException( $"Artifact source already registered." );
             _artifactSources.Add( newOne );
@@ -224,7 +224,7 @@ namespace CK.Env.DependencyModel
         /// InvalidOperationException is thrown).
         /// </summary>
         /// <param name="artifactSource">The artifact source.</param>
-        public void RemoveArtifactSource( IArtifactSource artifactSource )
+        public void RemoveArtifactSource( IArtifactFeed artifactSource )
         {
             if( !_artifactSources.Contains( artifactSource ) ) throw new InvalidOperationException( $"Artifact source not registered." );
             _artifactSources.Remove( artifactSource );
@@ -320,13 +320,13 @@ namespace CK.Env.DependencyModel
             _version++;
             _ctx.OnArtifactTargetRemoved( this, artifactTarget );
         }
-        void OnArtifactSourceAdded( IArtifactSource newOne )
+        void OnArtifactSourceAdded( IArtifactFeed newOne )
         {
             _version++;
             _ctx.OnArtifactSourceAdded( this, newOne );
         }
 
-        void OnArtifactSourceRemoved( IArtifactSource artifactSource )
+        void OnArtifactSourceRemoved( IArtifactFeed artifactSource )
         {
             _version++;
             _ctx.OnArtifactSourceRemoved( this, artifactSource );

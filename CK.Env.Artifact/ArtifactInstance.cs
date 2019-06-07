@@ -11,12 +11,14 @@ namespace CK.Env
         /// <summary>
         /// Initializes a new <see cref="ArtifactInstance"/>.
         /// </summary>
-        /// <param name="a">The artifact.</param>
-        /// <param name="version">The version. Can not be null.</param>
+        /// <param name="a">The artifact. Must be <see cref="Artifact.IsValid"/>.</param>
+        /// <param name="version">The version. Can not be null and must be <see cref="SVersion.IsValid"/>.</param>
         public ArtifactInstance( Artifact a, SVersion version )
         {
+            if( !a.IsValid ) throw new ArgumentException( "Artifact must be valid.", nameof( a ) );
             Artifact = a;
-            Version = version ?? throw new ArgumentNullException( nameof( version ) );
+            if( version == null || !version.IsValid ) throw new ArgumentException( "Version must be valid.", nameof( version ) );
+            Version = version;
         }
 
         /// <summary>
@@ -41,6 +43,11 @@ namespace CK.Env
         public SVersion Version { get; }
 
         /// <summary>
+        /// Gets whether this instance is valid: both <see cref="Artifact"/> and <see cref="Version"/> are valid.
+        /// </summary>
+        public bool IsValid => Artifact.IsValid;
+
+        /// <summary>
         /// Checks equality.
         /// </summary>
         /// <param name="other">The other instance.</param>
@@ -51,7 +58,12 @@ namespace CK.Env
 
         public override int GetHashCode() => Version.GetHashCode() ^ Artifact.GetHashCode();
 
-        public override string ToString() => $"{Artifact}/{Version}";
+        /// <summary>
+        /// Overridden to return <see cref="Artifact"/>/<see cref="Version"/> or the empty string
+        /// if <see cref="IsValid"/> is false.
+        /// </summary>
+        /// <returns>A readable string.</returns>
+        public override string ToString() => IsValid ? $"{Artifact}/{Version}" : String.Empty;
 
         /// <summary>
         /// Implements == operator.

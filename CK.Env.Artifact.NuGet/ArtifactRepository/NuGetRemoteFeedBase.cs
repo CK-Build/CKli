@@ -17,28 +17,16 @@ namespace CK.Env.NuGet
     /// <summary>
     /// Internal implementation that may be made public once.
     /// </summary>
-    abstract class NuGetRemoteFeedBase : IInternalFeed
+    abstract class NuGetRemoteFeedBase : InternalFeed, INuGetRepository
     {
-        protected readonly NuGetClient Client;
-        internal readonly PackageSource _packageSource;
-        readonly SourceRepository _sourceRepository;
         readonly AsyncLazy<PackageUpdateResource> _updater;
-        readonly AsyncLazy<MetadataResource> _meta;
         string _secret;
 
-        internal NuGetRemoteFeedBase( NuGetClient c, PackageSource source, INuGetFeedInfo info )
+        internal NuGetRemoteFeedBase( NuGetClient c, PackageSource source, INuGetRepositoryInfo info )
+            : base( c, source )
         {
             Info = info;
-            Client = c;
-            _packageSource = source;
-            _sourceRepository = new SourceRepository( _packageSource, NuGetClient.Providers );
             _updater = new AsyncLazy<PackageUpdateResource>( () => _sourceRepository.GetResourceAsync<PackageUpdateResource>() );
-            _meta = new AsyncLazy<MetadataResource>( () => _sourceRepository.GetResourceAsync<MetadataResource>() );
-        }
-
-        void IInternalFeed.CollectPackageSources( List<PackageSource> collector )
-        {
-            collector.Add( _packageSource );
         }
 
         /// <summary>
@@ -53,7 +41,7 @@ namespace CK.Env.NuGet
         /// <summary>
         /// Gets the info of this feed.
         /// </summary>
-        public INuGetFeedInfo Info { get; }
+        public INuGetRepositoryInfo Info { get; }
 
         /// <summary>
         /// Must resolve the push API key.
@@ -88,13 +76,6 @@ namespace CK.Env.NuGet
 
         protected virtual void OnSecretResolved( IActivityMonitor m, string secret )
         {
-        }
-
-        protected virtual NuGetLoggerAdapter EnsureInitialization( IActivityMonitor m )
-        {
-            var logger = new NuGetLoggerAdapter( m );
-            NuGetClient.Initalize( logger );
-            return logger;
         }
 
         /// <summary>

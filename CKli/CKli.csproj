@@ -8,13 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="MSBuild\XPrimarySolution.cs" />
-    <Compile Remove="MSBuild\XSecondarySolution.cs" />
-    <Compile Remove="MSBuild\XSolutionBase.cs" />
-    <Compile Remove="MSBuild\XSolutionCentral.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\CK.Env.DependencyModel\CK.Env.DependencyModel.csproj" />
     <ProjectReference Include="..\CK.Env.FileSystem\CK.Env.FileSystem.csproj" />
     <ProjectReference Include="..\CK.Env.Plugin.Appveyor\CK.Env.Plugin.Appveyor.csproj" />

@@ -7,34 +7,70 @@ using CK.Core;
 namespace CK.Env
 {
     /// <summary>
-    /// Combination of <see cref="IArtifactRepositoryFactory"/>.
-    /// Actual management of repositories and infos are totally delegated to the type factories, this
+    /// Combination of <see cref="IArtifactTypeHandler"/>.
+    /// Actual management of repositories and infos are totally delegated to the type handlers, this
     /// object doesn't track repositories or repository infos.
     /// </summary>
     public class ArtifactCenter
     {
-        readonly List<IArtifactRepositoryFactory> _factories;
+        readonly List<IArtifactTypeHandler> _typeHandlers;
 
         public ArtifactCenter()
         {
-            _factories = new List<IArtifactRepositoryFactory>();
+            _typeHandlers = new List<IArtifactTypeHandler>();
         }
 
         /// <summary>
         /// Registers a new <see cref="IArtifactRepository"/>.
         /// </summary>
         /// <param name="factory">The factory to register.</param>
-        public void Register( IArtifactRepositoryFactory factory )
+        public void Register( IArtifactTypeHandler factory )
         {
             if( factory == null ) throw new ArgumentNullException( nameof( factory ) );
-            if( factory == this ) throw new ArgumentException( nameof( factory ) );
-            if( _factories.Contains( factory ) ) throw new InvalidOperationException( nameof( factory ) );
-            _factories.Add( factory );
+            if( _typeHandlers.Contains( factory ) ) throw new InvalidOperationException( nameof( factory ) );
+            _typeHandlers.Add( factory );
         }
 
         /// <summary>
+        /// Ensure that source feeds are created from a set of xml elements.
+        /// </summary>
+        /// <param name="readers">Set of readers.</param>
+        public void InstanciateFeeds( IEnumerable<XElementReader> readers )
+        {
+            foreach( var r in readers ) InstanciateFeed( r );
+        }
+
+        IArtifactFeed InstanciateFeed( XElementReader r )
+        {
+            foreach( var h in _typeHandlers )
+            {
+                var f = h.CreateFeed( r );
+                if( f != null ) return f;
+            }
+            throw new ArgumentException( "Unable to resolve a package feed for: " + r.Element.ToString() );
+        }
+
+        /// <summary>
+        /// Finds a <see cref="IArtifactFeed"/> from its <see cref="IArtifactFeed.TypedName"/>.
+        /// If no feed can be found, an <see cref="ArgumentException"/> is thrown.
+        /// </summary>
+        /// <param name="uniqueTypedName">The <see cref="IArtifactFeed.TypedName"/>.</param>
+        /// <returns>The source.</returns>
+        public IArtifactFeed FindFeed( string uniqueTypedName )
+        {
+            if( uniqueTypedName == null ) throw new ArgumentNullException( nameof( uniqueTypedName ) );
+            foreach( var f in _typeHandlers )
+            {
+                var r = f.FindFeed( uniqueTypedName );
+                if( r != null ) return r;
+            }
+            throw new ArgumentException( $"Unable to find a feed named '{uniqueTypedName}'." );
+        }
+
+
+        /// <summary>
         /// Creates a <see cref="IArtifactRepositoryInfo"/> from a <see cref="XElement"/>
-        /// by calling <see cref="IArtifactRepositoryFactory.CreateInfo(XElement)"/> on each registered
+        /// by calling <see cref="IArtifactTypeHandler.CreateInfo(XElement)"/> on each registered
         /// factories and returning the first one that returns a non null information object.
         /// If no factory can handle the element, an <see cref="ArgumentException"/> is thrown.
         /// <para>
@@ -45,11 +81,11 @@ namespace CK.Env
         /// </summary>
         /// <param name="r">The xml reader element.</param>
         /// <returns>The mapped repository info.</returns>
-        IArtifactRepositoryInfo CreateInfo( in XElementReader r )
+        IArtifactRepositoryInfo ReadRepositoryInfo( in XElementReader r )
         {
-            foreach( var f in _factories )
+            foreach( var f in _typeHandlers )
             {
-                var info = f.CreateInfo( r );
+                var info = f.ReadRepositoryInfo( r );
                 if( info != null )
                 {
                     var checkName = r.HandleOptionalAttribute<string>( "CheckName", null );
@@ -71,28 +107,20 @@ namespace CK.Env
         /// <summary>
         /// Ensure that repositories are created from a set of xml info elements.
         /// </summary>
-        /// <param name="infoReaders">Set of info reader.</param>
-        public void InstanciateRepositories( IEnumerable<XElementReader> infoReaders )
+        /// <param name="readers">Set of readers.</param>
+        public void InstanciateRepositories( IEnumerable<XElementReader> readers )
         {
-            foreach( var r in infoReaders )
+            foreach( var r in readers )
             {
-                var info = CreateInfo( r );
-                FindOrCreate( r.Monitor, info );
+                var info = ReadRepositoryInfo( r );
+                InstanciateRepository( r.Monitor, info );
             }
         }
 
-        /// <summary>
-        /// Finds or creates a <see cref="IArtifactRepository"/> from a <see cref="IArtifactRepositoryInfo"/>.
-        /// If no registered <see cref="IArtifactRepositoryFactory"/> can provide a repository, an <see cref="ArgumentException"/>
-        /// is thrown.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="info">The info that describes the repository.</param>
-        /// <returns>A new or existing repository.</returns>
-        IArtifactRepository FindOrCreate( IActivityMonitor m, IArtifactRepositoryInfo info )
+        IArtifactRepository InstanciateRepository( IActivityMonitor m, IArtifactRepositoryInfo info )
         {
             if( info == null ) throw new ArgumentNullException( nameof( info ) );
-            foreach( var f in _factories )
+            foreach( var f in _typeHandlers )
             {
                 var r = f.FindOrCreate( m, info );
                 if( r != null ) return r;
@@ -106,12 +134,12 @@ namespace CK.Env
         /// </summary>
         /// <param name="uniqueRepositoryName">Repository name.</param>
         /// <returns>The repository.</returns>
-        public IArtifactRepository Find( string uniqueRepositoryName )
+        public IArtifactRepository FindRepository( string uniqueRepositoryName )
         {
             if( uniqueRepositoryName == null ) throw new ArgumentNullException( nameof( uniqueRepositoryName ) );
-            foreach( var f in _factories )
+            foreach( var f in _typeHandlers )
             {
-                var r = f.Find( uniqueRepositoryName );
+                var r = f.FindRepository( uniqueRepositoryName );
                 if( r != null ) return r;
             }
             throw new ArgumentException( $"Unable to find a repository named '{uniqueRepositoryName}'." );

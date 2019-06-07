@@ -1,9 +1,9 @@
 namespace CK.Env.NPM
 {
     /// <summary>
-    /// Dscribes NPM feed type that we handle.
+    /// Describes NPM feed type that we handle.
     /// </summary>
-    public enum NPMFeedType
+    public enum NPMFRepositoryType
     {
         /// <summary>
         /// Not applicable.

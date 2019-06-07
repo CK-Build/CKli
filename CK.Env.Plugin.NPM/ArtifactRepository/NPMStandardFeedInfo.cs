@@ -3,10 +3,10 @@ using System.Xml.Linq;
 namespace CK.Env.NPM
 {
     /// <summary>
-    /// Immutable implementation of <see cref="INPMFeedInfo"/> for standard feeds
+    /// Immutable implementation of <see cref="INPMArtifactRepositoryInfo"/> for standard feeds
     /// where a secret push API key is required.
     /// </summary>
-    public class NPMStandardFeedInfo : NPMFeedInfo
+    public class NPMStandardFeedInfo : NPMArtifactRepositoryInfo
     {
         public NPMStandardFeedInfo( in XElementReader r )
             : base( r )
@@ -17,7 +17,7 @@ namespace CK.Env.NPM
             UsePassword = r.HandleOptionalAttribute( "UsePassword", false );
         }
 
-        public override NPMFeedType Type => NPMFeedType.NPMStandard;
+        public override NPMFRepositoryType Type => NPMFRepositoryType.NPMStandard;
 
         public override string Name { get; }
 

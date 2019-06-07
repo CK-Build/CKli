@@ -9,7 +9,7 @@ namespace CK.Env.NuGet
     /// <summary>
     /// Internal implementation that may be made public once.
     /// </summary>
-    class NuGetClientAzureFeed : NuGetRemoteFeedBase, INuGetFeed
+    class NuGetClientAzureFeed : NuGetRemoteFeedBase, INuGetRepository
     {
         internal NuGetClientAzureFeed( NuGetClient c, NuGetAzureFeedInfo info )
             : base( c, new PackageSource( info.Url, info.Name ), info )

@@ -23,7 +23,7 @@ namespace CKli
             localFeedProvider.Register( new EnvLocalFeedProviderNuGetHandler() );
             fs.ServiceContainer.Add( _nuGetClient );
             artifact.Register( _nuGetClient );
-           initializer.Services.Add( this );
+            initializer.Services.Add( this );
         }
 
         void IDisposable.Dispose()

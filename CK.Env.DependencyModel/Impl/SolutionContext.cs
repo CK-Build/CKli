@@ -202,12 +202,12 @@ namespace CK.Env.DependencyModel
             ++_version;
         }
 
-        internal void OnArtifactSourceAdded( Solution solution, IArtifactSource newOne )
+        internal void OnArtifactSourceAdded( Solution solution, IArtifactFeed newOne )
         {
             ++_version;
         }
 
-        internal void OnArtifactSourceRemoved( Solution solution, IArtifactSource artifactSource )
+        internal void OnArtifactSourceRemoved( Solution solution, IArtifactFeed artifactSource )
         {
             ++_version;
         }

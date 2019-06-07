@@ -18,7 +18,7 @@ namespace CKli
             Initializer initializer)
             : base( initializer )
         {
-            _npmClient = new NPMClient( sharedHttpClient, secretKeyStore, initializer.Monitor );
+            _npmClient = new NPMClient( sharedHttpClient, secretKeyStore );
             artifact.Register( _npmClient );
             fs.ServiceContainer.Add( _npmClient );
             localFeedProvider.Register( new EnvLocalFeedProviderNPMHandler() );

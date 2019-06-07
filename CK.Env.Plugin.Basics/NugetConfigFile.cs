@@ -81,9 +81,12 @@ namespace CK.Env.Plugin
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
+            var solution = _solutionDriver.GetSolution( m );
+            if( solution == null ) return;
+
             EnsureDocument();
             PackageSources.EnsureFirstElement( "clear" );
-            foreach( var s in _solutionSpec.NuGetSources )
+            foreach( var s in solution.ArtifactSources.OfType<INuGetFeed>() )
             {
                 EnsureFeed( m, s.Name, s.Url );
                 if( s.Credentials != null )

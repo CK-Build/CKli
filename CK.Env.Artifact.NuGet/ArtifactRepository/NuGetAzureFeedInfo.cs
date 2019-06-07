@@ -3,9 +3,9 @@ using System.Xml.Linq;
 namespace CK.Env.NuGet
 {
     /// <summary>
-    /// Immutable implementation of <see cref="INuGetFeedInfo"/> for Azure feeds.
+    /// Immutable implementation of <see cref="INuGetRepositoryInfo"/> for Azure feeds.
     /// </summary>
-    public class NuGetAzureFeedInfo : NuGetFeedInfo
+    public class NuGetAzureFeedInfo : NuGetRepositoryInfo
     {
         readonly string _name;
 
@@ -21,7 +21,7 @@ namespace CK.Env.NuGet
             Label = label;
         }
 
-        public override NuGetFeedType Type => NuGetFeedType.NuGetAzure;
+        public override NuGetRepositoryType Type => NuGetRepositoryType.NuGetAzure;
 
         /// <summary>
         /// Gets the name of this feed:

@@ -16,16 +16,28 @@ namespace CK.Env.Plugin
         /// </summary>
         /// <param name="m">The monitor.</param>
         /// <param name="solution">The solution to be configured.</param>
-        public SolutionConfigurationEventArgs( IActivityMonitor m, Solution solution )
+        /// <param name="isNew">Whether the solution to be configured is a brand new one or is an existing one that is reconfigured.</param>
+        /// <param name="spec">The solution specification.</param>
+        public SolutionConfigurationEventArgs( IActivityMonitor m, Solution solution, bool isNew, SolutionSpec spec )
             : base( m )
         {
             Solution = solution;
         }
 
         /// <summary>
-        /// Gets the solution that must be configurated.
+        /// Gets the solution that must be configured.
         /// </summary>
         public Solution Solution { get; }
+
+        /// <summary>
+        /// Gets whether the <see cref="Solution"/> is a brand new one or is an existing one that is reconfigured.
+        /// </summary>
+        public bool IsNewSolution { get; }
+
+        /// <summary>
+        /// Gets the solution specification.
+        /// </summary>
+        public SolutionSpec SolutionSpec { get; }
 
         /// <summary>
         /// Gets the failure messages.

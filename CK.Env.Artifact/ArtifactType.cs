@@ -18,14 +18,14 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the type name. Typically "NuGet", "NPM", "CKSetup", etc.
+        /// Null when <see cref="IsValid"/> is false.
         /// </summary>
         public string Name { get; }
 
         /// <summary>
-        /// Gets whether this type is the default, invalid, one.
+        /// Gets whether this type is valid: its <see cref="Name"/> is defined.
         /// </summary>
-        public bool IsDefault => Name == null;
-
+        public bool IsValid => Name != null;
 
         static ArtifactType[] _types = Array.Empty<ArtifactType>();
         static readonly object _lock = new object();
@@ -50,10 +50,10 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets an already <see cref="Register"/>ed type or a <see cref="IsDefault"/> one.
+        /// Gets an already <see cref="Register"/>ed type or a not <see cref="IsValid"/> one.
         /// </summary>
         /// <param name="name">Type name.</param>
-        /// <returns>The single registered type or a default one.</returns>
+        /// <returns>The single registered type or a default, invalid, one.</returns>
         public static ArtifactType SingleOrDefault( string name )
         {
             var types = _types;
@@ -74,7 +74,7 @@ namespace CK.Env
             ArtifactType FindSame()
             {
                 var t = SingleOrDefault( name );
-                if( !t.IsDefault )
+                if( t.IsValid )
                 {
                     if( t.IsInstallable != isInstallable ) throw new InvalidOperationException();
                 }
@@ -84,7 +84,7 @@ namespace CK.Env
             lock( _lock )
             {
                 exists = FindSame();
-                if( exists.IsDefault )
+                if( !exists.IsValid )
                 {
                     exists = new ArtifactType( name, isInstallable );
                     Array.Resize( ref _types, _types.Length + 1 );
@@ -109,7 +109,11 @@ namespace CK.Env
 
         public override int GetHashCode() => Name.GetHashCode();
 
-        public override string ToString() => Name;
+        /// <summary>
+        /// Returns the <see cref="Name"/> or the empty string if <see cref="IsValid"/> is false.
+        /// </summary>
+        /// <returns>A readable string.</returns>
+        public override string ToString() => Name ?? String.Empty;
 
     }
 }

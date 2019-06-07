@@ -53,11 +53,17 @@ namespace System.Xml.Linq
         }
 
         /// <summary>
+        /// Calls <see cref="WarnUnhandledElements"/> with warnings for attributes.
+        /// </summary>
+        /// <returns>The number of emitted warnings.</returns>
+        public int WarnUnhandled() => WarnUnhandledElements( true );
+
+        /// <summary>
         /// Emits a warning if this <see cref="Element"/> has not been handled or for any of its own direct child element
         /// that has not been <see cref="Handle"/>d.
         /// </summary>
         /// <returns>The number of emitted warnings.</returns>
-        public int WarnUnhandledElements()
+        public int WarnUnhandledElements( bool withAttributes = false )
         {
             int warned = 0;
             if( !_handled.Contains( Element ) )
@@ -65,7 +71,10 @@ namespace System.Xml.Linq
                 warned = 1;
                 Monitor.Warn( $"Unmapped element '{Element.Name}'{Element.GetLineColumnString()}." );
             }
-            else foreach( var c in Element.Elements() )
+            else
+            {
+                if( withAttributes ) warned += WarnUnhandledAttributes();
+                foreach( var c in Element.Elements() )
                 {
                     if( !_handled.Contains( c ) )
                     {
@@ -73,6 +82,7 @@ namespace System.Xml.Linq
                         Monitor.Warn( $"Unhandled element '{c.Name}'{c.GetLineColumnString()}." );
                     }
                 }
+            }
             return warned;
         }
 
@@ -90,6 +100,18 @@ namespace System.Xml.Linq
             var r = e == Element ? this : new XElementReader( Monitor, e, _handled );
             if( handleElement ) _handled.Add( e );
             return r;
+        }
+
+        /// <summary>
+        /// Throws a xml exception with line/column information if possible.
+        /// </summary>
+        /// <param name="message">The exception message. Must not be null or empty.</param>
+        public void ThrowXmlException( string message )
+        {
+            if( String.IsNullOrWhiteSpace( message ) ) throw new ArgumentException( nameof( message ) );
+            IXmlLineInfo info = Element.GetLineColumnInfo();
+            if( info.HasLineInfo() ) throw new XmlException( message + info.GetLineColumnString(), null, info.LineNumber, info.LinePosition );
+            throw new XmlException( message );
         }
 
         /// <summary>

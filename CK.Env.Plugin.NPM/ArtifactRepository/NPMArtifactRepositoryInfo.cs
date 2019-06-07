@@ -2,11 +2,11 @@ using CK.Core;
 using System;
 using System.Xml.Linq;
 
-namespace CK.Env.NuGet
+namespace CK.Env.NPM
 {
-    public abstract class NuGetFeedInfo : INuGetFeedInfo
+    public abstract class NPMArtifactRepositoryInfo : INPMArtifactRepositoryInfo
     {
-        protected NuGetFeedInfo( in XElementReader r )
+        protected NPMArtifactRepositoryInfo( in XElementReader r )
         {
             QualityFilter = new PackageQualityFilter( r.HandleOptionalAttribute<string>( "QualityFilter", null ) );
         }
@@ -14,14 +14,15 @@ namespace CK.Env.NuGet
         /// <summary>
         /// Gets the type of feed.
         /// </summary>
-        public abstract NuGetFeedType Type { get; }
+        public abstract NPMFRepositoryType Type { get; }
 
         /// <summary>
         /// Gets the name of this feed.
-        /// Name is used as the feed identifier: it must be unique accross a set of NuGet feeds.
-        /// (See <see cref="NuGetFeedInfoComparer"/>.)
+        /// Name is used as the feed identifier: it must be unique accross a set of NPM feeds.
+        /// (See <see cref="NPMFeedInfoComparer"/>.)
         /// </summary>
         public abstract string Name { get; }
+
 
         /// <summary>
         /// Gets the range of package quality that is accepted by this feed.
@@ -35,7 +36,6 @@ namespace CK.Env.NuGet
         /// </summary>
         public abstract string SecretKeyName { get; }
 
-
         /// <summary>
         /// Overridden to return the <see cref="Type"/> and <see cref="Name"/>.
         /// This is the <see cref="IArtifactRepositoryInfo.UniqueArtifactRepositoryName"/>.
@@ -43,25 +43,24 @@ namespace CK.Env.NuGet
         /// <returns>A readble string.</returns>
         public override string ToString() => $"{Type}:{Name}";
 
-
         /// <summary>
-        /// Creates a <see cref="INuGetFeedInfo"/> from a <see cref="XElement"/>.
+        /// Creates a <see cref="INPMArtifactRepositoryInfo"/> from a <see cref="XElement"/>.
         /// </summary>
         /// <param name="r">The xml element reader.</param>
         /// <param name="skipMissingType">
-        /// True to silently ignore an element that doesn't have a Type attribute whose value is one of <see cref="NuGetFeedType"/>
+        /// True to silently ignore an element that doesn't have a Type attribute whose value is one of <see cref="NPMFRepositoryType"/>
         /// and returns null.
         /// When false (the default), an exception is thrown.
         /// </param>
         /// <returns>The info or null.</returns>
-        public static INuGetFeedInfo Create( in XElementReader r, bool skipMissingType = false )
+        public static INPMArtifactRepositoryInfo Create( in XElementReader r, bool skipMissingType = false )
         {
-            switch( r.Element.AttributeEnum( "Type", NuGetFeedType.None ) )
+            switch( r.Element.AttributeEnum( "Type", NPMFRepositoryType.None ) )
             {
-                case NuGetFeedType.NuGetAzure: return new NuGetAzureFeedInfo( r );
-                case NuGetFeedType.NuGetStandard: return new NuGetStandardFeedInfo( r );
+                case NPMFRepositoryType.NPMAzure: return new NPMAzureFeedInfo( r );
+                case NPMFRepositoryType.NPMStandard: return new NPMStandardFeedInfo( r );
                 default:
-                    if( !skipMissingType ) throw new Exception( $"Not a NuGetFeedInfo element: {r}." );
+                    if( !skipMissingType ) throw new Exception( $"Not a NPMFeedInfo element: {r}." );
                     return null;
             }
         }

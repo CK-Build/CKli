@@ -5,12 +5,12 @@ namespace CK.Env.NuGet
     /// Only <see cref="Name"/> appears. Url or source is hidden since
     /// some feed implementation may not have one (composite feed for instance).
     /// </summary>
-    public interface INuGetFeedInfo : IArtifactRepositoryInfo
+    public interface INuGetRepositoryInfo : IArtifactRepositoryInfo
     {
         /// <summary>
         /// Gets the type of feed.
         /// </summary>
-        NuGetFeedType Type { get; }
+        NuGetRepositoryType Type { get; }
 
         /// <summary>
         /// Gets the name of this feed.

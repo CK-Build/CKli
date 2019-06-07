@@ -8,7 +8,7 @@ using CKSetup;
 
 namespace CK.Env.CKSetup
 {
-    public class CKSetupClient : IArtifactRepositoryFactory
+    public class CKSetupClient : IArtifactTypeHandler
     {
         /// <summary>
         /// Exposes the "CKSetup" <see cref="ArtifactType"/>.
@@ -27,7 +27,7 @@ namespace CK.Env.CKSetup
             _stores = new Dictionary<string, Store>();
         }
 
-        public IArtifactRepositoryInfo CreateInfo( in XElementReader r )
+        public IArtifactRepositoryInfo ReadRepositoryInfo( in XElementReader r )
         {
             string type = r.HandleOptionalAttribute<string>( "Type", null );
             if( type == "CKSetup" )
@@ -46,7 +46,7 @@ namespace CK.Env.CKSetup
             return null;
         }
 
-        public IArtifactRepository Find( string uniqueRepositoryName )
+        public IArtifactRepository FindRepository( string uniqueRepositoryName )
         {
             _stores.TryGetValue( uniqueRepositoryName, out var store );
             return store;
@@ -65,5 +65,9 @@ namespace CK.Env.CKSetup
             }
             return null;
         }
+
+        public IArtifactFeed CreateFeed( in XElementReader r ) => null;
+
+        public IArtifactFeed FindFeed( string uniqueTypedName ) => null;
     }
 }

@@ -1,19 +1,19 @@
 using CK.Core;
-using CSemVer;
-using System.Threading.Tasks;
+using System.Linq;
+using System.Xml.Linq;
 
-namespace CK.Env.NPM
+namespace CK.Env
 {
     /// <summary>
-    /// Extends <see cref="IArtifactFeed"/> with NPM specific properties
+    /// Extends <see cref="IArtifactFeed"/> with NuGet specific properties
     /// and specific capabilities.
     /// </summary>
-    public interface INPMFeed : IArtifactFeed
+    public interface INuGetFeed : IArtifactFeed
     {
         /// <summary>
-        /// Gets the scope name. Can not be null and must start with @.
+        /// Gets the feed name. Can not be null.
         /// </summary>
-        string Scope { get; }
+        string Name { get; }
 
         /// <summary>
         /// Gets the feed url. Can not be null.
@@ -24,5 +24,6 @@ namespace CK.Env.NPM
         /// Gets optional credentials for the source. Can be null.
         /// </summary>
         SimpleCredentials Credentials { get; }
+
     }
 }
