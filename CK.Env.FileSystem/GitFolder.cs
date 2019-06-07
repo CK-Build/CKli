@@ -530,6 +530,8 @@ namespace CK.Env
         /// </summary>
         public bool CanAmendCommit => (_git.Head.TrackingDetails.AheadBy ?? 1) > 0;
 
+        public int? AheadOriginCommitCount => _git.Head.TrackingDetails.AheadBy;
+
         public string OriginUrl => ProtoGitFolder.OriginUrl;
 
         public NormalizedPath FullPhysicalPath => ProtoGitFolder.FullPhysicalPath;
