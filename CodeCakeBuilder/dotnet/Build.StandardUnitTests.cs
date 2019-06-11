@@ -58,11 +58,10 @@ namespace CodeCake
                 foreach( NormalizedPath buildDir in Directory.GetDirectories( binDir ) )
                 {
                     string framework = buildDir.LastPart;
-                    string testBinariesPath;
                     string fileWithoutExtension = buildDir.AppendPart( project.Name );
-                    if( File.Exists( fileWithoutExtension ) )
+                    string testBinariesPath = fileWithoutExtension + ".exe"; ;
+                    if( File.Exists( testBinariesPath ) )
                     {
-                        testBinariesPath = fileWithoutExtension + ".exe";
                         //we are with nunitLite
                         Cake.Information( $"Testing via NUnitLite ({framework}): {testBinariesPath}" );
                         if( CheckTestDone( testBinariesPath ) ) return;
