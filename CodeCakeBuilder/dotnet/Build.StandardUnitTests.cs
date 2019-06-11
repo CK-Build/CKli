@@ -4,6 +4,7 @@ using Cake.Common.Solution;
 using Cake.Common.Tools.DotNetCore;
 using Cake.Common.Tools.DotNetCore.Test;
 using Cake.Common.Tools.NUnit;
+using Cake.Core.IO;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,17 +19,17 @@ namespace CodeCake
         {
             string memoryFilePath = $"CodeCakeBuilder/UnitTestsDone.{globalInfo.GitInfo.CommitSha}.txt";
 
-            void WriteTestDone( Cake.Core.IO.FilePath test )
+            void WriteTestDone( FilePath test )
             {
                 if( globalInfo.GitInfo.IsValid ) System.IO.File.AppendAllLines( memoryFilePath, new[] { test.ToString() } );
             }
 
-            bool CheckTestDone( Cake.Core.IO.FilePath test )
+            bool CheckTestDone( FilePath test )
             {
                 bool done = System.IO.File.Exists( memoryFilePath )
                             ? System.IO.File.ReadAllLines( memoryFilePath ).Contains( test.ToString() )
                             : false;
-                if( done ) 
+                if( done )
                 {
                     if( !globalInfo.GitInfo.IsValid )
                     {
@@ -39,26 +40,54 @@ namespace CodeCake
                 }
                 return done;
             }
+            var testDlls = testProjects.Select
+                <SolutionProject,
+                   (FilePath csprojPath,
+                   DirectoryPath projectPath,
+                   DirectoryPath buildDirectoryNetCoreApp21,
+                   FilePath netCoreAppDll21,
+                   DirectoryPath buildDirectoryNetCoreApp22,
+                   FilePath netCoreAppDll22,
+                   DirectoryPath buildDirectoryNet461,
+                   FilePath net461Dll,
+                   FilePath net461Exe)>( p =>
+                    {
+                        var buildDirNetcore21 = p.Path.GetDirectory().Combine( "bin/" + globalInfo.BuildConfiguration + "/netcoreapp2.1/" );
+                        var buildDirNetcore22 = p.Path.GetDirectory().Combine( "bin/" + globalInfo.BuildConfiguration + "/netcoreapp2.2/" );
+                        var buildDirNet461 = p.Path.GetDirectory().Combine( "bin/" + globalInfo.BuildConfiguration + "/net461/" );
+                        return (
+                            p.Path,
+                            p.Path.GetDirectory(),
+                            buildDirNetcore21,
+                            buildDirNetcore21.CombineWithFilePath( p.Name + ".dll" ),
+                            buildDirNetcore22,
+                            buildDirNetcore22.CombineWithFilePath( p.Name + ".dll" ),
+                            buildDirNet461,
+                            buildDirNet461.CombineWithFilePath( p.Name + ".dll" ),
+                            buildDirNet461.CombineWithFilePath( "/net461/" + p.Name + ".exe" )
+                        );
+                   } );
 
-            var testDlls = testProjects.Select( p =>
-                         new
-                         {
-                             CSProjPath = p.Path,
-                             ProjectPath = p.Path.GetDirectory(),
-                             NetCoreAppDll21 = p.Path.GetDirectory().CombineWithFilePath( "bin/" + globalInfo.BuildConfiguration + "/netcoreapp2.1/" + p.Name + ".dll" ),
-                             NetCoreAppDll22 = p.Path.GetDirectory().CombineWithFilePath( "bin/" + globalInfo.BuildConfiguration + "/netcoreapp2.2/" + p.Name + ".dll" ),
-                             Net461Dll = p.Path.GetDirectory().CombineWithFilePath( "bin/" + globalInfo.BuildConfiguration + "/net461/" + p.Name + ".dll" ),
-                             Net461Exe = p.Path.GetDirectory().CombineWithFilePath( "bin/" + globalInfo.BuildConfiguration + "/net461/" + p.Name + ".exe" ),
-                         } );
-
-            foreach( var test in testDlls )
+            foreach(
+                var (csprojPath,projectPath,
+                buildDirectoryNetCoreApp21,
+                netCoreAppDll21,
+                buildDirectoryNetCoreApp22,
+                netCoreAppDll22,
+                buildDirectoryNet461,
+                net461Dll,
+                net461Exe) in testDlls )
             {
-                var net461 = Cake.FileExists( test.Net461Dll )
-                                ? test.Net461Dll
-                                : Cake.FileExists( test.Net461Exe )
-                                    ? test.Net461Exe
+                var net461 = Cake.FileExists( net461Dll )
+                                ? net461Dll
+                                : Cake.FileExists( net461Exe )
+                                    ? net461Exe
                                     : null;
-                if( net461 != null )
+                bool isVsTests =
+                    Cake.FileExists( buildDirectoryNetCoreApp21.CombineWithFilePath( "NUnit3.TestAdapter.dll" ))
+                    || Cake.FileExists( buildDirectoryNetCoreApp22.CombineWithFilePath( "NUnit3.TestAdapter.dll" ) )
+                    || Cake.FileExists( buildDirectoryNet461.CombineWithFilePath( "NUnit3.TestAdapter.dll" ) );
+                if( net461 != null && !isVsTests )
                 {
                     Cake.Information( $"Testing via NUnit (net461): {net461}" );
                     if( !CheckTestDone( net461 ) )
@@ -66,18 +95,18 @@ namespace CodeCake
                         Cake.NUnit( new[] { net461 }, new NUnitSettings()
                         {
                             Framework = "v4.5",
-                            ResultsFile = test.ProjectPath.CombineWithFilePath( "TestResult.Net461.xml" )
+                            ResultsFile = projectPath.CombineWithFilePath( "TestResult.Net461.xml" )
                         } );
                         WriteTestDone( net461 );
                     }
                 }
-                if( Cake.FileExists( test.NetCoreAppDll21 ) )
+                if( Cake.FileExists( netCoreAppDll21 ) )
                 {
-                    TestNetCore( test.CSProjPath.FullPath, test.NetCoreAppDll21, "netcoreapp2.1" );
+                    TestNetCore( csprojPath.FullPath, netCoreAppDll21, "netcoreapp2.1" );
                 }
-                if( Cake.FileExists( test.NetCoreAppDll22 ) )
+                if( Cake.FileExists( netCoreAppDll22 ) )
                 {
-                    TestNetCore( test.CSProjPath.FullPath, test.NetCoreAppDll22, "netcoreapp2.2" );
+                    TestNetCore( csprojPath.FullPath, netCoreAppDll22, "netcoreapp2.2" );
                 }
             }
 
