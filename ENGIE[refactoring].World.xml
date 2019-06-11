@@ -1,0 +1,160 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ENGIE-refactoring.World>
+  <LoadLibrary Name="CK.Env.Plugin.Basics" />
+  <LoadLibrary Name="CK.Env.Plugin.SolutionDriver" />
+  <LoadLibrary Name="CK.Env.Plugin.Appveyor" />
+  <LoadLibrary Name="CK.Env.Plugin.GitLab" />
+  <LoadLibrary Name="CK.Env.Plugin.NPM" />
+  <LoadLibrary Name="CK.Env.Plugin.CKSetup" />
+  <LoadLibrary Name="CK.Env.Plugin.NuGet" />
+  <SharedHttpClient />
+  <ArtifactCenter />
+  <LocalFeedProvider />
+  <NuGetClient />
+  <NPMClient />
+  <CKSetupClient />
+  <WorldState IsPublic="False" />
+  <ArtifactRepositories>
+    <Repository Type="NuGetAzure" Organization="invenietis" FeedName="engie-refactoring" CheckName="NuGetAzure:invenietis-engie-refactoring" CheckSecretKeyName="AZURE_FEED_INVENIETIS_PAT" />
+    <Repository Type="NPMAzure" Organization="invenietis" FeedName="engie-refactoring" NPMScope="@engie" CheckName="NPMAzure:@engie->invenietis-engie-refactoring" CheckSecretKeyName="AZURE_FEED_INVENIETIS_PAT" />
+  </ArtifactRepositories>
+  
+  <SharedSolutionSpec>
+    <NuGetSources>
+      <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json">
+        <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
+      </add>
+    </NuGetSources>
+    <RemoveNuGetSourceNames>
+      <add Name="MyGet_Invenietis_Release" />
+      <add Name="MyGet_Invenietis_Preview" />
+      <add Name="MyGet_Invenietis_CI" />
+      <add Name="VSTS_Invenietis_Release" />
+      <add Name="VSTS_Invenietis_Preview" />
+      <add Name="VSTS_Invenietis_CI" />
+      <add Name="VSTS_Invenietis_Engie" />
+      <add Name="EngieCI" />
+      <add Name="NuGet" />
+    </RemoveNuGetSourceNames>
+  </SharedSolutionSpec>
+  <!-- NuGetSources Signature-OpenSource  -->
+  <Folder Name="ENGIE">
+    <SharedSolutionSpec>
+      <ArtifactTargets>
+        <add Name="NuGetAzure:invenietis-engie-refactoring" />
+      </ArtifactTargets>
+    </SharedSolutionSpec>
+    <GitFolder Name="CK-DB-Feedermarket" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/CK-DB-Feedermarket">
+      <Branch Name="develop-refactoring">
+        <SolutionSpec />
+      </Branch>
+    </GitFolder>
+    <GitFolder Name="Feedermarket-Functions" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions">
+      <Branch Name="develop-refactoring">
+        <SolutionSpec />
+      </Branch>
+    </GitFolder>
+    <GitFolder Name="Feedermarket-Auth" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Auth">
+      <Branch Name="develop-refactoring">
+        <SolutionSpec />
+      </Branch>
+    </GitFolder>
+    <GitFolder Name="Engie-DataWeather-Sdk" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Engie-DataWeatherSdk">
+      <Branch Name="develop-refactoring">
+        <SolutionSpec>
+          <ArtifactTargets>
+            <add Name="NPMAzure:@engie->invenietis-engie-refactoring" />
+          </ArtifactTargets>
+          <NPMProjects>
+            <add Folder="js/" PackageName="@engie/data-weather-sdk" />
+          </NPMProjects>
+        </SolutionSpec>
+      </Branch>
+    </GitFolder>
+    <GitFolder Name="Feedermarket-Content" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Content">
+      <Branch Name="develop-refactoring">
+        <SolutionSpec NoStrongNameSigning="True" />
+      </Branch>
+    </GitFolder>
+    <SharedSolutionSpec>
+      <NuGetSources>
+        <add Name="Invenietis-Release" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-release/nuget/v3/index.json">
+          <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
+        </add>
+        <add Name="Invenietis-Preview" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-preview/nuget/v3/index.json">
+          <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
+        </add>
+        <add Name="Invenietis-CI" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-ci/nuget/v3/index.json">
+          <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
+        </add>
+        <add Name="Engie" Url="https://pkgs.dev.azure.com/invenietis/_packaging/Engie/nuget/v3/index.json">
+          <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
+        </add>
+        <add Name="Engie-CI" Url="https://pkgs.dev.azure.com/invenietis/_packaging/Engie-CI/nuget/v3/index.json">
+          <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
+        </add>
+      </NuGetSources>
+    </SharedSolutionSpec>
+    <!-- NuGetSources Invenietis -->
+    <GitFolder Name="Cofely" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Cofely">
+      <Branch Name="develop-refactoring">
+        <SolutionSpec>
+          <NPMProjects>
+            <add Folder="CFLY.Intranet.Web/Content/" PackageName="cofely-intranet" IsPrivate="True" />
+            <add Folder="CFLY.Web/Content/vue/" PackageName="backoffice" IsPrivate="True" />
+          </NPMProjects>
+        </SolutionSpec>
+      </Branch>
+    </GitFolder>
+    <GitFolder Name="Feedermarket-Utils" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Utils">
+      <Branch Name="develop-refactoring">
+        <SolutionSpec />
+      </Branch>
+    </GitFolder>
+    <GitFolder Name="Feedermarket-Buildings" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Buildings">
+      <Branch Name="develop-refactoring">
+        <SolutionSpec NoStrongNameSigning="True" />
+      </Branch>
+    </GitFolder>
+    <GitFolder Name="Feedermarket-Client" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Client">
+      <Branch Name="develop-refactoring">
+        <SolutionSpec NoStrongNameSigning="True" />
+      </Branch>
+    </GitFolder>
+    <GitFolder Name="Feedermarket-Functions-ACP" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions-ACP">
+      <Branch Name="develop-refactoring">
+        <SolutionSpec />
+      </Branch>
+    </GitFolder>
+    <GitFolder Name="Feedermarket-Functions-FM" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions-FM">
+      <Branch Name="develop-refactoring">
+        <SolutionSpec />
+      </Branch>
+    </GitFolder>
+    <GitFolder Name="Feedermarket-Functions-Optimum" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions-Optimum">
+      <Branch Name="develop-refactoring">
+        <SolutionSpec />
+      </Branch>
+    </GitFolder>
+    <GitFolder Name="Feedermarket-Functions-Siradel" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions-Siradel">
+      <Branch Name="develop-refactoring">
+        <SolutionSpec />
+      </Branch>
+    </GitFolder>
+    <GitFolder Name="Feedermarket-GED" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-GED">
+      <Branch Name="develop-refactoring">
+        <SolutionSpec />
+      </Branch>
+    </GitFolder>
+    <GitFolder Name="Feedermarket-Notifications" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Notifications">
+      <Branch Name="develop-refactoring">
+        <SolutionSpec />
+      </Branch>
+    </GitFolder>
+    <GitFolder Name="Feedermarket-Transformers" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Transformers">
+      <Branch Name="develop-refactoring">
+        <SolutionSpec />
+      </Branch>
+    </GitFolder>
+  </Folder>
+</ENGIE-refactoring.World>

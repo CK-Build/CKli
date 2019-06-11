@@ -3,6 +3,7 @@ using CK.Text;
 using LibGit2Sharp;
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace CK.Env
@@ -99,8 +100,9 @@ namespace CK.Env
                 }
 
                 EnsureHooks( m );
+                return GitFolder.EnsureGitFolderCorrectSetup( m, this, isPublic );
+
             }
-            return new GitFolder( this, isPublic );
         }
 
         public Credentials PATCredentialsHandler( IActivityMonitor m, string url )
