@@ -17,8 +17,8 @@ namespace CK.Env
         /// </summary>
         public string RootDirectoryPath { get; }
 
-        internal LocalWorldName( string xmlDescriptionFilePath, string worldName, string ltsKey, ILocalWorldRootPathMapping localMap )
-            : base( worldName, ltsKey )
+        internal LocalWorldName( string xmlDescriptionFilePath, string worldName, string parallelName, ILocalWorldRootPathMapping localMap )
+            : base( worldName, parallelName )
         {
             if( String.IsNullOrWhiteSpace( xmlDescriptionFilePath ) ) throw new ArgumentNullException( nameof( xmlDescriptionFilePath ) );
             XmlDescriptionFilePath = xmlDescriptionFilePath;
@@ -37,7 +37,7 @@ namespace CK.Env
                 {
                     return new LocalWorldName( filePath, fName, null, localMap );
                 }
-                int ltsLength = fName.IndexOf( ']' ) - idx;
+                int ltsLength = fName.IndexOf( ']' ) - idx - 1;
                 return new LocalWorldName( filePath, fName.Substring( 0, idx ), fName.Substring( idx + 1, ltsLength ), localMap );
             }
             catch( Exception ex )

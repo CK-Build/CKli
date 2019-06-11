@@ -35,7 +35,8 @@ namespace CK.Env
         {
             if( w == null ) throw new ArgumentNullException( nameof( w ) );
             if( d == null ) throw new ArgumentNullException( nameof( d ) );
-            if( d.Root.Name != w.FullName+".World.State" ) throw new ArgumentException( $"Invalid state document root. Must be {w.FullName+".World.State"}, found {d.Root.Name}.", nameof( d ) );
+            string safeName = w.FullName.Replace( '[', '-' ).Replace( "]", "" ) + ".World.State";
+            if( d.Root.Name != safeName) throw new ArgumentException( $"Invalid state document root. Must be {safeName}, found {d.Root.Name}.", nameof( d ) );
             _world = w;
             _doc = d;
             _generalState = d.Root.EnsureElement( xGeneralStateName );
@@ -50,7 +51,7 @@ namespace CK.Env
         }
 
         public RawXmlWorldState( IWorldName w )
-            : this( w, new XDocument( new XElement( w.FullName + ".World.State", new XAttribute( xWorkStatusName, GlobalWorkStatus.Idle.ToString() ) ) ) )
+            : this( w, new XDocument( new XElement( w.FullName.Replace( '[', '-' ).Replace( "]", "" ) + ".World.State", new XAttribute( xWorkStatusName, GlobalWorkStatus.Idle.ToString() ) ) ) )
         {
         }
 

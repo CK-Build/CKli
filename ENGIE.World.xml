@@ -190,12 +190,5 @@
         <SolutionSpec />
       </Branch>
     </GitFolder>
-
-    <GitFolder Name="Feedermarket-MarketOptimum" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-MarketOptimum">
-      <Branch Name="develop">
-      </Branch>
-    </GitFolder>
-
-
   </Folder>
 </ENGIE-WORLD>

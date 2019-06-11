@@ -34,6 +34,7 @@ namespace CK.Env
         /// </summary>
         public string FullName { get; }
 
+
         /// <summary>
         /// Overridden to return the <see cref="FullName"/>.
         /// </summary>
@@ -53,8 +54,8 @@ namespace CK.Env
             if( !String.IsNullOrWhiteSpace( parallelName ) )
             {
                 ParallelName = parallelName;
-                MasterBranchName = $"master[{parallelName}]";
-                DevelopBranchName = $"develop[{parallelName}]";
+                MasterBranchName = $"master-{parallelName}";
+                DevelopBranchName = $"develop-{parallelName}";
                 FullName = Name + '[' + parallelName + ']';
             }
             else

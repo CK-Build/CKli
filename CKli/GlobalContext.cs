@@ -128,13 +128,13 @@ namespace CKli
                         string key;
                         if( World.ParallelName == null )
                         {
-                            key = "  <Current>";
+                            key = "<Default>";
                         }
                         else
                         {
                             key = $"[{World.ParallelName}]";
                         }
-                        Console.WriteLine( $"   > {Idx + 1}{key} => { LocalPath ?? "(No local mapping)"}" );
+                        Console.WriteLine( $"   > {Idx + 1} {key} => { LocalPath ?? "(No local mapping)"}" );
                     }
                 }
                 Console.WriteLine( "   > x - Exit" );
