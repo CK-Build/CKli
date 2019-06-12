@@ -1,10 +1,11 @@
-using CSemVer;
 using System;
 
-namespace CK.Env
+namespace CSemVer
 {
     /// <summary>
     /// Defines a min/max filter of <see cref="PackageQuality"/>.
+    /// By default, this filter accepts everything (<see cref="PackageQuality.None"/> is the same as <see cref="PackageQuality.CI"/> for <see cref="Min"/>
+    /// and <see cref="PackageQuality.None"/> is the same as <see cref="PackageQuality.Release"/> for <see cref="Max"/>).
     /// </summary>
     public readonly struct PackageQualityFilter
     {
@@ -54,10 +55,10 @@ namespace CK.Env
         /// Throws an <see cref="ArgumentException"/> on invalid syntax: use <see cref="TryParse(string, out PackageQualityFilter)"/>
         /// to handle invalid syntax.
         /// </summary>
-        /// <param name="s">The string. Can be null.</param>
+        /// <param name="s">The string. Can be null or empty.</param>
         public PackageQualityFilter( string s )
         {
-            if( s != null )
+            if( !String.IsNullOrWhiteSpace( s ) )
             {
                 if( !TryParse( s, out PackageQualityFilter p ) ) throw new ArgumentException( "Invalid PackageQualityFilter syntax." );
                 Min = p.Min;
@@ -67,23 +68,41 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Overridden to return "<see cref="Min"/>,<see cref="Max"/>".
+        /// Overridden to return "<see cref="Min"/>-<see cref="Max"/>".
         /// </summary>
-        /// <returns>The "Min,Max" string.</returns>
-        public override string ToString() => Min.ToString() + ',' + Max.ToString();
+        /// <returns>The "Min-Max" string.</returns>
+        public override string ToString() => Min.ToString() + '-' + Max.ToString();
 
         /// <summary>
         /// Attempts to parse a string as a <see cref="PackageQualityFilter"/>.
-        /// Examples: "CI,Release", ",PreRelease", "Preview,Preview", "Preview,".
+        /// Examples:
+        /// "Release" (is the same as "Release-Release"): only <see cref="PackageQuality.Release"/> is accepted
+        /// "CI-Release" (is the same as "-Release" or "CI-" or ""): everything is accepted.
+        /// "-ReleaseCandidate" (same as "CI-ReleaseCandidate"): everything except Release.
+        /// "Exploratory-Preview": No CI, ReleaseCandidate, nor Release.
         /// </summary>
-        /// <param name="s">The string to parse.</param>
+        /// <param name="s">The string to parse. Can not be null but can be empty.</param>
         /// <param name="q">The result.</param>
         /// <returns>True on success, false on error.</returns>
         public static bool TryParse( string s, out PackageQualityFilter q )
         {
             var minMax = s.Replace( " ", "" )
-                          .Split( ',' );
-            if( minMax.Length == 2
+                          .Split( '-' );
+            if( minMax.Length == 1 )
+            {
+                var only = minMax[0];
+                if( only.Length == 0 )
+                {
+                    q = new PackageQualityFilter();
+                    return true;
+                }
+                if( TryParse( only, out PackageQuality both ) )
+                {
+                    q = new PackageQualityFilter( both, both );
+                    return true;
+                }
+            }
+            else if( minMax.Length == 2
                 && TryParse( minMax[0], out PackageQuality min )
                 && TryParse( minMax[1], out PackageQuality max ) )
             {

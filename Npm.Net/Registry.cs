@@ -21,6 +21,8 @@ namespace Npm.Net
 {
     public class Registry
     {
+        static readonly string _userAgent = CSemVer.InformationalVersion.ReadFromAssembly( typeof(Registry).Assembly ).ToString();
+
         static readonly Uri _npmjs = new Uri( "https://registry.npmjs.org/" );
         readonly HttpClient _httpClient;
         readonly AuthenticationHeaderValue _authHeader;
@@ -320,14 +322,13 @@ namespace Npm.Net
 
         void AddNpmHeaders( IActivityMonitor m, HttpRequestHeaders headers )
         {
-            const string userAgent = "Npm.Net/0.0.0";
             if( NpmInCi )
             {
                 headers.Add( "npm-in-ci", NpmInCi.ToString().ToLower() ); //json type are lowercase
                 m.Info( "Detected that we are running in CI. Sending to the registry an header indicating it." );
             }
             headers.Add( "npm-session", _session );
-            headers.Add( "user-agent", userAgent );
+            headers.Add( "user-agent", _userAgent );
             if( _authHeader != null )
             {
                 headers.Authorization = _authHeader;

@@ -16,7 +16,6 @@ namespace CK.Env.NuGet
     class InternalFeed 
     {
         private protected readonly NuGetClient Client;
-        private protected readonly PackageSource _packageSource;
         private protected readonly SourceRepository _sourceRepository;
         private protected readonly AsyncLazy<MetadataResource> _meta;
         INuGetFeed _feed;
@@ -35,7 +34,7 @@ namespace CK.Env.NuGet
 
             public string Name { get; }
 
-            public string Url { get; }
+            public string Url => _feed.PackageSource.Source;
 
             public SimpleCredentials Credentials { get; }
 
@@ -43,23 +42,26 @@ namespace CK.Env.NuGet
 
             public ArtifactType ArtifactType => NuGetClient.NuGetType;
 
-            public async Task<IReadOnlyCollection<ArtifactAvailableInstances>> GetVersionsAsync( IActivityMonitor m, IEnumerable<string> artifactNames )
+            public async Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, string artifactName )
             {
                 var logger = _feed.EnsureInitialization( m );
                 var meta = await _feed._meta;
-                var result = new List<ArtifactAvailableInstances>();
-                var tasks = artifactNames.Select( n => GetAvailable( meta, logger, n ) );
-                await Task.WhenAll( tasks );
-                return tasks.Select( t => t.Result ).ToArray();
+                return await GetAvailable( meta, logger, artifactName );
             }
 
             async Task<ArtifactAvailableInstances> GetAvailable( MetadataResource meta, NuGetLoggerAdapter logger, string name )
             {
-                var v = new ArtifactAvailableInstances( new Artifact( NuGetClient.NuGetType, name ) );
+                var v = new ArtifactAvailableInstances( this, name );
                 var latest = await meta.GetVersions( name, true, false, _feed.Client.SourceCache, logger, CancellationToken.None );
-                foreach( var sVer in latest.Select( nV => SVersion.Parse( nV.ToNormalizedString() ) ) )
+                foreach( var nugetVersion in latest )
                 {
-                    v = v.WithVersion( sVer );
+                    var vText = nugetVersion.ToNormalizedString();
+                    var sV = SVersion.TryParse( vText );
+                    if( !sV.IsValid )
+                    {
+                        logger.Monitor.Warn( $"Unable to parse version '{vText}' for '{name}': {sV.ErrorMessage}" );
+                    }
+                    else v = v.WithVersion( sV );
                 }
                 return v;
             }
@@ -68,8 +70,8 @@ namespace CK.Env.NuGet
         private protected InternalFeed( NuGetClient c, PackageSource packageSource )
         {
             Client = c;
-            _packageSource = packageSource;
-            _sourceRepository = new SourceRepository( _packageSource, NuGetClient.Providers );
+            PackageSource = packageSource;
+            _sourceRepository = new SourceRepository( PackageSource, NuGetClient.StaticProviders );
             _meta = new AsyncLazy<MetadataResource>( () => _sourceRepository.GetResourceAsync<MetadataResource>() );
         }
 
@@ -79,13 +81,13 @@ namespace CK.Env.NuGet
             HandleFeed( url, name, creds );
         }
 
-        internal INuGetFeed Feed => _feed;
+        internal readonly PackageSource PackageSource;
 
-        internal bool MatchFeedFor( string url ) => StringComparer.OrdinalIgnoreCase.Equals( _packageSource.Source, url );
+        internal INuGetFeed Feed => _feed;
 
         internal INuGetFeed HandleFeed( string url, string name, SimpleCredentials creds )
         {
-            Debug.Assert( _feed == null && MatchFeedFor( url ) );
+            Debug.Assert( _feed == null && url.Equals( PackageSource.Source, StringComparison.OrdinalIgnoreCase ) );
             return _feed = new ReadFeed( this, name, creds );
         }
 
@@ -96,9 +98,5 @@ namespace CK.Env.NuGet
             return logger;
         }
 
-        internal void CollectPackageSources( List<PackageSource> collector )
-        {
-            collector.Add( _packageSource );
-        }
     }
 }

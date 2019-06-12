@@ -14,6 +14,11 @@ namespace CK.Env.Plugin
 {
     public class SolutionDriver : GitBranchPluginBase, ISolutionDriver, IDisposable, ICommandMethodsProvider
     {
+        /// <summary>
+        /// As its name states...
+        /// </summary>
+        public const string CODECAKEBUILDER_SECRET_KEY = "CODECAKEBUILDER_SECRET_KEY";
+
         public static readonly ArtifactType NuGetType = ArtifactType.Register( "NuGet", true );
         public static readonly ArtifactType CKSetupType = ArtifactType.Register( "CKSetup", false );
 
@@ -44,6 +49,7 @@ namespace CK.Env.Plugin
             _keyStore = keyStore;
             _solutionSpec = spec;
             _localFeedProvider = localFeedProvider;
+            _keyStore.DeclareSecretKey( CODECAKEBUILDER_SECRET_KEY, d => d ?? $"Required to execute CodeCakeBuilder." );
         }
 
         void IDisposable.Dispose()
@@ -133,11 +139,15 @@ namespace CK.Env.Plugin
                 _solution = _solutionContext.AddSolution( BranchPath, expectedSolutionName );
                 foreach( var targetName in _solutionSpec.ArtifactTargets )
                 {
-                    _solution.AddArtifactTarget( _artifactCenter.FindRepository( targetName ) );
+                    var r = _artifactCenter.Repositories.FirstOrDefault( repo => repo.UniqueRepositoryName == targetName );
+                    if( r == null ) m.Error( $"Unable to find the repository named '{targetName}' (available repositories: {_artifactCenter.Repositories.Select( repo => repo.UniqueRepositoryName ).Concatenate()})." );
+                    else _solution.AddArtifactTarget( r );
                 }
                 foreach( var sourceName in _solutionSpec.ArtifactSources )
                 {
-                    _solution.AddArtifactSource( _artifactCenter.FindFeed( sourceName ) );
+                    var f = _artifactCenter.Feeds.FirstOrDefault( feed => feed.TypedName == sourceName );
+                    if( f == null ) m.Error( $"Unable to find the feed named '{sourceName}' (available sources: {_artifactCenter.Feeds.Select( feed => feed.TypedName ).Concatenate()})." );
+                    _solution.AddArtifactSource( f );
                 }
             }
             _solution.Tag( _sln );
@@ -472,7 +482,7 @@ namespace CK.Env.Plugin
         /// </summary>
         public event EventHandler<EventMonitoredArgs> OnBuildFailed;
 
-        public bool IsBuildEnabled => _world.WorkStatus == GlobalWorkStatus.Idle && IsActive;
+        public bool IsBuildEnabled => _world.WorkStatus == GlobalWorkStatus.Idle && IsActive && _keyStore.IsSecretKeyAvailable( CODECAKEBUILDER_SECRET_KEY ) == true;
 
         /// <summary>
         /// Builds the solution in 'local' branch or build in 'develop' without remotes, using the published Zero
@@ -635,9 +645,9 @@ namespace CK.Env.Plugin
             {
                 try
                 {
-                    string key = _keyStore.GetSecretKey( m, "CODECAKEBUILDER_SECRET_KEY", false, "Required to execute CodeCakeBuilder." );
+                    string key = _keyStore.GetSecretKey( m, CODECAKEBUILDER_SECRET_KEY, false );
                     if( key == null ) return false;
-                    ev.EnvironmentVariables.Add( ("CODECAKEBUILDER_SECRET_KEY", key) );
+                    ev.EnvironmentVariables.Add( (CODECAKEBUILDER_SECRET_KEY, key) );
 
                     var args = ev.WithZeroBuilder
                                 ? ev.CodeCakeBuilderExecutableFile + " SolutionDirectoryIsCurrentDirectory"

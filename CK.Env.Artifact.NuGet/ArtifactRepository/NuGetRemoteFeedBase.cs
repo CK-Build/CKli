@@ -17,17 +17,32 @@ namespace CK.Env.NuGet
     /// <summary>
     /// Internal implementation that may be made public once.
     /// </summary>
-    abstract class NuGetRemoteFeedBase : InternalFeed, INuGetRepository
+    abstract class NuGetRemoteFeedBase : InternalFeed, IArtifactRepository
     {
         readonly AsyncLazy<PackageUpdateResource> _updater;
         string _secret;
 
-        internal NuGetRemoteFeedBase( NuGetClient c, PackageSource source, INuGetRepositoryInfo info )
+        internal NuGetRemoteFeedBase(
+            NuGetClient c,
+            PackageSource source,
+            PackageQualityFilter qualityFilter )
             : base( c, source )
         {
-            Info = info;
+            QualityFilter = qualityFilter;
             _updater = new AsyncLazy<PackageUpdateResource>( () => _sourceRepository.GetResourceAsync<PackageUpdateResource>() );
+            UniqueRepositoryName = NuGetClient.NuGetType.Name + ':' + source.Name;
         }
+
+        /// <summary>
+        /// Gets the unique name of this repository.
+        /// It should uniquely identify the repository in any context and may contain type, address, urls, or any information
+        /// that helps defining unicity.
+        /// <para>
+        /// This name depends on the repository type. When described externally in xml, the "CheckName" attribute when it exists
+        /// must be exactly this computed name.
+        /// </para>
+        /// </summary>
+        public string UniqueRepositoryName { get; }
 
         /// <summary>
         /// This repository handles "NuGet" artifact type.
@@ -36,13 +51,6 @@ namespace CK.Env.NuGet
         /// <returns>True if this repository artifact type is "NuGet", false otherwise.</returns>
         public bool HandleArtifactType( in ArtifactType artifactType ) => artifactType == NuGetClient.NuGetType;
 
-        IArtifactRepositoryInfo IArtifactRepository.Info => Info;
-
-        /// <summary>
-        /// Gets the info of this feed.
-        /// </summary>
-        public INuGetRepositoryInfo Info { get; }
-
         /// <summary>
         /// Must resolve the push API key.
         /// The push API key is not necessarily the secret behind <see cref="SecretKeyName"/>.
@@ -50,6 +58,17 @@ namespace CK.Env.NuGet
         /// <param name="m">The monitor to use.</param>
         /// <returns>The API key or null.</returns>
         protected abstract string ResolvePushAPIKey( IActivityMonitor m );
+
+        /// <summary>
+        /// Gets the range of package quality that is accepted by this feed.
+        /// </summary>
+        public PackageQualityFilter QualityFilter { get; }
+        
+        /// <summary>
+        /// Must provide the secret key name.
+        /// A null or empty SecretKeyName means that the repository does not require any protection.
+        /// </summary>
+        public abstract string SecretKeyName { get; }
 
         /// <summary>
         /// Ensures that the secret behind the <see cref="SecretKeyName"/> is available.
@@ -64,10 +83,10 @@ namespace CK.Env.NuGet
         {
             if( _secret == null )
             {
-                var s = Info.SecretKeyName;
+                var s = SecretKeyName;
                 if( !String.IsNullOrWhiteSpace( s ) )
                 {
-                    _secret = Client.SecretKeyStore.GetSecretKey( m, s, throwOnEmpty, $"Needed for feed '{Info}'." );
+                    _secret = Client.SecretKeyStore.GetSecretKey( m, s, throwOnEmpty );
                     if( _secret != null ) OnSecretResolved( m, _secret ); 
                 }
             }
@@ -108,7 +127,7 @@ namespace CK.Env.NuGet
             string apiKey = ResolvePushAPIKey( m );
             if( string.IsNullOrEmpty( apiKey ) )
             {
-                m.Warn( $"Could not resolve API key. Push to '{Info}' is skipped." );
+                m.Warn( $"Could not resolve API key. Push to '{UniqueRepositoryName}' is skipped." );
                 return;
             }
             try
@@ -176,10 +195,10 @@ namespace CK.Env.NuGet
                     m.Error( $"Invalid artifact local set for NuGet feed." );
                     return false;
                 }
-                var accepted = locals.Where( l => Info.QualityFilter.Accepts( l.Version.PackageQuality ) ).ToList();
+                var accepted = locals.Where( l => QualityFilter.Accepts( l.Version.PackageQuality ) ).ToList();
                 if( accepted.Count == 0 )
                 {
-                    m.Info( $"No packages accpeted by {Info.QualityFilter} filter for {Info}." );
+                    m.Info( $"No packages accepted by {QualityFilter} filter for {UniqueRepositoryName}." );
                 }
                 else
                 {
@@ -188,5 +207,12 @@ namespace CK.Env.NuGet
             }
             return success;
         }
+
+        /// <summary>
+        /// Overridden to return the <see cref="UniqueRepositoryName"/> string.
+        /// </summary>
+        /// <returns>A readable string.</returns>
+        public override string ToString() => UniqueRepositoryName;
+
     }
 }

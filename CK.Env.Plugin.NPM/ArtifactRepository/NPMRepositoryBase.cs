@@ -12,17 +12,49 @@ namespace CK.Env.NPM
     /// <summary>
     /// Internal implementation that may be made public once.
     /// </summary>
-    abstract class NPMRemoteFeedBase : INPMArtifactRepository
+    abstract class NPMRepositoryBase : IArtifactRepository
     {
         protected readonly NPMClient Client;
         string _secret;
+        Registry _registry;
 
-        internal NPMRemoteFeedBase( NPMClient c, INPMArtifactRepositoryInfo info, Registry registry )
+        internal NPMRepositoryBase(
+            NPMClient c,
+            PackageQualityFilter qualityFilter,
+            string name,
+            string url )
         {
-            Info = info;
-            Registry = registry;
             Client = c;
+            QualityFilter = qualityFilter;
+            Url = url;
+            UniqueRepositoryName = NPMClient.NPMType.Name + ':' + name;
         }
+
+        /// <summary>
+        /// Get the NPM registry url.
+        /// </summary>
+        public string Url { get; }
+
+        /// <summary>
+        /// Must provide the secret key name.
+        /// </summary>
+        public abstract string SecretKeyName { get; }
+
+        /// <summary>
+        /// Gets the unique name of this repository.
+        /// It should uniquely identify the repository in any context and may contain type, address, urls, or any information
+        /// that helps defining unicity.
+        /// <para>
+        /// This name depends on the repository type. When described externally in xml, the "CheckName" attribute when it exists
+        /// must be exactly this computed name.
+        /// </para>
+        /// </summary>
+        public string UniqueRepositoryName { get; }
+
+        /// <summary>
+        /// Gets the range of package quality that is accepted by this feed.
+        /// </summary>
+        public PackageQualityFilter QualityFilter { get; }
 
         /// <summary>
         /// This repository handles "NPM" artifact type.
@@ -31,28 +63,23 @@ namespace CK.Env.NPM
         /// <returns>True if this repository artifact type is "NPM", false otherwise.</returns>
         public bool HandleArtifactType( in ArtifactType artifactType ) => artifactType == NPMClient.NPMType;
 
-        IArtifactRepositoryInfo IArtifactRepository.Info => Info;
-
         /// <summary>
-        /// Gets the info of this feed.
+        /// Resolves the target NPM registry. Never null.
         /// </summary>
-        public INPMArtifactRepositoryInfo Info { get; }
-
-        public Registry Registry { get; }
+        public Registry GetRegistry( IActivityMonitor m ) => _registry ?? (_registry = CreateRegistry( m ));
 
         /// <summary>
-        /// Overridden to return the <see cref="Info"/> string.
-        /// </summary>
-        /// <returns>A readable string.</returns>
-        public override string ToString() => Info.ToString();
-
-        /// <summary>
-        /// Must resolve the push API key.
-        /// The push API key is not necessarily the secret behind <see cref="SecretKeyName"/>.
+        /// Creates the registry or throws on error.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <returns>The API key or null.</returns>
-        protected abstract string ResolvePushAPIKey( IActivityMonitor m );
+        /// <returns>The initialized registry.</returns>
+        protected abstract Registry CreateRegistry( IActivityMonitor m );
+
+        /// <summary>
+        /// Overridden to return the <see cref="UniqueRepositoryName"/> string.
+        /// </summary>
+        /// <returns>A readable string.</returns>
+        public override string ToString() => UniqueRepositoryName;
 
         /// <summary>
         /// Ensures that the secret behind the <see cref="SecretKeyName"/> is available.
@@ -67,18 +94,13 @@ namespace CK.Env.NPM
         {
             if( _secret == null )
             {
-                var s = Info.SecretKeyName;
+                var s = SecretKeyName;
                 if( !String.IsNullOrWhiteSpace( s ) )
                 {
-                    _secret = Client.SecretKeyStore.GetSecretKey( m, s, throwOnEmpty, $"Needed for feed '{Info}'." );
-                    if( _secret != null ) OnSecretResolved( m, _secret );
+                    _secret = Client.SecretKeyStore.GetSecretKey( m, s, throwOnEmpty );
                 }
             }
             return String.IsNullOrWhiteSpace( _secret ) ? null : _secret;
-        }
-
-        protected virtual void OnSecretResolved( IActivityMonitor m, string secret )
-        {
         }
 
         /// <summary>
@@ -90,7 +112,7 @@ namespace CK.Env.NPM
         /// <returns>True if found, false otherwise.</returns>
         public virtual Task<bool> ExistsAsync( IActivityMonitor m, string packageId, SVersion version )
         {
-            return Registry.ExistAsync( m, packageId, version );
+            return GetRegistry( m ).ExistAsync( m, packageId, version );
         }
 
         /// <summary>
@@ -108,7 +130,7 @@ namespace CK.Env.NPM
                 var pushed = new List<LocalNPMPackageFile>();
                 foreach( LocalNPMPackageFile file in files )
                 {
-                    if( await Registry.ExistAsync( m, file.Instance.Artifact.Name, file.Instance.Version ) )
+                    if( await GetRegistry( m ).ExistAsync( m, file.Instance.Artifact.Name, file.Instance.Version ) )
                     {
                         m.Info( $"Package '{file.Instance}' already in '{ToString()}'. Push skipped." );
                         skipped.Add( file );
@@ -118,7 +140,7 @@ namespace CK.Env.NPM
                         string firstDistTag = file.Instance.Version.PackageQuality.GetLabels()[0].ToString();
                         using( FileStream fileStream = File.OpenRead( file.FullPath ) )
                         {
-                            if( Registry.Publish( m,
+                            if( GetRegistry( m ).Publish( m,
                                     tarballPath: file.FullPath,
                                     isPublic: arePublicArtifacts,
                                     scope: file.PackageScope,
@@ -139,7 +161,7 @@ namespace CK.Env.NPM
                     {
                         foreach( var label in file.Instance.Version.PackageQuality.GetLabels().Skip( 1 ) )
                         {
-                            success &= await Registry.AddDistTag( m, file.Instance.Artifact.Name, file.Instance.Version, label.ToString() );
+                            success &= await GetRegistry( m ).AddDistTag( m, file.Instance.Artifact.Name, file.Instance.Version, label.ToString() );
                         }
                     }
                     if( success )
@@ -163,7 +185,6 @@ namespace CK.Env.NPM
             return Task.CompletedTask;
         }
 
-
         public async Task<bool> PushAsync( IActivityMonitor m, IArtifactLocalSet artifacts )
         {
             bool success = true;
@@ -174,10 +195,10 @@ namespace CK.Env.NPM
                     m.Error( $"Invalid artifact local set for NPM feed." );
                     return false;
                 }
-                var accepted = locals.Where( l => Info.QualityFilter.Accepts( l.Instance.Version.PackageQuality ) ).ToList();
+                var accepted = locals.Where( l => QualityFilter.Accepts( l.Instance.Version.PackageQuality ) ).ToList();
                 if( accepted.Count == 0 )
                 {
-                    m.Info( $"No packages accepted by '{Info.QualityFilter}' filter for '{Info}'." );
+                    m.Info( $"No packages accepted by '{QualityFilter}' filter for '{UniqueRepositoryName}'." );
                 }
                 else
                 {

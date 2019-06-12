@@ -1,4 +1,5 @@
 using CK.Core;
+using CSemVer;
 using NuGet.Configuration;
 
 namespace CK.Env.NuGet
@@ -8,15 +9,18 @@ namespace CK.Env.NuGet
     /// </summary>
     class NuGetClientStandardFeed : NuGetRemoteFeedBase
     {
-        public NuGetClientStandardFeed( NuGetClient c, NuGetStandardFeedInfo info )
-            : base( c, new PackageSource( info.Url, info.Name ), info )
+        internal NuGetClientStandardFeed(
+            NuGetClient c,
+            string url,
+            string name,
+            PackageQualityFilter qualityFilter,
+            string secretKeyName )
+            : base( c, new PackageSource( url, name ), qualityFilter )
         {
+            SecretKeyName = secretKeyName;
         }
 
-        /// <summary>
-        /// Gets the <see cref="NuGetStandardFeedInfo"/> info.
-        /// </summary>
-        public new NuGetStandardFeedInfo Info => (NuGetStandardFeedInfo)base.Info;
+        public override string SecretKeyName { get; }
 
         protected override string ResolvePushAPIKey( IActivityMonitor m ) => ResolveSecret( m );
     }

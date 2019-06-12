@@ -1,4 +1,5 @@
 using CK.Core;
+using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,15 +15,10 @@ namespace CK.Env.NPM
         /// </summary>
         public static readonly ArtifactType NPMType = ArtifactType.Register( "NPM", true );
 
-        readonly Dictionary<string, INPMArtifactRepository> _repositories;
-        readonly List<NPMFeed> _feeds;
-
         public NPMClient( HttpClient httpClient, ISecretKeyStore keyStore )
         {
             HttpClient = httpClient;
             SecretKeyStore = keyStore;
-            _repositories = new Dictionary<string, INPMArtifactRepository>();
-            _feeds = new List<NPMFeed>();
         }
 
         /// <summary>
@@ -35,50 +31,38 @@ namespace CK.Env.NPM
         /// </summary>
         public HttpClient HttpClient { get; }
 
-        /// <summary>
-        /// Finds an already created repository.
-        /// </summary>
-        /// <param name="uniqueRepositoryName">The <see cref="IArtifactRepositoryInfo.UniqueArtifactRepositoryName"/>.</param>
-        /// <returns>The repository or null.</returns>
-        public IArtifactRepository FindRepository( string uniqueRepositoryName ) => _repositories.GetValueWithDefault( uniqueRepositoryName, null );
-
-        /// <summary>
-        /// Finds or creates a feed.
-        /// If a feed with the same <see cref="INPMArtifactRepositoryInfo.Name"/> exists,
-        /// it is returned.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="info">The feed info.</param>
-        /// <returns>The new or existing feed.</returns>
-        public INPMArtifactRepository FindOrCreate( IActivityMonitor m, INPMArtifactRepositoryInfo info )
+        public IArtifactRepository CreateRepository( in XElementReader r )
         {
-            if( !_repositories.TryGetValue( info.UniqueArtifactRepositoryName, out var feed ) )
+            IArtifactRepository result = null;
+            var qualityFilter = new PackageQualityFilter( r.HandleOptionalAttribute<string>( "QualityFilter", null ) );
+            switch( r.HandleOptionalAttribute<string>( "Type", null ) )
             {
-                string pat = SecretKeyStore.GetSecretKey( m, info.SecretKeyName, true );
-                switch( info )
-                {
-                    case NPMAzureFeedInfo a: feed = new NPMClientAzureFeed( this, a, pat ); break;
-                    case NPMStandardFeedInfo s: feed = new NPMClientStandardFeed( this, s, pat ); break;
-                    default: throw new ArgumentException( $"Unhandled type: {info}", nameof( info ) );
-                }
-                _repositories.Add( info.UniqueArtifactRepositoryName, feed );
+                case "NPMAzure":
+                    {
+                        var organization = r.HandleRequiredAttribute<string>( "Organization" );
+                        var feedName = r.HandleRequiredAttribute<string>( "FeedName" );
+                        var npmScope = r.HandleRequiredAttribute<string>( "NPMScope" );
+                        if( npmScope.Length <= 2 || npmScope[0] != '@' )
+                        {
+                            r.ThrowXmlException( $"Invalid NPScope '{npmScope}' (must start with a @)." );
+                        }
+                        result = new NPMAzureRepository( this, qualityFilter, organization, feedName, npmScope );
+                        break;
+                    }
+                case "NPMStandard":
+                    {
+                        var name = r.HandleRequiredAttribute<string>( "Name" );
+                        var url = r.HandleRequiredAttribute<string>( "Url" );
+                        var secretKeyName = r.HandleRequiredAttribute<string>( "SecretKeyName" );
+                        var usePassword = r.HandleOptionalAttribute( "UsePassword", false );
+                        result = new NPMStandardRepository( this, qualityFilter, name, url, secretKeyName, usePassword );
+                        break;
+                    }
             }
-            return feed;
+            return result;
         }
 
-        IArtifactRepositoryInfo IArtifactTypeHandler.ReadRepositoryInfo( in XElementReader r )
-        {
-            return NPMArtifactRepositoryInfo.Create( r, skipMissingType: true );
-        }
-
-        IArtifactRepository IArtifactTypeHandler.FindOrCreate( IActivityMonitor m, IArtifactRepositoryInfo info )
-        {
-            if( info == null ) throw new ArgumentNullException( nameof( info ) );
-            if( !(info is INPMArtifactRepositoryInfo fInfo) ) return null;
-            return FindOrCreate( m, fInfo );
-        }
-
-        public IArtifactFeed CreateFeed( in XElementReader r )
+        public IArtifactFeed CreateFeed( in XElementReader r, IReadOnlyList<IArtifactRepository> repositories, IReadOnlyList<IArtifactFeed> feeds )
         {
             if( r.HandleOptionalAttribute<string>( "Type", null ) != NPMType.Name ) return null;
             var url = r.HandleRequiredAttribute<string>( "Url" );
@@ -87,16 +71,10 @@ namespace CK.Env.NPM
             var xCreds = r.Element.Element( "Credentials" );
             var creds = xCreds != null ? new SimpleCredentials( r.WithElement( xCreds ) ) : null;
             r.WarnUnhandled();
-            if( _feeds.Any( f => f.Scope == scope ) ) r.ThrowXmlException( $"NPM feed with the same scope '{scope}' is already defined." );
-            if( _feeds.Any( f => StringComparer.OrdinalIgnoreCase.Equals( f.Url, url ) ) ) r.ThrowXmlException( $"NPM feed with the same url '{url}' is already defined." );
-            var feed = new NPMFeed( scope, url, creds );
-            _feeds.Add( feed );
-            return feed;
-        }
-
-        public IArtifactFeed FindFeed( string uniqueTypedName )
-        {
-            return _feeds.SingleOrDefault( f => f.TypedName == uniqueTypedName );
+            var npmFeeds = feeds.OfType<NPMFeed>();
+            if( npmFeeds.Any( f => f.Scope == scope ) ) r.ThrowXmlException( $"NPM feed with the same scope '{scope}' is already defined." );
+            if( npmFeeds.Any( f => StringComparer.OrdinalIgnoreCase.Equals( f.Url, url ) ) ) r.ThrowXmlException( $"NPM feed with the same url '{url}' is already defined." );
+            return new NPMFeed( scope, url, creds );
         }
     }
 }

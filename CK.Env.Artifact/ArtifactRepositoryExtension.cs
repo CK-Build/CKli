@@ -15,7 +15,7 @@ namespace CK.Env
         /// <returns></returns>
         public static bool Accepts( this IArtifactRepository @this, in ArtifactInstance a )
         {
-            return @this.HandleArtifactType( a.Artifact.Type ) && @this.Info.QualityFilter.Accepts( a.Version.PackageQuality );
+            return @this.HandleArtifactType( a.Artifact.Type ) && @this.QualityFilter.Accepts( a.Version.PackageQuality );
         }
     }
 }

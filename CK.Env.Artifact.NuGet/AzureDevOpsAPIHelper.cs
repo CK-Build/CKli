@@ -15,6 +15,20 @@ namespace CK.Env
     /// </summary>
     internal static class AzureDevOpsAPIHelper
     {
+
+        /// <summary>
+        /// The secret key name is:
+        /// "AZURE_FEED_" + Organization.ToUpperInvariant().Replace( '-', '_' ).Replace( ' ', '_' ) + "_PAT".
+        /// </summary>
+        public static string GetSecretKeyName( string organization )
+            => "AZURE_FEED_"
+                + organization
+                        .ToUpperInvariant()
+                        .Replace( '-', '_' )
+                        .Replace( ' ', '_' )
+                + "_PAT";
+
+
         /// <summary>
         /// Gets the url api.
         /// </summary>

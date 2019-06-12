@@ -1,4 +1,5 @@
 using CK.Core;
+using CSemVer;
 using System.Threading.Tasks;
 
 namespace CK.Env
@@ -9,9 +10,26 @@ namespace CK.Env
     public interface IArtifactRepository
     {
         /// <summary>
-        /// Gets the info of this repository.
+        /// Gets the unique name of this repository.
+        /// It should uniquely identify the repository in any context and may contain type, address, urls, or any information
+        /// that helps defining unicity.
+        /// <para>
+        /// This name depends on the repository type. When described externally in xml, the "CheckName" attribute when it exists
+        /// must be exactly this computed name.
+        /// </para>
         /// </summary>
-        IArtifactRepositoryInfo Info { get; }
+        string UniqueRepositoryName { get; }
+
+        /// <summary>
+        /// Must provide the secret key name.
+        /// A null or empty SecretKeyName means that the repository does not require any protection.
+        /// </summary>
+        string SecretKeyName { get; }
+
+        /// <summary>
+        /// Gets the range of package quality that is accepted by this feed.
+        /// </summary>
+        PackageQualityFilter QualityFilter { get; }
 
         /// <summary>
         /// Ensures that the secret behind the <see cref="IArtifactRepositoryInfo.SecretKeyName"/> is available.

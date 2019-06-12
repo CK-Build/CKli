@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Text;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace System.Xml.Linq
 {
@@ -24,6 +25,7 @@ namespace System.Xml.Linq
             XElement element,
             HashSet<XObject> handled )
         {
+            if( element == null ) throw new ArgumentNullException( nameof( element ) );
             _handled = handled;
             Monitor = m;
             Element = element;
@@ -100,6 +102,30 @@ namespace System.Xml.Linq
             var r = e == Element ? this : new XElementReader( Monitor, e, _handled );
             if( handleElement ) _handled.Add( e );
             return r;
+        }
+
+        /// <summary>
+        /// Creates a reader bound to a required name child (and declares the child as
+        /// being <see cref="Handle(XObject)">handled</see>.
+        /// </summary>
+        /// <param name="name">The name of child element.</param>
+        /// <returns>A reader.</returns>
+        public XElementReader WithRequiredChild( XName name )
+        {
+            var c = Element.Element( name );
+            if( c == null ) ThrowXmlException( $"Required '{name}' element." );
+            return WithElement( c );
+        }
+
+        /// <summary>
+        /// Creates a set of readers bound to the <see cref="Element"/>'s children (and declares them as
+        /// being <see cref="Handle(XObject)">handled</see>.
+        /// </summary>
+        /// <returns>A the set of readers for children.</returns>
+        public IEnumerable<XElementReader> WithChildren()
+        {
+            var r = this;
+            return Element.Elements().Select( e => r.WithElement( e ) );
         }
 
         /// <summary>

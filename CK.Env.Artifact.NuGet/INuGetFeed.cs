@@ -11,11 +11,6 @@ namespace CK.Env
     public interface INuGetFeed : IArtifactFeed
     {
         /// <summary>
-        /// Gets the feed name. Can not be null.
-        /// </summary>
-        string Name { get; }
-
-        /// <summary>
         /// Gets the feed url. Can not be null.
         /// </summary>
         string Url { get; }

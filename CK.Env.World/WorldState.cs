@@ -520,7 +520,7 @@ namespace CK.Env
         }
 
         [CommandMethod]
-        public void ShowExternalDependencies( IActivityMonitor m, bool onlyMultipleVersions = false )
+        public void ShowExternalDependencies( IActivityMonitor m, bool compact = true, bool onlyMultipleVersions = false )
         {
             var ctx = GetSolutionDependencyContextOnCurrentBranches( m );
             if( ctx == null ) return;
@@ -528,7 +528,14 @@ namespace CK.Env
             var externals = ctx.DependencyContext.Analyzer.ExternalReferences;
             if( externals.Count == 0 )
             {
-                m.Warn( "This World don't have any external references." );
+                m.Warn( "This World doesn't have any external references." );
+            }
+            using( m.OpenInfo( $"Refreshing external versions for {externals.Count} packages." ) )
+            {
+                foreach( var e in externals )
+                {
+                    _artifacts.GetExternalVersions( m, e.Target.Artifact );
+                }
             }
             ConsoleColor stdForeColor = Console.ForegroundColor;
             ConsoleColor stdBackColor = Console.BackgroundColor;
@@ -539,22 +546,43 @@ namespace CK.Env
                 Console.WriteLine( $"{byType.Key} external dependencies:" );
                 Console.ForegroundColor = stdForeColor;
                 Console.BackgroundColor = stdBackColor;
-                foreach( var byName in byType.GroupBy( g => g.Target.Artifact.Name ).OrderBy( g => g.Key ) )
+                foreach( var byName in byType.GroupBy( g => g.Target.Artifact ).OrderBy( g => g.Key.Name ) )
                 {
-                    var byVersion = byName.GroupBy( s => s.Target.Version );
+                    var byVersion = byName.GroupBy( s => s.Target.Version ).ToList();
                     if( !onlyMultipleVersions || byVersion.Count() > 1 )
                     {
-                        Console.WriteLine( $"    |{byName.Key}" );
+                        var maxVersion = byVersion.Select( v => v.Key ).Max();
+                        var externalVersionDisplay = _artifacts.GetExternalVersions( m, byName.Key )
+                                                               .SelectMany( a => a.Versions.Where( v => v > maxVersion ).Select( v => (v, a.Feed.Name) ) )
+                                                               .GroupBy( v => v.v )
+                                                               .OrderByDescending( v => v.Key )
+                                                               .Select( g => $"{g.Key} ({g.Select( vn => vn.Name ).Concatenate()})" )
+                                                               .Concatenate();
+
+                        if( externalVersionDisplay.Length > 0 ) externalVersionDisplay = " <= " + externalVersionDisplay;
+                        Console.Write( $"    |" );
+                        Console.Write( byName.Key.Name );
+                        Console.WriteLine( externalVersionDisplay );
                         if( byVersion.Count() > 1 ) Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        foreach( var versionGrouped in byVersion )
+                        if( compact )
                         {
-                            Console.WriteLine( "    |    |" + versionGrouped.Key );
-                            foreach( var solutionGrouped in versionGrouped.GroupBy( q => q.Owner.Solution ) )
+                            foreach( var v in byVersion )
                             {
-                                Console.WriteLine( "    |    |    |" + solutionGrouped.Key.Name + ":" );
-                                foreach( var project in solutionGrouped )
+                                Console.WriteLine( $"    |      => {v.Key} ({v.GroupBy( p => p.Owner.Solution ).Select( s => $"{s.Key.Name}" ).Concatenate()})" );
+                            }
+                        }
+                        else
+                        {
+                            foreach( var versionGrouped in byVersion )
+                            {
+                                Console.WriteLine( "    |    |" + versionGrouped.Key );
+                                foreach( var solutionGrouped in versionGrouped.GroupBy( q => q.Owner.Solution ) )
                                 {
-                                    Console.WriteLine( "    |    |    |    |" + project.Owner.Name );
+                                    Console.WriteLine( "    |    |    |" + solutionGrouped.Key.Name + ":" );
+                                    foreach( var project in solutionGrouped )
+                                    {
+                                        Console.WriteLine( "    |    |    |    |" + project.Owner.Name );
+                                    }
                                 }
                             }
                         }
@@ -1055,7 +1083,7 @@ namespace CK.Env
                 {
                     using( m.OpenInfo( $"Publishing to target: {a.Key}." ) )
                     {
-                        IArtifactRepository h = _artifacts.FindRepository( a.Key );
+                        IArtifactRepository h = _artifacts.Repositories.SingleOrDefault( repo => repo.UniqueRepositoryName == a.Key );
                         if( !local.PushLocalArtifacts( m, h, a.Select( p => p.Artifact ), IsPublicWorld ) )
                         {
                             Debug.Assert( error(), "An error must have been logged." );
@@ -1066,7 +1094,7 @@ namespace CK.Env
             } );
         }
 
-        public bool CanGenerateLTSWorld => WorldName.LTSKey == null
+        public bool CanGenerateParallelWorld => WorldName.ParallelName == null
                             && WorkStatus == GlobalWorkStatus.Idle
                             && (CachedGlobalGitStatus == StandardGitStatus.Local
                             || CachedGlobalGitStatus == StandardGitStatus.Develop);

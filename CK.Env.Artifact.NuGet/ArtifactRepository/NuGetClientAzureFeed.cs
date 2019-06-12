@@ -1,4 +1,5 @@
 using CK.Core;
+using CSemVer;
 using NuGet.Configuration;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,18 +9,45 @@ namespace CK.Env.NuGet
 {
     /// <summary>
     /// Internal implementation that may be made public once.
+    /// The name of this feed is <see cref="Organization"/>-<see cref="FeedName"/>[-<see cref="Label"/>(without the '@' label prefix)].
     /// </summary>
-    class NuGetClientAzureFeed : NuGetRemoteFeedBase, INuGetRepository
+    class NuGetClientAzureFeed : NuGetRemoteFeedBase
     {
-        internal NuGetClientAzureFeed( NuGetClient c, NuGetAzureFeedInfo info )
-            : base( c, new PackageSource( info.Url, info.Name ), info )
+        internal NuGetClientAzureFeed(
+            NuGetClient c,
+            string url,
+            string name,
+            PackageQualityFilter qualityFilter,
+            string organization,
+            string feedName,
+            string label )
+            : base( c, new PackageSource( url, name ), qualityFilter )
         {
+            Organization = organization;
+            FeedName = feedName;
+            Label = label;
         }
 
         /// <summary>
-        /// Gets the <see cref="NuGetAzureFeedInfo"/> info.
+        /// The secret key name is:
+        /// "AZURE_FEED_" + Organization.ToUpperInvariant().Replace( '-', '_' ).Replace( ' ', '_' ) + "_PAT".
         /// </summary>
-        public new NuGetAzureFeedInfo Info => (NuGetAzureFeedInfo)base.Info;
+        public override string SecretKeyName => AzureDevOpsAPIHelper.GetSecretKeyName( Organization );
+
+        /// <summary>
+        /// Gets the organization name.
+        /// </summary>
+        public string Organization { get; }
+
+        /// <summary>
+        /// Gets the name of the feed inside the <see cref="Organization"/>.
+        /// </summary>
+        public string FeedName { get; }
+
+        /// <summary>
+        /// Gets the "@Label" string or null.
+        /// </summary>
+        public string Label { get; }
 
         /// <summary>
         /// Always "VSTS" or null if <see cref="ResolveSecret"/> returns null.
@@ -30,7 +58,7 @@ namespace CK.Env.NuGet
 
         protected override void OnSecretResolved( IActivityMonitor m, string secret )
         {
-            NuGetClient.EnsureVSSFeedEndPointCredentials( m, Info.Url, secret );
+            NuGetClient.EnsureVSSFeedEndPointCredentials( m, PackageSource.Source, secret );
         }
 
         /// <summary>
@@ -41,7 +69,7 @@ namespace CK.Env.NuGet
         /// <returns>The url.</returns>
         protected string GetAzureDevOpsUrlAPI( string point = "packagesBatch", string version = "api-version=5.0-preview.1" )
         {
-            return AzureDevOpsAPIHelper.GetUrl( Info.Organization, Info.FeedName, false, point, version );
+            return AzureDevOpsAPIHelper.GetUrl( Organization, FeedName, false, point, version );
         }
 
         /// <summary>
@@ -55,7 +83,7 @@ namespace CK.Env.NuGet
         {
             string personalAccessToken = ResolveSecret( logger.Monitor );
             var packages = skipped.Concat( pushed ).Select( i => i.Instance );
-            return AzureDevOpsAPIHelper.PromotePackagesAync( logger.Monitor, Client.HttpClient, Info.Organization, Info.FeedName, personalAccessToken, packages, false );
+            return AzureDevOpsAPIHelper.PromotePackagesAync( logger.Monitor, Client.HttpClient, Organization, FeedName, personalAccessToken, packages, false );
         }
 
     }

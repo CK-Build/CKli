@@ -30,11 +30,11 @@
 
     <Repository Type="NuGetStandard" Name="nuget.org" Url="https://api.nuget.org/v3/index.json"
                 CheckName="NuGetStandard:nuget.org"
-                QualityFilter="ReleaseCandidate,Release"
+                QualityFilter="ReleaseCandidate-Release"
                 SecretKeyName="NUGET_ORG_PUSH_API_KEY" />
 
     <Repository Type="NPMStandard" Name="npmjs.org" Url="https://registry.npmjs.org/"
-                QualityFilter="ReleaseCandidate,Release"
+                QualityFilter="ReleaseCandidate-Release"
                 CheckName="NPMStandard:npmjs.org"
                 SecretKeyName="NPMJS_ORG_PUSH_PAT" />
 

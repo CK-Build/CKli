@@ -16,6 +16,8 @@ namespace CK.Env.NPM
             TypedName = $"{NPMClient.NPMType.Name}:{scope}";
         }
 
+        string IArtifactFeed.Name => Scope;
+
         public string Scope { get; }
 
         public string Url { get; }
@@ -26,7 +28,7 @@ namespace CK.Env.NPM
 
         public ArtifactType ArtifactType => throw new NotImplementedException();
 
-        public Task<IReadOnlyCollection<ArtifactAvailableInstances>> GetVersionsAsync( IActivityMonitor m, IEnumerable<string> artifactNames )
+        public Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, string artifactName )
         {
             throw new NotImplementedException();
         }

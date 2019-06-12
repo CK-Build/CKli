@@ -1,27 +1,35 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 using CK.Core;
+using CSemVer;
 
 namespace CK.Env
 {
     /// <summary>
-    /// Combination of <see cref="IArtifactTypeHandler"/>.
-    /// Actual management of repositories and infos are totally delegated to the type handlers, this
-    /// object doesn't track repositories or repository infos.
+    /// Registers <see cref="IArtifactTypeHandler"/> and their created <see cref="IArtifactRepository"/>
+    /// and <see cref="IArtifactFeed"/>.
     /// </summary>
     public class ArtifactCenter
     {
         readonly List<IArtifactTypeHandler> _typeHandlers;
+        readonly List<IArtifactFeed> _feeds;
+        readonly List<IArtifactRepository> _repositories;
+
+        readonly Dictionary<Artifact, IReadOnlyCollection<ArtifactAvailableInstances>> _cachedArtifacts;
 
         public ArtifactCenter()
         {
             _typeHandlers = new List<IArtifactTypeHandler>();
+            _feeds = new List<IArtifactFeed>();
+            _repositories = new List<IArtifactRepository>();
+            _cachedArtifacts = new Dictionary<Artifact, IReadOnlyCollection<ArtifactAvailableInstances>>();
         }
 
         /// <summary>
-        /// Registers a new <see cref="IArtifactRepository"/>.
+        /// Registers a new <see cref="IArtifactTypeHandler"/>.
         /// </summary>
         /// <param name="factory">The factory to register.</param>
         public void Register( IArtifactTypeHandler factory )
@@ -31,119 +39,86 @@ namespace CK.Env
             _typeHandlers.Add( factory );
         }
 
-        /// <summary>
-        /// Ensure that source feeds are created from a set of xml elements.
-        /// </summary>
-        /// <param name="readers">Set of readers.</param>
-        public void InstanciateFeeds( IEnumerable<XElementReader> readers )
+        public void Initialize( IActivityMonitor m, IEnumerable<XElementReader> feeds, IEnumerable<XElementReader> repositories )
         {
-            foreach( var r in readers ) InstanciateFeed( r );
+            foreach( var r in repositories )
+            {
+                _repositories.Add( InstanciateRepository( r ) );
+            }
+            foreach( var r in feeds )
+            {
+                _feeds.Add( InstanciateFeed( r ) );
+            }
+        }
+
+        IArtifactRepository InstanciateRepository( in XElementReader r )
+        {
+            IArtifactRepository repo = null;
+            foreach( var f in _typeHandlers )
+            {
+                repo = f.CreateRepository( r );
+                if( repo != null )
+                {
+                    // First, check naming coherency.
+                    var checkName = r.HandleOptionalAttribute<string>( "CheckName", null );
+                    if( checkName != null && checkName != repo.UniqueRepositoryName )
+                    {
+                        r.ThrowXmlException( $"Invalid check for name: CheckName is '{checkName}' but the actual repository name is '{repo.UniqueRepositoryName}'." );
+                    }
+                    var checkSecretKeyName = r.HandleOptionalAttribute<string>( "CheckSecretKeyName", null );
+                    if( checkSecretKeyName != null && checkSecretKeyName != repo.SecretKeyName )
+                    {
+                        r.ThrowXmlException( $"Invalid check for secret key name: CheckSecretKeyName is '{checkSecretKeyName}' but the actual repository secret key name is '{repo.SecretKeyName}'." );
+                    }
+                    // Second, check for duplicates.
+                    if( _repositories.Any( rp => rp.UniqueRepositoryName == repo.UniqueRepositoryName ) )
+                    {
+                        r.ThrowXmlException( $"Repository '{repo.UniqueRepositoryName}' already exists. " );
+                    }
+                    else
+                    {
+                        _repositories.Add( repo );
+                    }
+                    r.WarnUnhandled();
+                    break;
+                }
+            }
+            if( repo == null ) r.ThrowXmlException( "Unable to map Xml element to an Artifact repository." );
+            return repo;
         }
 
         IArtifactFeed InstanciateFeed( XElementReader r )
         {
             foreach( var h in _typeHandlers )
             {
-                var f = h.CreateFeed( r );
-                if( f != null ) return f;
-            }
-            throw new ArgumentException( "Unable to resolve a package feed for: " + r.Element.ToString() );
-        }
-
-        /// <summary>
-        /// Finds a <see cref="IArtifactFeed"/> from its <see cref="IArtifactFeed.TypedName"/>.
-        /// If no feed can be found, an <see cref="ArgumentException"/> is thrown.
-        /// </summary>
-        /// <param name="uniqueTypedName">The <see cref="IArtifactFeed.TypedName"/>.</param>
-        /// <returns>The source.</returns>
-        public IArtifactFeed FindFeed( string uniqueTypedName )
-        {
-            if( uniqueTypedName == null ) throw new ArgumentNullException( nameof( uniqueTypedName ) );
-            foreach( var f in _typeHandlers )
-            {
-                var r = f.FindFeed( uniqueTypedName );
-                if( r != null ) return r;
-            }
-            throw new ArgumentException( $"Unable to find a feed named '{uniqueTypedName}'." );
-        }
-
-
-        /// <summary>
-        /// Creates a <see cref="IArtifactRepositoryInfo"/> from a <see cref="XElement"/>
-        /// by calling <see cref="IArtifactTypeHandler.CreateInfo(XElement)"/> on each registered
-        /// factories and returning the first one that returns a non null information object.
-        /// If no factory can handle the element, an <see cref="ArgumentException"/> is thrown.
-        /// <para>
-        /// When "CheckName" attribute exists on the element, it must exactly match the
-        /// resulting <see cref="IArtifactRepositoryInfo.UniqueArtifactRepositoryName"/> otherwise
-        /// an <see cref="ArgumentException"/> is thrown.
-        /// </para>
-        /// </summary>
-        /// <param name="r">The xml reader element.</param>
-        /// <returns>The mapped repository info.</returns>
-        IArtifactRepositoryInfo ReadRepositoryInfo( in XElementReader r )
-        {
-            foreach( var f in _typeHandlers )
-            {
-                var info = f.ReadRepositoryInfo( r );
-                if( info != null )
+                var f = h.CreateFeed( r, _repositories, _feeds );
+                if( f != null )
                 {
-                    var checkName = r.HandleOptionalAttribute<string>( "CheckName", null );
-                    if( checkName != null && checkName != info.UniqueArtifactRepositoryName )
+                    if( _feeds.Any( feed => feed.TypedName == f.TypedName ) )
                     {
-                        throw new ArgumentException( $"Invalid check for name: CheckName is '{checkName}' but the actual repository name is '{info.UniqueArtifactRepositoryName}'." );
+                        r.ThrowXmlException( $"Repository '{f.TypedName}' already exists. " );
                     }
-                    var checkSecretKeyName = r.HandleOptionalAttribute<string>( "CheckSecretKeyName", null );
-                    if( checkSecretKeyName != null && checkSecretKeyName != info.SecretKeyName )
+                    else
                     {
-                        throw new ArgumentException( $"Invalid check for secret key name: CheckSecretKeyName is '{checkSecretKeyName}' but the actual repository secret key name is '{info.SecretKeyName}'." );
+                        _feeds.Add( f );
                     }
-                    return info;
+                    r.WarnUnhandled();
+                    return f;
                 }
             }
-            throw new ArgumentException( "Unable to map Xml element to an ArtifactRepositoryInfo: " + r.ToString() );
+            r.ThrowXmlException( "Unable to resolve a package feed." );
+            return null;
         }
 
         /// <summary>
-        /// Ensure that repositories are created from a set of xml info elements.
+        /// Gets the available feeds.
         /// </summary>
-        /// <param name="readers">Set of readers.</param>
-        public void InstanciateRepositories( IEnumerable<XElementReader> readers )
-        {
-            foreach( var r in readers )
-            {
-                var info = ReadRepositoryInfo( r );
-                InstanciateRepository( r.Monitor, info );
-            }
-        }
-
-        IArtifactRepository InstanciateRepository( IActivityMonitor m, IArtifactRepositoryInfo info )
-        {
-            if( info == null ) throw new ArgumentNullException( nameof( info ) );
-            foreach( var f in _typeHandlers )
-            {
-                var r = f.FindOrCreate( m, info );
-                if( r != null ) return r;
-            }
-            throw new ArgumentException( "Unable to resolve a repository for repository info: " + info.ToString() );
-        }
+        public IReadOnlyCollection<IArtifactFeed> Feeds => _feeds;
 
         /// <summary>
-        /// Finds a <see cref="IArtifactRepository"/> from its <see cref="IArtifactRepositoryInfo.UniqueArtifactRepositoryName"/>.
-        /// If no repository can be found, an <see cref="ArgumentException"/> is thrown.
+        /// Gets the available repositories.
         /// </summary>
-        /// <param name="uniqueRepositoryName">Repository name.</param>
-        /// <returns>The repository.</returns>
-        public IArtifactRepository FindRepository( string uniqueRepositoryName )
-        {
-            if( uniqueRepositoryName == null ) throw new ArgumentNullException( nameof( uniqueRepositoryName ) );
-            foreach( var f in _typeHandlers )
-            {
-                var r = f.FindRepository( uniqueRepositoryName );
-                if( r != null ) return r;
-            }
-            throw new ArgumentException( $"Unable to find a repository named '{uniqueRepositoryName}'." );
-        }
+        public IReadOnlyCollection<IArtifactRepository> Repositories => _repositories;
 
         /// <summary>
         /// Attempts to resolve required secrets for a set of <see cref="IArtifactRepository"/>.
@@ -157,10 +132,26 @@ namespace CK.Env
         /// </returns>
         public IReadOnlyList<(string SecretKeyName, string Secret)> ResolveSecrets( IActivityMonitor m, IEnumerable<IArtifactRepository> repositories )
         {
-            return repositories.Where( feed => !String.IsNullOrWhiteSpace( feed.Info.SecretKeyName ) )
-                               .GroupBy( feed => feed.Info.SecretKeyName )
+            return repositories.Where( feed => !String.IsNullOrWhiteSpace( feed.SecretKeyName ) )
+                               .GroupBy( feed => feed.SecretKeyName )
                                .Select( g => (g.Key, Secret: g.First().ResolveSecret( m )) )
                                .ToList();
+        }
+
+        public IReadOnlyCollection<ArtifactAvailableInstances> GetExternalVersions( IActivityMonitor m, Artifact artifact )
+        {
+            if( !_cachedArtifacts.TryGetValue( artifact, out var instances ) )
+            {
+                // Don't use parallel resolution here because of the monitor (and parallel here is quite useless).
+                var result = new List<ArtifactAvailableInstances>();
+                foreach( var f in _feeds.Where( f => f.ArtifactType == artifact.Type ) )
+                {
+                    var available = f.GetVersionsAsync( m, artifact.Name ).GetAwaiter().GetResult();
+                    result.Add( available );
+                }
+                _cachedArtifacts.Add( artifact, instances = result );
+            }
+            return instances;
         }
     }
 }

@@ -23,12 +23,17 @@ namespace CK.Env
         ArtifactType ArtifactType { get; }
 
         /// <summary>
-        /// Gets the best set of versions of a set of artifacts in this feed.
+        /// Name of this feed. Must be unique for the <see cref="ArtifactType"/>.
+        /// </summary>
+        string Name { get; }
+
+        /// <summary>
+        /// Gets the best set of versions of an artifact in this feed.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="artifactNames">The artifact names.</param>
+        /// <param name="artifactName">The artifact name.</param>
         /// <returns>The set of instances.</returns>
-        Task<IReadOnlyCollection<ArtifactAvailableInstances>> GetVersionsAsync( IActivityMonitor m, IEnumerable<string> artifactNames );
+        Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, string artifactName );
 
     }
 }

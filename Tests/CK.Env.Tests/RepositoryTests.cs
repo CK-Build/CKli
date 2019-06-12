@@ -16,7 +16,17 @@ namespace CK.Env.Tests
     {
         class KeyStore : ISecretKeyStore
         {
-            public string GetSecretKey( IActivityMonitor m, string name, bool throwOnEmpty, string message = null )
+            public void DeclareSecretKey( string name, Func<string, string> descriptionBuilder )
+            {
+                throw new NotImplementedException();
+            }
+
+            public string GetSecretKey( IActivityMonitor m, string name, bool throwOnEmpty )
+            {
+                throw new NotImplementedException();
+            }
+
+            public bool? IsSecretKeyAvailable( string name )
             {
                 throw new NotImplementedException();
             }

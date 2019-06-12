@@ -6,33 +6,52 @@ using System.Threading.Tasks;
 using CK.Core;
 using CK.Text;
 using CKSetup;
+using CSemVer;
 
 namespace CK.Env.CKSetup
 {
-    class Store : IArtifactRepository
+    public class CKSetupStore : IArtifactRepository
     {
         readonly HttpClient _sharedHttpClient;
         readonly ISecretKeyStore _keyStore;
 
-        public Store( ICKSetupStoreInfo info, ISecretKeyStore keyStore, HttpClient sharedHttpClient )
+        public CKSetupStore(
+            ISecretKeyStore keyStore,
+            HttpClient sharedHttpClient,
+            Uri url,
+            string name )
         {
             _sharedHttpClient = sharedHttpClient;
             _keyStore = keyStore;
-            Info = info;
+            Url = url;
+            Name = name;
+            SecretKeyName = name != "Public"
+                            ? $"CKSETUPREMOTESTORE_{name.ToUpperInvariant()}_PUSH_API_KEY"
+                            : "CKSETUPREMOTESTORE_PUSH_API_KEY"; 
+            UniqueRepositoryName = CKSetupClient.CKSetupType.Name + ':' + name;
+            _keyStore.DeclareSecretKey( SecretKeyName, d => d ?? $"Required to push to '{UniqueRepositoryName}'." );
         }
 
-        public ICKSetupStoreInfo Info { get; }
+        public CKSetupStore(
+            ISecretKeyStore keyStore,
+            HttpClient sharedHttpClient )
+            : this( keyStore, sharedHttpClient, Facade.DefaultStoreUrl, "Public" )
+        {
+        }
 
-        IArtifactRepositoryInfo IArtifactRepository.Info => Info;
+        public string Name { get; }
 
-        public string SecretKeyName => Info.SecretKeyName;
+        public Uri Url { get; }
+
+        public string SecretKeyName { get; }
+
+        public PackageQualityFilter QualityFilter { get; }
+
+        public string UniqueRepositoryName { get; }
 
         public string ResolveSecret( IActivityMonitor m, bool throwOnEmpty = false )
         {
-            var s = Info.SecretKeyName;
-            return String.IsNullOrWhiteSpace( s )
-                    ? null
-                    : _keyStore.GetSecretKey( m, SecretKeyName, throwOnEmpty, $"Required to push to {Info.Name}." );
+            return _keyStore.GetSecretKey( m, SecretKeyName, throwOnEmpty );
         }
 
         public bool HandleArtifactType( in ArtifactType artifactType ) => artifactType == CKSetupClient.CKSetupType;
@@ -49,17 +68,17 @@ namespace CK.Env.CKSetup
                 }
                 else
                 {
-                    var all = new HashSet<ComponentRef>( local.ComponentRefs.Where( c => Info.QualityFilter.Accepts( c.Version.PackageQuality ) ) );
+                    var all = new HashSet<ComponentRef>( local.ComponentRefs.Where( c => QualityFilter.Accepts( c.Version.PackageQuality ) ) );
                     if( all.Count == 0 )
                     {
-                        m.Info( $"No packages accepted by {Info.QualityFilter} filter for {Info}." );
+                        m.Info( $"No packages accepted by {QualityFilter} filter for {UniqueRepositoryName}." );
                     }
                     else
                     {
                         var secret = ResolveSecret( m, true );
                         using( LocalStore store = LocalStore.OpenOrCreate( m, local.StorePath ) )
                         {
-                            success &= store != null && store.PushComponents( c => all.Remove( c.GetRef() ), Info.Url, secret );
+                            success &= store != null && store.PushComponents( c => all.Remove( c.GetRef() ), Url, secret );
                         }
                         if( all.Count > 0 )
                         {

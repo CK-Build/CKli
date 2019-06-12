@@ -11,21 +11,22 @@
   <NuGetClient />
   <WorldState IsPublic="True" />
 
-  <ArtifactTargetRepositories>
-    <Repository Type="NuGetAzure" Organization="Signature-OpenSource" FeedName="Default"
-            CheckName="NuGetAzure:Signature-OpenSource-Default"
-            CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
-    <Repository Type="NuGetStandard" Name="nuget.org" Url="https://api.nuget.org/v3/index.json"
-            CheckName="NuGetStandard:nuget.org"
-            QualityFilter="ReleaseCandidate,Release"
-            SecretKeyName="NUGET_ORG_PUSH_API_KEY" />
-  </ArtifactTargetRepositories>
-
-  <ArtifactSourceFeeds>
-    <Feed Type="NuGet" Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json">
-      <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
-    </Feed>
-  </ArtifactSourceFeeds>
+  <Artifacts>
+    <SourceFeeds>
+      <Feed Type="NuGet" Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json">
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
+      </Feed>      
+    </SourceFeeds>
+    <TargetRepositories>
+      <Repository Type="NuGetAzure" Organization="Signature-OpenSource" FeedName="Default"
+              CheckName="NuGetAzure:Signature-OpenSource-Default"
+              CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
+      <Repository Type="NuGetStandard" Name="nuget.org" Url="https://api.nuget.org/v3/index.json"
+              CheckName="NuGetStandard:nuget.org"
+              QualityFilter="ReleaseCandidate-Release"
+              SecretKeyName="NUGET_ORG_PUSH_API_KEY" />     
+    </TargetRepositories>>
+  </Artifacts>
 
   <SharedSolutionSpec>
     <RemoveNuGetSourceNames>

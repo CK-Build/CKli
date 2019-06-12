@@ -1,52 +1,35 @@
 using CK.Core;
+using System.Collections.Generic;
 using System.Xml.Linq;
 
 namespace CK.Env
 {
     /// <summary>
-    /// Root abstraction that creates repository and repository information of a certain kind.
+    /// Root abstraction that creates <see cref="IArtifactRepository"/> and <see cref="IArtifactFeed"/> of a certain kind.
     /// These handlers are registered in <see cref="ArtifactCenter"/>.
     /// </summary>
     public interface IArtifactTypeHandler
     {
+        /// <summary>!
+        /// Creates a repository from a <see cref="XElementReader"/> or returns null if the element
+        /// cannot be handled.
+        /// This must throw on error by using <see cref="XElementReader.ThrowXmlException(string)"/> so
+        /// that position in the xml is visible.
+        /// </summary>
+        /// <param name="r">The element reader. The Element's <see cref="XElement.Name"/> may be ignored (or used).</param>
+        /// <returns>The repository info or null.</returns>
+        IArtifactRepository CreateRepository( in XElementReader r );
+
         /// <summary>
         /// Creates a source from a <see cref="XElementReader"/> or returns null if the element cannot be handled.
+        /// This must throw on error by using <see cref="XElementReader.ThrowXmlException(string)"/> so
+        /// that position in the xml is visible.
         /// </summary>
-        /// <param name="r">The element reader. The Element's <see cref="XElement.Name"/> must be ignored (it can be anything).</param>
+        /// <param name="r">The element reader. The Element's <see cref="XElement.Name"/> may be ignored (or used).</param>
+        /// <param name="repositories">The repositories already initialized.</param>
+        /// <param name="feeds">The feeds already initialized.</param>
         /// <returns>The artifact feed or null.</returns>
-        IArtifactFeed CreateFeed( in XElementReader r );
+        IArtifactFeed CreateFeed( in XElementReader r, IReadOnlyList<IArtifactRepository> repositories, IReadOnlyList<IArtifactFeed> feeds );
 
-        /// <summary>
-        /// Finds a feed from its name <see cref="IArtifactFeed.TypedName"/>.
-        /// </summary>
-        /// <param name="uniqueTypedName">The <see cref="IArtifactFeed.TypedName"/>.</param>
-        /// <returns>The artifact feed or null.</returns>
-        IArtifactFeed FindFeed( string uniqueTypedName );
-
-        /// <summary>!
-        /// Creates a repository information from a <see cref="XElementReader"/> or returns null if the element
-        /// cannot be handled.
-        /// </summary>
-        /// <param name="r">The element reader. The Element's <see cref="XElement.Name"/> must be ignored (it can be anything).</param>
-        /// <returns>The repository info or null.</returns>
-        IArtifactRepositoryInfo ReadRepositoryInfo( in XElementReader r );
-
-        /// <summary>
-        /// Finds or creates a feed from a feed information if actual information type is handled or null.
-        /// Repository unicity (ie. find vs. create) depends on each repository implementation
-        /// (see <see cref="IArtifactRepositoryInfo.UniqueArtifactRepositoryName"/>).
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="info">The repository information.</param>
-        /// <returns>The repository or null.</returns>
-        IArtifactRepository FindOrCreate( IActivityMonitor m, IArtifactRepositoryInfo info );
-
-        /// <summary>
-        /// Finds a repository by its <see cref="IArtifactRepositoryInfo.UniqueArtifactRepositoryName"/>.
-        /// Null when not found.
-        /// </summary>
-        /// <param name="uniqueRepositoryName">The unique repository name.</param>
-        /// <returns>The repository or null.</returns>
-        IArtifactRepository FindRepository( string uniqueRepositoryName );
     }
 }
