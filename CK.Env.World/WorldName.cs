@@ -34,6 +34,7 @@ namespace CK.Env
         /// </summary>
         public string FullName { get; }
 
+
         /// <summary>
         /// Overridden to return the <see cref="FullName"/>.
         /// </summary>

@@ -37,17 +37,17 @@ namespace CK.Env
             return Path.Combine( p, w.FullName + ".World.State.xml" );
         }
 
-        public IWorldName CreateNew( IActivityMonitor m, string name, string ltsKey, XDocument content )
+        public IWorldName CreateNew( IActivityMonitor m, string name, string parallelName, XDocument content )
         {
             if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
             if( content == null ) throw new ArgumentNullException( nameof( content ) );
-            if( String.IsNullOrWhiteSpace( ltsKey ) ) ltsKey = null;
+            if( String.IsNullOrWhiteSpace( parallelName ) ) parallelName = null;
 
-            string wName = name + (ltsKey != null ? '[' + ltsKey + ']' : String.Empty);
+            string wName = name + (parallelName != null ? '[' + parallelName + ']' : String.Empty);
             var path = _directoryPath.AppendPart( wName + ".World.xml" );
             if( !File.Exists( path ) )
             {
-                var w = new LocalWorldName( path, name, ltsKey, _localWorldRootPathMapping );
+                var w = new LocalWorldName( path, name, parallelName, _localWorldRootPathMapping );
                 if( !WriteWorldDescription( m, w, content ) )
                 {
                     m.Error( $"Unable to create {wName} world." );

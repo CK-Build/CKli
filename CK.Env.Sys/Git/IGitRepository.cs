@@ -18,7 +18,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">The branch name.</param>
-        void EnsureBranch( IActivityMonitor m, string branchName );
+        void EnsureBranch( IActivityMonitor m, string branchName, bool noWarnOnCreate = false );
 
         /// <summary>
         /// Gets the full physical path of the Git folder.

@@ -28,7 +28,40 @@ namespace CK.Env
 
         public ProtoGitFolder ProtoGitFolder { get; }
 
-        internal GitFolder( ProtoGitFolder data, bool isPublic )
+        internal static GitFolder EnsureGitFolderCorrectSetup( IActivityMonitor m, ProtoGitFolder data, bool isPublic )
+        {
+            GitFolder gitFolder = new GitFolder( data, isPublic );
+            if( !gitFolder._git.Branches.Any( p => p.Commits.Any() ) )
+            {
+                //Sometimes we fail while cloning the repo.
+                //The issue is that the repo is incorrectly intialized: the commits are not fetched
+                m.Warn( "Repo does not contain any commits, probably a bad clone." );
+                if( !gitFolder.FetchBranches( m ) ) throw new InvalidOperationException( "Erorr while fetching." );
+                if( !gitFolder._git.Branches.Any( p => p.Commits.Any() ) ) throw new InvalidOperationException( "Empty git repository." );
+            }
+            //Now we know that the repository have at least one commit. So it have a tracking branch
+            //This branch is maybe not here locally.
+            if( !gitFolder._git.Head.Commits.Any() )
+            {
+                //In a case of a failed repository clone, the head is on a local master branch with no commits.
+                if( !gitFolder.Checkout( m, data.World.DevelopBranchName ).Success ) throw new InvalidOperationException( $"Cannot checkout {data.World.DevelopBranchName}." );
+                if( !gitFolder._git.Head.Commits.Any() )
+                {
+                    throw new InvalidOperationException( $"The {data.World.DevelopBranchName} branch have no commit." );
+                }
+            }
+
+            string remoteUrl;
+            if( !StringComparer.OrdinalIgnoreCase.Equals( (remoteUrl = gitFolder._git.Network.Remotes["origin"]?.Url), data.OriginUrl ) )
+            {
+                gitFolder._git.Dispose();
+                throw new InvalidOperationException( $"The repository 'origin' url (ie. '{remoteUrl}') is different than the repository url specified in the world: {data.OriginUrl}" );
+            }
+
+            return gitFolder;
+        }
+
+        GitFolder( ProtoGitFolder data, bool isPublic )
         {
             ProtoGitFolder = data;
             IsPublic = isPublic;
@@ -41,12 +74,7 @@ namespace CK.Env
                 _git.Dispose();
                 throw new InvalidDataException( "This git repository does not contain any branches." );
             }
-            string remoteUrl;
-            if( !StringComparer.OrdinalIgnoreCase.Equals( (remoteUrl = _git.Network.Remotes["origin"]?.Url), data.OriginUrl ) )
-            {
-                _git.Dispose();
-                throw new InvalidOperationException( $"The repository 'origin' url (ie. '{remoteUrl}') is different than the repository url specified in the world: {ProtoGitFolder.OriginUrl}" );
-            }
+
             _headFolder = new HeadFolder( this );
             _branchesFolder = new BranchesFolder( this, "branches", isRemote: false );
             _remoteBranchesFolder = new RemotesFolder( this );
@@ -206,13 +234,13 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">The branch name.</param>
-        public void EnsureBranch( IActivityMonitor m, string branchName )
+        public void EnsureBranch( IActivityMonitor m, string branchName, bool noWarnOnCreate = false )
         {
             if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
             var b = GetBranch( m, branchName, logErrorMissingLocalAndRemote: false );
             if( b == null )
             {
-                m.Warn( $"Branch '{branchName}' does not exist. Creating local branch." );
+                m.Log( noWarnOnCreate ? Core.LogLevel.Info : Core.LogLevel.Warn, $"Branch '{branchName}' does not exist. Creating local branch." ); ;
                 _ = _git.CreateBranch( branchName );
             }
         }

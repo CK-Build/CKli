@@ -1116,27 +1116,40 @@ namespace CK.Env
             var worldData = _store.ReadWorldDescription( m, WorldName );
             var worldRoot = worldData.Root;
             var newWorldName = new WorldName( WorldName.Name, parallelName );
-
+            Dictionary<IGitRepository, string> branchesToPush = new Dictionary<IGitRepository, string>();
             using( m.OpenInfo( $"Changing the xml world definition." ) )
             {
-                worldRoot.Name = newWorldName.FullName + ".World";
+                worldRoot.Name = $"{newWorldName.Name}-{newWorldName.ParallelName}.World";
                 m.Trace( $"Setting root element name to '{worldRoot.Name}'." );
                 foreach( XElement branch in worldData.Root.Descendants( "Branch" ) )
                 {
                     var oldBranch = branch.AttributeRequired( "Name" );
                     string oldBranchName = (string)oldBranch;
+                    var branchName = oldBranchName == WorldName.MasterBranchName ? newWorldName.MasterBranchName : newWorldName.DevelopBranchName;
                     if( oldBranchName == WorldName.MasterBranchName || oldBranchName == WorldName.DevelopBranchName )
                     {
                         string url = (string)branch.Parent.AttributeRequired( "Url" );
                         var repo = _gitRepositories.Single( p => url == p.OriginUrl );
-                        var branchName = oldBranchName == WorldName.MasterBranchName ? newWorldName.MasterBranchName : newWorldName.DevelopBranchName;
-                        repo.EnsureBranch( m, branchName );
+                        repo.EnsureBranch( m, branchName, true );
                         m.Trace( $"Branch '{oldBranchName}' renamed to '{branchName}'." );
                         oldBranch.Value = branchName;
+                        branchesToPush.Add( repo, branchName );
                     }
                 }
             }
-            return _store.CreateNew( m, WorldName.Name, parallelName, worldData ) != null;
+            if( _store.CreateNew( m, WorldName.Name, parallelName, worldData ) == null ) return false;
+            bool error = false;
+            using( m.OpenInfo( $"Pushing branches." ) )
+            {
+                foreach( var kvp in branchesToPush )
+                {
+                    if(!kvp.Key.Push(m, kvp.Value ))
+                    {
+                        error = true;
+                    }
+                }
+            }
+            return error;
         }
 
         #region Read only State
