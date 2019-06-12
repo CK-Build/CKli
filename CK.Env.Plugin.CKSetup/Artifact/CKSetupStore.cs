@@ -49,6 +49,11 @@ namespace CK.Env.CKSetup
 
         public string UniqueRepositoryName { get; }
 
+        /// <summary>
+        /// Gets whether the secret is available in the key store.
+        /// </summary>
+        public bool IsAvailable => _keyStore.IsSecretKeyAvailable( SecretKeyName ) == true;
+
         public string ResolveSecret( IActivityMonitor m, bool throwOnEmpty = false )
         {
             return _keyStore.GetSecretKey( m, SecretKeyName, throwOnEmpty );

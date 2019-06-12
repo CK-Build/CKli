@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace CK.Env.NuGet
 {
-    class InternalFeed 
+    class NuGetFeedBase 
     {
         private protected readonly NuGetClient Client;
         private protected readonly SourceRepository _sourceRepository;
@@ -22,9 +22,9 @@ namespace CK.Env.NuGet
 
         class ReadFeed : INuGetFeed
         {
-            readonly InternalFeed _feed;
+            readonly NuGetFeedBase _feed;
 
-            public ReadFeed( InternalFeed feed, string name, SimpleCredentials creds )
+            public ReadFeed( NuGetFeedBase feed, string name, SimpleCredentials creds )
             {
                 _feed = feed;
                 Name = name;
@@ -34,7 +34,7 @@ namespace CK.Env.NuGet
 
             public string Name { get; }
 
-            public string Url => _feed.PackageSource.Source;
+            public string Url => _feed.Url;
 
             public SimpleCredentials Credentials { get; }
 
@@ -67,7 +67,7 @@ namespace CK.Env.NuGet
             }
         }
 
-        private protected InternalFeed( NuGetClient c, PackageSource packageSource )
+        private protected NuGetFeedBase( NuGetClient c, PackageSource packageSource )
         {
             Client = c;
             PackageSource = packageSource;
@@ -75,7 +75,7 @@ namespace CK.Env.NuGet
             _meta = new AsyncLazy<MetadataResource>( () => _sourceRepository.GetResourceAsync<MetadataResource>() );
         }
 
-        internal InternalFeed( NuGetClient c, string url, string name, SimpleCredentials creds )
+        internal NuGetFeedBase( NuGetClient c, string url, string name, SimpleCredentials creds )
             : this( c, new PackageSource( url, name ) )
         {
             HandleFeed( url, name, creds );
@@ -85,9 +85,13 @@ namespace CK.Env.NuGet
 
         internal INuGetFeed Feed => _feed;
 
+        public string Url => PackageSource.Source;
+
+        public string Name => PackageSource.Name;
+
         internal INuGetFeed HandleFeed( string url, string name, SimpleCredentials creds )
         {
-            Debug.Assert( _feed == null && url.Equals( PackageSource.Source, StringComparison.OrdinalIgnoreCase ) );
+            Debug.Assert( _feed == null && url.Equals( Url, StringComparison.OrdinalIgnoreCase ) );
             return _feed = new ReadFeed( this, name, creds );
         }
 

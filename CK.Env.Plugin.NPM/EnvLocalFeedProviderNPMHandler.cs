@@ -23,7 +23,7 @@ namespace CK.Env
             var locals = new List<LocalNPMPackageFile>();
             foreach( var a in artifacts )
             {
-                if( target.Info.QualityFilter.Accepts( a.Version.PackageQuality ) )
+                if( target.QualityFilter.Accepts( a.Version.PackageQuality ) )
                 {
                     var local = feed.GetNPMPackageFile( m, a.Artifact.Name, a.Version );
                     if( local == null )

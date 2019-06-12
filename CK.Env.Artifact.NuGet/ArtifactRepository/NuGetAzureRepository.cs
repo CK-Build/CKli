@@ -9,11 +9,10 @@ namespace CK.Env.NuGet
 {
     /// <summary>
     /// Internal implementation that may be made public once.
-    /// The name of this feed is <see cref="Organization"/>-<see cref="FeedName"/>[-<see cref="Label"/>(without the '@' label prefix)].
     /// </summary>
-    class NuGetClientAzureFeed : NuGetRemoteFeedBase
+    class NuGetAzureRepository : NuGetRepositoryBase, INuGetAzureRepository
     {
-        internal NuGetClientAzureFeed(
+        internal NuGetAzureRepository(
             NuGetClient c,
             string url,
             string name,
@@ -58,7 +57,7 @@ namespace CK.Env.NuGet
 
         protected override void OnSecretResolved( IActivityMonitor m, string secret )
         {
-            NuGetClient.EnsureVSSFeedEndPointCredentials( m, PackageSource.Source, secret );
+            NuGetClient.EnsureVSSFeedEndPointCredentials( m, Url, secret );
         }
 
         /// <summary>

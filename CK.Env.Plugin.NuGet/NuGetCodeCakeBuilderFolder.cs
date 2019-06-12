@@ -57,35 +57,36 @@ namespace CK.Env.Plugin
             }
             StringBuilder b = new StringBuilder();
             bool atLeastOne = false;
-            foreach( var info in solution.ArtifactTargets.Select( a => a.Info ).OfType<INuGetRepositoryInfo>() )
+            foreach( var r in solution.ArtifactTargets.OfType<INuGetRepository>() )
             {
                 atLeastOne = true;
-                if( info.QualityFilter.HasMin || info.QualityFilter.HasMax )
+                if( r.QualityFilter.HasMin || r.QualityFilter.HasMax )
                 {
                     b.Append( "if( " );
-                    if( info.QualityFilter.HasMin )
+                    if( r.QualityFilter.HasMin )
                     {
-                        b.Append( "GlobalInfo.Version.PackageQuality >= PackageQuality." )
-                         .Append( info.QualityFilter.Min.ToString() )
+                        b.Append( "GlobalInfo.Version.PackageQuality >= CSemVer.PackageQuality." )
+                         .Append( r.QualityFilter.Min.ToString() )
                          .Append( ' ' );
                     }
-                    if( info.QualityFilter.HasMax )
+                    if( r.QualityFilter.HasMax )
                     {
-                        b.Append( "GlobalInfo.Version.PackageQuality <= PackageQuality." )
-                         .Append( info.QualityFilter.Max.ToString() )
+                        if( r.QualityFilter.HasMin ) b.Append( "&& " );
+                        b.Append( "GlobalInfo.Version.PackageQuality <= CSemVer.PackageQuality." )
+                         .Append( r.QualityFilter.Max.ToString() )
                          .Append( ' ' );
                     }
                     b.Append( ") " );
                 }
-                switch( info )
+                switch( r )
                 {
-                    case NuGetAzureFeedInfo a:
+                    case INuGetAzureRepository a:
                         b.Append( "yield return new SignatureVSTSFeed( this, \"" )
                             .Append( a.Organization ).Append( "\", \"" )
                             .Append( a.FeedName )
                             .AppendLine( "\" );" );
                         break;
-                    case NuGetStandardFeedInfo n:
+                    case INuGetStandardRepository n:
                         b.Append( "yield return new RemoteFeed( this, \"" )
                             .Append( n.Name ).Append( "\", \"" )
                             .Append( n.Url ).Append( "\", \"" )

@@ -7,9 +7,9 @@ namespace CK.Env.NuGet
     /// <summary>
     /// Internal implementation that may be made public once.
     /// </summary>
-    class NuGetClientStandardFeed : NuGetRemoteFeedBase
+    class NuGetStandardRepository : NuGetRepositoryBase, INuGetStandardRepository
     {
-        internal NuGetClientStandardFeed(
+        internal NuGetStandardRepository(
             NuGetClient c,
             string url,
             string name,

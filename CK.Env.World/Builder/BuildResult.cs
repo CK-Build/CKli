@@ -46,7 +46,7 @@ namespace CK.Env
                 }
                 foreach( var h in handlers )
                 {
-                    result.Add( (row.a, row.s.Solution.Name, h.Info.Name) );
+                    result.Add( (row.a, row.s.Solution.Name, h.UniqueRepositoryName) );
                 }
             }
             return new BuildResult( type, result, releaseNotes );

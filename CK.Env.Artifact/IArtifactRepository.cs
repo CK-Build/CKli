@@ -21,15 +21,15 @@ namespace CK.Env
         string UniqueRepositoryName { get; }
 
         /// <summary>
+        /// Gets the range of package quality that is accepted by this feed.
+        /// </summary>
+        PackageQualityFilter QualityFilter { get; }
+
+        /// <summary>
         /// Must provide the secret key name.
         /// A null or empty SecretKeyName means that the repository does not require any protection.
         /// </summary>
         string SecretKeyName { get; }
-
-        /// <summary>
-        /// Gets the range of package quality that is accepted by this feed.
-        /// </summary>
-        PackageQualityFilter QualityFilter { get; }
 
         /// <summary>
         /// Ensures that the secret behind the <see cref="IArtifactRepositoryInfo.SecretKeyName"/> is available.
@@ -39,6 +39,13 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <returns>The non empty secret or null.</returns>
         string ResolveSecret( IActivityMonitor m, bool throwOnEmpty = false );
+
+        /// <summary>
+        /// Gets whether this repository is ready to accept artifacts.
+        /// This must be false if a <see cref="SecretKeyName"/> is defined  but
+        /// can not be resolved.
+        /// </summary>
+        bool IsAvailable { get; }
 
         /// <summary>
         /// Checks whether this artifact repository handles the artifact type.

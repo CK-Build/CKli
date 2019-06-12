@@ -17,12 +17,12 @@ namespace CK.Env.NuGet
     /// <summary>
     /// Internal implementation that may be made public once.
     /// </summary>
-    abstract class NuGetRemoteFeedBase : InternalFeed, IArtifactRepository
+    abstract class NuGetRepositoryBase : NuGetFeedBase, IArtifactRepository
     {
         readonly AsyncLazy<PackageUpdateResource> _updater;
         string _secret;
 
-        internal NuGetRemoteFeedBase(
+        internal NuGetRepositoryBase(
             NuGetClient c,
             PackageSource source,
             PackageQualityFilter qualityFilter )
@@ -43,6 +43,12 @@ namespace CK.Env.NuGet
         /// </para>
         /// </summary>
         public string UniqueRepositoryName { get; }
+
+        /// <summary>
+        /// Gets whether the secret is available.
+        /// </summary>
+        public bool IsAvailable => String.IsNullOrEmpty( SecretKeyName )
+                                    || Client.SecretKeyStore.IsSecretKeyAvailable( SecretKeyName ) == true;
 
         /// <summary>
         /// This repository handles "NuGet" artifact type.

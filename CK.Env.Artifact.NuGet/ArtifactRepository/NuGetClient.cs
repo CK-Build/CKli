@@ -134,7 +134,7 @@ namespace CK.Env.NuGet
 
             public event EventHandler PackageSourcesChanged;
 
-            internal void SetPackageSources( IEnumerable<InternalFeed> feeds )
+            internal void SetPackageSources( IEnumerable<NuGetFeedBase> feeds )
             {
                 _packageSources.Clear();
                 _packageSources.AddRange( feeds.Select( f => f.PackageSource ) );
@@ -245,7 +245,7 @@ namespace CK.Env.NuGet
                         if( label != null ) name += '-' + label;
                         if( label != null ) label = "@" + label;
                         var url = $"https://pkgs.dev.azure.com/{organization}/_packaging/{feedName}{label}/nuget/v3/index.json";
-                        result = new NuGetClientAzureFeed( this, url, name, qualityFilter, organization, feedName, label );
+                        result = new NuGetAzureRepository( this, url, name, qualityFilter, organization, feedName, label );
                         break;
                     }
                 case "NuGetStandard":
@@ -253,7 +253,7 @@ namespace CK.Env.NuGet
                         var name = r.HandleRequiredAttribute<string>( "Name" );
                         var url = r.HandleRequiredAttribute<string>( "Url" );
                         var secretKeyName = r.HandleRequiredAttribute<string>( "SecretKeyName" );
-                        result = new NuGetClientStandardFeed( this, url, name, qualityFilter, secretKeyName );
+                        result = new NuGetStandardRepository( this, url, name, qualityFilter, secretKeyName );
                         break;
                     }
             }
@@ -268,16 +268,16 @@ namespace CK.Env.NuGet
             var xCreds = r.Element.Element( "Credentials" );
             var creds = xCreds != null ? new SimpleCredentials( r.WithElement( xCreds ) ) : null;
 
-            var internals = repositories.OfType<InternalFeed>().Concat( feeds.OfType<InternalFeed>() );
+            var internals = repositories.OfType<NuGetFeedBase>().Concat( feeds.OfType<NuGetFeedBase>() );
             foreach( var i in internals )
             {
-                if( url.Equals( i.PackageSource.Source, StringComparison.OrdinalIgnoreCase ) )
+                if( url.Equals( i.Url, StringComparison.OrdinalIgnoreCase ) )
                 {
                     if( i.Feed != null ) r.ThrowXmlException( $"NuGet feed defined by url '{url}' is already registered." );
                     return i.HandleFeed( url, name, creds );
                 }
             }
-            var feed = new InternalFeed( this, url, name, creds );
+            var feed = new NuGetFeedBase( this, url, name, creds );
             _sourcePackageProvider.SetPackageSources( internals.Append( feed ) );
             return feed.Feed;
         }

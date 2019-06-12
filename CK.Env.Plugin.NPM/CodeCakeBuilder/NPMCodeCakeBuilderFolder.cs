@@ -69,35 +69,36 @@ namespace CK.Env.Plugin
             }
             StringBuilder b = new StringBuilder();
             bool atLeastOne = false;
-            foreach( var info in s.ArtifactTargets.Select( a => a.Info ).OfType<INPMArtifactRepositoryInfo>() )
+            foreach( var r in s.ArtifactTargets.OfType<INPMRepository>() )
             {
                 atLeastOne = true;
-                if( info.QualityFilter.HasMin || info.QualityFilter.HasMax )
+                if( r.QualityFilter.HasMin || r.QualityFilter.HasMax )
                 {
                     b.Append( "if( " );
-                    if( info.QualityFilter.HasMin )
+                    if( r.QualityFilter.HasMin )
                     {
-                        b.Append( "GlobalInfo.Version.PackageQuality >= PackageQuality." )
-                         .Append( info.QualityFilter.Min.ToString() )
+                        b.Append( "GlobalInfo.Version.PackageQuality >= CSemVer.PackageQuality." )
+                         .Append( r.QualityFilter.Min.ToString() )
                          .Append( ' ' );
                     }
-                    if( info.QualityFilter.HasMax )
+                    if( r.QualityFilter.HasMax )
                     {
-                        b.Append( "GlobalInfo.Version.PackageQuality <= PackageQuality." )
-                         .Append( info.QualityFilter.Max.ToString() )
+                        if( r.QualityFilter.HasMin ) b.Append( "&& " );
+                        b.Append( "GlobalInfo.Version.PackageQuality <= CSemVer.PackageQuality." )
+                         .Append( r.QualityFilter.Max.ToString() )
                          .Append( ' ' );
                     }
                     b.Append( ") " );
                 }
-                switch( info )
+                switch( r )
                 {
-                    case NPMAzureFeedInfo a:
+                    case INPMAzureRepository a:
                         b.Append( "yield return new AzureNPMFeed( this, \"" )
                             .Append( a.Organization ).Append( "\", \"" )
                             .Append( a.FeedName )
                             .AppendLine( "\" );" );
                         break;
-                    case NPMStandardFeedInfo n:
+                    case INPMStandardRepository n:
                         b.Append( "yield return new NPMRemoteFeed( this, \"" )
                             .Append( n.SecretKeyName )
                             .Append( "\", \"" )

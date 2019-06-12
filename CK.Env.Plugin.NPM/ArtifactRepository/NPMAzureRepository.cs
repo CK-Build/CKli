@@ -11,7 +11,7 @@ namespace CK.Env.NPM
     /// <summary>
     /// Internal implementation that may be made public once.
     /// </summary>
-    class NPMAzureRepository : NPMRepositoryBase
+    class NPMAzureRepository : NPMRepositoryBase, INPMAzureRepository
     {
         internal NPMAzureRepository(
             NPMClient c,
