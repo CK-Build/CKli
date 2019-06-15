@@ -1,12 +1,12 @@
 using CSemVer;
 using System;
 
-namespace CK.Env
+namespace CK.Core
 {
     /// <summary>
     /// Defines the instance of an <see cref="Artifact"/>: its <see cref="Version"/> is known.
     /// </summary>
-    public readonly struct ArtifactInstance : IEquatable<ArtifactInstance>
+    public readonly struct ArtifactInstance : IEquatable<ArtifactInstance>, IComparable<ArtifactInstance>
     {
         /// <summary>
         /// Initializes a new <see cref="ArtifactInstance"/>.
@@ -38,7 +38,8 @@ namespace CK.Env
         public Artifact Artifact { get; }
 
         /// <summary>
-        /// Gets the artifact version.
+        /// Gets the artifact version that is necessarily valid
+        /// if <see cref="IsValid"/> is true.
         /// </summary>
         public SVersion Version { get; }
 
@@ -46,6 +47,23 @@ namespace CK.Env
         /// Gets whether this instance is valid: both <see cref="Artifact"/> and <see cref="Version"/> are valid.
         /// </summary>
         public bool IsValid => Artifact.IsValid;
+
+        /// <summary>
+        /// Compares this instance to another: <see cref="Artifact"/> and descending <see cref="Version"/> are
+        /// the order keys.
+        /// </summary>
+        /// <param name="other">The other instance to compare to. Can be invalid.</param>
+        /// <returns>The negative/zero/positive standard value.</returns>
+        public int CompareTo( ArtifactInstance other )
+        {
+            if( !IsValid )
+            {
+                return other.IsValid ? -1 : 0;
+            }
+            if( !other.IsValid ) return 1;
+            int cmp = Artifact.CompareTo( other.Artifact );
+            return cmp != 0 ? cmp : other.Version.CompareTo( Version );
+        }
 
         /// <summary>
         /// Checks equality.
@@ -64,6 +82,38 @@ namespace CK.Env
         /// </summary>
         /// <returns>A readable string.</returns>
         public override string ToString() => IsValid ? $"{Artifact}/{Version}" : String.Empty;
+
+        /// <summary>
+        /// Simple parse of the "Type:Name/Version" format that may return an invalid
+        /// instance (see <see cref="ArtifactInstance.IsValid"/>).
+        /// This never throws.
+        /// </summary>
+        /// <param name="instanceName">The string to parse.</param>
+        /// <returns>The resulting instance that may be invalid.</returns>
+        public static ArtifactInstance TryParse( string instanceName )
+        {
+            int idx = instanceName.LastIndexOf( '/' );
+            if( idx > 0
+                && idx < instanceName.Length - 3
+                && SVersion.TryParse( instanceName.Substring( idx + 1 ), out var version )
+                && Core.Artifact.TryParse( instanceName.Substring(0,idx), out var artifact ) )
+            {
+                return new ArtifactInstance( artifact, version );
+            }
+            return new ArtifactInstance();
+        }
+
+        /// <summary>
+        /// Adapts <see cref="TryParse(string)"/> to the standard pattern. This never throws.
+        /// </summary>
+        /// <param name="instanceName">The string to parse.</param>
+        /// <param name="instance">The resulting instance that may be invalid.</param>
+        /// <returns>True on success, false on error.</returns>
+        public static bool TryParse( string instanceName, out ArtifactInstance instance )
+        {
+            instance = TryParse( instanceName );
+            return instance.IsValid;
+        }
 
         /// <summary>
         /// Implements == operator.

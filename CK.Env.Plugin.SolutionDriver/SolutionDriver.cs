@@ -19,7 +19,7 @@ namespace CK.Env.Plugin
         /// </summary>
         public const string CODECAKEBUILDER_SECRET_KEY = "CODECAKEBUILDER_SECRET_KEY";
 
-        public static readonly ArtifactType NuGetType = ArtifactType.Register( "NuGet", true );
+        public static readonly ArtifactType NuGetType = NuGet.NuGetClient.NuGetType;
         public static readonly ArtifactType CKSetupType = ArtifactType.Register( "CKSetup", false );
 
         readonly ISecretKeyStore _keyStore;
@@ -161,7 +161,7 @@ namespace CK.Env.Plugin
                     m.Warn( $"Project named {p.ProjectName} should be in folder of the same name, not in {p.SolutionRelativeFolderPath.LastPart}." );
                 }
                 Debug.Assert( p.ProjectFile != null );
-                var (project, isNewProject) = _solution.AddOrFindProject( p.SolutionRelativeFolderPath, ".Net", p.ProjectName );
+                var (project, isNewProject) = _solution.AddOrFindProject( p.SolutionRelativeFolderPath, ".Net", p.ProjectName, p.TargetFrameworks );
                 project.Tag( p );
                 if( isNewProject )
                 {
@@ -239,7 +239,7 @@ namespace CK.Env.Plugin
             foreach( var dep in p.Deps.Packages )
             {
                 toRemove.Remove( dep.Package.Artifact );
-                project.EnsurePackageReference( dep.Package, ProjectDependencyKind.Transitive );
+                project.EnsurePackageReference( dep.Package, ArtifactDependencyKind.Transitive, dep.Frameworks );
             }
             foreach( var noMore in toRemove ) project.RemovePackageReference( noMore );
         }
@@ -253,7 +253,7 @@ namespace CK.Env.Plugin
                 if( dep.TargetProject is MSProject target )
                 {
                     var mapped = depsFinder( target );
-                    project.EnsureProjectReference( mapped, ProjectDependencyKind.Transitive );
+                    project.EnsureProjectReference( mapped, ArtifactDependencyKind.Transitive, dep.Frameworks );
                     toRemove.Remove( mapped );
                 }
                 else

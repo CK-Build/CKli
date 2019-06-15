@@ -17,7 +17,7 @@ namespace CK.Env.MSBuildSln
         /// The <see cref="CKTraitContext.Separator"/> is the ';' to match the one used by csproj (parsing and
         /// string representation becomes straightforward).
         /// </summary>
-        public static readonly CKTraitContext Traits = new CKTraitContext( "MSBuild", ';' );
+        public static readonly CKTraitContext Savors = ArtifactType.Register("NuGet",true,';').ContextSavors;
 
         /// <summary>
         /// Captures <see cref="DeclaredPackageDependency"/> and <see cref="ProjectToProjectDependency"/>.
@@ -142,7 +142,7 @@ namespace CK.Env.MSBuildSln
                     }
                     else
                     {
-                        TargetFrameworks = Traits.FindOrCreate( f.Value );
+                        TargetFrameworks = Savors.FindOrCreate( f.Value );
 
                         LangVersion = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "LangVersion" ).FirstOrDefault()?.Value;
                         OutputType = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "OutputType" ).FirstOrDefault()?.Value;
@@ -155,7 +155,7 @@ namespace CK.Env.MSBuildSln
             if( _file == null )
             {
                 Sdk = null;
-                TargetFrameworks = Traits.EmptyTrait;
+                TargetFrameworks = Savors.EmptyTrait;
             }
             return _file;
         }
@@ -215,7 +215,7 @@ namespace CK.Env.MSBuildSln
         public bool SetTargetFrameworks( IActivityMonitor m, CKTrait frameworks )
         {
             if( frameworks?.IsEmpty ?? true ) throw new ArgumentException( "Must not be null or empty.", nameof( frameworks ) );
-            if( frameworks.Context != Traits ) throw new ArgumentException( "Must be from MSProject.Traits context.", nameof( frameworks ) );
+            if( frameworks.Context != Savors ) throw new ArgumentException( "Must be from MSProject.Traits context.", nameof( frameworks ) );
             if( _file == null ) throw new InvalidOperationException( "Invalid project file." );
             if( TargetFrameworks == frameworks ) return false;
             XElement f = _file.Document.Root

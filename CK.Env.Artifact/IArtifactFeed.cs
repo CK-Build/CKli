@@ -9,24 +9,8 @@ namespace CK.Env
     /// <summary>
     /// Models a source of packages (packages are installable artifacts).
     /// </summary>
-    public interface IArtifactFeed
+    public interface IArtifactFeed : IArtifactFeedIdentity
     {
-        /// <summary>
-        /// Identifies this feed. This starts with the <see cref="ArtifactType.Name"/> and must uniquely
-        /// identify this feed.
-        /// </summary>
-        string TypedName { get; }
-
-        /// <summary>
-        /// Gets the artifact type that this feed supports.
-        /// </summary>
-        ArtifactType ArtifactType { get; }
-
-        /// <summary>
-        /// Name of this feed. Must be unique for the <see cref="ArtifactType"/>.
-        /// </summary>
-        string Name { get; }
-
         /// <summary>
         /// Gets the best set of versions of an artifact in this feed.
         /// </summary>

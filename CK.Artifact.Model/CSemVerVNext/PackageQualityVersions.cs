@@ -12,23 +12,65 @@ namespace CSemVer
     /// </summary>
     public readonly struct PackageQualityVersions : IEnumerable<SVersion>
     {
+        readonly SVersion _sta;
+        readonly SVersion _lat;
+        readonly SVersion _pre;
+        readonly SVersion _exp;
+        readonly SVersion _ci;
+
         /// <summary>
         /// Initializes a new <see cref="PackageQualityVersions"/> from a set of versions.
         /// </summary>
         /// <param name="versions">Set of available versions.</param>
-        public PackageQualityVersions( IEnumerable<SVersion> versions )
+        /// <param name="versionsAreOrdered">True to shortcut the work as soon as a <see cref="PackageQuality.Release"/> has been met.</param>
+        public PackageQualityVersions( IEnumerable<SVersion> versions, bool versionsAreOrdered = false )
         {
-            CI = Exploratory = Preview = Latest = Stable = null;
+            _ci = _exp = _pre = _lat = _sta = null;
             foreach( var v in versions )
             {
-                if( v == null || !v.IsValid ) continue;
+                Apply( v, ref _ci, ref _exp, ref _pre, ref _lat, ref _sta );
+                if( versionsAreOrdered && v.PackageQuality == PackageQuality.Release ) break;
+            }
+        }
+
+        /// <summary>
+        /// Initializes a new <see cref="PackageQualityVersions"/> with known best versions.
+        /// (this is a low level constructor that does not test anything).
+        /// </summary>
+        /// <param name="ci">The current best CI version.</param>
+        /// <param name="exp">The current best Exploratory version.</param>
+        /// <param name="pre">The current best Preview version.</param>
+        /// <param name="lat">The current best Latest version.</param>
+        /// <param name="sta">The current best Stable version.</param>
+        public PackageQualityVersions( SVersion ci, SVersion exp, SVersion pre, SVersion lat, SVersion sta )
+        {
+            _ci = ci;
+            _exp = exp;
+            _pre = pre;
+            _lat = lat;
+            _sta = sta;
+        }
+
+        /// <summary>
+        /// Low level method that applies a new version to a vector.
+        /// </summary>
+        /// <param name="v">The new version.</param>
+        /// <param name="ci">The current best CI version.</param>
+        /// <param name="exp">The current best Exploratory version.</param>
+        /// <param name="pre">The current best Preview version.</param>
+        /// <param name="lat">The current best Latest version.</param>
+        /// <param name="sta">The current best Stable version.</param>
+        public static void Apply( SVersion v, ref SVersion ci, ref SVersion exp, ref SVersion pre, ref SVersion lat, ref SVersion sta )
+        {
+            if( v != null && v.IsValid )
+            {
                 switch( v.PackageQuality )
                 {
-                    case PackageQuality.Release: if( v > Stable ) Stable = v; goto case PackageQuality.ReleaseCandidate;
-                    case PackageQuality.ReleaseCandidate: if( v > Latest ) Latest = v; goto case PackageQuality.Preview;
-                    case PackageQuality.Preview: if( v > Preview ) Preview = v; goto case PackageQuality.Exploratory;
-                    case PackageQuality.Exploratory: if( v > Exploratory ) Exploratory = v; goto default;
-                    default: if( v > CI ) CI = v; break;
+                    case PackageQuality.Release: if( v > sta ) sta = v; goto case PackageQuality.ReleaseCandidate;
+                    case PackageQuality.ReleaseCandidate: if( v > lat ) lat = v; goto case PackageQuality.Preview;
+                    case PackageQuality.Preview: if( v > pre ) pre = v; goto case PackageQuality.Exploratory;
+                    case PackageQuality.Exploratory: if( v > exp ) exp = v; goto default;
+                    default: if( v > ci ) ci = v; break;
                 }
             }
         }
@@ -36,19 +78,12 @@ namespace CSemVer
         PackageQualityVersions( PackageQualityVersions q, SVersion v )
         {
             Debug.Assert( v?.IsValid ?? false );
-            CI = q.CI;
-            Exploratory = q.Exploratory;
-            Preview = q.Preview;
-            Latest = q.Latest;
-            Stable = q.Stable;
-            switch( v.PackageQuality )
-            {
-                case PackageQuality.Release: if( v > Stable ) Stable = v; goto case PackageQuality.ReleaseCandidate;
-                case PackageQuality.ReleaseCandidate: if( v > Latest ) Latest = v; goto case PackageQuality.Preview;
-                case PackageQuality.Preview: if( v > Preview ) Preview = v; goto case PackageQuality.Exploratory;
-                case PackageQuality.Exploratory: if( v > Exploratory ) Exploratory = v; goto default;
-                default: if( v > CI ) CI = v; break;
-            }
+            _ci = q.CI;
+            _exp = q.Exploratory;
+            _pre = q.Preview;
+            _lat = q.Latest;
+            _sta = q.Stable;
+            Apply( v, ref _ci, ref _exp, ref _pre, ref _lat, ref _sta );
         }
 
         /// <summary>
@@ -95,27 +130,27 @@ namespace CSemVer
         /// <summary>
         /// Gets the best stable version or null if no such version exists.
         /// </summary>
-        public SVersion Stable { get; }
+        public SVersion Stable => _sta;
 
         /// <summary>
         /// Gets the best latest compatible version or null if no such version exists.
         /// </summary>
-        public SVersion Latest { get; }
+        public SVersion Latest => _lat;
 
         /// <summary>
         /// Gets the best preview compatible version or null if no such version exists.
         /// </summary>
-        public SVersion Preview { get; }
+        public SVersion Preview => _pre;
 
         /// <summary>
         /// Gets the best exploratory compatible version or null if no such version exists.
         /// </summary>
-        public SVersion Exploratory { get; }
+        public SVersion Exploratory => _exp;
 
         /// <summary>
         /// Gets the best version or null if <see cref="IsValid"/> is false.
         /// </summary>
-        public SVersion CI { get; }
+        public SVersion CI => _ci;
 
         /// <summary>
         /// Retuns this <see cref="PackageQualityVersions"/> or a new one that combines a new version.

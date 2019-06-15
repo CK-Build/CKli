@@ -1,3 +1,5 @@
+using CK.Core;
+
 namespace CK.Env.DependencyModel
 {
     /// <summary>

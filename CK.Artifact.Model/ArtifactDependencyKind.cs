@@ -1,9 +1,9 @@
-namespace CK.Env.DependencyModel
+namespace CK.Core
 {
     /// <summary>
-    /// Defines how a project references another project or package.
+    /// Defines how a project, package, any artifact references another project, package or any artifact.
     /// </summary>
-    public enum ProjectDependencyKind
+    public enum ArtifactDependencyKind
     {
         /// <summary>
         /// Non applicable.

@@ -23,6 +23,9 @@ namespace CK.Env.NuGet
     {
         /// <summary>
         /// Exposes the "NuGet" <see cref="ArtifactType"/>. This type of artifact is installable.
+        /// Savors are used to manage framework names.
+        /// The <see cref="CKTraitContext.Separator"/> is the ';' to match the one used by csproj (parsing and
+        /// string representation becomes straightforward).
         /// </summary>
         public static readonly ArtifactType NuGetType;
 
@@ -194,7 +197,7 @@ namespace CK.Env.NuGet
 
         static NuGetClient()
         {
-            NuGetType = ArtifactType.Register( "NuGet", true );
+            NuGetType = ArtifactType.Register( "NuGet", true, ';' );
 
             // Workaround for dev/NuGet.Client\src\NuGet.Core\NuGet.Protocol\Plugins\PluginFactory.cs line 161:
             // FileName = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH"),

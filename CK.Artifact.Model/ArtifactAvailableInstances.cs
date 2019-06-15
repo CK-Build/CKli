@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace CK.Env
+namespace CK.Core
 {
     /// <summary>
     /// Immutable that defines an Artifact associated to a set of available versions (a <see cref="PackageQualityVersions"/>)
@@ -12,23 +12,38 @@ namespace CK.Env
     public class ArtifactAvailableInstances
     {
         /// <summary>
-        /// Initializes a new <see cref="ArtifactAvailableInstances"/>.
+        /// Initializes a new <see cref="ArtifactAvailableInstances"/> from an actual feed.
         /// </summary>
         /// <param name="feed">The feed.</param>
         /// <param name="artifactName">The artifact name.</param>
         /// <param name="v">The quality versions.</param>
-        public ArtifactAvailableInstances( IArtifactFeed feed, string artifactName, in PackageQualityVersions v = default )
+        public ArtifactAvailableInstances( IArtifactFeedIdentity feed, string artifactName, in PackageQualityVersions v = default )
         {
             if( feed == null ) throw new ArgumentNullException( nameof( feed ) );
             Artifact = new Artifact( feed.ArtifactType, artifactName );
-            Feed = feed;
+            FeedName = feed.Name;
             Versions = v;
         }
 
         /// <summary>
-        /// Gets the feed.
+        /// Initializes a new <see cref="ArtifactAvailableInstances"/>.
         /// </summary>
-        public IArtifactFeed Feed { get; }
+        /// <param name="feedName">The <see cref="IArtifactFeed.Name"/>.</param>
+        /// <param name="artifact">The artifact.</param>
+        /// <param name="v">The quality versions.</param>
+        public ArtifactAvailableInstances( string feedName, Artifact artifact, in PackageQualityVersions v = default )
+        {
+            if( feedName == null ) throw new ArgumentNullException( nameof( feedName ) );
+            Artifact = artifact;
+            FeedName = feedName;
+            Versions = v;
+        }
+
+        /// <summary>
+        /// Gets the <see cref="IArtifactFeedIdentity.Name"/> or "*" when multiple available versions
+        /// have been combined by <see cref="With(ArtifactAvailableInstances)"/>.
+        /// </summary>
+        public string FeedName { get; }
 
         /// <summary>
         /// Gets the artifact.
@@ -48,7 +63,7 @@ namespace CK.Env
         public ArtifactAvailableInstances WithVersion( SVersion v )
         {
             if( !IsValid || v == null || !v.IsValid ) return this;
-            return new ArtifactAvailableInstances( Feed, Artifact.Name, Versions.WithVersion( v ) );
+            return new ArtifactAvailableInstances( FeedName, Artifact, Versions.WithVersion( v ) );
         }
 
         /// <summary>
@@ -59,7 +74,24 @@ namespace CK.Env
         public ArtifactAvailableInstances WithVersions( PackageQualityVersions versions )
         {
             if( !IsValid || !versions.IsValid ) return this;
-            return new ArtifactAvailableInstances( Feed, Artifact.Name, Versions.With( versions ) );
+            return new ArtifactAvailableInstances( FeedName, Artifact, Versions.With( versions ) );
+        }
+
+        /// <summary>
+        /// Combines this <see cref="ArtifactAvailableInstances"/> with another one.
+        /// Both <see cref="Artifact"/> must be equal otherwise an <see cref="ArgumentException"/> is thrown.
+        /// If <see cref="FeedName"/> differ, the resulting FeedName is "*".
+        /// </summary>
+        /// <param name="other">Other available instances to combine.</param>
+        /// <returns>The new available instances.</returns>
+        public ArtifactAvailableInstances With( ArtifactAvailableInstances other )
+        {
+            if( other == null ) throw new ArgumentNullException( nameof( other ) );
+            if( !other.IsValid ) return this;
+            if( !IsValid ) return other;
+            if( Artifact != other.Artifact ) throw new ArgumentException( $"Cannot combine versions for '{Artifact}' with '{other.Artifact}'.", nameof( other ) );
+            var name = FeedName == other.FeedName ? FeedName : "*";
+            return new ArtifactAvailableInstances( name, Artifact, other.Versions );
         }
 
         /// <summary>

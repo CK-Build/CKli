@@ -1,11 +1,14 @@
+using CK.Core;
 using System;
 
-namespace CK.Env
+namespace CK.Core
 {
     /// <summary>
-    /// Encapsulates registered types of artifacts.
+    /// Immutable description of artifacts type that can be registered
+    /// from independent modules.
+    /// Implements vaule equality through reference equality.
     /// </summary>
-    public readonly struct ArtifactType : IEquatable<ArtifactType>
+    public class ArtifactType : IComparable<ArtifactType>
     {
         /// <summary>
         /// Gets whether this type of artifact is installable.
@@ -18,22 +21,24 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the type name. Typically "NuGet", "NPM", "CKSetup", etc.
-        /// Null when <see cref="IsValid"/> is false.
+        /// Never null.
         /// </summary>
         public string Name { get; }
 
         /// <summary>
-        /// Gets whether this type is valid: its <see cref="Name"/> is defined.
+        /// Gets the context where potential savors must be defined.
+        /// If this type of artifact doesn't require (or support) savors, this is null.
         /// </summary>
-        public bool IsValid => Name != null;
+        public CKTraitContext ContextSavors { get; }
 
         static ArtifactType[] _types = Array.Empty<ArtifactType>();
         static readonly object _lock = new object();
 
-        ArtifactType( string name, bool installable )
+        ArtifactType( string name, bool installable, char savorSeparator )
         {
             Name = name;
             IsInstallable = installable;
+            ContextSavors = savorSeparator == 0 ? null : new CKTraitContext( "ArtifactType:" + name, savorSeparator );
         }
 
         /// <summary>
@@ -44,21 +49,23 @@ namespace CK.Env
         /// <returns>The single registered type.</returns>
         public static ArtifactType Single( string name ) 
         {
+            if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
             var types = _types;
             foreach( var t in types ) if( t.Name == name ) return t;
             throw new ArgumentException( $"Unregistered Artifact type: '{name}'." );
         }
 
         /// <summary>
-        /// Gets an already <see cref="Register"/>ed type or a not <see cref="IsValid"/> one.
+        /// Gets an already <see cref="Register"/>ed type or null.
         /// </summary>
         /// <param name="name">Type name.</param>
-        /// <returns>The single registered type or a default, invalid, one.</returns>
+        /// <returns>The single registered type or null.</returns>
         public static ArtifactType SingleOrDefault( string name )
         {
+            if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
             var types = _types;
             foreach( var t in types ) if( t.Name == name ) return t;
-            return new ArtifactType();
+            return null;
         }
 
         /// <summary>
@@ -68,15 +75,20 @@ namespace CK.Env
         /// </summary>
         /// <param name="name">The type name.</param>
         /// <param name="isInstallable">Whether the type is installable.</param>
-        /// <returns>The reistered type.</returns>
-        public static ArtifactType Register( string name, bool isInstallable )
+        /// <param name="savorSeparator">Optional support of <see cref="ContextSavors"/> by defining a separator.</param>
+        /// <returns>The registered type.</returns>
+        public static ArtifactType Register( string name, bool isInstallable, char savorSeparator = '\0' )
         {
             ArtifactType FindSame()
             {
                 var t = SingleOrDefault( name );
-                if( t.IsValid )
+                if( t != null )
                 {
-                    if( t.IsInstallable != isInstallable ) throw new InvalidOperationException();
+                    if( t.IsInstallable != isInstallable
+                        || (t.ContextSavors?.Separator ?? '\0') != savorSeparator )
+                    {
+                        throw new InvalidOperationException( $"Type {name} is already defined with IsInstallable/Savors=({t.IsInstallable},{(t.ContextSavors != null ? t.ContextSavors.Separator.ToString() : "(none)")}). It cannot be redefined with {isInstallable},{(savorSeparator != '\0' ? savorSeparator.ToString() : "(none)")}" );
+                    }
                 }
                 return t;
             }
@@ -84,9 +96,9 @@ namespace CK.Env
             lock( _lock )
             {
                 exists = FindSame();
-                if( !exists.IsValid )
+                if( exists == null )
                 {
-                    exists = new ArtifactType( name, isInstallable );
+                    exists = new ArtifactType( name, isInstallable, savorSeparator );
                     Array.Resize( ref _types, _types.Length + 1 );
                     _types[_types.Length - 1] = exists;
                 }
@@ -95,25 +107,17 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets whether this type is equal to the other one.
+        /// Compares this type to another: <see cref="Name"/> is the order key.
         /// </summary>
-        /// <param name="other">Other artifact type.</param>
-        /// <returns>Whether they ahve the same name.</returns>
-        public bool Equals( ArtifactType other ) => Name == other.Name;
-
-        public static bool operator ==( in ArtifactType t1, in ArtifactType t2 ) => t1.Equals( t2 );
-
-        public static bool operator !=( in ArtifactType t1, in ArtifactType t2 ) => !t1.Equals( t2 );
-
-        public override bool Equals( object obj ) => obj is ArtifactType t && t.Equals( this );
-
-        public override int GetHashCode() => Name.GetHashCode();
+        /// <param name="other">The other type to compare to. Can be null.</param>
+        /// <returns>The negative/zero/positive standard value.</returns>
+        public int CompareTo( ArtifactType other ) => other != null ? Name.CompareTo( other.Name ) : 1;
 
         /// <summary>
-        /// Returns the <see cref="Name"/> or the empty string if <see cref="IsValid"/> is false.
+        /// Returns the <see cref="Name"/>.
         /// </summary>
         /// <returns>A readable string.</returns>
-        public override string ToString() => Name ?? String.Empty;
+        public override string ToString() => Name;
 
     }
 }

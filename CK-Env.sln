@@ -77,7 +77,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Artifact.NuGet", "CK
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Npm.Net.Tests", "Tests\Npm.Net.Tests\Npm.Net.Tests.csproj", "{3A9F2DC4-65AE-4DD1-9E68-298AA4451718}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.PackageSource", "CK.Env.PackageSource\CK.Env.PackageSource.csproj", "{F2769A66-EC11-4365-BB3F-C1FDBBC53ED2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Artifact.Model", "CK.Artifact.Model\CK.Artifact.Model.csproj", "{20706B63-81A3-466B-9B12-5E5EB3C0696F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -197,10 +197,10 @@ Global
 		{3A9F2DC4-65AE-4DD1-9E68-298AA4451718}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3A9F2DC4-65AE-4DD1-9E68-298AA4451718}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3A9F2DC4-65AE-4DD1-9E68-298AA4451718}.Release|Any CPU.Build.0 = Release|Any CPU
-		{F2769A66-EC11-4365-BB3F-C1FDBBC53ED2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{F2769A66-EC11-4365-BB3F-C1FDBBC53ED2}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{F2769A66-EC11-4365-BB3F-C1FDBBC53ED2}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{F2769A66-EC11-4365-BB3F-C1FDBBC53ED2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{20706B63-81A3-466B-9B12-5E5EB3C0696F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{20706B63-81A3-466B-9B12-5E5EB3C0696F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{20706B63-81A3-466B-9B12-5E5EB3C0696F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{20706B63-81A3-466B-9B12-5E5EB3C0696F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

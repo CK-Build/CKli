@@ -553,10 +553,10 @@ namespace CK.Env
                     {
                         var maxVersion = byVersion.Select( v => v.Key ).Max();
                         var externalVersionDisplay = _artifacts.GetExternalVersions( m, byName.Key )
-                                                               .SelectMany( a => a.Versions.Where( v => v > maxVersion ).Select( v => (v, a.Feed.Name) ) )
+                                                               .SelectMany( a => a.Versions.Where( v => v > maxVersion ).Select( v => (v, a.FeedName) ) )
                                                                .GroupBy( v => v.v )
                                                                .OrderByDescending( v => v.Key )
-                                                               .Select( g => $"{g.Key} ({g.Select( vn => vn.Name ).Concatenate()})" )
+                                                               .Select( g => $"{g.Key} ({g.Select( vn => vn.FeedName ).Concatenate()})" )
                                                                .Concatenate();
 
                         if( externalVersionDisplay.Length > 0 ) externalVersionDisplay = " <= " + externalVersionDisplay;

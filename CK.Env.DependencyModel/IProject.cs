@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using CK.Core;
 using CK.Text;
 
 namespace CK.Env.DependencyModel
@@ -44,6 +45,23 @@ namespace CK.Env.DependencyModel
         /// Gets the project type: basically supported types are ".Net" and "js".
         /// </summary>
         string Type { get; }
+
+        /// <summary>
+        /// Gets the savors of this project. This is null by default.
+        /// When not null:
+        /// <para>
+        /// - this trait can not be the empty one (see <see cref="CKTrait.IsEmpty"/>).
+        /// </para>
+        /// <para>
+        /// - the <see cref="CKTrait.Context"/> can be any context (typically
+        /// the <see cref="ArtifactType.ContextSavors"/> of the "primary" artifact produced by this project).
+        /// </para>
+        /// <para>
+        /// <see cref="PackageReference.ApplicableSavors"/> and <see cref="ProjectReference.ApplicableSavors"/> share
+        /// the same context and are either equal to these savors or are a subset of them (and cannot be empty either).
+        /// </para>
+        /// </summary>
+        CKTrait Savors { get; }
 
         /// <summary>
         /// Gets all artifacts that this project generates. 

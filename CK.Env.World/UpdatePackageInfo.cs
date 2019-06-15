@@ -1,3 +1,4 @@
+using CK.Core;
 using CK.Env.DependencyModel;
 using CSemVer;
 

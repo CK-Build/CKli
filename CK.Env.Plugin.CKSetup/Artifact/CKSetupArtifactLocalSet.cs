@@ -1,3 +1,4 @@
+using CK.Core;
 using CKSetup;
 using System;
 using System.Collections.Generic;

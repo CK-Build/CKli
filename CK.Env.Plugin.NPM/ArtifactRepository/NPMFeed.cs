@@ -16,7 +16,7 @@ namespace CK.Env.NPM
             TypedName = $"{NPMClient.NPMType.Name}:{scope}";
         }
 
-        string IArtifactFeed.Name => Scope;
+        string IArtifactFeedIdentity.Name => Scope;
 
         public string Scope { get; }
 

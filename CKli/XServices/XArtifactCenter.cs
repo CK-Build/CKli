@@ -14,7 +14,7 @@ namespace CKli
             fs.ServiceContainer.Add( ArtifactCenter );
             initializer.Services.Add( ArtifactCenter );
             // Quick & dirty registration.
-            ArtifactType.Register( "NuGet", true );
+            ArtifactType.Register( "NuGet", true, ';' );
             ArtifactType.Register( "NPM", true );
             ArtifactType.Register( "CKSetup", false );
         }
