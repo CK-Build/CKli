@@ -58,7 +58,7 @@ namespace CK.Env
             {
                 var buildProjectUpgrades = GetBuildProjectUpgrades( s );
                 if( !driver.UpdatePackageDependencies( m, buildProjectUpgrades ) ) return null;
-                if( !driver.GitRepository.Commit( m, "Updated Build project dependencies.", amendIfPossible: true ) ) return null;
+                if( !driver.GitRepository.Commit( m, "Updated Build project dependencies.", CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage ) ) return null;
                 _commits[s.Index] = driver.GitRepository.Head.CommitSha;
             }
             return base.CreateBuildResult( m );

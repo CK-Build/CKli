@@ -70,7 +70,7 @@ namespace CK.Env
         /// True to call <see cref="AmendCommit"/> if <see cref="CanAmendCommit"/>. is true.
         /// </param>
         /// <returns>True on success, false on error.</returns>
-        bool Commit( IActivityMonitor m, string commitMessage, bool amendIfPossible = false );
+        bool Commit( IActivityMonitor m, string commitMessage, CommitBehavior commitBehavior = CommitBehavior.CreateNewCommit );
 
         /// <summary>
         /// Amends the current commit, optionaly changing its message and/or its date.

@@ -253,8 +253,11 @@ namespace CKli
                 else if( f.Type.IsEnum )
                 {
                     bool isFlags = f.Type.GetCustomAttributes( typeof( FlagsAttribute ), false ).Length > 0;
-                    Console.Write( isFlags ? "Combinable flags:" : "Values:" );
-                    Console.WriteLine( Enum.GetNames( f.Type ).Concatenate() );
+                    Console.WriteLine( isFlags ? "Combinable flags:" : "Values: " );
+                    foreach( var enumValue in Enum.GetValues(f.Type) )
+                    {
+                        Console.WriteLine( $"    {Convert.ChangeType( enumValue, Enum.GetUnderlyingType(f.Type))}:{Enum.GetName(f.Type, enumValue)}" );
+                    }
                     var s = ReadNullableString();
                     if( s == null )
                     {
