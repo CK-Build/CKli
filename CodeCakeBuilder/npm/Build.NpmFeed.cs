@@ -238,7 +238,7 @@ namespace CodeCake
                             req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue( "Basic", basicAuth );
                             var body = GetPromotionJSONBody( p.Name, p.Version.ToNuGetPackageString(), view.ToString() );
                             req.Content = new StringContent( body, Encoding.UTF8, "application/json" );
-                            using( var m = await NuGetHelper.SharedHttpClient.SendAsync( req ) )
+                            using( var m = await StandardGlobalInfo.SharedHttpClient.SendAsync( req ) )
                             {
                                 if( m.IsSuccessStatusCode )
                                 {

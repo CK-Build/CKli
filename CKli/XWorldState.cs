@@ -68,7 +68,7 @@ namespace CKli
 
         void OnDumpWorldStatus( IActivityMonitor m )
         {
-            var gitFolders = _worldState.SolutionDrivers.Select( x => (GitFolder)x.GitRepository );
+            var gitFolders = _worldState.SolutionDrivers.GetDriversOnCurrentBranch(m).Select( x => (GitFolder)x.GitRepository );
             DumpGitFolders( m, gitFolders );
         }
 

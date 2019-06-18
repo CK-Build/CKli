@@ -23,7 +23,7 @@ namespace Npm.Net
     {
         static readonly Uri _npmjs = new Uri( "https://registry.npmjs.org/" );
         readonly HttpClient _httpClient;
-        readonly AuthenticationHeaderValue _authHeader;
+        AuthenticationHeaderValue _authHeader;
         readonly string _session = GenerateSessionId();
 
         readonly string _password;
@@ -139,43 +139,54 @@ namespace Npm.Net
         public bool Publish( IActivityMonitor m, NormalizedPath tarballPath, bool isPublic, string scope = null, string distTag = null )
         {
             string tempDirectory = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
-            using( m.OpenInfo( "Falling back on 'npm publish' external process." ) )
+            using( m.OpenInfo( "Npm publish." ) )
             {
                 try
                 {
                     Directory.CreateDirectory( tempDirectory );
+                    m.Debug( $"Creating temp directory {tempDirectory}." );
+                    using(m.OpenInfo("Creating .npmrc. with content:"))
                     using( StreamWriter w = File.CreateText( Path.Combine( tempDirectory, ".npmrc" ) ) )
                     {
                         string uriString = RegistryUri.ToString();
                         w.WriteLine( $"registry={uriString}" );
+                        m.Debug( $"registry={uriString}" );
                         string uriConfig = uriString.Remove( 0, uriString.IndexOf( '/' ) );
 
                         if( _authHeader == null )
                         {
-                            m.Error( "Missing credentials to configure npm.rc file." );
+                            m.Error( "Missing credentials to configure .npmrc file." );
                             return false;
                         }
                         if( _authHeader.Scheme == "Basic" )
                         {
                             w.WriteLine( $"{uriConfig}:always-auth=true" );
+                            m.Debug( $"{uriConfig}:always-auth=true" );
+
                             w.WriteLine( $"{uriConfig}:_password={_password}" );
+                            m.Debug( $"{uriConfig}:_password=[REDACTED]" );
+
                             w.WriteLine( $"{uriConfig}:username={_username}" );
+                            m.Debug( $"{uriConfig}:username={_username}" );
                         }
                         else if( _authHeader.Scheme == "Bearer" )
                         {
                             w.WriteLine( $"{uriConfig}:always-auth=true" );
+                            m.Debug( $"{uriConfig}:always-auth=true" );
                             w.WriteLine( $"{uriConfig}:_authToken={_authHeader.Parameter}" );
+                            m.Debug( $"{uriConfig}:_authToken=[REDACTED]" );
                         }
 
                         if( !string.IsNullOrWhiteSpace(scope) )
                         {
                             w.WriteLine( scope + $":registry={RegistryUri.ToString()}" );
+                            m.Debug( scope + $":registry={RegistryUri.ToString()}" );
                         }
                     }
                     string tarPath = Path.GetFullPath( tarballPath );
                     string distTagArg = distTag != null ? $"--tag {distTag.ToLowerInvariant()}" : "";
                     string access = isPublic ? "public" : "private";
-                    return ProcessRunner.Run( m, tempDirectory, "cmd.exe", $"/C npm publish \"{tarPath}\" --access {access} {distTagArg}", LogLevel.Debug );
+                    return ProcessRunner.Run( m, tempDirectory, "cmd.exe", $"/C npm publish \"{tarPath}\" --access {access} {distTagArg}", LogLevel.Trace );
                 }
                 catch( Exception ex )
                 {
@@ -244,12 +255,18 @@ namespace Npm.Net
 
         async Task<(string body, bool found)> AzureSpecialVersionRequest( IActivityMonitor m, string packageName, string version )
         {
+            if( string.IsNullOrEmpty( _username ) ) throw new InvalidOperationException( "Azure username must not be empty." );
+            var oldAuth = _authHeader;
+            string realPassword = Encoding.UTF8.GetString( Convert.FromBase64String( _password ) );
+            string basic = Convert.ToBase64String( Encoding.ASCII.GetBytes( $"{_username}:{realPassword}" ) );
+            _authHeader = new AuthenticationHeaderValue( "Basic", basic );
             (string organization, string feedId) = GetAzureInfoFromUri();
             string url = $"https://pkgs.dev.azure.com/" +
                 $"{organization}/_apis/packaging/feeds/{feedId}/npm/{packageName}/versions/{version}?api-version=5.0-preview.1";
             using( HttpRequestMessage req = NpmRequestMessage( m, new Uri( url ), HttpMethod.Get ) )
             using( HttpResponseMessage res = await _httpClient.SendAsync( req ) )
             {
+                _authHeader = oldAuth;
                 string body = await res.Content.ReadAsStringAsync();
                 if( res.StatusCode == HttpStatusCode.NotFound ) return (body, false);
                 if( !res.IsSuccessStatusCode ) throw new Exception( "Status code not successfull and is not a 404" );

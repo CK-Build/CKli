@@ -1,7 +1,9 @@
 using CK.Core;
 using Npm.Net;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace CK.Env.NPM
@@ -12,7 +14,7 @@ namespace CK.Env.NPM
     class NPMClientAzureFeed : NPMRemoteFeedBase, INPMFeed
     {
         internal NPMClientAzureFeed( NPMClient c, NPMAzureFeedInfo info, string pat )
-            : base( c, info, new Registry(c.HttpClient, "", pat, new System.Uri( info.Url)) )
+            : base( c, info, new Registry( c.HttpClient, "CKli", Convert.ToBase64String( Encoding.UTF8.GetBytes( pat ) ), new System.Uri( info.Url ) ) )
         {
         }
 

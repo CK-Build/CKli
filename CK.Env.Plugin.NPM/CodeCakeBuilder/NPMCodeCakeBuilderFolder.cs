@@ -77,13 +77,13 @@ namespace CK.Env.Plugin
                     b.Append( "if( " );
                     if( info.QualityFilter.HasMin )
                     {
-                        b.Append( "GlobalInfo.Version.PackageQuality >= PackageQuality." )
+                        b.Append( "GlobalInfo.Version.PackageQuality >= CSemVer.PackageQuality." )
                          .Append( info.QualityFilter.Min.ToString() )
                          .Append( ' ' );
                     }
                     if( info.QualityFilter.HasMax )
                     {
-                        b.Append( "GlobalInfo.Version.PackageQuality <= PackageQuality." )
+                        b.Append( "GlobalInfo.Version.PackageQuality <= CSemVer.PackageQuality." )
                          .Append( info.QualityFilter.Max.ToString() )
                          .Append( ' ' );
                     }

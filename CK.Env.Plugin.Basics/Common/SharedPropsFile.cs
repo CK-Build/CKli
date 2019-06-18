@@ -148,7 +148,7 @@ namespace CK.Env.Plugin
                 XElement.Parse(
 $@"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
   <Deterministic>true</Deterministic>
-  <PathMap>$(SolutionDir)=C:\CKli-World\{GitFolder.SubPath.Path.Replace( '/', '\\' )}</PathMap>
+  <PathMap>'$(SolutionDir)'=C:\CKli-World\{GitFolder.SubPath.Path.Replace( '/', '\\' )}</PathMap>
 </PropertyGroup>" ) );
         }
 

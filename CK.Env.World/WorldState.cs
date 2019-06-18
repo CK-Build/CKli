@@ -120,7 +120,7 @@ namespace CK.Env
         readonly IEnvLocalFeedProvider _localFeedProvider;
         readonly ArtifactCenter _artifacts;
 
-        readonly HashSet<ISolutionDriver> _solutionDrivers;
+        readonly DriversCollection _solutionDrivers;
         readonly Dictionary<string, WorldBranchContext> _perBranchContext;
         readonly HashSet<IGitRepository> _gitRepositories;
         readonly IActivityMonitorFilteredClient _userMonitorClient;
@@ -158,7 +158,7 @@ namespace CK.Env
             _userMonitorClient = userMonitorClient;
             IsPublicWorld = isPublicWorld;
             _appLife = appLife;
-            _solutionDrivers = new HashSet<ISolutionDriver>();
+            _solutionDrivers = new DriversCollection(this);
             _perBranchContext = new Dictionary<string, WorldBranchContext>();
             _gitRepositories = new HashSet<IGitRepository>();
 
@@ -191,7 +191,7 @@ namespace CK.Env
             _perBranchContext[driver.BranchName].OnUnregisterDriver( driver );
 
             _gitRepositories.Clear();
-            _gitRepositories.AddRange( _solutionDrivers.Select( d => d.GitRepository ) );
+            _gitRepositories.AddRange( _solutionDrivers.AllDrivers.Select( d => d.GitRepository ) );
             UpdateGlobalGitStatus();
         }
 
@@ -270,7 +270,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the registered solution drivers.
         /// </summary>
-        public IReadOnlyCollection<ISolutionDriver> SolutionDrivers => _solutionDrivers;
+        public DriversCollection SolutionDrivers => _solutionDrivers;
 
         bool RunSafe( IActivityMonitor m, string message, Action<IActivityMonitor, Func<bool>> action )
         {
@@ -429,9 +429,9 @@ namespace CK.Env
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="reloadSolutions">True to force a reload of the solutions.</param>
         /// <returns>The context or null on error.</returns>
-        IWorldSolutionContext GetSolutionDependencyContextOnCurrentBranches( IActivityMonitor monitor, bool reloadSolutions = false )
+        internal IWorldSolutionContext GetSolutionDependencyContextOnCurrentBranches( IActivityMonitor monitor, bool reloadSolutions = false )
         {
-            var currentDrivers = _perBranchContext.First().Value.Drivers.Select( d => d.GetCurrentBranchDriver() );
+            var currentDrivers = _perBranchContext.First().Value.Drivers.Select( d => d.GetCurrentBranchDriver() );//Kuinox: i don't like this.
             var c = new WorldBranchContext( currentDrivers );
             return c.Refresh( monitor, reloadSolutions ) ? c : null;
         }
@@ -1007,7 +1007,8 @@ namespace CK.Env
         /// CI can be published when <see cref="GlobalWorkStatus.Idle"/> and a CI build result is available.
         /// </summary>
         public bool CanPublishCI => WorkStatus == GlobalWorkStatus.Idle
-                                    && _rawState.GetBuildResult( BuildResultType.CI ) != null;
+                                    && _rawState.GetBuildResult( BuildResultType.CI ) != null
+                                    && ((int)_cachedGlobalGitStatus & (int)StandardGitStatus.MasterOrDevelop) > 0;
 
         [CommandMethod]
         public bool PublishCI( IActivityMonitor monitor )
