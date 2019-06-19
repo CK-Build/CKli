@@ -772,7 +772,10 @@ namespace CK.Env
                     }
                     var options = new PushOptions()
                     {
-                        CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m, url )
+                        CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m, url ),
+                        OnPushStatusError = (e) => {
+                            throw new InvalidOperationException( $"Error while pushing ref {e.Reference} => {e.Message}" );
+                        }
                     };
                     if( created || (b.TrackingDetails.AheadBy ?? 1) > 0 )
                     {

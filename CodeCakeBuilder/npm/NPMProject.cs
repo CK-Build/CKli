@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using static CodeCake.Build;
 
 namespace CodeCake
 {
@@ -24,6 +25,7 @@ namespace CodeCake
             readonly string _savedPackageJson;
 
             public PackageVersionReplacer(
+                StandardGlobalInfo globalInfo,
                 NPMProject p,
                 SVersion version,
                 bool preparePack,
@@ -39,8 +41,42 @@ namespace CodeCake
                     json.Remove( "devDependencies" );
                     json.Remove( "scripts" );
                 }
-                if( packageJsonPreProcessor != null ) packageJsonPreProcessor( json );
+                UpdateLocalNpmVersions( globalInfo, json );
+                packageJsonPreProcessor?.Invoke( json );
                 File.WriteAllText( p.PackageJson.JsonFilePath, json.ToString() );
+            }
+
+            void UpdateLocalNpmVersions( StandardGlobalInfo globalInfo, JObject obj )
+            {
+                var npmArtifact = globalInfo.ArtifactTypes.FirstOrDefault( x => x.TypeName == "NPM" ) as NPMArtifactType;
+                var dependencyPropNames = new string[]
+                {
+                "dependencies",
+                "peerDependencies",
+                "devDependencies",
+                "bundledDependencies",
+                "optionalDependencies",
+                };
+
+                foreach( var dependencyPropName in dependencyPropNames )
+                {
+                    if( obj.ContainsKey( dependencyPropName ) )
+                    {
+                        FixupLocalNpmVersion( (JObject)obj[dependencyPropName], npmArtifact );
+                    }
+                }
+            }
+
+            void FixupLocalNpmVersion( JObject dependencies, NPMArtifactType npmArtifactType )
+            {
+                foreach( KeyValuePair<string, JToken> keyValuePair in dependencies )
+                {
+                    if( npmArtifactType?.Solution?.Projects.FirstOrDefault( x => x.PackageJson.Name == keyValuePair.Key )
+                        is NPMPublishedProject localProject )
+                    {
+                        dependencies[keyValuePair.Key] = new JValue( "^" + localProject.ArtifactInstance.Version.ToNuGetPackageString() );
+                    }
+                }
             }
 
             public void Dispose()
@@ -249,14 +285,14 @@ namespace CodeCake
         /// <returns>False if the script doesn't exist (<paramref name="scriptMustExist"/> is false), otherwise true.</returns>
         public void RunTest( StandardGlobalInfo globalInfo, bool scriptMustExist = true ) => RunScript( globalInfo, "test", scriptMustExist );
 
-        private protected IDisposable TemporarySetVersion( SVersion version )
+        private protected IDisposable TemporarySetVersion( StandardGlobalInfo globalInfo, SVersion version )
         {
-            return new PackageVersionReplacer( this, version, false, null );
+            return new PackageVersionReplacer( globalInfo, this, version, false, null );
         }
 
-        private protected IDisposable TemporaryPrePack( SVersion version, bool cleanupPackageJson, Action<JObject> packageJsonPreProcessor )
+        private protected IDisposable TemporaryPrePack( StandardGlobalInfo globalInfo, SVersion version, bool cleanupPackageJson, Action<JObject> packageJsonPreProcessor )
         {
-            return new PackageVersionReplacer( this, version, cleanupPackageJson, packageJsonPreProcessor );
+            return new PackageVersionReplacer( globalInfo, this, version, cleanupPackageJson, packageJsonPreProcessor );
         }
 
         #region .npmrc configuration
@@ -280,7 +316,7 @@ namespace CodeCake
 
             readonly NormalizedPath _npmrcPath;
 
-            public NPMRCTokenInjector( NormalizedPath path, string pushUri, string scope, Action<List<string>,string> configure )
+            public NPMRCTokenInjector( NormalizedPath path, string pushUri, string scope, Action<List<string>, string> configure )
             {
                 List<string> npmrc = ReadCommentedLines( path );
                 if( String.IsNullOrEmpty( scope ) )
@@ -311,7 +347,7 @@ namespace CodeCake
 
         public IDisposable TemporarySetPushTargetAndTokenLogin( string pushUri, string token )
         {
-            return new NPMRCTokenInjector( NPMRCPath, pushUri, PackageJson.Scope, (npmrc,u) => npmrc.Add( u + ":_authToken=" + token ) );
+            return new NPMRCTokenInjector( NPMRCPath, pushUri, PackageJson.Scope, ( npmrc, u ) => npmrc.Add( u + ":_authToken=" + token ) );
         }
 
         public IDisposable TemporarySetPushTargetAndPasswordLogin( string pushUri, string password )
