@@ -25,7 +25,6 @@ namespace CodeCake
             readonly string _savedPackageJson;
 
             public PackageVersionReplacer(
-                StandardGlobalInfo globalInfo,
                 NPMProject p,
                 SVersion version,
                 bool preparePack,
@@ -41,14 +40,14 @@ namespace CodeCake
                     json.Remove( "devDependencies" );
                     json.Remove( "scripts" );
                 }
-                UpdateLocalNpmVersions( globalInfo, json );
+                UpdateLocalNpmVersions( json );
                 packageJsonPreProcessor?.Invoke( json );
                 File.WriteAllText( p.PackageJson.JsonFilePath, json.ToString() );
             }
 
-            void UpdateLocalNpmVersions( StandardGlobalInfo globalInfo, JObject obj )
+            void UpdateLocalNpmVersions( JObject obj )
             {
-                var npmArtifact = globalInfo.ArtifactTypes.FirstOrDefault( x => x.TypeName == "NPM" ) as NPMArtifactType;
+                var npmArtifact = _p.GlobalInfo.ArtifactTypes.FirstOrDefault( x => x.TypeName == "NPM" ) as NPMArtifactType;
                 var dependencyPropNames = new string[]
                 {
                 "dependencies",
@@ -124,17 +123,20 @@ namespace CodeCake
             }
         }
 
-        public NPMProject( NormalizedPath path )
-            : this( path, new SimplePackageJsonFile( path ) )
+        public NPMProject( StandardGlobalInfo globalInfo, NormalizedPath path )
+            : this( globalInfo, path, new SimplePackageJsonFile( path ) )
         {
         }
 
-        protected NPMProject( NormalizedPath path, SimplePackageJsonFile json )
+        protected NPMProject( StandardGlobalInfo globalInfo, NormalizedPath path, SimplePackageJsonFile json )
         {
             DirectoryPath = path;
             PackageJson = json;
             NPMRCPath = path.AppendPart( ".npmrc" );
+            GlobalInfo = globalInfo;
         }
+
+        public StandardGlobalInfo GlobalInfo { get; }
 
         public virtual bool IsPublished => false;
 
@@ -149,9 +151,10 @@ namespace CodeCake
         /// See https://docs.npmjs.com/cli/ci.html.
         /// </summary>
         /// <param name="globalInfo">The global information object.</param>
-        public virtual void RunInstall( StandardGlobalInfo globalInfo )
+        public virtual void RunInstall()
         {
-            globalInfo.Cake.NpmCi( settings =>
+            GlobalInfo.Cake.Information( $"Running 'npm ci' in {DirectoryPath.Path}" );
+            GlobalInfo.Cake.NpmCi( settings =>
             {
                 settings.LogLevel = NpmLogLevel.Warn;
                 settings.WorkingDirectory = DirectoryPath.Path;
@@ -178,10 +181,10 @@ namespace CodeCake
         /// When null (and baseName cannot be found), null is returned.
         /// </param>
         /// <returns>The best script (or null if it doesn't exist and <paramref name="checkBaseNameExist"/> is null).</returns>
-        public string FindBestScript( bool isRelease, string baseName, bool? checkBaseNameExist = true )
+        public string FindBestScript( string baseName, bool? checkBaseNameExist = true )
         {
             string n;
-            if( (isRelease && HasScript( (n = baseName + "-release") )) || (!isRelease && HasScript( (n = baseName + "-debug") )) )
+            if( (GlobalInfo.IsRelease && HasScript( (n = baseName + "-release") )) || (!GlobalInfo.IsRelease && HasScript( (n = baseName + "-debug") )) )
             {
                 return n;
             }
@@ -210,18 +213,18 @@ namespace CodeCake
         /// By default if no script is found an <see cref="InvalidOperationException"/> is thrown.
         /// </param>
         /// <returns>The best script (or null if it doesn't exist and <paramref name="scriptMustExist"/> is false).</returns>
-        public string FindBestScript( StandardGlobalInfo globalInfo, string name, bool scriptMustExist = true )
+        public string FindBestScript( string name, bool scriptMustExist = true )
         {
-            string n = FindBestScript( globalInfo.IsRelease, name, scriptMustExist ? (bool?)true : null );
+            string n = FindBestScript( name, scriptMustExist ? (bool?)true : null );
             if( n == null )
             {
-                globalInfo.Cake.Warning( $"Missing script '{name}' in '{PackageJson.JsonFilePath}'." );
+                GlobalInfo.Cake.Warning( $"Missing script '{name}' in '{PackageJson.JsonFilePath}'." );
             }
             return n;
         }
 
         /// <summary>
-        /// Runs a "npm install" followed by a call to the clean script (that must exist, see <see cref="FindBestScript(StandardGlobalInfo, string, bool)"/>). 
+        /// Runs a "npm install" followed by a call to the clean script (that must exist, see <see cref="FindBestScript(string, bool)"/>). 
         /// </summary>
         /// <param name="globalInfo">The global information object.</param>
         /// <param name="scriptMustExist">
@@ -230,14 +233,14 @@ namespace CodeCake
         /// </param>
         /// <param name="cleanScriptName">Clean script name.</param>
         /// <returns>False if the script doesn't exist (<paramref name="scriptMustExist"/> is false), otherwise true.</returns>
-        public virtual void RunInstallAndClean( StandardGlobalInfo globalInfo, bool scriptMustExist = true, string cleanScriptName = "clean" )
+        public virtual void RunInstallAndClean( bool scriptMustExist = true, string cleanScriptName = "clean" )
         {
-            RunInstall( globalInfo );
-            RunScript( globalInfo, cleanScriptName, scriptMustExist );
+            RunInstall();
+            RunScript( cleanScriptName, scriptMustExist );
         }
 
         /// <summary>
-        /// Runs the 'name-debug', 'name-release' or 'name' script (see <see cref="FindBestScript(StandardGlobalInfo, string, bool)"/>).
+        /// Runs the 'name-debug', 'name-release' or 'name' script (see <see cref="FindBestScript(string, bool)"/>).
         /// </summary>
         /// <param name="globalInfo">The global information object.</param>
         /// <param name="scriptMustExist">
@@ -245,17 +248,17 @@ namespace CodeCake
         /// throwing an exception.
         /// </param>
         /// <returns>False if the script doesn't exist (<paramref name="scriptMustExist"/> is false), otherwise true.</returns>
-        public bool RunScript( StandardGlobalInfo globalInfo, string name, bool scriptMustExist = true )
+        public bool RunScript( string name, bool scriptMustExist = true )
         {
-            string n = FindBestScript( globalInfo, name, scriptMustExist );
+            string n = FindBestScript( name, scriptMustExist );
             if( n == null ) return false;
-            DoRunScript( globalInfo, n );
+            DoRunScript( n );
             return true;
         }
 
-        private protected virtual void DoRunScript( StandardGlobalInfo globalInfo, string n )
+        private protected virtual void DoRunScript( string n )
         {
-            globalInfo.Cake.NpmRunScript(
+            GlobalInfo.Cake.NpmRunScript(
                     n,
                     s => s
                         .WithLogLevel( NpmLogLevel.Info )
@@ -264,7 +267,7 @@ namespace CodeCake
         }
 
         /// <summary>
-        /// Runs "build" script: see <see cref="RunScript(StandardGlobalInfo, string, bool)"/>.
+        /// Runs "build" script: see <see cref="RunScript(string, bool)"/>.
         /// </summary>
         /// <param name="globalInfo">The global information object.</param>
         /// <param name="scriptMustExist">
@@ -272,10 +275,10 @@ namespace CodeCake
         /// throwing an exception.
         /// </param>
         /// <returns>False if the script doesn't exist (<paramref name="scriptMustExist"/> is false), otherwise true.</returns>
-        public bool RunBuild( StandardGlobalInfo globalInfo, bool scriptMustExist = true ) => RunScript( globalInfo, "build", scriptMustExist );
+        public bool RunBuild( bool scriptMustExist = true ) => RunScript( "build", scriptMustExist );
 
         /// <summary>
-        /// Runs "test" script: see <see cref="RunScript(StandardGlobalInfo, string, bool)"/>.
+        /// Runs "test" script: see <see cref="RunScript(string, bool)"/>.
         /// </summary>
         /// <param name="globalInfo">The global information object.</param>
         /// <param name="scriptMustExist">
@@ -283,16 +286,16 @@ namespace CodeCake
         /// throwing an exception.
         /// </param>
         /// <returns>False if the script doesn't exist (<paramref name="scriptMustExist"/> is false), otherwise true.</returns>
-        public void RunTest( StandardGlobalInfo globalInfo, bool scriptMustExist = true ) => RunScript( globalInfo, "test", scriptMustExist );
+        public void RunTest( bool scriptMustExist = true ) => RunScript( "test", scriptMustExist );
 
-        private protected IDisposable TemporarySetVersion( StandardGlobalInfo globalInfo, SVersion version )
+        private protected IDisposable TemporarySetVersion( SVersion version )
         {
-            return new PackageVersionReplacer( globalInfo, this, version, false, null );
+            return new PackageVersionReplacer( this, version, false, null );
         }
 
-        private protected IDisposable TemporaryPrePack( StandardGlobalInfo globalInfo, SVersion version, bool cleanupPackageJson, Action<JObject> packageJsonPreProcessor )
+        private protected IDisposable TemporaryPrePack( SVersion version, bool cleanupPackageJson, Action<JObject> packageJsonPreProcessor )
         {
-            return new PackageVersionReplacer( globalInfo, this, version, cleanupPackageJson, packageJsonPreProcessor );
+            return new PackageVersionReplacer( this, version, cleanupPackageJson, packageJsonPreProcessor );
         }
 
         #region .npmrc configuration
