@@ -583,7 +583,6 @@ namespace CK.Env
         [CommandMethod]
         public bool Commit( IActivityMonitor m, string commitMessage, CommitBehavior commitBehavior = CommitBehavior.CreateNewCommit )
         {
-            if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
             if( commitBehavior != CommitBehavior.CreateNewCommit && CanAmendCommit )
             {
                 Func<string, string> modified = null;
@@ -595,12 +594,15 @@ namespace CK.Env
                         modified = p => p;
                         break;
                     case CommitBehavior.AmendIfPossibleAndAppendPreviousMessage:
+                        if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
                         modified = p => $"{p} (...)\r\n{commitMessage}";
                         break;
                     case CommitBehavior.AmendIfPossibleAndPrependPreviousMessage:
+                        if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
                         modified = p => $"{commitMessage}(...)\r\n{p}";
                         break;
                     case CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage:
+                        if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
                         modified = p => commitMessage;
                         break;
                     default:
@@ -608,6 +610,7 @@ namespace CK.Env
                 }
                 return AmendCommit( m, modified );
             }
+            if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
             using( m.OpenInfo( $"Committing changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
             {
                 Commands.Stage( _git, "*" );
@@ -773,7 +776,8 @@ namespace CK.Env
                     var options = new PushOptions()
                     {
                         CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m, url ),
-                        OnPushStatusError = (e) => {
+                        OnPushStatusError = ( e ) =>
+                        {
                             throw new InvalidOperationException( $"Error while pushing ref {e.Reference} => {e.Message}" );
                         }
                     };

@@ -25,7 +25,7 @@ namespace CK.Env.Plugin
 
         public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
 
-       
+
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
@@ -78,6 +78,7 @@ namespace CK.Env.Plugin
             DeleteProjectReference( "Code.Cake" ); //imported by SimpleGitVersion.Cake
             DeleteProjectReference( "Cake.Common" ); //imported by Code.Cake
             DeleteProjectReference( "Cake.Core" ); //imported by Cake.Common
+            EnsureProjectReference( "SimpleGitVersion.Cake", "0.38.0" );
             if( !_solutionSpec.NoDotNetUnitTests )
             {
                 EnsureProjectReference( "NUnit.ConsoleRunner", "3.9.0" );
@@ -85,8 +86,6 @@ namespace CK.Env.Plugin
             }
             if( PluginBranch != StandardGitStatus.Local )
             {
-                EnsureProjectReference( "SimpleGitVersion.Cake", "0.37.4--0022-develop" );
-
                 // This should NOT BE HERE.
                 // This should actually not be at all since configuring
                 // the project reference like this is clearly awful.

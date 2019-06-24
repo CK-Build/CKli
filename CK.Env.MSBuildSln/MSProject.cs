@@ -88,7 +88,7 @@ namespace CK.Env.MSBuildSln
                     KnownProjectType type,
                     string projectGuid,
                     string projectName,
-                    string relativePath  )
+                    string relativePath )
             : base( solution, projectGuid, type.ToGuid(), projectName, relativePath )
         {
             Debug.Assert( KnownType.IsVSProject() );
@@ -114,57 +114,33 @@ namespace CK.Env.MSBuildSln
             _file = MSProjFile.FindOrLoadProjectFile( fs, m, Path, cache );
             if( _file != null )
             {
-                Sdk = (string)_file.Document.Root.Attribute( "Sdk" );
-                if( Sdk == null )
+                XElement f = _file.Document.Root
+                                .Elements( "PropertyGroup" )
+                                .Elements()
+                                .Where( x => x.Name.LocalName == "TargetFramework" || x.Name.LocalName == "TargetFrameworks" )
+                                .SingleOrDefault();
+                if( f == null )
                 {
-                    if( _file.Document.Root.Elements( "Import" ).Where( el => el.Attribute( "Sdk" ) != null ).Any() )
-                    {
-                        m.Error( "Explicit Import of the Sdk is not supported, only the Sdk attribute on the project element is supported: https://docs.microsoft.com/en-us/visualstudio/msbuild/how-to-use-project-sdk." );
-                    }
-                    if( _file.Document.Root.Elements( "Sdk" ).Any() )
-                    {
-                        m.Error( "Top level element Sdk is not supported, only the Sdk attribute on the project element is supported: https://docs.microsoft.com/en-us/visualstudio/msbuild/how-to-use-project-sdk." );
-                    }
-                    m.Error( $"There must be a Sdk attribute on root {Path}." );
+                    m.Error( $"There must be one and only one TargetFramework or TargetFrameworks element in {Path}." );
                     _file = null;
                 }
                 else
                 {
-                    XElement f = _file.Document.Root
-                                    .Elements( "PropertyGroup" )
-                                    .Elements()
-                                    .Where( x => x.Name.LocalName == "TargetFramework" || x.Name.LocalName == "TargetFrameworks" )
-                                    .SingleOrDefault();
-                    if( f == null )
-                    {
-                        m.Error( $"There must be one and only one TargetFramework or TargetFrameworks element in {Path}." );
-                        _file = null;
-                    }
-                    else
-                    {
-                        TargetFrameworks = Traits.FindOrCreate( f.Value );
+                    TargetFrameworks = Traits.FindOrCreate( f.Value );
 
-                        LangVersion = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "LangVersion" ).FirstOrDefault()?.Value;
-                        OutputType = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "OutputType" ).FirstOrDefault()?.Value;
+                    LangVersion = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "LangVersion" ).FirstOrDefault()?.Value;
+                    OutputType = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "OutputType" ).FirstOrDefault()?.Value;
 
-                        DoInitializeDependencies( m );
-                        if( !_dependencies.IsInitialized ) _file = null;
-                    }
+                    DoInitializeDependencies( m );
+                    if( !_dependencies.IsInitialized ) _file = null;
                 }
             }
             if( _file == null )
             {
-                Sdk = null;
                 TargetFrameworks = Traits.EmptyTrait;
             }
             return _file;
         }
-
-        /// <summary>
-        /// Gets the Sdk attribute of the primary project file.
-        /// Null if the project can not be read.
-        /// </summary>
-        public string Sdk { get; private set; }
 
         /// <summary>
         /// Gets the LangVersion value of the primary project file.

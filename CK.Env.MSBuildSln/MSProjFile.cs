@@ -81,6 +81,7 @@ namespace CK.Env.MSBuildSln
                     cache[path] = f;
                     var folder = path.RemoveLastPart();
                     imports.AddRange( content.Root.Descendants( "Import" )
+                                        .Where( i => i.Attribute( "Sdk" ) == null )
                                         .Select( i => (E: i, P: (string)i.Attribute( "Project" )) )
                                         .Where( i => i.P != null )
                                         .Select( i => new Import( i.E, FindOrLoadProjectFile( fs, m, folder.Combine( i.P ).ResolveDots(), cache ) ) ) );

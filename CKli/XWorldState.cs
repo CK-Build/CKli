@@ -132,7 +132,7 @@ namespace CKli
                         {
                             using( m.OpenInfo( $"Branch '{b.Key}':" ) )
                             {
-                                m.Info( b.Select( g => g.SubPath.Path ).Concatenate() );
+                                m.Warn( b.Select( g => g.SubPath.Path ).Concatenate() );
                             }
                         }
                     }
