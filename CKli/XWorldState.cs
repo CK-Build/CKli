@@ -16,10 +16,8 @@ namespace CKli
     public class XWorldState : XTypedObject
     {
         readonly IWorldName _world;
-        readonly IWorldStore _worldStore;
         readonly IEnvLocalFeedProvider _localFeeds;
         readonly WorldState _worldState;
-        readonly CommandRegister _commandRegister;
         readonly IActivityMonitorFilteredClient _userMonitorFilter;
 
         public XWorldState(
@@ -34,9 +32,7 @@ namespace CKli
             : base( initializer )
         {
             _world = world;
-            _worldStore = worldStore;
             _localFeeds = localFeeds;
-            _commandRegister = commandRegister;
             bool isPublic = initializer.Reader.HandleRequiredAttribute<bool>( "IsPublic" );
             _userMonitorFilter = initializer.Monitor.Output.Clients.OfType<IActivityMonitorFilteredClient>().FirstOrDefault();
             if( _userMonitorFilter == null ) throw new InvalidOperationException();
@@ -68,7 +64,7 @@ namespace CKli
 
         void OnDumpWorldStatus( IActivityMonitor m )
         {
-            var gitFolders = _worldState.SolutionDrivers.GetDriversOnCurrentBranch(m).Select( x => (GitFolder)x.GitRepository );
+            var gitFolders = _worldState.SolutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m ).Drivers.Select( x => (GitFolder)x.GitRepository );
             DumpGitFolders( m, gitFolders );
         }
 
@@ -130,7 +126,7 @@ namespace CKli
                     {
                         foreach( var b in byActiveBranch )
                         {
-                            using( m.OpenInfo( $"Branch '{b.Key}':" ) )
+                            using( m.OpenWarn( $"Branch '{b.Key}':" ) )
                             {
                                 m.Warn( b.Select( g => g.SubPath.Path ).Concatenate() );
                             }

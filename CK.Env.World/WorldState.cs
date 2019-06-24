@@ -121,7 +121,6 @@ namespace CK.Env
         readonly ArtifactCenter _artifacts;
 
         readonly DriversCollection _solutionDrivers;
-        readonly Dictionary<string, WorldBranchContext> _perBranchContext;
         readonly HashSet<IGitRepository> _gitRepositories;
         readonly IActivityMonitorFilteredClient _userMonitorClient;
 
@@ -158,8 +157,7 @@ namespace CK.Env
             _userMonitorClient = userMonitorClient;
             IsPublicWorld = isPublicWorld;
             _appLife = appLife;
-            _solutionDrivers = new DriversCollection(this);
-            _perBranchContext = new Dictionary<string, WorldBranchContext>();
+            _solutionDrivers = new DriversCollection();
             _gitRepositories = new HashSet<IGitRepository>();
 
             CommandProviderName = "World";
@@ -172,12 +170,7 @@ namespace CK.Env
 
         SolutionContext ISolutionDriverWorld.Register( ISolutionDriver driver )
         {
-            if( !_solutionDrivers.Add( driver ) ) throw new InvalidOperationException( "Already registered." );
-            if( !_perBranchContext.TryGetValue( driver.BranchName, out var c ) )
-            {
-                c = new WorldBranchContext( driver.BranchName );
-                _perBranchContext.Add( driver.BranchName, c );
-            }
+            var c = _solutionDrivers.Register( driver );
             if( _gitRepositories.Add( driver.GitRepository ) )
             {
                 UpdateGlobalGitStatus();
@@ -187,8 +180,7 @@ namespace CK.Env
 
         void ISolutionDriverWorld.Unregister( ISolutionDriver driver )
         {
-            if( !_solutionDrivers.Remove( driver ) ) throw new InvalidOperationException( "Not registered." );
-            _perBranchContext[driver.BranchName].OnUnregisterDriver( driver );
+            _solutionDrivers.Unregister( driver );
 
             _gitRepositories.Clear();
             _gitRepositories.AddRange( _solutionDrivers.AllDrivers.Select( d => d.GitRepository ) );
@@ -415,26 +407,12 @@ namespace CK.Env
         {
             var branchName = GetCleanBranchName( monitor );
             if( branchName == null ) return null;
-            if( !_perBranchContext.TryGetValue( branchName, out var c ) )
-            {
-                throw new Exception( $"No solution context available for branch {branchName}. GitBranchPlugins are not initialized or a ISolutionDriver plugin implementation is missing." );
-            }
+            var c = _solutionDrivers.GetContextOnBranch( branchName )
+                ?? throw new Exception( $"No solution context available for branch {branchName}. GitBranchPlugins are not initialized or a ISolutionDriver plugin implementation is missing." );
             return c.Refresh( monitor, reloadSolutions ) ? c : null;
         }
 
 
-        /// <summary>
-        /// Gets an up to date <see cref="IWorldSolutionContext"/> for the current branches.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="reloadSolutions">True to force a reload of the solutions.</param>
-        /// <returns>The context or null on error.</returns>
-        internal IWorldSolutionContext GetSolutionDependencyContextOnCurrentBranches( IActivityMonitor monitor, bool reloadSolutions = false )
-        {
-            var currentDrivers = _perBranchContext.First().Value.Drivers.Select( d => d.GetCurrentBranchDriver() );//Kuinox: i don't like this.
-            var c = new WorldBranchContext( currentDrivers );
-            return c.Refresh( monitor, reloadSolutions ) ? c : null;
-        }
 
         /// <summary>
         /// Gets whether the <see cref="WorkStatus"/> is not <see cref="GlobalWorkStatus.Idle"/>
@@ -522,7 +500,7 @@ namespace CK.Env
         [CommandMethod]
         public void ShowExternalDependencies( IActivityMonitor m, bool onlyMultipleVersions = false )
         {
-            var ctx = GetSolutionDependencyContextOnCurrentBranches( m );
+            var ctx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
             if( ctx == null ) return;
 
             var externals = ctx.DependencyContext.Analyzer.ExternalReferences;
@@ -567,7 +545,7 @@ namespace CK.Env
         [CommandMethod]
         public void UpgradeDependency( IActivityMonitor m, string packageTypedName, string versionToUpgrade = null )
         {
-            var worldCtx = GetSolutionDependencyContextOnCurrentBranches( m );
+            var worldCtx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
             if( worldCtx == null ) return;
             SVersion version;
             var analyzer = worldCtx.DependencyContext.Analyzer;
@@ -1116,7 +1094,7 @@ namespace CK.Env
             {
                 foreach( var kvp in branchesToPush )
                 {
-                    if(!kvp.Key.Push(m, kvp.Value ))
+                    if( !kvp.Key.Push( m, kvp.Value ) )
                     {
                         error = true;
                     }

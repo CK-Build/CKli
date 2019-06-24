@@ -181,7 +181,10 @@ namespace CK.Env.Plugin
 
         static void ConfigureFromSpec( IActivityMonitor m, DependencyModel.Project project, SolutionSpec spec )
         {
-            if( project.SimpleProjectName == "CodeCakeBuilder" ) project.IsBuildProject = true;
+            if( project.SimpleProjectName == "CodeCakeBuilder" )
+            {
+                project.IsBuildProject = true;
+            }
             else
             {
                 project.IsTestProject = project.SimpleProjectName.EndsWith( ".Tests" );
@@ -210,7 +213,9 @@ namespace CK.Env.Plugin
                     foreach( var name in project.Tag<MSProject>()
                                                 .TargetFrameworks.AtomicTraits
                                                 .Select( t => new Artifact( CKSetupType, project.SimpleProjectName + '/' + t.ToString() ) ) )
+                    {
                         project.AddGeneratedArtifacts( name );
+                    }
                 }
             }
         }

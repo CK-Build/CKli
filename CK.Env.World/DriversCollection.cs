@@ -1,24 +1,151 @@
 using CK.Core;
+using CK.Env.DependencyModel;
+using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace CK.Env
 {
+    /// <summary>
+    /// Store drivers and expose methods to get a bunch of drivers.
+    /// </summary>
     public class DriversCollection
     {
-        readonly HashSet<ISolutionDriver> _solutionDrivers;
-        readonly WorldState _worldState;
-
-        internal DriversCollection(WorldState worldState)
+        internal class WorldBranchContext : IWorldSolutionContext
         {
-            _worldState = worldState;
-            _solutionDrivers = new HashSet<ISolutionDriver>();
+            readonly List<ISolutionDriver> _drivers;
+            readonly SolutionContext _context;
+            readonly PairList _pairList;
+            SolutionDependencyContext _depContext;
+
+            internal WorldBranchContext( string branchName )
+            {
+                BranchName = branchName;
+                _context = new SolutionContext();
+                _drivers = new List<ISolutionDriver>();
+                _pairList = new PairList( this );
+            }
+
+            /// <summary>
+            /// Multiple branches constructor.
+            /// </summary>
+            /// <param name="drivers">The driver list from the develop branch.</param>
+            internal WorldBranchContext( IEnumerable<ISolutionDriver> drivers )
+            {
+                _drivers = drivers.ToList();
+                _pairList = new PairList( this );
+            }
+
+            /// <summary>
+            /// Gets the branch name.
+            /// This is null for multiple branches context.
+            /// </summary>
+            public string BranchName { get; }
+
+            public SolutionDependencyContext DependencyContext => _depContext;
+
+            public IReadOnlyList<DependentSolution> DependentSolutions => _depContext.Solutions;
+
+            public IReadOnlyList<ISolutionDriver> Drivers => _drivers;
+
+            class PairList : IReadOnlyList<(DependentSolution Solution, ISolutionDriver Driver)>
+            {
+                readonly WorldBranchContext _c;
+
+                public PairList( WorldBranchContext c ) => _c = c;
+
+                public (DependentSolution Solution, ISolutionDriver Driver) this[int index] => (_c.DependentSolutions[index], _c._drivers[index]);
+
+                public int Count => _c._drivers.Count;
+
+                public IEnumerator<(DependentSolution Solution, ISolutionDriver Driver)> GetEnumerator()
+                {
+                    return _c.DependentSolutions.Select( s => (s, _c._drivers[s.Index]) ).GetEnumerator();
+                }
+
+                IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+            }
+
+            public IReadOnlyList<(DependentSolution Solution, ISolutionDriver Driver)> Solutions => _pairList;
+
+            public bool Refresh( IActivityMonitor m, bool forceReload )
+            {
+                foreach( var d in _drivers )
+                {
+                    if( d.GetSolution( m, forceReload ) == null )
+                    {
+                        m.Error( $"Failed to load solution from '{d.GitRepository.SubPath}'." );
+                        return false;
+                    }
+                }
+                if( _depContext == null || _depContext.HasError || _depContext.IsObsolete )
+                {
+                    LogFilter final = m.ActualFilter;
+                    if( final == LogFilter.Undefined ) final = ActivityMonitor.DefaultFilter;
+                    _depContext = _context != null
+                                   ? _context.GetDependencyAnalyser( m, final == LogFilter.Debug ).DefaultDependencyContext
+                                   : DependencyAnalyzer.Create( m, _drivers.Select( d => d.GetSolution( m, false ) ).ToList(), final == LogFilter.Debug ).DefaultDependencyContext;
+                    if( !_depContext.HasError )
+                    {
+                        Debug.Assert( _drivers.Count() == _depContext.Solutions.Count );
+                        var aliasCtx = _depContext;
+                        _drivers.Sort( ( d1, d2 ) => aliasCtx[d1.GetSolution( m, false )].Index - aliasCtx[d2.GetSolution( m, false )].Index );
+                    }
+                }
+                return true;
+            }
+
+
+            internal SolutionContext OnRegisterDriver( ISolutionDriver d )
+            {
+                Debug.Assert( d != null && !_drivers.Contains( d ) );
+                _drivers.Add( d );
+                _depContext = null;
+                return _context;
+            }
+
+            internal void OnUnregisterDriver( ISolutionDriver d )
+            {
+                _drivers.Remove( d );
+                _depContext = null;
+            }
         }
 
-        //public IEnumerable<ISolutionDriver> GetSolutionDriversOn( string branchName ) => _solutionDrivers.Where( p => p.GitRepository.CurrentBranchName == branchName );
-        public IEnumerable<ISolutionDriver> GetDriversOnCurrentBranch( IActivityMonitor m )
+        readonly HashSet<ISolutionDriver> _solutionDrivers;
+        readonly Dictionary<string, WorldBranchContext> _perBranchContext;
+        internal DriversCollection()
         {
-            return _worldState.GetSolutionDependencyContextOnCurrentBranches( m ).Drivers;
+            _solutionDrivers = new HashSet<ISolutionDriver>();
+            _perBranchContext = new Dictionary<string, WorldBranchContext>();
+        }
+
+        /// <summary>
+        /// Gets the <see cref="WorldBranchContext"/> of a branch.
+        /// Return null if there is no <see cref="WorldBranchContext"/> for the branch.
+        /// </summary>
+        /// <param name="branchName">The name of the branch</param>
+        /// <returns>The <see cref="WorldBranchContext"/> of a branch or null if it doesn't exist.</returns>
+        internal WorldBranchContext GetContextOnBranch( string branchName )
+        {
+            return _perBranchContext.TryGetValue( branchName, out var ctx ) ? ctx : null;
+        }
+
+        /// <summary>
+        /// Gets an up to date <see cref="IWorldSolutionContext"/> for the current branches.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="reloadSolutions">True to force a reload of the solutions.</param>
+        /// <returns>The context or null on error.</returns>
+        public IWorldSolutionContext GetSolutionDependencyContextOnCurrentBranches( IActivityMonitor monitor, bool reloadSolutions = false )
+        {
+            var currentDrivers = _perBranchContext
+                .SelectMany(
+                    p => p.Value.Drivers.Select( d => d.GetCurrentBranchDriver() )
+                ).Distinct();
+            var c = new WorldBranchContext( currentDrivers );
+            return c.Refresh( monitor, reloadSolutions ) ? c : null;
         }
 
         public IEnumerable<ISolutionDriver> AllDrivers => _solutionDrivers;
@@ -27,7 +154,16 @@ namespace CK.Env
 
         public int Count => _solutionDrivers.Count;
 
-        public bool Add( ISolutionDriver item ) =>  _solutionDrivers.Add( item );
+        internal WorldBranchContext Register( ISolutionDriver driver )
+        {
+            if( !_perBranchContext.TryGetValue( driver.BranchName, out var c ) )
+            {
+                c = new WorldBranchContext( driver.BranchName );
+                _perBranchContext.Add( driver.BranchName, c );
+            }
+            if( !_solutionDrivers.Add( driver ) ) throw new InvalidOperationException( "Already registered." );
+            return c;
+        }
 
         public void Clear()
         {
@@ -44,6 +180,11 @@ namespace CK.Env
             _solutionDrivers.CopyTo( array, arrayIndex );
         }
 
-        public bool Remove( ISolutionDriver item ) => _solutionDrivers.Remove( item );
+        public void Unregister( ISolutionDriver driver )
+        {
+            if( !_solutionDrivers.Remove( driver ) ) throw new InvalidOperationException( "Not registered." );
+            _perBranchContext[driver.BranchName].OnUnregisterDriver( driver );
+            _solutionDrivers.Remove( driver );
+        }
     }
 }
