@@ -193,8 +193,14 @@
 
     <GitFolder Name="Nemo-Model" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Nemo-Model">
       <Branch Name="develop">
-        <SolutionSpec />
+        <SolutionSpec NoStrongNameSigning="True" />
       </Branch>
     </GitFolder>
+
+    <GitFolder Name="CK-Extensions" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/CK-Extensions">
+            <Branch Name="develop">
+                <SolutionSpec />
+            </Branch>
+        </GitFolder>
   </Folder>
 </ENGIE-WORLD>

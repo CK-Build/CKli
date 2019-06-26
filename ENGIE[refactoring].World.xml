@@ -161,5 +161,10 @@
             </Branch>
         </GitFolder>
         
+        <GitFolder Name="CK-Extensions" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/CK-Extensions">
+            <Branch Name="develop-refactoring">
+                <SolutionSpec />
+            </Branch>
+        </GitFolder>
     </Folder>
 </ENGIE-refactoring.World>
