@@ -454,6 +454,12 @@ namespace CK.Env.Plugin
             return GitFolder.Commit( m, "Local build auto commit.", amend ? CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage : CommitBehavior.CreateNewCommit );
         }
 
+        [CommandMethod(confirmationRequired:false)]
+        public bool Reload(IActivityMonitor m)
+        {
+            LoadSolution( m );
+            return true;
+        }
 
         /// <summary>
         /// Fires before a build.
