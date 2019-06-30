@@ -260,6 +260,13 @@ namespace CK.Env.NuGet
                         break;
                     }
             }
+            if( result != null )
+            {
+                if( !String.IsNullOrEmpty( result.SecretKeyName ) )
+                {
+                    SecretKeyStore.DeclareSecretKey( result.SecretKeyName, desc => $"Required to push NuGet packages to repository '{result.UniqueRepositoryName}'." );
+                }
+            }
             return result;
         }
 
@@ -270,6 +277,12 @@ namespace CK.Env.NuGet
             var name = r.HandleRequiredAttribute<string>( "Name" );
             var xCreds = r.Element.Element( "Credentials" );
             var creds = xCreds != null ? new SimpleCredentials( r.WithElement( xCreds ) ) : null;
+
+            if( creds.IsSecretKeyName )
+            {
+                SecretKeyStore.DeclareSecretKey( creds.PasswordOrSecretKeyName, desc => desc
+                                    ?? $"Required for NuGet.config file to retrieve packages from '{name}' feed." );
+            }
 
             var internals = repositories.OfType<NuGetFeedBase>().Concat( feeds.OfType<NuGetFeedBase>() );
             foreach( var i in internals )

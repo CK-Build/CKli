@@ -646,7 +646,11 @@ namespace CK.Env.Plugin
                 try
                 {
                     string key = _keyStore.GetSecretKey( m, CODECAKEBUILDER_SECRET_KEY, false );
-                    if( key == null ) return false;
+                    if( key == null )
+                    {
+                        m.Error( "CODECAKEBUILDER_SECRET_KEY knowledge is required." );
+                        return false;
+                    }
                     ev.EnvironmentVariables.Add( (CODECAKEBUILDER_SECRET_KEY, key) );
 
                     var args = ev.WithZeroBuilder

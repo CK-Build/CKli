@@ -28,7 +28,8 @@ namespace CK.Env.Plugin
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath.AppendPart( "(CKSetup)" );
 
-        public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
+        public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart
+                                        && _secretStore.IsSecretKeyAvailable( SolutionDriver.CODECAKEBUILDER_SECRET_KEY ) == true;
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )

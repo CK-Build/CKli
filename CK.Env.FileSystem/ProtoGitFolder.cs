@@ -37,6 +37,34 @@ namespace CK.Env
             FullPhysicalPath = fullPhysicalPath;
             FileSystem = fileSystem;
             CommandRegister = commandRegister;
+
+            if( KnownGitProvider != KnownGitProvider.Unknown )
+            {
+                switch( KnownGitProvider )
+                {
+                    case KnownGitProvider.AzureDevOps:
+                        var regex = Regex.Match( url, @"(?:\:\/\/)[^\/]*\/([^\/]*)" );
+                        string organization = regex.Groups[1].Value;
+                        PATKeyName = "AZURE_GIT_" + organization
+                            .ToUpperInvariant()
+                            .Replace( '-', '_' )
+                            .Replace( ' ', '_' )
+                            + "_PAT";
+                        break;
+                    default:
+                        PATKeyName = KnownGitProvider.ToString() + "_GIT_PAT";
+                        break;
+                }
+                secretKeyStore.DeclareSecretKey( PATKeyName, desc =>
+                {
+                    if( desc == null ) desc = $"Required to interact with solutions hosted by '{KnownGitProvider}':";
+                    if( !desc.Contains( url ) )
+                    {
+                        desc += Environment.NewLine + url; 
+                    }
+                    return desc;
+                } );
+            }
         }
 
         /// <summary>
@@ -62,6 +90,11 @@ namespace CK.Env
         public NormalizedPath FullPhysicalPath { get; }
 
         public ISecretKeyStore SecretKeyStore { get; }
+
+        /// <summary>
+        /// Gets the PAT key name for this repository.
+        /// </summary>
+        public string PATKeyName { get; }
 
         public CommandRegister CommandRegister { get; }
 
@@ -107,23 +140,8 @@ namespace CK.Env
 
         public Credentials PATCredentialsHandler( IActivityMonitor m, string url )
         {
-            string keyName;
-            switch( KnownGitProvider )
-            {
-                case KnownGitProvider.AzureDevOps:
-                    var regex = Regex.Match( url, @"(?:\:\/\/)[^\/]*\/([^\/]*)" );
-                    string organization = regex.Groups[1].Value;
-                    keyName = "AZURE_GIT_" + organization
-                        .ToUpperInvariant()
-                        .Replace( '-', '_' )
-                        .Replace( ' ', '_' )
-                        + "_PAT";
-                    break;
-                default:
-                    keyName = KnownGitProvider.ToString() + "_GIT_PAT";
-                    break;
-            }
-            string pat = SecretKeyStore.GetSecretKey( m, keyName, true );
+            if( KnownGitProvider == KnownGitProvider.Unknown ) throw new InvalidOperationException( "Unknown Git provider." );
+            string pat = SecretKeyStore.GetSecretKey( m, PATKeyName, true );
             return new UsernamePasswordCredentials()
             {
                 Username = "CK-Env",

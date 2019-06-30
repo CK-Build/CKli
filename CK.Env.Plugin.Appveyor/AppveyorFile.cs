@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Text;
 using SharpYaml.Model;
+using System;
 using System.Linq;
 
 namespace CK.Env.Plugin
@@ -11,6 +12,8 @@ namespace CK.Env.Plugin
         readonly SolutionSpec _solutionSpec;
         readonly ISecretKeyStore _secretStore;
 
+        const string APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY = "APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY";
+
 
         public AppveyorFile( GitFolder f, SolutionDriver driver, SolutionSpec settings, ISecretKeyStore secretStore, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "appveyor.yml" ) )
@@ -18,6 +21,8 @@ namespace CK.Env.Plugin
             _driver = driver;
             _solutionSpec = settings;
             _secretStore = secretStore;
+            _secretStore.DeclareSecretKey( APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY, desc => desc
+                ?? "This must be the CODECAKEBUILDER_SECRET_KEY encrypted by the Appveyor account's secret key that will run the build: https://ci.appveyor.com/tools/encrypt." );
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
@@ -46,14 +51,14 @@ namespace CK.Env.Plugin
             // We currently always use AppVeyor when the repository is public.
             YamlMapping env = FindOrCreateYamlElement( m, firstMapping, "environment" );
             if( env == null ) return;
-            string appveyorSecure = _secretStore.GetSecretKey( m, "APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY", false );
+            string appveyorSecure = _secretStore.GetSecretKey( m, APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY, false );
             if( appveyorSecure != null )
             {
-                env["CODECAKEBUILDER_SECRET_KEY"] = CreateKeyValue( "secure", appveyorSecure );
+                env[SolutionDriver.CODECAKEBUILDER_SECRET_KEY] = CreateKeyValue( "secure", appveyorSecure );
             }
             else
             {
-                m.Warn( "Update of CODECAKEBUILDER_SECRET_KEY secure key has been skipped." );
+                m.Warn( "Update of CODECAKEBUILDER_SECRET_KEY encrypted secure key has been skipped." );
             }
             // Remove obsolete environment variables definitions.
             env.Remove( "NUGET_API_KEY" );
