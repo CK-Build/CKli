@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Text;
 using SharpYaml.Model;
+using System;
 using System.Linq;
 
 namespace CK.Env.Plugin
@@ -11,6 +12,8 @@ namespace CK.Env.Plugin
         readonly SolutionSpec _solutionSpec;
         readonly ISecretKeyStore _secretStore;
 
+        const string APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY = "APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY";
+
 
         public AppveyorFile( GitFolder f, SolutionDriver driver, SolutionSpec settings, ISecretKeyStore secretStore, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "appveyor.yml" ) )
@@ -18,11 +21,13 @@ namespace CK.Env.Plugin
             _driver = driver;
             _solutionSpec = settings;
             _secretStore = secretStore;
+            _secretStore.DeclareSecretKey( APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY, desc => desc
+                ?? "This must be the CODECAKEBUILDER_SECRET_KEY encrypted by the Appveyor account's secret key that will run the build: https://ci.appveyor.com/tools/encrypt." );
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
-        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+        public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
@@ -30,11 +35,11 @@ namespace CK.Env.Plugin
             if( !this.CheckCurrentBranch( m ) ) return;
             YamlMapping firstMapping = GetFirstMapping( m, true );
             if( firstMapping == null ) return;
-            var s = _driver.GetSolution( m );
-            if( s == null ) return;
+            var solution = _driver.GetSolution( m );
+            if( solution == null ) return;
 
             // We don't use AppVeyor for private repositories.
-            if( !Folder.IsPublic ) 
+            if( !GitFolder.IsPublic ) 
             {
                 if( TextContent != null )
                 {
@@ -46,14 +51,14 @@ namespace CK.Env.Plugin
             // We currently always use AppVeyor when the repository is public.
             YamlMapping env = FindOrCreateYamlElement( m, firstMapping, "environment" );
             if( env == null ) return;
-            string appveyorSecure = _secretStore.GetSecretKey( m, "APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY", false );
+            string appveyorSecure = _secretStore.GetSecretKey( m, APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY, false );
             if( appveyorSecure != null )
             {
-                env["CODECAKEBUILDER_SECRET_KEY"] = CreateKeyValue( "secure", appveyorSecure );
+                env[SolutionDriver.CODECAKEBUILDER_SECRET_KEY] = CreateKeyValue( "secure", appveyorSecure );
             }
             else
             {
-                m.Warn( "Update of CODECAKEBUILDER_SECRET_KEY secure key has been skipped." );
+                m.Warn( "Update of CODECAKEBUILDER_SECRET_KEY encrypted secure key has been skipped." );
             }
             // Remove obsolete environment variables definitions.
             env.Remove( "NUGET_API_KEY" );
@@ -79,7 +84,7 @@ namespace CK.Env.Plugin
                 CreateKeyValue( "ps", "./CodeCakeBuilder/InstallCredentialProvider.ps1" )
             };
             // Temporary: installs the 6.9.0 of npm.
-            if( s.GeneratedArtifacts.Any( g => g.Artifact.Type.Name == "NPM" ) )
+            if( solution.GeneratedArtifacts.Any( g => g.Artifact.Type.Name == "NPM" ) )
             {
                 install.Add( CreateKeyValue( "cmd", "npm install -g npm@6.9.0" ) );
             }
@@ -87,7 +92,7 @@ namespace CK.Env.Plugin
 
             firstMapping["version"] = new YamlValue( "build{build}" );
             firstMapping["image"] = new YamlValue( "Visual Studio 2017" );
-            firstMapping["clone_folder"] = new YamlValue( "C:\\CK-World\\" + Folder.SubPath.Path.Replace( '/', '\\' ) );
+            firstMapping["clone_folder"] = new YamlValue( "C:\\CKli-World\\" + GitFolder.SubPath.Path.Replace( '/', '\\' ) );
             EnsureDefaultBranches( firstMapping );
             EnsureSequence( firstMapping, "build_script", "dotnet run --project CodeCakeBuilder -nointeraction" );
             firstMapping["test"] = new YamlValue( "off" );

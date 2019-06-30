@@ -1,7 +1,6 @@
 using CK.Core;
 using CK.Env.DependencyModel;
 using CK.Text;
-using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

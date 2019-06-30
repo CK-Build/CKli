@@ -64,7 +64,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The set of diff or null on error.</returns>
-        IReadOnlyCollection<DirectoryDiff> GetProjectsDiff( IActivityMonitor m );
+        IDiffResult GetProjectsDiff( IActivityMonitor m );
 
         /// <summary>
         /// Cancels the current session. It can be restarted later.

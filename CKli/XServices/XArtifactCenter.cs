@@ -14,13 +14,13 @@ namespace CKli
             fs.ServiceContainer.Add( ArtifactCenter );
             initializer.Services.Add( ArtifactCenter );
             // Quick & dirty registration.
-            ArtifactType.Register( "NuGet", true );
+            ArtifactType.Register( "NuGet", true, ';' );
             ArtifactType.Register( "NPM", true );
             ArtifactType.Register( "CKSetup", false );
         }
 
         /// <summary>
-        /// Gets the artifact type factory: <see cref="IArtifactRepositoryFactory"/> must be registered
+        /// Gets the artifact type factory: <see cref="IArtifactTypeHandler"/> must be registered
         /// in it.
         /// This is injected into the <see cref="FileSystem.ServiceContainer"/>.
         /// </summary>

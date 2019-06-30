@@ -1,11 +1,7 @@
 using CK.Core;
 using CK.Env.DependencyModel;
 using CK.Text;
-using System;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
 
 namespace CK.Env.Plugin
 {

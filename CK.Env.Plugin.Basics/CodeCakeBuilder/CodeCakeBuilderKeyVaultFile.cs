@@ -1,9 +1,7 @@
 using CK.Core;
 using CK.SimpleKeyVault;
 using CK.Text;
-using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace CK.Env.Plugin
 {
@@ -22,7 +20,7 @@ namespace CK.Env.Plugin
             ISecretKeyStore secretStore,
             ArtifactCenter artifacts,
             NormalizedPath branchPath )
-            : base( f.Folder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilderKeyVault.txt" ) )
+            : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilderKeyVault.txt" ) )
         {
             _f = f;
             _driver = driver;
@@ -33,7 +31,8 @@ namespace CK.Env.Plugin
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
-        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+        public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart
+                                        && _secretStore.IsSecretKeyAvailable( "CODECAKEBUILDER_SECRET_KEY" ) == true;
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
@@ -42,7 +41,7 @@ namespace CK.Env.Plugin
             var s = _driver.GetSolution( m );
             if( s == null ) return;
 
-            var passPhrase = _secretStore.GetSecretKey( m, "CODECAKEBUILDER_SECRET_KEY", true );
+            var passPhrase = _secretStore.GetSecretKey( m, SolutionDriver.CODECAKEBUILDER_SECRET_KEY, true );
 
             Dictionary<string,string> current = KeyVault.DecryptValues( TextContent, passPhrase );
             var repositorySecrets = _artfifacts.ResolveSecrets( m, s.ArtifactTargets );

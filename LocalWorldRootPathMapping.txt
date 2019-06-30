@@ -1,6 +1,6 @@
-A1Test > C:\Dev\CKEnvTest
-A2Test > C:\Dev\CKEnvTest
-A2TestPrivate > C:\Dev\CKEnvTest
-SC > C:\Dev\
-ENGIE > C:\Dev\
-
+CK-Build > C:\Dev\CK
+SC > C:\Dev\CK
+ENGIE > C:\Dev\ENGIE
+A1Test > C:\Dev\CKEnvTest\A1Test
+A2Test > C:\Dev\CKEnvTest\A2Test
+A2TestPrivate > C:\Dev\CKEnvTest\A2TestPrivate

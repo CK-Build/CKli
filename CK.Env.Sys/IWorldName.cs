@@ -1,22 +1,22 @@
 namespace CK.Env
 {
     /// <summary>
-    /// Defines the "Long Term Support World". A World is identified by a name
-    /// and a <see cref="LTSKey"/>.
+    /// Defines a "World" that is identified by a name and an optional <see cref="ParallelName"/>.
     /// It exposes the 3 fundamentals branch names we handle:
     /// <see cref="MasterBranchName"/>, <see cref="DevelopBranchName"/> and <see cref="LocalBranchName"/>.
     /// </summary>
     public interface IWorldName
     {
         /// <summary>
-        /// Gets the name of this world.
+        /// Gets the base name of this world: this is the name of the "Stack" and
+        /// the name of the default world of this Stack.
         /// </summary>
         string Name { get; }
 
         /// <summary>
-        /// Gets the LTS key. Normalized to null for current.
+        /// Gets the parallel name. Normalized to null for the default world.
         /// </summary>
-        string LTSKey { get; }
+        string ParallelName { get; }
 
         /// <summary>
         /// Gets the develop branch name.
@@ -36,7 +36,8 @@ namespace CK.Env
         string LocalBranchName { get; }
 
         /// <summary>
-        /// Gets the <see cref="Name"/> or <see cref="Name"/>-<see cref="LTSKey"/> if the key is not null.
+        /// Gets the <see cref="Name"/> (the "Stack" name) or <see cref="Name"/>[<see cref="ParallelName"/>]
+        /// if the ParallelName is not null (we are not in the default World of the Stack).
         /// </summary>
         string FullName { get; }
     }

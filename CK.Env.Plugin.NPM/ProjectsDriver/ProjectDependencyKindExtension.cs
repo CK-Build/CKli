@@ -1,9 +1,6 @@
+using CK.Core;
 using CK.Env.DependencyModel;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CK.Env.Plugin
 {
@@ -15,13 +12,13 @@ namespace CK.Env.Plugin
         /// </summary>
         /// <param name="this">This kind.</param>
         /// <returns>The section name.</returns>
-        public static string ToPackageJsonKey( this ProjectDependencyKind @this )
+        public static string ToPackageJsonKey( this ArtifactDependencyKind @this )
         {
             switch( @this)
             {
-                case ProjectDependencyKind.Development: return "devDependencies";
-                case ProjectDependencyKind.Transitive: return "peerDependencies";
-                case ProjectDependencyKind.Private: return "dependencies";
+                case ArtifactDependencyKind.Development: return "devDependencies";
+                case ArtifactDependencyKind.Transitive: return "peerDependencies";
+                case ArtifactDependencyKind.Private: return "dependencies";
                 default: return String.Empty;
             }
         }

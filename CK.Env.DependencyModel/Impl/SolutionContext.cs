@@ -1,11 +1,9 @@
 using CK.Core;
 using CK.Text;
-using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 
 namespace CK.Env.DependencyModel
 {
@@ -123,7 +121,7 @@ namespace CK.Env.DependencyModel
         {
             if( _analyzer == null || _analyzer.IsObsolete )
             {
-                _analyzer = DependencyAnalyzer.Create( m, this, traceGraphDetails );
+                _analyzer = DependencyAnalyzer.Create( m, this, traceGraphDetails, this );
             }
             return _analyzer;
         }
@@ -200,6 +198,16 @@ namespace CK.Env.DependencyModel
         }
 
         internal void OnArtifactTargetRemoved( Solution solution, IArtifactRepository artifactTarget )
+        {
+            ++_version;
+        }
+
+        internal void OnArtifactSourceAdded( Solution solution, IArtifactFeed newOne )
+        {
+            ++_version;
+        }
+
+        internal void OnArtifactSourceRemoved( Solution solution, IArtifactFeed artifactSource )
         {
             ++_version;
         }

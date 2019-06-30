@@ -14,19 +14,11 @@ namespace CK.Env
         string OriginUrl { get; }
 
         /// <summary>
-        /// Create a local branch in the repository
+        /// Ensures that a local branch exists.
         /// </summary>
-        /// <param name="m"></param>
-        /// <param name="branchName"></param>
-        void CreateBranch( IActivityMonitor m, string branchName );
-
-        /// <summary>
-        /// Create a local branch pointing on the given commitin the repository.
-        /// </summary>
-        /// <param name="m"></param>
-        /// <param name="branchName"></param>
-        /// <param name="commitHash"></param>
-        void CreateBranch( IActivityMonitor m, string branchName, string commitHash );
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="branchName">The branch name.</param>
+        void EnsureBranch( IActivityMonitor m, string branchName, bool noWarnOnCreate = false );
 
         /// <summary>
         /// Gets the full physical path of the Git folder.
@@ -64,7 +56,7 @@ namespace CK.Env
         /// <param name="previousVersionCommitSha">Previous commit.</param>
         /// <param name="solutionRelativeFolders">Folders for which diffs must be computed.</param>
         /// <returns>The set of diff or null on error.</returns>
-        IReadOnlyCollection<DirectoryDiff> GetPathsDiff( IActivityMonitor m, string previousVersionCommitSha, IEnumerable<NormalizedPath> solutionRelativeFolders );
+        IDiffResult GetDiff( IActivityMonitor m, string previousVersionCommitSha, IEnumerable<IDiffRoot> solutionRelativeFolders );
 
         /// <summary>
         /// Commits any pending changes.
@@ -78,7 +70,7 @@ namespace CK.Env
         /// True to call <see cref="AmendCommit"/> if <see cref="CanAmendCommit"/>. is true.
         /// </param>
         /// <returns>True on success, false on error.</returns>
-        bool Commit( IActivityMonitor m, string commitMessage, bool amendIfPossible = false );
+        bool Commit( IActivityMonitor m, string commitMessage, CommitBehavior commitBehavior = CommitBehavior.CreateNewCommit );
 
         /// <summary>
         /// Amends the current commit, optionaly changing its message and/or its date.

@@ -2,12 +2,9 @@ using CK.Core;
 using CK.Env.DependencyModel;
 using CK.Env.NPM;
 using CK.Text;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Xml.Linq;
 
 namespace CK.Env.Plugin
@@ -67,7 +64,7 @@ namespace CK.Env.Plugin
             {
                 if( _packageFile.Root == null )
                 {
-                    return Driver.Folder.FileSystem.GetDirectoryContents( FullPath ).Exists
+                    return Driver.GitFolder.FileSystem.GetDirectoryContents( FullPath ).Exists
                         ? Error( NPMProjectStatus.ErrorMissingPackageJson )
                         : Error( NPMProjectStatus.FatalInitializationError );
                 }

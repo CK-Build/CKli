@@ -1,13 +1,9 @@
 using CK.Core;
 using CK.Env;
-using CK.Env.Plugin;
 using CK.Text;
-using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Net.Http;
 
 namespace CKli
 {
@@ -56,14 +52,14 @@ namespace CKli
                 return missing;
             }
 
-            public bool PushLocalArtifacts( IActivityMonitor m, IArtifactRepository target, IEnumerable<ArtifactInstance> artifacts )
+            public bool PushLocalArtifacts( IActivityMonitor m, IArtifactRepository target, IEnumerable<ArtifactInstance> artifacts, bool arePublicArtifacts )
             {
                 bool success = true;
                 foreach( var h in _provider._handlers )
                 {
                     using( m.OpenTrace( $"Pushing for type handler '{h}'." ) )
                     {
-                        if( !h.PushLocalArtifacts( this, m, target, artifacts ) )
+                        if( !h.PushLocalArtifacts( this, m, target, artifacts, arePublicArtifacts ) )
                         {
                             m.CloseGroup( "Failed." );
                             success = false;

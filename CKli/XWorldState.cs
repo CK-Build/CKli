@@ -68,7 +68,7 @@ namespace CKli
 
         void OnDumpWorldStatus( IActivityMonitor m )
         {
-            var gitFolders = _worldState.SolutionDrivers.Select( x => (GitFolder)x.GitRepository );
+            var gitFolders = _worldState.SolutionDrivers.GetDriversOnCurrentBranch(m).Select( x => (GitFolder)x.GitRepository );
             DumpGitFolders( m, gitFolders );
         }
 
@@ -90,7 +90,8 @@ namespace CKli
             foreach( var git in gitFolders )
             {
                 ++gitFoldersCount;
-                using( m.OpenInfo( $"{git.SubPath} - branch: {git.CurrentBranchName}." ) )
+                string commitAhead = git.AheadOriginCommitCount != null ? $"{git.AheadOriginCommitCount} commits ahead origin" : "Untracked";
+                using( m.OpenInfo( $"{git.SubPath} - branch: {git.CurrentBranchName} ({commitAhead})." ) )
                 {
                     string pluginInfo;
                     if( !git.EnsureCurrentBranchPlugins( m ) )
@@ -131,7 +132,7 @@ namespace CKli
                         {
                             using( m.OpenInfo( $"Branch '{b.Key}':" ) )
                             {
-                                m.Info( b.Select( g => g.SubPath.Path ).Concatenate() );
+                                m.Warn( b.Select( g => g.SubPath.Path ).Concatenate() );
                             }
                         }
                     }

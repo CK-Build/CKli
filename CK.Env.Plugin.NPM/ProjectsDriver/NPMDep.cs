@@ -1,10 +1,7 @@
+using CK.Core;
 using CK.Env.DependencyModel;
 using CSemVer;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CK.Env.Plugin
 {
@@ -24,7 +21,7 @@ namespace CK.Env.Plugin
         /// <summary>
         /// Gets the kind of the dependency (dev, peer, etc.).
         /// </summary>
-        public ProjectDependencyKind Kind { get; }
+        public ArtifactDependencyKind Kind { get; }
 
         /// <summary>
         /// Gets the raw dependency as expressed in the package json file
@@ -39,7 +36,7 @@ namespace CK.Env.Plugin
         /// </summary>
         public SVersion MinVersion { get; }
 
-        public NPMDep( string name, ProjectDependencyKind kind, SVersion minVersion )
+        public NPMDep( string name, ArtifactDependencyKind kind, SVersion minVersion )
         {
             Name = name;
             Type = NPMVersionDependencyType.MinVersion;
@@ -48,7 +45,7 @@ namespace CK.Env.Plugin
             RawDep = ">=" + minVersion.ToNuGetPackageString();
         }
 
-        public NPMDep( string name, NPMVersionDependencyType type, ProjectDependencyKind kind, string rawDep, SVersion minVersion )
+        public NPMDep( string name, NPMVersionDependencyType type, ArtifactDependencyKind kind, string rawDep, SVersion minVersion )
         {
             Name = name;
             Type = type;

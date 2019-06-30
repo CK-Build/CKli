@@ -5,6 +5,7 @@ using System.Linq;
 using System.Xml.Linq;
 using CK.Core;
 using CK.Env.DependencyModel;
+using CK.Env.Diff;
 using CK.Env.MSBuildSln;
 using CK.Text;
 using CSemVer;
@@ -13,7 +14,12 @@ namespace CK.Env.Plugin
 {
     public class SolutionDriver : GitBranchPluginBase, ISolutionDriver, IDisposable, ICommandMethodsProvider
     {
-        public static readonly ArtifactType NuGetType = ArtifactType.Register( "NuGet", true );
+        /// <summary>
+        /// As its name states...
+        /// </summary>
+        public const string CODECAKEBUILDER_SECRET_KEY = "CODECAKEBUILDER_SECRET_KEY";
+
+        public static readonly ArtifactType NuGetType = NuGet.NuGetClient.NuGetType;
         public static readonly ArtifactType CKSetupType = ArtifactType.Register( "CKSetup", false );
 
         readonly ISecretKeyStore _keyStore;
@@ -43,6 +49,7 @@ namespace CK.Env.Plugin
             _keyStore = keyStore;
             _solutionSpec = spec;
             _localFeedProvider = localFeedProvider;
+            _keyStore.DeclareSecretKey( CODECAKEBUILDER_SECRET_KEY, d => d ?? $"Required to execute CodeCakeBuilder." );
         }
 
         void IDisposable.Dispose()
@@ -52,7 +59,7 @@ namespace CK.Env.Plugin
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => BranchPath.AppendPart( "SolutionDriver" );
 
-        IGitRepository ISolutionDriver.GitRepository => Folder;
+        IGitRepository ISolutionDriver.GitRepository => GitFolder;
 
         string ISolutionDriver.BranchName => BranchPath.LastPart;
 
@@ -61,7 +68,7 @@ namespace CK.Env.Plugin
         /// It provides services only on local or develop and if the <see cref="GitFolder.StandardGitStatus"/>
         /// is the same as <see cref="GitBranchPluginBase.PluginBranch"/>.
         /// </summary>
-        bool IsActive => Folder.StandardGitStatus == PluginBranch
+        bool IsActive => GitFolder.StandardGitStatus == PluginBranch
                          && (PluginBranch == StandardGitStatus.Local || PluginBranch == StandardGitStatus.Develop);
 
         /// <summary>
@@ -70,9 +77,9 @@ namespace CK.Env.Plugin
         /// <returns>This solution driver or the one of the current branch.</returns>
         public ISolutionDriver GetCurrentBranchDriver()
         {
-            return Folder.StandardGitStatus == PluginBranch
+            return GitFolder.StandardGitStatus == PluginBranch
                 ? this
-                : Folder.PluginManager.BranchPlugins[Folder.CurrentBranchName].GetPlugin<SolutionDriver>();
+                : GitFolder.PluginManager.BranchPlugins[GitFolder.CurrentBranchName].GetPlugin<SolutionDriver>();
         }
 
         /// <summary>
@@ -90,7 +97,7 @@ namespace CK.Env.Plugin
             if( _sln != null )
             {
                 _sln.Saved -= OnSolutionSaved;
-                m.Info( $"Solution '{Folder.SubPath}' must be reloaded." );
+                m.Info( $"Solution '{GitFolder.SubPath}' must be reloaded." );
                 _sln = null;
             }
         }
@@ -105,10 +112,14 @@ namespace CK.Env.Plugin
         {
             if( _sln == null || reloadSolution )
             {
-                using( monitor.OpenInfo( $"Loading solution '{Folder.SubPath}'." ) )
+                using( monitor.OpenInfo( $"Loading solution '{GitFolder.SubPath}'." ) )
                 {
                     LoadSolution( monitor );
                 }
+            }
+            if( (_isSolutionValid ? _solution : null) == null )
+            {
+
             }
             return _isSolutionValid ? _solution : null;
         }
@@ -116,16 +127,27 @@ namespace CK.Env.Plugin
         void LoadSolution( IActivityMonitor m )
         {
             _isSolutionValid = false;
-            var expectedSolutionName = Folder.SubPath.LastPart + ".sln" ;
-            _sln = SolutionFile.Read( Folder.FileSystem,  m, BranchPath.AppendPart( expectedSolutionName ) );
+            var expectedSolutionName = GitFolder.SubPath.LastPart + ".sln";
+            _sln = SolutionFile.Read( GitFolder.FileSystem, m, BranchPath.AppendPart( expectedSolutionName ) );
             if( _sln == null ) return;
+
             _sln.Saved += OnSolutionSaved;
+            bool newSolution = false;
             if( _solution == null )
             {
+                newSolution = true;
                 _solution = _solutionContext.AddSolution( BranchPath, expectedSolutionName );
-                foreach( var uniqueRepositoryName in _solutionSpec.ArtifactTargets )
+                foreach( var targetName in _solutionSpec.ArtifactTargets )
                 {
-                    _solution.AddArtifactTarget( _artifactCenter.Find( uniqueRepositoryName ) );
+                    var r = _artifactCenter.Repositories.FirstOrDefault( repo => repo.UniqueRepositoryName == targetName );
+                    if( r == null ) m.Error( $"Unable to find the repository named '{targetName}' (available repositories: {_artifactCenter.Repositories.Select( repo => repo.UniqueRepositoryName ).Concatenate()})." );
+                    else _solution.AddArtifactTarget( r );
+                }
+                foreach( var sourceName in _solutionSpec.ArtifactSources )
+                {
+                    var f = _artifactCenter.Feeds.FirstOrDefault( feed => feed.TypedName == sourceName );
+                    if( f == null ) m.Error( $"Unable to find the feed named '{sourceName}' (available sources: {_artifactCenter.Feeds.Select( feed => feed.TypedName ).Concatenate()})." );
+                    _solution.AddArtifactSource( f );
                 }
             }
             _solution.Tag( _sln );
@@ -139,7 +161,7 @@ namespace CK.Env.Plugin
                     m.Warn( $"Project named {p.ProjectName} should be in folder of the same name, not in {p.SolutionRelativeFolderPath.LastPart}." );
                 }
                 Debug.Assert( p.ProjectFile != null );
-                var (project, isNewProject) = _solution.AddOrFindProject( p.SolutionRelativeFolderPath, ".Net", p.ProjectName );
+                var (project, isNewProject) = _solution.AddOrFindProject( p.SolutionRelativeFolderPath, ".Net", p.ProjectName, p.TargetFrameworks );
                 project.Tag( p );
                 if( isNewProject )
                 {
@@ -149,7 +171,7 @@ namespace CK.Env.Plugin
                 projectsToRemove.Remove( project );
                 orderedProjects[i++] = project;
             }
-            foreach( var project in _solution.Projects.Where(p=>p.Tag<MSProject>() != null) )
+            foreach( var project in _solution.Projects.Where( p => p.Tag<MSProject>() != null ) )
             {
                 SynchronizeProjectReferences( m, project, msProj => orderedProjects[msProj.MSProjIndex] );
             }
@@ -159,7 +181,7 @@ namespace CK.Env.Plugin
             var h = OnSolutionConfiguration;
             if( h != null )
             {
-                var e = new SolutionConfigurationEventArgs( m, _solution );
+                var e = new SolutionConfigurationEventArgs( m, _solution, newSolution, _solutionSpec );
                 h( this, e );
                 if( e.ConfigurationFailed )
                 {
@@ -205,7 +227,7 @@ namespace CK.Env.Plugin
                     foreach( var name in project.Tag<MSProject>()
                                                 .TargetFrameworks.AtomicTraits
                                                 .Select( t => new Artifact( CKSetupType, project.SimpleProjectName + '/' + t.ToString() ) ) )
-                    project.AddGeneratedArtifacts( name );
+                        project.AddGeneratedArtifacts( name );
                 }
             }
         }
@@ -217,7 +239,7 @@ namespace CK.Env.Plugin
             foreach( var dep in p.Deps.Packages )
             {
                 toRemove.Remove( dep.Package.Artifact );
-                project.EnsurePackageReference( dep.Package, ProjectDependencyKind.Transitive );
+                project.EnsurePackageReference( dep.Package, ArtifactDependencyKind.Transitive, dep.Frameworks );
             }
             foreach( var noMore in toRemove ) project.RemovePackageReference( noMore );
         }
@@ -231,7 +253,7 @@ namespace CK.Env.Plugin
                 if( dep.TargetProject is MSProject target )
                 {
                     var mapped = depsFinder( target );
-                    project.EnsureProjectReference( mapped, ProjectDependencyKind.Transitive );
+                    project.EnsureProjectReference( mapped, ArtifactDependencyKind.Transitive, dep.Frameworks );
                     toRemove.Remove( mapped );
                 }
                 else
@@ -261,7 +283,7 @@ namespace CK.Env.Plugin
         [CommandMethod]
         public bool Pull( IActivityMonitor m )
         {
-            var (Success, ReloadNeeded) = Folder.Pull( m );
+            var (Success, ReloadNeeded) = GitFolder.Pull( m );
             if( !Success ) return false;
             return !ReloadNeeded || GetSolution( m, true ) != null;
         }
@@ -282,10 +304,25 @@ namespace CK.Env.Plugin
                 return false;
             }
             m.Info( $"Parsed date range: {beginningDate} => {endingDate}" );
-            Folder.ShowLogsBetweenDates( m, beginningDate, endingDate, solution.Projects.Select( p => p.SolutionRelativeFolderPath ) );
+            GitFolder.ShowLogsBetweenDates( m, beginningDate, endingDate, solution.Projects.Select( proj => new DiffRoot( solution.Name, proj.ProjectSources ) ) );
             return true;
         }
 
+        [CommandMethod]
+        public void ShowSolutionExternalDependencies( IActivityMonitor m )
+        {
+            var packages = _solutionContext.GetDependencyAnalyser( m, m.ActualFilter == LogFilter.Debug ).ExternalReferences;
+            if( packages.Count == 0 )
+            {
+                Console.WriteLine( "This Solution don't have any external references." );
+            }
+
+            Console.WriteLine( $"External dependency of the Solution {GetSolution(m).Name}:" );
+            foreach( PackageReference externalRef in packages )
+            {
+                Console.WriteLine( "====|" + externalRef.ToString() );
+            }
+        }
 
         /// <summary>
         /// Fires whenever a package reference version must be upgraded.
@@ -380,7 +417,7 @@ namespace CK.Env.Plugin
                         : $@"publish --output ""{_localFeedProvider.GetZeroVersionCodeCakeBuilderExecutablePath( solution.Name ).RemoveLastPart()}""";
             args += commonArgs + versionArgs;
 
-            var path = Folder.FileSystem.GetFileInfo( msP.Path.RemoveLastPart() ).PhysicalPath;
+            var path = GitFolder.FileSystem.GetFileInfo( msP.Path.RemoveLastPart() ).PhysicalPath;
             FileHelper.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "bin" ) );
             FileHelper.RawDeleteLocalDirectory( monitor, System.IO.Path.Combine( path, "obj" ) );
 
@@ -391,7 +428,7 @@ namespace CK.Env.Plugin
             }
             finally
             {
-                Folder.ResetHard( monitor );
+                GitFolder.ResetHard( monitor );
                 OnZeroBuildProject?.Invoke( this, new ZeroBuildEventArgs( monitor, false, info ) );
             }
         }
@@ -425,8 +462,8 @@ namespace CK.Env.Plugin
         bool LocalCommit( IActivityMonitor m )
         {
             Debug.Assert( IsActive );
-            bool amend = PluginBranch == StandardGitStatus.Local || Folder.Head.Message == "Local build auto commit.";
-            return Folder.Commit( m, "Local build auto commit.", amend );
+            bool amend = PluginBranch == StandardGitStatus.Local || GitFolder.Head.Message == "Local build auto commit.";
+            return GitFolder.Commit( m, "Local build auto commit.", amend ? CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage : CommitBehavior.CreateNewCommit );
         }
 
 
@@ -445,7 +482,7 @@ namespace CK.Env.Plugin
         /// </summary>
         public event EventHandler<EventMonitoredArgs> OnBuildFailed;
 
-        public bool IsBuildEnabled => _world.WorkStatus == GlobalWorkStatus.Idle && IsActive;
+        public bool IsBuildEnabled => _world.WorkStatus == GlobalWorkStatus.Idle && IsActive && _keyStore.IsSecretKeyAvailable( CODECAKEBUILDER_SECRET_KEY ) == true;
 
         /// <summary>
         /// Builds the solution in 'local' branch or build in 'develop' without remotes, using the published Zero
@@ -484,7 +521,7 @@ namespace CK.Env.Plugin
             if( solution == null ) return false;
 
             // Version is always provided by the current commit point.
-            var v = Folder.ReadRepositoryVersionInfo( monitor )?.FinalNuGetVersion;
+            var v = GitFolder.ReadRepositoryVersionInfo( monitor )?.FinalNuGetVersion;
             if( v == null ) return false;
 
             BuildType buildType;
@@ -585,7 +622,7 @@ namespace CK.Env.Plugin
                             solution,
                             v,
                             buildType,
-                            Folder.FullPhysicalPath,
+                            GitFolder.FullPhysicalPath,
                             ccbPath );
 
             bool hasError = false;
@@ -597,7 +634,7 @@ namespace CK.Env.Plugin
             var r = DoBuild( ev );
             if( r ) OnBuildSucceed?.Invoke( this, ev );
             else OnBuildFailed?.Invoke( this, ev );
-            if( ev.IsUsingDirtyFolder ) Folder.ResetHard( ev.Monitor );
+            if( ev.IsUsingDirtyFolder ) GitFolder.ResetHard( ev.Monitor );
             return r;
         }
 
@@ -608,9 +645,13 @@ namespace CK.Env.Plugin
             {
                 try
                 {
-                    string key = _keyStore.GetSecretKey( m, "CODECAKEBUILDER_SECRET_KEY", false, "Required to execute CodeCakeBuilder." );
-                    if( key == null ) return false;
-                    ev.EnvironmentVariables.Add( ("CODECAKEBUILDER_SECRET_KEY", key) );
+                    string key = _keyStore.GetSecretKey( m, CODECAKEBUILDER_SECRET_KEY, false );
+                    if( key == null )
+                    {
+                        m.Error( "CODECAKEBUILDER_SECRET_KEY knowledge is required." );
+                        return false;
+                    }
+                    ev.EnvironmentVariables.Add( (CODECAKEBUILDER_SECRET_KEY, key) );
 
                     var args = ev.WithZeroBuilder
                                 ? ev.CodeCakeBuilderExecutableFile + " SolutionDirectoryIsCurrentDirectory"
@@ -633,6 +674,5 @@ namespace CK.Env.Plugin
                 return true;
             }
         }
-
     }
 }

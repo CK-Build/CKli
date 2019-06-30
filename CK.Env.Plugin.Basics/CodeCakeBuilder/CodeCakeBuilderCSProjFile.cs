@@ -1,6 +1,5 @@
 using CK.Core;
 using CK.Env.MSBuildSln;
-using CK.Env.Plugin;
 using CK.Text;
 using CSemVer;
 using System.Collections.Generic;
@@ -15,7 +14,7 @@ namespace CK.Env.Plugin
         readonly SolutionDriver _solutionDriver;
 
         public CodeCakeBuilderCSProjFile( CodeCakeBuilderFolder f, SolutionSpec solutionSpec, NormalizedPath branchPath, SolutionDriver solutionDriver )
-            : base( f.Folder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" ) )
+            : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" ) )
         {
             _f = f;
             _solutionSpec = solutionSpec;
@@ -24,9 +23,9 @@ namespace CK.Env.Plugin
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
-        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+        public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
 
-       
+
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
@@ -35,7 +34,7 @@ namespace CK.Env.Plugin
             var solution = _solutionDriver.GetSolution( m );
             if( solution == null ) return;
 
-            var framework = MSProject.Traits.FindOrCreate( "netcoreapp2.1" );
+            var framework = MSProject.Savors.FindOrCreate( "netcoreapp2.1" );
 
             var slnFile = solution.Tag<SolutionFile>();
             MSProject ccbProject = slnFile.MSProjects.SingleOrDefault( p => p.ProjectName == "CodeCakeBuilder" );
@@ -79,15 +78,14 @@ namespace CK.Env.Plugin
             DeleteProjectReference( "Code.Cake" ); //imported by SimpleGitVersion.Cake
             DeleteProjectReference( "Cake.Common" ); //imported by Code.Cake
             DeleteProjectReference( "Cake.Core" ); //imported by Cake.Common
+            EnsureProjectReference( "SimpleGitVersion.Cake", "0.38.0" );
             if( !_solutionSpec.NoDotNetUnitTests )
             {
                 EnsureProjectReference( "NUnit.ConsoleRunner", "3.9.0" );
                 EnsureProjectReference( "NUnit.Runners.Net4", "2.6.4" );
             }
-            if( PluginBranch != StandardGitStatus.Local || _f.Folder.World.Name != "CK-World" )
+            if( PluginBranch != StandardGitStatus.Local )
             {
-                EnsureProjectReference( "SimpleGitVersion.Cake", "0.37.4--0022-develop" );
-
                 // This should NOT BE HERE.
                 // This should actually not be at all since configuring
                 // the project reference like this is clearly awful.

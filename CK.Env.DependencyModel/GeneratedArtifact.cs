@@ -1,3 +1,4 @@
+using CK.Core;
 using CK.Text;
 using System.Collections.Generic;
 
@@ -19,11 +20,11 @@ namespace CK.Env.DependencyModel
         public IProject Project { get; }
 
         /// <summary>
-        /// Gets a set of full paths (folder or files) that are "sources" for this project.
+        /// Gets a set of full paths (folder or files) that are "sources" for this artifact.
         /// By default, <see cref="IProject.ProjectSources"/> is returned but this may be an independent
         /// set if required.
         /// </summary>
-        IReadOnlyCollection<NormalizedPath> ArtifactSources { get; }
+        public IReadOnlyCollection<NormalizedPath> ArtifactSources { get; }
 
         /// <summary>
         /// Initializes a new <see cref="GeneratedArtifact"/>.

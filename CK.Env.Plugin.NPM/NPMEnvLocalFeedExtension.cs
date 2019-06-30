@@ -1,13 +1,7 @@
 using CK.Core;
-using CK.Env;
 using CK.Env.NPM;
-using CK.Env.NuGet;
-using CK.Text;
 using CSemVer;
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 
 namespace CK.Env
 {

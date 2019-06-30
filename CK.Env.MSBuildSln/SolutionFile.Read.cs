@@ -2,11 +2,8 @@ using CK.Core;
 using CK.Text;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
 
 namespace CK.Env.MSBuildSln
@@ -28,24 +25,28 @@ namespace CK.Env.MSBuildSln
             using( m.OpenInfo( $"Reading '{solutionPath}'." ) )
             {
                 var file = fs.GetFileInfo( solutionPath );
-                if( !file.Exists )
+                if( !file.Exists && mustExist )
                 {
-                    if( mustExist )
-                    {
-                        m.Error( $"File '{solutionPath}' not found. Unable to read the solution." );
-                        return null;
-                    }
-                    m.Warn( $"File '{solutionPath}' not found. Creating an empty solution." );
+                    m.Error( $"File '{solutionPath}' not found. Unable to read the solution." );
+                    return null;
                 }
                 var s = new SolutionFile( fs, solutionPath );
                 if( file.Exists )
                 {
                     using( var r = new Reader( m, file.CreateReadStream() ) )
                     {
-                        if( s.Read( r ) ) return s;
+                        if( !s.Read( r ) )
+                        {
+                            m.Error( "Unable to read the Solution." );
+                            return null;
+                        }
                     }
                 }
-                return null;
+                else
+                {
+                    m.Warn( $"File '{solutionPath}' not found. Creating an empty solution." );
+                }
+                return s;
             }
         }
 
@@ -376,7 +377,7 @@ namespace CK.Env.MSBuildSln
         const string PatternParsePropertyLine = @"^(?<PROPERTYNAME>[^=]*)\s*=\s*(?<PROPERTYVALUE>[^=]*)$";
         static readonly Regex _rParsePropertyLine = new Regex( PatternParsePropertyLine, RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture );
 
-        static Dictionary<string,PropertyLine> ReadPropertyLines( Reader r, string endOfSectionToken )
+        static Dictionary<string, PropertyLine> ReadPropertyLines( Reader r, string endOfSectionToken )
         {
             PropertyLine ReadPropertyLine()
             {

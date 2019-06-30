@@ -1,14 +1,5 @@
-using CK.Core;
-using CK.Env.Plugin;
 using CK.Text;
-using SharpYaml;
-using SharpYaml.Model;
 using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CK.Env.Plugin
 {
@@ -28,7 +19,7 @@ namespace CK.Env.Plugin
         /// Its <see cref="GitFolder.CurrentBranchName"/> can be different from
         /// the branch of the plugin (see <see cref="BranchPath"/>).
         /// </summary>
-        public GitFolder Folder => _pluginImpl.Folder;
+        public GitFolder GitFolder => _pluginImpl.Folder;
 
         /// <summary>
         /// Gets the branch path (relative to the <see cref="FileSystem"/>) into

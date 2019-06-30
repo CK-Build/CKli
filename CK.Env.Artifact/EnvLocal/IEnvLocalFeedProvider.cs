@@ -1,5 +1,4 @@
 using CK.Core;
-using CSemVer;
 using System.Collections.Generic;
 
 namespace CK.Env

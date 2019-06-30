@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 
 namespace CK.Env.DependencyModel
 {
@@ -14,7 +13,7 @@ namespace CK.Env.DependencyModel
         /// <param name="type">The type of the tag to retrieve or sets.</param>
         /// <param name="newValue">Non null value of type <paramref name="type"/> to be set as the new tag value.</param>
         /// <returns>
-        /// When <paramref name="newValue"/> is null, fhe first tag of the type, or null if no tag is the specified type.
+        /// When <paramref name="newValue"/> is null, fhe first tag of the type, or null if no tag matches the specified type.
         /// Otherwise, newValue is always returned.
         /// </returns>
         object Tag( Type type, object newValue = null );
@@ -25,7 +24,7 @@ namespace CK.Env.DependencyModel
         /// <typeparam name="T">The type of the tag to retrieve or set.</typeparam>
         /// <param name="newValue">Non null value to be set as the new tag value.</param>
         /// <returns>
-        /// When <paramref name="newValue"/> is null, fhe first tag of the type, or null if no tag is the specified type.
+        /// When <paramref name="newValue"/> is null, fhe first tag of the type, or null if no tag matches the specified type.
         /// Otherwise, newValue is always returned.
         /// </returns>
         T Tag<T>( T newValue = null ) where T : class;

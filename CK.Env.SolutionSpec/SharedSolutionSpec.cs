@@ -2,7 +2,6 @@ using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Xml.Linq;
 
 namespace CK.Env
@@ -28,6 +27,11 @@ namespace CK.Env
                     new HashSet<string>(),
                     eR => eR.HandleRequiredAttribute<string>( "Name" ) );
 
+            ArtifactSources = r.HandleCollection(
+                    nameof( ArtifactSources ),
+                    new HashSet<string>(),
+                    eR => eR.HandleRequiredAttribute<string>( "Name" ) );
+
             ExcludedPlugins = r.HandleCollection(
                                     nameof( ExcludedPlugins ),
                                     new HashSet<Type>(),
@@ -35,17 +39,9 @@ namespace CK.Env
 
             var e = r.Element;
 
-            NuGetSources = e.Elements( nameof( NuGetSources ) )
-                             .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Name" ), s => new NuGetSource( s ) )
-                             .Values;
-            RemoveNuGetSourceNames = e.Elements( nameof( RemoveNuGetSourceNames ) )
-                                        .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Name" ) );
+            RemoveNuGetSourceNames = r.HandleCollection( nameof( RemoveNuGetSourceNames ), new HashSet<string>(), eR => eR.HandleRequiredAttribute<string>( "Name" ) );
 
-            NPMSources = e.Elements( nameof( NPMSources ) )
-                             .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Scope" ), s => new NPMSource( s ) )
-                             .Values;
-            RemoveNPMScopeNames = e.Elements( nameof( RemoveNPMScopeNames ) )
-                                        .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Scope" ) );
+            RemoveNPMScopeNames = r.HandleCollection( nameof( RemoveNPMScopeNames ), new HashSet<string>(), eR => eR.HandleRequiredAttribute<string>( "Scope" ) );
 
         }
 
@@ -61,14 +57,17 @@ namespace CK.Env
             NoStrongNameSigning = r.HandleOptionalAttribute( nameof( NoStrongNameSigning ), other.NoStrongNameSigning );
             NoSharedPropsFile = r.HandleOptionalAttribute( nameof( NoSharedPropsFile ), other.NoSharedPropsFile );
 
-            var nuGetSources = other.NuGetSources.ToDictionary( s => s.Name );
             var excludedNuGetSourceNames = new HashSet<string>( other.RemoveNuGetSourceNames );
-            var npmSources = other.NPMSources.ToDictionary( s => s.Scope );
             var excludedNPMScopeNames = new HashSet<string>( other.RemoveNPMScopeNames );
 
             ArtifactTargets = r.HandleCollection(
                                 nameof( ArtifactTargets ),
                                 new HashSet<string>( other.ArtifactTargets ),
+                                eR => eR.HandleRequiredAttribute<string>( "Name" ) );
+
+            ArtifactSources = r.HandleCollection(
+                                nameof( ArtifactTargets ),
+                                new HashSet<string>( other.ArtifactSources ),
                                 eR => eR.HandleRequiredAttribute<string>( "Name" ) );
 
             ExcludedPlugins = r.HandleCollection(
@@ -78,19 +77,9 @@ namespace CK.Env
 
             var e = r.Element;
 
-            NuGetSources = e.Elements( nameof( NuGetSources ) )
-                            .ApplyAddRemoveClear( nuGetSources, s => (string)s.AttributeRequired( "Name" ), s => new NuGetSource( s ) )
-                            .Values;
+            RemoveNuGetSourceNames = r.HandleCollection( nameof( RemoveNuGetSourceNames ), excludedNuGetSourceNames, eR => eR.HandleRequiredAttribute<string>( "Name" ) );
 
-            RemoveNuGetSourceNames = e.Elements( nameof( RemoveNuGetSourceNames ) )
-                                        .ApplyAddRemoveClear( excludedNuGetSourceNames, s => (string)s.AttributeRequired( "Name" ) );
-
-            NPMSources = e.Elements( nameof( NPMSources ) )
-                            .ApplyAddRemoveClear( npmSources, s => (string)s.AttributeRequired( "Scope" ), s => new NPMSource( s ) )
-                            .Values;
-
-            RemoveNPMScopeNames = e.Elements( nameof( RemoveNPMScopeNames ) )
-                                        .ApplyAddRemoveClear( excludedNuGetSourceNames, s => (string)s.AttributeRequired( "Scope" ) );
+            RemoveNPMScopeNames = r.HandleCollection( nameof( RemoveNPMScopeNames ), excludedNPMScopeNames, eR => eR.HandleRequiredAttribute<string>( "Scope" ) );
 
 
         }
@@ -121,23 +110,11 @@ namespace CK.Env
         public bool DisableSourceLink { get; }
 
         /// <summary>
-        /// Defines the set of NuGet sources that is used.
-        /// Impacts NuGet.config file.
-        /// </summary>
-        public IReadOnlyCollection<INuGetSource> NuGetSources { get; }
-
-        /// <summary>
         /// Gets the NuGet source names that must be excluded.
         /// Must be used to clean up existing source names that must no more be used.
         /// Impacts NuGet.config file.
         /// </summary>
         public IReadOnlyCollection<string> RemoveNuGetSourceNames { get; }
-
-        /// <summary>
-        /// Defines the set of NPM sources that is used.
-        /// Impacts .npmrc file.
-        /// </summary>
-        public IReadOnlyCollection<INPMSource> NPMSources { get; }
 
         /// <summary>
         /// Gets the NPM scope names that must be excluded.
@@ -150,6 +127,11 @@ namespace CK.Env
         /// Gets the repositories names where produced artifacts must be pushed.
         /// </summary>
         public IReadOnlyCollection<string> ArtifactTargets { get; }
+
+        /// <summary>
+        /// Gets the source feed names from which artifacts must be retrieved.
+        /// </summary>
+        public IReadOnlyCollection<string> ArtifactSources { get; }
 
         /// <summary>
         /// Defines the set of Git or GitBranch plugins type that must NOT be activated.

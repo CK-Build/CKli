@@ -1,2 +1,94 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<ClassDiagram /> 
+<ClassDiagram MajorVersion="1" MinorVersion="1">
+  <Struct Name="CK.Env.Artifact">
+    <Position X="9.25" Y="3" Width="3" />
+    <Members>
+      <Method Name="Equals" Hidden="true" />
+      <Method Name="GetHashCode" Hidden="true" />
+      <Method Name="ToString" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>AAAAQAAAAAAAAAAEgAgAAAQAAAAAAIAAAQAAAAAEAiA=</HashCode>
+      <FileName>Artifact.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" />
+  </Struct>
+  <Struct Name="CK.Env.ArtifactInstance">
+    <Position X="6.25" Y="3.75" Width="2" />
+    <Members>
+      <Method Name="Equals" Hidden="true" />
+      <Method Name="GetHashCode" Hidden="true" />
+      <Method Name="ToString" Hidden="true" />
+    </Members>
+    <AssociationLine Name="Artifact" Type="CK.Env.Artifact">
+      <MemberNameLabel ManuallyPlaced="true">
+        <Position X="0.173" Y="0.053" />
+      </MemberNameLabel>
+    </AssociationLine>
+    <TypeIdentifier>
+      <HashCode>IAAAAAAAAACAAAAEgAAAAAAAAAAAAIAAAAAAAAAAAiA=</HashCode>
+      <FileName>ArtifactInstance.cs</FileName>
+    </TypeIdentifier>
+    <ShowAsAssociation>
+      <Property Name="Artifact" />
+    </ShowAsAssociation>
+    <Lollipop Position="0.2" />
+  </Struct>
+  <Interface Name="CK.Env.IEnvLocalFeed">
+    <Position X="0.5" Y="1.25" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAEAAAAAAAAQAAAAABAAAAAAAAAAAIAAAAAAAAAg=</HashCode>
+      <FileName>EnvLocal\IEnvLocalFeed.cs</FileName>
+    </TypeIdentifier>
+  </Interface>
+  <Interface Name="CK.Env.IEnvLocalFeedProvider">
+    <Position X="3" Y="1.75" Width="2.75" />
+    <AssociationLine Name="Release" Type="CK.Env.IEnvLocalFeed">
+      <MemberNameLabel ManuallyPlaced="true">
+        <Position X="0.145" Y="0.039" />
+      </MemberNameLabel>
+    </AssociationLine>
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAgAAAAABBACAAAAAAABAAAEA=</HashCode>
+      <FileName>EnvLocal\IEnvLocalFeedProvider.cs</FileName>
+    </TypeIdentifier>
+    <ShowAsAssociation>
+      <Property Name="Local" />
+      <Property Name="CI" />
+      <Property Name="Release" />
+      <Property Name="ZeroBuild" />
+    </ShowAsAssociation>
+  </Interface>
+  <Interface Name="CK.Env.IEnvLocalFeedProviderArtifactHandler">
+    <Position X="6.5" Y="0.75" Width="2.75" />
+    <TypeIdentifier>
+      <HashCode>AAAAAEAAAAAAAAAAAAAABAAAAAAAACAAAAACAAAAAAA=</HashCode>
+      <FileName>EnvLocal\IEnvLocalFeedProviderArtifactHandler.cs</FileName>
+    </TypeIdentifier>
+  </Interface>
+  <Interface Name="CK.Env.IArtifactRepository">
+    <Position X="3.5" Y="4" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAIAAAAAAAAAAAgIAAAAAAAAAAAAAAAAAEAAAAA=</HashCode>
+      <FileName>IArtifactRepository.cs</FileName>
+    </TypeIdentifier>
+    <ShowAsAssociation>
+      <Property Name="Info" />
+    </ShowAsAssociation>
+  </Interface>
+  <Interface Name="CK.Env.IArtifactRepositoryInfo">
+    <Position X="0.5" Y="4.25" Width="2.25" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAkAAAAAAAAAAAAAAAAAQAAAAAAAAAAA=</HashCode>
+      <FileName>IArtifactRepositoryInfo.cs</FileName>
+    </TypeIdentifier>
+  </Interface>
+  <Interface Name="CK.Env.IArtifactRepositoryFactory">
+    <Position X="0.5" Y="6" Width="2.25" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAQAAAAAA=</HashCode>
+      <FileName>IArtifactRepositoryFactory.cs</FileName>
+    </TypeIdentifier>
+  </Interface>
+  <Font Name="Segoe UI" Size="9" />
+</ClassDiagram>

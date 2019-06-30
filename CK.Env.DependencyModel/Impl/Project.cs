@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 
 namespace CK.Env.DependencyModel
 {
@@ -29,18 +28,22 @@ namespace CK.Env.DependencyModel
             NormalizedPath primarySolutionRelativeFolderPath,
             NormalizedPath fullFolderPath,
             string type,
-            string simpleProjecName )
+            string simpleProjecName,
+            CKTrait savors )
         {
+            Debug.Assert( savors == null || !savors.IsEmpty );
             _solution = s;
             Type = type;
             SolutionRelativeFolderPath = primarySolutionRelativeFolderPath;
             FullFolderPath = fullFolderPath;
             SimpleProjectName = simpleProjecName;
+            Savors = savors;
             _generatedArtifacts = new List<GeneratedArtifact>();
             _projectReferences = new List<ProjectReference>();
             _packageReferences = new List<PackageReference>();
             _projectSources = new List<NormalizedPath>();
-            _projectSources.Add( FullFolderPath );
+
+            _projectSources.Add( SolutionRelativeFolderPath );
         }
 
         internal void NormalizeName( IReadOnlyList<Project> homonyms )
@@ -180,6 +183,15 @@ namespace CK.Env.DependencyModel
         }
 
         /// <summary>
+        /// Gets the savors of this project. This is null by default.
+        /// <para>
+        /// When not null, the <see cref="CKTrait.Context"/> can be any context (typically
+        /// the <see cref="ArtifactType.ContextSavors"/> of the "primary" artifact produced by this project).
+        /// </para>
+        /// </summary>
+        public CKTrait Savors { get; }
+
+        /// <summary>
         /// Gets all artifacts that this project generates. 
         /// </summary>
         public IReadOnlyList<GeneratedArtifact> GeneratedArtifacts => _generatedArtifacts;
@@ -245,12 +257,13 @@ namespace CK.Env.DependencyModel
         /// </summary>
         /// <param name="target">The referenced project.</param>
         /// <param name="kind">Optional non standard dependency kind if needed.</param>
-        public void AddProjectReference( Project target, ProjectDependencyKind kind = ProjectDependencyKind.Transitive )
+        /// <param name="applicableSavors">Optional savors that, when defined, must be a subset of this <see cref="Savors"/>.</param>
+        public void AddProjectReference( Project target, ArtifactDependencyKind kind = ArtifactDependencyKind.Transitive, CKTrait applicableSavors = null )
         {
             CheckSolution();
             if( _projectReferences.Any( p => p.Target == target ) ) throw new InvalidOperationException( $"Project '{target}' is already referenced by '{ToString()}'." );
             if( target._solution != _solution ) throw new InvalidOperationException( $"Project '{target}' belongs to '{target._solution}' whereas {ToString()} belons to '{_solution}'." );
-            DoAddProjectReference( target, kind );
+            DoAddProjectReference( target, kind, applicableSavors ?? Savors );
         }
 
         /// <summary>
@@ -259,17 +272,19 @@ namespace CK.Env.DependencyModel
         /// </summary>
         /// <param name="target">The referenced project.</param>
         /// <param name="kind">The dependency kind.</param>
-        public void EnsureProjectReference( Project target, ProjectDependencyKind kind = ProjectDependencyKind.Transitive )
+        /// <param name="applicableSavors">Optional savors that, when defined, must be a subset of this <see cref="Savors"/>.</param>
+        public void EnsureProjectReference( Project target, ArtifactDependencyKind kind = ArtifactDependencyKind.Transitive , CKTrait applicableSavors = null)
         {
             CheckSolution();
+            var savors = applicableSavors ?? Savors;
             int idx = _projectReferences.IndexOf( r => r.Target == target );
             if( idx >= 0 )
             {
                 var exists = _projectReferences[idx];
-                if( exists.Kind == kind ) return;
+                if( exists.Kind == kind && exists.ApplicableSavors == savors ) return;
                 DoRemoveProjectReferenceAt( idx );
             }
-            DoAddProjectReference( target, kind );
+            DoAddProjectReference( target, kind, savors );
         }
 
         /// <summary>
@@ -289,9 +304,9 @@ namespace CK.Env.DependencyModel
             return false;
         }
 
-        void DoAddProjectReference( Project target, ProjectDependencyKind kind )
+        void DoAddProjectReference( Project target, ArtifactDependencyKind kind, CKTrait applicableSavors )
         {
-            var r = new ProjectReference( this, target, kind );
+            var r = new ProjectReference( this, target, kind, CheckSavors( applicableSavors ) );
             _projectReferences.Add( r );
             _solution.OnProjectReferenceAdded( r );
         }
@@ -313,11 +328,12 @@ namespace CK.Env.DependencyModel
         /// </summary>
         /// <param name="target">The referenced package.</param>
         /// <param name="kind">The dependency kind.</param>
-        public void AddPackageReference( ArtifactInstance target, ProjectDependencyKind kind )
+        /// <param name="applicableSavors">Optional savors that, when defined, must be a subset of this <see cref="Savors"/>.</param>
+        public void AddPackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait applicableSavors = null )
         {
             CheckSolution();
             if( _packageReferences.Any( p => p.Target.Artifact == target.Artifact ) ) throw new InvalidOperationException( $"Package '{target.Artifact}' is already referenced by '{ToString()}'." );
-            DoAddPackageReference( target, kind );
+            DoAddPackageReference( target, kind, applicableSavors ?? Savors );
         }
 
         /// <summary>
@@ -325,17 +341,21 @@ namespace CK.Env.DependencyModel
         /// </summary>
         /// <param name="target">The referenced package.</param>
         /// <param name="kind">The dependency kind.</param>
-        public void EnsurePackageReference( ArtifactInstance target, ProjectDependencyKind kind )
+        /// <param name="applicableSavors">Optional savors that, when defined, must be a subset of this <see cref="Savors"/>.</param>
+        public void EnsurePackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait applicableSavors = null )
         {
             CheckSolution();
+            var savors = applicableSavors ?? Savors;
             int idx = _packageReferences.IndexOf( p => p.Target.Artifact == target.Artifact );
             if( idx >= 0 )
             {
                 var exists = _packageReferences[idx];
-                if( exists.Kind == kind && exists.Target == target ) return;
+                if( exists.Kind == kind
+                    && exists.Target == target
+                    && exists.ApplicableSavors == savors ) return;
                 DoRemovePackageReferenceAt( idx );
             }
-            DoAddPackageReference( target, kind );
+            DoAddPackageReference( target, kind, savors );
         }
 
         /// <summary>
@@ -351,11 +371,23 @@ namespace CK.Env.DependencyModel
             return false;
         }
 
-        void DoAddPackageReference( ArtifactInstance target, ProjectDependencyKind kind )
+        void DoAddPackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait applicableSavors )
         {
-            var r = new PackageReference( this, target, kind );
+            var r = new PackageReference( this, target, kind, CheckSavors( applicableSavors ) );
             _packageReferences.Add( r );
             _solution.OnPackageReferenceAdded( r );
+        }
+
+        CKTrait CheckSavors( CKTrait applicableSavors )
+        {
+            Debug.Assert( applicableSavors == null && Savors == null
+                       || applicableSavors != null && Savors != null );
+            if( applicableSavors != null
+                && (Savors.Context != applicableSavors.Context || !Savors.IsSupersetOf( applicableSavors )) )
+            {
+                throw new ArgumentException( $"Savors '{applicableSavors}' must be a subset of '{Savors}' (and belong to the same context).", nameof( applicableSavors ) );
+            }
+            return applicableSavors;
         }
 
         void DoRemovePackageReferenceAt( int idx )

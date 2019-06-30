@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using CK.Core;
 using CK.Text;
 
 namespace CK.Env.DependencyModel
@@ -28,7 +29,7 @@ namespace CK.Env.DependencyModel
 
         /// <summary>
         /// Gets a set of full paths (folder or files) that are "sources" for this project.
-        /// By default, <see cref="FullFolderPath"/> is systematically added to this set.
+        /// By default, <see cref="SolutionRelativeFolderPath"/> is systematically added to this set.
         /// Any file and or folder that are outside the project folder should be added to this
         /// set (typically files or folders shared accross multiple projects).
         /// This is used to detect changes for project (typically thanks to Git history).
@@ -44,6 +45,23 @@ namespace CK.Env.DependencyModel
         /// Gets the project type: basically supported types are ".Net" and "js".
         /// </summary>
         string Type { get; }
+
+        /// <summary>
+        /// Gets the savors of this project. This is null by default.
+        /// When not null:
+        /// <para>
+        /// - this trait can not be the empty one (see <see cref="CKTrait.IsEmpty"/>).
+        /// </para>
+        /// <para>
+        /// - the <see cref="CKTrait.Context"/> can be any context (typically
+        /// the <see cref="ArtifactType.ContextSavors"/> of the "primary" artifact produced by this project).
+        /// </para>
+        /// <para>
+        /// <see cref="PackageReference.ApplicableSavors"/> and <see cref="ProjectReference.ApplicableSavors"/> share
+        /// the same context and are either equal to these savors or are a subset of them (and cannot be empty either).
+        /// </para>
+        /// </summary>
+        CKTrait Savors { get; }
 
         /// <summary>
         /// Gets all artifacts that this project generates. 

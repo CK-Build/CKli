@@ -2,10 +2,6 @@ using CK.Core;
 using CK.Text;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Text.RegularExpressions;
-using System.Xml;
 
 namespace CK.Env.MSBuildSln
 {

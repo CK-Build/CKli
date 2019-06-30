@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Xml.Linq;
 using CK.Core;
 using CK.Text;
@@ -18,7 +17,7 @@ namespace CK.Env.MSBuildSln
         /// The <see cref="CKTraitContext.Separator"/> is the ';' to match the one used by csproj (parsing and
         /// string representation becomes straightforward).
         /// </summary>
-        public static readonly CKTraitContext Traits = new CKTraitContext( "MSBuild", ';' );
+        public static readonly CKTraitContext Savors = ArtifactType.Register("NuGet",true,';').ContextSavors;
 
         /// <summary>
         /// Captures <see cref="DeclaredPackageDependency"/> and <see cref="ProjectToProjectDependency"/>.
@@ -89,7 +88,7 @@ namespace CK.Env.MSBuildSln
                     KnownProjectType type,
                     string projectGuid,
                     string projectName,
-                    string relativePath  )
+                    string relativePath )
             : base( solution, projectGuid, type.ToGuid(), projectName, relativePath )
         {
             Debug.Assert( KnownType.IsVSProject() );
@@ -115,57 +114,33 @@ namespace CK.Env.MSBuildSln
             _file = MSProjFile.FindOrLoadProjectFile( fs, m, Path, cache );
             if( _file != null )
             {
-                Sdk = (string)_file.Document.Root.Attribute( "Sdk" );
-                if( Sdk == null )
+                XElement f = _file.Document.Root
+                                .Elements( "PropertyGroup" )
+                                .Elements()
+                                .Where( x => x.Name.LocalName == "TargetFramework" || x.Name.LocalName == "TargetFrameworks" )
+                                .SingleOrDefault();
+                if( f == null )
                 {
-                    if( _file.Document.Root.Elements( "Import" ).Where( el => el.Attribute( "Sdk" ) != null ).Any() )
-                    {
-                        m.Error( "Explicit Import of the Sdk is not supported, only the Sdk attribute on the project element is supported: https://docs.microsoft.com/en-us/visualstudio/msbuild/how-to-use-project-sdk." );
-                    }
-                    if( _file.Document.Root.Elements( "Sdk" ).Any() )
-                    {
-                        m.Error( "Top level element Sdk is not supported, only the Sdk attribute on the project element is supported: https://docs.microsoft.com/en-us/visualstudio/msbuild/how-to-use-project-sdk." );
-                    }
-                    m.Error( $"There must be a Sdk attribute on root {Path}." );
+                    m.Error( $"There must be one and only one TargetFramework or TargetFrameworks element in {Path}." );
                     _file = null;
                 }
                 else
                 {
-                    XElement f = _file.Document.Root
-                                    .Elements( "PropertyGroup" )
-                                    .Elements()
-                                    .Where( x => x.Name.LocalName == "TargetFramework" || x.Name.LocalName == "TargetFrameworks" )
-                                    .SingleOrDefault();
-                    if( f == null )
-                    {
-                        m.Error( $"There must be one and only one TargetFramework or TargetFrameworks element in {Path}." );
-                        _file = null;
-                    }
-                    else
-                    {
-                        TargetFrameworks = Traits.FindOrCreate( f.Value );
+                    TargetFrameworks = Savors.FindOrCreate( f.Value );
 
-                        LangVersion = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "LangVersion" ).FirstOrDefault()?.Value;
-                        OutputType = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "OutputType" ).FirstOrDefault()?.Value;
+                    LangVersion = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "LangVersion" ).FirstOrDefault()?.Value;
+                    OutputType = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "OutputType" ).FirstOrDefault()?.Value;
 
-                        DoInitializeDependencies( m );
-                        if( !_dependencies.IsInitialized ) _file = null;
-                    }
+                    DoInitializeDependencies( m );
+                    if( !_dependencies.IsInitialized ) _file = null;
                 }
             }
             if( _file == null )
             {
-                Sdk = null;
-                TargetFrameworks = Traits.EmptyTrait;
+                TargetFrameworks = Savors.EmptyTrait;
             }
             return _file;
         }
-
-        /// <summary>
-        /// Gets the Sdk attribute of the primary project file.
-        /// Null if the project can not be read.
-        /// </summary>
-        public string Sdk { get; private set; }
 
         /// <summary>
         /// Gets the LangVersion value of the primary project file.
@@ -216,7 +191,7 @@ namespace CK.Env.MSBuildSln
         public bool SetTargetFrameworks( IActivityMonitor m, CKTrait frameworks )
         {
             if( frameworks?.IsEmpty ?? true ) throw new ArgumentException( "Must not be null or empty.", nameof( frameworks ) );
-            if( frameworks.Context != Traits ) throw new ArgumentException( "Must be from MSProject.Traits context.", nameof( frameworks ) );
+            if( frameworks.Context != Savors ) throw new ArgumentException( "Must be from MSProject.Traits context.", nameof( frameworks ) );
             if( _file == null ) throw new InvalidOperationException( "Invalid project file." );
             if( TargetFrameworks == frameworks ) return false;
             XElement f = _file.Document.Root

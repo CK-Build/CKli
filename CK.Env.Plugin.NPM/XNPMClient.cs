@@ -1,5 +1,4 @@
 using CK.Env;
-using System;
 using CK.Core;
 using System.Net.Http;
 using CK.Env.NPM;
@@ -19,7 +18,7 @@ namespace CKli
             Initializer initializer)
             : base( initializer )
         {
-            _npmClient = new NPMClient( sharedHttpClient, secretKeyStore, initializer.Monitor );
+            _npmClient = new NPMClient( sharedHttpClient, secretKeyStore );
             artifact.Register( _npmClient );
             fs.ServiceContainer.Add( _npmClient );
             localFeedProvider.Register( new EnvLocalFeedProviderNPMHandler() );

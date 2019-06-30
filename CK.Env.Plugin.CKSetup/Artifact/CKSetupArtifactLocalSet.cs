@@ -1,3 +1,4 @@
+using CK.Core;
 using CKSetup;
 using System;
 using System.Collections.Generic;
@@ -7,7 +8,7 @@ namespace CK.Env.CKSetup
 {
     public class CKSetupArtifactLocalSet : IArtifactLocalSet
     {
-        public CKSetupArtifactLocalSet( IEnumerable<ArtifactInstance> instances, string localPath )
+        public CKSetupArtifactLocalSet( IEnumerable<ArtifactInstance> instances, string localPath, bool arePublicArtifacts )
         {
             StorePath = localPath;
             Instances = instances;
@@ -16,6 +17,8 @@ namespace CK.Env.CKSetup
         public string StorePath { get; }
 
         public IEnumerable<ArtifactInstance> Instances { get; }
+
+        public bool ArePublicArtifacts { get; }
 
         public IEnumerable<ComponentRef> ComponentRefs => Instances.Select( i => ToComponentRef( i ) );
 

@@ -1,10 +1,6 @@
 using CK.Core;
-using CK.Text;
 using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Threading;
-using System.Xml.Linq;
 
 namespace CK.Env
 {

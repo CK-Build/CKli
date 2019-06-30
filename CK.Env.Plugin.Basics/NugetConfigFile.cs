@@ -65,25 +65,28 @@ namespace CK.Env.Plugin
 
         void IDisposable.Dispose()
         {
-            Folder.OnLocalBranchEntered -= OnLocalBranchEntered;
-            Folder.OnLocalBranchLeaving -= OnLocalBranchLeaving;
+            GitFolder.OnLocalBranchEntered -= OnLocalBranchEntered;
+            GitFolder.OnLocalBranchLeaving -= OnLocalBranchLeaving;
             _solutionDriver.OnStartBuild -= OnStartBuild;
             _solutionDriver.OnZeroBuildProject -= OnZeroBuildProject;
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
-        public bool IsOnLocalBranch => BranchPath.LastPart == Folder.World.LocalBranchName;
+        public bool IsOnLocalBranch => BranchPath.LastPart == GitFolder.World.LocalBranchName;
 
-        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+        public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
+            var solution = _solutionDriver.GetSolution( m );
+            if( solution == null ) return;
+
             EnsureDocument();
             PackageSources.EnsureFirstElement( "clear" );
-            foreach( var s in _solutionSpec.NuGetSources )
+            foreach( var s in solution.ArtifactSources.OfType<INuGetFeed>() )
             {
                 EnsureFeed( m, s.Name, s.Url );
                 if( s.Credentials != null )

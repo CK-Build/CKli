@@ -1,6 +1,6 @@
 using CK.Core;
-using CK.Env;
 using CK.Text;
+using CSemVer;
 using NuGet.Common;
 using NuGet.Configuration;
 using NuGet.Credentials;
@@ -19,37 +19,41 @@ using System.Xml.Linq;
 
 namespace CK.Env.NuGet
 {
-    public class NuGetClient : IArtifactRepositoryFactory, IDisposable
+    public class NuGetClient : IArtifactTypeHandler, IDisposable
     {
         /// <summary>
         /// Exposes the "NuGet" <see cref="ArtifactType"/>. This type of artifact is installable.
+        /// Savors are used to manage framework names.
+        /// The <see cref="CKTraitContext.Separator"/> is the ';' to match the one used by csproj (parsing and
+        /// string representation becomes straightforward).
         /// </summary>
         public static readonly ArtifactType NuGetType;
 
-        internal static readonly List<Lazy<INuGetResourceProvider>> Providers;
+        internal static readonly List<Lazy<INuGetResourceProvider>> StaticProviders;
 
-        readonly Dictionary<string, IInternalFeed> _feeds;
+        //readonly Dictionary<string, IArtifactRepository> _repositories;
+        //readonly List<InternalFeed> _internalFeeds;
         readonly SourcePackageProvider _sourcePackageProvider;
         internal readonly SourceCacheContext SourceCache;
 
         #region VSS_NUGET_EXTERNAL_FEED_ENDPOINTS
 
         private static readonly object _secretKeysLock;
-        private static readonly Dictionary<string, string> _secretKeys;
+        private static readonly Dictionary<string, string> _secretAzureKeys;
         private static bool _initialized;
 
         internal static void EnsureVSSFeedEndPointCredentials( IActivityMonitor m, string url, string secret )
         {
             lock( _secretKeysLock )
             {
-                if( !_secretKeys.ContainsKey( url ) )
+                if( !_secretAzureKeys.ContainsKey( url ) )
                 {
-                    _secretKeys.Add( url, secret );
+                    _secretAzureKeys.Add( url, secret );
                     // The VSS_NUGET_EXTERNAL_FEED_ENDPOINTS is used by Azure Credential Provider to handle authentication
                     // for the feed.
                     StringBuilder b = new StringBuilder( @"{""endpointCredentials"":[" );
                     bool already = false;
-                    foreach( var kv in _secretKeys )
+                    foreach( var kv in _secretAzureKeys )
                     {
                         if( already ) b.Append( ',' );
                         else already = true;
@@ -60,7 +64,7 @@ namespace CK.Env.NuGet
                     }
                     b.Append( "]}" );
                     var json = b.ToString();
-                    m.Info( $"Updated VSS_NUGET_EXTERNAL_FEED_ENDPOINTS with {_secretKeys.Count} endpoints." );
+                    m.Info( $"Updated VSS_NUGET_EXTERNAL_FEED_ENDPOINTS with {_secretAzureKeys.Count} endpoints." );
 
                     Debug.Assert( Newtonsoft.Json.Linq.JObject.Parse( json )["endpointCredentials"] != null );
                     Environment.SetEnvironmentVariable( "VSS_NUGET_EXTERNAL_FEED_ENDPOINTS", json );
@@ -127,16 +131,16 @@ namespace CK.Env.NuGet
                 _packageSources = new List<PackageSource>();
             }
 
-            string IPackageSourceProvider.ActivePackageSourceName => _c._feeds.FirstOrDefault().Key;
+            string IPackageSourceProvider.ActivePackageSourceName => _packageSources.FirstOrDefault()?.Name;
 
             string IPackageSourceProvider.DefaultPushSource => null;
 
             public event EventHandler PackageSourcesChanged;
 
-            public void RaisePackageSourcesChanged()
+            internal void SetPackageSources( IEnumerable<NuGetFeedBase> feeds )
             {
                 _packageSources.Clear();
-                foreach( var f in _c._feeds.Values ) f.CollectPackageSources( _packageSources );
+                _packageSources.AddRange( feeds.Select( f => f.PackageSource ) );
                 PackageSourcesChanged?.Invoke( this, EventArgs.Empty );
             }
 
@@ -193,7 +197,7 @@ namespace CK.Env.NuGet
 
         static NuGetClient()
         {
-            NuGetType = ArtifactType.Register( "NuGet", true );
+            NuGetType = ArtifactType.Register( "NuGet", true, ';' );
 
             // Workaround for dev/NuGet.Client\src\NuGet.Core\NuGet.Protocol\Plugins\PluginFactory.cs line 161:
             // FileName = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH"),
@@ -203,18 +207,18 @@ namespace CK.Env.NuGet
             // Issue: https://github.com/NuGet/Home/issues/7438
             //
             Environment.SetEnvironmentVariable( "DOTNET_HOST_PATH", "dotnet" );
-            Providers = new List<Lazy<INuGetResourceProvider>>();
-            Providers.AddRange( Repository.Provider.GetCoreV3() );
+            StaticProviders = new List<Lazy<INuGetResourceProvider>>();
+            StaticProviders.AddRange( Repository.Provider.GetCoreV3() );
             _secretKeysLock = new object();
-            _secretKeys = new Dictionary<string, string>();
+            _secretAzureKeys = new Dictionary<string, string>();
         }
-
 
         public NuGetClient( HttpClient httpClient, ISecretKeyStore keyStore )
         {
             HttpClient = httpClient;
             SecretKeyStore = keyStore;
-            _feeds = new Dictionary<string, IInternalFeed>();
+            //_repositories = new Dictionary<string, IArtifactRepository>( StringComparer.OrdinalIgnoreCase );
+            //_internalFeeds = new List<InternalFeed>();
             var c = new SourceCacheContext() { NoCache = true };
             SourceCache = c.WithRefreshCacheTrue();
             _sourcePackageProvider = new SourcePackageProvider( this );
@@ -224,43 +228,75 @@ namespace CK.Env.NuGet
 
         public HttpClient HttpClient { get; }
 
-        public IArtifactRepository Find( string uniqueRepositoryName )
-        {
-            _feeds.TryGetValue( uniqueRepositoryName, out var f );
-            return f;
-        }
-
-        public INuGetFeed FindOrCreate( INuGetFeedInfo info )
-        {
-            if( !_feeds.TryGetValue( info.UniqueArtifactRepositoryName, out var feed ) )
-            {
-                switch( info )
-                {
-                    case NuGetAzureFeedInfo a: feed = new NuGetClientAzureFeed( this, a ); break;
-                    case NuGetStandardFeedInfo s: feed = new NuGetClientStandardFeed( this, s ); break;
-                    default: throw new ArgumentException( $"Unhandled type: {info}", nameof( info ) );
-                }
-                _feeds.Add( info.UniqueArtifactRepositoryName, feed );
-                _sourcePackageProvider.RaisePackageSourcesChanged();
-            }
-            return feed;
-        }
-
         public void Dispose()
         {
             SourceCache.Dispose();
         }
 
-        IArtifactRepositoryInfo IArtifactRepositoryFactory.CreateInfo( in XElementReader e )
+        public IArtifactRepository CreateRepository( in XElementReader r )
         {
-            return NuGetFeedInfo.Create( e, skipMissingType: true );
+            IArtifactRepository result = null;
+            var qualityFilter = new PackageQualityFilter( r.HandleOptionalAttribute<string>( "QualityFilter", null ) );
+            switch( r.HandleOptionalAttribute<string>( "Type", null ) )
+            {
+                case "NuGetAzure":
+                    {
+                        var organization = r.HandleRequiredAttribute<string>( "Organization" );
+                        var feedName = r.HandleRequiredAttribute<string>( "FeedName" );
+                        var label = r.HandleOptionalAttribute<string>( "Label", null );
+                        var name = "Azure:" + organization + '-' + feedName;
+                        if( label != null ) name += '-' + label;
+                        if( label != null ) label = "@" + label;
+                        var url = $"https://pkgs.dev.azure.com/{organization}/_packaging/{feedName}{label}/nuget/v3/index.json";
+                        result = new NuGetAzureRepository( this, url, name, qualityFilter, organization, feedName, label );
+                        break;
+                    }
+                case "NuGetStandard":
+                    {
+                        var name = r.HandleRequiredAttribute<string>( "Name" );
+                        var url = r.HandleRequiredAttribute<string>( "Url" );
+                        var secretKeyName = r.HandleRequiredAttribute<string>( "SecretKeyName" );
+                        result = new NuGetStandardRepository( this, url, name, qualityFilter, secretKeyName );
+                        break;
+                    }
+            }
+            if( result != null )
+            {
+                if( !String.IsNullOrEmpty( result.SecretKeyName ) )
+                {
+                    SecretKeyStore.DeclareSecretKey( result.SecretKeyName, desc => $"Required to push NuGet packages to repository '{result.UniqueRepositoryName}'." );
+                }
+            }
+            return result;
         }
 
-        IArtifactRepository IArtifactRepositoryFactory.FindOrCreate( IActivityMonitor m, IArtifactRepositoryInfo info )
+        public IArtifactFeed CreateFeed( in XElementReader r, IReadOnlyList<IArtifactRepository> repositories, IReadOnlyList<IArtifactFeed> feeds )
         {
-            if( info == null ) throw new ArgumentNullException( nameof( info ) );
-            if( !(info is INuGetFeedInfo fInfo) ) return null;
-            return FindOrCreate( fInfo );
+            if( r.HandleOptionalAttribute<string>( "Type", null ) != NuGetType.Name ) return null;
+            var url = r.HandleRequiredAttribute<string>( "Url" );
+            var name = r.HandleRequiredAttribute<string>( "Name" );
+            var xCreds = r.Element.Element( "Credentials" );
+            var creds = xCreds != null ? new SimpleCredentials( r.WithElement( xCreds ) ) : null;
+
+            if( creds.IsSecretKeyName )
+            {
+                SecretKeyStore.DeclareSecretKey( creds.PasswordOrSecretKeyName, desc => desc
+                                    ?? $"Required for NuGet.config file to retrieve packages from '{name}' feed." );
+            }
+
+            var internals = repositories.OfType<NuGetFeedBase>().Concat( feeds.OfType<NuGetFeedBase>() );
+            foreach( var i in internals )
+            {
+                if( url.Equals( i.Url, StringComparison.OrdinalIgnoreCase ) )
+                {
+                    if( i.Feed != null ) r.ThrowXmlException( $"NuGet feed defined by url '{url}' is already registered." );
+                    return i.HandleFeed( url, name, creds );
+                }
+            }
+            var feed = new NuGetFeedBase( this, url, name, creds );
+            _sourcePackageProvider.SetPackageSources( internals.Append( feed ) );
+            return feed.Feed;
         }
+
     }
 }

@@ -1,9 +1,7 @@
 using CK.Core;
 using CK.Text;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace System.Xml.Linq
 {
@@ -17,7 +15,7 @@ namespace System.Xml.Linq
         readonly HashSet<XObject> _handled;
 
         /// <summary>
-        /// Inirializes a new reader bound to an <see cref="Element"/>.
+        /// Initializes a new reader bound to an <see cref="Element"/>.
         /// </summary>
         /// <param name="m">The monitor that must be used.</param>
         /// <param name="element">The read element.</param>
@@ -27,6 +25,7 @@ namespace System.Xml.Linq
             XElement element,
             HashSet<XObject> handled )
         {
+            if( element == null ) throw new ArgumentNullException( nameof( element ) );
             _handled = handled;
             Monitor = m;
             Element = element;
@@ -56,11 +55,17 @@ namespace System.Xml.Linq
         }
 
         /// <summary>
+        /// Calls <see cref="WarnUnhandledElements"/> with warnings for attributes.
+        /// </summary>
+        /// <returns>The number of emitted warnings.</returns>
+        public int WarnUnhandled() => WarnUnhandledElements( true );
+
+        /// <summary>
         /// Emits a warning if this <see cref="Element"/> has not been handled or for any of its own direct child element
         /// that has not been <see cref="Handle"/>d.
         /// </summary>
         /// <returns>The number of emitted warnings.</returns>
-        public int WarnUnhandledElements()
+        public int WarnUnhandledElements( bool withAttributes = false )
         {
             int warned = 0;
             if( !_handled.Contains( Element ) )
@@ -68,7 +73,10 @@ namespace System.Xml.Linq
                 warned = 1;
                 Monitor.Warn( $"Unmapped element '{Element.Name}'{Element.GetLineColumnString()}." );
             }
-            else foreach( var c in Element.Elements() )
+            else
+            {
+                if( withAttributes ) warned += WarnUnhandledAttributes();
+                foreach( var c in Element.Elements() )
                 {
                     if( !_handled.Contains( c ) )
                     {
@@ -76,6 +84,7 @@ namespace System.Xml.Linq
                         Monitor.Warn( $"Unhandled element '{c.Name}'{c.GetLineColumnString()}." );
                     }
                 }
+            }
             return warned;
         }
 
@@ -93,6 +102,42 @@ namespace System.Xml.Linq
             var r = e == Element ? this : new XElementReader( Monitor, e, _handled );
             if( handleElement ) _handled.Add( e );
             return r;
+        }
+
+        /// <summary>
+        /// Creates a reader bound to a required name child (and declares the child as
+        /// being <see cref="Handle(XObject)">handled</see>.
+        /// </summary>
+        /// <param name="name">The name of child element.</param>
+        /// <returns>A reader.</returns>
+        public XElementReader WithRequiredChild( XName name )
+        {
+            var c = Element.Element( name );
+            if( c == null ) ThrowXmlException( $"Required '{name}' element." );
+            return WithElement( c );
+        }
+
+        /// <summary>
+        /// Creates a set of readers bound to the <see cref="Element"/>'s children (and declares them as
+        /// being <see cref="Handle(XObject)">handled</see>.
+        /// </summary>
+        /// <returns>A the set of readers for children.</returns>
+        public IEnumerable<XElementReader> WithChildren()
+        {
+            var r = this;
+            return Element.Elements().Select( e => r.WithElement( e ) );
+        }
+
+        /// <summary>
+        /// Throws a xml exception with line/column information if possible.
+        /// </summary>
+        /// <param name="message">The exception message. Must not be null or empty.</param>
+        public void ThrowXmlException( string message )
+        {
+            if( String.IsNullOrWhiteSpace( message ) ) throw new ArgumentException( nameof( message ) );
+            IXmlLineInfo info = Element.GetLineColumnInfo();
+            if( info.HasLineInfo() ) throw new XmlException( message + info.GetLineColumnString(), null, info.LineNumber, info.LinePosition );
+            throw new XmlException( message );
         }
 
         /// <summary>

@@ -1,14 +1,10 @@
 using CK.Core;
 using CK.Env.DependencyModel;
-using CK.Env.Plugin;
 using CSemVer;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace CK.Env.Plugin
 {
@@ -20,7 +16,7 @@ namespace CK.Env.Plugin
         readonly List<NPMDep> _deps;
 
         internal PackageJsonFile( NPMProject p )
-            : base( p.Driver.Folder.FileSystem, p.FullPath.AppendPart( "package.json" ) )
+            : base( p.Driver.GitFolder.FileSystem, p.FullPath.AppendPart( "package.json" ) )
         {
             _deps = new List<NPMDep>();
         }
@@ -107,7 +103,7 @@ namespace CK.Env.Plugin
         /// <param name="name">The dependency name.</param>
         /// <param name="v">The minimal version. Must not be null.</param>
         /// <param name="kind">The kind of the dependency.</param>
-        public void EnsureDependency( string name, SVersion v, ProjectDependencyKind kind )
+        public void EnsureDependency( string name, SVersion v, ArtifactDependencyKind kind )
         {
             var d = new NPMDep( name, kind, v );
             Root[d.Kind.ToPackageJsonKey()][d.Name] = d.RawDep;
@@ -126,13 +122,13 @@ namespace CK.Env.Plugin
         internal NPMProjectStatus Refresh( IActivityMonitor m )
         {
             _deps.Clear();
-            var s = FillDeps( m, ProjectDependencyKind.Private );
-            if( s == NPMProjectStatus.Valid ) s = FillDeps( m, ProjectDependencyKind.Development );
-            if( s == NPMProjectStatus.Valid ) s = FillDeps( m, ProjectDependencyKind.Transitive );
+            var s = FillDeps( m, ArtifactDependencyKind.Private );
+            if( s == NPMProjectStatus.Valid ) s = FillDeps( m, ArtifactDependencyKind.Development );
+            if( s == NPMProjectStatus.Valid ) s = FillDeps( m, ArtifactDependencyKind.Transitive );
             return s;
         }
 
-        NPMProjectStatus FillDeps( IActivityMonitor m, ProjectDependencyKind depKind )
+        NPMProjectStatus FillDeps( IActivityMonitor m, ArtifactDependencyKind depKind )
         {
             string depNameKind = depKind.ToPackageJsonKey();
             var oDeps = Root[depNameKind];

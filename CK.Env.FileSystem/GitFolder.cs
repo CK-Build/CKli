@@ -17,7 +17,7 @@ namespace CK.Env
     /// Implements Git repository mapping.
     /// GitFolder are internally created (and disposed) by <see cref="FileSystem"/>.
     /// </summary>
-    public class GitFolder : IGitRepository, IGitHeadInfo, ICommandMethodsProvider
+    public partial class GitFolder : IGitRepository, IGitHeadInfo, ICommandMethodsProvider
     {
         readonly Repository _git;
         readonly RootDir _thisDir;
@@ -28,7 +28,40 @@ namespace CK.Env
 
         public ProtoGitFolder ProtoGitFolder { get; }
 
-        internal GitFolder( ProtoGitFolder data, bool isPublic )
+        internal static GitFolder EnsureGitFolderCorrectSetup( IActivityMonitor m, ProtoGitFolder data, bool isPublic )
+        {
+            GitFolder gitFolder = new GitFolder( data, isPublic );
+            if( !gitFolder._git.Branches.Any( p => p.Commits.Any() ) )
+            {
+                //Sometimes we fail while cloning the repo.
+                //The issue is that the repo is incorrectly intialized: the commits are not fetched
+                m.Warn( "Repo does not contain any commits, probably a bad clone." );
+                if( !gitFolder.FetchBranches( m ) ) throw new InvalidOperationException( "Erorr while fetching." );
+                if( !gitFolder._git.Branches.Any( p => p.Commits.Any() ) ) throw new InvalidOperationException( "Empty git repository." );
+            }
+            //Now we know that the repository have at least one commit. So it have a tracking branch
+            //This branch is maybe not here locally.
+            if( !gitFolder._git.Head.Commits.Any() )
+            {
+                //In a case of a failed repository clone, the head is on a local master branch with no commits.
+                if( !gitFolder.Checkout( m, data.World.DevelopBranchName ).Success ) throw new InvalidOperationException( $"Cannot checkout {data.World.DevelopBranchName}." );
+                if( !gitFolder._git.Head.Commits.Any() )
+                {
+                    throw new InvalidOperationException( $"The {data.World.DevelopBranchName} branch have no commit." );
+                }
+            }
+
+            string remoteUrl;
+            if( !StringComparer.OrdinalIgnoreCase.Equals( (remoteUrl = gitFolder._git.Network.Remotes["origin"]?.Url), data.OriginUrl ) )
+            {
+                gitFolder._git.Dispose();
+                throw new InvalidOperationException( $"The repository 'origin' url (ie. '{remoteUrl}') is different than the repository url specified in the world: {data.OriginUrl}" );
+            }
+
+            return gitFolder;
+        }
+
+        GitFolder( ProtoGitFolder data, bool isPublic )
         {
             ProtoGitFolder = data;
             IsPublic = isPublic;
@@ -41,12 +74,7 @@ namespace CK.Env
                 _git.Dispose();
                 throw new InvalidDataException( "This git repository does not contain any branches." );
             }
-            string remoteUrl;
-            if( !StringComparer.OrdinalIgnoreCase.Equals( (remoteUrl = _git.Network.Remotes["origin"]?.Url), data.OriginUrl ) )
-            {
-                _git.Dispose();
-                throw new InvalidOperationException( $"The repository 'origin' url (ie. '{remoteUrl}') is different than the repository url specified in the world: {ProtoGitFolder.OriginUrl}" );
-            }
+
             _headFolder = new HeadFolder( this );
             _branchesFolder = new BranchesFolder( this, "branches", isRemote: false );
             _remoteBranchesFolder = new RemotesFolder( this );
@@ -153,92 +181,6 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the set of <see cref="DirectoryDiff"/> for packages from the current head.
-        /// </summary>
-        /// <param name="m">The minitor to use.</param>
-        /// <param name="previousVersionCommitSha">Previous commit.</param>
-        /// <param name="paths">Generated packages of a solution.</param>
-        /// <returns>The set of diff or null on error.</returns>
-        public IReadOnlyCollection<DirectoryDiff> GetPathsDiff( IActivityMonitor m, string previousVersionCommitSha, IEnumerable<NormalizedPath> paths )
-        {
-            Commit commit = _git.Lookup<Commit>( previousVersionCommitSha );
-            var commits = _git.Commits.QueryBy( new CommitFilter()
-            {
-                IncludeReachableFrom = _git.Head.Tip,
-                ExcludeReachableFrom = commit
-            } );
-            return GetReleaseDiff( paths, commits.ToList() );
-        }
-
-        IReadOnlyCollection<DirectoryDiff> GetReleaseDiff( IEnumerable<NormalizedPath> paths, List<Commit> commits )
-        {
-            var r = new List<DirectoryDiff>();
-            foreach( var p in paths )
-            {
-                r.Add( CreateDiff( commits, p, path => path.Path.StartsWith( p ) ) );
-            }
-            r.Add( CreateDiff( commits, "Other changes", path => !paths.Any( p => p.StartsWith( path.Path ) ) ) );
-
-            return r;
-        }
-
-        /// <summary>
-        /// Create Diff on a single file.
-        /// </summary>
-        /// <param name="topCommit"></param>
-        /// <param name="commit"></param>
-        /// <param name="diffName"></param>
-        /// 
-        /// <returns></returns>
-        DirectoryDiff CreateDiff( List<Commit> commits, string diffName, Func<TreeEntryChanges, bool> includeInDiffPredicate )
-        {
-            var commitsAndParents = commits.Select( s => (s, s.Parents.FirstOrDefault()) );
-            //There is a diff with the first commit and his parent, and we don't want it
-            var commitsAndDiffWithParent = commitsAndParents.Select( c => (c.s, _git.Diff.Compare<TreeChanges>( c.s.Tree, c.Item2.Tree )) );
-            var commitsThatChangedTheDirectory = commitsAndDiffWithParent.Where( p => p.Item2.Any( includeInDiffPredicate ) ).Select( p => p.s );
-
-            using( TreeChanges changes = _git.Diff.Compare<TreeChanges>( commits.Last().Tree, commits.First().Tree ) )
-            {
-                var allChanges = changes.Where( includeInDiffPredicate ).Select( gC => new FileReleaseDiff( gC.Path, (FileReleaseDiffType)gC.Status ) ).ToList();
-                return new DirectoryDiff( diffName, allChanges, commitsThatChangedTheDirectory.Select( p => new CommitInfo( p.Message, p.Sha ) ).ToList() );
-            }
-        }
-
-        IEnumerable<Commit> GetCommitsBetweenDates( DateTimeOffset beginning, DateTimeOffset ending )
-        {
-            if( ending < beginning ) throw new ArgumentException( $"{nameof( ending )}<{nameof( beginning )}" );
-            return _git.Head.Commits.SkipWhile( p => p.Committer.When > ending ).TakeWhile( p => p.Committer.When > beginning );
-        }
-
-        public void ShowLogsBetweenDates(
-            IActivityMonitor m,
-            DateTimeOffset beginning,
-            DateTimeOffset ending,
-            IEnumerable<NormalizedPath> paths )
-        {
-            List<Commit> commits = GetCommitsBetweenDates( beginning, ending ).ToList();
-            if( commits.Count == 0 )
-            {
-                m.Info( "No commits between the given dates." );
-            }
-            else
-            {
-                var diffs = GetReleaseDiff( paths, commits );
-                if( diffs.Count == 0 )
-                {
-                    m.Info( "No diffs." );
-                }
-                using( m.OpenInfo( "Diffs detected: " ) )
-                {
-                    foreach( var d in diffs )
-                    {
-                        d.DumpDiff( m );
-                    }
-                }
-            }
-        }
-
-        /// <summary>
         /// Checks that the current head is a clean commit (working directory is clean and no staging files exists).
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -292,31 +234,17 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">The branch name.</param>
-        public void EnsureBranch( IActivityMonitor m, string branchName )
+        public void EnsureBranch( IActivityMonitor m, string branchName, bool noWarnOnCreate = false )
         {
             if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
             var b = GetBranch( m, branchName, logErrorMissingLocalAndRemote: false );
             if( b == null )
             {
-                m.Warn( $"Branch '{branchName}' does not exist. Creating local branch." );
+                m.Log( noWarnOnCreate ? Core.LogLevel.Info : Core.LogLevel.Warn, $"Branch '{branchName}' does not exist. Creating local branch." ); ;
                 _ = _git.CreateBranch( branchName );
             }
         }
 
-        public void CreateBranch( IActivityMonitor m, string branchName )
-        {
-            if( string.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
-            m.Info( $"Creating Branch {branchName} in repository {PrimarySolutionName}" );
-            _git.CreateBranch( branchName );
-        }
-
-        public void CreateBranch( IActivityMonitor m, string branchName, string commitHash )
-        {
-            if( string.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
-            if( string.IsNullOrWhiteSpace( commitHash ) ) throw new ArgumentNullException( nameof( commitHash ) );
-            m.Info( $"Creating Branch {branchName} in repository {PrimarySolutionName} on commit {commitHash}" );
-            _git.CreateBranch( branchName, commitHash );
-        }
 
         /// <summary>
         /// Fetches 'origin' (or all remotes) branches into this repository.
@@ -630,11 +558,15 @@ namespace CK.Env
         /// </summary>
         public bool CanAmendCommit => (_git.Head.TrackingDetails.AheadBy ?? 1) > 0;
 
+        public int? AheadOriginCommitCount => _git.Head.TrackingDetails.AheadBy;
+
         public string OriginUrl => ProtoGitFolder.OriginUrl;
 
         public NormalizedPath FullPhysicalPath => ProtoGitFolder.FullPhysicalPath;
 
         public FileSystem FileSystem => ProtoGitFolder.FileSystem;
+
+
 
         /// <summary>
         /// Commits any pending changes.
@@ -649,13 +581,36 @@ namespace CK.Env
         /// </param>
         /// <returns>True on success, false on error.</returns>
         [CommandMethod]
-        public bool Commit( IActivityMonitor m, string commitMessage, bool amendIfPossible = false )
+        public bool Commit( IActivityMonitor m, string commitMessage, CommitBehavior commitBehavior = CommitBehavior.CreateNewCommit )
         {
-            if( String.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
-            if( amendIfPossible && CanAmendCommit )
+            if( commitBehavior != CommitBehavior.CreateNewCommit && CanAmendCommit )
             {
-                return AmendCommit( m );
+                Func<string, string> modified = null;
+                switch( commitBehavior )
+                {
+                    case CommitBehavior.CreateNewCommit:
+                        throw new InvalidOperationException();
+                    case CommitBehavior.AmendIfPossibleAndKeepPreviousMessage:
+                        modified = p => p;
+                        break;
+                    case CommitBehavior.AmendIfPossibleAndAppendPreviousMessage:
+                        if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
+                        modified = p => $"{p} (...)\r\n{commitMessage}";
+                        break;
+                    case CommitBehavior.AmendIfPossibleAndPrependPreviousMessage:
+                        if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
+                        modified = p => $"{commitMessage}(...)\r\n{p}";
+                        break;
+                    case CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage:
+                        if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
+                        modified = p => commitMessage;
+                        break;
+                    default:
+                        throw new ArgumentException();
+                }
+                return AmendCommit( m, modified );
             }
+            if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
             using( m.OpenInfo( $"Committing changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
             {
                 Commands.Stage( _git, "*" );
@@ -820,7 +775,11 @@ namespace CK.Env
                     }
                     var options = new PushOptions()
                     {
-                        CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m, url )
+                        CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m, url ),
+                        OnPushStatusError = ( e ) =>
+                        {
+                            throw new InvalidOperationException( $"Error while pushing ref {e.Reference} => {e.Message}" );
+                        }
                     };
                     if( created || (b.TrackingDetails.AheadBy ?? 1) > 0 )
                     {

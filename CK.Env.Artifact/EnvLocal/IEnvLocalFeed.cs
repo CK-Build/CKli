@@ -1,6 +1,5 @@
 using CK.Core;
 using CK.Text;
-using CSemVer;
 using System.Collections.Generic;
 
 namespace CK.Env
@@ -36,8 +35,12 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="target">The repository target.</param>
         /// <param name="artifacts">Set of artifact instances.</param>
+        /// <param name="arePublicArtifacts">
+        /// True if the artifacts are public and can be pushed to public repositories (no authentication required to download them).
+        /// False to forbid these artifacts to eventually be available from any public repositories.
+        /// </param>
         /// <returns>True on success, false on error.</returns>
-        bool PushLocalArtifacts( IActivityMonitor m, IArtifactRepository target, IEnumerable<ArtifactInstance> artifacts );
+        bool PushLocalArtifacts( IActivityMonitor m, IArtifactRepository target, IEnumerable<ArtifactInstance> artifacts, bool arePublicArtifacts );
 
         /// <summary>
         /// Clears all local artifacts.

@@ -1,33 +1,24 @@
 using CK.Core;
-using CK.Env;
-using CK.Text;
+using CSemVer;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Text;
-using System.Threading.Tasks;
 using System.Xml.Linq;
 
 namespace CK.Env.NPM
 {
-    public class NPMClient : IArtifactRepositoryFactory
+    public class NPMClient : IArtifactTypeHandler
     {
         /// <summary>
         /// Exposes the "NPM" <see cref="ArtifactType"/>. This type of artifact is installable.
         /// </summary>
         public static readonly ArtifactType NPMType = ArtifactType.Register( "NPM", true );
 
-        readonly Dictionary<string, INPMFeed> _feeds;
-        readonly IActivityMonitor _activityMonitor;
-
-        public NPMClient( HttpClient httpClient, ISecretKeyStore keyStore, IActivityMonitor activityMonitor )
+        public NPMClient( HttpClient httpClient, ISecretKeyStore keyStore )
         {
             HttpClient = httpClient;
             SecretKeyStore = keyStore;
-            _activityMonitor = activityMonitor;
-            _feeds = new Dictionary<string, INPMFeed>();
         }
 
         /// <summary>
@@ -40,50 +31,50 @@ namespace CK.Env.NPM
         /// </summary>
         public HttpClient HttpClient { get; }
 
-        /// <summary>
-        /// Finds an already created repository.
-        /// </summary>
-        /// <param name="uniqueRepositoryName">The <see cref="IArtifactRepositoryInfo.UniqueArtifactRepositoryName"/>.</param>
-        /// <returns>The repository or null.</returns>
-        public IArtifactRepository Find( string uniqueRepositoryName )
+        public IArtifactRepository CreateRepository( in XElementReader r )
         {
-            _feeds.TryGetValue( uniqueRepositoryName, out var f );
-            return f;
-        }
-
-        /// <summary>
-        /// Finds or creates a feed.
-        /// If a feed with the same <see cref="INPMFeedInfo.Name"/> exists,
-        /// it is returned.
-        /// </summary>
-        /// <param name="info">The feed info.</param>
-        /// <returns>The new or existing feed.</returns>
-        public INPMFeed FindOrCreate( INPMFeedInfo info )
-        {
-            if( !_feeds.TryGetValue( info.UniqueArtifactRepositoryName, out var feed ) )
+            IArtifactRepository result = null;
+            var qualityFilter = new PackageQualityFilter( r.HandleOptionalAttribute<string>( "QualityFilter", null ) );
+            switch( r.HandleOptionalAttribute<string>( "Type", null ) )
             {
-                string pat = SecretKeyStore.GetSecretKey( _activityMonitor, info.SecretKeyName, true );
-                switch( info )
-                {
-                    case NPMAzureFeedInfo a: feed = new NPMClientAzureFeed( this, a, pat ); break;
-                    case NPMStandardFeedInfo s: feed = new NPMClientStandardFeed( this, s, pat ); break;
-                    default: throw new ArgumentException( $"Unhandled type: {info}", nameof( info ) );
-                }
-                _feeds.Add( info.UniqueArtifactRepositoryName, feed );
+                case "NPMAzure":
+                    {
+                        var organization = r.HandleRequiredAttribute<string>( "Organization" );
+                        var feedName = r.HandleRequiredAttribute<string>( "FeedName" );
+                        var npmScope = r.HandleRequiredAttribute<string>( "NPMScope" );
+                        if( npmScope.Length <= 2 || npmScope[0] != '@' )
+                        {
+                            r.ThrowXmlException( $"Invalid NPScope '{npmScope}' (must start with a @)." );
+                        }
+                        result = new NPMAzureRepository( this, qualityFilter, organization, feedName, npmScope );
+                        break;
+                    }
+                case "NPMStandard":
+                    {
+                        var name = r.HandleRequiredAttribute<string>( "Name" );
+                        var url = r.HandleRequiredAttribute<string>( "Url" );
+                        var secretKeyName = r.HandleRequiredAttribute<string>( "SecretKeyName" );
+                        var usePassword = r.HandleOptionalAttribute( "UsePassword", false );
+                        result = new NPMStandardRepository( this, qualityFilter, name, url, secretKeyName, usePassword );
+                        break;
+                    }
             }
-            return feed;
+            return result;
         }
 
-        IArtifactRepositoryInfo IArtifactRepositoryFactory.CreateInfo( in XElementReader r )
+        public IArtifactFeed CreateFeed( in XElementReader r, IReadOnlyList<IArtifactRepository> repositories, IReadOnlyList<IArtifactFeed> feeds )
         {
-            return NPMFeedInfo.Create( r, skipMissingType: true );
-        }
-
-        IArtifactRepository IArtifactRepositoryFactory.FindOrCreate( IActivityMonitor m, IArtifactRepositoryInfo info )
-        {
-            if( info == null ) throw new ArgumentNullException( nameof( info ) );
-            if( !(info is INPMFeedInfo fInfo) ) return null;
-            return FindOrCreate( fInfo );
+            if( r.HandleOptionalAttribute<string>( "Type", null ) != NPMType.Name ) return null;
+            var url = r.HandleRequiredAttribute<string>( "Url" );
+            var scope = r.HandleRequiredAttribute<string>( "Scope" );
+            if( !scope.StartsWith( "@" ) ) r.ThrowXmlException( $"Scope attribute must start with @." );
+            var xCreds = r.Element.Element( "Credentials" );
+            var creds = xCreds != null ? new SimpleCredentials( r.WithElement( xCreds ) ) : null;
+            r.WarnUnhandled();
+            var npmFeeds = feeds.OfType<NPMFeed>();
+            if( npmFeeds.Any( f => f.Scope == scope ) ) r.ThrowXmlException( $"NPM feed with the same scope '{scope}' is already defined." );
+            if( npmFeeds.Any( f => StringComparer.OrdinalIgnoreCase.Equals( f.Url, url ) ) ) r.ThrowXmlException( $"NPM feed with the same url '{url}' is already defined." );
+            return new NPMFeed( scope, url, creds );
         }
     }
 }

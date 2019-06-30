@@ -1,5 +1,4 @@
 using CK.Core;
-using CK.Env.DependencyModel;
 using CSemVer;
 using System;
 using System.Collections.Generic;
@@ -47,7 +46,7 @@ namespace CK.Env
                 }
                 foreach( var h in handlers )
                 {
-                    result.Add( (row.a, row.s.Solution.Name, h.Info.UniqueArtifactRepositoryName) );
+                    result.Add( (row.a, row.s.Solution.Name, h.UniqueRepositoryName) );
                 }
             }
             return new BuildResult( type, result, releaseNotes );

@@ -1,28 +1,28 @@
 using CK.Core;
-using CK.Env;
 using CSemVer;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace CK.Env.NPM
 {
     /// <summary>
-    /// Defines a NPM feed, either remote or local.
+    /// Extends <see cref="IArtifactFeed"/> with NPM specific properties
+    /// and specific capabilities.
     /// </summary>
-    public interface INPMFeed : IArtifactRepository
+    public interface INPMFeed : IArtifactFeed
     {
         /// <summary>
-        /// Gets the info of this feed.
+        /// Gets the scope name. Can not be null and must start with @.
         /// </summary>
-        new INPMFeedInfo Info { get; }
+        string Scope { get; }
 
         /// <summary>
-        /// Cheks whether a versioned package exists in this feed.
+        /// Gets the feed url. Can not be null.
         /// </summary>
-        /// <param name="m">The activity monitor.</param>
-        /// <param name="packageId">The package identifier.</param>
-        /// <param name="v">The version.</param>
-        /// <returns>True if found, false otherwise.</returns>
-        Task<bool> ExistsAsync( IActivityMonitor m, string packageId, SVersion v );
+        string Url { get; }
+
+        /// <summary>
+        /// Gets optional credentials for the source. Can be null.
+        /// </summary>
+        SimpleCredentials Credentials { get; }
     }
 }

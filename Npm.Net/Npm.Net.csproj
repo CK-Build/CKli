@@ -1,14 +1,18 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="11.0.3--0039-develop" />
-    <PackageReference Include="CK.Monitoring" Version="10.0.3--0035-develop" />
+    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="11.1.0" />
+    <PackageReference Include="CK.Monitoring" Version="10.1.0" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
-    <PackageReference Include="SimpleGitVersion.Core" Version="0.37.4--0026-develop" />
+    <PackageReference Include="SimpleGitVersion.Core" Version="0.38.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CK.Env.Sys\CK.Env.Sys.csproj" />
   </ItemGroup>
 
 </Project>

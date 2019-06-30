@@ -1,5 +1,3 @@
-using CK.Env.DependencyModel;
-using CK.Text;
 using FluentAssertions;
 using NUnit.Framework;
 using System;

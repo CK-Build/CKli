@@ -40,7 +40,7 @@ namespace CKli
                         .Where( p => p.Length == 2 )
                         .Select( p => (p[0].Trim(), p[1].Trim()) )
                         .Where( p => p.Item1.Length > 0 && p.Item2.Length > 0 )
-                        .ToDictionary( p => p.Item1, p => new NormalizedPath(p.Item2) )
+                        .ToDictionary( p => p.Item1, p => new NormalizedPath( p.Item2 ) )
                         : new Dictionary<string, NormalizedPath>();
                 if( !_map.ContainsKey( "CK" ) )
                 {
@@ -48,20 +48,38 @@ namespace CKli
                     {
                         throw new Exception( "When CK is not mapped in LocalWorldRootPathMapping.txt, CK-Env MUST BE ran from a 'CK/CK-Env' folder." );
                     }
-                    _map.Add( "CK", _rootPath.RemoveLastPart() );
+                    _map.Add( "CK", _rootPath );
                 }
             }
 
+            /// <summary>
+            /// Gets the root path for a World.
+            /// If the <see cref="IWorldName.FullName"/> is defined, the mapped path is taken as-is.
+            /// Otherwise, on a parallel world and if the if the Stack name is mapped (the default world),
+            /// we map the parallel world next to the default one.
+            /// </summary>
+            /// <param name="w">The world name.</param>
+            /// <returns>The path to the root directory or null if it is not mapped.</returns>
             public string GetRootPath( IWorldName w )
             {
-                if( _map.TryGetValue( w.FullName, out NormalizedPath p )
-                    || _map.TryGetValue( w.Name, out p ) )
+                NormalizedPath p;
+                if( !_map.TryGetValue( w.FullName, out p ) )
                 {
-                    p = p.AppendPart( w.FullName );
-                    Directory.CreateDirectory( p );
-                    File.WriteAllText( Path.Combine( p, "CK-World.htm" ), "<html></html>" );
+                    // If Name is not the same as FullName, we are on a parralel
+                    // world that is not mapped: if the Stack name is mapped (the default world),
+                    // we map the parrallel world next to the default one.
+                    if( _map.TryGetValue( w.Name, out p ) )
+                    {
+                        p = p.RemoveLastPart().AppendPart( w.FullName );
+                    }
                 }
-                return p;
+                if( !p.IsEmptyPath )
+                {
+                    Directory.CreateDirectory( p );
+                    File.WriteAllText( p.AppendPart( "CKli-World.htm" ), "<html></html>" );
+                    return p;
+                }
+                return null;
             }
         }
 
@@ -125,9 +143,19 @@ namespace CKli
                     Console.WriteLine( $"- {g.Key}" );
                     foreach( var (Idx, World, LocalPath) in g )
                     {
-                        Console.WriteLine( $"   > {Idx + 1} - {World.LTSKey ?? "<Current>"} => { LocalPath ?? "(No local mapping)"}" );
+                        string key;
+                        if( World.ParallelName == null )
+                        {
+                            key = "<Default>";
+                        }
+                        else
+                        {
+                            key = $"[{World.ParallelName}]";
+                        }
+                        Console.WriteLine( $"   > {Idx + 1} {key} => { LocalPath ?? "(No local mapping)"}" );
                     }
                 }
+                Console.WriteLine( "-------------" );
                 Console.WriteLine( "   > x - Exit" );
                 string r = Console.ReadLine();
                 if( Int32.TryParse( r, out int result )

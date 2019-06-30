@@ -1,12 +1,3 @@
-using CK.Core;
-using CK.Env;
-using CK.Text;
-using CSemVer;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
 namespace CK.Env
 {
     public static class CKSetupEnvLocalFeedExtension

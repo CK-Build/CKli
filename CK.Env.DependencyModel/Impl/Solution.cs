@@ -1,11 +1,10 @@
+using CK.Core;
 using CK.Setup;
 using CK.Text;
-using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 
 namespace CK.Env.DependencyModel
 {
@@ -16,6 +15,7 @@ namespace CK.Env.DependencyModel
     {
         readonly List<Project> _projects;
         readonly List<IArtifactRepository> _artifactTargets;
+        readonly List<IArtifactFeed> _artifactSources;
         SolutionContext _ctx;
         Project _buildProject;
         int _version;
@@ -27,6 +27,7 @@ namespace CK.Env.DependencyModel
             Name = name;
             _projects = new List<Project>();
             _artifactTargets = new List<IArtifactRepository>();
+            _artifactSources = new List<IArtifactFeed>();
         }
 
         /// <summary>
@@ -141,13 +142,24 @@ namespace CK.Env.DependencyModel
         /// </param>
         /// <param name="type">The project type.</param>
         /// <param name="simpleProjecName">The project name.</param>
+        /// <param name="savors">
+        /// Optional savors for this project. When not null, the <see cref="CKTrait.Context"/> can be any
+        /// context (typically the <see cref="ArtifactType.ContextSavors"/> of the "primary" artifact produced
+        /// by this project).
+        /// </param>
         /// <returns>The project and whether it has been created or not.</returns>
-        public (Project Project, bool Created) AddOrFindProject( NormalizedPath solutionRelativeFolderPath, string type, string simpleProjecName )
+        public (Project Project, bool Created) AddOrFindProject(
+            NormalizedPath solutionRelativeFolderPath,
+            string type,
+            string simpleProjecName,
+            CKTrait savors = null )
         {
             if( String.IsNullOrWhiteSpace( type ) ) throw new ArgumentNullException( nameof( type ) );
             if( String.IsNullOrWhiteSpace( simpleProjecName ) ) throw new ArgumentNullException( nameof( simpleProjecName ) );
+            if( savors != null && savors.IsEmpty ) throw new ArgumentException( "Savors can not be empty.", nameof( savors ) ); ;
+
             var fullFolderPath = FullPath.Combine( solutionRelativeFolderPath );
-            var newOne = new Project( this, solutionRelativeFolderPath, fullFolderPath, type, simpleProjecName );
+            var newOne = new Project( this, solutionRelativeFolderPath, fullFolderPath, type, simpleProjecName, savors );
             Debug.Assert( newOne.Name == null );
             var added = _ctx.OnProjectAdding( newOne );
             if( added != newOne ) return (added, false);
@@ -195,12 +207,43 @@ namespace CK.Env.DependencyModel
         /// InvalidOperationException is thrown).
         /// </summary>
         /// <param name="artifactTarget">The artifact target.</param>
-        public void RemoveArtifactTArget( IArtifactRepository artifactTarget )
+        public void RemoveArtifactTarget( IArtifactRepository artifactTarget )
         {
             if( !_artifactTargets.Contains( artifactTarget ) ) throw new InvalidOperationException( $"Artifact target not registered." );
             _artifactTargets.Remove( artifactTarget );
             OnArtifactTargetRemoved( artifactTarget );
         }
+
+        /// <summary>
+        /// Gets the artifacts sources.
+        /// </summary>
+        public IReadOnlyCollection<IArtifactFeed> ArtifactSources => _artifactSources;
+
+        /// <summary>
+        /// Adds a new artifact source (that must not already belong to <see cref="ArtifactSources"/> otherwise an
+        /// InvalidOperationException is thrown).
+        /// </summary>
+        /// <param name="newOne">New artifact source.</param>
+        public void AddArtifactSource( IArtifactFeed newOne )
+        {
+            if( _artifactSources.Contains( newOne ) ) throw new InvalidOperationException( $"Artifact source already registered." );
+            _artifactSources.Add( newOne );
+            OnArtifactSourceAdded( newOne );
+        }
+
+        /// <summary>
+        /// Removes the artifact source (that must belong to <see cref="ArtifactSources"/> otherwise an
+        /// InvalidOperationException is thrown).
+        /// </summary>
+        /// <param name="artifactSource">The artifact source.</param>
+        public void RemoveArtifactSource( IArtifactFeed artifactSource )
+        {
+            if( !_artifactSources.Contains( artifactSource ) ) throw new InvalidOperationException( $"Artifact source not registered." );
+            _artifactSources.Remove( artifactSource );
+            OnArtifactSourceRemoved( artifactSource );
+        }
+
+
 
         string IDependentItemRef.FullName => Name;
 
@@ -288,6 +331,17 @@ namespace CK.Env.DependencyModel
         {
             _version++;
             _ctx.OnArtifactTargetRemoved( this, artifactTarget );
+        }
+        void OnArtifactSourceAdded( IArtifactFeed newOne )
+        {
+            _version++;
+            _ctx.OnArtifactSourceAdded( this, newOne );
+        }
+
+        void OnArtifactSourceRemoved( IArtifactFeed artifactSource )
+        {
+            _version++;
+            _ctx.OnArtifactSourceRemoved( this, artifactSource );
         }
 
     }

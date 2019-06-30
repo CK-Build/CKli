@@ -39,6 +39,7 @@ namespace CK.Env.Plugin
                 //CakeExtensions
                 SetTextResource( m, "CakeExtensions/NpmDistTagRunner.cs" );
                 SetTextResource( m, "CakeExtensions/NpmView.cs" );
+                SetTextResource( m, "CakeExtensions/NpmGetNpmVersion.cs" );
                 //npm itself
                 SetTextResource( m, "npm/Build.NPMArtifactType.cs", text => AdaptBuildNPMArtifactForPushFeeds( text, solution ) );
                 SetTextResource( m, "npm/Build.NPMFeed.cs" );
@@ -51,6 +52,7 @@ namespace CK.Env.Plugin
                 m.Info( "Removing build files related to NPM handling." );
                 DeleteFile( m, "CakeExtensions/NpmDistTagRunner.cs" );
                 DeleteFile( m, "CakeExtensions/NpmView.cs" );
+                DeleteFile( m, "CakeExtensions/NpmGetNpmVersion.cs" );
                 DeleteFile( m, "npm/Build.NPMArtifactType.cs" );
                 DeleteFile( m, "npm/Build.NPMFeed.cs" );
                 DeleteFile( m, "npm/NPMProject.cs" );
@@ -69,35 +71,36 @@ namespace CK.Env.Plugin
             }
             StringBuilder b = new StringBuilder();
             bool atLeastOne = false;
-            foreach( var info in s.ArtifactTargets.Select( a => a.Info ).OfType<INPMFeedInfo>() )
+            foreach( var r in s.ArtifactTargets.OfType<INPMRepository>() )
             {
                 atLeastOne = true;
-                if( info.QualityFilter.HasMin || info.QualityFilter.HasMax )
+                if( r.QualityFilter.HasMin || r.QualityFilter.HasMax )
                 {
                     b.Append( "if( " );
-                    if( info.QualityFilter.HasMin )
+                    if( r.QualityFilter.HasMin )
                     {
-                        b.Append( "GlobalInfo.Version.PackageQuality >= PackageQuality." )
-                         .Append( info.QualityFilter.Min.ToString() )
+                        b.Append( "GlobalInfo.Version.PackageQuality >= CSemVer.PackageQuality." )
+                         .Append( r.QualityFilter.Min.ToString() )
                          .Append( ' ' );
                     }
-                    if( info.QualityFilter.HasMax )
+                    if( r.QualityFilter.HasMax )
                     {
-                        b.Append( "GlobalInfo.Version.PackageQuality <= PackageQuality." )
-                         .Append( info.QualityFilter.Max.ToString() )
+                        if( r.QualityFilter.HasMin ) b.Append( "&& " );
+                        b.Append( "GlobalInfo.Version.PackageQuality <= CSemVer.PackageQuality." )
+                         .Append( r.QualityFilter.Max.ToString() )
                          .Append( ' ' );
                     }
                     b.Append( ") " );
                 }
-                switch( info )
+                switch( r )
                 {
-                    case NPMAzureFeedInfo a:
+                    case INPMAzureRepository a:
                         b.Append( "yield return new AzureNPMFeed( this, \"" )
                             .Append( a.Organization ).Append( "\", \"" )
                             .Append( a.FeedName )
                             .AppendLine( "\" );" );
                         break;
-                    case NPMStandardFeedInfo n:
+                    case INPMStandardRepository n:
                         b.Append( "yield return new NPMRemoteFeed( this, \"" )
                             .Append( n.SecretKeyName )
                             .Append( "\", \"" )
@@ -115,7 +118,7 @@ namespace CK.Env.Plugin
 
         string AdaptBuild( string text )
         {
-            var name = Folder.SubPath.LastPart;
+            var name = GitFolder.SubPath.LastPart;
             Regex r = new Regex(
                   "(?<1>const\\s+string\\s+solutionName\\s*=\\s*\").*?(?<2>\";\\s*//\\s*!Transformable)",
                   RegexOptions.ExplicitCapture | RegexOptions.CultureInvariant );

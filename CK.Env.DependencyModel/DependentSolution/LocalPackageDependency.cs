@@ -1,6 +1,5 @@
-using System;
+using CK.Core;
 using System.Collections.Generic;
-using System.Text;
 
 namespace CK.Env.DependencyModel
 {

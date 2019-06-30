@@ -1,11 +1,8 @@
 using CK.Core;
-using CK.Env;
 using CK.Env.CKSetup;
 using CKSetup;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace CK.Env
 {
@@ -30,11 +27,11 @@ namespace CK.Env
             }
         }
 
-        public bool PushLocalArtifacts( IEnvLocalFeed feed, IActivityMonitor m, IArtifactRepository target, IEnumerable<ArtifactInstance> artifacts )
+        public bool PushLocalArtifacts( IEnvLocalFeed feed, IActivityMonitor m, IArtifactRepository target, IEnumerable<ArtifactInstance> artifacts, bool arePublicArtifacts )
         {
             if( !target.HandleArtifactType( CKSetupClient.CKSetupType ) ) return true;
             string localStore = feed.GetCKSetupStorePath();
-            return target.PushAsync( m, new CKSetupArtifactLocalSet( artifacts, localStore ) ).GetAwaiter().GetResult();
+            return target.PushAsync( m, new CKSetupArtifactLocalSet( artifacts, localStore, arePublicArtifacts ) ).GetAwaiter().GetResult();
         }
 
         public void Remove( IEnvLocalFeed feed, IActivityMonitor m, IEnumerable<ArtifactInstance> artifacts )

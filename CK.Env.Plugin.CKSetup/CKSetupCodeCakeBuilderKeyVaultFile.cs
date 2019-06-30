@@ -2,7 +2,6 @@ using CK.Core;
 using CK.Env.CKSetup;
 using CK.SimpleKeyVault;
 using CK.Text;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -25,11 +24,12 @@ namespace CK.Env.Plugin
             _driver = driver;
             _secretStore = secretStore;
             _solutionSpec = solutionSpec;
-       }
+        }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath.AppendPart( "(CKSetup)" );
 
-        public bool CanApplySettings => Folder.CurrentBranchName == BranchPath.LastPart;
+        public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart
+                                        && _secretStore.IsSecretKeyAvailable( SolutionDriver.CODECAKEBUILDER_SECRET_KEY ) == true;
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
@@ -37,20 +37,18 @@ namespace CK.Env.Plugin
             var s = _driver.GetSolution( m );
             if( s == null ) return;
 
-            var passPhrase = _secretStore.GetSecretKey( m, "CODECAKEBUILDER_SECRET_KEY", true );
-
+            var passPhrase = _secretStore.GetSecretKey( m, SolutionDriver.CODECAKEBUILDER_SECRET_KEY, true );
             Dictionary<string,string> current = KeyVault.DecryptValues( TextContent, passPhrase );
-
             if( _solutionSpec.UseCKSetup )
             {
-                var storeInfo = s.ArtifactTargets.Select( t => t.Info ).OfType<ICKSetupStoreInfo>().SingleOrDefault();
-                if( storeInfo == null )
+                var store = s.ArtifactTargets.OfType<CKSetupStore>().SingleOrDefault();
+                if( store == null )
                 {
                     m.Error( $"Single CKSetup Artifact target not found. Since UseCKSetup is true, one and only one CKSetup store target must be available." );
                     return;
                 }
-                var apiKey = _secretStore.GetSecretKey( m, storeInfo.SecretKeyName, true, $"Required to push components to {storeInfo}." );
-                current["CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL"] = apiKey + '|' + storeInfo.Url;
+                var apiKey = _secretStore.GetSecretKey( m, store.SecretKeyName, true );
+                current["CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL"] = apiKey + '|' + store.Url;
             }
 
             string result = KeyVault.EncryptValuesToString( current, passPhrase );
