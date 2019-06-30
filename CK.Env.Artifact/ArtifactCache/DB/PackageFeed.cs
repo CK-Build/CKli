@@ -22,12 +22,10 @@ namespace CK.Env
             _instances = instances;
         }
 
-        internal PackageFeed( PackageFeed other, PackageInstance newOne )
+        internal PackageFeed( PackageFeed other, List<PackageInstance> newPackages )
         {
             _name = other._name;
-            int idx = other._instances.IndexOf( newOne.ArtifactInstance );
-            Debug.Assert( idx < 0 );
-            _instances = new PackageDB.InstanceStore( other._instances, newOne, ~idx );
+            _instances = other._instances.Add( newPackages );
         }
 
         /// <summary>
@@ -56,7 +54,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="type">The package's type.</param>
         /// <returns>The list of the known instances.</returns>
-        public ReadOnlySpan<PackageInstance> GetInstances( ArtifactType type )
+        public IReadOnlyList<PackageInstance> GetInstances( ArtifactType type )
         {
             return _instances.GetInstances( type );
         }
@@ -66,7 +64,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="name">The package's name.</param>
         /// <returns>The list of the known instances.</returns>
-        public ReadOnlySpan<PackageInstance> GetInstances( string name )
+        public IReadOnlyList<PackageInstance> GetInstances( string name )
         {
             var a = new Artifact( _name.Type, name );
             return _instances.GetInstances( a );
@@ -83,7 +81,7 @@ namespace CK.Env
             SVersion ci = null, exp = null, pre = null, lat = null, sta = null;
             foreach( var p in GetInstances( artifactName ) )
             {
-                PackageQualityVersions.Apply( p.ArtifactInstance.Version, ref ci, ref exp, ref pre, ref lat, ref sta );
+                PackageQualityVersions.Apply( p.Key.Version, ref ci, ref exp, ref pre, ref lat, ref sta );
             }
             var versions = new PackageQualityVersions( ci, exp, pre, lat, sta );
             return new ArtifactAvailableInstances( this, artifactName, versions );

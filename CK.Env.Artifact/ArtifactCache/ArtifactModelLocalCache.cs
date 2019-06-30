@@ -15,6 +15,9 @@ namespace CK.Env.ArtifactCache
             _db = new PackageDB();
         }
 
+        /// <summary>
+        /// Gets the package database.
+        /// </summary>
         public PackageDB DB => _db;
 
         /// <summary>

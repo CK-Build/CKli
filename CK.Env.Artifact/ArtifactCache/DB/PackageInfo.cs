@@ -15,9 +15,9 @@ namespace CK.Env
         CKTrait _savors;
 
         /// <summary>
-        /// Gets or sets the artifact instance.
+        /// Gets or sets the key of this package.
         /// </summary>
-        public ArtifactInstance ArtifactInstance { get; set; }
+        public ArtifactInstance Key { get; set; }
 
         /// <summary>
         /// Gets the name of the feeds that are known to contain this package.
@@ -33,7 +33,7 @@ namespace CK.Env
             get => _savors;
             set
             {
-                if( value != null && value.IsEmpty ) throw new ArgumentException( "PackageInfo Savors can not be empty.", "value" );
+                if( value != null && value.IsEmpty ) throw new ArgumentException( "PackageInfo Savors cannot be empty.", "value" );
                 _savors = value;
             }
         }
@@ -61,13 +61,13 @@ namespace CK.Env
                 return null;
             }
             // Cheking name.
-            if( !ArtifactInstance.IsValid )
+            if( !Key.IsValid )
             {
                 return Error( $"Invalid ArtifactInstance." );
             }
 
             // Checking FeedNames.
-            var feedNames = FeedNames.Select( n => Artifact.TryParseOrCreate( n, ArtifactInstance.Artifact.Type ) ).ToArray();
+            var feedNames = FeedNames.Select( n => Artifact.TryParseOrCreate( n, Key.Artifact.Type ) ).ToArray();
             if( feedNames.Any( f => !f.IsValid ) )
             {
                 return Error( $"Invalid feed names found in '{FeedNames.Concatenate("', '")}'." );

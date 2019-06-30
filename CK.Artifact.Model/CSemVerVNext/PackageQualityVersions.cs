@@ -52,7 +52,7 @@ namespace CSemVer
         }
 
         /// <summary>
-        /// Low level method that applies a new version to a vector.
+        /// Low level method that applies a new version to a vector of best versions.
         /// </summary>
         /// <param name="v">The new version.</param>
         /// <param name="ci">The current best CI version.</param>

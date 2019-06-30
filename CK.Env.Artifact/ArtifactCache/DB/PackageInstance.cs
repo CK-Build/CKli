@@ -40,18 +40,23 @@ namespace CK.Env
             }
         }
 
-        internal PackageInstance( in ArtifactInstance instance, in CKTrait savors, IReadOnlyList<Reference> deps )
+        internal PackageInstance(
+            in ArtifactInstance instance,
+            CKTrait savors,
+            IReadOnlyList<Reference> deps,
+            DateTime registrationDate )
         {
-            ArtifactInstance = instance;
+            Key = instance;
             Savors = savors;
             Dependencies = deps;
+            RegistrationDate = registrationDate;
         }
 
         /// <summary>
         /// Gets the artifact instance.
         /// This is the key that identifies the package.
         /// </summary>
-        public ArtifactInstance ArtifactInstance { get; }
+        public ArtifactInstance Key { get; }
 
         /// <summary>
         /// Gets the savors of this package. When not null:
@@ -74,37 +79,42 @@ namespace CK.Env
         public IReadOnlyList<Reference> Dependencies { get; }
 
         /// <summary>
-        /// Compares this instance to another: <see cref="ArtifactInstance"/> is the key:
+        /// Gets the time at which this instance has been registered.
+        /// </summary>
+        public DateTime RegistrationDate { get; }
+
+        /// <summary>
+        /// Compares this instance to another: <see cref="Key"/> is the key:
         /// order is Type, Name and descending Version.
         /// </summary>
         /// <param name="other">The other instance to compare to. Can be null.</param>
         /// <returns>The negative/zero/positive standard value.</returns>
-        public int CompareTo( PackageInstance other ) => other == null ? 1 : ArtifactInstance.CompareTo( other.ArtifactInstance );
+        public int CompareTo( PackageInstance other ) => other == null ? 1 : Key.CompareTo( other.Key );
 
         /// <summary>
-        /// Implements equality based on <see cref="ArtifactInstance"/>.
+        /// Implements equality based on <see cref="Key"/>.
         /// </summary>
         /// <param name="other">The other instance.</param>
-        /// <returns>Returns <see cref="ArtifactInstance"/> equality.</returns>
-        public bool Equals( PackageInstance other ) => other == null ? false : ArtifactInstance.Equals( other.ArtifactInstance );
+        /// <returns>Returns <see cref="Key"/> equality.</returns>
+        public bool Equals( PackageInstance other ) => other == null ? false : Key.Equals( other.Key );
 
         /// <summary>
-        /// Relays to <see cref="ArtifactInstance"/>'s equality.
+        /// Relays to <see cref="Key"/>'s equality.
         /// </summary>
         /// <param name="obj">The other object to compare to.</param>
         /// <returns>True if equal, fals otherwise.</returns>
         public override bool Equals( object obj ) => obj is PackageInstance p ? Equals( p ) : false;
 
         /// <summary>
-        /// Gets the <see cref="ArtifactInstance"/>'s hash code.
+        /// Gets the <see cref="Key"/>'s hash code.
         /// </summary>
         /// <returns>The hash.</returns>
-        public override int GetHashCode() => ArtifactInstance.GetHashCode();
+        public override int GetHashCode() => Key.GetHashCode();
 
         /// <summary>
-        /// Returns the <see cref="ArtifactInstance"/> string.
+        /// Returns the <see cref="Key"/> string.
         /// </summary>
         /// <returns>The readable key.</returns>
-        public override string ToString() => ArtifactInstance.ToString();
+        public override string ToString() => Key.ToString();
     }
 }
