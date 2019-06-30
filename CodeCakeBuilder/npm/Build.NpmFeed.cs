@@ -231,14 +231,18 @@ namespace CodeCake
                 var basicAuth = Convert.ToBase64String( Encoding.ASCII.GetBytes( ":" + Cake.InteractiveEnvironmentVariable( SecretKeyName ) ) );
                 foreach( var p in pushes )
                 {
+                    bool isNpm = p.Feed.ArtifactType is NPMArtifactType;
+                    string uriProtocol = isNpm ? "npm" : "nuget";
                     foreach( var view in p.Version.PackageQuality.GetLabels() )
                     {
-                        using( HttpRequestMessage req = new HttpRequestMessage( HttpMethod.Post, $"https://pkgs.dev.azure.com/{Organization}/_apis/packaging/feeds/{FeedName}/nuget/packagesBatch?api-version=5.0-preview.1" ) )
+                        
+                        
+                        using( HttpRequestMessage req = new HttpRequestMessage( HttpMethod.Post, $"https://pkgs.dev.azure.com/{Organization}/_apis/packaging/feeds/{FeedName}/{uriProtocol}/packagesBatch?api-version=5.0-preview.1" ) )
                         {
                             req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue( "Basic", basicAuth );
-                            var body = GetPromotionJSONBody( p.Name, p.Version.ToNuGetPackageString(), view.ToString() );
+                            var body = GetPromotionJSONBody( p.Name, p.Version.ToNuGetPackageString(), view.ToString(), isNpm );
                             req.Content = new StringContent( body, Encoding.UTF8, "application/json" );
-                            using( var m = await NuGetHelper.SharedHttpClient.SendAsync( req ) )
+                            using( var m = await StandardGlobalInfo.SharedHttpClient.SendAsync( req ) )
                             {
                                 if( m.IsSuccessStatusCode )
                                 {
@@ -256,7 +260,7 @@ namespace CodeCake
                 }
             }
 
-            string GetPromotionJSONBody( string packageName, string packageVersion, string viewId, bool npm = false )
+            string GetPromotionJSONBody( string packageName, string packageVersion, string viewId, bool npm )
             {
                 var bodyFormat = @"{
  ""data"": {

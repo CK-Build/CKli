@@ -4,6 +4,7 @@ using Cake.Common.Solution;
 using Cake.Common.Tools.DotNetCore;
 using Cake.Common.Tools.DotNetCore.Test;
 using Cake.Common.Tools.NUnit;
+using Cake.Core.IO;
 using CK.Text;
 using Newtonsoft.Json.Linq;
 using System;
@@ -55,19 +56,37 @@ namespace CodeCake
             {
                 NormalizedPath projectPath = project.Path.GetDirectory().FullPath;
                 NormalizedPath binDir = projectPath.AppendPart( "bin" ).AppendPart( globalInfo.BuildConfiguration );
+                NormalizedPath objDir = projectPath.AppendPart( "obj" );
+                string assetsJson = File.ReadAllText( objDir.AppendPart( "project.assets.json" ) );
+                bool isNunitLite = assetsJson.Contains( "NUnitLite" );
+                bool isVSTest = assetsJson.Contains( "Microsoft.NET.Test.Sdk" );
                 foreach( NormalizedPath buildDir in Directory.GetDirectories( binDir ) )
                 {
                     string framework = buildDir.LastPart;
                     string fileWithoutExtension = buildDir.AppendPart( project.Name );
-                    string testBinariesPath = fileWithoutExtension + ".exe"; ;
-                    if( File.Exists( testBinariesPath ) )
+                    string testBinariesPath = "";
+                    if( isNunitLite )
                     {
                         //we are with nunitLite
-                        Cake.Information( $"Testing via NUnitLite ({framework}): {testBinariesPath}" );
-                        if( CheckTestDone( testBinariesPath ) ) return;
-                        Cake.DotNetCoreExecute( testBinariesPath );
+                        testBinariesPath = fileWithoutExtension + ".exe";
+                        if( File.Exists( testBinariesPath ) )
+                        {
+                            Cake.Information( $"Testing via NUnitLite ({framework}): {testBinariesPath}" );
+                            if( CheckTestDone( testBinariesPath ) ) return;
+                            Cake.NUnit3( new[] { testBinariesPath }, new NUnit3Settings
+                            {
+                                Results = new[] { new NUnit3Result() { FileName = FilePath.FromString( projectPath.AppendPart( "TestResult.Net461.xml" ) ) } }
+                            } );
+                        }
+                        else
+                        {
+                            testBinariesPath = fileWithoutExtension + ".dll";
+                            Cake.Information( $"Testing via NUnitLite ({framework}): {testBinariesPath}" );
+                            if( CheckTestDone( testBinariesPath ) ) return;
+                            Cake.DotNetCoreExecute( testBinariesPath );
+                        }
                     }
-                    else
+                    if(isVSTest)
                     {
                         testBinariesPath = fileWithoutExtension + ".dll";
                         //VS Tests
@@ -81,6 +100,18 @@ namespace CodeCake
                             NoBuild = true,
                             Logger = "trx"
                         } );
+                    }
+
+                    if(!isVSTest && !isNunitLite)
+                    {
+                        testBinariesPath = fileWithoutExtension + ".dll";
+                        Cake.Information( "Testing via NUnit: {0}", testBinariesPath );
+                        Cake.NUnit( new[] { testBinariesPath }, new NUnitSettings()
+                        {
+                            Framework = "v4.5",
+                            ResultsFile = FilePath.FromString(projectPath.AppendPart( "TestResult.Net461.xml" ))
+                        } );
+
                     }
                     WriteTestDone( testBinariesPath );
                 }

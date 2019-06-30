@@ -190,5 +190,11 @@
         <SolutionSpec />
       </Branch>
     </GitFolder>
+
+    <GitFolder Name="Nemo-Model" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Nemo-Model">
+      <Branch Name="develop">
+        <SolutionSpec />
+      </Branch>
+    </GitFolder>
   </Folder>
 </ENGIE-WORLD>

@@ -566,6 +566,8 @@ namespace CK.Env
 
         public FileSystem FileSystem => ProtoGitFolder.FileSystem;
 
+
+
         /// <summary>
         /// Commits any pending changes.
         /// </summary>
@@ -579,13 +581,36 @@ namespace CK.Env
         /// </param>
         /// <returns>True on success, false on error.</returns>
         [CommandMethod]
-        public bool Commit( IActivityMonitor m, string commitMessage, bool amendIfPossible = false )
+        public bool Commit( IActivityMonitor m, string commitMessage, CommitBehavior commitBehavior = CommitBehavior.CreateNewCommit )
         {
-            if( String.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
-            if( amendIfPossible && CanAmendCommit )
+            if( commitBehavior != CommitBehavior.CreateNewCommit && CanAmendCommit )
             {
-                return AmendCommit( m );
+                Func<string, string> modified = null;
+                switch( commitBehavior )
+                {
+                    case CommitBehavior.CreateNewCommit:
+                        throw new InvalidOperationException();
+                    case CommitBehavior.AmendIfPossibleAndKeepPreviousMessage:
+                        modified = p => p;
+                        break;
+                    case CommitBehavior.AmendIfPossibleAndAppendPreviousMessage:
+                        if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
+                        modified = p => $"{p} (...)\r\n{commitMessage}";
+                        break;
+                    case CommitBehavior.AmendIfPossibleAndPrependPreviousMessage:
+                        if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
+                        modified = p => $"{commitMessage}(...)\r\n{p}";
+                        break;
+                    case CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage:
+                        if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
+                        modified = p => commitMessage;
+                        break;
+                    default:
+                        throw new ArgumentException();
+                }
+                return AmendCommit( m, modified );
             }
+            if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
             using( m.OpenInfo( $"Committing changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
             {
                 Commands.Stage( _git, "*" );
@@ -750,7 +775,11 @@ namespace CK.Env
                     }
                     var options = new PushOptions()
                     {
-                        CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m, url )
+                        CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m, url ),
+                        OnPushStatusError = ( e ) =>
+                        {
+                            throw new InvalidOperationException( $"Error while pushing ref {e.Reference} => {e.Message}" );
+                        }
                     };
                     if( created || (b.TrackingDetails.AheadBy ?? 1) > 0 )
                     {

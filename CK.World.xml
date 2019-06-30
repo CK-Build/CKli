@@ -307,4 +307,19 @@
     </GitFolder>
 
   </Folder>
+  
+  <Folder Name="CK-Crs-Projects">
+
+    <GitFolder Name="CK-Crs" Url="https://github.com/Invenietis/crs.git">
+      <Branch Name="develop">
+        <SolutionSpec>
+          <NPMProjects>
+            <add Folder="js/crs-client" PackageName="@signature/crs-client" />
+            <add Folder="js/crs-client-signalr" PackageName="@signature/crs-client-signalr" />
+          </NPMProjects>
+        </SolutionSpec>
+      </Branch>
+    </GitFolder>
+
+  </Folder>
 </CK-World>

@@ -39,6 +39,7 @@ namespace CK.Env.Plugin
                 //CakeExtensions
                 SetTextResource( m, "CakeExtensions/NpmDistTagRunner.cs" );
                 SetTextResource( m, "CakeExtensions/NpmView.cs" );
+                SetTextResource( m, "CakeExtensions/NpmGetNpmVersion.cs" );
                 //npm itself
                 SetTextResource( m, "npm/Build.NPMArtifactType.cs", text => AdaptBuildNPMArtifactForPushFeeds( text, solution ) );
                 SetTextResource( m, "npm/Build.NPMFeed.cs" );
@@ -51,6 +52,7 @@ namespace CK.Env.Plugin
                 m.Info( "Removing build files related to NPM handling." );
                 DeleteFile( m, "CakeExtensions/NpmDistTagRunner.cs" );
                 DeleteFile( m, "CakeExtensions/NpmView.cs" );
+                DeleteFile( m, "CakeExtensions/NpmGetNpmVersion.cs" );
                 DeleteFile( m, "npm/Build.NPMArtifactType.cs" );
                 DeleteFile( m, "npm/Build.NPMFeed.cs" );
                 DeleteFile( m, "npm/NPMProject.cs" );

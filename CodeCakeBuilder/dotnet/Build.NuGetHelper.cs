@@ -33,13 +33,6 @@ namespace CodeCake
             static ILogger _logger;
 
             /// <summary>
-            /// Shared http client.
-            /// See: https://aspnetmonsters.com/2016/08/2016-08-27-httpclientwrong/
-            /// Do not add any default on it.
-            /// </summary>
-            public static readonly HttpClient SharedHttpClient;
-
-            /// <summary>
             /// Implements a IPackageSourceProvider that mixes sources from NuGet.config settings
             /// and sources that are used by the build chain.
             /// </summary>
@@ -147,7 +140,6 @@ namespace CodeCake
                 _sourceCache = new SourceCacheContext().WithRefreshCacheTrue();
                 _providers = new List<Lazy<INuGetResourceProvider>>();
                 _providers.AddRange( Repository.Provider.GetCoreV3() );
-                SharedHttpClient = new HttpClient();
             }
 
             class Logger : ILogger
@@ -519,7 +511,7 @@ namespace CodeCake
                             req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue( "Basic", basicAuth );
                             var body = GetPromotionJSONBody( p.Name, p.Version.ToNuGetPackageString(), view.ToString() );
                             req.Content = new StringContent( body, Encoding.UTF8, "application/json" );
-                            using( var m = await NuGetHelper.SharedHttpClient.SendAsync( req ) )
+                            using( var m = await StandardGlobalInfo.SharedHttpClient.SendAsync( req ) )
                             {
                                 if( m.IsSuccessStatusCode )
                                 {
