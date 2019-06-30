@@ -244,7 +244,7 @@ namespace CK.Env.NuGet
                         var organization = r.HandleRequiredAttribute<string>( "Organization" );
                         var feedName = r.HandleRequiredAttribute<string>( "FeedName" );
                         var label = r.HandleOptionalAttribute<string>( "Label", null );
-                        var name = "NuGetAzure:" + organization + '-' + feedName;
+                        var name = "Azure:" + organization + '-' + feedName;
                         if( label != null ) name += '-' + label;
                         if( label != null ) label = "@" + label;
                         var url = $"https://pkgs.dev.azure.com/{organization}/_packaging/{feedName}{label}/nuget/v3/index.json";

@@ -21,7 +21,7 @@ namespace CK.Env.NPM
             string scope )
             : base( c,
                     qualityFilter,
-                    $"{scope}->{organization}-{feedName}",
+                    $"Azure:{scope}->{organization}-{feedName}",
                     $"https://pkgs.dev.azure.com/{organization}/_packaging/{feedName}/npm/registry/" )
         {
             Organization = organization;
@@ -52,7 +52,9 @@ namespace CK.Env.NPM
 
         protected override Registry CreateRegistry( IActivityMonitor m )
         {
-            return new Registry( Client.HttpClient, "", ResolveSecret( m, true ), new Uri( Url ) );
+            string pat = ResolveSecret( m, true );
+            pat = Convert.ToBase64String( System.Text.Encoding.UTF8.GetBytes( pat ) );
+            return new Registry( Client.HttpClient, "CKli", pat, new Uri( Url ) );
         }
 
         /// <summary>

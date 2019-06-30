@@ -19,10 +19,10 @@
     </SourceFeeds>
     <TargetRepositories>
       <Repository Type="NuGetAzure" Organization="Signature-OpenSource" FeedName="Default"
-              CheckName="NuGetAzure:Signature-OpenSource-Default"
+              CheckName="NuGet:Azure:Signature-OpenSource-Default"
               CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
       <Repository Type="NuGetStandard" Name="nuget.org" Url="https://api.nuget.org/v3/index.json"
-              CheckName="NuGetStandard:nuget.org"
+              CheckName="NuGet:nuget.org"
               QualityFilter="ReleaseCandidate-Release"
               SecretKeyName="NUGET_ORG_PUSH_API_KEY" />     
     </TargetRepositories>>
@@ -40,8 +40,8 @@
       <add Name="NuGet:Signature-OpenSource" />
     </ArtifactSources>
     <ArtifactTargets>
-      <add Name="NuGetStandard:nuget.org" />
-      <add Name="NuGetAzure:Signature-OpenSource-Default" />
+      <add Name="NuGet:nuget.org" />
+      <add Name="NuGet:Azure:Signature-OpenSource-Default" />
     </ArtifactTargets>
   </SharedSolutionSpec>
 
