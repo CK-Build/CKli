@@ -245,6 +245,17 @@ namespace CK.Env
             }
         }
 
+        [BackgroundCommand(false)]
+        [ParallelCommand(false)]
+        [CommandMethod]
+        public bool RunCommand(IActivityMonitor m, string commandToRun)
+        {
+            if( Environment.OSVersion.Platform != PlatformID.Win32NT )
+            {
+                throw new PlatformNotSupportedException( "Linux not supported yet." );
+            }
+            return ProcessRunner.Run( m, FullPhysicalPath, "cmd", "/c " + commandToRun );
+        }
 
         /// <summary>
         /// Fetches 'origin' (or all remotes) branches into this repository.

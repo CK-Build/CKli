@@ -186,35 +186,31 @@ namespace CKli
                 DumpPayLoad( payload );
                 if( !YesOrNo() ) return;
             }
-            Task task;
-            if( !parallelRun.Value )
-            {
-                task = new Task( () =>
-                {
-                    foreach( var h in handlers )
-                    {
-                        if( appLife.StopRequested( m ) ) break;
-                        h.Execute( m, payload );
-                    }
-                } );
-            }
-            else
-            {
-                task = Task.WhenAll( handlers.Select( h => new Task( () =>
-                   {
-                       ActivityMonitor monitor = new ActivityMonitor();
-                       h.Execute( monitor, payload );
-                   } ) ).ToArray() );
-            }
-
-            if( !backgroundRun.Value )
-            {
-                task.RunSynchronously();
-            }
-            else
+            if( backgroundRun.Value )
             {
                 throw new NotImplementedException();
             }
+
+            if( !parallelRun.Value )
+            {
+
+                foreach( var h in handlers )
+                {
+                    if( appLife.StopRequested( m ) ) break;
+                    h.Execute( m, payload );
+                }
+
+            }
+            else
+            {
+                var tasks = handlers.Select( h => Task.Run( () =>
+                {
+                    ActivityMonitor monitor = new ActivityMonitor();
+                    h.Execute( monitor, payload );
+                } ) ).ToArray();
+                Task.WaitAll( tasks );
+            }
+            
         }
 
 
