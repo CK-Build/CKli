@@ -145,7 +145,7 @@ namespace Npm.Net
                 {
                     Directory.CreateDirectory( tempDirectory );
                     m.Debug( $"Creating temp directory {tempDirectory}." );
-                    using(m.OpenInfo("Creating .npmrc. with content:"))
+                    using( m.OpenInfo( "Creating .npmrc. with content:" ) )
                     using( StreamWriter w = File.CreateText( Path.Combine( tempDirectory, ".npmrc" ) ) )
                     {
                         string uriString = RegistryUri.ToString();
@@ -177,7 +177,7 @@ namespace Npm.Net
                             m.Debug( $"{uriConfig}:_authToken=[REDACTED]" );
                         }
 
-                        if( !string.IsNullOrWhiteSpace(scope) )
+                        if( !string.IsNullOrWhiteSpace( scope ) )
                         {
                             w.WriteLine( scope + $":registry={RegistryUri.ToString()}" );
                             m.Debug( scope + $":registry={RegistryUri.ToString()}" );
@@ -186,6 +186,10 @@ namespace Npm.Net
                     string tarPath = Path.GetFullPath( tarballPath );
                     string distTagArg = distTag != null ? $"--tag {distTag.ToLowerInvariant()}" : "";
                     string access = isPublic ? "public" : "private";
+                    if( Environment.OSVersion.Platform != PlatformID.Win32NT )
+                    {
+                        throw new PlatformNotSupportedException( "Linux not supported yet." );
+                    }
                     return ProcessRunner.Run( m, tempDirectory, "cmd.exe", $"/C npm publish \"{tarPath}\" --access {access} {distTagArg}", LogLevel.Trace );
                 }
                 catch( Exception ex )
