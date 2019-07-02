@@ -253,3 +253,4 @@ paket-files/
 CodeCakeBuilder/Tools/
 Tests/**/TestResult*.xml
 /Tests/A1Test/
+Logs/
