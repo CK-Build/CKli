@@ -7,6 +7,9 @@ using CK.Env;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
 using CK.Text;
+using CK.Monitoring;
+using System.Threading.Tasks;
+using System.Collections.Concurrent;
 
 namespace CKli
 {
@@ -33,15 +36,16 @@ namespace CKli
             throw new InvalidOperationException( "Must be in CK-Env/CKli source." );
         }
 
+
         static void Main( string[] args )
         {
             Console.OutputEncoding = System.Text.Encoding.Unicode;
+            var goc = new GrandOutputConfiguration();
+            goc.Handlers.Add( new CK.Monitoring.Handlers.ConsoleConfiguration() );
+            GrandOutput.EnsureActiveDefault( goc );
             var monitor = new ActivityMonitor();
-            var consoleClient = new ColoredActivityMonitorConsoleClient();
-            monitor.Output.RegisterClient( consoleClient );
             var xFactory = new XTypedFactory();
             xFactory.AutoRegisterFromLoadedAssemblies( monitor );
-
             IBasicApplicationLifetime appLife = new FakeApplicationLifetime();
             var rootPath = GetRootPath( args );
             using( var global = new GlobalContext( monitor, xFactory, rootPath, appLife ) )
@@ -108,81 +112,118 @@ namespace CKli
                 if( rep.StartsWith( "run " ) )
                 {
                     rep = rep.Substring( 4 ).Trim();
-                    var handlersBySig = global.CommandRegister.GetCommands( rep )
-                                            .GroupBy( c => c.PayloadSignature )
-                                            .ToList();
-                    if( handlersBySig.Count == 0 )
-                    {
-                        monitor.Warn( $"Pattern '{rep}' has no match." );
-                    }
-                    else if( handlersBySig.Count == 1 )
-                    {
-                        var firstHandler = handlersBySig[0].First();
-                        bool? globalConfirm = firstHandler.ConfirmationRequired;
-                        if( handlersBySig[0].Any( h => h.ConfirmationRequired != globalConfirm.Value ) )
-                        {
-                            monitor.Warn( "Different ConfirmationRequired found among commands. Each command that requires confirmation must be confirmed. " );
-                            globalConfirm = null;
-                        }
-                        var payload = firstHandler.CreatePayload();
-                        if( ReadPayload( monitor, payload ) )
-                        {
-                            char c = 'Y';
-                            if( globalConfirm == true )
-                            {
-                                Console.WriteLine( "Confirm execution of:" );
-                                foreach( var h in handlersBySig[0] )
-                                {
-                                    Console.WriteLine( h.UniqueName );
-                                }
-                                DumpPayLoad( payload );
-                                Console.WriteLine( "Y/N?" );
-                                while( "YN".IndexOf( (c = Console.ReadKey().KeyChar) ) < 0 ) ;
-                            }
-                            if( c == 'Y' )
-                            {
-                                bool payloadDisplayed = false;
-                                foreach( var h in handlersBySig[0] )
-                                {
-                                    if( globalConfirm == null && h.ConfirmationRequired )
-                                    {
-                                        Console.Write( "Confirm execution of: " );
-                                        Console.Write( h.UniqueName );
-                                        if( payloadDisplayed )
-                                        {
-                                            Console.WriteLine( " (with same payload as before)" );
-                                        }
-                                        else 
-                                        {
-                                            payloadDisplayed = true;
-                                            Console.WriteLine();
-                                            DumpPayLoad( payload );
-                                        }
-                                        Console.WriteLine( "Y/N/C (to cancel all)?" );
-                                        while( "YNC".IndexOf( (c = Console.ReadKey().KeyChar) ) < 0 ) ;
-                                        if( c == 'N' ) continue;
-                                        if( c == 'C' ) break;
-                                    }
-                                    if( appLife.StopRequested( monitor ) ) break;
-                                    h.Execute( monitor, payload );
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        using( monitor.OpenWarn( $"Pattern '{rep}' matches require {handlersBySig.Count} different payloads." ) )
-                        {
-                            foreach( var c in handlersBySig )
-                            {
-                                monitor.Warn( $"{c.Key ?? "<No payload>"}: {c.Select( n => n.UniqueName.ToString() ).Concatenate() }" );
-                            }
-                        }
-                    }
+                    RunCommand( monitor, global, appLife, rep );
                     continue;
                 }
                 Console.WriteLine( "Unrecognized command." );
             }
+        }
+
+        static void RunCommand( ActivityMonitor m, GlobalContext global, IBasicApplicationLifetime appLife, string rep )
+        {
+            var handlers = global.CommandRegister.GetCommands( rep );
+            var handlersBySig = handlers
+                                    .GroupBy( c => c.PayloadSignature )
+                                    .ToList();
+            if( handlersBySig.Count == 0 )
+            {
+                m.Warn( $"Pattern '{rep}' has no match." );
+                return;
+            }
+            if( handlersBySig.Count != 1 )
+            {
+                using( m.OpenWarn( $"Pattern '{rep}' matches require {handlersBySig.Count} different payloads." ) )
+                {
+                    foreach( var c in handlersBySig )
+                    {
+                        m.Warn( $"{c.Key ?? "<No payload>"}: {c.Select( n => n.UniqueName.ToString() ).Concatenate() }" );
+                    }
+                }
+                return;
+            }
+            var firstHandler = handlers.First();
+            bool? parallelRun = firstHandler.ParallelRun;
+            bool? globalConfirm = firstHandler.ConfirmationRequired;
+            bool? backgroundRun = firstHandler.BackgroundRun;
+
+            if( handlers.Any( h => h.ConfirmationRequired != globalConfirm.Value ) )
+            {
+                m.Error( "Different ConfirmationRequired found among commands. All commands must have the same ConfirmationRequired " );
+                return;
+            }
+            if( handlers.Any( h => h.BackgroundRun != backgroundRun ) )
+            {
+                m.Error( "Different BackgroundCommandAttribute found among commands. All commands must have the same attributes and identically configured attribute." );
+                return;
+            }
+            if( handlers.Any( h => h.ParallelRun != parallelRun ) )
+            {
+                m.Error( "Different ParallelCommandAttribute found among commands. All commands must have the same attributes and identically configured attribute." );
+                return;
+            }
+            var payload = firstHandler.CreatePayload();
+            if( !ReadPayload( m, payload ) ) return;
+
+            if( parallelRun == null )
+            {
+                Console.WriteLine( "The selected command(s) can be run in parallel. Do you want to run them in parallel ?" );
+                parallelRun = YesOrNo();
+            }
+
+            if( backgroundRun == null )
+            {
+                Console.WriteLine( "The selected command(s) can be run in background. Do you want to run them in background ?" );
+                backgroundRun = YesOrNo();
+            }
+
+            if( globalConfirm == true )
+            {
+                Console.WriteLine( "Confirm execution of:" );
+                foreach( var h in handlers )
+                {
+                    Console.WriteLine( h.UniqueName );
+                }
+                DumpPayLoad( payload );
+                if( !YesOrNo() ) return;
+            }
+            Task task;
+            if( !parallelRun.Value )
+            {
+                task = new Task( () =>
+                {
+                    foreach( var h in handlers )
+                    {
+                        if( appLife.StopRequested( m ) ) break;
+                        h.Execute( m, payload );
+                    }
+                } );
+            }
+            else
+            {
+                task = Task.WhenAll( handlers.Select( h => new Task( () =>
+                   {
+                       ActivityMonitor monitor = new ActivityMonitor();
+                       h.Execute( monitor, payload );
+                   } ) ).ToArray() );
+            }
+
+            if( !backgroundRun.Value )
+            {
+                task.RunSynchronously();
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+
+        static bool YesOrNo()
+        {
+            char c;
+            Console.WriteLine( "Y/N?" );
+            while( "YN".IndexOf( (c = Console.ReadKey().KeyChar) ) < 0 ) ;
+            return c == 'Y';
         }
 
         static void DumpPayLoad( object payload )
@@ -254,9 +295,9 @@ namespace CKli
                 {
                     bool isFlags = f.Type.GetCustomAttributes( typeof( FlagsAttribute ), false ).Length > 0;
                     Console.WriteLine( isFlags ? "Combinable flags:" : "Values: " );
-                    foreach( var enumValue in Enum.GetValues(f.Type) )
+                    foreach( var enumValue in Enum.GetValues( f.Type ) )
                     {
-                        Console.WriteLine( $"    {Convert.ChangeType( enumValue, Enum.GetUnderlyingType(f.Type))}:{Enum.GetName(f.Type, enumValue)}" );
+                        Console.WriteLine( $"    {Convert.ChangeType( enumValue, Enum.GetUnderlyingType( f.Type ) )}:{Enum.GetName( f.Type, enumValue )}" );
                     }
                     var s = ReadNullableString();
                     if( s == null )
@@ -330,7 +371,7 @@ namespace CKli
 
         static bool? ReadNullableBoolean()
         {
-            for( ; ;)
+            for(; ; )
             {
                 string s = ReadNullableString();
                 if( s == null ) return null;

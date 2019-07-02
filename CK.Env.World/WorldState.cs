@@ -4,9 +4,11 @@ using CK.Text;
 using CSemVer;
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 
 namespace CK.Env
@@ -22,6 +24,7 @@ namespace CK.Env
             readonly SolutionContext _context;
             readonly PairList _pairList;
             SolutionDependencyContext _depContext;
+            ConcurrentQueue<Task> _backgroundTasks;
 
             internal WorldBranchContext( string branchName )
             {
@@ -122,7 +125,6 @@ namespace CK.Env
 
         readonly DriversCollection _solutionDrivers;
         readonly HashSet<IGitRepository> _gitRepositories;
-        readonly IActivityMonitorFilteredClient _userMonitorClient;
 
         readonly IBasicApplicationLifetime _appLife;
 
@@ -147,14 +149,12 @@ namespace CK.Env
             IWorldName worldName,
             bool isPublicWorld,
             IEnvLocalFeedProvider localFeedProvider,
-            IActivityMonitorFilteredClient userMonitorClient,
             IBasicApplicationLifetime appLife )
         {
             _artifacts = artifacts ?? throw new ArgumentNullException( nameof( artifacts ) );
             _store = store ?? throw new ArgumentNullException( nameof( store ) );
             WorldName = worldName ?? throw new ArgumentNullException( nameof( worldName ) );
             _localFeedProvider = localFeedProvider ?? throw new ArgumentNullException( nameof( localFeedProvider ) );
-            _userMonitorClient = userMonitorClient;
             IsPublicWorld = isPublicWorld;
             _appLife = appLife;
             _solutionDrivers = new DriversCollection();
@@ -372,9 +372,9 @@ namespace CK.Env
 
         void DoSetUserLogFilter( IActivityMonitor m, LogFilter filter, bool saveOnChange )
         {
-            if( _userMonitorClient.MinimalFilter != filter )
+            if( m.MinimalFilter != filter )
             {
-                _userMonitorClient.MinimalFilter = filter;
+                m.MinimalFilter = filter;
                 _rawState.GeneralState.SetAttributeValue( "UserLogFilter", filter.ToString() );
                 m.UnfilteredLog( ActivityMonitor.Tags.Empty, LogLevel.Info, $"User Log Filter level set to '{filter}' (actual filter is '{m.ActualFilter}').", m.NextLogTime(), null );
                 if( saveOnChange ) Save( m );

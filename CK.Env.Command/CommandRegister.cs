@@ -34,7 +34,7 @@ namespace CK.Env
             readonly Func<bool> _enabled;
             readonly ParameterInfo[] _parameters;
 
-            public MethodHandler( bool confirmationRequired, NormalizedPath n, object instance, MethodInfo method, ParameterInfo[] parameters, Func<bool> enabled )
+            public MethodHandler( bool confirmationRequired,bool? parallelRun, bool? backgroundRun, NormalizedPath n, object instance, MethodInfo method, ParameterInfo[] parameters, Func<bool> enabled )
             {
                 ConfirmationRequired = confirmationRequired;
                 UniqueName = n;
@@ -45,6 +45,8 @@ namespace CK.Env
                               ? null
                               : '(' + parameters.Skip(1).Select( p => p.Name ).Concatenate() + ')';
                 _enabled = enabled;
+                ParallelRun = parallelRun;
+                BackgroundRun = backgroundRun;
             }
 
             public bool ConfirmationRequired { get; }
@@ -54,6 +56,10 @@ namespace CK.Env
             public bool GetEnabled() => _enabled != null ? _enabled() : true;
 
             public string PayloadSignature { get; }
+
+            public bool? ParallelRun { get; }
+
+            public bool? BackgroundRun { get; }
 
             public object CreatePayload()
             {
@@ -105,7 +111,11 @@ namespace CK.Env
             {
                 throw new ArgumentException( $"Method {method} for command '{uniqueName}' must have a first IActivityMonitor parameter.", nameof( method ) );
             }
-            var h = new MethodHandler( confirmationRequired, uniqueName, o, method, parameters, enabled );
+            var parallelAttribute = method.GetCustomAttribute<ParallelCommandAttribute>();
+            var backgroundAttribute = method.GetCustomAttribute<BackgroundCommandAttribute>();
+            bool? runParallel = parallelAttribute == null ? false : parallelAttribute.AlwaysRunInParallel ? true : (bool?)null;
+            bool? runBackground = backgroundAttribute == null ? false : backgroundAttribute.AlwaysRunInBackground ? true : (bool?)null;
+            var h = new MethodHandler( confirmationRequired, runParallel, runBackground, uniqueName, o, method, parameters, enabled );
             _commands.Add( uniqueName, h );
             return h;
         }

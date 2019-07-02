@@ -23,6 +23,17 @@ namespace CK.Env
         bool ConfirmationRequired { get; }
 
         /// <summary>
+        /// Gets whether this command should be run in parallel.
+        /// <see langword="null"/> means ask the user.
+        /// </summary>
+        bool? ParallelRun { get; }
+
+        /// <summary>
+        /// Gets whether this command should be run in parallel.
+        /// </summary>
+        bool? BackgroundRun { get; }
+
+        /// <summary>
         /// Gets the signature of the payload.
         /// Can be null.
         /// </summary>

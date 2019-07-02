@@ -18,7 +18,6 @@ namespace CKli
         readonly IWorldName _world;
         readonly IEnvLocalFeedProvider _localFeeds;
         readonly WorldState _worldState;
-        readonly IActivityMonitorFilteredClient _userMonitorFilter;
 
         public XWorldState(
             FileSystem fileSystem,
@@ -34,9 +33,7 @@ namespace CKli
             _world = world;
             _localFeeds = localFeeds;
             bool isPublic = initializer.Reader.HandleRequiredAttribute<bool>( "IsPublic" );
-            _userMonitorFilter = initializer.Monitor.Output.Clients.OfType<IActivityMonitorFilteredClient>().FirstOrDefault();
-            if( _userMonitorFilter == null ) throw new InvalidOperationException();
-            _worldState = new WorldState( commandRegister, artifacts, worldStore, world, isPublic, _localFeeds, _userMonitorFilter, appLife )
+            _worldState = new WorldState( commandRegister, artifacts, worldStore, world, isPublic, _localFeeds, appLife )
             {
                 VersionSelector = new ReleaseVersionSelector()
             };
@@ -77,7 +74,7 @@ namespace CKli
                 final = ActivityMonitor.DefaultFilter;
                 isLogFilterDefault = true;
             }
-            var msg = $"Monitor filters: User:'{_userMonitorFilter.MinimalFilter}', Monitor.MinimalFilter:'{m.MinimalFilter}' => Final:'{final}'{(isLogFilterDefault ? "(AppDomain's default)" : "")}.";
+            var msg = $"Monitor filters: Monitor.MinimalFilter:'{m.MinimalFilter}' => Final:'{final}'{(isLogFilterDefault ? "(AppDomain's default)" : "")}.";
             m.UnfilteredLog( ActivityMonitor.Tags.Empty, LogLevel.Info, msg, m.NextLogTime(), null );
 
             int gitFoldersCount = 0;
