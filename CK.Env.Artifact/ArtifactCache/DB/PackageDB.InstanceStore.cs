@@ -140,49 +140,6 @@ namespace CK.Env
                 };
                 int end = ~_instances.AsSpan().BinarySearch( new Comparable( rEnd ) );
                 return all.Slice( start, end - start );
-
-                //int start = -1;
-                //int lo = 0;
-                //int hi = all.Count - 1;
-                //int end = hi+1;
-                //while( lo <= hi )
-                //{
-                //    int i = (int)(((uint)hi + (uint)lo) >> 1);
-                //    int cmp = comparable.CompareTo( all[i] );
-                //    if( cmp < 0 )
-                //    {
-                //        lo = i + 1;
-                //    }
-                //    else
-                //    {
-                //        if( cmp == 0 )
-                //        {
-                //            if( i == 0 )
-                //            {
-                //                start = 0;
-                //                break;
-                //            }
-                //            cmp = comparable.CompareTo( all[--i] );
-                //            if( cmp != 0 )
-                //            {
-                //                Debug.Assert( cmp < 0 );
-                //                start = i + 1;
-                //                break;
-                //            }
-                //            if( i == 0 )
-                //            {
-                //                start = i;
-                //                break;
-                //            }
-                //            hi = i - 1;
-                //        }
-                //        else
-                //        {
-                //            end = hi;
-                //            hi = i - 1;
-                //        }
-                //    }
-                //}
             }
         }
 

@@ -26,7 +26,7 @@ namespace CK.Env
 
         /// <summary>
         /// Gets or sets the savors if any.
-        /// <see cref="CKTrait.IsEmpty"/> is forbidden and raises an ArgumentExceptiuon if set.
+        /// It is null by default, and note that <see cref="CKTrait.IsEmpty"/> is forbidden and raises an ArgumentExceptiuon if set.
         /// </summary>
         public CKTrait Savors
         {
