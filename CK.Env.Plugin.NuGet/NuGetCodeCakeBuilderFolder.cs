@@ -28,15 +28,12 @@ namespace CK.Env.Plugin
         protected override void DoApplySettings( IActivityMonitor m )
         {
             var solution = _driver.GetSolution( m );
-            if( solution == null ) return;
-
             bool hasDotNetPackages = solution.GeneratedArtifacts.Any( g => g.Artifact.Type == NuGetClient.NuGetType );
 
             if( hasDotNetPackages )
             {
                 SetTextResource( m, "dotnet/Build.NuGetArtifactType.cs", text => AdaptBuildNugetRepositoryForPushFeeds( text, solution ) );
                 SetTextResource( m, "dotnet/Build.NuGetHelper.cs" );
-                SetTextResource( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
             }
             else
             {

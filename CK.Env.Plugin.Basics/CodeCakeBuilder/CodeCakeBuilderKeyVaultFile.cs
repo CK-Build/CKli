@@ -38,7 +38,6 @@ namespace CK.Env.Plugin
         {
             if( !_f.EnsureDirectory( m ) ) return;
             var s = _driver.GetSolution( m );
-            if( s == null ) return;
 
             var passPhrase = _secretStore.GetSecretKey( m, "CODECAKEBUILDER_SECRET_KEY", true );
 

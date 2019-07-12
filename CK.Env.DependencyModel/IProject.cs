@@ -72,7 +72,7 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets the project name: it can be the <see cref="SimpleProjectName"/>, prefixed or
         /// not by the <see cref="Solution.Name"/> and automatically prefixed by (<see cref="Type"/>)
-        /// or the specified with <see cref="SolutionRelativeFolderPath"/> in case of conflicts
+        /// or with <see cref="SolutionRelativeFolderPath"/> in case of conflicts
         /// with other projects in the <see cref="SolutionContext"/>.
         /// Given that the solution name is unique by design and that only one project of a given type can
         /// be defined in a folder, this name is eventually always unique. 

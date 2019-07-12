@@ -36,6 +36,12 @@ namespace CK.Env
         ISolution GetSolution( IActivityMonitor monitor, bool reloadSolution );
 
         /// <summary>
+        /// Gets wether the Solution that this driver handles is valid or not.
+        /// </summary>
+        /// <returns></returns>
+        bool IsSolutionValid { get; }
+
+        /// <summary>
         /// Updates projects dependencies and saves the solution and its updated projects.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>

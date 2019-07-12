@@ -20,7 +20,6 @@ namespace CK.Env.Plugin
         protected override void DoApplySettings( IActivityMonitor m )
         {
             var s = _driver.GetSolution( m );
-            if( s == null ) return;
 
             bool needDotNetBuild = s.Projects.Any( p => p.Type == ".Net" && p != s.BuildProject );
 
@@ -60,25 +59,18 @@ namespace CK.Env.Plugin
             SetTextResource( m, "Abstractions/ArtifactPush.cs" );
             SetTextResource( m, "Abstractions/ArtifactType.cs" );
             SetTextResource( m, "Abstractions/ILocalArtifact.cs" );
-
+            SetTextResource( m, "Abstractions/ISolution.cs" );
+            SetTextResource( m, "Abstractions/ISolutionProducingArtifact.cs" );
 
             if( needDotNetBuild )
             {
-                SetTextResource( m, "dotnet/Build.StandardSolutionBuild.cs" );
-                if( _solutionSpec.NoDotNetUnitTests )
-                {
-                    m.Info( "Removing Build.StandardUnitTests since NoDotNetUnitTests is true." );
-                    DeleteFile( m, "dotnet/Build.StandardUnitTests.cs" );
-                }
-                else
-                {
-                    SetTextResource( m, "dotnet/Build.StandardUnitTests.cs" );
-                }
+                SetTextResource( m, "dotnet/DotnetSolution.cs" );
             }
             else
             {
                 m.Info( "Removing all files for .Net projects." );
 
+                DeleteFile( m, "dotnet/DotnetSolution.cs" );
                 DeleteFile( m, "dotnet/Build.StandardSolutionBuild.cs" );
                 DeleteFile( m, "dotnet/Build.NuGetArtifactType.cs" );
                 DeleteFile( m, "dotnet/Build.NuGetHelper.cs" );
@@ -98,6 +90,5 @@ namespace CK.Env.Plugin
             }
             return text;
         }
-
     }
 }

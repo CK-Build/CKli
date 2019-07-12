@@ -8,7 +8,7 @@ For Invenietis/Signature Code internal use only.
 
 ## A word about authentication
 
-Private repositories (like `invenietis.visualstudio.com`) use the Git credentials stored on **Windows** by another Got tool (like Git for Windows).
+Private repositories (like `invenietis.visualstudio.com`) use the Git credentials stored on **Windows** by another Git tool (like Git for Windows).
 
 You'll need to check out a private repository externally and save your credentials once before executing CKli, or authentication will fail because no credentials can be found on your machine.
 

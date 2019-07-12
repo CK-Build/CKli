@@ -128,9 +128,13 @@ namespace CK.Env.MSBuildSln
                 {
                     TargetFrameworks = Traits.FindOrCreate( f.Value );
 
-                    LangVersion = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "LangVersion" ).FirstOrDefault()?.Value;
-                    OutputType = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "OutputType" ).FirstOrDefault()?.Value;
-
+                    LangVersion = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "LangVersion" ).LastOrDefault()?.Value;
+                    OutputType = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "OutputType" ).LastOrDefault()?.Value;
+                    IsPackable = (bool?)_file.Document.Root.Elements( "PropertyGroup" ).Elements( "IsPackable" ).LastOrDefault();
+                    if(IsPackable == false)
+                    {
+                        
+                    }
                     DoInitializeDependencies( m );
                     if( !_dependencies.IsInitialized ) _file = null;
                 }
@@ -141,6 +145,8 @@ namespace CK.Env.MSBuildSln
             }
             return _file;
         }
+
+        public bool? IsPackable { get; private set; }
 
         /// <summary>
         /// Gets the LangVersion value of the primary project file.
@@ -345,6 +351,21 @@ namespace CK.Env.MSBuildSln
         }
 
         /// <summary>
+        /// Sets the value or remove the IsPackable element.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="isPackable">The new IsPackable or <see langword="null"/> to remove it.</param>
+        /// <returns></returns>
+        public bool SetIsPackable(IActivityMonitor m, bool? isPackable)
+        {
+            if(isPackable != IsPackable)
+            {
+                DoSetSimpleProperty( m, "IsPackable", isPackable.ToString() );
+            }
+            return true;
+        }
+
+        /// <summary>
         /// Removes the <see cref="Dependencies.UselessDependencies"/> and returns the number of changes.
         /// </summary>
         /// <param name="m">The monitor.</param>
@@ -439,13 +460,18 @@ namespace CK.Env.MSBuildSln
             {
                 if( p.Origin.Name.LocalName == "PackageReference" )
                 {
-                    if( p.Origin.Attribute( "Include" ) != null )
+                    if( p.Origin.Attribute( "Include" ) == null )
+                    {
+                        m.Warn( "PackageReference that are not Include are not supported and ignored." );
+                        continue;
+                    }
+                    else
                     {
                         bool isPropVersion;
                         bool versionLocked = false;
                         SVersion version = null;
-                        if( String.IsNullOrWhiteSpace( p.PackageId )
-                            || String.IsNullOrWhiteSpace( p.RawVersion )
+                        if( string.IsNullOrWhiteSpace( p.PackageId )
+                            || string.IsNullOrWhiteSpace( p.RawVersion )
                             || (
                                  !(isPropVersion = p.RawVersion.StartsWith( "$(" ))
                                  && !((versionLocked, version) = SVersionRange.TryParseSimpleRange( m, p.RawVersion )).version.IsValid
@@ -473,15 +499,9 @@ namespace CK.Env.MSBuildSln
                         {
                             m.Warn( $"Useless PackageReference (applies to undeclared frameworks): {p.Origin}." );
                             uselessDeps.Add( p.Origin );
+                            continue;
                         }
-                        else
-                        {
-                            deps.Add( new DeclaredPackageDependency( this, p.PackageId, versionLocked, version, p.Origin, propertyDef, frameworks ) );
-                        }
-                    }
-                    else
-                    {
-                        m.Warn( "PackageReference that are not Include are not supported and ignored." );
+                        deps.Add( new DeclaredPackageDependency( this, p.PackageId, versionLocked, version, p.Origin, propertyDef, frameworks ) );
                     }
                 }
                 else
@@ -497,8 +517,9 @@ namespace CK.Env.MSBuildSln
                     var target = Solution.MSProjects.FirstOrDefault( pRef => pRef.ProjectName == projectName );
                     if( target == null )
                     {
-                        m.Error( $"ProjectReference '{p.PackageId}' not found in the solution. Project name '{projectName}' must exist in the solution." );
-                        return;
+                        m.Warn( $"ProjectReference '{p.PackageId}' not found in the solution. Project name '{projectName}' should exist in the solution." );
+                        uselessDeps.Add( p.Origin );
+                        continue;
                     }
                     CKTrait frameworks = ComputeFrameworks( m, p.Origin, conditionEvaluator );
                     if( frameworks == null ) return;
@@ -506,11 +527,9 @@ namespace CK.Env.MSBuildSln
                     {
                         m.Warn( $"Useless ProjectReference (applies to undeclared frameworks): {p.Origin}." );
                         uselessDeps.Add( p.Origin );
+                        continue;
                     }
-                    else
-                    {
-                        projs.Add( new ProjectToProjectDependency( this, target, frameworks, p.Origin ) );
-                    }
+                    projs.Add( new ProjectToProjectDependency( this, target, frameworks, p.Origin ) );
                 }
             }
             // Consider Solution level dependency as active for all TargetFrameworks.

@@ -1,3 +1,5 @@
+using System;
+
 namespace CK.Env.DependencyModel
 {
     /// <summary>
@@ -22,7 +24,7 @@ namespace CK.Env.DependencyModel
 
         internal ProjectReference( IProject o, IProject t, ProjectDependencyKind kind )
         {
-            Owner = o;
+            Owner = o ?? throw new ArgumentNullException();
             Target = t;
             Kind = kind;
         }

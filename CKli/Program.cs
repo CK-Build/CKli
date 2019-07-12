@@ -10,6 +10,8 @@ using CK.Text;
 using CK.Monitoring;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Text;
 
 namespace CKli
 {
@@ -39,7 +41,6 @@ namespace CKli
 
         static void Main( string[] args )
         {
-            Console.OutputEncoding = System.Text.Encoding.Unicode;
             var goc = new GrandOutputConfiguration();
             goc.Handlers.Add( new CK.Monitoring.Handlers.ConsoleConfiguration() );
             GrandOutput.EnsureActiveDefault( goc );

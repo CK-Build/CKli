@@ -31,7 +31,6 @@ namespace CK.Env.Plugin
             YamlMapping firstMapping = GetFirstMapping( m, true );
             if( firstMapping == null ) return;
             var solution = _driver.GetSolution( m );
-            if( solution == null ) return;
 
             // We don't use AppVeyor for private repositories.
             if( !GitFolder.IsPublic ) 

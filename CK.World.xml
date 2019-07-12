@@ -8,7 +8,7 @@
   <LoadLibrary Name="CK.Env.Plugin.NPM" />
   <LoadLibrary Name="CK.Env.Plugin.CKSetup" />
   <LoadLibrary Name="CK.Env.Plugin.NuGet" />
-
+  <LoadLibrary Name="CK.Env.Plugin.Dotnet" />
   <SharedHttpClient />
   <ArtifactCenter />
   <LocalFeedProvider />
@@ -312,7 +312,7 @@
 
     <GitFolder Name="CK-Crs" Url="https://github.com/Invenietis/crs.git">
       <Branch Name="develop">
-        <SolutionSpec>
+        <SolutionSpec PublishProjectInDirectories="true">
           <NPMProjects>
             <add Folder="js/crs-client" PackageName="@signature/crs-client" />
             <add Folder="js/crs-client-signalr" PackageName="@signature/crs-client-signalr" />

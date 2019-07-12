@@ -24,7 +24,6 @@ namespace CK.Env
             readonly SolutionContext _context;
             readonly PairList _pairList;
             SolutionDependencyContext _depContext;
-            ConcurrentQueue<Task> _backgroundTasks;
 
             internal WorldBranchContext( string branchName )
             {
@@ -80,7 +79,8 @@ namespace CK.Env
             {
                 foreach( var d in _drivers )
                 {
-                    if( d.GetSolution( m, forceReload ) == null )
+                    d.GetSolution( m, forceReload );
+                    if(!d.IsSolutionValid )
                     {
                         m.Error( $"Failed to load solution from '{d.GitRepository.SubPath}'." );
                         return false;

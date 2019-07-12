@@ -32,7 +32,6 @@ namespace CK.Env.Plugin
         {
             if( !_f.EnsureDirectory( m ) ) return;
             var solution = _solutionDriver.GetSolution( m );
-            if( solution == null ) return;
 
             var framework = MSProject.Traits.FindOrCreate( "netcoreapp2.1" );
 

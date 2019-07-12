@@ -74,7 +74,8 @@ namespace CK.Env
             {
                 foreach( var d in _drivers )
                 {
-                    if( d.GetSolution( m, forceReload ) == null )
+                    d.GetSolution( m, forceReload );
+                    if(!d.IsSolutionValid)
                     {
                         m.Error( $"Failed to load solution from '{d.GitRepository.SubPath}'." );
                         return false;
@@ -84,9 +85,22 @@ namespace CK.Env
                 {
                     LogFilter final = m.ActualFilter;
                     if( final == LogFilter.Undefined ) final = ActivityMonitor.DefaultFilter;
-                    _depContext = _context != null
-                                   ? _context.GetDependencyAnalyser( m, final == LogFilter.Debug ).DefaultDependencyContext
-                                   : DependencyAnalyzer.Create( m, _drivers.Select( d => d.GetSolution( m, false ) ).ToList(), final == LogFilter.Debug ).DefaultDependencyContext;
+                    SolutionDependencyContext solutionDependencyContext;
+                    if( _context != null )
+                    {
+                        solutionDependencyContext = _context.GetDependencyAnalyser( m, final == LogFilter.Debug ).DefaultDependencyContext;
+                    }
+                    else
+                    {
+                        var da = DependencyAnalyzer.Create( m, _drivers.Select( d => d.GetSolution( m, false ) ).ToList(), final == LogFilter.Debug );
+                        if(da == null)
+                        {
+                            m.Error( "Error while creating the DependencyAnalyzer." );
+                            return false;
+                        }
+                        solutionDependencyContext = da.DefaultDependencyContext;
+                    }
+                    _depContext = solutionDependencyContext;
                     if( !_depContext.HasError )
                     {
                         Debug.Assert( _drivers.Count() == _depContext.Solutions.Count );

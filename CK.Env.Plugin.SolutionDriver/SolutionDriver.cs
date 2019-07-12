@@ -9,6 +9,7 @@ using CK.Env.Diff;
 using CK.Env.MSBuildSln;
 using CK.Text;
 using CSemVer;
+using CK.Env;
 
 namespace CK.Env.Plugin
 {
@@ -111,11 +112,11 @@ namespace CK.Env.Plugin
                     LoadSolution( monitor );
                 }
             }
-            if( (_isSolutionValid ? _solution : null) == null )
+            if(_solution == null)
             {
-
+                throw new NullReferenceException();
             }
-            return _isSolutionValid ? _solution : null;
+            return _solution;
         }
 
         void LoadSolution( IActivityMonitor m )
@@ -137,6 +138,7 @@ namespace CK.Env.Plugin
             var projectsToRemove = new HashSet<DependencyModel.Project>( _solution.Projects );
             var orderedProjects = new DependencyModel.Project[_sln.MSProjects.Count];
             int i = 0;
+            bool badPack = false;
             foreach( var p in _sln.MSProjects )
             {
                 if( p.ProjectName != p.SolutionRelativeFolderPath.LastPart )
@@ -144,6 +146,37 @@ namespace CK.Env.Plugin
                     m.Warn( $"Project named {p.ProjectName} should be in folder of the same name, not in {p.SolutionRelativeFolderPath.LastPart}." );
                 }
                 Debug.Assert( p.ProjectFile != null );
+
+                bool doPack = p.IsPackable ?? true;
+                if( doPack == true )
+                {
+                    if( _solutionSpec.NotPublishedProjects.Contains( p.Path ) )
+                    {
+                        m.Error( $"Project {p.ProjectName} that must not be published have the Element IsPackable not set to false." );
+                        badPack = true;
+                    }
+                    else if(
+                        !_solutionSpec.TestProjectsArePublished
+                        && (p.Path.Parts.Contains( "Tests" )
+                            || p.ProjectName.EndsWith( ".Tests" )) )
+                    {
+                        m.Error( $"Tests Project {p.ProjectName} does not have IsPackable set to false." );
+                        badPack = true;
+                    }
+                    else if( p.ProjectName.ToLower() == "CodeCakeBuilder".ToLower() )
+                    {
+                        m.Error( $"CodeCakeBuilder Project does not have IsPackable set to false." );
+                    }
+                    else
+                    {
+                        m.Info( $"Project {p.ProjectName} will be publised." );
+                    }
+                }
+                else
+                {
+                    m.Info( "Project is set to not be packed. This project won't be published." );
+                }
+
                 var (project, isNewProject) = _solution.AddOrFindProject( p.SolutionRelativeFolderPath, ".Net", p.ProjectName );
                 project.Tag( p );
                 if( isNewProject )
@@ -160,7 +193,7 @@ namespace CK.Env.Plugin
             }
             foreach( var noMore in projectsToRemove ) _solution.RemoveProject( noMore );
 
-            _isSolutionValid = true;
+            _isSolutionValid = !badPack;
             var h = OnSolutionConfiguration;
             if( h != null )
             {
@@ -195,10 +228,17 @@ namespace CK.Env.Plugin
                 }
                 else
                 {
-                    mustPublish = !spec.NotPublishedProjects.Contains( project.SolutionRelativeFolderPath )
-                                  &&
-                                  (project.SolutionRelativeFolderPath.Parts.Count == 1
-                                    || (project.IsTestProject && spec.TestProjectsArePublished));
+                    bool notPublished = !spec.NotPublishedProjects.Contains( project.SolutionRelativeFolderPath );
+                    bool notRootDirectory = project.SolutionRelativeFolderPath.Parts.Count == 1;
+                    
+
+
+                    bool ignoreNotRoot = spec.PublishProjectInDirectories && !project.IsTestProject;
+                    mustPublish = project.Tag<MSProject>().IsPackable // we bindly follow the IsPackable. If it's not defined we must think.
+                        ??(notPublished
+                            &&
+                            (notRootDirectory || ignoreNotRoot
+                            || (project.IsTestProject && spec.TestProjectsArePublished)));
                 }
                 if( mustPublish )
                 {
@@ -241,6 +281,10 @@ namespace CK.Env.Plugin
                 if( dep.TargetProject is MSProject target )
                 {
                     var mapped = depsFinder( target );
+                    if( mapped == null )
+                    {
+                        throw new NullReferenceException();
+                    }
                     project.EnsureProjectReference( mapped, ProjectDependencyKind.Transitive );
                     toRemove.Remove( mapped );
                 }
@@ -305,7 +349,7 @@ namespace CK.Env.Plugin
                 Console.WriteLine( "This Solution don't have any external references." );
             }
 
-            Console.WriteLine( $"External dependency of the Solution {GetSolution(m).Name}:" );
+            Console.WriteLine( $"External dependency of the Solution {GetSolution( m ).Name}:" );
             foreach( PackageReference externalRef in packages )
             {
                 Console.WriteLine( "====|" + externalRef.ToString() );
@@ -454,11 +498,11 @@ namespace CK.Env.Plugin
             return GitFolder.Commit( m, "Local build auto commit.", amend ? CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage : CommitBehavior.CreateNewCommit );
         }
 
-        [CommandMethod(confirmationRequired:false)]
-        public bool Reload(IActivityMonitor m)
+        [CommandMethod( confirmationRequired: false )]
+        public bool Reload( IActivityMonitor m )
         {
             LoadSolution( m );
-            return true;
+            return _isSolutionValid;
         }
 
         /// <summary>

@@ -15,7 +15,7 @@ namespace CK.Env.DependencyModel
         readonly List<Project> _projects;
         readonly List<IArtifactRepository> _artifactTargets;
         readonly List<IArtifactSource> _artifactSources;
-        SolutionContext _ctx;
+        readonly SolutionContext _ctx;
         Project _buildProject;
         int _version;
 
@@ -144,8 +144,8 @@ namespace CK.Env.DependencyModel
         /// <returns>The project and whether it has been created or not.</returns>
         public (Project Project, bool Created) AddOrFindProject( NormalizedPath solutionRelativeFolderPath, string type, string simpleProjecName )
         {
-            if( String.IsNullOrWhiteSpace( type ) ) throw new ArgumentNullException( nameof( type ) );
-            if( String.IsNullOrWhiteSpace( simpleProjecName ) ) throw new ArgumentNullException( nameof( simpleProjecName ) );
+            if( string.IsNullOrWhiteSpace( type ) ) throw new ArgumentNullException( nameof( type ) );
+            if( string.IsNullOrWhiteSpace( simpleProjecName ) ) throw new ArgumentNullException( nameof( simpleProjecName ) );
             var fullFolderPath = FullPath.Combine( solutionRelativeFolderPath );
             var newOne = new Project( this, solutionRelativeFolderPath, fullFolderPath, type, simpleProjecName );
             Debug.Assert( newOne.Name == null );
