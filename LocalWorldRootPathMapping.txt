@@ -4,3 +4,4 @@ ENGIE > C:\Dev\ENGIE
 A1Test > C:\Dev\CKEnvTest\A1Test
 A2Test > C:\Dev\CKEnvTest\A2Test
 A2TestPrivate > C:\Dev\CKEnvTest\A2TestPrivate
+CK > C:\Dev\CK

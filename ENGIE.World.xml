@@ -61,6 +61,24 @@
       </Branch>
     </GitFolder>
 
+    <GitFolder Name="CK-DB-Geo" Url="https://invenietis@dev.azure.com/invenietis/CK/_git/CK-DB-Geo">
+      <Branch Name="develop">
+        <SolutionSpec/>
+      </Branch>
+    </GitFolder>
+
+    <GitFolder Name="CK-Operations" Url="https://invenietis@dev.azure.com/invenietis/CK/_git/CK-Operations">
+      <Branch Name="develop">
+        <SolutionSpec/>
+      </Branch>
+    </GitFolder>
+
+    <GitFolder Name="CK-Gis" Url="https://invenietis.visualstudio.com/DefaultCollection/CK/_git/CK-Gis">
+      <Branch Name="develop">
+        <SolutionSpec/>
+      </Branch>
+    </GitFolder>
+
     <GitFolder Name="Feedermarket-Functions" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions">
       <Branch Name="develop">
         <SolutionSpec/>
@@ -82,6 +100,32 @@
           </ArtifactTargets>
           <NPMProjects>
             <add Folder="js/" PackageName="@engie/data-weather-sdk" />
+          </NPMProjects>
+        </SolutionSpec>
+      </Branch>
+    </GitFolder>
+
+    <GitFolder Name="Engie-LayerSdk" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Engie-LayerSdk">
+      <Branch Name="develop">
+        <SolutionSpec>
+          <ArtifactTargets>
+            <add Name="NPMAzure:@engie->invenietis-engie" />
+          </ArtifactTargets>
+          <NPMProjects>
+            <add Folder="dist/" PackageName="@engie/nemo-layer-sdk" />
+          </NPMProjects>
+        </SolutionSpec>
+      </Branch>
+    </GitFolder>
+
+    <GitFolder Name="Engie-SharedComponents" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Engie-SharedComponents">
+      <Branch Name="develop">
+        <SolutionSpec>
+          <ArtifactTargets>
+            <add Name="NPMAzure:@engie->invenietis-engie" />
+          </ArtifactTargets>
+          <NPMProjects>
+            <add Folder="src/" PackageName="@engie/shared-components" />
           </NPMProjects>
         </SolutionSpec>
       </Branch>
@@ -193,8 +237,20 @@
 
     <GitFolder Name="Nemo-Model" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Nemo-Model">
       <Branch Name="develop">
-        <SolutionSpec />
+        <SolutionSpec NoStrongNameSigning="True" />
       </Branch>
     </GitFolder>
+
+    <GitFolder Name="Nemo-Data" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Nemo-Data">
+      <Branch Name="develop">
+        <SolutionSpec NoStrongNameSigning="True" />
+      </Branch>
+    </GitFolder>
+
+    <GitFolder Name="CK-Extensions" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/CK-Extensions">
+            <Branch Name="develop">
+                <SolutionSpec />
+            </Branch>
+        </GitFolder>
   </Folder>
 </ENGIE-WORLD>

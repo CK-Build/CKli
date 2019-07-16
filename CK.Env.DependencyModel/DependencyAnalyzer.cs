@@ -401,6 +401,9 @@ namespace CK.Env.DependencyModel
                     index.Add( current, newDependent );
                 }
             }
+
+            depSolutions = depSolutions.OrderBy( p => p.Rank ).ThenBy( p => p.Index ).ToArray();
+
             return new SolutionDependencyContext( this, index, result, table, depSolutions, GetBuildProjectInfo( m, traceGraphDetails ) );
         }
 
@@ -444,7 +447,7 @@ namespace CK.Env.DependencyModel
                             {
                                 if( packages.TryGetValue( package.Artifact, out var alreadyPublished ) )
                                 {
-                                    m.Error( $"'{package}' is already published by {alreadyPublished.Project}." );
+                                    m.Error( $"'{package.Project.Solution+"->"+package}' is already published by {alreadyPublished.Project.Solution+"->"+alreadyPublished.Project}." );
                                     return null;
                                 }
                                 packages.Add( package.Artifact, new LocalPackageItem( package.Artifact, project ) );

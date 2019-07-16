@@ -36,7 +36,7 @@ namespace CK.Env
                 //Sometimes we fail while cloning the repo.
                 //The issue is that the repo is incorrectly intialized: the commits are not fetched
                 m.Warn( "Repo does not contain any commits, probably a bad clone." );
-                if( !gitFolder.FetchBranches( m ) ) throw new InvalidOperationException( "Erorr while fetching." );
+                if( !gitFolder.FetchBranches( m ) ) throw new InvalidOperationException( "Error while fetching." );
                 if( !gitFolder._git.Branches.Any( p => p.Commits.Any() ) ) throw new InvalidOperationException( "Empty git repository." );
             }
             //Now we know that the repository have at least one commit. So it have a tracking branch
@@ -244,6 +244,17 @@ namespace CK.Env
             }
         }
 
+        [BackgroundCommand(false)]
+        [ParallelCommand(false)]
+        [CommandMethod]
+        public bool RunCommand(IActivityMonitor m, string commandToRun)
+        {
+            if( Environment.OSVersion.Platform != PlatformID.Win32NT )
+            {
+                throw new PlatformNotSupportedException( "Linux not supported yet." );
+            }
+            return ProcessRunner.Run( m, FullPhysicalPath, "cmd", "/c " + commandToRun );
+        }
 
         /// <summary>
         /// Fetches 'origin' (or all remotes) branches into this repository.

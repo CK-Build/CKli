@@ -16,11 +16,8 @@ namespace CKli
     public class XWorldState : XTypedObject
     {
         readonly IWorldName _world;
-        readonly IWorldStore _worldStore;
         readonly IEnvLocalFeedProvider _localFeeds;
         readonly WorldState _worldState;
-        readonly CommandRegister _commandRegister;
-        readonly IActivityMonitorFilteredClient _userMonitorFilter;
 
         public XWorldState(
             FileSystem fileSystem,
@@ -34,13 +31,9 @@ namespace CKli
             : base( initializer )
         {
             _world = world;
-            _worldStore = worldStore;
             _localFeeds = localFeeds;
-            _commandRegister = commandRegister;
             bool isPublic = initializer.Reader.HandleRequiredAttribute<bool>( "IsPublic" );
-            _userMonitorFilter = initializer.Monitor.Output.Clients.OfType<IActivityMonitorFilteredClient>().FirstOrDefault();
-            if( _userMonitorFilter == null ) throw new InvalidOperationException();
-            _worldState = new WorldState( commandRegister, artifacts, worldStore, world, isPublic, _localFeeds, _userMonitorFilter, appLife )
+            _worldState = new WorldState( commandRegister, artifacts, worldStore, world, isPublic, _localFeeds, appLife )
             {
                 VersionSelector = new ReleaseVersionSelector()
             };
@@ -68,7 +61,9 @@ namespace CKli
 
         void OnDumpWorldStatus( IActivityMonitor m )
         {
-            var gitFolders = _worldState.SolutionDrivers.GetDriversOnCurrentBranch(m).Select( x => (GitFolder)x.GitRepository );
+             var worldCtx = _worldState.SolutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
+            if( worldCtx == null ) return;
+            var gitFolders = worldCtx.Drivers.Select( x => (GitFolder)x.GitRepository );
             DumpGitFolders( m, gitFolders );
         }
 
@@ -81,7 +76,7 @@ namespace CKli
                 final = ActivityMonitor.DefaultFilter;
                 isLogFilterDefault = true;
             }
-            var msg = $"Monitor filters: User:'{_userMonitorFilter.MinimalFilter}', Monitor.MinimalFilter:'{m.MinimalFilter}' => Final:'{final}'{(isLogFilterDefault ? "(AppDomain's default)" : "")}.";
+            var msg = $"Monitor filters: Monitor.MinimalFilter:'{m.MinimalFilter}' => Final:'{final}'{(isLogFilterDefault ? "(AppDomain's default)" : "")}.";
             m.UnfilteredLog( ActivityMonitor.Tags.Empty, LogLevel.Info, msg, m.NextLogTime(), null );
 
             int gitFoldersCount = 0;
@@ -130,7 +125,7 @@ namespace CKli
                     {
                         foreach( var b in byActiveBranch )
                         {
-                            using( m.OpenInfo( $"Branch '{b.Key}':" ) )
+                            using( m.OpenWarn( $"Branch '{b.Key}':" ) )
                             {
                                 m.Warn( b.Select( g => g.SubPath.Path ).Concatenate() );
                             }

@@ -32,7 +32,6 @@ namespace CK.Env.Plugin
         protected override void DoApplySettings( IActivityMonitor m )
         {
             var s = _driver.GetSolution( m );
-            if( s == null ) return;
             bool produceCKSetupComponents = s.GeneratedArtifacts.Any( g => g.Artifact.Type == CKSetupClient.CKSetupType );
             if( produceCKSetupComponents == true )
             {

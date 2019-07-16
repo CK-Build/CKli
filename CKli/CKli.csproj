@@ -1,10 +1,15 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.1</TargetFramework>
     <OutputType>Exe</OutputType>
     <ProjectView>ShowAllFiles</ProjectView>
     <LangVersion>latest</LangVersion>
+    <Platforms>AnyCPU;x64</Platforms>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,6 +18,7 @@
     <ProjectReference Include="..\CK.Env.Plugin.Appveyor\CK.Env.Plugin.Appveyor.csproj" />
     <ProjectReference Include="..\CK.Env.Plugin.Basics\CK.Env.Plugin.Basics.csproj" />
     <ProjectReference Include="..\CK.Env.Plugin.CKSetup\CK.Env.Plugin.CKSetup.csproj" />
+    <ProjectReference Include="..\CK.Env.Plugin.Dotnet\CK.Env.Plugin.Dotnet.csproj" />
     <ProjectReference Include="..\CK.Env.Plugin.GitLab\CK.Env.Plugin.GitLab.csproj" />
     <ProjectReference Include="..\CK.Env.Plugin.NPM\CK.Env.Plugin.NPM.csproj" />
     <ProjectReference Include="..\CK.Env.Plugin.NuGet\CK.Env.Plugin.NuGet.csproj" />

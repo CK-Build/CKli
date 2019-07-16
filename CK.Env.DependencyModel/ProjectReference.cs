@@ -40,7 +40,7 @@ namespace CK.Env.DependencyModel
                             || (o.Savors.Context == applicableSavors.Context
                                 && !applicableSavors.IsEmpty
                                 && o.Savors.IsSupersetOf( applicableSavors )) );
-            Owner = o;
+            Owner = o ?? throw new ArgumentNullException( nameof( o ) );
             Target = t;
             Kind = kind;
             ApplicableSavors = applicableSavors;

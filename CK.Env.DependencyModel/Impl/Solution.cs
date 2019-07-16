@@ -16,7 +16,7 @@ namespace CK.Env.DependencyModel
         readonly List<Project> _projects;
         readonly List<IArtifactRepository> _artifactTargets;
         readonly List<IArtifactFeed> _artifactSources;
-        SolutionContext _ctx;
+        readonly SolutionContext _ctx;
         Project _buildProject;
         int _version;
 
@@ -154,8 +154,8 @@ namespace CK.Env.DependencyModel
             string simpleProjecName,
             CKTrait savors = null )
         {
-            if( String.IsNullOrWhiteSpace( type ) ) throw new ArgumentNullException( nameof( type ) );
-            if( String.IsNullOrWhiteSpace( simpleProjecName ) ) throw new ArgumentNullException( nameof( simpleProjecName ) );
+            if( string.IsNullOrWhiteSpace( type ) ) throw new ArgumentNullException( nameof( type ) );
+            if( string.IsNullOrWhiteSpace( simpleProjecName ) ) throw new ArgumentNullException( nameof( simpleProjecName ) );
             if( savors != null && savors.IsEmpty ) throw new ArgumentException( "Savors can not be empty.", nameof( savors ) ); ;
 
             var fullFolderPath = FullPath.Combine( solutionRelativeFolderPath );
