@@ -10,14 +10,14 @@ namespace CK.Env.Plugin
         readonly CodeCakeBuilderFolder _f;
         readonly SolutionDriver _driver;
         readonly SolutionSpec _solutionSpec;
-        readonly ISecretKeyStore _secretStore;
+        readonly SecretKeyStore _secretStore;
         readonly ArtifactCenter _artfifacts;
 
         public CodeCakeBuilderKeyVaultFile(
             CodeCakeBuilderFolder f,
             SolutionDriver driver,
             SolutionSpec solutionSpec,
-            ISecretKeyStore secretStore,
+            SecretKeyStore secretStore,
             ArtifactCenter artifacts,
             NormalizedPath branchPath )
             : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilderKeyVault.txt" ) )

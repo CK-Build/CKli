@@ -22,7 +22,7 @@ namespace CK.Env.Plugin
         public static readonly ArtifactType NuGetType = NuGet.NuGetClient.NuGetType;
         public static readonly ArtifactType CKSetupType = ArtifactType.Register( "CKSetup", false );
 
-        readonly ISecretKeyStore _keyStore;
+        readonly SecretKeyStore _keyStore;
         readonly ISolutionDriverWorld _world;
         readonly IEnvLocalFeedProvider _localFeedProvider;
         readonly ArtifactCenter _artifactCenter;
@@ -34,7 +34,7 @@ namespace CK.Env.Plugin
         bool _isSolutionValid;
 
         public SolutionDriver(
-                ISecretKeyStore keyStore,
+                SecretKeyStore keyStore,
                 ISolutionDriverWorld w,
                 GitFolder f,
                 ArtifactCenter artifactCenter,

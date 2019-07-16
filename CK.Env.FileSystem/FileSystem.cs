@@ -19,7 +19,7 @@ namespace CK.Env
     public class FileSystem : IFileProvider, IDisposable
     {
         readonly CommandRegister _commandRegister;
-        readonly ISecretKeyStore _secretKeyStore;
+        readonly SecretKeyStore _secretKeyStore;
         readonly List<GitFolder> _gits;
 
         /// <summary>
@@ -29,7 +29,7 @@ namespace CK.Env
         public FileSystem(
             string rootPath,
             CommandRegister commandRegister,
-            ISecretKeyStore secretKeyStore,
+            SecretKeyStore secretKeyStore,
             IServiceProvider sp )
         {
             Root = new NormalizedPath( Path.GetFullPath( rootPath ) );
@@ -78,7 +78,7 @@ namespace CK.Env
             if( g == null )
             {
                 folderPath = Root.Combine( folderPath );
-                g = new ProtoGitFolder( urlRepository, folderPath, world, _secretKeyStore, this, _commandRegister ).CreateGitFolder( m, isPublic );
+                g = new ProtoGitFolder( urlRepository, isPublic, folderPath, world, _secretKeyStore, this, _commandRegister ).CreateGitFolder( m );
                 g.EnsureBranch( m, world.DevelopBranchName );
                 _gits.Add( g );
             }

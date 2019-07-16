@@ -213,18 +213,16 @@ namespace CK.Env.NuGet
             _secretAzureKeys = new Dictionary<string, string>();
         }
 
-        public NuGetClient( HttpClient httpClient, ISecretKeyStore keyStore )
+        public NuGetClient( HttpClient httpClient, SecretKeyStore keyStore )
         {
             HttpClient = httpClient;
             SecretKeyStore = keyStore;
-            //_repositories = new Dictionary<string, IArtifactRepository>( StringComparer.OrdinalIgnoreCase );
-            //_internalFeeds = new List<InternalFeed>();
             var c = new SourceCacheContext() { NoCache = true };
             SourceCache = c.WithRefreshCacheTrue();
             _sourcePackageProvider = new SourcePackageProvider( this );
         }
 
-        public ISecretKeyStore SecretKeyStore { get; }
+        public SecretKeyStore SecretKeyStore { get; }
 
         public HttpClient HttpClient { get; }
 

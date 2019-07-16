@@ -10,26 +10,8 @@ namespace CK.Env.MSBuildSln.Tests
     [TestFixture]
     public class SolutionFileTests
     {
-        class KeyStore : ISecretKeyStore
-        {
-            public void DeclareSecretKey( string name, Func<string, string> descriptionBuilder )
-            {
-                throw new NotImplementedException();
-            }
-
-            public string GetSecretKey( IActivityMonitor m, string name, bool throwOnEmpty )
-            {
-                throw new NotImplementedException();
-            }
-
-            public bool? IsSecretKeyAvailable( string name )
-            {
-                throw new NotImplementedException();
-            }
-        }
-
         readonly CommandRegister _commandRegister = new CommandRegister();
-        readonly ISecretKeyStore _keyStore = new KeyStore();
+        readonly SecretKeyStore _keyStore = new SecretKeyStore();
 
         [Test]
         public void reading_this_solution_works()

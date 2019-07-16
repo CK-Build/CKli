@@ -28,9 +28,9 @@ namespace CK.Env
 
         public ProtoGitFolder ProtoGitFolder { get; }
 
-        internal static GitFolder EnsureGitFolderCorrectSetup( IActivityMonitor m, ProtoGitFolder data, bool isPublic )
+        internal static GitFolder EnsureGitFolderCorrectSetup( IActivityMonitor m, ProtoGitFolder data )
         {
-            GitFolder gitFolder = new GitFolder( data, isPublic );
+            GitFolder gitFolder = new GitFolder( data );
             if( !gitFolder._git.Branches.Any( p => p.Commits.Any() ) )
             {
                 //Sometimes we fail while cloning the repo.
@@ -61,10 +61,9 @@ namespace CK.Env
             return gitFolder;
         }
 
-        GitFolder( ProtoGitFolder data, bool isPublic )
+        GitFolder( ProtoGitFolder data )
         {
             ProtoGitFolder = data;
-            IsPublic = isPublic;
 
             SubPath = ProtoGitFolder.FullPhysicalPath.RemovePrefix( data.FileSystem.Root );
             if( SubPath.IsEmptyPath ) throw new InvalidOperationException( "Root path can not be a Git folder." );
@@ -90,7 +89,7 @@ namespace CK.Env
         /// <summary>
         /// Gets whether the Git repository is public or private.
         /// </summary>
-        public bool IsPublic { get; }
+        public bool IsPublic => ProtoGitFolder.IsPublic;
 
         /// <summary>
         /// Gets the service container for this GitFolder.

@@ -17,9 +17,9 @@ namespace CK.Env.CKSetup
         public static readonly ArtifactType CKSetupType = ArtifactType.Register( "CKSetup", false );
 
         readonly HttpClient _sharedHttpClient;
-        readonly ISecretKeyStore _keyStore;
+        readonly SecretKeyStore _keyStore;
 
-        public CKSetupClient( ISecretKeyStore keyStore, HttpClient sharedHttpClient )
+        public CKSetupClient( SecretKeyStore keyStore, HttpClient sharedHttpClient )
         {
             _keyStore = keyStore;
             _sharedHttpClient = sharedHttpClient;

@@ -7,7 +7,7 @@ namespace CK.Env.CKSetup
     {
         public XCKSetupClient(
             HttpClient sharedHttpClient,
-            ISecretKeyStore secretKeyStore,
+            SecretKeyStore secretKeyStore,
             ArtifactCenter artifact,
             IEnvLocalFeedProvider localFeedProvider,
             FileSystem fs,

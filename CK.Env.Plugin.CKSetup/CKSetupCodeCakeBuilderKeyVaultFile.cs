@@ -11,14 +11,14 @@ namespace CK.Env.Plugin
     {
         readonly SolutionDriver _driver;
         readonly SolutionSpec _solutionSpec;
-        readonly ISecretKeyStore _secretStore;
+        readonly SecretKeyStore _secretStore;
 
         public CKSetupCodeCakeBuilderKeyVaultFile(
             GitFolder f,
             NormalizedPath branchPath,
             SolutionDriver driver,
             SolutionSpec solutionSpec,
-            ISecretKeyStore secretStore )
+            SecretKeyStore secretStore )
             : base( f, branchPath, branchPath.AppendPart( "CodeCakeBuilder" ).AppendPart( "CodeCakeBuilderKeyVault.txt" ) )
         {
             _driver = driver;

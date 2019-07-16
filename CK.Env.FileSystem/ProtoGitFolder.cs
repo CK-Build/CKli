@@ -12,9 +12,10 @@ namespace CK.Env
     {
         public ProtoGitFolder(
             string url,
+            bool isPublic,
             string fullPhysicalPath,
             IWorldName world,
-            ISecretKeyStore secretKeyStore,
+            SecretKeyStore secretKeyStore,
             FileSystem fileSystem,
             CommandRegister commandRegister )
         {
@@ -31,6 +32,7 @@ namespace CK.Env
             else if( url.IndexOf( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.AzureDevOps;
             else if( url.IndexOf( "bitbucket.org", StringComparison.OrdinalIgnoreCase ) >= 0 ) KnownGitProvider = KnownGitProvider.Bitbucket;
 
+            IsPublic = isPublic;
             OriginUrl = url;
             World = world;
             SecretKeyStore = secretKeyStore;
@@ -40,30 +42,50 @@ namespace CK.Env
 
             if( KnownGitProvider != KnownGitProvider.Unknown )
             {
-                switch( KnownGitProvider )
+                ReadPATKeyName = GetPATName();
+                var read = secretKeyStore.DeclareSecretKey( ReadPATKeyName, desc =>
                 {
-                    case KnownGitProvider.AzureDevOps:
-                        var regex = Regex.Match( url, @"(?:\:\/\/)[^\/]*\/([^\/]*)" );
-                        string organization = regex.Groups[1].Value;
-                        PATKeyName = "AZURE_GIT_" + organization
-                            .ToUpperInvariant()
-                            .Replace( '-', '_' )
-                            .Replace( ' ', '_' )
-                            + "_PAT";
-                        break;
-                    default:
-                        PATKeyName = KnownGitProvider.ToString() + "_GIT_PAT";
-                        break;
-                }
-                secretKeyStore.DeclareSecretKey( PATKeyName, desc =>
-                {
-                    if( desc == null ) desc = $"Required to interact with solutions hosted by '{KnownGitProvider}':";
+                    if( desc == null ) desc = $"Used to read/clone solutions hosted by '{KnownGitProvider}':";
                     if( !desc.Contains( url ) )
                     {
                         desc += Environment.NewLine + url; 
                     }
                     return desc;
-                } );
+                }, isRequired: !IsPublic );
+
+                WritePATKeyName = GetPATName( "_WRITE_PAT" );
+                secretKeyStore.DeclareSecretKey( WritePATKeyName, desc =>
+                {
+                    if( desc == null ) desc = $"Used to push solutions hosted by '{KnownGitProvider}':";
+                    if( !desc.Contains( url ) )
+                    {
+                        desc += Environment.NewLine + url;
+                    }
+                    return desc;
+                }, subKey: read );
+            }
+        }
+
+        /// <summary>
+        /// Helper that formts the PAT name based on the kind of provider.
+        /// </summary>
+        /// <param name="suffix">Suffix to use.</param>
+        /// <returns>The PAT name or null if <see cref="KnownGitProvider"/> is Unknown.</returns>
+        public string GetPATName( string suffix = "_PAT" )
+        {
+            switch( KnownGitProvider )
+            {
+                case KnownGitProvider.Unknown: return null;
+                case KnownGitProvider.AzureDevOps:
+                    var regex = Regex.Match( OriginUrl, @"(?:\:\/\/)[^\/]*\/([^\/]*)" );
+                    string organization = regex.Groups[1].Value;
+                    return "AZURE_GIT_" + organization
+                                .ToUpperInvariant()
+                                .Replace( '-', '_' )
+                                .Replace( ' ', '_' )
+                                + suffix;
+                default:
+                    return KnownGitProvider.ToString().ToUpperInvariant() + "_GIT" + suffix;
             }
         }
 
@@ -73,6 +95,11 @@ namespace CK.Env
         public IWorldName World { get; }
 
         public FileSystem FileSystem { get; }
+
+        /// <summary>
+        /// Gets whether the Git repository is public.
+        /// </summary>
+        public bool IsPublic { get; }
 
         /// <summary>
         /// Gets the current remote origin url.
@@ -89,12 +116,23 @@ namespace CK.Env
         /// </summary>
         public NormalizedPath FullPhysicalPath { get; }
 
-        public ISecretKeyStore SecretKeyStore { get; }
+        /// <summary>
+        /// Gets the key store.
+        /// </summary>
+        public SecretKeyStore SecretKeyStore { get; }
 
         /// <summary>
-        /// Gets the PAT key name for this repository.
+        /// Gets the basic, read/clone, PAT key name for this repository.
+        /// Note that if <see cref="IsPublic"/> is true, this PAT should be useless: anyone should be able to
+        /// read/clone the repository.
         /// </summary>
-        public string PATKeyName { get; }
+        public string ReadPATKeyName { get; }
+
+        /// <summary>
+        /// Gets the write PAT key name for this repository.
+        /// This PAT must allow pushes to the repository.
+        /// </summary>
+        public string WritePATKeyName { get; }
 
         public CommandRegister CommandRegister { get; }
 
@@ -103,9 +141,8 @@ namespace CK.Env
         /// GitFolder instance.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="isPublic">Whether <see cref="GitFolder.IsPublic"/> is true.</param>
         /// <returns>The GitFolder instance.</returns>
-        public GitFolder CreateGitFolder( IActivityMonitor m, bool isPublic )
+        public GitFolder CreateGitFolder( IActivityMonitor m )
         {
             using( m.OpenTrace( $"Ensuring git repository {FullPhysicalPath}" ) )
             {
@@ -133,7 +170,7 @@ namespace CK.Env
                 }
 
                 EnsureHooks( m );
-                return GitFolder.EnsureGitFolderCorrectSetup( m, this, isPublic );
+                return GitFolder.EnsureGitFolderCorrectSetup( m, this );
 
             }
         }
@@ -141,7 +178,7 @@ namespace CK.Env
         public Credentials PATCredentialsHandler( IActivityMonitor m, string url )
         {
             if( KnownGitProvider == KnownGitProvider.Unknown ) throw new InvalidOperationException( "Unknown Git provider." );
-            string pat = SecretKeyStore.GetSecretKey( m, PATKeyName, true );
+            string pat = SecretKeyStore.GetSecretKey( m, ReadPATKeyName, true );
             return new UsernamePasswordCredentials()
             {
                 Username = "CK-Env",

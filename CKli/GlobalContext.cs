@@ -3,6 +3,7 @@ using CK.Env;
 using CK.Text;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
@@ -110,15 +111,15 @@ namespace CKli
             _currentWorld = null;
 
             var baseProvider = new SimpleServiceContainer();
-            var keyStore = new CKEnvKeyVault( World, LocalPath, CommandRegister );
-            _fs = new FileSystem( LocalPath, CommandRegister, keyStore, baseProvider );
+            var keyVault = new CKEnvKeyVault( World, LocalPath, CommandRegister );
+            _fs = new FileSystem( LocalPath, CommandRegister, keyVault.KeyStore, baseProvider );
             baseProvider.Add<ISimpleObjectActivator>( new SimpleObjectActivator() );
             baseProvider.Add( CommandRegister );
             baseProvider.Add( _fs );
             baseProvider.Add( World );
             baseProvider.Add( _worldStore );
             baseProvider.Add( _appLife );
-            baseProvider.Add<ISecretKeyStore>( keyStore );
+            baseProvider.Add( keyVault.KeyStore );
             var original = _worldStore.ReadWorldDescription( _monitor, World ).Root;
             var expanded = XTypedFactory.PreProcess( _monitor, original );
             if( expanded.Errors.Count > 0 )
@@ -128,7 +129,51 @@ namespace CKli
             _root = _factory.CreateInstance<XTypedObject>( _monitor, expanded.Result, baseProvider );
             if( _root == null ) return false;
             _currentWorld = World;
+            // Ensures that all required secrets are knwon.
+            if( !OpenKeyVault( _monitor, keyVault ) ) return false;
             CurrentWorldChanged?.Invoke( this, EventArgs.Empty );
+            return true;
+        }
+
+        bool OpenKeyVault( IActivityMonitor m, CKEnvKeyVault vault )
+        {
+            Debug.Assert( vault.CanOpenKeyVault );
+            if( !vault.KeyVaultFileExists )
+            {
+                m.Warn( $"File '{vault.KeyVaultPath}' is missing. It must be created. " );
+            }
+            do
+            {
+                try
+                {
+                    Console.Write( $"Enter '{vault.KeyVaultKeyName}' pass phrase (empty string to cancel): " );
+                    string pass = Console.ReadLine();
+                    if( pass.Length == 0 )
+                    {
+                        m.Warn( "No pass phrase entered." );
+                        return false;
+                    }
+                    if( vault.OpenKeyVault( m, pass ) )
+                    {
+                        foreach( var required in vault.KeyStore.Infos.Where( i => i.IsRequired ) )
+                        {
+                            Console.Write( $"Required secret '{required}' (empty string to cancel): " );
+                            string secret = Console.ReadLine();
+                            if( secret.Length == 0 )
+                            {
+                                m.Warn( "No secret entered. Canceled opening." );
+                                return false;
+                            }
+                            required.SetSecret( secret );
+                        }
+                    }
+                }
+                catch( Exception ex )
+                {
+                    m.Error( ex );
+                }
+            }
+            while( !vault.IsKeyVaultOpened );
             return true;
         }
 

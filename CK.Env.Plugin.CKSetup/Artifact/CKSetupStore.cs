@@ -13,10 +13,10 @@ namespace CK.Env.CKSetup
     public class CKSetupStore : IArtifactRepository
     {
         readonly HttpClient _sharedHttpClient;
-        readonly ISecretKeyStore _keyStore;
+        readonly SecretKeyStore _keyStore;
 
         public CKSetupStore(
-            ISecretKeyStore keyStore,
+            SecretKeyStore keyStore,
             HttpClient sharedHttpClient,
             Uri url,
             string name )
@@ -32,9 +32,7 @@ namespace CK.Env.CKSetup
             _keyStore.DeclareSecretKey( SecretKeyName, d => d ?? $"Required to push to '{UniqueRepositoryName}'." );
         }
 
-        public CKSetupStore(
-            ISecretKeyStore keyStore,
-            HttpClient sharedHttpClient )
+        public CKSetupStore( SecretKeyStore keyStore, HttpClient sharedHttpClient )
             : this( keyStore, sharedHttpClient, Facade.DefaultStoreUrl, "Public" )
         {
         }

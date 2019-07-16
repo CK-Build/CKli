@@ -15,7 +15,7 @@ namespace CK.Env.NPM
         /// </summary>
         public static readonly ArtifactType NPMType = ArtifactType.Register( "NPM", true );
 
-        public NPMClient( HttpClient httpClient, ISecretKeyStore keyStore )
+        public NPMClient( HttpClient httpClient, SecretKeyStore keyStore )
         {
             HttpClient = httpClient;
             SecretKeyStore = keyStore;
@@ -24,7 +24,7 @@ namespace CK.Env.NPM
         /// <summary>
         /// Gets the key store.
         /// </summary>
-        public ISecretKeyStore SecretKeyStore { get; }
+        public SecretKeyStore SecretKeyStore { get; }
 
         /// <summary>
         /// Gets the shared <see cref="HttpClient"/> that will be used for remote access.

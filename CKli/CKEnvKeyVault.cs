@@ -4,17 +4,18 @@ using CK.SimpleKeyVault;
 using CK.Text;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
 namespace CKli
 {
-    public class CKEnvKeyVault : ISecretKeyStore, ICommandMethodsProvider, IDisposable
+    public class CKEnvKeyVault : ICommandMethodsProvider, IDisposable
     {
         static readonly NormalizedPath _commandProviderName = new NormalizedPath("KeyVault");
 
-        readonly Dictionary<string, string> _keys;
-        readonly Dictionary<string, string> _secrets;
+        readonly SecretKeyStore _store;
+        readonly Dictionary<string,string> _vaultContent;
         readonly IWorldName _worldName;
         string _passPhrase;
 
@@ -23,8 +24,8 @@ namespace CKli
             NormalizedPath localWorldPath,
             CommandRegister commandRegister)
         {
-            _keys = new Dictionary<string, string>();
-            _secrets = new Dictionary<string, string>();
+            _store = new SecretKeyStore();
+            _vaultContent = new Dictionary<string, string>();
             _worldName = worldName;
             KeyVaultPath = localWorldPath.AppendPart( $"CKEnv-{_worldName.Name}-KeyVault.txt" );
             KeyVaultKeyName = $"CKENV_{_worldName.Name.ToUpperInvariant().Replace( '-', '_' )}_KEY_VAULT_SECRET_KEY";
@@ -32,17 +33,25 @@ namespace CKli
         }
 
         /// <summary>
+        /// Gets the actual key store.
+        /// </summary>
+        public SecretKeyStore KeyStore => _store;
+        
+        /// <summary>
         /// Gets the key vault file path.
         /// </summary>
-        string KeyVaultPath { get; }
+        public string KeyVaultPath { get; }
 
         /// <summary>
         /// Gets the name of the primary secret required to open the key vault.
         /// This is built from the <see cref="IWorldName.Name"/> (CKENV_XXX_KEY_VAULT_SECRET_KEY).
         /// </summary>
-        string KeyVaultKeyName { get; }
+        public string KeyVaultKeyName { get; }
 
-        bool KeyVaultFileExists => File.Exists( KeyVaultPath );
+        /// <summary>
+        /// Gets whether there is a file for this vault. When no file exists it must be created.
+        /// </summary>
+        public bool KeyVaultFileExists => File.Exists( KeyVaultPath );
 
         /// <summary>
         /// Gets whether the key vault bound to the current <see cref="IWorldName"/> is opened.
@@ -76,10 +85,11 @@ namespace CKli
                 try
                 {
                     var keys = KeyVault.DecryptValues( File.ReadAllText( KeyVaultPath ), passPhrase );
+                    m.OpenInfo( $"Opening existing Key Vault with keys: {keys.Keys.Concatenate()}." );
+                    _store.ImportSecretKeys( m, keys );
                     _passPhrase = passPhrase;
-                    _secrets.Clear();
-                    _secrets.AddRange( keys );
-                    m.OpenInfo( $"Opened existing Key Vault with keys: {_secrets.Keys.Concatenate()}." );
+                    _vaultContent.Clear();
+                    _vaultContent.AddRange( keys );
                 }
                 catch( Exception ex )
                 {
@@ -90,14 +100,16 @@ namespace CKli
             else
             {
                 _passPhrase = passPhrase;
-                m.OpenInfo( $"Opened new Key Vault." );
+                m.OpenInfo( $"New Key Vault opened." );
             }
-            var missing = _keys.Keys.Except( _secrets.Keys );
-            if( missing.Any() )
+            if( _store.Infos.Any( s => !s.IsSecretAvailable ) )
             {
-                foreach( var km in missing )
+                using( m.OpenWarn( $"Missing secrets:" ) )
                 {
-                    m.Warn( $"Missing secret '{km}': {_keys[km]}" );
+                    foreach( var s in _store.Infos.Where( s => !s.IsSecretAvailable ) )
+                    {
+                        m.Warn( s.ToString() );
+                    }
                 }
             }
             m.CloseGroup();
@@ -133,9 +145,18 @@ namespace CKli
                 if( !CheckPassPhraseConstraints( m, newPassPhrase ) ) return false;
                 _passPhrase = newPassPhrase;
             }
-            m.Info( $"Saved Key Vault with keys: {_secrets.Keys.Concatenate()}." );
-            File.WriteAllText( KeyVaultPath, KeyVault.EncryptValuesToString( _secrets, _passPhrase ) );
+            DoSaveKeyVault( m );
             return true;
+        }
+
+        void DoSaveKeyVault( IActivityMonitor m )
+        {
+            foreach( var e in _store.OptimalAvailableInfos )
+            {
+                _vaultContent[e.Name] = e.Secret;
+            }
+            m?.Info( $"Saved Key Vault with keys: {_vaultContent.Keys.Concatenate()}." );
+            File.WriteAllText( KeyVaultPath, KeyVault.EncryptValuesToString( _vaultContent, _passPhrase ) );
         }
 
         /// <summary>
@@ -148,7 +169,8 @@ namespace CKli
         {
             if( IsKeyVaultOpened )
             {
-                _secrets.Clear();
+                _store.Clear();
+                _vaultContent.Clear();
                 _passPhrase = null;
                 if( File.Exists( KeyVaultPath ) )
                 {
@@ -179,67 +201,11 @@ namespace CKli
         }
 
 
-        /// <summary>
-        /// Declares a secret key.
-        /// Can be called as many times as needed: the <paramref name="descriptionBuilder"/> can
-        /// compose the final description.
-        /// </summary>
-        /// <param name="secretName">The name to declare. Must not be empty.</param>
-        /// <param name="descriptionBuilder">
-        /// The description builder that accepts the current description (initially null) and must return the combined one.
-        /// Must not be null.
-        /// </param>
-        public void DeclareSecretKey( string secretName, Func<string, string> descriptionBuilder )
-        {
-            if( String.IsNullOrWhiteSpace( secretName ) ) throw new ArgumentException( nameof( secretName ) );
-            if( descriptionBuilder == null ) throw new ArgumentNullException( nameof( descriptionBuilder ) );
-            _keys.TryGetValue( secretName, out var desc );
-            _keys[secretName] = descriptionBuilder( desc );
-        }
-
-        /// <summary>
-        /// Implements <see cref="ISecretKeyStore.IsSecretKeyAvailable(string)"/>.
-        /// </summary>
-        /// <param name="secretName">The secret name.</param>
-        /// <returns>Null if the secret has not been declared, false if it has been declared but not known.</returns>
-        public bool? IsSecretKeyAvailable( string secretName )
-        {
-            if( String.IsNullOrWhiteSpace( secretName ) ) throw new ArgumentException( nameof( secretName ) );
-            if( !_keys.ContainsKey( secretName ) ) return null;
-            return _secrets.ContainsKey( secretName );
-        }
-
-        /// <summary>
-        /// Implements <see cref="ISecretKeyStore.GetSecretKey(IActivityMonitor, string, bool)"/>. 
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="name">The secret name.</param>
-        /// <param name="throwOnEmpty">True to throw an <see cref="Exception"/> if the secret cannot be obtained.</param>
-        /// <returns>The secret or null if it cannot be obtained.</returns>
-        /// <returns></returns>
-        public string GetSecretKey( IActivityMonitor m, string name, bool throwOnEmpty )
-        {
-            string pass = null;
-            bool exists = IsKeyVaultOpened && _secrets.TryGetValue( name, out pass );
-            if( !exists )
-            {
-                if( !_keys.TryGetValue( name, out var desc ) )
-                {
-                    throw new InvalidOperationException( $"Secret '{name}' is not declared. It cannot be required." );
-                }
-                if( throwOnEmpty )
-                {
-                    throw new Exception( $"Secret '{name}' is required. Description: {desc}" );
-                }
-            }
-            return pass;
-        }
-
         void IDisposable.Dispose()
         {
             if( IsKeyVaultOpened )
             {
-                File.WriteAllText( KeyVaultPath, KeyVault.EncryptValuesToString( _secrets, _passPhrase ) );
+                DoSaveKeyVault( null );
                 _passPhrase = null;
             }
         }

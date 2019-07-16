@@ -14,26 +14,9 @@ namespace CK.Env.Tests
     [TestFixture]
     public class RepositoryTests
     {
-        class KeyStore : ISecretKeyStore
-        {
-            public void DeclareSecretKey( string name, Func<string, string> descriptionBuilder )
-            {
-                throw new NotImplementedException();
-            }
-
-            public string GetSecretKey( IActivityMonitor m, string name, bool throwOnEmpty )
-            {
-                throw new NotImplementedException();
-            }
-
-            public bool? IsSecretKeyAvailable( string name )
-            {
-                throw new NotImplementedException();
-            }
-        }
 
         readonly CommandRegister _commandRegister = new CommandRegister();
-        readonly ISecretKeyStore _keyStore = new KeyStore();
+        readonly SecretKeyStore _keyStore = new SecretKeyStore();
 
 
         [Test]
@@ -201,10 +184,10 @@ namespace CK.Env.Tests
         public void FileSystem_remotes_contains_the_remote_branches()
         {
             var w = new WorldMock();
-            var keyStore = new CKEnvKeyVault( w, LocalTestHelper.WorldFolder, _commandRegister );
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, keyStore, new SimpleServiceContainer() ) )
+            var keyVault = new CKEnvKeyVault( w, LocalTestHelper.WorldFolder, _commandRegister );
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, keyVault.KeyStore, new SimpleServiceContainer() ) )
             {
-                fs.ServiceContainer.Add<ISecretKeyStore>( keyStore );
+                fs.ServiceContainer.Add( keyVault.KeyStore );
                 fs.EnsureGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
                 var f = fs.GetFileInfo( "TestGitRepository/remotes/" );
                 f.IsDirectory.Should().BeTrue();

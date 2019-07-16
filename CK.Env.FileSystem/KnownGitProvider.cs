@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace CK.Env
 {
     public enum KnownGitProvider
@@ -8,4 +10,5 @@ namespace CK.Env
         AzureDevOps = 3,
         Bitbucket = 4
     }
+
 }

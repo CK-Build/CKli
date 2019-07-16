@@ -11,7 +11,7 @@ namespace CKli
 
         public XNPMClient(
             HttpClient sharedHttpClient,
-            ISecretKeyStore secretKeyStore,
+            SecretKeyStore secretKeyStore,
             ArtifactCenter artifact,
             IEnvLocalFeedProvider localFeedProvider,
             FileSystem fs,

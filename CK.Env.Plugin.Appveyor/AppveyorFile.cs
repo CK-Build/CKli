@@ -10,12 +10,12 @@ namespace CK.Env.Plugin
     {
         readonly SolutionDriver _driver;
         readonly SolutionSpec _solutionSpec;
-        readonly ISecretKeyStore _secretStore;
+        readonly SecretKeyStore _secretStore;
 
         const string APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY = "APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY";
 
 
-        public AppveyorFile( GitFolder f, SolutionDriver driver, SolutionSpec settings, ISecretKeyStore secretStore, NormalizedPath branchPath )
+        public AppveyorFile( GitFolder f, SolutionDriver driver, SolutionSpec settings, SecretKeyStore secretStore, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "appveyor.yml" ) )
         {
             _driver = driver;

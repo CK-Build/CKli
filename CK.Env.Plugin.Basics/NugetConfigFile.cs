@@ -11,10 +11,10 @@ namespace CK.Env.Plugin
         readonly SolutionSpec _solutionSpec;
         readonly IEnvLocalFeedProvider _localFeedProvider;
         readonly SolutionDriver _solutionDriver;
-        readonly ISecretKeyStore _secretStore;
+        readonly SecretKeyStore _secretStore;
         XElement _packageSources;
 
-        public NugetConfigFile( GitFolder f, SolutionDriver driver, IEnvLocalFeedProvider localFeedProvider, ISecretKeyStore secretStore, SolutionSpec s, NormalizedPath branchPath )
+        public NugetConfigFile( GitFolder f, SolutionDriver driver, IEnvLocalFeedProvider localFeedProvider, SecretKeyStore secretStore, SolutionSpec s, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "NuGet.config" ) )
         {
             _localFeedProvider = localFeedProvider;
@@ -92,7 +92,7 @@ namespace CK.Env.Plugin
                 if( s.Credentials != null )
                 {
                     string password = s.Credentials.IsSecretKeyName
-                                        ? _secretStore.GetSecretKey( m, s.Credentials.PasswordOrSecretKeyName, throwOnEmpty: true )
+                                        ? _secretStore.GetSecretKey( m, s.Credentials.PasswordOrSecretKeyName, throwOnUnavailable: true )
                                         : s.Credentials.PasswordOrSecretKeyName;
                     EnsureFeedCredentials( m, s.Name, s.Credentials.UserName, password );
                 }

@@ -12,7 +12,7 @@ namespace CKli
 
         public XNuGetClient(
             HttpClient sharedHttpClient,
-            ISecretKeyStore secretKeyStore,
+            SecretKeyStore secretKeyStore,
             ArtifactCenter artifact,
             IEnvLocalFeedProvider localFeedProvider,
             FileSystem fs,

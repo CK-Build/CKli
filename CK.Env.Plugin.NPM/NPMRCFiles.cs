@@ -18,9 +18,9 @@ namespace CK.Env.Plugin
         readonly SolutionSpec _solutionSpec;
         readonly NPMProjectsDriver _driver;
         readonly SolutionDriver _solutionDriver;
-        readonly ISecretKeyStore _secretStore;
+        readonly SecretKeyStore _secretStore;
 
-        public NPMRCFiles( GitFolder f, NPMProjectsDriver driver, SolutionDriver solutionDriver, ISecretKeyStore secretStore, SolutionSpec solutionSpec, NormalizedPath branchPath )
+        public NPMRCFiles( GitFolder f, NPMProjectsDriver driver, SolutionDriver solutionDriver, SecretKeyStore secretStore, SolutionSpec solutionSpec, NormalizedPath branchPath )
             : base( f, branchPath )
         {
             _solutionDriver = solutionDriver;
@@ -119,7 +119,7 @@ namespace CK.Env.Plugin
                     EnsureLine( lines, scopeUrl, "username", p.Credentials.UserName );
                     EnsureLine( lines, scopeUrl, "always-auth", "true" );
                     string password = p.Credentials.IsSecretKeyName
-                                        ? _secretStore.GetSecretKey( m, p.Credentials.PasswordOrSecretKeyName, throwOnEmpty: true )
+                                        ? _secretStore.GetSecretKey( m, p.Credentials.PasswordOrSecretKeyName, throwOnUnavailable: true )
                                         : p.Credentials.PasswordOrSecretKeyName;
                     if( p.Url.IndexOf( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) >= 0 )
                     {
