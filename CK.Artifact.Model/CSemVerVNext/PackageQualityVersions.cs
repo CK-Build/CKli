@@ -8,7 +8,7 @@ using System.Text;
 namespace CSemVer
 {
     /// <summary>
-    /// Handles 5 potentially different versions associated to <see cref="PackageQuality"/>.
+    /// ================> CSEMVER VNEXT!!
     /// </summary>
     public readonly struct PackageQualityVersions : IEnumerable<SVersion>
     {

@@ -28,6 +28,7 @@ namespace CK.Env.Plugin
             }
             _solutionDriver.OnStartBuild += OnStartBuild;
             _solutionDriver.OnZeroBuildProject += OnZeroBuildProject;
+            _solutionDriver.OnSolutionConfiguration += OnSolutionConfiguration;
         }
 
         void OnZeroBuildProject( object sender, ZeroBuildEventArgs e )
@@ -63,10 +64,23 @@ namespace CK.Env.Plugin
             Save( e.Monitor );
         }
 
+        void OnSolutionConfiguration( object sender, SolutionConfigurationEventArgs e )
+        {
+            var creds = e.Solution.ArtifactSources.OfType<INuGetFeed>()
+                            .Where( s => s.Credentials != null && s.Credentials.IsSecretKeyName )
+                            .Select( s => s.Credentials.PasswordOrSecretKeyName );
+            foreach( var c in creds )
+            {
+                _secretStore.DeclareSecretKey( c, desc => desc ?? "Needed to configure NuGet.config file." );
+            }
+        }
+
+
         void IDisposable.Dispose()
         {
             GitFolder.OnLocalBranchEntered -= OnLocalBranchEntered;
             GitFolder.OnLocalBranchLeaving -= OnLocalBranchLeaving;
+            _solutionDriver.OnSolutionConfiguration -= OnSolutionConfiguration;
             _solutionDriver.OnStartBuild -= OnStartBuild;
             _solutionDriver.OnZeroBuildProject -= OnZeroBuildProject;
         }
@@ -81,7 +95,8 @@ namespace CK.Env.Plugin
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
-            var solution = _solutionDriver.GetSolution( m );
+
+            var solution = _solutionDriver.GetSolution( m, allowInvalidSolution: true );
             if( solution == null ) return;
 
             EnsureDocument();
@@ -92,9 +107,12 @@ namespace CK.Env.Plugin
                 if( s.Credentials != null )
                 {
                     string password = s.Credentials.IsSecretKeyName
-                                        ? _secretStore.GetSecretKey( m, s.Credentials.PasswordOrSecretKeyName, throwOnUnavailable: true )
+                                        ? _secretStore.GetSecretKey( m, s.Credentials.PasswordOrSecretKeyName, throwOnUnavailable: false )
                                         : s.Credentials.PasswordOrSecretKeyName;
-                    EnsureFeedCredentials( m, s.Name, s.Credentials.UserName, password );
+                    if( password != null )
+                    {
+                        EnsureFeedCredentials( m, s.Name, s.Credentials.UserName, password );
+                    }
                 }
             }
             foreach( var name in _solutionSpec.RemoveNuGetSourceNames )

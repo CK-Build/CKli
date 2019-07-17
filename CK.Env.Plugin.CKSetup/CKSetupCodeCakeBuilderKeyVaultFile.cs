@@ -34,7 +34,8 @@ namespace CK.Env.Plugin
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
         {
-            var s = _driver.GetSolution( m );
+            var s = _driver.GetSolution( m, allowInvalidSolution: true );
+            if( s == null ) return;
 
             var passPhrase = _secretStore.GetSecretKey( m, SolutionDriver.CODECAKEBUILDER_SECRET_KEY, true );
             Dictionary<string,string> current = KeyVault.DecryptValues( TextContent, passPhrase );

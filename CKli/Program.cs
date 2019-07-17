@@ -41,14 +41,18 @@ namespace CKli
 
         static void Main( string[] args )
         {
+            var rootPath = GetRootPath( args );
+            LogFile.RootLogPath = Path.Combine( rootPath, "Logs" );
             var goc = new GrandOutputConfiguration();
-            goc.Handlers.Add( new CK.Monitoring.Handlers.ConsoleConfiguration() );
+            goc.Handlers.Add( new CK.Monitoring.Handlers.TextFileConfiguration() { Path = "Text" } );
             GrandOutput.EnsureActiveDefault( goc );
+
             var monitor = new ActivityMonitor();
+            monitor.Output.RegisterClient( new ColoredActivityMonitorConsoleClient() );
+
             var xFactory = new XTypedFactory();
             xFactory.AutoRegisterFromLoadedAssemblies( monitor );
             IBasicApplicationLifetime appLife = new FakeApplicationLifetime();
-            var rootPath = GetRootPath( args );
             using( var global = new GlobalContext( monitor, xFactory, rootPath, appLife ) )
             {
                 if( !InteractiveRun( monitor, global, appLife ) ) Console.ReadLine();

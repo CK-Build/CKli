@@ -20,6 +20,7 @@ namespace CK.Env
     {
         readonly CommandRegister _commandRegister;
         readonly SecretKeyStore _secretKeyStore;
+        readonly List<ProtoGitFolder> _protoGits;
         readonly List<GitFolder> _gits;
 
         /// <summary>
@@ -35,6 +36,7 @@ namespace CK.Env
             Root = new NormalizedPath( Path.GetFullPath( rootPath ) );
             _commandRegister = commandRegister;
             _secretKeyStore = secretKeyStore;
+            _protoGits = new List<ProtoGitFolder>();
             _gits = new List<GitFolder>();
             ServiceContainer = new SimpleServiceContainer( sp );
             ServiceContainer.Add( this );
@@ -65,24 +67,57 @@ namespace CK.Env
         public NormalizedPath Root { get; }
 
         /// <summary>
+        /// Finds or creates a <see cref="ProtoGitFolder"/>.
+        /// </summary>
+        /// <param name="folderPath">The folder relative to the <see cref="Root"/> and contains the .git sub folder.</param>
+        /// <param name="urlRepository">The url repository.</param>
+        /// <param name="isPublic">Whether the repository is public.</param>
+        /// <returns>The <see cref="ProtoGitFolder"/>.</returns>
+        public ProtoGitFolder FindOrCreateProtoGitFolder( IActivityMonitor m, IWorldName world, NormalizedPath folderPath, string urlRepository, bool isPublic = false )
+        {
+            ProtoGitFolder g = _protoGits.FirstOrDefault( f => f.FolderPath == folderPath );
+            if( g == null )
+            {
+                g = new ProtoGitFolder( urlRepository, isPublic, folderPath, world, _secretKeyStore, this, _commandRegister );
+                _protoGits.Add( g );
+            }
+            return g;
+        }
+
+        /// <summary>
         /// Ensures that the Git folder is loaded.
+        /// The <see cref="ProtoGitFolder"/> must have been created first.
         /// </summary>
         /// <param name="folderPath">
         /// The folder path is a sub path of <see cref="Root"/> and contains the .git sub folder.
         /// </param>
-        /// <param name="urlRepository">The url repository.</param>
-        /// <returns>The <see cref="GitFolder"/> or null if there is not .git subfolder.</returns>
-        public GitFolder EnsureGitFolder( IActivityMonitor m, IWorldName world, NormalizedPath folderPath, string urlRepository, bool isPublic = false )
+        /// <returns>The <see cref="GitFolder"/> or null if not found.</returns>
+        public GitFolder EnsureGitFolder( IActivityMonitor m, ProtoGitFolder proto )
         {
-            GitFolder g = GitFolders.FirstOrDefault( f => f.SubPath == folderPath );
+            if( proto == null ) throw new ArgumentNullException( nameof( proto ) );
+            if( proto.FileSystem != this ) throw new ArgumentException( "FileSystem mismatch.", nameof( proto ) );
+            GitFolder g = GitFolders.FirstOrDefault( f => f.ProtoGitFolder == proto );
             if( g == null )
             {
-                folderPath = Root.Combine( folderPath );
-                g = new ProtoGitFolder( urlRepository, isPublic, folderPath, world, _secretKeyStore, this, _commandRegister ).CreateGitFolder( m );
-                g.EnsureBranch( m, world.DevelopBranchName );
+                g = proto.CreateGitFolder( m );
+                g.EnsureBranch( m, proto.World.DevelopBranchName );
                 _gits.Add( g );
             }
             return g;
+        }
+
+        /// <summary>
+        /// Ensures that the Git folder is loaded.
+        /// The <see cref="ProtoGitFolder"/> must have been created first.
+        /// </summary>
+        /// <param name="folderPath">
+        /// The folder path is a sub path of <see cref="Root"/> and contains the .git sub folder.
+        /// </param>
+        /// <returns>The <see cref="GitFolder"/> or null if not found.</returns>
+        public GitFolder EnsureGitFolder( IActivityMonitor m, NormalizedPath folderPath )
+        {
+            ProtoGitFolder pg = _protoGits.FirstOrDefault( f => f.FolderPath == folderPath );
+            return pg != null ? EnsureGitFolder( m, pg ) : null;
         }
 
         /// <summary>

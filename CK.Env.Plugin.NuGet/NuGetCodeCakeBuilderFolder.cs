@@ -27,7 +27,9 @@ namespace CK.Env.Plugin
 
         protected override void DoApplySettings( IActivityMonitor m )
         {
-            var solution = _driver.GetSolution( m );
+            var solution = _driver.GetSolution( m, allowInvalidSolution: true );
+            if( solution == null ) return;
+
             bool hasDotNetPackages = solution.GeneratedArtifacts.Any( g => g.Artifact.Type == NuGetClient.NuGetType );
 
             if( hasDotNetPackages )

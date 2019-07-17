@@ -17,39 +17,10 @@ namespace CK.Env
     /// </summary>
     public class GitPluginManager : IDisposable
     {
-        readonly GitPluginRegistry _registry;
         readonly CommandRegister _commandRegister;
         readonly string _defaultBranchName;
         readonly PluginCollection<IGitPlugin> _plugins;
         readonly Branches _branches;
-
-        /// <summary>
-        /// Static helper that registers all the <see cref="IGitPlugin"/> concrete types
-        /// available in the currently loaded assemblies.
-        /// </summary>
-        public static class GlobalRegister
-        {
-            static readonly HashSet<Assembly> _analyzed = new HashSet<Assembly>();
-            static readonly List<Type> _plugins = new List<Type>();
-
-            /// <summary>
-            /// Gets the list of all the <see cref="IGitPlugin"/> concrete types
-            /// available in the currently loaded assemblies.
-            /// </summary>
-            /// <returns>The Git plugin types.</returns>
-            public static IReadOnlyList<Type> GetAllGitPlugins()
-            {
-                foreach( var a in AppDomain.CurrentDomain.GetAssemblies() )
-                {
-                    if( _analyzed.Add( a ) )
-                    {
-                        _plugins.AddRange( a.ExportedTypes.Where( t => !t.IsAbstract && typeof( IGitPlugin ).IsAssignableFrom( t ) ) );
-                    }
-                }
-                return _plugins;
-            }
-
-        }
 
         class Branches : IGitBranchPluginCollection, IDisposable
         {
@@ -66,15 +37,15 @@ namespace CK.Env
 
             public IGitPluginCollection<IGitBranchPlugin> this[ string branchName ] => DoFindOrCreate( true, branchName );
 
-            public bool EnsurePlugins( IActivityMonitor m, string branchName, string holderName ) => DoFindOrCreate( true, branchName, holderName, m ) != null;
+            public bool EnsurePlugins( IActivityMonitor m, string branchName ) => DoFindOrCreate( true, branchName, m ) != null;
 
-            PluginCollection<IGitBranchPlugin> DoFindOrCreate( bool ensureFirstLoad, string branchName, string holderName = null, IActivityMonitor m = null )
+            PluginCollection<IGitBranchPlugin> DoFindOrCreate( bool ensureFirstLoad, string branchName, IActivityMonitor m = null )
             {
                 if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
                 if( !_branchPlugins.TryGetValue( branchName, out var c )
                     || (ensureFirstLoad && !c.IsFirstLoadDone) )
                 {
-                    using( ensureFirstLoad && m != null ? m.OpenTrace( $"Initializing plugins for '{holderName}' branch '{branchName}'." ) : null )
+                    using( ensureFirstLoad && m != null ? m.OpenTrace( $"Initializing plugins for '{_manager.Registry.FolderPath}' branch '{branchName}'." ) : null )
                     {
                         try
                         {
@@ -182,7 +153,7 @@ namespace CK.Env
                 if( _pluginCount != 0 ) Reset();
                 // Collects the settings.
                 var updatedMappings = new Dictionary<Type, object>( _mappings ); 
-                _pluginCount = _manager._registry.FillMappings(
+                _pluginCount = _manager.Registry.FillMappings(
                                                     updatedMappings,
                                                     ServiceContainer,
                                                     _manager._commandRegister,
@@ -233,20 +204,27 @@ namespace CK.Env
         /// <summary>
         /// Initializes a new plugin manager.
         /// </summary>
+        /// <param name="registry">The registry of plugins.</param>
         /// <param name="baseProvider">The base service provider.</param>
         /// <param name="commandRegister">Command registerer.</param>
         /// <param name="defaultBranchName">The default branch name (typically "develop"). Must not be null or empty.</param>
-        /// <param name="branchesPath">Required root /branches path relative from the root FileSystem.</param>
-        public GitPluginManager( ISimpleServiceContainer baseProvider, CommandRegister commandRegister, string defaultBranchName, NormalizedPath branchesPath )
+        public GitPluginManager( GitPluginRegistry registry, ISimpleServiceContainer baseProvider, CommandRegister commandRegister, string defaultBranchName )
         {
             if( String.IsNullOrWhiteSpace(defaultBranchName) ) throw new ArgumentNullException( nameof( defaultBranchName ) );
             ServiceContainer = new SimpleServiceContainer( baseProvider );
             _defaultBranchName = defaultBranchName;
             _commandRegister = commandRegister ?? throw new ArgumentNullException( nameof( commandRegister ) );
-            _registry = new GitPluginRegistry( branchesPath );
+            Registry = registry;
             _plugins = new PluginCollection<IGitPlugin>( this, null );
             _branches = new Branches( this );
         }
+
+        /// <summary>
+        /// Gets the plugin registry.
+        /// Any registration of new <see cref="IGitPlugin"/> (or <see cref="IGitBranchPlugin"/>) must be followed
+        /// by a <see cref="Reload"/> for actual plugins to be instanciated.
+        /// </summary>
+        public GitPluginRegistry Registry { get; }
 
         /// <summary>
         /// Gets the primary service container. Use <see cref="GetServiceContainer(string)"/> to obtain the
@@ -287,47 +265,6 @@ namespace CK.Env
             if( branchName == null ) _plugins.Reload();
             _branches.Reload( branchName );
         }
-
-        /// <summary>
-        /// Registers a type that must be <see cref="IGitPlugin"/>.
-        /// The plugin will be available in all branches (after a subsequent <see cref="Reload"/>).
-        /// </summary>
-        /// <param name="pluginType">The type of the plugin. Must be a non null <see cref="IGitPlugin"/>.</param>
-        public void Register( Type pluginType ) => _registry.Register( pluginType );
-
-        /// <summary>
-        /// Registers a type that must be <see cref="IGitBranchPlugin"/> (or a <see cref="IGitPlugin"/> if allowed).
-        /// A branch plugin will be available only in the specific branch (after a subsequent <see cref="Reload"/>).
-        /// </summary>
-        /// <param name="pluginType">
-        /// The type of the plugin. Must be a non null <see cref="IGitBranchPlugin"/> or <see cref="IGitPlugin"/>
-        /// (if <paramref name="allowGitPlugin"/> is true).
-        /// </param>
-        /// <param name="branchName">Branch name. Must not be null.</param>
-        /// <param name="allowGitPlugin">True to allow <see cref="IGitPlugin"/> to be registered.</param>
-        public void Register( Type pluginType, string branchName, bool allowGitPlugin = false ) => _registry.Register( pluginType, branchName, allowGitPlugin );
-
-        /// <summary>
-        /// Registers a settings object.
-        /// The instance will be available in all branches if <paramref name="branchName"/> is null.
-        /// Note that if an instance has already been registered, it is replaced.
-        /// It will be available after a subsequent <see cref="Reload"/>.
-        /// </summary>
-        /// <typeparam name="T">Type of the settings.</typeparam>
-        /// <param name="instance">The instance. Must not be null.</param>
-        /// <param name="branchName">The branch name or null for a root setting.</param>
-        public void RegisterSettings<T>( T instance, string branchName = null ) => _registry.RegisterSettings( typeof(T), instance, branchName );
-
-        /// <summary>
-        /// Registers a settings object.
-        /// The instance will be available in all branches if <paramref name="branchName"/> is null.
-        /// Note that if an instance has already been registered, it is replaced.
-        /// It will be available after a subsequent <see cref="Reload"/>.
-        /// </summary>
-        /// <param name="type">The type to register. Must not be null.</param>
-        /// <param name="instance">The instance. Must not be null.</param>
-        /// <param name="branchName">The branch name or null for a root setting.</param>
-        public void RegisterSettings( Type type, object instance, string branchName = null ) => _registry.RegisterSettings( type, instance, branchName );
 
         void IDisposable.Dispose()
         {

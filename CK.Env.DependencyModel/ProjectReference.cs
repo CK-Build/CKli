@@ -36,11 +36,11 @@ namespace CK.Env.DependencyModel
 
         internal ProjectReference( IProject o, IProject t, ArtifactDependencyKind kind, CKTrait applicableSavors )
         {
-            Debug.Assert( o.Savors == null && applicableSavors == null
+            Debug.Assert( o != null && o.Savors == null && applicableSavors == null
                             || (o.Savors.Context == applicableSavors.Context
                                 && !applicableSavors.IsEmpty
                                 && o.Savors.IsSupersetOf( applicableSavors )) );
-            Owner = o ?? throw new ArgumentNullException( nameof( o ) );
+            Owner = o;
             Target = t;
             Kind = kind;
             ApplicableSavors = applicableSavors;

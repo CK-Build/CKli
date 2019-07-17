@@ -126,18 +126,45 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="repositories">The set of repository for which secrets must be resolved.</param>
+        /// <param name="allMustBeResolved">
+        /// True to return null if at least one secret is not resolved and to log an error for each of them.
+        /// When false, the non null returned list can contain null secret.
+        /// </param>
         /// <returns>
         /// The list of resolved secrets: a null secret means that the secret has not been successfully obtained
         /// for the corresponding <see cref="IArtifactRepositoryInfo.SecretKeyName"/>.
         /// </returns>
-        public IReadOnlyList<(string SecretKeyName, string Secret)> ResolveSecrets( IActivityMonitor m, IEnumerable<IArtifactRepository> repositories )
+        public List<(string SecretKeyName, string Secret)> ResolveSecrets(
+            IActivityMonitor m,
+            IEnumerable<IArtifactRepository> repositories,
+            bool allMustBeResolved )
         {
-            return repositories.Where( feed => !String.IsNullOrWhiteSpace( feed.SecretKeyName ) )
+            var r = repositories.Where( feed => !String.IsNullOrWhiteSpace( feed.SecretKeyName ) )
                                .GroupBy( feed => feed.SecretKeyName )
                                .Select( g => (g.Key, Secret: g.First().ResolveSecret( m )) )
                                .ToList();
+            if( allMustBeResolved )
+            {
+                bool missing = false;
+                foreach( var (SecretKeyName, Secret) in r )
+                {
+                    if( Secret == null )
+                    {
+                        m.Error( $"A required repository secret is missing: {SecretKeyName}" );
+                        missing = true;
+                    }
+                }
+                if( missing ) r = null;
+            }
+            return r;
         }
 
+        /// <summary>
+        /// Returns a collection of <see cref="ArtifactAvailableInstances"/> for an <see cref="Artifact"/> accross all feeds.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="artifact">The artifact top lookup.</param>
+        /// <returns>The collection of available instances accross all feeds.</returns>
         public IReadOnlyCollection<ArtifactAvailableInstances> GetExternalVersions( IActivityMonitor m, Artifact artifact )
         {
             if( !_cachedArtifacts.TryGetValue( artifact, out var instances ) )

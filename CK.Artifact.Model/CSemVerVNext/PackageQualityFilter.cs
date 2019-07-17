@@ -3,9 +3,7 @@ using System;
 namespace CSemVer
 {
     /// <summary>
-    /// Defines a min/max filter of <see cref="PackageQuality"/>.
-    /// By default, this filter accepts everything (<see cref="PackageQuality.None"/> is the same as <see cref="PackageQuality.CI"/> for <see cref="Min"/>
-    /// and <see cref="PackageQuality.None"/> is the same as <see cref="PackageQuality.Release"/> for <see cref="Max"/>).
+    /// ================> CSEMVER VNEXT!!
     /// </summary>
     public readonly struct PackageQualityFilter
     {

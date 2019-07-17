@@ -31,10 +31,10 @@ namespace CKli
 
             // Registers the SolutionSpec as a branch settings: the Solution specifications becomes
             // available to any of this branch plugins.
-            branch.Parent.GitFolder.PluginManager.RegisterSettings( SolutionSpec, branch.Name );           
-            foreach( var type in GitPluginManager.GlobalRegister.GetAllGitPlugins().Except( SolutionSpec.ExcludedPlugins ) )
+            branch.Parent.ProtoGitFolder.PluginRegistry.RegisterSettings( SolutionSpec, branch.Name );           
+            foreach( var type in GitPluginRegistry.GlobalRegister.GetAllGitPlugins().Except( SolutionSpec.ExcludedPlugins ) )
             {
-                branch.Parent.GitFolder.PluginManager.Register( type, branch.Name, allowGitPlugin: true );
+                branch.Parent.ProtoGitFolder.PluginRegistry.Register( type, branch.Name, allowGitPlugin: true );
             }
         }
 

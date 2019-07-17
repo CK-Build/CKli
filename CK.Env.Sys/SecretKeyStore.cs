@@ -34,6 +34,12 @@ namespace CK.Env
         /// </summary>
         public IEnumerable<SecretKeyInfo> OptimalAvailableInfos => _orderedInfos.Where( i => i.IsSecretAvailable && (i.SuperKey == null || !i.SuperKey.IsSecretAvailable) );
 
+        /// <summary>
+        /// Gets the secret key info or null if it deosn't exist.
+        /// </summary>
+        /// <param name="name">The name of the key.</param>
+        /// <returns>The info or null.</returns>
+        public SecretKeyInfo Find( string name ) => _keyInfos.GetValueWithDefault( name, null );
 
         /// <summary>
         /// Clears this store.
@@ -63,7 +69,6 @@ namespace CK.Env
             else info.Reconfigure( descriptionBuilder, isRequired );
             return info;
         }
-
 
         /// <summary>
         /// Declares a secret key.
@@ -147,7 +152,7 @@ namespace CK.Env
             if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentException( nameof( name ) );
             if( !_keyInfos.TryGetValue( name, out var info ) )
             {
-                throw new InvalidOperationException( $"Secret '{name}' is not declared. It cannot be obtained." );
+                throw new InvalidOperationException( $"Secret '{name}' must be declared before any use of it." );
             }
             if( !info.IsSecretAvailable && throwOnUnavailable ) throw new Exception( info.ToString() );
             return info.Secret;

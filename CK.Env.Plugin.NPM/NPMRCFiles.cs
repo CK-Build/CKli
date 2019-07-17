@@ -88,7 +88,7 @@ namespace CK.Env.Plugin
 
         void ApplySettings( IActivityMonitor m, NormalizedPath f )
         {
-            var s = _solutionDriver.GetSolution( m );
+            var s = _solutionDriver.GetSolution( m, allowInvalidSolution: true );
             if( s == null ) return;
 
             var text = GitFolder.FileSystem.GetFileInfo( f ).AsTextFileInfo( ignoreExtension: true )?.TextContent ?? String.Empty;

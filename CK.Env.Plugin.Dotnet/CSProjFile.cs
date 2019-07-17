@@ -33,9 +33,10 @@ namespace CK.Env.Plugin
         public bool ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return false;
-            var sln = _solutionDriver.GetSolution( m );
+            var solution = _solutionDriver.GetSolution( m, allowInvalidSolution: true );
+            if( solution == null ) return false;
 
-            var csprojs = sln.Projects.Select<IProject, (IProject project, MSProject msproject)>( p => (p, p.Tag<MSProject>()) ).Where( p => p.Item2 != null );
+            var csprojs = solution.Projects.Select<IProject, (IProject project, MSProject msproject)>( p => (p, p.Tag<MSProject>()) ).Where( p => p.Item2 != null );
             foreach( var p in csprojs )
             {
 

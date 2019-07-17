@@ -27,12 +27,14 @@ namespace CK.Env
 
         /// <summary>
         /// Must provide the secret key name.
-        /// A null or empty SecretKeyName means that the repository does not require any protection.
+        /// A null or empty SecretKeyName means that the repository does not require any protection (or
+        /// uses a different, external, security architecture).
         /// </summary>
         string SecretKeyName { get; }
 
         /// <summary>
-        /// Ensures that the secret behind the <see cref="IArtifactRepositoryInfo.SecretKeyName"/> is available.
+        /// Ensures that the secret behind the <see cref="IArtifactRepositoryInfo.SecretKeyName"/> is available
+        /// and if not, must return null.
         /// The implementation must ensure that the secret only depends from the <see cref="SecretKeyName"/>:
         /// if two repositories share the same SecretKeyName, the resolved secret must be the same.
         /// </summary>

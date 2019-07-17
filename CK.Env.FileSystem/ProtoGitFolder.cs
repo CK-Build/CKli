@@ -8,20 +8,38 @@ using System.Text.RegularExpressions;
 
 namespace CK.Env
 {
+    /// <summary>
+    /// Captures all information required to instanciate an actual <see cref="GitFolder"/> in two steps.
+    /// This split in two phases is mainly to first collect the secrets required by the
+    /// repositories and resolve them before any actual instanciation.
+    /// </summary>
     public class ProtoGitFolder
     {
+        /// <summary>
+        /// Initializes a new <see cref="ProtoGitFolder"/>.
+        /// </summary>
+        /// <param name="url">The url of the remote.</param>
+        /// <param name="isPublic">Whether this repository is public.</param>
+        /// <param name="folderPath">The path that is relative to <see cref="FileSystem.Root"/> and contains the .git sub folder.</param>
+        /// <param name="world">The world name.</param>
+        /// <param name="secretKeyStore">The secret key store.</param>
+        /// <param name="fileSystem">=The file system.</param>
+        /// <param name="commandRegister">The command register.</param>
         public ProtoGitFolder(
             string url,
             bool isPublic,
-            string fullPhysicalPath,
+            in NormalizedPath folderPath,
             IWorldName world,
             SecretKeyStore secretKeyStore,
             FileSystem fileSystem,
             CommandRegister commandRegister )
         {
             if( url == null ) throw new ArgumentNullException( nameof( url ) );
-            if( fullPhysicalPath == null ) throw new ArgumentNullException( nameof( fullPhysicalPath ) );
-            if( fullPhysicalPath.Contains( ".git" ) ) throw new ArgumentException( "Path should be the repository directory and not the .git directory" );
+
+            if( folderPath.IsEmptyPath ) throw new ArgumentException( "Empty path: FileSystem.Root path can not be a Git folder.", nameof( folderPath ) );
+            if( folderPath.IsRooted ) throw new ArgumentException( "Must be relative to the FileSystem.Root.", nameof( folderPath ) );
+            if( folderPath.EndsWith( ".git" ) ) throw new ArgumentException( "Path should be the repository directory and not the .git directory.", nameof( folderPath ) );
+
             if( world == null ) throw new ArgumentNullException( nameof( world ) );
             if( secretKeyStore == null ) throw new ArgumentNullException( nameof( secretKeyStore ) );
             if( fileSystem == null ) throw new ArgumentNullException( nameof( fileSystem ) );
@@ -36,9 +54,11 @@ namespace CK.Env
             OriginUrl = url;
             World = world;
             SecretKeyStore = secretKeyStore;
-            FullPhysicalPath = fullPhysicalPath;
+            FolderPath = folderPath;
+            FullPhysicalPath = fileSystem.Root.Combine( folderPath );
             FileSystem = fileSystem;
             CommandRegister = commandRegister;
+            PluginRegistry = new GitPluginRegistry( folderPath );
 
             if( KnownGitProvider != KnownGitProvider.Unknown )
             {
@@ -67,7 +87,7 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Helper that formts the PAT name based on the kind of provider.
+        /// Helper that formats the PAT name based on the kind of provider.
         /// </summary>
         /// <param name="suffix">Suffix to use.</param>
         /// <returns>The PAT name or null if <see cref="KnownGitProvider"/> is Unknown.</returns>
@@ -94,6 +114,9 @@ namespace CK.Env
         /// </summary>
         public IWorldName World { get; }
 
+        /// <summary>
+        /// Gets the file system object.
+        /// </summary>
         public FileSystem FileSystem { get; }
 
         /// <summary>
@@ -112,12 +135,17 @@ namespace CK.Env
         public KnownGitProvider KnownGitProvider { get; }
 
         /// <summary>
+        /// Gets the path that is relative to <see cref="FileSystem.Root"/> and contains the .git sub folder.
+        /// </summary>
+        public NormalizedPath FolderPath { get; }
+
+        /// <summary>
         /// Gets the full path (that starts with the <see cref="FileSystem"/>' root path) of the Git folder.
         /// </summary>
         public NormalizedPath FullPhysicalPath { get; }
 
         /// <summary>
-        /// Gets the key store.
+        /// Gets the secret key store.
         /// </summary>
         public SecretKeyStore SecretKeyStore { get; }
 
@@ -134,7 +162,15 @@ namespace CK.Env
         /// </summary>
         public string WritePATKeyName { get; }
 
+        /// <summary>
+        /// Gets the command register.
+        /// </summary>
         public CommandRegister CommandRegister { get; }
+
+        /// <summary>
+        /// Gets the plugin registry for this repository.
+        /// </summary>
+        public GitPluginRegistry PluginRegistry { get; }
 
         /// <summary>
         /// Ensures that the Git working folder actually exists and creates a
@@ -147,12 +183,12 @@ namespace CK.Env
             using( m.OpenTrace( $"Ensuring git repository {FullPhysicalPath}" ) )
             {
 
-                var gitFolderPath = Path.Combine( FullPhysicalPath, ".git" );
+                var gitFolderPath = Path.Combine( FolderPath, ".git" );
                 if( !Directory.Exists( gitFolderPath ) )
                 {
-                    using( m.OpenInfo( $"Checking out '{FullPhysicalPath}' from '{OriginUrl}' on {World.DevelopBranchName}." ) )
+                    using( m.OpenInfo( $"Checking out '{FolderPath}' from '{OriginUrl}' on {World.DevelopBranchName}." ) )
                     {
-                        Repository.Clone( OriginUrl, FullPhysicalPath, new CloneOptions()
+                        Repository.Clone( OriginUrl, FolderPath, new CloneOptions()
                         {
                             CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, url ),
                             BranchName = World.DevelopBranchName,
@@ -175,7 +211,7 @@ namespace CK.Env
             }
         }
 
-        public Credentials PATCredentialsHandler( IActivityMonitor m, string url )
+        internal Credentials PATCredentialsHandler( IActivityMonitor m, string url )
         {
             if( KnownGitProvider == KnownGitProvider.Unknown ) throw new InvalidOperationException( "Unknown Git provider." );
             string pat = SecretKeyStore.GetSecretKey( m, ReadPATKeyName, true );
@@ -188,7 +224,6 @@ namespace CK.Env
 
 
         #region GitHooks
-
 
         bool CheckHookDispatcherVersion( string scriptString )
         {
@@ -210,7 +245,7 @@ namespace CK.Env
             EnsureHookFile( m, prepush, "check_no_commit_nopush", _hook_check_no_commit_nopush );
         }
 
-        string GetHooksDir => Path.Combine( FullPhysicalPath, ".git", "hooks" );
+        string GetHooksDir => Path.Combine( FolderPath, ".git", "hooks" );
 
         string GetHookPath( string hookName ) => Path.Combine( GetHooksDir, hookName );
 

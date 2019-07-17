@@ -79,7 +79,7 @@ namespace CK.Env.Plugin
 
         public IReadOnlyList<NPMProject> GetNPMProjects( IActivityMonitor m )
         {
-            return _driver.GetSolution( m ) != null ? _npmProjects : null;
+            return _driver.GetSolution( m, allowInvalidSolution: true ) != null ? _npmProjects : null;
         }
 
         void OnUpdatePackageDependency( object sender, UpdatePackageDependencyEventArgs e )

@@ -29,7 +29,9 @@ namespace CK.Env.Plugin
 
         protected override void DoApplySettings( IActivityMonitor m )
         {
-            var solution = _driver.GetSolution( m );
+            var solution = _driver.GetSolution( m, allowInvalidSolution: true );
+            if( solution == null ) return;
+
             var projects = _npmDriver.GetNPMProjects( m );
             if( projects == null ) return;
             bool useNpm = projects.Any();

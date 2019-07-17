@@ -22,9 +22,8 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">The branch name. Cannot be null or whitespace.</param>
-        /// <param name="holderName">The name of the plugin container used for logging.</param>
         /// <returns>True on success, false on error.</returns>
-        bool EnsurePlugins( IActivityMonitor m, string branchName, string holderName );
+        bool EnsurePlugins( IActivityMonitor m, string branchName );
 
     }
 }

@@ -19,7 +19,8 @@ namespace CK.Env.Plugin
 
         protected override void DoApplySettings( IActivityMonitor m )
         {
-            var s = _driver.GetSolution( m );
+            var s = _driver.GetSolution( m, allowInvalidSolution: true );
+            if( s == null ) return;
 
             bool needDotNetBuild = s.Projects.Any( p => p.Type == ".Net" && p != s.BuildProject );
 

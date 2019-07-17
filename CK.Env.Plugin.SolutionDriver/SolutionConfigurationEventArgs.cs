@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Env.DependencyModel;
 using System;
+using System.Collections.Generic;
 
 namespace CK.Env.Plugin
 {
@@ -18,11 +19,26 @@ namespace CK.Env.Plugin
         /// <param name="solution">The solution to be configured.</param>
         /// <param name="isNew">Whether the solution to be configured is a brand new one or is an existing one that is reconfigured.</param>
         /// <param name="spec">The solution specification.</param>
-        public SolutionConfigurationEventArgs( IActivityMonitor m, Solution solution, bool isNew, SolutionSpec spec )
+        /// <param name="buildSecrets">See <see cref="BuildRequiredSecrets"/>.</param>
+        public SolutionConfigurationEventArgs(
+            IActivityMonitor m,
+            Solution solution,
+            bool isNew,
+            SolutionSpec spec,
+            IList<(string SecretKeyName, string Secret)> buildSecrets )
             : base( m )
         {
-            Solution = solution;
+            Solution = solution ?? throw new ArgumentNullException( nameof( solution ) );
+            SolutionSpec = spec ?? throw new ArgumentNullException( nameof( spec ) );
+            BuildRequiredSecrets = buildSecrets ?? throw new ArgumentNullException( nameof( SolutionSpec ) );
         }
+
+        /// <summary>
+        /// Gets a mutable list of secrets that are required for the build: these are the secrets that must be
+        /// injected into the CodeCakeBuilderKeyVault.txt file.
+        /// There is no guaranty that all secrets here are not null: missing secrets can exist (only the SecretKeyName is non null).
+        /// </summary>
+        public IList<(string SecretKeyName, string Secret)> BuildRequiredSecrets { get; }
 
         /// <summary>
         /// Gets the solution that must be configured.
@@ -63,5 +79,6 @@ namespace CK.Env.Plugin
                 ? Environment.NewLine + message
                 : (String.IsNullOrWhiteSpace( message ) ? "(no message)" : message );
         }
+
     }
 }

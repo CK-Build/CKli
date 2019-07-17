@@ -13,13 +13,13 @@ namespace CKli
         {
             _branches = new List<XBranch>();
             initializer.ChildServices.Add( this );
-            GitFolder = FileSystem.EnsureGitFolder( initializer.Monitor, world.WorldName, FullPath, Url, world.IsPublicWorld );
+            ProtoGitFolder = FileSystem.FindOrCreateProtoGitFolder( initializer.Monitor, world.WorldName, FullPath, Url, world.IsPublicWorld );
         }
 
         /// <summary>
-        /// Gets the GitFolder object that encapsulates the Git repoistory.
+        /// Gets the ProtoGitFolder object that encapsulates information about Git repository.
         /// </summary>
-        public GitFolder GitFolder { get; }
+        public ProtoGitFolder ProtoGitFolder { get; }
 
         /// <summary>
         /// Gets the url of the remote repository.
@@ -39,7 +39,7 @@ namespace CKli
         internal void Register( XBranch b )
         {
             _branches.Add( b );
-            if( b.Name == GitFolder.World.DevelopBranchName )
+            if( b.Name == ProtoGitFolder.World.DevelopBranchName )
             {
                 DevelopBranch = b;
             }

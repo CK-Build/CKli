@@ -32,8 +32,12 @@ namespace CK.Env
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="reloadSolution">The solution names or null on error.</param>
+        /// <param name="allowInvalidSolution">
+        /// True to allow <see cref="IsSolutionValid"/> to be false: the instance is returned as long as the <see cref="ISolution"/> instance has
+        /// successfully been built even if some required cheks have failed.
+        /// </param>
         /// <returns>The updated sol</returns>
-        ISolution GetSolution( IActivityMonitor monitor, bool reloadSolution );
+        ISolution GetSolution( IActivityMonitor monitor, bool allowInvalidSolution, bool reloadSolution );
 
         /// <summary>
         /// Gets wether the Solution that this driver handles is valid or not.

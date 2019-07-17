@@ -18,113 +18,13 @@ namespace CK.Env
     /// </summary>
     public partial class WorldState : IWorldState, ISolutionDriverWorld, ICommandMethodsProvider
     {
-        class WorldBranchContext : IWorldSolutionContext
-        {
-            readonly List<ISolutionDriver> _drivers;
-            readonly SolutionContext _context;
-            readonly PairList _pairList;
-            SolutionDependencyContext _depContext;
-
-            internal WorldBranchContext( string branchName )
-            {
-                BranchName = branchName;
-                _context = new SolutionContext();
-                _drivers = new List<ISolutionDriver>();
-                _pairList = new PairList( this );
-            }
-
-            /// <summary>
-            /// Multiple branches constructor.
-            /// </summary>
-            /// <param name="drivers">The driver list from the develop branch.</param>
-            internal WorldBranchContext( IEnumerable<ISolutionDriver> drivers )
-            {
-                _drivers = drivers.ToList();
-                _pairList = new PairList( this );
-            }
-
-            /// <summary>
-            /// Gets the branch name.
-            /// This is null for multiple branches context.
-            /// </summary>
-            public string BranchName { get; }
-
-            public SolutionDependencyContext DependencyContext => _depContext;
-
-            public IReadOnlyList<DependentSolution> DependentSolutions => _depContext.Solutions;
-
-            public IReadOnlyList<ISolutionDriver> Drivers => _drivers;
-
-            class PairList : IReadOnlyList<(DependentSolution Solution, ISolutionDriver Driver)>
-            {
-                readonly WorldBranchContext _c;
-
-                public PairList( WorldBranchContext c ) => _c = c;
-
-                public (DependentSolution Solution, ISolutionDriver Driver) this[int index] => (_c.DependentSolutions[index], _c._drivers[index]);
-
-                public int Count => _c._drivers.Count;
-
-                public IEnumerator<(DependentSolution Solution, ISolutionDriver Driver)> GetEnumerator()
-                {
-                    return _c.DependentSolutions.Select( s => (s, _c._drivers[s.Index]) ).GetEnumerator();
-                }
-
-                IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-            }
-
-            public IReadOnlyList<(DependentSolution Solution, ISolutionDriver Driver)> Solutions => _pairList;
-
-            public bool Refresh( IActivityMonitor m, bool forceReload )
-            {
-                foreach( var d in _drivers )
-                {
-                    d.GetSolution( m, forceReload );
-                    if(!d.IsSolutionValid )
-                    {
-                        m.Error( $"Failed to load solution from '{d.GitRepository.SubPath}'." );
-                        return false;
-                    }
-                }
-                if( _depContext == null || _depContext.HasError || _depContext.IsObsolete )
-                {
-                    LogFilter final = m.ActualFilter;
-                    if( final == LogFilter.Undefined ) final = ActivityMonitor.DefaultFilter;
-                    _depContext = _context != null
-                                   ? _context.GetDependencyAnalyser( m, final == LogFilter.Debug ).DefaultDependencyContext
-                                   : DependencyAnalyzer.Create( m, _drivers.Select( d => d.GetSolution( m, false ) ).ToList(), final == LogFilter.Debug ).DefaultDependencyContext;
-                    if( !_depContext.HasError )
-                    {
-                        Debug.Assert( _drivers.Count() == _depContext.Solutions.Count );
-                        var aliasCtx = _depContext;
-                        _drivers.Sort( ( d1, d2 ) => aliasCtx[d1.GetSolution( m, false )].Index - aliasCtx[d2.GetSolution( m, false )].Index );
-                    }
-                }
-                return true;
-            }
-
-
-            internal SolutionContext OnRegisterDriver( ISolutionDriver d )
-            {
-                Debug.Assert( d != null && !_drivers.Contains( d ) );
-                _drivers.Add( d );
-                _depContext = null;
-                return _context;
-            }
-
-            internal void OnUnregisterDriver( ISolutionDriver d )
-            {
-                _drivers.Remove( d );
-                _depContext = null;
-            }
-        }
-
         readonly IWorldStore _store;
         readonly IEnvLocalFeedProvider _localFeedProvider;
         readonly ArtifactCenter _artifacts;
 
         readonly DriversCollection _solutionDrivers;
         readonly HashSet<IGitRepository> _gitRepositories;
+        readonly IActivityMonitorFilteredClient _userMonitorClient;
 
         readonly IBasicApplicationLifetime _appLife;
 
@@ -149,6 +49,7 @@ namespace CK.Env
             IWorldName worldName,
             bool isPublicWorld,
             IEnvLocalFeedProvider localFeedProvider,
+            IActivityMonitorFilteredClient userMonitorClient,
             IBasicApplicationLifetime appLife )
         {
             _artifacts = artifacts ?? throw new ArgumentNullException( nameof( artifacts ) );
@@ -159,6 +60,7 @@ namespace CK.Env
             _appLife = appLife;
             _solutionDrivers = new DriversCollection();
             _gitRepositories = new HashSet<IGitRepository>();
+            _userMonitorClient = userMonitorClient;
 
             CommandProviderName = "World";
             commandRegister.Register( this );
@@ -244,7 +146,7 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Asks this world state to be dumped (in the monitor or anywhere lese) by
+        /// Asks this world state to be dumped (in the monitor or anywhere else) by
         /// raising <see cref="DumpWorldStatus"/> event.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
@@ -372,9 +274,9 @@ namespace CK.Env
 
         void DoSetUserLogFilter( IActivityMonitor m, LogFilter filter, bool saveOnChange )
         {
-            if( m.MinimalFilter != filter )
+            if( _userMonitorClient.MinimalFilter != filter )
             {
-                m.MinimalFilter = filter;
+                _userMonitorClient.MinimalFilter = filter;
                 _rawState.GeneralState.SetAttributeValue( "UserLogFilter", filter.ToString() );
                 m.UnfilteredLog( ActivityMonitor.Tags.Empty, LogLevel.Info, $"User Log Filter level set to '{filter}' (actual filter is '{m.ActualFilter}').", m.NextLogTime(), null );
                 if( saveOnChange ) Save( m );

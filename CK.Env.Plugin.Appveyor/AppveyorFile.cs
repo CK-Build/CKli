@@ -35,7 +35,8 @@ namespace CK.Env.Plugin
             if( !this.CheckCurrentBranch( m ) ) return;
             YamlMapping firstMapping = GetFirstMapping( m, true );
             if( firstMapping == null ) return;
-            var solution = _driver.GetSolution( m );
+            var solution = _driver.GetSolution( m, allowInvalidSolution: true );
+            if( solution == null ) return;
 
             // We don't use AppVeyor for private repositories.
             if( !GitFolder.IsPublic ) 
@@ -53,11 +54,11 @@ namespace CK.Env.Plugin
             string appveyorSecure = _secretStore.GetSecretKey( m, APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY, false );
             if( appveyorSecure != null )
             {
-                env[SolutionDriver.CODECAKEBUILDER_SECRET_KEY] = CreateKeyValue( "secure", appveyorSecure );
+                env[ SolutionDriver.CODECAKEBUILDER_SECRET_KEY ] = CreateKeyValue( "secure", appveyorSecure );
             }
             else
             {
-                m.Warn( "Update of CODECAKEBUILDER_SECRET_KEY encrypted secure key has been skipped." );
+                m.Warn( $"Update of {SolutionDriver.CODECAKEBUILDER_SECRET_KEY} encrypted secure key has been skipped." );
             }
             // Remove obsolete environment variables definitions.
             env.Remove( "NUGET_API_KEY" );

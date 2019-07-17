@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.29020.237
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.271
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CKli", "CKli\CKli.csproj", "{21EE2C7F-2467-4929-B0E8-18B4D6E4F2CF}"
 EndProject
@@ -317,14 +317,14 @@ Global
 		{3A9F2DC4-65AE-4DD1-9E68-298AA4451718}.Release|Any CPU.Build.0 = Release|Any CPU
 		{3A9F2DC4-65AE-4DD1-9E68-298AA4451718}.Release|x64.ActiveCfg = Release|Any CPU
 		{3A9F2DC4-65AE-4DD1-9E68-298AA4451718}.Release|x64.Build.0 = Release|Any CPU
+		{20706B63-81A3-466B-9B12-5E5EB3C0696F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{20706B63-81A3-466B-9B12-5E5EB3C0696F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{20706B63-81A3-466B-9B12-5E5EB3C0696F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{20706B63-81A3-466B-9B12-5E5EB3C0696F}.Debug|x64.Build.0 = Debug|Any CPU
 		{20706B63-81A3-466B-9B12-5E5EB3C0696F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{20706B63-81A3-466B-9B12-5E5EB3C0696F}.Release|Any CPU.Build.0 = Release|Any CPU
-		{F2769A66-EC11-4365-BB3F-C1FDBBC53ED2}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{F2769A66-EC11-4365-BB3F-C1FDBBC53ED2}.Debug|x64.Build.0 = Debug|Any CPU
-		{F2769A66-EC11-4365-BB3F-C1FDBBC53ED2}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{F2769A66-EC11-4365-BB3F-C1FDBBC53ED2}.Release|Any CPU.Build.0 = Release|Any CPU
-		{F2769A66-EC11-4365-BB3F-C1FDBBC53ED2}.Release|x64.ActiveCfg = Release|Any CPU
-		{F2769A66-EC11-4365-BB3F-C1FDBBC53ED2}.Release|x64.Build.0 = Release|Any CPU
+		{20706B63-81A3-466B-9B12-5E5EB3C0696F}.Release|x64.ActiveCfg = Release|Any CPU
+		{20706B63-81A3-466B-9B12-5E5EB3C0696F}.Release|x64.Build.0 = Release|Any CPU
 		{777AC8E9-32CE-4B63-8606-6C9D8B531E88}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{777AC8E9-32CE-4B63-8606-6C9D8B531E88}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{777AC8E9-32CE-4B63-8606-6C9D8B531E88}.Debug|x64.ActiveCfg = Debug|Any CPU

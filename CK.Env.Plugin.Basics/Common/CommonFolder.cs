@@ -18,7 +18,9 @@ namespace CK.Env.Plugin
 
         protected override void DoApplySettings( IActivityMonitor m )
         {
-            var s = _driver.GetSolution( m );
+            var s = _driver.GetSolution( m, allowInvalidSolution: true );
+            if( s == null ) return;
+
             bool dotNet = s.Projects.Any( p => !p.IsBuildProject && p.Type == ".Net" );
             if( _settings.NoStrongNameSigning || !dotNet )
             {

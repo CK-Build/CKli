@@ -8,11 +8,13 @@ using System.Reflection;
 namespace CK.Env
 {
     /// <summary>
-    /// Internal, hidden behind <see cref="GitPluginManager"/>.
+    /// Registry of <see cref="IGitPlugin"/> and <see cref="IGitBranchPlugin"/> that apply
+    /// to a <see cref="FolderPath"/>.
+    /// The <see cref="GitPluginManager"/> of a <see cref="GitFolder"/> uses this registry to instanciate
+    /// the plugins.
     /// </summary>
-    class GitPluginRegistry
+    public class GitPluginRegistry
     {
-        readonly NormalizedPath _branchesPath;
         readonly Dictionary<EntryKey, Descriptor> _descriptors;
 
         readonly struct EntryKey : IEquatable<EntryKey>
@@ -86,15 +88,66 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Static helper that registers all the <see cref="IGitPlugin"/> concrete types
+        /// available in the currently loaded assemblies.
+        /// </summary>
+        public static class GlobalRegister
+        {
+            static readonly HashSet<Assembly> _analyzed = new HashSet<Assembly>();
+            static readonly List<Type> _plugins = new List<Type>();
+
+            /// <summary>
+            /// Gets the list of all the <see cref="IGitPlugin"/> concrete types
+            /// available in the currently loaded assemblies.
+            /// </summary>
+            /// <returns>The Git plugin types.</returns>
+            public static IReadOnlyList<Type> GetAllGitPlugins()
+            {
+                foreach( var a in AppDomain.CurrentDomain.GetAssemblies() )
+                {
+                    if( _analyzed.Add( a ) )
+                    {
+                        _plugins.AddRange( a.ExportedTypes.Where( t => !t.IsAbstract && typeof( IGitPlugin ).IsAssignableFrom( t ) ) );
+                    }
+                }
+                return _plugins;
+            }
+
+        }
+
+
+        /// <summary>
         /// Initializes a new <see cref="GitPluginRegistry"/>.
         /// </summary>
-        /// <param name="branchesPath">Required root /branches path relative from the root FileSystem.</param>
-        public GitPluginRegistry( NormalizedPath branchesPath )
+        /// <param name="folderPath">Path relative to <see cref="FileSystem.Root"/> and that contains the .git sub folder.</param>
+        public GitPluginRegistry( in NormalizedPath folderPath )
         {
-            _branchesPath = branchesPath;
+            if( folderPath.IsRooted ) throw new ArgumentException( "Must not be rooted.", nameof( folderPath ) );
+            if( folderPath.LastPart == "branches" ) throw new ArgumentException( "Must not end with /branches.", nameof( folderPath ) );
+            FolderPath = folderPath;
+            BranchesPath = folderPath.AppendPart( "branches" );
             _descriptors = new Dictionary<EntryKey, Descriptor>();
         }
 
+        /// <summary>
+        /// Gets the path that is relative to <see cref="FileSystem.Root"/> and contains the .git sub folder.
+        /// </summary>
+        public NormalizedPath FolderPath { get; }
+
+        /// <summary>
+        /// Get the path to which the registered plugins apply.
+        /// It is <see cref="FolderPath"/> with a trailing "/branches" part.
+        /// </summary>
+        public NormalizedPath BranchesPath { get; }
+
+        /// <summary>
+        /// Registers a settings object.
+        /// The instance will be available in all branches if <paramref name="branchName"/> is null.
+        /// Note that if an instance has already been registered, it is replaced.
+        /// </summary>
+        /// <param name="type">The type to register. Must not be null.</param>
+        /// <param name="instance">The instance. Must not be null.</param>
+        /// <param name="branchName">The branch name or null for a root setting.</param>
         public void RegisterSettings( Type type, object instance, string branchName = null )
         {
             if( type == null ) throw new ArgumentNullException( nameof( type ) );
@@ -115,14 +168,37 @@ namespace CK.Env
             }
         }
 
-        public void RegisterSettings( object instance, string branchName = null ) => RegisterSettings( instance?.GetType(), branchName );
+        /// <summary>
+        /// Registers a settings object.
+        /// The instance will be available in all branches if <paramref name="branchName"/> is null.
+        /// Note that if an instance has already been registered, it is replaced.
+        /// </summary>
+        /// <typeparam name="T">Type of the settings.</typeparam>
+        /// <param name="instance">The instance. Must not be null.</param>
+        /// <param name="branchName">The branch name or null for a root setting.</param>
+        public void RegisterSettings<T>( T instance, string branchName = null ) => RegisterSettings( typeof( T ), instance, branchName );
 
+        /// <summary>
+        /// Registers a type that must be <see cref="IGitPlugin"/>.
+        /// The plugin will be available in all branches.
+        /// </summary>
+        /// <param name="pluginType">The type of the plugin. Must be a non null <see cref="IGitPlugin"/>.</param>
         public void Register( Type pluginType )
         {
             CheckPluginType( pluginType );
             DoRegister( pluginType, null );
         }
 
+        /// <summary>
+        /// Registers a type that must be <see cref="IGitBranchPlugin"/> (or a <see cref="IGitPlugin"/> if allowed).
+        /// A branch plugin will be available only in the specific branch.
+        /// </summary>
+        /// <param name="pluginType">
+        /// The type of the plugin. Must be a non null <see cref="IGitBranchPlugin"/> or <see cref="IGitPlugin"/>
+        /// (if <paramref name="allowGitPlugin"/> is true).
+        /// </param>
+        /// <param name="branchName">Branch name. Must not be null.</param>
+        /// <param name="allowGitPlugin">True to allow <see cref="IGitPlugin"/> to be registered.</param>
         public void Register( Type pluginType, string branchName, bool allowGitPlugin )
         {
             if( CheckBranchPluginType( pluginType, branchName, allowGitPlugin ) )
@@ -191,7 +267,7 @@ namespace CK.Env
             {
                 if( i == desc.BranchParameterIdx )
                 {
-                    parameters[i] = _branchesPath.Combine( branchName );
+                    parameters[i] = BranchesPath.Combine( branchName );
                 }
                 else
                 {

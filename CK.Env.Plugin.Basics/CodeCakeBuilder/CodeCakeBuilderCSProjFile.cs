@@ -31,7 +31,8 @@ namespace CK.Env.Plugin
         public void ApplySettings( IActivityMonitor m )
         {
             if( !_f.EnsureDirectory( m ) ) return;
-            var solution = _solutionDriver.GetSolution( m );
+            var solution = _solutionDriver.GetSolution( m, allowInvalidSolution:true );
+            if( solution == null ) return;
 
             var framework = MSProject.Savors.FindOrCreate( "netcoreapp2.1" );
 

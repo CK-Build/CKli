@@ -2,6 +2,7 @@ using CK.Core;
 using CK.SimpleKeyVault;
 using CK.Text;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace CK.Env.Plugin
 {
@@ -11,7 +12,7 @@ namespace CK.Env.Plugin
         readonly SolutionDriver _driver;
         readonly SolutionSpec _solutionSpec;
         readonly SecretKeyStore _secretStore;
-        readonly ArtifactCenter _artfifacts;
+        readonly ArtifactCenter _artifacts;
 
         public CodeCakeBuilderKeyVaultFile(
             CodeCakeBuilderFolder f,
@@ -25,36 +26,41 @@ namespace CK.Env.Plugin
             _f = f;
             _driver = driver;
             _secretStore = secretStore;
-            _artfifacts = artifacts;
+            _artifacts = artifacts;
             _solutionSpec = solutionSpec;
-       }
+            _secretStore.DeclareSecretKey( SolutionDriver.CODECAKEBUILDER_SECRET_KEY, d => d ?? $"Required to update CodeCakeBuilderKeyVault.txt used by CI processes." );
+        }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
         public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart
-                                        && _secretStore.IsSecretKeyAvailable( "CODECAKEBUILDER_SECRET_KEY" ) == true;
+                                        && _secretStore.IsSecretKeyAvailable( SolutionDriver.CODECAKEBUILDER_SECRET_KEY ) == true;
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
         {
             if( !_f.EnsureDirectory( m ) ) return;
-            var s = _driver.GetSolution( m );
+            var s = _driver.GetSolution( m, allowInvalidSolution: true );
+            if( s == null ) return;
 
             var passPhrase = _secretStore.GetSecretKey( m, SolutionDriver.CODECAKEBUILDER_SECRET_KEY, true );
 
             Dictionary<string,string> current = KeyVault.DecryptValues( TextContent, passPhrase );
-            var repositorySecrets = _artfifacts.ResolveSecrets( m, s.ArtifactTargets );
-            foreach( var (SecretKeyName, Secret) in repositorySecrets )
+            bool complete = true;
+            foreach( var secret in _driver.BuildRequiredSecrets )
             {
-                if( Secret == null )
+                if( secret.Secret == null )
                 {
-                    m.Error( "A required repository secret is missing." );
-                    return;
+                    m.Error( $"Missing secret {secret.SecretKeyName}." );
+                    complete = false;
                 }
-                current[SecretKeyName] = Secret;
+                else current[secret.SecretKeyName] = secret.Secret;
             }
-            string result = KeyVault.EncryptValuesToString( current, passPhrase );
-            CreateOrUpdate( m, result );
+            if( complete )
+            {
+                string result = KeyVault.EncryptValuesToString( current, passPhrase );
+                CreateOrUpdate( m, result );
+            }
         }
 
     }

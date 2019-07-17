@@ -72,15 +72,20 @@ namespace CK.Env
 
             public bool Refresh( IActivityMonitor m, bool forceReload )
             {
+                var solutions = new ISolution[_drivers.Count];
+                int idxSolution = 0;
                 foreach( var d in _drivers )
                 {
-                    d.GetSolution( m, forceReload );
-                    if(!d.IsSolutionValid)
+                    var s = d.GetSolution( m, allowInvalidSolution: false, reloadSolution: forceReload );
+                    if( s == null )
                     {
-                        m.Error( $"Failed to load solution from '{d.GitRepository.SubPath}'." );
-                        return false;
+                        m.Error( $"Failed to load and configure solution from '{d.GitRepository.SubPath}'." );
+                        idxSolution = -1;
                     }
+                    if( idxSolution != -1 ) solutions[idxSolution] = s;
                 }
+                if( idxSolution == -1 ) return false;
+
                 if( _depContext == null || _depContext.HasError || _depContext.IsObsolete )
                 {
                     LogFilter final = m.ActualFilter;
@@ -92,7 +97,7 @@ namespace CK.Env
                     }
                     else
                     {
-                        var da = DependencyAnalyzer.Create( m, _drivers.Select( d => d.GetSolution( m, false ) ).ToList(), final == LogFilter.Debug );
+                        var da = DependencyAnalyzer.Create( m, solutions, final == LogFilter.Debug );
                         if(da == null)
                         {
                             m.Error( "Error while creating the DependencyAnalyzer." );
@@ -105,7 +110,7 @@ namespace CK.Env
                     {
                         Debug.Assert( _drivers.Count() == _depContext.Solutions.Count );
                         var aliasCtx = _depContext;
-                        _drivers.Sort( ( d1, d2 ) => aliasCtx[d1.GetSolution( m, false )].Index - aliasCtx[d2.GetSolution( m, false )].Index );
+                        _drivers.Sort( ( d1, d2 ) => aliasCtx[d1.GetSolution( m, false, false )].Index - aliasCtx[d2.GetSolution( m, false, false )].Index );
                     }
                 }
                 return true;
@@ -129,6 +134,7 @@ namespace CK.Env
 
         readonly HashSet<ISolutionDriver> _solutionDrivers;
         readonly Dictionary<string, WorldBranchContext> _perBranchContext;
+
         internal DriversCollection()
         {
             _solutionDrivers = new HashSet<ISolutionDriver>();

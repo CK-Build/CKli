@@ -103,36 +103,43 @@ namespace CKli
 
         public bool Open()
         {
-            Close();
             _localWorldRootPathMapping.Load();
-            var (LocalPath, World) = ChooseWorld( _monitor );
-            if( LocalPath == null ) return false;
-
-            _currentWorld = null;
-
-            var baseProvider = new SimpleServiceContainer();
-            var keyVault = new CKEnvKeyVault( World, LocalPath, CommandRegister );
-            _fs = new FileSystem( LocalPath, CommandRegister, keyVault.KeyStore, baseProvider );
-            baseProvider.Add<ISimpleObjectActivator>( new SimpleObjectActivator() );
-            baseProvider.Add( CommandRegister );
-            baseProvider.Add( _fs );
-            baseProvider.Add( World );
-            baseProvider.Add( _worldStore );
-            baseProvider.Add( _appLife );
-            baseProvider.Add( keyVault.KeyStore );
-            var original = _worldStore.ReadWorldDescription( _monitor, World ).Root;
-            var expanded = XTypedFactory.PreProcess( _monitor, original );
-            if( expanded.Errors.Count > 0 )
+            for( ; ; )
             {
-                return false;
+                Close();
+                var (LocalPath, World) = ChooseWorld( _monitor );
+                if( LocalPath == null ) return false;
+
+                _currentWorld = null;
+
+                var baseProvider = new SimpleServiceContainer();
+                var keyVault = new CKEnvKeyVault( World, LocalPath, CommandRegister );
+                _fs = new FileSystem( LocalPath, CommandRegister, keyVault.KeyStore, baseProvider );
+                baseProvider.Add<ISimpleObjectActivator>( new SimpleObjectActivator() );
+                baseProvider.Add( CommandRegister );
+                baseProvider.Add( _fs );
+                baseProvider.Add( World );
+                baseProvider.Add( _worldStore );
+                baseProvider.Add( _appLife );
+                baseProvider.Add( keyVault.KeyStore );
+                var original = _worldStore.ReadWorldDescription( _monitor, World ).Root;
+                var expanded = XTypedFactory.PreProcess( _monitor, original );
+                if( expanded.Errors.Count > 0 ) continue;
+                _root = _factory.CreateInstance<XTypedObject>( _monitor, expanded.Result, baseProvider );
+                if( _root == null ) return false;
+                _currentWorld = World;
+                var xState = _root.Descendants<XWorldState>().FirstOrDefault();
+                if( xState == null )
+                {
+                    _monitor.Error( "Missing expected WorldState (or XWorldState) element." );
+                    continue;
+                }
+                // Ensures that all required secrets are knwon.
+                if( !OpenKeyVault( _monitor, keyVault ) ) continue;
+                if( !xState.Initialize( _monitor ) ) continue;
+                CurrentWorldChanged?.Invoke( this, EventArgs.Empty );
+                return true;
             }
-            _root = _factory.CreateInstance<XTypedObject>( _monitor, expanded.Result, baseProvider );
-            if( _root == null ) return false;
-            _currentWorld = World;
-            // Ensures that all required secrets are knwon.
-            if( !OpenKeyVault( _monitor, keyVault ) ) return false;
-            CurrentWorldChanged?.Invoke( this, EventArgs.Empty );
-            return true;
         }
 
         bool OpenKeyVault( IActivityMonitor m, CKEnvKeyVault vault )

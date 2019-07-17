@@ -15,13 +15,13 @@ namespace CK.Env.Plugin
 {
     public class SolutionDriver : GitBranchPluginBase, ISolutionDriver, IDisposable, ICommandMethodsProvider
     {
+        public static readonly ArtifactType NuGetType = NuGet.NuGetClient.NuGetType;
+        public static readonly ArtifactType CKSetupType = ArtifactType.Register( "CKSetup", false );
         /// <summary>
-        /// As its name states...
+        /// This is shared here: more than one plugin needs this.
         /// </summary>
         public const string CODECAKEBUILDER_SECRET_KEY = "CODECAKEBUILDER_SECRET_KEY";
 
-        public static readonly ArtifactType NuGetType = NuGet.NuGetClient.NuGetType;
-        public static readonly ArtifactType CKSetupType = ArtifactType.Register( "CKSetup", false );
 
         readonly SecretKeyStore _keyStore;
         readonly ISolutionDriverWorld _world;
@@ -32,6 +32,7 @@ namespace CK.Env.Plugin
 
         Solution _solution;
         SolutionFile _sln;
+        IReadOnlyList<(string SecretKeyName, string Secret)> _buildSecrets;
         bool _isSolutionValid;
 
         public SolutionDriver(
@@ -50,7 +51,6 @@ namespace CK.Env.Plugin
             _keyStore = keyStore;
             _solutionSpec = spec;
             _localFeedProvider = localFeedProvider;
-            _keyStore.DeclareSecretKey( CODECAKEBUILDER_SECRET_KEY, d => d ?? $"Required to execute CodeCakeBuilder." );
         }
 
         void IDisposable.Dispose()
@@ -84,13 +84,27 @@ namespace CK.Env.Plugin
         }
 
         /// <summary>
-        /// Fires whenever a solution has been configured so that any other
+        /// Fires whenever a solution has been loaded so that any other
         /// plugins can participate to its configuration.
         /// </summary>
         public event EventHandler<SolutionConfigurationEventArgs> OnSolutionConfiguration;
 
+
         /// <summary>
-        /// Forces the solution to be reloaded next time <see cref="GetSolution(IActivityMonitor, bool)"/> is called.
+        /// Gets whether the solution has been correctly read and configured.
+        /// Nothing should be done with the solution when this is false, except fix operations.
+        /// </summary>
+        public bool IsSolutionValid => _isSolutionValid;
+
+        /// <summary>
+        /// Gets the secrets required to build the solution.
+        /// This not null as soon as the solution has been successfuly read (this is available even
+        /// if <see cref="IsSolutionValid"/> is false).
+        /// </summary>
+        public IReadOnlyList<(string SecretKeyName, string Secret)> BuildRequiredSecrets => _buildSecrets;
+
+        /// <summary>
+        /// Forces the solution to be reloaded next time <see cref="GetSolution"/> is called.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         public void SetSolutionDirty( IActivityMonitor m )
@@ -107,28 +121,29 @@ namespace CK.Env.Plugin
         /// Gets the Solution that this driver handles.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="reloadSolution">The solution names or null on error.</param>
-        /// <returns>The updated sol</returns>
-        public ISolution GetSolution( IActivityMonitor monitor, bool reloadSolution = false )
+        /// <param name="reloadSolution">True to force a lod (like having called <see cref="SetSolutionDirty(IActivityMonitor)"/>).</param>
+        /// <param name="allowInvalidSolution">
+        /// True to allow <see cref="IsSolutionValid"/> to be false: the instance is returned as long as the <see cref="ISolution"/> instance has
+        /// successfully been built even if some required cheks have failed.
+        /// </param>
+        /// <returns>The solution or null if unable to load the solution.</returns>
+        public ISolution GetSolution( IActivityMonitor monitor, bool allowInvalidSolution, bool reloadSolution = false )
         {
             if( _sln == null || reloadSolution )
             {
                 using( monitor.OpenInfo( $"Loading solution '{GitFolder.SubPath}'." ) )
                 {
-                    LoadSolution( monitor );
+                    DoLoadSolution( monitor );
                 }
             }
-            if(_solution == null)
-            {
-                throw new NullReferenceException();
-            }
-            return _solution;
+            return _isSolutionValid || allowInvalidSolution ? _solution : null;
         }
 
-        void LoadSolution( IActivityMonitor m )
+        void DoLoadSolution( IActivityMonitor m )
         {
             _isSolutionValid = false;
             var expectedSolutionName = GitFolder.SubPath.LastPart + ".sln";
+            _buildSecrets = null;
             _sln = SolutionFile.Read( GitFolder.FileSystem, m, BranchPath.AppendPart( expectedSolutionName ) );
             if( _sln == null ) return;
 
@@ -172,17 +187,15 @@ namespace CK.Env.Plugin
                         m.Error( $"Project {p.ProjectName} that must not be published have the Element IsPackable not set to false." );
                         badPack = true;
                     }
-                    else if(
-                        !_solutionSpec.TestProjectsArePublished
-                        && (p.Path.Parts.Contains( "Tests" )
-                            || p.ProjectName.EndsWith( ".Tests" )) )
+                    else if( !_solutionSpec.TestProjectsArePublished && (p.Path.Parts.Contains( "Tests" ) || p.ProjectName.EndsWith( ".Tests" )) )
                     {
                         m.Error( $"Tests Project {p.ProjectName} does not have IsPackable set to false." );
                         badPack = true;
                     }
-                    else if( p.ProjectName.ToLower() == "CodeCakeBuilder".ToLower() )
+                    else if( p.ProjectName.Equals( "CodeCakeBuilder", StringComparison.OrdinalIgnoreCase ) )
                     {
                         m.Error( $"CodeCakeBuilder Project does not have IsPackable set to false." );
+                        badPack = true;
                     }
                     else
                     {
@@ -191,9 +204,9 @@ namespace CK.Env.Plugin
                 }
                 else
                 {
-                    m.Info( "Project is set to not be packed. This project won't be published." );
+                    m.Info( $"Project {p.ProjectName} is set to not be packed: this project won't be published." );
                 }
-
+                var (project, isNewProject) = _solution.AddOrFindProject( p.SolutionRelativeFolderPath, ".Net", p.ProjectName, p.TargetFrameworks );
                 project.Tag( p );
                 if( isNewProject )
                 {
@@ -209,11 +222,12 @@ namespace CK.Env.Plugin
             }
             foreach( var noMore in projectsToRemove ) _solution.RemoveProject( noMore );
 
+            List<(string SecretKeyName, string Secret)> buildSecrets = _artifactCenter.ResolveSecrets( m, _solution.ArtifactTargets, false );
             _isSolutionValid = !badPack;
             var h = OnSolutionConfiguration;
             if( h != null )
             {
-                var e = new SolutionConfigurationEventArgs( m, _solution, newSolution, _solutionSpec );
+                var e = new SolutionConfigurationEventArgs( m, _solution, newSolution, _solutionSpec, buildSecrets );
                 h( this, e );
                 if( e.ConfigurationFailed )
                 {
@@ -221,6 +235,7 @@ namespace CK.Env.Plugin
                     _isSolutionValid = false;
                 }
             }
+            _buildSecrets = buildSecrets;
         }
 
         void OnSolutionSaved( object sender, EventMonitoredArgs e )
@@ -230,6 +245,7 @@ namespace CK.Env.Plugin
 
         static void ConfigureFromSpec( IActivityMonitor m, DependencyModel.Project project, SolutionSpec spec )
         {
+            var msProject = project.Tag<MSProject>();
             if( project.SimpleProjectName == "CodeCakeBuilder" )
             {
                 project.IsBuildProject = true;
@@ -250,11 +266,10 @@ namespace CK.Env.Plugin
 
 
                     bool ignoreNotRoot = spec.PublishProjectInDirectories && !project.IsTestProject;
-                    mustPublish = project.Tag<MSProject>().IsPackable // we bindly follow the IsPackable. If it's not defined we must think.
-                        ??(notPublished
-                            &&
-                            (notRootDirectory || ignoreNotRoot
-                            || (project.IsTestProject && spec.TestProjectsArePublished)));
+                    // We bindly follow the <IsPackable> element. Only if it's not defined (ie. it's null) we must "think".
+                    mustPublish = msProject.IsPackable 
+                                    ?? (notPublished &&
+                                            (notRootDirectory || ignoreNotRoot || (project.IsTestProject && spec.TestProjectsArePublished)));
                 }
                 if( mustPublish )
                 {
@@ -298,7 +313,7 @@ namespace CK.Env.Plugin
                 {
                     var mapped = depsFinder( target );
                     Debug.Assert( mapped != null );
-                    project.EnsureProjectReference( mapped, ProjectDependencyKind.Transitive );
+                    project.EnsureProjectReference( mapped, ArtifactDependencyKind.Transitive );
                     toRemove.Remove( mapped );
                 }
                 else
@@ -308,11 +323,6 @@ namespace CK.Env.Plugin
             }
             foreach( var noMore in toRemove ) project.RemoveProjectReference( noMore );
         }
-
-        /// <summary>
-        /// Gets whether the solution has been correctly read and configured.
-        /// </summary>
-        public bool IsSolutionValid => _isSolutionValid;
 
         /// <summary>
         /// Gets whether <see cref="IWorldState.WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/>
@@ -336,7 +346,7 @@ namespace CK.Env.Plugin
         [CommandMethod]
         public bool DumpLogsBetweenDates( IActivityMonitor m, string beginning, string ending )
         {
-            var solution = GetSolution( m );
+            var solution = GetSolution( m, allowInvalidSolution: true );
             if( solution == null ) return false;
             if( !DateTimeOffset.TryParse( beginning, out DateTimeOffset beginningDate ) )
             {
@@ -362,7 +372,7 @@ namespace CK.Env.Plugin
                 Console.WriteLine( "This Solution don't have any external references." );
             }
 
-            Console.WriteLine( $"External dependency of the Solution {GetSolution( m ).Name}:" );
+            Console.WriteLine( $"External dependency of the Solution {GetSolution( m, allowInvalidSolution: true ).Name}:" );
             foreach( PackageReference externalRef in packages )
             {
                 Console.WriteLine( "====|" + externalRef.ToString() );
@@ -382,7 +392,7 @@ namespace CK.Env.Plugin
         /// <returns>True on success, false on error.</returns>
         public bool UpdatePackageDependencies( IActivityMonitor monitor, IReadOnlyCollection<UpdatePackageInfo> packageInfos )
         {
-            var solution = GetSolution( monitor );
+            var solution = GetSolution( monitor, allowInvalidSolution: false );
             if( solution == null ) return false;
             Debug.Assert( packageInfos.All( p => p.Project.Solution == solution ) );
             bool mustSave = false;
@@ -431,7 +441,7 @@ namespace CK.Env.Plugin
         {
             if( info == null ) throw new ArgumentNullException( nameof( info ) );
 
-            var solution = GetSolution( monitor );
+            var solution = GetSolution( monitor, allowInvalidSolution: false );
             if( solution == null ) return false;
 
             // This is required, otherwise the NuGet cache keeps the previous version (lost 4 hours of my life here).
@@ -485,7 +495,7 @@ namespace CK.Env.Plugin
         {
             if( !IsUpgradeLocalPackagesEnabled ) throw new InvalidOperationException( nameof( IsUpgradeLocalPackagesEnabled ) );
 
-            var solution = GetSolution( monitor );
+            var solution = GetSolution( monitor, allowInvalidSolution: false );
             if( solution == null ) return false;
 
             var feed = PluginBranch == StandardGitStatus.Local
@@ -511,13 +521,6 @@ namespace CK.Env.Plugin
             return GitFolder.Commit( m, "Local build auto commit.", amend ? CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage : CommitBehavior.CreateNewCommit );
         }
 
-        [CommandMethod( confirmationRequired: false )]
-        public bool Reload( IActivityMonitor m )
-        {
-            LoadSolution( m );
-            return _isSolutionValid;
-        }
-
         /// <summary>
         /// Fires before a build.
         /// </summary>
@@ -533,7 +536,14 @@ namespace CK.Env.Plugin
         /// </summary>
         public event EventHandler<EventMonitoredArgs> OnBuildFailed;
 
-        public bool IsBuildEnabled => _world.WorkStatus == GlobalWorkStatus.Idle && IsActive && _keyStore.IsSecretKeyAvailable( CODECAKEBUILDER_SECRET_KEY ) == true;
+        /// <summary>
+        /// The solution must be valid (see <see cref="IsSolutionValid"/>) and all build secrets
+        /// must be resolved.
+        /// </summary>
+        public bool IsBuildEnabled => _world.WorkStatus == GlobalWorkStatus.Idle
+                                        && IsActive
+                                        && _isSolutionValid
+                                        && _buildSecrets.All( s => s.Secret != null );
 
         /// <summary>
         /// Builds the solution in 'local' branch or build in 'develop' without remotes, using the published Zero
@@ -568,7 +578,7 @@ namespace CK.Env.Plugin
 
         bool DoBuild( IActivityMonitor monitor, bool withUnitTest, bool? withZeroBuilder, bool withPushToRemote )
         {
-            var solution = GetSolution( monitor );
+            var solution = GetSolution( monitor, false );
             if( solution == null ) return false;
 
             // Version is always provided by the current commit point.
@@ -631,7 +641,7 @@ namespace CK.Env.Plugin
                         throw new ArgumentException( "Remote push is not allowed for 'local' builds.", nameof( withPushToRemote ) );
                     }
                     // The version is a 'release'. When releasing with CK-Env, no push to remotes are done (artifacts are
-                    // retained and pushes are defferred).
+                    // retained and pushes are deferred).
                     // ==> This could be an ArgumentException just as above for the 'local' case.
                     // BUT! We may be in "normal CI Build" case and the version is 'release' because the commit has been
                     // already released on this system or on another one.
@@ -696,13 +706,7 @@ namespace CK.Env.Plugin
             {
                 try
                 {
-                    string key = _keyStore.GetSecretKey( m, CODECAKEBUILDER_SECRET_KEY, false );
-                    if( key == null )
-                    {
-                        m.Error( "CODECAKEBUILDER_SECRET_KEY knowledge is required." );
-                        return false;
-                    }
-                    ev.EnvironmentVariables.Add( (CODECAKEBUILDER_SECRET_KEY, key) );
+                    ev.EnvironmentVariables.AddRange( _buildSecrets.Where( s => s.Secret != null ) );
 
                     var args = ev.WithZeroBuilder
                                 ? ev.CodeCakeBuilderExecutableFile + " SolutionDirectoryIsCurrentDirectory"

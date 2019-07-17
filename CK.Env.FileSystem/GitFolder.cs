@@ -64,9 +64,6 @@ namespace CK.Env
         GitFolder( ProtoGitFolder data )
         {
             ProtoGitFolder = data;
-
-            SubPath = ProtoGitFolder.FullPhysicalPath.RemovePrefix( data.FileSystem.Root );
-            if( SubPath.IsEmptyPath ) throw new InvalidOperationException( "Root path can not be a Git folder." );
             _git = new Repository( FullPhysicalPath );
             if( _git.Branches.Count() == 0 )
             {
@@ -80,7 +77,7 @@ namespace CK.Env
             _thisDir = new RootDir( this, SubPath.LastPart );
             ServiceContainer = new SimpleServiceContainer( FileSystem.ServiceContainer );
             ServiceContainer.Add( this );
-            PluginManager = new GitPluginManager( ServiceContainer, data.CommandRegister, data.World.DevelopBranchName, SubPath.AppendPart( "branches" ) );
+            PluginManager = new GitPluginManager( data.PluginRegistry, ServiceContainer, data.CommandRegister, data.World.DevelopBranchName );
             data.CommandRegister.Register( this );
         }
 
@@ -101,7 +98,6 @@ namespace CK.Env
         /// </summary>
         public GitPluginManager PluginManager { get; }
 
-
         /// <summary>
         /// Ensures that plugins are loaded for the <see cref="CurrentBranchName"/>.
         /// </summary>
@@ -111,7 +107,7 @@ namespace CK.Env
         {
             if( CurrentBranchName != null )
             {
-                return PluginManager.BranchPlugins.EnsurePlugins( m, CurrentBranchName, SubPath );
+                return PluginManager.BranchPlugins.EnsurePlugins( m, CurrentBranchName );
             }
             m.Error( $"No plugins since '{ToString()}' is not on a branch." );
             return false;
@@ -126,12 +122,12 @@ namespace CK.Env
         /// <summary>
         /// Get the path relative to the <see cref="FileSystem"/>.
         /// </summary>
-        public NormalizedPath SubPath { get; }
+        public NormalizedPath SubPath => ProtoGitFolder.FolderPath;
 
-        /// <summary>
-        /// Gets the name of the Git folder that is the name of the primary solution (by convention and by design).
-        /// </summary>
-        public string PrimarySolutionName => SubPath.LastPart;
+        ///// <summary>
+        ///// Gets the name of the Git folder that is the name of the primary solution (by convention and by design).
+        ///// </summary>
+        //public string PrimarySolutionName => SubPath.LastPart;
 
         /// <summary>
         /// Fires whenever we switched to the local branch.
@@ -572,7 +568,7 @@ namespace CK.Env
 
         public string OriginUrl => ProtoGitFolder.OriginUrl;
 
-        public NormalizedPath FullPhysicalPath => ProtoGitFolder.FullPhysicalPath;
+        public NormalizedPath FullPhysicalPath => ProtoGitFolder.FolderPath;
 
         public FileSystem FileSystem => ProtoGitFolder.FileSystem;
 
@@ -998,7 +994,7 @@ namespace CK.Env
 
         bool RaiseEnteredLocalBranch( IActivityMonitor m, bool enter )
         {
-            PluginManager.BranchPlugins.EnsurePlugins( m, World.LocalBranchName, SubPath );
+            PluginManager.BranchPlugins.EnsurePlugins( m, World.LocalBranchName );
             using( m.OpenTrace( $"{ToString()}: Raising {(enter ? "OnLocalBranchEntered" : "OnLocalBranchLeaving")} event." ) )
             {
                 try

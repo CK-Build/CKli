@@ -13,7 +13,13 @@ namespace CK.Env
     {
         string _secret;
         string _description;
+        CKTrait _tags;
         bool _isRequired;
+
+        /// <summary>
+        /// Gets the <see cref="Tags"/>'s context.
+        /// </summary>
+        public static CKTraitContext TagsContext = new CKTraitContext( "SecretCategory", '|' );
 
         internal SecretKeyInfo( string name, Func<string, string> descriptionBuilder, bool isRequired )
             : this( name, descriptionBuilder )
@@ -121,6 +127,21 @@ namespace CK.Env
                 k = k.SubKey;
             }
             while( k != null );
+        }
+
+        /// <summary>
+        /// Gets or sets one or more tags. When set to null, tags is set to the <see cref="CKTraitContext.EmptyTrait"/>.
+        /// When not null, tags must belong to <see cref="TagsContext"/>
+        /// </summary>
+        public CKTrait Tags
+        {
+            get => _tags;
+            set
+            {
+                if( value == null ) _tags = TagsContext.EmptyTrait;
+                else if( value.Context != TagsContext ) throw new ArgumentException( "Tag context mismatch." );
+                _tags = value;
+            }
         }
 
         /// <summary>
