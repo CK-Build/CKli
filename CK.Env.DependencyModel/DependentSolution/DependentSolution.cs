@@ -17,11 +17,6 @@ namespace CK.Env.DependencyModel
         public class Row
         {
             /// <summary>
-            /// Gets the build order for the <see cref="Solution"/>.
-            /// </summary>
-            public int Index { get; }
-
-            /// <summary>
             /// Gets the solution of the <see cref="Origin"/> project.
             /// </summary>
             public ISolution Solution { get; }
@@ -50,10 +45,9 @@ namespace CK.Env.DependencyModel
                                                                         .Select( d => d.Target )
                                                                     : null;
 
-            internal Row( int idx, ISolution s, IProject o, IProject t )
+            internal Row( ISolution s, IProject o, IProject t )
             {
                 Debug.Assert( (o == null) == (t == null) );
-                Index = idx;
                 Solution = s;
                 Origin = o;
                 Target = t;
@@ -62,19 +56,17 @@ namespace CK.Env.DependencyModel
             public override string ToString()
             {
                 return Origin == null
-                        ? $"{Index}|{Solution.Name}"
-                        : $"{Index}|{Origin.Name}=>{Target.Name}";
+                        ? Solution.Name
+                        : $"{Origin.Name}=>{Target.Name}";
             }
         }
 
         internal DependentSolution(
             ISolution s,
-            int index,
             IReadOnlyList<Row> dependencyTable,
             Func<ISolution, DependentSolution> others )
         {
             Solution = s;
-            Index = index;
             Requirements = dependencyTable.Where( r => r.Solution == s && r.Target != null )
                             .Select( r => r.Target.Solution )
                             .Distinct()
@@ -102,7 +94,7 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets the index of this solution.
         /// </summary>
-        public int Index { get; }
+        public int Index { get; internal set; }
 
         /// <summary>
         /// Gets the solution itself.

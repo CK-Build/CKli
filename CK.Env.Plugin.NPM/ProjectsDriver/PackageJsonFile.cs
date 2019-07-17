@@ -154,17 +154,18 @@ namespace CK.Env.Plugin
 
         (SVersion, NPMVersionDependencyType) GetVersionType( IActivityMonitor m, string depNameKind, string name, string value )
         {
-            if( value.IndexOf("://") > 0 )
+            if( value.StartsWith( "file:" ) )
             {
-                if( value.StartsWith( "file:" ) )
+                if( !value.StartsWith( "file:.." ) )
                 {
-                    if( !value.StartsWith( "file:.." ) )
-                    {
-                        m.Error( $"Dependency '{value}' for {depNameKind}/{name} must be relative and starts with 'file:..'." );
-                        return (null, NPMVersionDependencyType.None);
-                    }
-                    else return (null, NPMVersionDependencyType.LocalPath);
+                    m.Error( $"Dependency '{value}' for {depNameKind}/{name} must be relative and starts with 'file:..'." );
+                    return (null, NPMVersionDependencyType.None);
                 }
+                else return (null, NPMVersionDependencyType.LocalPath);
+            }
+            else if( value.IndexOf("://") > 0 )
+            {
+                
                 if( value.StartsWith( "http://" ) || value.StartsWith( "https://" ) ) return (null, NPMVersionDependencyType.UrlTar);
                 if( value.StartsWith( "git://" )
                     || value.StartsWith( "git+ssh://" )

@@ -65,10 +65,8 @@ namespace CodeCake
         /// </param>
         /// <returns></returns>
         public static DotnetSolution FromSolutionInCurrentWorkingDirectory(
-            StandardGlobalInfo globalInfo,
-            Func<SolutionProject, bool> projectToPublishPredicate = null )
+            StandardGlobalInfo globalInfo)
         {
-            if( projectToPublishPredicate == null ) projectToPublishPredicate = p => !p.Path.Segments.Contains( "Tests" );
             string solutionFileName = System.IO.Path.GetFileName(
                 globalInfo.Cake.GetFiles( "*.sln",
                     new GlobberSettings
@@ -83,14 +81,14 @@ namespace CodeCake
                 .Where( p => !(p is SolutionFolder)
                             && p.Name != "CodeCakeBuilder" )
                 .ToList();
-            var packableProjects = projects.Where(
+            var projectsToPublish = projects.Where(
                     p => ((bool?)XDocument.Load( p.Path.FullPath )
+                        .Root
                         .Elements( "PropertyGroup" )
                         .Elements( "IsPackable" ).LastOrDefault() ?? true) == true
                 )
                 .ToList();
 
-            var projectsToPublish = packableProjects.Where( projectToPublishPredicate ).ToList();
             return new DotnetSolution( globalInfo, solutionFileName, projects, projectsToPublish );
         }
 

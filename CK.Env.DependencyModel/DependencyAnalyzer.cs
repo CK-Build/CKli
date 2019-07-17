@@ -353,9 +353,8 @@ namespace CK.Env.DependencyModel
             var table = result.SortedItems
                           // 1 - Selects solutions along with their ordered index.
                           .Where( sorted => sorted.GroupForHead == null && sorted.Item is SolutionItem )
-                          .Select( ( sorted, idx ) =>
+                          .Select( sorted =>
                                         (
-                                            Index: idx,
                                             Solution: (Solution)sorted.StartValue,
                                             // The projects from this solution that reference packages that are
                                             // produced by local solutions have a direct requires to a Package
@@ -372,15 +371,13 @@ namespace CK.Env.DependencyModel
                            .SelectMany( s => s.LocalRefs.Any()
                                                 ? s.LocalRefs.Select( r => new DependentSolution.Row
                                                                 (
-                                                                    s.Index,
                                                                     s.Solution,
                                                                     r.Origin,
                                                                     r.Target.Project
                                                                 ) )
-                                                : new[] { new DependentSolution.Row( s.Index, s.Solution, null, null ) }
+                                                : new[] { new DependentSolution.Row( s.Solution, null, null ) }
                                       )
                             .ToList();
-            Debug.Assert( table.Select( r => r.Index ).IsSortedLarge() );
 
             // Now that the table of SolutionDependencyContext.DependencyRow is built, use it to compute the
             // pure solution dependency graph.
@@ -388,19 +385,26 @@ namespace CK.Env.DependencyModel
             var index = new Dictionary<object, DependentSolution>();
             ISolution current = null;
             var depSolutions = new DependentSolution[sortables.Count];
+
+            int idx = 0;
             foreach( var r in table )
             {
                 if( current != r.Solution )
                 {
                     current = r.Solution;
-                    var newDependent = new DependentSolution( current, r.Index, table, s => index[s] );
-                    depSolutions[r.Index] = newDependent;
+                    var newDependent = new DependentSolution( current, table, s => index[s] );
+                    depSolutions[idx++] = newDependent;
                     index.Add( current.Name, newDependent );
                     index.Add( current, newDependent );
                 }
             }
-
-            depSolutions = depSolutions.OrderBy( p => p.Rank ).ThenBy( p => p.Index ).ToArray();
+            Array.Sort( depSolutions, ( d1, d2 ) =>
+            {
+                int cmp = d1.Rank - d2.Rank;
+                if( cmp == 0 ) cmp = d1.Solution.Name.CompareTo( d2.Solution.Name );
+                return cmp;
+            } );
+            for( int i = 0; i < depSolutions.Length; ++i ) depSolutions[i].Index = i;
 
             return new SolutionDependencyContext( this, index, result, table, depSolutions, GetBuildProjectInfo( m, traceGraphDetails ) );
         }
