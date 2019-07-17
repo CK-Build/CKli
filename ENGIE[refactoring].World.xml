@@ -139,7 +139,7 @@
             </NuGetSources>
         </SharedSolutionSpec>
         <!-- NuGetSources Invenietis -->
-        <!-- <GitFolder Name="Cofely" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Cofely">
+        <GitFolder Name="Cofely" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Cofely">
             <Branch Name="develop-refactoring">
                 <SolutionSpec>
                     <NPMProjects>
@@ -148,7 +148,7 @@
                     </NPMProjects>
                 </SolutionSpec>
             </Branch>
-        </GitFolder> -->
+        </GitFolder>
         <GitFolder Name="Feedermarket-Utils" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Utils">
             <Branch Name="develop-refactoring">
                 <SolutionSpec />
