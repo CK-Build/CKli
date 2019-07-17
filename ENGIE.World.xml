@@ -72,12 +72,16 @@
         <SolutionSpec/>
       </Branch>
     </GitFolder>
-
-    <GitFolder Name="CK-Gis" Url="https://invenietis.visualstudio.com/DefaultCollection/CK/_git/CK-Gis">
-      <Branch Name="develop">
-        <SolutionSpec/>
+<!-- 
+    <GitFolder Name="CK-Gis" Url="https://invenietis@dev.azure.com/invenietis/CK/_git/CK-Gis">
+      <Branch Name="develop"> 
+        <SolutionSpec>
+          <NPMProjects>
+            <add Folder="CK.Gis.App/" PackageName="ck-gis-app" />
+          </NPMProjects>
+        </SolutionSpec>
       </Branch>
-    </GitFolder>
+    </GitFolder> -->
 
     <GitFolder Name="Feedermarket-Functions" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions">
       <Branch Name="develop">
@@ -112,7 +116,7 @@
             <add Name="NPMAzure:@engie->invenietis-engie" />
           </ArtifactTargets>
           <NPMProjects>
-            <add Folder="dist/" PackageName="@engie/nemo-layer-sdk" />
+            <add Folder="/" PackageName="@engie/nemo-layer-sdk" />
           </NPMProjects>
         </SolutionSpec>
       </Branch>
@@ -125,7 +129,7 @@
             <add Name="NPMAzure:@engie->invenietis-engie" />
           </ArtifactTargets>
           <NPMProjects>
-            <add Folder="src/" PackageName="@engie/shared-components" />
+            <add Folder="/" PackageName="@engie/shared-components" />
           </NPMProjects>
         </SolutionSpec>
       </Branch>

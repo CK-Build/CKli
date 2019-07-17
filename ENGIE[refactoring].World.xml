@@ -7,6 +7,7 @@
     <LoadLibrary Name="CK.Env.Plugin.NPM" />
     <LoadLibrary Name="CK.Env.Plugin.CKSetup" />
     <LoadLibrary Name="CK.Env.Plugin.NuGet" />
+    <LoadLibrary Name="CK.Env.Plugin.Dotnet" />
     <SharedHttpClient />
     <ArtifactCenter />
     <LocalFeedProvider />
@@ -48,6 +49,20 @@
                 <SolutionSpec />
             </Branch>
         </GitFolder>
+        <GitFolder Name="CK-DB-Geo" Url="https://invenietis@dev.azure.com/invenietis/CK/_git/CK-DB-Geo">
+            <Branch Name="develop-refactoring">
+                <SolutionSpec/>
+            </Branch>
+        </GitFolder>
+        <GitFolder Name="CK-Operations" Url="https://invenietis@dev.azure.com/invenietis/CK/_git/CK-Operations">
+            <Branch Name="develop-refactoring">
+                <SolutionSpec/>
+            </Branch>
+        </GitFolder>
+        <!-- <GitFolder Name="CK-Gis" Url="https://invenietis@dev.azure.com/invenietis/CK/_git/CK-Gis">
+            <Branch Name="develop-refactoring">
+            </Branch>
+        </GitFolder> -->
         <GitFolder Name="Feedermarket-Functions" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Functions">
             <Branch Name="develop-refactoring">
                 <SolutionSpec />
@@ -70,9 +85,38 @@
                 </SolutionSpec>
             </Branch>
         </GitFolder>
+        <GitFolder Name="Engie-LayerSdk" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Engie-LayerSdk">
+            <Branch Name="develop-refactoring">
+                <SolutionSpec>
+                    <ArtifactTargets>
+                        <add Name="NPMAzure:@engie->invenietis-engie-refactoring" />
+                    </ArtifactTargets>
+                    <NPMProjects>
+                        <add Folder="/" PackageName="@engie/nemo-layer-sdk" />
+                    </NPMProjects>
+                </SolutionSpec>
+            </Branch>
+        </GitFolder>
+        <GitFolder Name="Engie-SharedComponents" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Engie-SharedComponents">
+            <Branch Name="develop-refactoring">
+                <SolutionSpec>
+                    <ArtifactTargets>
+                        <add Name="NPMAzure:@engie->invenietis-engie-refactoring" />
+                    </ArtifactTargets>
+                    <NPMProjects>
+                        <add Folder="/" PackageName="@engie/shared-components" />
+                    </NPMProjects>
+                </SolutionSpec>
+            </Branch>
+        </GitFolder>
         <GitFolder Name="Feedermarket-Content" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Content">
             <Branch Name="develop-refactoring">
                 <SolutionSpec NoStrongNameSigning="True" />
+            </Branch>
+        </GitFolder>
+        <GitFolder Name="CK-Extensions" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/CK-Extensions">
+            <Branch Name="develop-refactoring">
+                <SolutionSpec />
             </Branch>
         </GitFolder>
         <SharedSolutionSpec>
@@ -95,7 +139,7 @@
             </NuGetSources>
         </SharedSolutionSpec>
         <!-- NuGetSources Invenietis -->
-        <GitFolder Name="Cofely" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Cofely">
+        <!-- <GitFolder Name="Cofely" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Cofely">
             <Branch Name="develop-refactoring">
                 <SolutionSpec>
                     <NPMProjects>
@@ -104,7 +148,7 @@
                     </NPMProjects>
                 </SolutionSpec>
             </Branch>
-        </GitFolder>
+        </GitFolder> -->
         <GitFolder Name="Feedermarket-Utils" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Utils">
             <Branch Name="develop-refactoring">
                 <SolutionSpec />
@@ -160,10 +204,9 @@
                 <SolutionSpec NoStrongNameSigning="True" />
             </Branch>
         </GitFolder>
-        
-        <GitFolder Name="CK-Extensions" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/CK-Extensions">
+        <GitFolder Name="Nemo-Data" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Nemo-Data">
             <Branch Name="develop-refactoring">
-                <SolutionSpec />
+                <SolutionSpec NoStrongNameSigning="True" />
             </Branch>
         </GitFolder>
     </Folder>

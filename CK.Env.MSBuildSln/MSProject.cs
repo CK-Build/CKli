@@ -131,10 +131,6 @@ namespace CK.Env.MSBuildSln
                     LangVersion = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "LangVersion" ).LastOrDefault()?.Value;
                     OutputType = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "OutputType" ).LastOrDefault()?.Value;
                     IsPackable = (bool?)_file.Document.Root.Elements( "PropertyGroup" ).Elements( "IsPackable" ).LastOrDefault();
-                    if(IsPackable == false)
-                    {
-                        
-                    }
                     DoInitializeDependencies( m );
                     if( !_dependencies.IsInitialized ) _file = null;
                 }

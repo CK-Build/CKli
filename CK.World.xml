@@ -121,6 +121,12 @@
       </Branch>
     </GitFolder>
 
+    <GitFolder Name="CK-Globbing" Url="https://github.com/Invenietis/CK-Globbing.git">
+      <Branch Name="develop">
+        <SolutionSpec />
+      </Branch>
+    </GitFolder>
+
     <GitFolder Name="CK-SqlServer" Url="https://github.com/Invenietis/CK-SqlServer.git" >
       <Branch Name="develop">
         <SolutionSpec SqlServer="2016" />
@@ -312,7 +318,7 @@
 
     <GitFolder Name="CK-Crs" Url="https://github.com/Invenietis/crs.git">
       <Branch Name="develop">
-        <SolutionSpec PublishProjectInDirectories="true">
+        <SolutionSpec PublishProjectInDirectories="True">
           <NPMProjects>
             <add Folder="js/crs-client" PackageName="@signature/crs-client" />
             <add Folder="js/crs-client-signalr" PackageName="@signature/crs-client-signalr" />

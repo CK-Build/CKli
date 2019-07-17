@@ -33,10 +33,12 @@ namespace CK.Env.Plugin
         public bool ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return false;
+
             var solution = _solutionDriver.GetSolution( m, allowInvalidSolution: true );
             if( solution == null ) return false;
 
             var csprojs = solution.Projects.Select<IProject, (IProject project, MSProject msproject)>( p => (p, p.Tag<MSProject>()) ).Where( p => p.Item2 != null );
+
             foreach( var p in csprojs )
             {
 
@@ -63,7 +65,7 @@ namespace CK.Env.Plugin
             isPackableElements.Reverse();
             if( isPackableElements.Count() > 1 )
             {
-                m.Info( $"Removing duplicate IsPackable in " );
+                m.Info( $"Removing duplicate IsPackable in {path} " );
                 isPackableElements.Skip( 1 ).Remove();
             }
             var property = properties.First();
@@ -79,11 +81,21 @@ namespace CK.Env.Plugin
                 return;
             }
             var packableElement = isPackableElements.First();
-            if( packTarget == null )
+            if( packTarget == null)
             {
-                packableElement.Remove();
+                if( (bool?)packableElement != true )
+                {
+                    packableElement.Remove();
+                }
+                else
+                {
+                    packableElement.Value = "True";
+                }
             }
-            packableElement.Value = packTarget.ToString();
+            else
+            {
+                packableElement.Value = packTarget.ToString();
+            }
             File.WriteAllText( info.PhysicalPath, csproj.ToString() );
         }
     }

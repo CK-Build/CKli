@@ -151,7 +151,7 @@ namespace CK.Env.Plugin
                 if( dep.Type == NPMVersionDependencyType.LocalPath )
                 {
                     var path = _project.SolutionRelativeFolderPath.Combine( dep.RawDep.Substring( "file:".Length ) );
-                    var mapped = _project.Solution.Projects.FirstOrDefault( d => d.SolutionRelativeFolderPath == path
+                    var mapped = _project.Solution.Projects.FirstOrDefault( d => d.SolutionRelativeFolderPath == path.ResolveDots()
                                                                                  && d.Type == "js" );
                     if( mapped == null )
                     {
