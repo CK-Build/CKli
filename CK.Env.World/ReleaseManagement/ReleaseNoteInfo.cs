@@ -17,20 +17,20 @@ namespace CK.Env
 
         public ReleaseNoteInfo( XElement e )
         {
-            SolutionName = (string)e.AttributeRequired( "SolutionName" );
-            Current = new ReleaseInfo( e.Element( "ReleaseInfo" ) );
-            var p = e.Element( "PreviousVersion" );
+            SolutionName = (string)e.AttributeRequired( XmlNames.xSolutionName );
+            Current = new ReleaseInfo( e.Element( XmlNames.xReleaseInfo ) );
+            var p = e.Element( XmlNames.xPreviousVersion );
             if( p != null ) PreviousVersion = CSVersion.Parse( p.Value );
-            ReleaseNote = e.Element( "ReleaseNote" ).Value;
+            ReleaseNote = e.Element( XmlNames.xReleaseNote ).Value;
         }
 
         public XElement ToXml()
         {
-            return new XElement( "R",
-                        new XAttribute( "SolutionName", SolutionName ),
+            return new XElement( XmlNames.xR,
+                        new XAttribute( XmlNames.xSolutionName, SolutionName ),
                         Current.ToXml(),
-                        PreviousVersion != null ? new XElement( "PreviousVersion", PreviousVersion.ToString() ) : null,
-                        new XElement( "ReleaseNote", new XCData( ReleaseNote ?? String.Empty ) ) );
+                        PreviousVersion != null ? new XElement( XmlNames.xPreviousVersion, PreviousVersion.ToString() ) : null,
+                        new XElement( XmlNames.xReleaseNote, new XCData( ReleaseNote ?? String.Empty ) ) );
         }
 
         /// <summary>

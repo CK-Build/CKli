@@ -17,14 +17,6 @@ namespace CK.Env
         IReadOnlyList<IWorldName> ReadWorlds( IActivityMonitor m );
 
         /// <summary>
-        /// Gets the world description of one world.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="w">The world that must exist in the <see cref="ReadWorlds"/> result.</param>
-        /// <returns>The Xml document.</returns>
-        XDocument ReadWorldDescription( IActivityMonitor m, IWorldName w );
-
-        /// <summary>
         /// Creates a new world in this store.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -33,6 +25,14 @@ namespace CK.Env
         /// <param name="content">The initial content. Must not be null.</param>
         /// <returns>The new world or null on error.</returns>
         IWorldName CreateNew( IActivityMonitor m, string name, string parallelWorld, XDocument content );
+
+        /// <summary>
+        /// Gets the world description of one world.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="w">The world that must exist in the <see cref="ReadWorlds"/> result.</param>
+        /// <returns>The Xml document.</returns>
+        XDocument ReadWorldDescription( IActivityMonitor m, IWorldName w );
 
         /// <summary>
         /// Updates the world description to this store.

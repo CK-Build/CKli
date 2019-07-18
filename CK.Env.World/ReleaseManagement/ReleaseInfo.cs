@@ -59,10 +59,10 @@ namespace CK.Env
         /// <returns>A new XElement.</returns>
         public XElement ToXml()
         {
-            return new XElement( "ReleaseInfo",
-                                    Version != null ? new XAttribute( "Version", Version ) : null,
-                                    new XAttribute( "Level", Level ),
-                                    new XAttribute( "Constraint", Constraint ) );
+            return new XElement( XmlNames.xReleaseInfo,
+                                    Version != null ? new XAttribute( XmlNames.xVersion, Version ) : null,
+                                    new XAttribute( XmlNames.xLevel, Level ),
+                                    new XAttribute( XmlNames.xConstraint, Constraint ) );
         }
 
         /// <summary>

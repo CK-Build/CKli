@@ -6,22 +6,12 @@ using System.Xml.Linq;
 namespace CK.Env
 {
     /// <summary>
-    /// Basic encapsulation of a <see cref="XDocument"/>.
+    /// Encapsulates local and shared <see cref="XDocument"/> states.
     /// </summary>
     public class RawXmlWorldState
     {
-        static readonly XName xWorkStatusName = XNamespace.None + "WorkStatus";
-        static readonly XName xGeneralStateName = XNamespace.None + "GeneralState";
-        static readonly XName xLastBuild = XNamespace.None + "LastBuild";
-        static readonly XName xBuilds = XNamespace.None + "Builds";
-        static readonly XName xPublishedBuildHistory = XNamespace.None + "PublishedBuildHistory";
-        static readonly XName xType = XNamespace.None + "Type";
-        static readonly XName xRelease = XNamespace.None + "Release";
-        static readonly XName xCI = XNamespace.None + "CI";
-        static readonly XName xLocal = XNamespace.None + "Local";
-
-        readonly XDocument _doc;
         readonly IWorldName _world;
+        readonly XDocument _doc;
         readonly XElement _generalState;
         readonly XElement _lastBuild;
         readonly XElement _builds;
@@ -35,25 +25,28 @@ namespace CK.Env
         {
             if( w == null ) throw new ArgumentNullException( nameof( w ) );
             if( d == null ) throw new ArgumentNullException( nameof( d ) );
-            string safeName = w.FullName.Replace( '[', '-' ).Replace( "]", "" ) + ".World.State";
-            if( d.Root.Name != safeName) throw new ArgumentException( $"Invalid state document root. Must be {safeName}, found {d.Root.Name}.", nameof( d ) );
+            string safeName = SafeElementName( w );
             _world = w;
+
+            if( d.Root.Name != safeName ) throw new ArgumentException( $"Invalid state document root. Must be {safeName}, found {d.Root.Name}.", nameof( d ) );
             _doc = d;
-            _generalState = d.Root.EnsureElement( xGeneralStateName );
-            _lastBuild = d.Root.EnsureElement( xLastBuild );
-            _builds = d.Root.EnsureElement( xBuilds );
-            _releaseBuildResult = _builds.EnsureElement( xRelease );
-            _ciBuildResult = _builds.EnsureElement( xCI );
-            _localBuildResult = _builds.EnsureElement( xLocal );
-            _publishedBuildHistory = d.Root.EnsureElement( xPublishedBuildHistory );
-            LastBuildType = _lastBuild.AttributeEnum( xType, BuildResultType.None );
+            _generalState = d.Root.EnsureElement( XmlNames.xGeneralState );
+            _lastBuild = d.Root.EnsureElement( XmlNames.xLastBuild );
+            _builds = d.Root.EnsureElement( XmlNames.xBuilds );
+            _releaseBuildResult = _builds.EnsureElement( XmlNames.xRelease );
+            _ciBuildResult = _builds.EnsureElement( XmlNames.xCI );
+            _localBuildResult = _builds.EnsureElement( XmlNames.xLocal );
+            _publishedBuildHistory = d.Root.EnsureElement( XmlNames.xPublishedBuildHistory );
+            LastBuildType = _lastBuild.AttributeEnum( XmlNames.xType, BuildResultType.None );
             _buildResults = new BuildResult[3];
         }
 
         public RawXmlWorldState( IWorldName w )
-            : this( w, new XDocument( new XElement( w.FullName.Replace( '[', '-' ).Replace( "]", "" ) + ".World.State", new XAttribute( xWorkStatusName, GlobalWorkStatus.Idle.ToString() ) ) ) )
+            : this( w, new XDocument( new XElement( SafeElementName( w ), new XAttribute( XmlNames.xWorkStatus, GlobalWorkStatus.Idle.ToString() ) ) ) )
         {
         }
+
+        static string SafeElementName( IWorldName w ) => w.FullName.Replace( '[', '-' ).Replace( "]", "" ) + ".World.State";
 
         /// <summary>
         /// Gets the world.
@@ -65,8 +58,8 @@ namespace CK.Env
         /// </summary>
         public GlobalWorkStatus WorkStatus
         {
-            get => _doc.Root.AttributeEnum( xWorkStatusName, GlobalWorkStatus.Idle );
-            set => _doc.Root.SetAttributeValue( xWorkStatusName, value.ToString() );
+            get => _doc.Root.AttributeEnum( XmlNames.xWorkStatus, GlobalWorkStatus.Idle );
+            set => _doc.Root.SetAttributeValue( XmlNames.xWorkStatus, value.ToString() );
         }
 
         /// <summary>
@@ -84,7 +77,7 @@ namespace CK.Env
             if( r == null ) throw new ArgumentNullException( nameof( r ) );
             if( r.Type == BuildResultType.None ) throw new ArgumentException( nameof( r ) );
             LastBuildType = r.Type;
-            _lastBuild.SetAttributeValue( xType, r.Type.ToString() );
+            _lastBuild.SetAttributeValue( XmlNames.xType, r.Type.ToString() );
             var rXml = r.ToXml();
             switch( r.Type )
             {

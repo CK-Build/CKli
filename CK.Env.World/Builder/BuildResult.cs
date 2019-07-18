@@ -58,20 +58,20 @@ namespace CK.Env
         /// <param name="e">The xml element.</param>
         public BuildResult( XElement e )
         {
-            Type = e.AttributeEnum( "Type", BuildResultType.None );
+            Type = e.AttributeEnum( XmlNames.xType, BuildResultType.None );
             if( Type == BuildResultType.None )
             {
                 throw new ArgumentException( $"Missing BuildResultType." );
             }
             CreationDate = XmlConvert.ToDateTime( (string)e.Attribute( nameof(CreationDate) ), XmlDateTimeSerializationMode.Utc );
-            GeneratedArtifacts = e.Elements( "A" )
+            GeneratedArtifacts = e.Elements( XmlNames.xA )
                                   .Select( a => (
                                             new ArtifactInstance(
-                                                    ArtifactType.Single( (string)a.AttributeRequired("Type") ),
-                                                    (string)a.AttributeRequired( "Name" ),
-                                                    SVersion.Parse( (string)a.AttributeRequired( "Version" ) ) ),
-                                            (string)a.AttributeRequired( "Solution" ),
-                                            (string)a.AttributeRequired( "Target" ) ) )
+                                                    ArtifactType.Single( (string)a.AttributeRequired( XmlNames.xType ) ),
+                                                    (string)a.AttributeRequired( XmlNames.xName ),
+                                                    SVersion.Parse( (string)a.AttributeRequired( XmlNames.xVersion ) ) ),
+                                            (string)a.AttributeRequired( XmlNames.xSolution ),
+                                            (string)a.AttributeRequired( XmlNames.xTarget ) ) )
                                   .ToList();
             var r = e.Element( nameof(ReleaseNotes) );
             if( r != null )
@@ -80,6 +80,9 @@ namespace CK.Env
             }
         }
 
+        /// <summary>
+        /// Gets the type of the build (Local, CI or Release).
+        /// </summary>
         public BuildResultType Type { get; }
 
         /// <summary>
@@ -103,18 +106,18 @@ namespace CK.Env
         /// <returns>A "BuildResult" element.</returns>
         public XElement ToXml()
         {
-            var artifacts = GeneratedArtifacts.Select( a => new XElement( "A",
-                                                                   new XAttribute( "Type", a.Artifact.Artifact.Type ),
-                                                                   new XAttribute( "Name", a.Artifact.Artifact.Name ),
-                                                                   new XAttribute( "Version", a.Artifact.Version.ToNuGetPackageString() ),
-                                                                   new XAttribute( "Solution", a.SolutionName ),
-                                                                   new XAttribute( "Target", a.TargetName ) ) );
+            var artifacts = GeneratedArtifacts.Select( a => new XElement( XmlNames.xA,
+                                                                   new XAttribute( XmlNames.xType, a.Artifact.Artifact.Type ),
+                                                                   new XAttribute( XmlNames.xName, a.Artifact.Artifact.Name ),
+                                                                   new XAttribute( XmlNames.xVersion, a.Artifact.Version.ToNuGetPackageString() ),
+                                                                   new XAttribute( XmlNames.xSolution, a.SolutionName ),
+                                                                   new XAttribute( XmlNames.xTarget, a.TargetName ) ) );
             var releaseNotes = ReleaseNotes != null
                                 ? new XElement( nameof(ReleaseNotes), ReleaseNotes.Select( r => r.ToXml() ) )
                                 : null;
 
-            return new XElement( "BuildResult",
-                                    new XAttribute( "Type", Type.ToString() ),
+            return new XElement( XmlNames.xBuildResult,
+                                    new XAttribute( XmlNames.xType, Type.ToString() ),
                                     new XAttribute( nameof(CreationDate), CreationDate ),
                                     artifacts,
                                     releaseNotes );

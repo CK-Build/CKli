@@ -16,7 +16,7 @@ namespace CK.Env
     /// <summary>
     /// 
     /// </summary>
-    public partial class WorldState : IWorldState, ISolutionDriverWorld, ICommandMethodsProvider
+    public partial class WorldState : ISolutionDriverWorld, ICommandMethodsProvider
     {
         readonly IWorldStore _store;
         readonly IEnvLocalFeedProvider _localFeedProvider;
@@ -92,7 +92,6 @@ namespace CK.Env
         void RawStateChanged( object sender, XObjectChangeEventArgs e )
         {
             _isStateDirty = true;
-            SetReadonlyState();
         }
 
         /// <summary>
@@ -110,13 +109,12 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool Save( IActivityMonitor m )
+        public bool SaveState( IActivityMonitor m )
         {
             if( _isStateDirty )
             {
                 if( !_store.SetLocalState( m, _rawState ) ) return false;
                 _isStateDirty = false;
-                SetReadonlyState();
             }
             return true;
         }
@@ -139,7 +137,6 @@ namespace CK.Env
                 _rawState = _store.GetOrCreateLocalState( monitor, WorldName );
                 LogFilter.TryParse( (string)_rawState.GeneralState.Attribute( "UserLogFilter" ) ?? "", out var logFilter );
                 DoSetUserLogFilter( monitor, logFilter, false );
-                SetReadonlyState();
                 _rawState.Document.Changed += RawStateChanged;
             }
             return true;
@@ -160,6 +157,11 @@ namespace CK.Env
                 DumpWorldStatus?.Invoke( this, ev );
             } );
         }
+
+        /// <summary>
+        /// Raised by <see cref="DumpWorldState(IActivityMonitor)"/>.
+        /// </summary>
+        public event EventHandler<EventMonitoredArgs> DumpWorldStatus;
 
         /// <summary>
         /// Gets the registered solution drivers.
@@ -266,7 +268,7 @@ namespace CK.Env
         bool SetWorkStatusAndSave( IActivityMonitor m, GlobalWorkStatus s )
         {
             SetWorkStatus( s );
-            return Save( m );
+            return SaveState( m );
         }
 
         [CommandMethod( confirmationRequired: false )]
@@ -279,7 +281,7 @@ namespace CK.Env
                 _userMonitorClient.MinimalFilter = filter;
                 _rawState.GeneralState.SetAttributeValue( "UserLogFilter", filter.ToString() );
                 m.UnfilteredLog( ActivityMonitor.Tags.Empty, LogLevel.Info, $"User Log Filter level set to '{filter}' (actual filter is '{m.ActualFilter}').", m.NextLogTime(), null );
-                if( saveOnChange ) Save( m );
+                if( saveOnChange ) SaveState( m );
             }
         }
 
@@ -602,7 +604,7 @@ namespace CK.Env
                 }
             }
             _rawState.SetBuildResult( result );
-            return Save( m );
+            return SaveState( m );
         }
 
         /// <summary>
@@ -701,7 +703,7 @@ namespace CK.Env
             bool editSucceed = roadmap.UpdateRoadmap( monitor, VersionSelector, forgetAllExistingRoadmapVersions );
             // Always saves state to preserve any change in the roadmap, even on error.
             GeneralState.ReplaceElementByName( roadmap.ToXml() );
-            if( !Save( monitor ) || !editSucceed ) return null;
+            if( !SaveState( monitor ) || !editSucceed ) return null;
             return roadmap;
         }
 
@@ -749,7 +751,7 @@ namespace CK.Env
             if( roadmap == null ) return false;
 
             SetWorkStatus( GlobalWorkStatus.Releasing );
-            if( !Save( monitor ) ) return false;
+            if( !SaveState( monitor ) ) return false;
 
             return DoReleasing( monitor );
         }
@@ -758,18 +760,18 @@ namespace CK.Env
         {
             return RunSafe( monitor, $"Starting Release.", ( m, error ) =>
             {
-                bool firstRun = GeneralState.Element( "GitSnapshot" ) == null;
+                bool firstRun = GeneralState.Element( XmlNames.xGitSnapshot ) == null;
                 if( firstRun )
                 {
                     using( m.OpenInfo( $"First run: capturing {WorldName.DevelopBranchName} and {WorldName.MasterBranchName} branches positions." ) )
                     {
-                        var snapshot = new XElement( "GitSnapshot",
-                                                 _gitRepositories.Select( g => new XElement( "G",
-                                                            new XAttribute( "P", g.SubPath ),
-                                                            new XAttribute( "D", g.GetBranchSha( m, WorldName.DevelopBranchName ) ),
-                                                            new XAttribute( "M", g.GetBranchSha( m, WorldName.MasterBranchName ) ?? "" ) ) ) );
+                        var snapshot = new XElement( XmlNames.xGitSnapshot,
+                                                 _gitRepositories.Select( g => new XElement( XmlNames.xG,
+                                                            new XAttribute( XmlNames.xP, g.SubPath ),
+                                                            new XAttribute( XmlNames.xD, g.GetBranchSha( m, WorldName.DevelopBranchName ) ),
+                                                            new XAttribute( XmlNames.xM, g.GetBranchSha( m, WorldName.MasterBranchName ) ?? "" ) ) ) );
                         GeneralState.Add( snapshot );
-                        if( !Save( m ) ) return;
+                        if( !SaveState( m ) ) return;
                         if( !_localFeedProvider.Release.RemoveAll( m ) ) return;
                     }
                 }
@@ -933,7 +935,7 @@ namespace CK.Env
                 }
                 if( !success ) return;
                 _rawState.PublishBuildResult( buildResults.Type );
-                Save( m );
+                SaveState( m );
             } );
         }
 
@@ -1032,33 +1034,6 @@ namespace CK.Env
             }
             return error;
         }
-
-        #region Read only State
-
-        StandardGitStatus _roGlobalGitStatus;
-        GlobalWorkStatus _roGlobalWorkStatus;
-        XElement _roGeneralState;
-
-        void SetReadonlyState()
-        {
-            _roGlobalGitStatus = CachedGlobalGitStatus;
-            _roGlobalWorkStatus = _rawState.WorkStatus;
-            _roGeneralState = new XElement( _rawState.GeneralState );
-            _roGeneralState.Changing += PreventChanges;
-        }
-
-        static void PreventChanges( object sender, XObjectChangeEventArgs e )
-        {
-            throw new InvalidOperationException( "XElement is read-only." );
-        }
-
-        StandardGitStatus IWorldState.GlobalGitStatus => _roGlobalGitStatus;
-
-        GlobalWorkStatus IWorldState.WorkStatus => _roGlobalWorkStatus;
-
-        XElement IWorldState.GeneralState => _roGeneralState;
-
-        #endregion
 
     }
 

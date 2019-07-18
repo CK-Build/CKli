@@ -341,12 +341,12 @@ namespace CK.Env
 
         internal XElement ToXml()
         {
-            return new XElement( "S",
-                        new XAttribute( "Name", Solution.Solution.Name ),
-                        new XAttribute( "SubPath", Solution.Solution.FullPath ),
-                        new XAttribute( "CommitSha", _commitVersionInfo.CommitSha ),
+            return new XElement( XmlNames.xS,
+                        new XAttribute( XmlNames.xName, Solution.Solution.Name ),
+                        new XAttribute( XmlNames.xSubPath, Solution.Solution.FullPath ),
+                        new XAttribute( XmlNames.xCommitSha, _commitVersionInfo.CommitSha ),
                         _releaseInfo.ToXml(),
-                        new XElement( "ReleaseNote", new XCData( ReleaseNote ?? String.Empty ) ));
+                        new XElement( XmlNames.xReleaseNote, new XCData( ReleaseNote ?? String.Empty ) ));
         }
     }
 }

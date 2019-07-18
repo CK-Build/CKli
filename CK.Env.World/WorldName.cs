@@ -2,6 +2,9 @@ using System;
 
 namespace CK.Env
 {
+    /// <summary>
+    /// Immutable implementation of <see cref="IWorldName"/>.
+    /// </summary>
     public class WorldName : IWorldName
     {
         /// <summary>

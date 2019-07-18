@@ -9,7 +9,7 @@ using System.Linq;
 namespace CK.Env
 {
     /// <summary>
-    /// Store drivers and expose methods to get a bunch of drivers.
+    /// Handles drivers per branches and their respective solutions.
     /// </summary>
     public class DriversCollection
     {
@@ -20,6 +20,10 @@ namespace CK.Env
             readonly PairList _pairList;
             SolutionDependencyContext _depContext;
 
+            /// <summary>
+            /// Initializes an empty context for a given branch.
+            /// </summary>
+            /// <param name="branchName">The branch name.</param>
             internal WorldBranchContext( string branchName )
             {
                 BranchName = branchName;
@@ -29,9 +33,10 @@ namespace CK.Env
             }
 
             /// <summary>
-            /// Multiple branches constructor.
+            /// Initializes an empty context for "current" branches: the drivers are the one of the
+            /// develop branch (<see cref="BranchName"/> is null).
             /// </summary>
-            /// <param name="drivers">The driver list from the develop branch.</param>
+            /// <param name="drivers">The drivers for each branch.</param>
             internal WorldBranchContext( IEnumerable<ISolutionDriver> drivers )
             {
                 _drivers = drivers.ToList();
@@ -40,7 +45,7 @@ namespace CK.Env
 
             /// <summary>
             /// Gets the branch name.
-            /// This is null for multiple branches context.
+            /// This is null for "current" branches context.
             /// </summary>
             public string BranchName { get; }
 
@@ -154,6 +159,7 @@ namespace CK.Env
 
         /// <summary>
         /// Gets an up to date <see cref="IWorldSolutionContext"/> for the current branches.
+        /// Each drivers can be in different branches.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="reloadSolutions">True to force a reload of the solutions.</param>
