@@ -17,7 +17,7 @@ namespace CK.Env
         /// </summary>
         public string RootDirectoryPath { get; }
 
-        internal LocalWorldName( string xmlDescriptionFilePath, string worldName, string parallelName, ILocalWorldRootPathMapping localMap )
+        internal LocalWorldName( string xmlDescriptionFilePath, string worldName, string parallelName, IWorldLocalMapping localMap )
             : base( worldName, parallelName )
         {
             if( String.IsNullOrWhiteSpace( xmlDescriptionFilePath ) ) throw new ArgumentNullException( nameof( xmlDescriptionFilePath ) );
@@ -25,7 +25,7 @@ namespace CK.Env
             RootDirectoryPath = localMap.GetRootPath( this );
         }
 
-        internal static LocalWorldName Parse( IActivityMonitor m, string filePath, ILocalWorldRootPathMapping localMap )
+        internal static LocalWorldName Parse( IActivityMonitor m, string filePath, IWorldLocalMapping localMap )
         {
             Debug.Assert( filePath.EndsWith( ".World.xml" ) );
             try

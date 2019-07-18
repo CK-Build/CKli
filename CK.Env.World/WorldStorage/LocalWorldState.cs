@@ -1,17 +1,16 @@
 using CK.Core;
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Xml.Linq;
 
 namespace CK.Env
 {
     /// <summary>
-    /// Encapsulates local and shared <see cref="XDocument"/> states.
+    /// Encapsulates local <see cref="XDocument"/> state.
     /// </summary>
-    public class RawXmlWorldState
+    public class LocalWorldState : BaseWorldState
     {
-        readonly IWorldName _world;
-        readonly XDocument _doc;
         readonly XElement _generalState;
         readonly XElement _lastBuild;
         readonly XElement _builds;
@@ -20,53 +19,94 @@ namespace CK.Env
         readonly XElement _localBuildResult;
         readonly XElement _publishedBuildHistory;
         readonly BuildResult[] _buildResults;
+        LogFilter _logFilter;
 
-        public RawXmlWorldState( IWorldName w, XDocument d )
+        public LocalWorldState( WorldStore store, IWorldName w, XDocument d = null )
+            : base( store, w, true, d )
         {
-            if( w == null ) throw new ArgumentNullException( nameof( w ) );
-            if( d == null ) throw new ArgumentNullException( nameof( d ) );
-            string safeName = SafeElementName( w );
-            _world = w;
-
-            if( d.Root.Name != safeName ) throw new ArgumentException( $"Invalid state document root. Must be {safeName}, found {d.Root.Name}.", nameof( d ) );
-            _doc = d;
-            _generalState = d.Root.EnsureElement( XmlNames.xGeneralState );
-            _lastBuild = d.Root.EnsureElement( XmlNames.xLastBuild );
-            _builds = d.Root.EnsureElement( XmlNames.xBuilds );
+            var r = XDocument.Root;
+            _generalState = r.EnsureElement( XmlNames.xGeneralState );
+            _lastBuild = r.EnsureElement( XmlNames.xLastBuild );
+            _builds = r.EnsureElement( XmlNames.xBuilds );
             _releaseBuildResult = _builds.EnsureElement( XmlNames.xRelease );
             _ciBuildResult = _builds.EnsureElement( XmlNames.xCI );
             _localBuildResult = _builds.EnsureElement( XmlNames.xLocal );
-            _publishedBuildHistory = d.Root.EnsureElement( XmlNames.xPublishedBuildHistory );
+            _publishedBuildHistory = r.EnsureElement( XmlNames.xPublishedBuildHistory );
             LastBuildType = _lastBuild.AttributeEnum( XmlNames.xType, BuildResultType.None );
             _buildResults = new BuildResult[3];
         }
-
-        public RawXmlWorldState( IWorldName w )
-            : this( w, new XDocument( new XElement( SafeElementName( w ), new XAttribute( XmlNames.xWorkStatus, GlobalWorkStatus.Idle.ToString() ) ) ) )
-        {
-        }
-
-        static string SafeElementName( IWorldName w ) => w.FullName.Replace( '[', '-' ).Replace( "]", "" ) + ".World.State";
-
-        /// <summary>
-        /// Gets the world.
-        /// </summary>
-        public IWorldName World => _world;
 
         /// <summary>
         /// Gets or sets the current global status.
         /// </summary>
         public GlobalWorkStatus WorkStatus
         {
-            get => _doc.Root.AttributeEnum( XmlNames.xWorkStatus, GlobalWorkStatus.Idle );
-            set => _doc.Root.SetAttributeValue( XmlNames.xWorkStatus, value.ToString() );
+            get => XDocument.Root.AttributeEnum( XmlNames.xWorkStatus, GlobalWorkStatus.Idle );
+            set => XDocument.Root.SetAttributeValue( XmlNames.xWorkStatus, value.ToString() );
         }
 
         /// <summary>
-        /// Gets the <see cref="XElement"/> general state.
-        /// This is where state information should be stored.
+        /// Gets or sets the user log filter.
         /// </summary>
-        public XElement GeneralState => _generalState;
+        public LogFilter UserLogFilter
+        {
+            get
+            {
+                if( _logFilter == LogFilter.Undefined )
+                {
+                    LogFilter.TryParse( (string)_generalState.Attribute( XmlNames.xUserLogFilter ) ?? "", out _logFilter );
+                }
+                return _logFilter;
+            }
+            set
+            {
+                if( value != _logFilter ) _generalState.SetAttributeValue( XmlNames.xUserLogFilter, (_logFilter = value).ToString() );
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the current Roadmap element.
+        /// The element is automatically created as needed.
+        /// When setting, the value must not be null and its <see cref="XElement.Name"/> must be <see cref="XmlNames.xRoadmap"/>.
+        /// </summary>
+        public XElement Roadmap
+        {
+            get => _generalState.EnsureElement( XmlNames.xRoadmap );
+            set
+            {
+                if( value == null || value.Name != XmlNames.xRoadmap ) throw new ArgumentException();
+                _generalState.ReplaceElementByName( value );
+            }
+        }
+
+        /// <summary>
+        /// Gets the <see cref="XmlNames.xGitSnapshot"/> element or null if there is no snapshot.
+        /// </summary>
+        public XElement GetGitSnapshot() => _generalState.Element( XmlNames.xGitSnapshot );
+
+        /// <summary>
+        /// Sets the <see cref="XmlNames.xGitSnapshot"/> element.
+        /// There must be no current snapshot otherwise an <see cref="InvalidOperationException"/> is thrown.
+        /// </summary>
+        /// <param name="e">The non null snapshot.</param>
+        public void SetGitSnapshot( XElement e )
+        {
+            if( e == null || e.Name != XmlNames.xGitSnapshot ) throw new ArgumentException();
+            if( GetGitSnapshot() != null ) throw new InvalidOperationException();
+            _generalState.Add( e );
+        }
+
+        /// <summary>
+        /// Clears the <see cref="XmlNames.xGitSnapshot"/> element.
+        /// There must be a current snapshot otherwise an <see cref="InvalidOperationException"/> is thrown.
+        /// </summary>
+        public void ClearGitSnapshot()
+        {
+            var g = GetGitSnapshot();
+            if( g == null ) throw new InvalidOperationException();
+            g.Remove();
+            Debug.Assert( GetGitSnapshot() == null );
+        }
 
         /// <summary>
         /// Sets a build result, updating <see cref="LastBuildType"/>.
@@ -136,18 +176,7 @@ namespace CK.Env
         /// Gets the last build type.
         /// </summary>
         public BuildResultType LastBuildType { get; private set; }
-
-        /// <summary>
-        /// Gets the full document.
-        /// </summary>
-        /// <returns>The document.</returns>
-        public XDocument Document => _doc;
-
-        /// <summary>
-        /// Overridden to return the xml document as a string.
-        /// </summary>
-        /// <returns>The xml.</returns>
-        public override string ToString() => _doc.ToString();
+       
 
     }
 }

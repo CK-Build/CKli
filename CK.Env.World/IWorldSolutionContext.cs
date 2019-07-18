@@ -7,7 +7,7 @@ namespace CK.Env
     /// <summary>
     /// Captures a set of <see cref="Solution"/> and their respective <see cref="ISolutionDriver"/>
     /// that is able to refresh/reload the solutions.
-    /// In practice a <see cref="WorldState"/> maintains a context per logical branch it works on ('develop'
+    /// In practice a <see cref="World"/> maintains a context per logical branch it works on ('develop'
     /// and/or 'local') however this may be used to work on solutions accross different branches as long
     /// as there is no duplicate solution in the context (see <see cref="Solution.Name"/>
     /// and <see cref="Solution.FullPath"/>).

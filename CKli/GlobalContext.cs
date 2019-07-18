@@ -14,14 +14,14 @@ namespace CKli
         readonly IActivityMonitor _monitor;
         readonly XTypedFactory _factory;
         readonly string _rootPath;
-        readonly IWorldStore _worldStore;
+        readonly WorldStore _worldStore;
         readonly LocalWorldRootPathMapping _localWorldRootPathMapping;
         readonly IBasicApplicationLifetime _appLife;
         FileSystem _fs;
         IWorldName _currentWorld;
         XTypedObject _root;
 
-        class LocalWorldRootPathMapping : ILocalWorldRootPathMapping
+        class LocalWorldRootPathMapping : IWorldLocalMapping
         {
             readonly NormalizedPath _rootPath;
             Dictionary<string, NormalizedPath> _map;
@@ -61,14 +61,14 @@ namespace CKli
             /// </summary>
             /// <param name="w">The world name.</param>
             /// <returns>The path to the root directory or null if it is not mapped.</returns>
-            public string GetRootPath( IWorldName w )
+            public NormalizedPath GetRootPath( IWorldName w )
             {
                 NormalizedPath p;
                 if( !_map.TryGetValue( w.FullName, out p ) )
                 {
-                    // If Name is not the same as FullName, we are on a parralel
+                    // If Name is not the same as FullName, we are on a parallel
                     // world that is not mapped: if the Stack name is mapped (the default world),
-                    // we map the parrallel world next to the default one.
+                    // we map the parallel world next to the default one.
                     if( _map.TryGetValue( w.Name, out p ) )
                     {
                         p = p.RemoveLastPart().AppendPart( w.FullName );
@@ -78,9 +78,8 @@ namespace CKli
                 {
                     Directory.CreateDirectory( p );
                     File.WriteAllText( p.AppendPart( "CKli-World.htm" ), "<html></html>" );
-                    return p;
                 }
-                return null;
+                return p;
             }
         }
 
@@ -204,7 +203,7 @@ namespace CKli
                         {
                             key = $"[{World.ParallelName}]";
                         }
-                        Console.WriteLine( $"   > {Idx + 1} {key} => { LocalPath ?? "(No local mapping)"}" );
+                        Console.WriteLine( $"   > {Idx + 1} {key} => {(LocalPath.IsEmptyPath ? "(No local mapping)" : LocalPath.Path)}" );
                     }
                 }
                 Console.WriteLine( "-------------" );

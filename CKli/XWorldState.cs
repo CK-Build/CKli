@@ -18,13 +18,13 @@ namespace CKli
         readonly IWorldName _world;
         readonly FileSystem _fileSystem;
         readonly IEnvLocalFeedProvider _localFeeds;
-        readonly WorldState _worldState;
+        readonly World _worldState;
         readonly IActivityMonitorFilteredClient _userMonitorFilter;
 
         public XWorldState(
             FileSystem fileSystem,
             IWorldName world,
-            IWorldStore worldStore,
+            WorldStore worldStore,
             IEnvLocalFeedProvider localFeeds,
             ArtifactCenter artifacts,
             CommandRegister commandRegister,
@@ -40,7 +40,7 @@ namespace CKli
             if( _userMonitorFilter == null ) throw new InvalidOperationException();
 
             bool isPublic = initializer.Reader.HandleRequiredAttribute<bool>( "IsPublic" );
-            _worldState = new WorldState( commandRegister, artifacts, worldStore, world, isPublic, _localFeeds, _userMonitorFilter, appLife )
+            _worldState = new World( commandRegister, artifacts, worldStore, world, isPublic, _localFeeds, _userMonitorFilter, appLife )
             {
                 VersionSelector = new ReleaseVersionSelector()
             };
