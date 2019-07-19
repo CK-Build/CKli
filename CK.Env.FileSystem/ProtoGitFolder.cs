@@ -183,12 +183,12 @@ namespace CK.Env
             using( m.OpenTrace( $"Ensuring git repository {FullPhysicalPath}" ) )
             {
 
-                var gitFolderPath = Path.Combine( FolderPath, ".git" );
+                var gitFolderPath = Path.Combine( FullPhysicalPath, ".git" );
                 if( !Directory.Exists( gitFolderPath ) )
                 {
                     using( m.OpenInfo( $"Checking out '{FolderPath}' from '{OriginUrl}' on {World.DevelopBranchName}." ) )
                     {
-                        Repository.Clone( OriginUrl, FolderPath, new CloneOptions()
+                        Repository.Clone( OriginUrl, FullPhysicalPath, new CloneOptions()
                         {
                             CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, url ),
                             BranchName = World.DevelopBranchName,
@@ -245,17 +245,17 @@ namespace CK.Env
             EnsureHookFile( m, prepush, "check_no_commit_nopush", _hook_check_no_commit_nopush );
         }
 
-        string GetHooksDir => Path.Combine( FolderPath, ".git", "hooks" );
+        NormalizedPath GetHooksDir => FullPhysicalPath.AppendPart(".git").AppendPart("hooks");
 
-        string GetHookPath( string hookName ) => Path.Combine( GetHooksDir, hookName );
+        NormalizedPath GetHookPath( string hookName ) => GetHooksDir.AppendPart(hookName);
 
-        string GetMultiHooksDir( string hookName ) => Path.Combine( GetHooksDir, hookName + "_scripts/" );
+        NormalizedPath GetMultiHooksDir( string hookName ) => GetHooksDir.AppendPart(hookName + "_scripts");
 
         void EnsureHookDispatcher( IActivityMonitor m, string hookName )
         {
-            string hookPath = GetHookPath( hookName );
-            string multiHookDirectory = GetMultiHooksDir( hookName );
-            bool hookPresent = File.Exists( hookPath );
+            NormalizedPath hookPath = GetHookPath( hookName );
+            NormalizedPath multiHookDirectory = GetMultiHooksDir( hookName );
+            bool hookPresent = File.Exists(hookPath);
             Directory.CreateDirectory( multiHookDirectory );
             if( hookPresent )
             {
