@@ -123,6 +123,21 @@ namespace CK.Env
         /// </summary>
         public bool IsSecretAvailable => _secret != null;
 
+        public SecretKeyInfo FinalSubKey
+        {
+            get
+            {
+                var curr = this;
+                while( true )
+                {
+                    var previous = curr;
+                    if(  curr.SubKey == null) return previous;
+                    curr = curr.SubKey;
+                    if( previous == curr ) throw new InvalidOperationException( "Cycle detected." );
+                }
+            }
+        }
+
         [Conditional( "DEBUG" )]
         void CheckSecretPropagation()
         {

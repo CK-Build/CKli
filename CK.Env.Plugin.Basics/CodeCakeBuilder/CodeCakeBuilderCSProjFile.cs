@@ -79,11 +79,6 @@ namespace CK.Env.Plugin
             DeleteProjectReference( "Cake.Common" ); //imported by Code.Cake
             DeleteProjectReference( "Cake.Core" ); //imported by Cake.Common
             EnsureProjectReference( "SimpleGitVersion.Cake", "0.38.0" );
-            if( !_solutionSpec.NoDotNetUnitTests )
-            {
-                EnsureProjectReference( "NUnit.ConsoleRunner", "3.9.0" );
-                EnsureProjectReference( "NUnit.Runners.Net4", "2.6.4" );
-            }
             if( PluginBranch != StandardGitStatus.Local )
             {
                 // This should NOT BE HERE.

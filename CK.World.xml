@@ -17,44 +17,62 @@
   <CKSetupClient />
   <WorldState IsPublic="True" />
 
-  <ArtifactRepositories>
+  <Artifacts>
+    <SourceFeeds>
+        <Feed
+          Type="NuGet"
+          Name="Signature-OpenSource"
+          Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json">
+          <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
+        </Feed>
+        <Feed
+          Type="NPM"
+          Scope="@signature"
+          Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/npm/registry/" >
+          <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
+        </Feed>
+    </SourceFeeds>
+    <TargetRepositories>
+      <Repository
+        Type="NuGetAzure"
+        Organization="Signature-OpenSource"
+        FeedName="Default"
+        CheckName="NuGet:Azure:Signature-OpenSource-Default"
+        CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
 
-    <Repository Type="NuGetAzure" Organization="Signature-OpenSource" FeedName="Default"
-                CheckName="NuGetAzure:Signature-OpenSource-Default"
-                CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
+      <Repository
+        Type="NPMAzure"
+        Organization="Signature-OpenSource"
+        FeedName="Default"
+        NPMScope="@signature"
+        CheckName="NPM:Azure:@signature->Signature-OpenSource-Default"
+        CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
 
-    <Repository Type="NPMAzure" Organization="Signature-OpenSource" FeedName="Default"
-                NPMScope="@signature"
-                CheckName="NPMAzure:@signature->Signature-OpenSource-Default"
-                CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
+      <Repository
+        Type="NuGetStandard"
+        Name="nuget.org"
+        Url="https://api.nuget.org/v3/index.json"
+        CheckName="NuGet:nuget.org"
+        QualityFilter="ReleaseCandidate-Release"
+        SecretKeyName="NUGET_ORG_PUSH_API_KEY" />
 
-    <Repository Type="NuGetStandard" Name="nuget.org" Url="https://api.nuget.org/v3/index.json"
-                CheckName="NuGetStandard:nuget.org"
-                QualityFilter="ReleaseCandidate-Release"
-                SecretKeyName="NUGET_ORG_PUSH_API_KEY" />
+      <Repository
+        Type="NPMStandard"
+        Name="npmjs.org"
+        Url="https://registry.npmjs.org/"
+        QualityFilter="ReleaseCandidate-Release"
+        CheckName="NPM:npmjs.org"
+        SecretKeyName="NPMJS_ORG_PUSH_PAT" />
 
-    <Repository Type="NPMStandard" Name="npmjs.org" Url="https://registry.npmjs.org/"
-                QualityFilter="ReleaseCandidate-Release"
-                CheckName="NPMStandard:npmjs.org"
-                SecretKeyName="NPMJS_ORG_PUSH_PAT" />
+      <Repository
+        Type="CKSetup"
+        CheckName="CKSetup:Public"
+        CheckSecretKeyName="CKSETUPREMOTESTORE_PUSH_API_KEY" />
 
-    <Repository Type="CKSetup"
-                CheckName="CKSetup:Public"
-                CheckSecretKeyName="CKSETUPREMOTESTORE_PUSH_API_KEY" />
-
-  </ArtifactRepositories>
+    </TargetRepositories>
+  </Artifacts>
 
   <SharedSolutionSpec>
-    <NuGetSources>
-      <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json" >
-        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
-      </add>
-    </NuGetSources>
-    <NPMSources>
-      <add Scope="@signature" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/npm/registry/" >
-        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
-      </add>
-    </NPMSources>
     <RemoveNuGetSourceNames>
       <add Name="CKEnvTest" />
       <add Name="CKEnvTest3" />
@@ -62,11 +80,14 @@
       <add Name="Invenietis - Preview" />
       <add Name="Invenietis - CI" />
     </RemoveNuGetSourceNames>
+    <ArtifactSources>
+      <add Name="NuGet:Signature-OpenSource" />
+    </ArtifactSources>
     <ArtifactTargets>
-      <add Name="NPMAzure:@signature->Signature-OpenSource-Default" />
-      <add Name="NuGetStandard:nuget.org" />
-      <add Name="NuGetAzure:Signature-OpenSource-Default" />
-      <add Name="NPMStandard:npmjs.org" />
+      <add Name="NPM:Azure:@signature->Signature-OpenSource-Default" />
+      <add Name="NuGet:nuget.org" />
+      <add Name="NuGet:Azure:Signature-OpenSource-Default" />
+      <add Name="NPM:npmjs.org" />
       <add Name="CKSetup:Public" />
     </ArtifactTargets>
   </SharedSolutionSpec>
@@ -124,6 +145,16 @@
     <GitFolder Name="CK-Globbing" Url="https://github.com/Invenietis/CK-Globbing.git">
       <Branch Name="develop">
         <SolutionSpec />
+      </Branch>
+    </GitFolder>
+
+    <GitFolder Name="CKSetupRemoteStore" Url="https://gitlab.com/Signature-Code/CKSetupRemoteStore.git" >
+      <Branch Name="develop">
+        <SolutionSpec UseCKSetup="true" >
+          <NotPublishedProjects>
+            <add Folder="CKSetupRemoteStore" />
+          </NotPublishedProjects>
+        </SolutionSpec>
       </Branch>
     </GitFolder>
 
@@ -266,16 +297,6 @@
     <GitFolder Name="CK-Setup-Dependency" Url="https://github.com/Invenietis/CK-Setup-Dependency.git" >
       <Branch Name="develop">
         <SolutionSpec />
-      </Branch>
-    </GitFolder>
-
-    <GitFolder Name="CKSetupRemoteStore" Url="https://gitlab.com/Signature-Code/CKSetupRemoteStore.git" >
-      <Branch Name="develop">
-        <SolutionSpec UseCKSetup="true" >
-          <NotPublishedProjects>
-            <add Folder="CKSetupRemoteStore" />
-          </NotPublishedProjects>
-        </SolutionSpec>
       </Branch>
     </GitFolder>
 

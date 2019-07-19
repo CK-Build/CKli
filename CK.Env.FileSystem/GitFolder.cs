@@ -127,6 +127,11 @@ namespace CK.Env
         /// </summary>
         public NormalizedPath SubPath => ProtoGitFolder.FolderPath;
 
+        /// <summary>
+        /// Gets the full path (that starts with the <see cref="FileSystem"/>' root path) of the Git folder.
+        /// </summary>
+        public NormalizedPath FullPhysicalPath => ProtoGitFolder.FullPhysicalPath;
+
         ///// <summary>
         ///// Gets the name of the Git folder that is the name of the primary solution (by convention and by design).
         ///// </summary>
@@ -571,7 +576,7 @@ namespace CK.Env
 
         public string OriginUrl => ProtoGitFolder.OriginUrl;
 
-        public NormalizedPath FullPhysicalPath => ProtoGitFolder.FolderPath;
+        
 
         public FileSystem FileSystem => ProtoGitFolder.FileSystem;
 

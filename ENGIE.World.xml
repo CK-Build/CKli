@@ -17,24 +17,54 @@
   <CKSetupClient />
   <WorldState IsPublic="False"/>
 
+  <Artifacts>
+    <SourceFeeds>
+      <Feed
+          Type="NuGet"
+          Name="Signature-OpenSource"
+          Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json">
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
+      </Feed>
+      <Feed
+        Type="NPM"
+        Scope="@signature"
+        Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/npm/registry/" >
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
+      </Feed>
 
-  <ArtifactRepositories>
-
-    <Repository Type="NuGetAzure" Organization="invenietis" FeedName="engie"
-                CheckName="NuGetAzure:invenietis-engie"
+      <Feed Type="NuGet"
+          Name="Invenietis-Release" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-release/nuget/v3/index.json">
+        <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
+      </Feed>
+      <Feed Type="NuGet"
+          Name="Invenietis-Preview" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-preview/nuget/v3/index.json">
+        <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
+      </Feed>
+      <Feed Type="NuGet"
+          Name="Invenietis-CI" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-ci/nuget/v3/index.json">
+        <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
+      </Feed>
+      <Feed Type="NuGet"
+          Name="Engie" Url="https://pkgs.dev.azure.com/invenietis/_packaging/Engie/nuget/v3/index.json">
+        <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
+      </Feed>
+      <Feed Type="NuGet"
+          Name="Engie-CI" Url="https://pkgs.dev.azure.com/invenietis/_packaging/Engie-CI/nuget/v3/index.json">
+        <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
+      </Feed>
+    </SourceFeeds>
+    <TargetRepositories>
+      <Repository Type="NuGetAzure" Organization="invenietis" FeedName="engie"
+                CheckName="NuGet:Azure:invenietis-engie"
                 CheckSecretKeyName="AZURE_FEED_INVENIETIS_PAT" />
-    <Repository Type="NPMAzure" Organization="invenietis" FeedName="engie"
-                NPMScope="@engie"
-                CheckName="NPMAzure:@engie->invenietis-engie"
-                CheckSecretKeyName="AZURE_FEED_INVENIETIS_PAT" />
-  </ArtifactRepositories>
+      <Repository Type="NPMAzure" Organization="invenietis" FeedName="engie"
+                  NPMScope="@engie"
+                  CheckName="NPM:Azure:@engie->invenietis-engie"
+                  CheckSecretKeyName="AZURE_FEED_INVENIETIS_PAT" />
+    </TargetRepositories>
+  </Artifacts>
 
   <SharedSolutionSpec>
-    <NuGetSources>
-      <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json">
-        <Credentials UserName="SignatureOpenSource" Password="c56geu5acyhfgeiqhdl3t2xo5xumlztnjf736zdbogyxtaulydlq" />
-      </add>
-    </NuGetSources>
     <RemoveNuGetSourceNames>
       <add Name="MyGet_Invenietis_Release" />
       <add Name="MyGet_Invenietis_Preview" />
@@ -46,12 +76,15 @@
       <add Name="EngieCI" />
       <add Name="NuGet"/>
     </RemoveNuGetSourceNames>
+    <ArtifactSources>
+      <add Name="NuGet:Signature-OpenSource" />
+    </ArtifactSources>
   </SharedSolutionSpec>
   <!-- NuGetSources Signature-OpenSource  -->
   <Folder Name="ENGIE">
     <SharedSolutionSpec>
       <ArtifactTargets>
-        <add Name="NuGetAzure:invenietis-engie" />
+        <add Name="NuGet:Azure:invenietis-engie" />
       </ArtifactTargets>
     </SharedSolutionSpec>
 
@@ -72,7 +105,7 @@
         <SolutionSpec/>
       </Branch>
     </GitFolder>
-<!-- 
+    <!-- 
     <GitFolder Name="CK-Gis" Url="https://invenietis@dev.azure.com/invenietis/CK/_git/CK-Gis">
       <Branch Name="develop"> 
         <SolutionSpec>
@@ -100,7 +133,7 @@
       <Branch Name="develop">
         <SolutionSpec>
           <ArtifactTargets>
-            <add Name="NPMAzure:@engie->invenietis-engie" />
+            <add Name="NPM:Azure:@engie->invenietis-engie" />
           </ArtifactTargets>
           <NPMProjects>
             <add Folder="js/" PackageName="@engie/data-weather-sdk" />
@@ -113,7 +146,7 @@
       <Branch Name="develop">
         <SolutionSpec>
           <ArtifactTargets>
-            <add Name="NPMAzure:@engie->invenietis-engie" />
+            <add Name="NPM:Azure:@engie->invenietis-engie" />
           </ArtifactTargets>
           <NPMProjects>
             <add Folder="/" PackageName="@engie/nemo-layer-sdk" />
@@ -126,7 +159,7 @@
       <Branch Name="develop">
         <SolutionSpec>
           <ArtifactTargets>
-            <add Name="NPMAzure:@engie->invenietis-engie" />
+            <add Name="NPM:Azure:@engie->invenietis-engie" />
           </ArtifactTargets>
           <NPMProjects>
             <add Folder="/" PackageName="@engie/shared-components" />
@@ -142,23 +175,14 @@
     </GitFolder>
 
     <SharedSolutionSpec>
-      <NuGetSources>
-        <add Name="Invenietis-Release" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-release/nuget/v3/index.json">
-          <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
-        </add>
-        <add Name="Invenietis-Preview" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-preview/nuget/v3/index.json">
-          <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
-        </add>
-        <add Name="Invenietis-CI" Url="https://pkgs.dev.azure.com/invenietis/_packaging/invenietis-ci/nuget/v3/index.json">
-          <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
-        </add>
-        <add Name="Engie" Url="https://pkgs.dev.azure.com/invenietis/_packaging/Engie/nuget/v3/index.json">
-          <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
-        </add>
-        <add Name="Engie-CI" Url="https://pkgs.dev.azure.com/invenietis/_packaging/Engie-CI/nuget/v3/index.json">
-         <Credentials UserName="Invenietis" PasswordSecretKeyName="INVENIETIS_READ_PAT" />
-        </add>
-      </NuGetSources>
+      <ArtifactSources>
+        <add Name="NuGet:Signature-OpenSource" />
+        <add Name="NuGet:Invenietis-Release"/>
+        <add Name="NuGet:Invenietis-Preview"/>
+        <add Name="NuGet:Invenietis-CI"/>
+        <add Name="NuGet:Engie-CI"/>
+        <add Name="NuGet:Engie"/>
+      </ArtifactSources>
     </SharedSolutionSpec>
     <!-- NuGetSources Invenietis -->
 
@@ -231,7 +255,7 @@
       </Branch>
     </GitFolder>
 
-    
+
 
     <GitFolder Name="Feedermarket-Transformers" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/Feedermarket-Transformers">
       <Branch Name="develop">
@@ -252,9 +276,9 @@
     </GitFolder>
 
     <GitFolder Name="CK-Extensions" Url="https://invenietis@dev.azure.com/invenietis/Cofely/_git/CK-Extensions">
-            <Branch Name="develop">
-                <SolutionSpec />
-            </Branch>
-        </GitFolder>
+      <Branch Name="develop">
+        <SolutionSpec />
+      </Branch>
+    </GitFolder>
   </Folder>
 </ENGIE-WORLD>

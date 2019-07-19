@@ -59,6 +59,13 @@ namespace CK.Env.NPM
                         break;
                     }
             }
+            if( result != null )
+            {
+                if( !String.IsNullOrEmpty( result.SecretKeyName ) )
+                {
+                    SecretKeyStore.DeclareSecretKey( result.SecretKeyName, desc => $"Required to push NPM packages to repository '{result.UniqueRepositoryName}'." );
+                }
+            }
             return result;
         }
 
