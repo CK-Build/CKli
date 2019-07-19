@@ -42,6 +42,34 @@ namespace CK.Env
             subKey.SuperKey = this;
         }
 
+        /// <summary>
+        /// Deserializatiuon constructor.
+        /// </summary>
+        /// <param name="data">Data captured by <see cref="GetData"/>.</param>
+        /// <param name="keyInfos">Current set of secrets being restored.</param>
+        internal SecretKeyInfo( (string name, string description, string secret, bool isRequired, string tags, string subKey) data, IReadOnlyDictionary<string, SecretKeyInfo> keyInfos )
+        {
+            Name = data.name;
+            _description = data.description;
+            _secret = data.secret;
+            _isRequired = data.isRequired;
+            _tags = TagsContext.FindOrCreate( data.tags );
+            if( data.subKey != null )
+            {
+                SubKey = keyInfos[data.subKey];
+                SubKey.SuperKey = this;
+            }
+        }
+
+        /// <summary>
+        /// Exports data for "serialization".
+        /// </summary>
+        /// <returns>The raw data.</returns>
+        internal (string name, string description, string secret, bool isRequired, string tags, string subKey) GetData()
+        {
+            return (Name, _description, _secret, _isRequired, _tags.ToString(), SubKey?.Name );
+        }
+
         SecretKeyInfo( string name, Func<string, string> descriptionBuilder )
         {
             Name = name ?? throw new ArgumentNullException( nameof( name ) );
@@ -160,7 +188,7 @@ namespace CK.Env
         /// Gets the <see cref="Name"/>, <see cref="Description"/>, <see cref="IsRequired"/> and <see cref="IsSecretAvailable"/> status.
         /// </summary>
         /// <returns>A readable string.</returns>
-        public override string ToString() => $"Secret '{Name}': {_description} [{(IsRequired ? "Required" : "Optional")},{(IsSecretAvailable ? "Available" : "Unavailable")}]";
+        public override string ToString() => $"Secret '{Name}' [{(IsRequired ? "Required" : "Optional")},{(IsSecretAvailable ? "Available" : "Unavailable")}]: {_description}";
 
     }
 }

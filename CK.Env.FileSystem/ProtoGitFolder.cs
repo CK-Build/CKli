@@ -63,26 +63,9 @@ namespace CK.Env
             if( KnownGitProvider != KnownGitProvider.Unknown )
             {
                 ReadPATKeyName = GetPATName();
-                var read = secretKeyStore.DeclareSecretKey( ReadPATKeyName, desc =>
-                {
-                    if( desc == null ) desc = $"Used to read/clone solutions hosted by '{KnownGitProvider}':";
-                    if( !desc.Contains( url ) )
-                    {
-                        desc += Environment.NewLine + url; 
-                    }
-                    return desc;
-                }, isRequired: !IsPublic );
-
+                var read = secretKeyStore.DeclareSecretKey( ReadPATKeyName, desc => desc ?? $"Used to read/clone solutions hosted by '{KnownGitProvider}':", isRequired: !IsPublic );
                 WritePATKeyName = GetPATName( "_WRITE_PAT" );
-                secretKeyStore.DeclareSecretKey( WritePATKeyName, desc =>
-                {
-                    if( desc == null ) desc = $"Used to push solutions hosted by '{KnownGitProvider}':";
-                    if( !desc.Contains( url ) )
-                    {
-                        desc += Environment.NewLine + url;
-                    }
-                    return desc;
-                }, subKey: read );
+                secretKeyStore.DeclareSecretKey( WritePATKeyName, desc => desc ?? $"Used to push solutions hosted by '{KnownGitProvider}'. This is required to publish builds.", subKey: read );
             }
         }
 

@@ -1,3 +1,4 @@
+using CK.Env.NPM;
 using CK.Env.Tests;
 using CSemVer;
 using FluentAssertions;

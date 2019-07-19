@@ -29,11 +29,11 @@ namespace CK.Env
         protected IWorldLocalMapping LocalWorldRootPathMapping { get; }
 
         /// <summary>
-        /// Returns all the available worlds in this store ordered by world name.
+        /// Returns all the available worlds with their potential local path (ordered by <see cref="IWorldName.FullName"/>).
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <returns>The world list.</returns>
-        public abstract IReadOnlyList<IWorldName> ReadWorlds( IActivityMonitor m );
+        /// <returns>The world list. Can return null on error.</returns>
+        public abstract IReadOnlyList<IRootedWorldName> ReadWorlds( IActivityMonitor m );
 
         /// <summary>
         /// Creates a new world in this store or returns null if the world already exists.
@@ -43,7 +43,7 @@ namespace CK.Env
         /// <param name="parallelName">The long-term support key. See <see cref="IWorldName"/>.</param>
         /// <param name="content">The initial content. Must not be null.</param>
         /// <returns>The new world or null on error.</returns>
-        public IWorldName CreateNew( IActivityMonitor m, string name, string parallelName, XDocument content )
+        public IRootedWorldName CreateNew( IActivityMonitor m, string name, string parallelName, XDocument content )
         {
             if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
             if( content == null ) throw new ArgumentNullException( nameof( content ) );
@@ -59,7 +59,7 @@ namespace CK.Env
         /// <param name="parallelName">The long-term support key. See <see cref="IWorldName"/>.</param>
         /// <param name="content">The initial content.</param>
         /// <returns>The new world or null on error.</returns>
-        protected abstract IWorldName DoCreateNew( IActivityMonitor m, string name, string parallelName, XDocument content );
+        protected abstract IRootedWorldName DoCreateNew( IActivityMonitor m, string name, string parallelName, XDocument content );
 
 
         /// <summary>

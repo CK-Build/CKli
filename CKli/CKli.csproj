@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.1</TargetFramework>
@@ -25,7 +25,6 @@
     <ProjectReference Include="..\CK.Env.Plugin.SolutionDriver\CK.Env.Plugin.SolutionDriver.csproj" />
     <ProjectReference Include="..\CK.Env.SolutionSpec\CK.Env.SolutionSpec.csproj" />
     <ProjectReference Include="..\CK.Env.World\CK.Env.World.csproj" />
-    <ProjectReference Include="..\CK.Env.XTyping\CK.Env.XTyping.csproj" />
     <ProjectReference Include="..\CK.SimpleKeyVault\CK.SimpleKeyVault.csproj" />
   </ItemGroup>
   

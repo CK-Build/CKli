@@ -26,6 +26,9 @@ namespace CK.Env
         readonly RemotesFolder _remoteBranchesFolder;
         bool _branchRefreshed;
 
+        /// <summary>
+        /// Gets the <see cref="ProtoGitFolder"/>.
+        /// </summary>
         public ProtoGitFolder ProtoGitFolder { get; }
 
         internal static GitFolder EnsureGitFolderCorrectSetup( IActivityMonitor m, ProtoGitFolder data )

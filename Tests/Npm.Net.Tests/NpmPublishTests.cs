@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Env.NPM;
 using CK.Env.Tests;
 using FluentAssertions;
 using Newtonsoft.Json.Linq;

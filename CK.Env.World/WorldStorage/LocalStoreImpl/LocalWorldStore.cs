@@ -41,7 +41,7 @@ namespace CK.Env
             throw new NotImplementedException();
         }
 
-        protected override IWorldName DoCreateNew( IActivityMonitor m, string name, string parallelName, XDocument content )
+        protected override IRootedWorldName DoCreateNew( IActivityMonitor m, string name, string parallelName, XDocument content )
         {
             Debug.Assert( !String.IsNullOrWhiteSpace( name ) );
             Debug.Assert( content != null );
@@ -63,7 +63,7 @@ namespace CK.Env
             return null;
         }
 
-        public override IReadOnlyList<IWorldName> ReadWorlds( IActivityMonitor m )
+        public override IReadOnlyList<IRootedWorldName> ReadWorlds( IActivityMonitor m )
         {
             return Directory.GetFiles( _directoryPath, "*.World.xml" )
                                 .Select( p => LocalWorldName.Parse( m, p, LocalWorldRootPathMapping ) )

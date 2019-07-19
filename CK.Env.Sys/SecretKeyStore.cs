@@ -14,6 +14,39 @@ namespace CK.Env
         readonly List<SecretKeyInfo> _orderedInfos;
 
         /// <summary>
+        /// Opaque capture of a <see cref="SecretKeyStore"/> content.
+        /// </summary>
+        public struct Snapshot
+        {
+            readonly (string name, string description, string secret, bool isRequired, string tags, string subKey)[] _data;
+
+            internal Snapshot( SecretKeyStore store )
+            {
+                _data = new (string name, string description, string secret, bool isRequired, string tags, string subKey)[store._orderedInfos.Count];
+                for( int i = 0; i < store._orderedInfos.Count; i++ )
+                {
+                    _data[i] = store._orderedInfos[i].GetData();
+                }
+            }
+
+            /// <summary>
+            /// Restores this snapshot content into the <paramref name="store"/>.
+            /// </summary>
+            /// <param name="store">The target store.</param>
+            public void RestoreTo( SecretKeyStore store )
+            {
+                store.Clear();
+                int max = _data.Length - 1;
+                for( int i = 0; i <= max; i++ )
+                {
+                    var s = new SecretKeyInfo( _data[max - i], store._keyInfos );
+                    store._orderedInfos.Add( s );
+                    store._keyInfos.Add( s.Name, s );
+                }
+            }
+        }
+
+        /// <summary>
         /// Initializes a new empty key store.
         /// </summary>
         public SecretKeyStore()
@@ -40,6 +73,12 @@ namespace CK.Env
         /// <param name="name">The name of the key.</param>
         /// <returns>The info or null.</returns>
         public SecretKeyInfo Find( string name ) => _keyInfos.GetValueWithDefault( name, null );
+
+        /// <summary>
+        /// Creates a new <see cref="Snapshot"/>.
+        /// </summary>
+        /// <returns>The snapshot.</returns>
+        public Snapshot CreateSnapshot() => new Snapshot( this );
 
         /// <summary>
         /// Clears this store.
