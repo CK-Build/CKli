@@ -104,7 +104,7 @@ namespace CKli
         public bool Open()
         {
             _localWorldRootPathMapping.Load();
-            for( ; ; )
+            for(; ; )
             {
                 Close();
                 var (LocalPath, World) = ChooseWorld( _monitor );
@@ -162,16 +162,27 @@ namespace CKli
                     }
                     if( vault.OpenKeyVault( m, pass ) )
                     {
-                        foreach( var required in vault.KeyStore.Infos.Where( i => i.IsRequired ) )
+                        foreach( var vaultKey in vault.KeyStore.Infos )
                         {
-                            Console.Write( $"Required secret '{required}' (empty string to cancel): " );
+                            if( vaultKey.IsSecretAvailable )
+                            {
+                                m.Info( $"Secret '{vaultKey.Name}' is available. We don't need to ask it." );
+                                continue;
+                            }
+                            if( !vaultKey.FinalSubKey.IsRequired )
+                            {
+                                m.Info( $"Secret '{vaultKey.Name}' or its SubKeys are not required. We won't ask it now." );
+                                continue;
+                            }
+
+                            Console.Write( $"Required secret '{vaultKey}' (empty string to cancel): " );
                             string secret = Console.ReadLine();
                             if( secret.Length == 0 )
                             {
                                 m.Warn( "No secret entered. Canceled opening." );
                                 return false;
                             }
-                            required.SetSecret( secret );
+                            vaultKey.SetSecret( secret );
                         }
                     }
                 }
