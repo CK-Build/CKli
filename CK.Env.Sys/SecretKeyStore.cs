@@ -98,7 +98,7 @@ namespace CK.Env
         /// <param name="descriptionBuilder">Description builder function.</param>
         /// <param name="isRequired">True if this key is required to initialize a World.</param>
         /// <returns>The secret key info.</returns>
-        public SecretKeyInfo DeclareSecretKey( string name, Func<string, string> descriptionBuilder, bool isRequired = false )
+        public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo, string> descriptionBuilder, bool isRequired = false )
         {
             if( !_keyInfos.TryGetValue( name, out var info ) )
             {
@@ -119,7 +119,7 @@ namespace CK.Env
         /// <param name="descriptionBuilder">Description builder function.</param>
         /// <param name="subKey">The sub key.</param>
         /// <returns>The secret key info.</returns>
-        public SecretKeyInfo DeclareSecretKey( string name, Func<string, string> descriptionBuilder, SecretKeyInfo subKey )
+        public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo, string> descriptionBuilder, SecretKeyInfo subKey )
         {
             if( !_keyInfos.TryGetValue( name, out var info ) )
             {

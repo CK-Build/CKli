@@ -41,7 +41,7 @@ namespace CK.Env
             throw new NotImplementedException();
         }
 
-        protected override IRootedWorldName DoCreateNew( IActivityMonitor m, string name, string parallelName, XDocument content )
+        protected override LocalWorldName DoCreateNew( IActivityMonitor m, string name, string parallelName, XDocument content )
         {
             Debug.Assert( !String.IsNullOrWhiteSpace( name ) );
             Debug.Assert( content != null );
@@ -51,7 +51,7 @@ namespace CK.Env
             var path = _directoryPath.AppendPart( wName + ".World.xml" );
             if( !File.Exists( path ) )
             {
-                var w = new LocalWorldName( path, name, parallelName, LocalWorldRootPathMapping );
+                var w = new LocalWorldName( path, name, parallelName, WorldLocalMapping );
                 if( !WriteWorldDescription( m, w, content ) )
                 {
                     m.Error( $"Unable to create {wName} world." );
@@ -66,7 +66,7 @@ namespace CK.Env
         public override IReadOnlyList<IRootedWorldName> ReadWorlds( IActivityMonitor m )
         {
             return Directory.GetFiles( _directoryPath, "*.World.xml" )
-                                .Select( p => LocalWorldName.Parse( m, p, LocalWorldRootPathMapping ) )
+                                .Select( p => LocalWorldName.TryParse( m, p, WorldLocalMapping ) )
                                 .Where( w => w != null ).OrderBy( p => p.FullName )
                                 .ToList();
         }

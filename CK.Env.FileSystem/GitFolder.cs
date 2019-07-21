@@ -280,7 +280,7 @@ namespace CK.Env
                         IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification ).ToArray();
                         Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
                         {
-                            CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m, url ),
+                            CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m ),
                             TagFetchMode = TagFetchMode.All
                         }, $"Fetching remote '{remote.Name}'." );
                     }
@@ -379,7 +379,7 @@ namespace CK.Env
                 FetchOptions = new FetchOptions
                 {
                     TagFetchMode = TagFetchMode.All,
-                    CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m, url )
+                    CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m )
                 },
                 MergeOptions = new MergeOptions
                 {
@@ -516,7 +516,7 @@ namespace CK.Env
                     Remote remote = _git.Network.Remotes["origin"];
                     var options = new PushOptions()
                     {
-                        CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m, url )
+                        CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m )
                     };
 
                     var exists = _git.Tags[sv];
@@ -574,7 +574,7 @@ namespace CK.Env
 
         public int? AheadOriginCommitCount => _git.Head.TrackingDetails.AheadBy;
 
-        public string OriginUrl => ProtoGitFolder.OriginUrl;
+        public Uri OriginUrl => ProtoGitFolder.OriginUrl;
 
         
 
@@ -789,7 +789,7 @@ namespace CK.Env
                     }
                     var options = new PushOptions()
                     {
-                        CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m, url ),
+                        CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m ),
                         OnPushStatusError = ( e ) =>
                         {
                             throw new InvalidOperationException( $"Error while pushing ref {e.Reference} => {e.Message}" );

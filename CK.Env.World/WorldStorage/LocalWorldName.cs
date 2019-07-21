@@ -7,11 +7,12 @@ using System.IO;
 namespace CK.Env
 {
     /// <summary>
-    /// Local world name
+    /// Local world name is a <see cref="IRootedWorldName"/> defined by its
+    /// definition file path (<see cref="XmlDescriptionFilePath"/>).
     /// </summary>
     public class LocalWorldName : WorldName, IRootedWorldName
     {
-        internal LocalWorldName( string xmlDescriptionFilePath, string worldName, string parallelName, IWorldLocalMapping localMap )
+        internal LocalWorldName( NormalizedPath xmlDescriptionFilePath, string worldName, string parallelName, IWorldLocalMapping localMap )
             : base( worldName, parallelName )
         {
             if( String.IsNullOrWhiteSpace( xmlDescriptionFilePath ) ) throw new ArgumentNullException( nameof( xmlDescriptionFilePath ) );
@@ -20,35 +21,46 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the local file full path.
+        /// Gets the local definition file full path.
         /// </summary>
-        public string XmlDescriptionFilePath { get; }
+        public NormalizedPath XmlDescriptionFilePath { get; }
 
         /// <summary>
         /// Gets the local world root directory path.
-        /// This is <see cref="NormalizedPath.IsEmptyPath"/> if the world is not mapped by the <see cref="IWorldLocalMapping"/>.
+        /// This is <see cref="NormalizedPath.IsEmptyPath"/> if the world is not mapped.
         /// </summary>
         public NormalizedPath Root { get; }
 
-        internal static LocalWorldName Parse( IActivityMonitor m, string filePath, IWorldLocalMapping localMap )
+        /// <summary>
+        /// Tries to parse a xml World definition file name.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="path">The file path.</param>
+        /// <param name="localMap">The mapper to use.</param>
+        /// <returns>The name or null on error.</returns>
+        public static LocalWorldName TryParse( IActivityMonitor m, NormalizedPath path, IWorldLocalMapping localMap )
         {
-            Debug.Assert( filePath.EndsWith( ".World.xml" ) );
+            if( path.IsEmptyPath || !path.LastPart.EndsWith( ".World.xml", StringComparison.OrdinalIgnoreCase ) )
+            {
+                m.Error( $"Path must end with '.World.xml': '{path}'" );
+                return null;
+            }
             try
             {
-                var fName = Path.GetFileName( filePath );
+                var fName = path.LastPart;
                 Debug.Assert( ".World.xml".Length == 10 );
                 fName = fName.Substring( 0, fName.Length - 10 );
                 int idx = fName.IndexOf( '[' );
                 if( idx < 0 )
                 {
-                    return new LocalWorldName( filePath, fName, null, localMap );
+                    return new LocalWorldName( path, fName, null, localMap );
                 }
                 int paraLength = fName.IndexOf( ']' ) - idx - 1;
-                return new LocalWorldName( filePath, fName.Substring( 0, idx ), fName.Substring( idx + 1, paraLength ), localMap );
+                return new LocalWorldName( path, fName.Substring( 0, idx ), fName.Substring( idx + 1, paraLength ), localMap );
             }
             catch( Exception ex )
             {
-                m.Error( $"While parsing file path: {filePath}.", ex );
+                m.Error( $"While parsing file path: {path}.", ex );
                 return null;
             }
         }

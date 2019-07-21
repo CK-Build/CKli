@@ -21,13 +21,13 @@ namespace CK.Env
         /// </summary>
         public static CKTraitContext TagsContext = new CKTraitContext( "SecretCategory", '|' );
 
-        internal SecretKeyInfo( string name, Func<string, string> descriptionBuilder, bool isRequired )
+        internal SecretKeyInfo( string name, Func<SecretKeyInfo, string> descriptionBuilder, bool isRequired )
             : this( name, descriptionBuilder )
         {
             _isRequired = isRequired;
         }
 
-        internal SecretKeyInfo( string name, Func<string, string> descriptionBuilder, SecretKeyInfo subKey, IReadOnlyDictionary<string, SecretKeyInfo> keyInfos )
+        internal SecretKeyInfo( string name, Func<SecretKeyInfo, string> descriptionBuilder, SecretKeyInfo subKey, IReadOnlyDictionary<string, SecretKeyInfo> keyInfos )
             : this( name, descriptionBuilder )
         {
             SubKey = subKey ?? throw new ArgumentNullException( nameof( subKey ) );
@@ -70,20 +70,20 @@ namespace CK.Env
             return (Name, _description, _secret, _isRequired, _tags.ToString(), SubKey?.Name );
         }
 
-        SecretKeyInfo( string name, Func<string, string> descriptionBuilder )
+        SecretKeyInfo( string name, Func<SecretKeyInfo, string> descriptionBuilder )
         {
             Name = name ?? throw new ArgumentNullException( nameof( name ) );
             SetDescription( descriptionBuilder );
         }
 
-        internal void Reconfigure( Func<string, string> descriptionBuilder, bool isRequired )
+        internal void Reconfigure( Func<SecretKeyInfo, string> descriptionBuilder, bool isRequired )
         {
             SetDescription( descriptionBuilder );
             _isRequired |= isRequired;
             CheckSecretPropagation();
         }
 
-        internal void Reconfigure( Func<string, string> descriptionBuilder, SecretKeyInfo subKey )
+        internal void Reconfigure( Func<SecretKeyInfo, string> descriptionBuilder, SecretKeyInfo subKey )
         {
             SetDescription( descriptionBuilder );
             if( subKey != SubKey )
@@ -93,10 +93,10 @@ namespace CK.Env
             CheckSecretPropagation();
         }
 
-        void SetDescription( Func<string, string> descriptionBuilder )
+        void SetDescription( Func<SecretKeyInfo, string> descriptionBuilder )
         {
             if( descriptionBuilder == null ) throw new ArgumentNullException( nameof( descriptionBuilder ) );
-            _description = descriptionBuilder( _description );
+            _description = descriptionBuilder( _description != null ? this : null );
             if( String.IsNullOrWhiteSpace( _description ) )
             {
                 throw new InvalidOperationException( $"Description must not be null or empty." );

@@ -17,16 +17,16 @@ namespace CK.Env
         /// <summary>
         /// Initializes a new <see cref="WorldStore"/>.
         /// </summary>
-        /// <param name="localWorldRootPathMapping">Required path mapper.</param>
-        public WorldStore( IWorldLocalMapping localWorldRootPathMapping )
+        /// <param name="worldLocalMapping">Required path mapper.</param>
+        public WorldStore( IWorldLocalMapping worldLocalMapping )
         {
-            LocalWorldRootPathMapping = localWorldRootPathMapping ?? throw new ArgumentNullException( nameof( localWorldRootPathMapping ) );
+            WorldLocalMapping = worldLocalMapping ?? throw new ArgumentNullException( nameof( worldLocalMapping ) );
         }
 
         /// <summary>
         /// Gets the mapper.
         /// </summary>
-        protected IWorldLocalMapping LocalWorldRootPathMapping { get; }
+        protected IWorldLocalMapping WorldLocalMapping { get; }
 
         /// <summary>
         /// Returns all the available worlds with their potential local path (ordered by <see cref="IWorldName.FullName"/>).
@@ -59,7 +59,7 @@ namespace CK.Env
         /// <param name="parallelName">The long-term support key. See <see cref="IWorldName"/>.</param>
         /// <param name="content">The initial content.</param>
         /// <returns>The new world or null on error.</returns>
-        protected abstract IRootedWorldName DoCreateNew( IActivityMonitor m, string name, string parallelName, XDocument content );
+        protected abstract LocalWorldName DoCreateNew( IActivityMonitor m, string name, string parallelName, XDocument content );
 
 
         /// <summary>
@@ -170,7 +170,7 @@ namespace CK.Env
         /// <returns>The path to use to read/write the local state.</returns>
         protected virtual NormalizedPath ToLocalStateFilePath( IWorldName w )
         {
-            var p = LocalWorldRootPathMapping.GetRootPath( w );
+            var p = WorldLocalMapping.GetRootPath( w );
             return p.AppendPart( w.FullName + ".World.State.xml" );
         }
     }

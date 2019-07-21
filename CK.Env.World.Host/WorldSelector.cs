@@ -11,10 +11,8 @@ namespace CK.Env
     /// <summary>
     /// Exposes a <see cref="CurrentWorld"/> among the ones in a <see cref="Store"/>.
     /// </summary>
-    public class WorldSelector : ICommandMethodsProvider
+    public sealed class WorldSelector : ICommandMethodsProvider
     {
-        static readonly NormalizedPath _commandPath = "Universe";
-
         readonly XTypedFactory _factory;
         readonly SecretKeyStore _userKeyStore;
         readonly CommandRegister _command;
@@ -53,7 +51,7 @@ namespace CK.Env
         /// </summary>
         public World CurrentWorld { get; private set; }
 
-        NormalizedPath ICommandMethodsProvider.CommandProviderName => _commandPath;
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => UserHost.HomeCommandPath;
 
         /// <summary>
         /// Tries to open a world in <see cref="Store"/> by its full name (or its index).

@@ -27,6 +27,8 @@ namespace CK.Env
         /// Initializes a new <see cref="FileSystem"/> on a physical root path.
         /// </summary>
         /// <param name="rootPath">Physical root path.</param>
+        /// <param name="commandRegister">Command register.</param>
+        /// <param name="sp">Optional base services.</param>
         public FileSystem(
             string rootPath,
             CommandRegister commandRegister,
@@ -78,7 +80,7 @@ namespace CK.Env
             ProtoGitFolder g = _protoGits.FirstOrDefault( f => f.FolderPath == folderPath );
             if( g == null )
             {
-                g = new ProtoGitFolder( urlRepository, isPublic, folderPath, world, _secretKeyStore, this, _commandRegister );
+                g = new ProtoGitFolder( new Uri( urlRepository ), isPublic, folderPath, world, _secretKeyStore, this, _commandRegister );
                 _protoGits.Add( g );
             }
             return g;

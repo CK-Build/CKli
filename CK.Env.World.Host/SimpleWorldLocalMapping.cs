@@ -1,6 +1,7 @@
 using CK.Text;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -13,24 +14,23 @@ namespace CK.Env
     public class SimpleWorldLocalMapping : IWorldLocalMapping
     {
         readonly NormalizedPath _filePath;
-        Dictionary<string, NormalizedPath> _map;
+        readonly Dictionary<string, NormalizedPath> _map;
 
-        public SimpleWorldLocalMapping( string filePath )
+        public SimpleWorldLocalMapping( in NormalizedPath filePath )
         {
             _filePath = filePath;
-            Load();
-        }
-
-        protected void Load()
-        {
-            _map = File.Exists( _filePath )
-                    ? File.ReadAllLines( _filePath )
+            _map = new Dictionary<string, NormalizedPath>( StringComparer.OrdinalIgnoreCase );
+            if( File.Exists( _filePath ) )
+            {
+                foreach( var kv in File.ReadAllLines( _filePath )
                         .Select( line => line.Split( '>' ) )
                         .Where( p => p.Length == 2 )
                         .Select( p => (p[0].Trim(), p[1].Trim()) )
-                        .Where( p => p.Item1.Length > 0 && p.Item2.Length > 0 )
-                        .ToDictionary( p => p.Item1, p => new NormalizedPath( p.Item2 ) )
-                    : new Dictionary<string, NormalizedPath>();
+                        .Where( p => p.Item1.Length > 0 && p.Item2.Length > 0 ) )
+                {
+                    _map[kv.Item1] = kv.Item2;
+                }
+            }
         }
 
         protected void Save()
@@ -66,6 +66,14 @@ namespace CK.Env
                 File.WriteAllText( p.AppendPart( "CKli-World.htm" ), "<html></html>" );
             }
             return p;
+        }
+
+        internal bool IsMapped( string worldFullName ) => _map.ContainsKey( worldFullName );
+
+        internal void SetMap( string worldFullName, NormalizedPath mappedPath )
+        {
+            Debug.Assert( mappedPath.IsRooted );
+            _map[worldFullName] = mappedPath;
         }
     }
 
