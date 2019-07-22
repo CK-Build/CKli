@@ -14,7 +14,7 @@
   <NuGetClient />
   <NPMClient />
   <CKSetupClient />
-  <WorldState />
+  <WorldState IsPublic="False" />
 
   <Artifacts>
     <SourceFeeds>
@@ -24,7 +24,9 @@
       <Feed Type="NuGet" Name="Open-Source-CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/CKEnvTest3/nuget/v3/index.json">
         <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
       </Feed>
-      <Feed Type="NuGet" Name="Code-CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/CKEnvTest3/nuget/v3/index.json" />
+      <Feed Type="NuGet" Name="Code-CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/CKEnvTest3/nuget/v3/index.json">
+        <Credentials UserName="SignatureCode" PasswordSecretKeyName="SIGNATURE_CODE_READ_PAT" />
+      </Feed>
       <Feed Type="NPM" Scope="@signature" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/npm/registry/" >
         <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
       </Feed>
@@ -51,15 +53,13 @@
       <add Name="Invenietis - CI" />
     </RemoveNuGetSourceNames>
     <ArtifactTargets>
-      <add Name="NPMAzure:@signature-code->Signature-Code-CKEnvTest3" />
-      <add Name="NuGetAzure:Signature-Code-CKEnvTest3" />
+      <add Name="NPM:Azure:@signature-code->Signature-Code-CKEnvTest3" />
+      <add Name="NuGet:Azure:Signature-Code-CKEnvTest3" />
     </ArtifactTargets>
     <ArtifactSources>
       <add Name="NuGet:Signature-OpenSource"/>
       <add Name="NuGet:Open-Source-CKEnvTest3"/>
       <add Name="NuGet:Code-CKEnvTest3"/>
-      <add Name="NuGet:Signature-OpenSource"/>
-      <add Name="NuGet:Signature-OpenSource"/>
       <add Name="NPM:@signature"/>
       <add Name="NPM:@signature-code"/>
     </ArtifactSources>

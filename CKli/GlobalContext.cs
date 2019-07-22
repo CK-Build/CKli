@@ -169,9 +169,9 @@ namespace CKli
                                 m.Info( $"Secret '{vaultKey.Name}' is available. We don't need to ask it." );
                                 continue;
                             }
-                            if( !vaultKey.FinalSubKey.IsRequired )
+                            if( !vaultKey.FinalSubKey.IsRequired && !vaultKey.IsRequired)
                             {
-                                m.Info( $"Secret '{vaultKey.Name}' or its SubKeys are not required. We won't ask it now." );
+                                m.Info( $"Secret '{vaultKey.Name}' and its SubKeys are not required. We won't ask it now." );
                                 continue;
                             }
 
