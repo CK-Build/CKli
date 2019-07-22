@@ -60,7 +60,11 @@ namespace CK.Env
                 gitFolder._git.Dispose();
                 throw new InvalidOperationException( $"The repository 'origin' url (ie. '{remoteUrl}') is different than the repository url specified in the world: {data.OriginUrl}" );
             }
-
+            if( gitFolder._git.Branches.Count() == 0 )
+            {
+                gitFolder._git.Dispose();
+                throw new InvalidDataException( "This git repository does not contain any branches." );
+            }
             return gitFolder;
         }
 
@@ -68,12 +72,6 @@ namespace CK.Env
         {
             ProtoGitFolder = data;
             _git = new Repository( FullPhysicalPath );
-            if( _git.Branches.Count() == 0 )
-            {
-                _git.Dispose();
-                throw new InvalidDataException( "This git repository does not contain any branches." );
-            }
-
             _headFolder = new HeadFolder( this );
             _branchesFolder = new BranchesFolder( this, "branches", isRemote: false );
             _remoteBranchesFolder = new RemotesFolder( this );

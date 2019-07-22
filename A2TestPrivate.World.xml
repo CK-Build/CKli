@@ -16,29 +16,35 @@
   <CKSetupClient />
   <WorldState />
 
-  <ArtifactRepositories>
-    
-    <Repository Type="NPMAzure" Organization="Signature-Code" FeedName="CKEnvTest3"
+  <Artifacts>
+    <SourceFeeds>
+      <Feed Type="NuGet" Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json">
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
+      </Feed>
+      <Feed Type="NuGet" Name="Open-Source-CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/CKEnvTest3/nuget/v3/index.json">
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
+      </Feed>
+      <Feed Type="NuGet" Name="Code-CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/CKEnvTest3/nuget/v3/index.json" />
+      <Feed Type="NPM" Scope="@signature" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/npm/registry/" >
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
+      </Feed>
+      <Feed Type="NPM" Scope="@signature-code" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/Default/npm/registry/" >
+        <Credentials UserName="SignatureCode" PasswordSecretKeyName="SIGNATURE_CODE_READ_PAT" />
+      </Feed>
+    </SourceFeeds>
+    <TargetRepositories>
+      <Repository Type="NPMAzure" Organization="Signature-Code" FeedName="CKEnvTest3"
                 NPMScope="@signature-code"
-                CheckName="NPMAzure:@signature-code->Signature-Code-CKEnvTest3"
+                CheckName="NPM:Azure:@signature-code->Signature-Code-CKEnvTest3"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_CODE_PAT" />
-    
-    <Repository Type="NuGetAzure" Organization="Signature-Code" FeedName="CKEnvTest3"
-                  CheckName="NuGetAzure:Signature-Code-CKEnvTest3"
-                  CheckSecretKeyName="AZURE_FEED_SIGNATURE_CODE_PAT" />
-    
-  </ArtifactRepositories>
+
+      <Repository Type="NuGetAzure" Organization="Signature-Code" FeedName="CKEnvTest3"
+                    CheckName="NuGet:Azure:Signature-Code-CKEnvTest3"
+                    CheckSecretKeyName="AZURE_FEED_SIGNATURE_CODE_PAT" />
+    </TargetRepositories>
+  </Artifacts>
 
   <SharedSolutionSpec>
-    <NuGetSources>
-      <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json">
-        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
-      </add>
-      <add Name="Open-Source-CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/CKEnvTest3/nuget/v3/index.json">
-        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
-      </add>
-      <add Name="Code-CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/CKEnvTest3/nuget/v3/index.json" />
-    </NuGetSources>
     <RemoveNuGetSourceNames>
       <add Name="Invenietis - Release" />
       <add Name="Invenietis - Preview" />
@@ -48,14 +54,15 @@
       <add Name="NPMAzure:@signature-code->Signature-Code-CKEnvTest3" />
       <add Name="NuGetAzure:Signature-Code-CKEnvTest3" />
     </ArtifactTargets>
-    <NPMSources>
-      <add Scope="@signature" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/npm/registry/" >
-        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
-      </add>
-      <add Scope="@signature-code" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/Default/npm/registry/" >
-        <Credentials UserName="SignatureCode" PasswordSecretKeyName="SIGNATURE_CODE_READ_PAT" />
-      </add>
-    </NPMSources>
+    <ArtifactSources>
+      <add Name="NuGet:Signature-OpenSource"/>
+      <add Name="NuGet:Open-Source-CKEnvTest3"/>
+      <add Name="NuGet:Code-CKEnvTest3"/>
+      <add Name="NuGet:Signature-OpenSource"/>
+      <add Name="NuGet:Signature-OpenSource"/>
+      <add Name="NPM:@signature"/>
+      <add Name="NPM:@signature-code"/>
+    </ArtifactSources>
   </SharedSolutionSpec>
 
   <Folder Name="Projects">

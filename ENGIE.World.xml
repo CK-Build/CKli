@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ENGIE-WORLD>
+<Engie.World>
 
   <LoadLibrary Name="CK.Env.Plugin.Basics"/>
   <LoadLibrary Name="CK.Env.Plugin.SolutionDriver" />
@@ -281,4 +281,4 @@
       </Branch>
     </GitFolder>
   </Folder>
-</ENGIE-WORLD>
+</Engie.World>
