@@ -71,7 +71,7 @@ namespace CK.Env.Plugin
                             .Select( s => s.Credentials.PasswordOrSecretKeyName );
             foreach( var c in creds )
             {
-                _secretStore.DeclareSecretKey( c, desc => desc ?? "Needed to configure NuGet.config file." );
+                _secretStore.DeclareSecretKey( c, current => current?.Description ?? "Needed to configure NuGet.config file." );
             }
         }
 

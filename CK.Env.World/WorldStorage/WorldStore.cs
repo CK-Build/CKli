@@ -61,7 +61,6 @@ namespace CK.Env
         /// <returns>The new world or null on error.</returns>
         protected abstract LocalWorldName DoCreateNew( IActivityMonitor m, string name, string parallelName, XDocument content );
 
-
         /// <summary>
         /// Gets the world description of one world.
         /// </summary>

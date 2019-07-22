@@ -31,47 +31,10 @@ namespace CK.Env
         /// </summary>
         public ProtoGitFolder ProtoGitFolder { get; }
 
-        internal static GitFolder EnsureGitFolderCorrectSetup( IActivityMonitor m, ProtoGitFolder data )
+        GitFolder( Repository r, ProtoGitFolder data )
         {
-            GitFolder gitFolder = new GitFolder( data );
-            if( !gitFolder._git.Branches.Any( p => p.Commits.Any() ) )
-            {
-                //Sometimes we fail while cloning the repo.
-                //The issue is that the repo is incorrectly intialized: the commits are not fetched
-                m.Warn( "Repo does not contain any commits, probably a bad clone." );
-                if( !gitFolder.FetchBranches( m ) ) throw new InvalidOperationException( "Error while fetching." );
-                if( !gitFolder._git.Branches.Any( p => p.Commits.Any() ) ) throw new InvalidOperationException( "Empty git repository." );
-            }
-            //Now we know that the repository have at least one commit. So it have a tracking branch
-            //This branch is maybe not here locally.
-            if( !gitFolder._git.Head.Commits.Any() )
-            {
-                //In a case of a failed repository clone, the head is on a local master branch with no commits.
-                if( !gitFolder.Checkout( m, data.World.DevelopBranchName ).Success ) throw new InvalidOperationException( $"Cannot checkout {data.World.DevelopBranchName}." );
-                if( !gitFolder._git.Head.Commits.Any() )
-                {
-                    throw new InvalidOperationException( $"The {data.World.DevelopBranchName} branch have no commit." );
-                }
-            }
-
-            string remoteUrl;
-            if( !StringComparer.OrdinalIgnoreCase.Equals( (remoteUrl = gitFolder._git.Network.Remotes["origin"]?.Url), data.OriginUrl ) )
-            {
-                gitFolder._git.Dispose();
-                throw new InvalidOperationException( $"The repository 'origin' url (ie. '{remoteUrl}') is different than the repository url specified in the world: {data.OriginUrl}" );
-            }
-            if( gitFolder._git.Branches.Count() == 0 )
-            {
-                gitFolder._git.Dispose();
-                throw new InvalidDataException( "This git repository does not contain any branches." );
-            }
-            return gitFolder;
-        }
-
-        GitFolder( ProtoGitFolder data )
-        {
+            _git = r;
             ProtoGitFolder = data;
-            _git = new Repository( FullPhysicalPath );
             _headFolder = new HeadFolder( this );
             _branchesFolder = new BranchesFolder( this, "branches", isRemote: false );
             _remoteBranchesFolder = new RemotesFolder( this );
@@ -80,6 +43,55 @@ namespace CK.Env
             ServiceContainer.Add( this );
             PluginManager = new GitPluginManager( data.PluginRegistry, ServiceContainer, data.CommandRegister, data.World.DevelopBranchName );
             data.CommandRegister.Register( this );
+        }
+
+        internal static GitFolder Create( IActivityMonitor m, Repository r, ProtoGitFolder data )
+        {
+            // 1 - Checks everything we can based on Repository and ProtoGitFolder.
+            var g = new GitFolder( r, data );
+            // 2 - Now checks everything that requires an actual GitFolder.
+            //@Nico... Is this REALLY required?
+            // Upt to me, everything should be done above, BEFORE creating the instance...
+            if( !g.CheckValid( m ) )
+            {
+                g.Dispose();
+                g = null;
+            }
+            return g;
+        }
+
+        bool CheckValid( IActivityMonitor m )
+        { 
+            if( !_git.Branches.Any( p => p.Commits.Any() ) )
+            {
+                // Sometimes we fail while cloning the repo.
+                // The issue is that the repo is incorrectly intialized: the commits are not fetched.
+                m.Warn( "Repo does not contain any commits, probably a bad clone." );
+                if( !FetchBranches( m ) ) return false;
+                if( !_git.Branches.Any( p => p.Commits.Any() ) )
+                {
+                    m.Error( "The repository is empty." );
+                    return false;
+                }
+            }
+            // Now we know that the repository have at least one commit. So it has a tracking branch
+            // This branch may not be here locally.
+            if( !_git.Head.Commits.Any() )
+            {
+                // In a case of a failed repository clone, the head is on a local master branch with no commits.
+                if( !Checkout( m, World.DevelopBranchName ).Success ) return false;
+                if( !_git.Head.Commits.Any() )
+                {
+                    m.Error( $"The {World.DevelopBranchName} branch have no commit." );
+                    return false;
+                }
+            }
+            if( _git.Branches.Count() == 0 )
+            {
+                m.Error( "This git repository does not contain any branches." );
+                return false;
+            }
+            return true;
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => SubPath;

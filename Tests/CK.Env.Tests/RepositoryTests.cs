@@ -39,7 +39,7 @@ namespace CK.Env.Tests
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
                 var proto = fs.FindOrCreateProtoGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
-                fs.EnsureGitFolder( TestHelper.Monitor, proto );
+                fs.EnsureGitFolder( TestHelper.Monitor, proto ).Should().NotBeNull();
                 CheckRoot( fs.GetFileInfo( "TestGitRepository" ) );
                 CheckRoot( fs.GetFileInfo( "/TestGitRepository" ) );
                 CheckRoot( fs.GetFileInfo( "TestGitRepository/" ) );

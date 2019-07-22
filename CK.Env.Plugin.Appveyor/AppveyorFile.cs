@@ -21,7 +21,7 @@ namespace CK.Env.Plugin
             _driver = driver;
             _solutionSpec = settings;
             _secretStore = secretStore;
-            _secretStore.DeclareSecretKey( APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY, desc => desc
+            _secretStore.DeclareSecretKey( APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY, current => current?.Description
                 ?? "This must be the CODECAKEBUILDER_SECRET_KEY encrypted by the Appveyor account's secret key that will run the build: https://ci.appveyor.com/tools/encrypt." );
         }
 

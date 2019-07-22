@@ -278,7 +278,7 @@ namespace CK.Env.NuGet
 
             if( creds.IsSecretKeyName )
             {
-                SecretKeyStore.DeclareSecretKey( creds.PasswordOrSecretKeyName, desc => desc
+                SecretKeyStore.DeclareSecretKey( creds.PasswordOrSecretKeyName, current => current?.Description
                                     ?? $"Required for NuGet.config file to retrieve packages from '{name}' feed." );
             }
 

@@ -81,75 +81,76 @@ namespace CK.Env
         /// </summary>
         public GitPluginRegistry PluginRegistry { get; }
 
-
-        static Repository EnsureWorkingFolder(
+        /// <summary>
+        /// Checks out a working folder if needed or check that an existing one is
+        /// bound to the <see cref="GitRepositoryKey.OriginUrl"/> 'origin' remote.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="git">The Git key.</param>
+        /// <param name="workingFolder">The local working folder.</param>
+        /// <param name="ensureHooks">True to create the standard hooks.</param>
+        /// <param name="clonedBranchName">The initial branch name if cloning is done.</param>
+        /// <returns>The LibGit2Sharp repository object or null on error.</returns>
+        public static Repository EnsureWorkingFolder(
             IActivityMonitor m,
             GitRepositoryKey git,
             NormalizedPath workingFolder,
+            bool ensureHooks,
             string clonedBranchName )
         {
-            using( m.OpenTrace( $"Ensuring git repository {workingFolder}" ) )
+            using( m.OpenTrace( $"Ensuring working folder '{workingFolder}' on '{git.OriginUrl}'." ) )
             {
-                var gitFolderPath = Path.Combine( workingFolder, ".git" );
-                if( !Directory.Exists( gitFolderPath ) )
+                try
                 {
-                    using( m.OpenInfo( $"Checking out '{workingFolder}' from '{git.OriginUrl}' on {clonedBranchName}." ) )
+                    var gitFolderPath = Path.Combine( workingFolder, ".git" );
+                    if( !Directory.Exists( gitFolderPath ) )
                     {
-                        Repository.Clone( git.OriginUrl.ToString(), workingFolder, new CloneOptions()
+                        using( m.OpenInfo( $"Checking out '{workingFolder}' from '{git.OriginUrl}' on {clonedBranchName}." ) )
                         {
-                            CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, git ),
-                            BranchName = clonedBranchName,
-                            Checkout = true
-                        } );
+                            Repository.Clone( git.OriginUrl.ToString(), workingFolder, new CloneOptions()
+                            {
+                                CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, git ),
+                                BranchName = clonedBranchName,
+                                Checkout = true
+                            } );
+                        }
                     }
-                }
-                else if( !Repository.IsValid( gitFolderPath ) )
-                {
-                    throw new InvalidOperationException( $"Git folder {gitFolderPath} exists but is not a valid Repository." );
-                }
-                else
-                {
+                    else if( !Repository.IsValid( gitFolderPath ) )
+                    {
+                        throw new InvalidOperationException( $"Git folder {gitFolderPath} exists but is not a valid Repository." );
+                    }
+                    Repository r = new Repository( workingFolder );
+                    var remote = r.Network.Remotes.FirstOrDefault( rem => rem.Url.Equals( git.OriginUrl.ToString(), StringComparison.OrdinalIgnoreCase ) );
+                    if( remote == null || remote.Name != "origin" )
+                    {
 
+                        m.Fatal( $"Existing '{workingFolder}' must have its 'origin' remote set to '{git.OriginUrl}'. This must be fixed manually." );
+                        r.Dispose();
+                        return null;
+                    }
+                    if( ensureHooks ) EnsureHooks( m, workingFolder );
                     m.CloseGroup( "Repository is checked out." );
+                    return r;
+                }
+                catch( Exception ex )
+                {
+                    m.Fatal( $"Failed to ensure '{workingFolder}'.", ex );
+                    return null;
                 }
             }
         }
 
         /// <summary>
         /// Ensures that the Git working folder actually exists and creates a
-        /// GitFolder instance.
+        /// GitFolder instance or returns null on error.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <returns>The GitFolder instance.</returns>
+        /// <returns>The GitFolder instance or null on error.</returns>
         public GitFolder CreateGitFolder( IActivityMonitor m )
         {
-            using( m.OpenTrace( $"Ensuring git repository {FullPhysicalPath}" ) )
-            {
-                var gitFolderPath = Path.Combine( FullPhysicalPath, ".git" );
-                if( !Directory.Exists( gitFolderPath ) )
-                {
-                    using( m.OpenInfo( $"Checking out '{FolderPath}' from '{OriginUrl}' on {World.DevelopBranchName}." ) )
-                    {
-                        Repository.Clone( OriginUrl.ToString(), FullPhysicalPath, new CloneOptions()
-                        {
-                            CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m ),
-                            BranchName = World.DevelopBranchName,
-                            Checkout = true
-                        } );
-                    }
-                }
-                else if( !Repository.IsValid( gitFolderPath ) )
-                {
-                    throw new InvalidOperationException( $"Git folder {gitFolderPath} exists but is not a valid Repository." );
-                }
-                else
-                {
-                    m.Trace( "Repository is checked out." );
-                }
-                EnsureHooks( m );
-                return GitFolder.EnsureGitFolderCorrectSetup( m, this );
-
-            }
+            var r = EnsureWorkingFolder( m, this, FullPhysicalPath, true, World.DevelopBranchName );
+            if( r == null ) return null;
+            return GitFolder.Create( m, r, this );
         }
 
         /// <summary>
@@ -178,7 +179,7 @@ namespace CK.Env
 
         #region GitHooks
 
-        bool CheckHookDispatcherVersion( string scriptString )
+        static bool CheckHookDispatcherVersion( string scriptString )
         {
             string[] lines = scriptString.Split( '\n' );
             if( lines.Length <= 2 ) return false;
@@ -190,24 +191,24 @@ namespace CK.Env
             return false;
         }
 
-        void EnsureHooks( IActivityMonitor m )
+        static void EnsureHooks( IActivityMonitor m, NormalizedPath root )
         {
             const string prepush = "pre_push";
-            EnsureHookDispatcher( m, "pre_push" );
-            EnsureHookFile( m, prepush, "check_not_local_branch", _hook_check_not_local );
-            EnsureHookFile( m, prepush, "check_no_commit_nopush", _hook_check_no_commit_nopush );
+            EnsureHookDispatcher( m, root, prepush );
+            EnsureHookFile( m, root, prepush, "check_not_local_branch", _hook_check_not_local );
+            EnsureHookFile( m, root, prepush, "check_no_commit_nopush", _hook_check_no_commit_nopush );
         }
 
-        NormalizedPath GetHooksDir => FullPhysicalPath.AppendPart(".git").AppendPart("hooks");
+        static NormalizedPath GetHooksDir( NormalizedPath root ) => root.AppendPart(".git").AppendPart("hooks");
 
-        NormalizedPath GetHookPath( string hookName ) => GetHooksDir.AppendPart(hookName);
+        static NormalizedPath GetHookPath( NormalizedPath root, string hookName ) => GetHooksDir(root).AppendPart(hookName);
 
-        NormalizedPath GetMultiHooksDir( string hookName ) => GetHooksDir.AppendPart(hookName + "_scripts");
+        static NormalizedPath GetMultiHooksDir( NormalizedPath root, string hookName ) => GetHooksDir(root).AppendPart(hookName + "_scripts");
 
-        void EnsureHookDispatcher( IActivityMonitor m, string hookName )
+        static void EnsureHookDispatcher( IActivityMonitor m, NormalizedPath root, string hookName )
         {
-            NormalizedPath hookPath = GetHookPath( hookName );
-            NormalizedPath multiHookDirectory = GetMultiHooksDir( hookName );
+            NormalizedPath hookPath = GetHookPath( root, hookName );
+            NormalizedPath multiHookDirectory = GetMultiHooksDir( root, hookName );
             bool hookPresent = File.Exists(hookPath);
             Directory.CreateDirectory( multiHookDirectory );
             if( hookPresent )
@@ -234,7 +235,7 @@ namespace CK.Env
                     }
                 }
             }
-            //Now hook file may not exist event if it did.
+            // Now hook file may not exist event if it did.
             if( !hookPresent )
             {
                 File.WriteAllText( hookPath, HookPrePushScript( hookName ) );
@@ -242,9 +243,9 @@ namespace CK.Env
             }
         }
 
-        void EnsureHookFile( IActivityMonitor m, string hookName, string scriptName, string script )
+        static void EnsureHookFile( IActivityMonitor m, NormalizedPath root, string hookName, string scriptName, string script )
         {
-            var hookPath = Path.Combine( GetMultiHooksDir( hookName ), scriptName );
+            var hookPath = Path.Combine( GetMultiHooksDir( root, hookName ), scriptName );
             bool currentHookIsUpToDate = File.Exists( hookPath ) && File.ReadAllText( hookPath ) == script;
             if( !currentHookIsUpToDate )
             {
@@ -310,7 +311,7 @@ done
 echo ""No commit found with NOPUSH. Push can continue.""
 exit 1
 ";
-        string HookPrePushScript( string hookName ) =>
+        static string HookPrePushScript( string hookName ) =>
 $@"#!/bin/sh
 #script-dispatcher-0.0.0
 # Hook that execute all scripts in a directory

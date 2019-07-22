@@ -93,7 +93,7 @@ namespace CK.Env
         /// <param name="folderPath">
         /// The folder path is a sub path of <see cref="Root"/> and contains the .git sub folder.
         /// </param>
-        /// <returns>The <see cref="GitFolder"/> or null if not found.</returns>
+        /// <returns>The <see cref="GitFolder"/> or null on error.</returns>
         public GitFolder EnsureGitFolder( IActivityMonitor m, ProtoGitFolder proto )
         {
             if( proto == null ) throw new ArgumentNullException( nameof( proto ) );
@@ -102,8 +102,11 @@ namespace CK.Env
             if( g == null )
             {
                 g = proto.CreateGitFolder( m );
-                g.EnsureBranch( m, proto.World.DevelopBranchName );
-                _gits.Add( g );
+                if( g != null )
+                {
+                    g.EnsureBranch( m, proto.World.DevelopBranchName );
+                    _gits.Add( g );
+                }
             }
             return g;
         }

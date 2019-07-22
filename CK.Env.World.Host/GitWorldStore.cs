@@ -87,7 +87,7 @@ namespace CK.Env
         /// and reads the list of all the worlds.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        public void Initialize( IActivityMonitor m )
+        public void Initialize( IActivityMonitor m, bool openRepositories )
         {
             if( !File.Exists( StacksFilePath ) )
             {
@@ -142,33 +142,33 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="stackName">The name of the stack. This is the key.</param>
-        /// <param name="mappedPath">
-        /// The mapped path used if no exisitng mapping already exists.
-        /// If no mapping already exists, it must be a local rooted path (that may not exist).
-        /// </param>
         /// <param name="url">The remote repository url.</param>
         /// <param name="isPublic">Whether this stack is public (Open Source).</param>
+        /// <param name="mappedPath">
+        /// The mapped path used if no existing mapping already exists.
+        /// This is required if no mapping currently already exists, it must be a local rooted path.
+        /// </param>
         /// <param name="branchName">Optional branch name. Should always be "master".</param>
         [CommandMethod]
         public void EnsureStackDefinition(
             IActivityMonitor m,
             string stackName,
-            NormalizedPath mappedPath,
             string url,
             bool isPublic,
-            string branchName = "master" )
+            NormalizedPath mappedPath = default,
+            string branchName = "master")
         {
             if( String.IsNullOrWhiteSpace( stackName ) ) throw new ArgumentException( "Must not be empty.", nameof(stackName) );
-            if( !WorldLocalMapping.IsMapped( stackName ) )
-            {
-                if( !mappedPath.IsRooted ) throw new ArgumentException( "Path must be rooted.", nameof( mappedPath ) );
-                WorldLocalMapping.SetMap( stackName, mappedPath );
-            }
-            EnsureStackDefinition( m, stackName, url, isPublic, branchName );
-            OnStacksChanged( m, true );
+            bool change = WorldLocalMapping.SetMap( m, stackName, mappedPath )
+                          || EnsureStackDefinition( m, stackName, url, isPublic, branchName );
+            if( change ) OnStacksChanged( m, true );
         }
 
-        void EnsureStackDefinition(
+        /// <summary>
+        /// Returns true it the definition has been added or updated.
+        /// False if nothing changed.
+        /// </summary>
+        bool EnsureStackDefinition(
                         IActivityMonitor m,
                         string stackName,
                         string url,
@@ -179,11 +179,12 @@ namespace CK.Env
             int idx = _stacks.IndexOf( d => d.StackName.Equals( stackName, StringComparison.OrdinalIgnoreCase ) );
             if( idx >= 0 )
             {
-                if( _stacks[idx].ToString() == def.ToString() ) return;
+                if( _stacks[idx].ToString() == def.ToString() ) return false;
                 m.Trace( $"Replacing existing: '{_stacks[idx]}'." );
                 _stacks[idx] = def;
             }
             else _stacks.Add( def );
+            return true;
         }
 
         /// <summary>
@@ -213,7 +214,7 @@ namespace CK.Env
 
         #endregion
 
-        #region Repsitory
+        #region Repository
         class StackRepo
         {
             public readonly Uri OriginUrl;
@@ -228,7 +229,11 @@ namespace CK.Env
             {
                 _store = store;
                 OriginUrl = uri;
-                var cleanPath = uri.AbsolutePath.Replace( "_git", "" ).Replace( "_", "" ).Replace( '/', '_' ).Replace( "__", "_" ).ToLowerInvariant();
+                var cleanPath = uri.AbsolutePath.Replace( "_git", "" )
+                                   .Replace( "_", "" )
+                                   .Replace( '/', '_' )
+                                   .Replace( "__", "_" )
+                                   .ToLowerInvariant();
                 _root = store._rootPath.AppendPart( cleanPath );
             }
 
@@ -326,6 +331,7 @@ namespace CK.Env
                 return newOne;
             }
         }
+
         #endregion
 
         /// <summary>
@@ -356,7 +362,7 @@ namespace CK.Env
                 m.Error( $"Invalid '{mappedPath}'. It must be rooted." );
                 return false;
             }
-            WorldLocalMapping.SetMap( w.FullName, mappedPath );
+            if( !WorldLocalMapping.SetMap( m, w.FullName, mappedPath ) ) return true;
             m.Info( $"World '{w.FullName}' is now mapped to '{mappedPath}'." );
             return Refresh( m, false );
         }
@@ -369,10 +375,10 @@ namespace CK.Env
         /// True to pull the repositories, false to only refresh from the local
         /// working folder.
         /// </param>
-        /// <returns>True on success, falseon error.</returns>
+        /// <returns>True on success, false on error.</returns>
         public bool Refresh( IActivityMonitor m, bool withPull )
         {
-
+            throw new NotImplementedException( "WIP" );
         }
  
         void SetWorlds( IActivityMonitor m, List<LocalWorldName> newWorlds )
@@ -383,7 +389,7 @@ namespace CK.Env
 
         public override IReadOnlyList<IRootedWorldName> ReadWorlds( IActivityMonitor m )
         {
-            throw new NotImplementedException();
+            return _worldNames;
         }
 
         public override SharedWorldState GetOrCreateSharedState( IActivityMonitor m, IWorldName w )

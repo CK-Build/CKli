@@ -28,7 +28,8 @@ namespace CK.Env.Plugin
             _secretStore = secretStore;
             _artifacts = artifacts;
             _solutionSpec = solutionSpec;
-            _secretStore.DeclareSecretKey( SolutionDriver.CODECAKEBUILDER_SECRET_KEY, d => d ?? $"Required to update CodeCakeBuilderKeyVault.txt used by CI processes." );
+            _secretStore.DeclareSecretKey( SolutionDriver.CODECAKEBUILDER_SECRET_KEY, current => current?.Description
+                                                ?? $"Required to update CodeCakeBuilderKeyVault.txt used by CI processes." );
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
