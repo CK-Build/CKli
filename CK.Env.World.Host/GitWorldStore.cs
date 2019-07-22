@@ -20,7 +20,6 @@ namespace CK.Env
         IReadOnlyList<LocalWorldName> _worldNames;
         int _syncCount;
 
-
         public GitWorldStore(
             NormalizedPath userHostPath,
             SimpleWorldLocalMapping mapping,
@@ -48,20 +47,14 @@ namespace CK.Env
         /// <summary>
         /// Reads the Stacks.txt file and instanciates the <see cref="StackDef"/> objects:
         /// this registers the required PAT in the key store.
-        /// Optionally opens the repositories (the required secrets must be available)
-        /// and reads the list of all the worlds.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="openRepositories">True to clone/open the repositories.</param>
-        /// <returns>True on success, false on error.</returns>
-        public bool Initialize( IActivityMonitor m, bool openRepositories )
+        public void ReadStacksFromFile( IActivityMonitor m )
         {
             if( !File.Exists( StacksFilePath ) )
             {
                 m.Warn( $"File '{StacksFilePath}' not found." );
-                return false;
             }
-            bool success = true;
             using( m.OpenInfo( $"Reading '{StacksFilePath}'." ) )
             {
                 foreach( var line in File.ReadAllLines( StacksFilePath ) )
@@ -81,7 +74,7 @@ namespace CK.Env
                                     var pubTxt = l[2].Trim();
                                     bool isPublic = pubTxt.Equals( "Public", StringComparison.OrdinalIgnoreCase );
                                     string branchName = l.Length >= 4 ? l[3].Trim() : null;
-                                    EnsureStackDefinition( m, name, url, isPublic, branchName );
+                                    FindOrCreateStackDef( m, name, url, isPublic, branchName );
                                     continue;
                                 }
                                 else m.Error( $"Invalid repository url '{url}'." );
@@ -95,11 +88,23 @@ namespace CK.Env
                         severe = ex;
                     }
                     m.Error( $"Unable to read line '{line}'.", severe );
-                    success = false;
                 }
             }
-            if( success ) OnStacksChanged( m, openRepositories );
-            return success;
+        }
+
+        /// <summary>
+        /// Must be called after <see cref="ReadStacksFromFile(IActivityMonitor)"/>
+        /// and after beeing sure that all required secrets are available.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        public void Initialize( IActivityMonitor m )
+        {
+            UpdateReposFromDefinitions( m, StackInitializeOption.OpenAndPullRepository );
+        }
+
+        void WriteStacksToFile( IActivityMonitor m )
+        {
+            File.WriteAllLines( StacksFilePath, _stacks.Select( s => s.ToString() ) );
         }
 
         #region Stack Definition
@@ -168,15 +173,19 @@ namespace CK.Env
         {
             if( String.IsNullOrWhiteSpace( stackName ) ) throw new ArgumentException( "Must not be empty.", nameof(stackName) );
             bool change = WorldLocalMapping.SetMap( m, stackName, mappedPath )
-                          || EnsureStackDefinition( m, stackName, url, isPublic, branchName );
-            if( change ) OnStacksChanged( m, true );
+                          || FindOrCreateStackDef( m, stackName, url, isPublic, branchName );
+            if( change )
+            {
+                UpdateReposFromDefinitions( m, StackInitializeOption.None );
+                WriteStacksToFile( m );
+            }
         }
 
         /// <summary>
         /// Returns true it the definition has been added or updated.
         /// False if nothing changed.
         /// </summary>
-        bool EnsureStackDefinition(
+        bool FindOrCreateStackDef(
                         IActivityMonitor m,
                         string stackName,
                         string url,
@@ -210,14 +219,8 @@ namespace CK.Env
             {
                 m.Info( $"Removing: '{_stacks[idx]}'." );
                 _stacks.RemoveAt( idx );
-                OnStacksChanged( m, false );
-            }          
-        }
-
-        void OnStacksChanged( IActivityMonitor m, bool openRepositories )
-        {
-            File.WriteAllText( StacksFilePath, _stacks.Select( s => s.ToString() ).Concatenate( Environment.NewLine ) );
-            UpdateReposFromDefinitions( m, openRepositories );
+                UpdateReposFromDefinitions( m, StackInitializeOption.None );
+            }
         }
 
         #endregion
@@ -231,7 +234,7 @@ namespace CK.Env
             int _syncCount;
 
             StackDef[] _stacks;
-            Repository _git;
+            GitRepository _git;
             
             public StackRepo( GitWorldStore store, Uri uri )
             {
@@ -246,16 +249,28 @@ namespace CK.Env
                 _root = store._rootPath.AppendPart( cleanPath );
             }
 
+            /// <summary>
+            /// Pulls the remote and returns true if the working folder has been updated.
+            /// </summary>
+            /// <param name="m">The monitor to use.</param>
+            /// <returns>True if the working folder has been updated.</returns>
+            internal bool Pull( IActivityMonitor m )
+            {
+                return EnsureOpen( m ) && _git.Pull( m, MergeFileFavor.Theirs ).ReloadNeeded;
+            }
+
+            internal NormalizedPath Root => _git != null ? _git.FullPhysicalPath : new NormalizedPath();
+
             bool IsOpen => _git != null;
 
-            bool EnsureOpen( IActivityMonitor m )
+            internal bool EnsureOpen( IActivityMonitor m )
             {
                 if( !IsOpen )
                 {
                     var gitKey = _stacks[0];
                     Debug.Assert( _stacks.All( d => d.OriginUrl == gitKey.OriginUrl && d.IsPublic == gitKey.IsPublic ) );
                     Debug.Assert( _stacks.All( d => d.BranchName == gitKey.BranchName ) );
-                    _git = ProtoGitFolder.EnsureWorkingFolder( m, gitKey, _root, false, gitKey.BranchName, true );
+                    _git = GitRepository.Create( m, gitKey, _root, _root.LastPart, false, gitKey.BranchName, true );
                 }
                 return IsOpen;
             }
@@ -263,14 +278,13 @@ namespace CK.Env
             internal void Synchronize(
                 IActivityMonitor m,
                 IEnumerable<StackDef> expectedStacks,
-                bool openRepositories,
+                StackInitializeOption option,
                 Action<LocalWorldName> addWorld )
             {
                 Debug.Assert( expectedStacks.All( d => d.OriginUrl == OriginUrl ) );
                 _syncCount = _store._syncCount;
                 _stacks = expectedStacks.ToArray();
-                if( openRepositories ) EnsureOpen( m );
-                if( IsOpen ) ReadWorlds( m, addWorld );
+                ReadWorlds( m, option, addWorld );
             }
 
             internal bool PostSynchronize( IActivityMonitor m )
@@ -295,9 +309,12 @@ namespace CK.Env
                 return false;
             }
 
-            void ReadWorlds( IActivityMonitor m, Action<LocalWorldName> addWorld )
+            internal void ReadWorlds( IActivityMonitor m, StackInitializeOption option, Action<LocalWorldName> addWorld )
             {
-                Debug.Assert( IsOpen );
+                if( option == StackInitializeOption.OpenRepository ) EnsureOpen( m );
+                else if( option == StackInitializeOption.OpenAndPullRepository ) Pull( m );
+                if( !IsOpen ) return;
+
                 var worldNames = Directory.GetFiles( _root, "*.World.xml" )
                                     .Select( p => LocalWorldName.TryParse( m, p, _store.WorldLocalMapping ) )
                                     .Where( w => w != null )
@@ -325,7 +342,8 @@ namespace CK.Env
             }
         }
 
-        void UpdateReposFromDefinitions( IActivityMonitor m, bool openRepositories )
+
+        void UpdateReposFromDefinitions( IActivityMonitor m, StackInitializeOption option )
         {
             var newWorlds = new List<LocalWorldName>();
             ++_syncCount;
@@ -341,7 +359,7 @@ namespace CK.Env
                 }
                 else
                 {
-                    EnsureRepo( gD.Key ).Synchronize( m, gD, openRepositories, newWorlds.Add );
+                    EnsureRepo( gD.Key ).Synchronize( m, gD, option, newWorlds.Add );
                 }
             }
             for( int i = 0; i < _repos.Count; ++i )
@@ -395,57 +413,135 @@ namespace CK.Env
             }
             if( !WorldLocalMapping.SetMap( m, w.FullName, mappedPath ) ) return true;
             m.Info( $"World '{w.FullName}' is now mapped to '{mappedPath}'." );
-            return Refresh( m, false );
+            ReadWorlds( m, false );
+            return true;
+        }
+
+
+        StackRepo FindRepo( IActivityMonitor m, string stackName )
+        {
+            int idx = _stacks.IndexOf( d => d.StackName == stackName );
+            if( idx < 0 )
+            {
+                m.Error( $"Stack named '{stackName}' not found." );
+                return null;
+            }
+            var home = _repos.FirstOrDefault( r => r.OriginUrl == _stacks[idx].OriginUrl );
+            if( home == null || home.Root.IsEmptyPath )
+            {
+                m.Error( $"Repository initialization error for stack '{_stacks[idx]}'." );
+                return null;
+            }
+            return home;
         }
 
         /// <summary>
-        /// Refreshes the list of <see cref="ReadWorlds"/>, optionally pulling the repositories.
+        /// Gets the list of <see cref="ReadWorlds"/>, optionally pulling the repositories.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="withPull">
         /// True to pull the repositories, false to only refresh from the local
-        /// working folder.
+        /// working folders.
         /// </param>
-        /// <returns>True on success, false on error.</returns>
-        public bool Refresh( IActivityMonitor m, bool withPull )
+        public IReadOnlyList<IRootedWorldName> ReadWorlds( IActivityMonitor m, bool withPull )
         {
-            throw new NotImplementedException( "Soon!" );
+            var newWorlds = new List<LocalWorldName>();
+            foreach( var r in _repos )
+            {
+                r.ReadWorlds( m, withPull ? StackInitializeOption.OpenAndPullRepository : StackInitializeOption.OpenRepository, newWorlds.Add );
+            }
+            return SetWorlds( m, newWorlds );
         }
- 
-        void SetWorlds( IActivityMonitor m, List<LocalWorldName> newWorlds )
+
+        IReadOnlyList<IRootedWorldName> SetWorlds( IActivityMonitor m, List<LocalWorldName> newWorlds )
         {
             newWorlds.Sort( ( w1, w2 ) => w1.FullName.CompareTo( w2.FullName ) );
-            _worldNames = newWorlds;
+            return _worldNames = newWorlds;
         }
 
-        public override IReadOnlyList<IRootedWorldName> ReadWorlds( IActivityMonitor m )
+        LocalWorldName ToLocal( IWorldName w )
         {
-            return _worldNames;
+            if( w is LocalWorldName loc ) return loc;
+            throw new ArgumentException( "Must be a valid LocalWorldName.", nameof( w ) );
         }
 
-        public override SharedWorldState GetOrCreateSharedState( IActivityMonitor m, IWorldName w )
-        {
-            throw new NotImplementedException();
-        }
+        public override IReadOnlyList<IRootedWorldName> ReadWorlds( IActivityMonitor m ) => ReadWorlds( m, false );
 
         public override XDocument ReadWorldDescription( IActivityMonitor m, IWorldName w )
         {
-            throw new NotImplementedException();
+            return XDocument.Load( ToLocal( w ).XmlDescriptionFilePath, LoadOptions.SetLineInfo );
         }
 
         public override bool WriteWorldDescription( IActivityMonitor m, IWorldName w, XDocument content )
         {
-            throw new NotImplementedException();
+            if( content == null ) throw new ArgumentNullException( nameof( content ) );
+            content.Save( ToLocal( w ).XmlDescriptionFilePath );
+            return true;
         }
 
         protected override LocalWorldName DoCreateNew( IActivityMonitor m, string name, string parallelName, XDocument content )
         {
-            throw new NotImplementedException();
+            Debug.Assert( !String.IsNullOrWhiteSpace( name ) );
+            Debug.Assert( content != null );
+            Debug.Assert( parallelName == null || !String.IsNullOrWhiteSpace( parallelName ) );
+
+            string wName = name + (parallelName != null ? '[' + parallelName + ']' : String.Empty);
+            if( ReadWorlds( m ).Any( w => w.FullName == wName ) )
+            {
+                m.Error( $"World '{wName}' already exists." );
+                return null;
+            }
+            int idx = _stacks.IndexOf( d => d.StackName == name );
+            if( idx < 0 )
+            {
+                m.Error( "A repository must be created first for a new Stack." );
+                return null;
+            }
+            var home = FindRepo( m, name );
+            if( home == null ) return null;
+
+            var path = home.Root.AppendPart( wName + ".World.xml" );
+            if( !File.Exists( path ) )
+            {
+                var w = new LocalWorldName( path, name, parallelName, WorldLocalMapping );
+                if( !WriteWorldDescription( m, w, content ) )
+                {
+                    m.Error( $"Unable to create {wName} world." );
+                    return null;
+                }
+                return w;
+            }
+            m.Error( $"World file {path} already exists." );
+            return null;
+        }
+
+
+        public override SharedWorldState GetOrCreateSharedState( IActivityMonitor m, IWorldName w )
+        {
+            var p = ToSharedStateFilePath( w );
+            if( File.Exists( p ) ) return new SharedWorldState( this, w, XDocument.Load( p, LoadOptions.SetLineInfo ) );
+            m.Info( $"Creating new shared state for {w.FullName}." );
+            return new SharedWorldState( this, w );
         }
 
         protected override bool SaveSharedState( IActivityMonitor m, IWorldName w, XDocument d )
         {
-            throw new NotImplementedException();
+            var p = ToSharedStateFilePath( w );
+            d.Save( p );
+            return true;
         }
+
+        /// <summary>
+        /// Computes the path of the shared state file: it is next to the definition file.
+        /// </summary>
+        /// <param name="w">The world name.</param>
+        /// <returns>The path to use to read/write the shared state.</returns>
+        NormalizedPath ToSharedStateFilePath( IWorldName w )
+        {
+            var def = ToLocal( w ).XmlDescriptionFilePath;
+            Debug.Assert( def.EndsWith( ".World.xml" ) );
+            return def.RemoveLastPart().AppendPart( def.LastPart.Substring( def.LastPart.Length - 3 ) + "SharedState.xml" );
+        }
+
     }
 }

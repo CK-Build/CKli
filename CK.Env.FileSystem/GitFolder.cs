@@ -17,9 +17,8 @@ namespace CK.Env
     /// Implements Git repository mapping.
     /// GitFolder are internally created (and disposed) by <see cref="FileSystem"/>.
     /// </summary>
-    public partial class GitFolder : IGitRepository, IGitHeadInfo, ICommandMethodsProvider
+    public partial class GitFolder : GitHelper, IGitRepository, IGitHeadInfo, ICommandMethodsProvider
     {
-        readonly Repository _git;
         readonly RootDir _thisDir;
         readonly HeadFolder _headFolder;
         readonly BranchesFolder _branchesFolder;
@@ -29,12 +28,11 @@ namespace CK.Env
         /// <summary>
         /// Gets the <see cref="ProtoGitFolder"/>.
         /// </summary>
-        public ProtoGitFolder ProtoGitFolder { get; }
+        public ProtoGitFolder ProtoGitFolder => (ProtoGitFolder)RepositoryKey;
 
         GitFolder( Repository r, ProtoGitFolder data )
+            : base( data, r, data.FolderPath, data.FullPhysicalPath )
         {
-            _git = r;
-            ProtoGitFolder = data;
             _headFolder = new HeadFolder( this );
             _branchesFolder = new BranchesFolder( this, "branches", isRemote: false );
             _remoteBranchesFolder = new RemotesFolder( this );
@@ -63,13 +61,13 @@ namespace CK.Env
 
         bool CheckValid( IActivityMonitor m )
         { 
-            if( !_git.Branches.Any( p => p.Commits.Any() ) )
+            if( !Git.Branches.Any( p => p.Commits.Any() ) )
             {
                 // Sometimes we fail while cloning the repo.
                 // The issue is that the repo is incorrectly intialized: the commits are not fetched.
                 m.Warn( "Repo does not contain any commits, probably a bad clone." );
                 if( !FetchBranches( m ) ) return false;
-                if( !_git.Branches.Any( p => p.Commits.Any() ) )
+                if( !Git.Branches.Any( p => p.Commits.Any() ) )
                 {
                     m.Error( "The repository is empty." );
                     return false;
@@ -77,17 +75,17 @@ namespace CK.Env
             }
             // Now we know that the repository have at least one commit. So it has a tracking branch
             // This branch may not be here locally.
-            if( !_git.Head.Commits.Any() )
+            if( !Git.Head.Commits.Any() )
             {
                 // In a case of a failed repository clone, the head is on a local master branch with no commits.
                 if( !Checkout( m, World.DevelopBranchName ).Success ) return false;
-                if( !_git.Head.Commits.Any() )
+                if( !Git.Head.Commits.Any() )
                 {
                     m.Error( $"The {World.DevelopBranchName} branch have no commit." );
                     return false;
                 }
             }
-            if( _git.Branches.Count() == 0 )
+            if( Git.Branches.Count() == 0 )
             {
                 m.Error( "This git repository does not contain any branches." );
                 return false;
@@ -96,11 +94,6 @@ namespace CK.Env
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => SubPath;
-
-        /// <summary>
-        /// Gets whether the Git repository is public or private.
-        /// </summary>
-        public bool IsPublic => ProtoGitFolder.IsPublic;
 
         /// <summary>
         /// Gets the service container for this GitFolder.
@@ -127,26 +120,13 @@ namespace CK.Env
             return false;
         }
 
+        protected override void OnNewCurrentBranch( IActivityMonitor m ) => EnsureCurrentBranchPlugins( m );
+
         void CheckoutWithPlugins( IActivityMonitor m, Branch branch )
         {
-            Commands.Checkout( _git, branch );
+            Commands.Checkout( Git, branch );
             EnsureCurrentBranchPlugins( m );
         }
-
-        /// <summary>
-        /// Get the path relative to the <see cref="FileSystem"/>.
-        /// </summary>
-        public NormalizedPath SubPath => ProtoGitFolder.FolderPath;
-
-        /// <summary>
-        /// Gets the full path (that starts with the <see cref="FileSystem"/>' root path) of the Git folder.
-        /// </summary>
-        public NormalizedPath FullPhysicalPath => ProtoGitFolder.FullPhysicalPath;
-
-        ///// <summary>
-        ///// Gets the name of the Git folder that is the name of the primary solution (by convention and by design).
-        ///// </summary>
-        //public string PrimarySolutionName => SubPath.LastPart;
 
         /// <summary>
         /// Fires whenever we switched to the local branch.
@@ -159,11 +139,6 @@ namespace CK.Env
         public event EventHandler<EventMonitoredArgs> OnLocalBranchLeaving;
 
         /// <summary>
-        /// Gets the current branch name (name of the repository's HEAD).
-        /// </summary>
-        public string CurrentBranchName => _git.Head.FriendlyName;
-
-        /// <summary>
         /// Gets the standard git status, based on the <see cref="CurrentBranchName"/>.
         /// </summary>
         public StandardGitStatus StandardGitStatus => CurrentBranchName == World.LocalBranchName
@@ -172,92 +147,6 @@ namespace CK.Env
                                                             ? StandardGitStatus.Develop
                                                             : StandardGitStatus.Unknown);
         public IWorldName World => ProtoGitFolder.World;
-
-        public KnownGitProvider KnownGitProvider => ProtoGitFolder.KnownGitProvider;
-
-        /// <summary>
-        /// Gets the head information.
-        /// </summary>
-        public IGitHeadInfo Head => this;
-
-        string IGitHeadInfo.CommitSha => _git.Head.Tip.Sha;
-
-        string IGitHeadInfo.Message => _git.Head.Tip.Message;
-
-        DateTimeOffset IGitHeadInfo.CommitDate => _git.Head.Tip.Committer.When;
-
-        string IGitHeadInfo.GetSha( string path )
-        {
-            if( path == null ) return _git.Head.Tip.Sha;
-            if( path.Length == 0 ) return _git.Head.Tip.Tree.Sha;
-            var e = _git.Head.Tip.Tree[path];
-            return e?.Target.Sha;
-        }
-
-        /// <summary>
-        /// Checks that the current head is a clean commit (working directory is clean and no staging files exists).
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <returns>True if the current head is clean, false otherwise.</returns>
-        public bool CheckCleanCommit( IActivityMonitor m )
-        {
-            if( _git.RetrieveStatus().IsDirty )
-            {
-                m.Error( $"Repository '{SubPath}' has uncommited changes ({CurrentBranchName})." );
-                return false;
-            }
-            return true;
-        }
-
-        /// <summary>
-        /// Gets the sha of the given branch tip or null if the branch doesnt' exist.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="branchName">The branch name. Must not be null or empty.</param>
-        /// <returns>The Sha or null.</returns>
-        public string GetBranchSha( IActivityMonitor m, string branchName )
-        {
-            if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
-            var b = GetBranch( m, branchName, false );
-            return b?.Tip.Sha;
-        }
-
-        Branch GetBranch( IActivityMonitor m, string branchName, bool logErrorMissingLocalAndRemote )
-        {
-            var b = _git.Branches[branchName];
-            if( b == null )
-            {
-                string remoteName = "origin/" + branchName;
-                var remote = _git.Branches[remoteName];
-                if( remote == null )
-                {
-                    var msg = $"Repository '{SubPath}': Both local '{branchName}' and remote '{remoteName}' not found.";
-                    if( logErrorMissingLocalAndRemote ) m.Error( msg );
-                    else m.Warn( msg );
-                    return null;
-                }
-                m.Info( $"Creating local branch on remote '{remoteName}' in repository '{SubPath}'." );
-                b = _git.Branches.Add( branchName, remote.Tip );
-                b = _git.Branches.Update( b, u => u.TrackedBranch = remote.CanonicalName );
-            }
-            return b;
-        }
-
-        /// <summary>
-        /// Ensures that a local branch exists.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="branchName">The branch name.</param>
-        public void EnsureBranch( IActivityMonitor m, string branchName, bool noWarnOnCreate = false )
-        {
-            if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
-            var b = GetBranch( m, branchName, logErrorMissingLocalAndRemote: false );
-            if( b == null )
-            {
-                m.Log( noWarnOnCreate ? Core.LogLevel.Info : Core.LogLevel.Warn, $"Branch '{branchName}' does not exist. Creating local branch." ); ;
-                b = _git.CreateBranch( branchName );
-            }
-        }
 
         [BackgroundCommand(false)]
         [ParallelCommand(false)]
@@ -269,144 +158,6 @@ namespace CK.Env
                 throw new PlatformNotSupportedException( "Linux not supported yet." );
             }
             return ProcessRunner.Run( m, FullPhysicalPath, "cmd", "/c " + commandToRun );
-        }
-
-        /// <summary>
-        /// Fetches 'origin' (or all remotes) branches into this repository.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <returns>
-        /// Success is true on success, false on error.
-        /// </returns>
-        [CommandMethod]
-        public bool FetchBranches( IActivityMonitor m, bool originOnly = true )
-        {
-            using( m.OpenInfo( $"Fetching {(originOnly ? "origin" : "all remotes")} in repository '{SubPath}'." ) )
-            {
-                try
-                {
-                    foreach( Remote remote in _git.Network.Remotes.Where( r => !originOnly || r.Name == "origin" ) )
-                    {
-                        m.Info( $"Fetching remote '{remote.Name}'." );
-                        IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification ).ToArray();
-                        Commands.Fetch( _git, remote.Name, refSpecs, new FetchOptions()
-                        {
-                            CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m ),
-                            TagFetchMode = TagFetchMode.All
-                        }, $"Fetching remote '{remote.Name}'." );
-                    }
-                    return true;
-                }
-                catch( Exception ex )
-                {
-                    m.Error( ex );
-                    return false;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Pulls current branch by merging changes from remote 'orgin' branch into this repository.
-        /// The current head must be clean.
-        /// Note that this is not a [CommandMethod]: Pull command is implemented by Solution driver
-        /// so that potential reloading solution is handled.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <returns>
-        /// Success is true on success, false on error (such as merge conflicts) and in case of success,
-        /// the result states whether a reload should be required or if nothing changed.
-        /// </returns>
-        public (bool Success, bool ReloadNeeded) Pull( IActivityMonitor m )
-        {
-            using( m.OpenInfo( $"Pulling branch '{CurrentBranchName}' in '{SubPath}'." ) )
-            {
-                if( !FetchBranches( m )
-                    || !CheckCleanCommit( m ) )
-                {
-                    return (false, false);
-                }
-
-                try
-                {
-                    return DoPull( m, false, FileSystem.ServerMode ? MergeFileFavor.Theirs : MergeFileFavor.Ours );
-                }
-                catch( Exception ex )
-                {
-                    m.Error( ex );
-                    return (false, true);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Checks out a branch: calls <see cref="FetchAll"/> and pulls remote 'origin' branch changes.
-        /// There must not be any uncommitted changes on the current head.
-        /// The branch must exist locally or on the 'origin' remote.
-        /// If the branch exists only in the "origin" remote, a local branch is automatically
-        /// created that tracks the remote one.
-        /// </summary>
-        /// <param name="m">The monitor.</param>
-        /// <param name="branchName">The local name of the branch.</param>
-        /// <returns>
-        /// Success is true on success, false on error (such as merge conflicts) and in case of success,
-        /// the result states whether a reload should be required or if nothing changed.
-        /// </returns>
-        public (bool Success, bool ReloadNeeded) Checkout( IActivityMonitor m, string branchName )
-        {
-            using( m.OpenInfo( $"Checking out branch '{branchName}' in '{SubPath}'." ) )
-            {
-                if( !FetchBranches( m ) ) return (false, false);
-                try
-                {
-                    bool reloadNeeded = false;
-                    Branch b = GetBranch( m, branchName, logErrorMissingLocalAndRemote: true );
-                    if( b == null ) return (false, false);
-                    if( b.IsCurrentRepositoryHead )
-                    {
-                        m.Trace( $"Already on {branchName}." );
-                    }
-                    else
-                    {
-                        if( !CheckCleanCommit( m ) ) return (false, false);
-                        m.Info( $"Checking out {branchName} (leaving {CurrentBranchName})." );
-                        CheckoutWithPlugins( m, b );
-                        reloadNeeded = true;
-                    }
-                    return DoPull( m, reloadNeeded, MergeFileFavor.Theirs );
-                }
-                catch( Exception ex )
-                {
-                    m.Error( ex );
-                    return (false, true);
-                }
-            }
-        }
-
-        (bool Success, bool ReloadNeeded) DoPull( IActivityMonitor m, bool alreadyReloadNeeded, MergeFileFavor mergeFileFavor )
-        {
-            var merger = _git.Config.BuildSignature( DateTimeOffset.Now ) ?? new Signature( "CKli", "none", DateTimeOffset.Now );
-            var result = Commands.Pull( _git, merger, new PullOptions
-            {
-                FetchOptions = new FetchOptions
-                {
-                    TagFetchMode = TagFetchMode.All,
-                    CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m )
-                },
-                MergeOptions = new MergeOptions
-                {
-                    MergeFileFavor = mergeFileFavor,
-                    CommitOnSuccess = true,
-                    FailOnConflict = true,
-                    FastForwardStrategy = FastForwardStrategy.Default,
-                    SkipReuc = true
-                }
-            } );
-            if( result.Status == MergeStatus.Conflicts )
-            {
-                m.Error( "Merge conflicts occurred. Unable to merge changes from the remote." );
-                return (false, false);
-            }
-            return (true, alreadyReloadNeeded || result.Status != MergeStatus.UpToDate);
         }
 
         /// <summary>
@@ -443,7 +194,7 @@ namespace CK.Env
             if( branchName == null ) branchName = CurrentBranchName;
             try
             {
-                Branch b = _git.Branches[branchName];
+                Branch b = Git.Branches[branchName];
                 if( b == null )
                 {
                     m.Error( $"Unknown branch {branchName}." );
@@ -462,7 +213,7 @@ namespace CK.Env
                 }
                 var opt = RepositoryInfoOptions.Read( fOpt.ReadAsXDocument().Root );
                 opt.StartingBranchName = branchName;
-                var result = new RepositoryInfo( _git, opt );
+                var result = new RepositoryInfo( Git, opt );
                 if( result.RepositoryError != null )
                 {
                     m.Error( $"Unable to read RepositoryInfo. RepositoryError: {result.RepositoryError}." );
@@ -494,13 +245,13 @@ namespace CK.Env
             var sv = 'v' + v.ToString();
             try
             {
-                var exists = _git.Tags[sv];
-                if( exists != null && exists.PeeledTarget == _git.Head.Tip )
+                var exists = Git.Tags[sv];
+                if( exists != null && exists.PeeledTarget == Git.Head.Tip )
                 {
                     m.Info( $"Version Tag {sv} is already set." );
                     return true;
                 }
-                _git.ApplyTag( sv );
+                Git.ApplyTag( sv );
                 m.Info( $"Set Version tag {sv} on {CurrentBranchName}." );
                 return true;
             }
@@ -524,19 +275,19 @@ namespace CK.Env
             {
                 try
                 {
-                    Remote remote = _git.Network.Remotes["origin"];
+                    Remote remote = Git.Network.Remotes["origin"];
                     var options = new PushOptions()
                     {
                         CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m )
                     };
 
-                    var exists = _git.Tags[sv];
+                    var exists = Git.Tags[sv];
                     if( exists == null )
                     {
                         m.Error( $"Version Tag {sv} does not exist in {SubPath}." );
                         return false;
                     }
-                    _git.Network.Push( remote, exists.CanonicalName, options );
+                    Git.Network.Push( remote, exists.CanonicalName, options );
                     return true;
                 }
                 catch( Exception ex )
@@ -559,13 +310,13 @@ namespace CK.Env
             var sv = 'v' + v.ToString();
             try
             {
-                if( _git.Tags[sv] == null )
+                if( Git.Tags[sv] == null )
                 {
                     m.Info( $"Tag '{sv}' in {SubPath} not found (cannot remove it)." );
                 }
                 else
                 {
-                    _git.Tags.Remove( sv );
+                    Git.Tags.Remove( sv );
                     m.Info( $"Removing Version tag '{sv}' from {SubPath}." );
                 }
                 return true;
@@ -577,252 +328,7 @@ namespace CK.Env
             }
         }
 
-        /// <summary>
-        /// Gets whether the head can be amended: the current branch
-        /// is not tracked or the current commit is ahead of the remote branch.
-        /// </summary>
-        public bool CanAmendCommit => (_git.Head.TrackingDetails.AheadBy ?? 1) > 0;
-
-        public int? AheadOriginCommitCount => _git.Head.TrackingDetails.AheadBy;
-
-        public Uri OriginUrl => ProtoGitFolder.OriginUrl;
-
-        
-
         public FileSystem FileSystem => ProtoGitFolder.FileSystem;
-
-
-
-        /// <summary>
-        /// Commits any pending changes.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="commitMessage">
-        /// Required commit message.
-        /// This is ignored when <paramref name="amendIfPossible"/> and <see cref="CanAmendCommit"/> are both true.
-        /// </param>
-        /// <param name="amendIfPossible">
-        /// True to call <see cref="AmendCommit"/> if <see cref="CanAmendCommit"/>. is true.
-        /// </param>
-        /// <returns>True on success, false on error.</returns>
-        [CommandMethod]
-        public bool Commit( IActivityMonitor m, string commitMessage, CommitBehavior commitBehavior = CommitBehavior.CreateNewCommit )
-        {
-            if( commitBehavior != CommitBehavior.CreateNewCommit && CanAmendCommit )
-            {
-                Func<string, string> modified = null;
-                switch( commitBehavior )
-                {
-                    case CommitBehavior.CreateNewCommit:
-                        throw new InvalidOperationException();
-                    case CommitBehavior.AmendIfPossibleAndKeepPreviousMessage:
-                        modified = p => p;
-                        break;
-                    case CommitBehavior.AmendIfPossibleAndAppendPreviousMessage:
-                        if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
-                        modified = p => $"{p} (...)\r\n{commitMessage}";
-                        break;
-                    case CommitBehavior.AmendIfPossibleAndPrependPreviousMessage:
-                        if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
-                        modified = p => $"{commitMessage}(...)\r\n{p}";
-                        break;
-                    case CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage:
-                        if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
-                        modified = p => commitMessage;
-                        break;
-                    default:
-                        throw new ArgumentException();
-                }
-                return AmendCommit( m, modified );
-            }
-            if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
-            using( m.OpenInfo( $"Committing changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
-            {
-                Commands.Stage( _git, "*" );
-                var s = _git.RetrieveStatus();
-                if( !s.IsDirty )
-                {
-                    m.CloseGroup( "Working folder is up-to-date." );
-                    return true;
-                }
-                return DoCommit( m, commitMessage, DateTimeOffset.Now, false, true );
-            }
-        }
-
-        /// <summary>
-        /// Amends the current commit, optionaly changing its message and/or its date.
-        /// <see cref="CanAmendCommit"/> must be true otherwise an <see cref="InvalidOperationException"/> is thrown.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="editMessage">
-        /// Optional message transformer. By returning null, the operation is canceled and false is returned.
-        /// </param>
-        /// <param name="editDate">
-        /// Optional date transformer. By returning null, the operation is canceled and false is returned.
-        /// </param>
-        /// <returns>True on success, false on error.</returns>
-        public bool AmendCommit( IActivityMonitor m, Func<string, string> editMessage = null, Func<DateTimeOffset, DateTimeOffset?> editDate = null )
-        {
-            if( !CanAmendCommit ) throw new InvalidOperationException( nameof( CanAmendCommit ) );
-            using( m.OpenInfo( $"Amending Commit in '{SubPath}' (branch '{CurrentBranchName}')." ) )
-            {
-                var message = _git.Head.Tip.Message;
-                if( editMessage != null ) message = editMessage( message );
-                if( String.IsNullOrWhiteSpace( message ) )
-                {
-                    m.CloseGroup( "Canceled by empty message." );
-                    return false;
-                }
-                DateTimeOffset initialDate = _git.Head.Tip.Committer.When;
-                DateTimeOffset? date = initialDate;
-                if( editDate != null ) date = editDate( date.Value );
-                if( date == null )
-                {
-                    m.CloseGroup( "Canceled by null date." );
-                    return false;
-                }
-                Commands.Stage( _git, "*" );
-                var s = _git.RetrieveStatus();
-                bool hasChange = s.IsDirty;
-                if( hasChange )
-                {
-                    if( editDate == null )
-                    {
-                        var minDate = initialDate.AddSeconds( 1 );
-                        date = DateTimeOffset.Now;
-                        if( date < minDate )
-                        {
-                            m.Trace( "Adusted commit date to the next second." );
-                            date = minDate;
-                        }
-                    }
-                }
-                else
-                {
-                    bool messageUpdate = message != _git.Head.Tip.Message;
-                    bool dateUpdate = date.Value != _git.Head.Tip.Committer.When;
-                    if( messageUpdate && dateUpdate )
-                    {
-                        m.Info( "Updating message and date." );
-                    }
-                    else if( dateUpdate )
-                    {
-                        m.Info( "Updating commit date." );
-                    }
-                    else if( messageUpdate )
-                    {
-                        m.Info( "Only updating message." );
-                    }
-                    else
-                    {
-                        m.CloseGroup( "Working folder is up-to-date." );
-                        return true;
-                    }
-                }
-                return DoCommit( m, message, date.Value, true, hasChange );
-            }
-        }
-
-        bool DoCommit( IActivityMonitor m, string commitMessage, DateTimeOffset date, bool amendPreviousCommit, bool isDirty )
-        {
-            try
-            {
-                if( isDirty ) m.Info( "Working Folder is dirty. Committing changes." );
-                Signature author = amendPreviousCommit ? _git.Head.Tip.Author : _git.Config.BuildSignature( date );
-                // Let AllowEmptyCommit even when amending: this avoids creating an empty commit.
-                // If we are not amending, this is an error and we let the EmptyCommitException pops.
-                var options = new CommitOptions { AmendPreviousCommit = amendPreviousCommit };
-                var committer = new Signature( "CKli", "none", date );
-                try
-                {
-                    _git.Commit( commitMessage, author ?? committer, committer, options );
-                }
-                catch( EmptyCommitException )
-                {
-                    if( !amendPreviousCommit ) throw;
-                    Debug.Assert( _git.Head.Tip.Parents.Count() == 1, "This check on merge commit is already done by LibGit2Sharp." );
-                    m.Trace( "No actual changes. Reseting branch to parent commit." );
-                    _git.Reset( ResetMode.Hard, _git.Head.Tip.Parents.Single() );
-                    Debug.Assert( options.AmendPreviousCommit = true );
-                    _git.Commit( commitMessage, author, committer, options );
-                    return true;
-                }
-                return true;
-            }
-            catch( Exception ex )
-            {
-                m.Error( ex );
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Gets whether <see cref="Push(IActivityMonitor)"/> can be called:
-        /// the current branch is tracked and is ahead of the remote branch.
-        /// </summary>
-        /// 
-        /// <returns></returns>
-        public bool PushEnabled() => (_git.Head.TrackingDetails.AheadBy ?? 0) > 0;
-
-        /// <summary>
-        /// Pushes changes from the current branch to the origin.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <returns>True on success, false on error.</returns>
-        [CommandMethod]
-        public bool Push( IActivityMonitor m ) => Push( m, CurrentBranchName );
-
-        /// <summary>
-        /// Pushes changes from a branch to the origin.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="branchName">Local branch name.</param>
-        /// <returns>True on success, false on error.</returns>
-        public bool Push( IActivityMonitor m, string branchName )
-        {
-            if( branchName == null ) throw new ArgumentNullException( nameof( branchName ) );
-            using( m.OpenInfo( $"Pushing '{SubPath}' (branch '{branchName}') to origin." ) )
-            {
-                try
-                {
-                    var b = _git.Branches[branchName];
-                    if( b == null )
-                    {
-                        m.Error( $"Unable to find branch '{branchName}'." );
-                        return false;
-                    }
-                    bool created = false;
-                    if( !b.IsTracking )
-                    {
-                        m.Warn( $"Branch '{branchName}' does not exist on the remote. Creating the remote branch on 'origin'." );
-                        _git.Branches.Update( b, u => { u.Remote = "origin"; u.UpstreamBranch = b.CanonicalName; } );
-                        created = true;
-                    }
-                    var options = new PushOptions()
-                    {
-                        CredentialsProvider = ( url, user, cred ) => ProtoGitFolder.PATCredentialsHandler( m ),
-                        OnPushStatusError = ( e ) =>
-                        {
-                            throw new InvalidOperationException( $"Error while pushing ref {e.Reference} => {e.Message}" );
-                        }
-                    };
-                    if( created || (b.TrackingDetails.AheadBy ?? 1) > 0 )
-                    {
-                        _git.Network.Push( b, options );
-                    }
-                    else
-                    {
-                        m.CloseGroup( "Remote branch is on the same commit. Push skipped." );
-                    }
-                    return true;
-                }
-                catch( Exception ex )
-                {
-                    m.Error( ex );
-                    return false;
-                }
-            }
-        }
 
         /// <summary>
         /// Resets the index to the tree recorded by the commit and updates the working directory to
@@ -837,7 +343,7 @@ namespace CK.Env
             {
                 try
                 {
-                    _git.Reset( ResetMode.Hard );
+                    Git.Reset( ResetMode.Hard );
                     return true;
                 }
                 catch( Exception ex )
@@ -872,18 +378,18 @@ namespace CK.Env
                             m.Error( $"Cannot delete the branch {branchName} since it is the current one." );
                             return false;
                         }
-                        var toDelete = _git.Branches[branchName];
+                        var toDelete = Git.Branches[branchName];
                         if( toDelete == null )
                         {
                             m.Info( $"Branch '{branchName}' does not exist." );
                             return true;
                         }
-                        _git.Branches.Remove( toDelete );
+                        Git.Branches.Remove( toDelete );
                         m.Info( $"Branch '{branchName}' has been removed." );
                         return true;
                     }
                     Debug.Assert( !delete );
-                    var current = _git.Head;
+                    var current = Git.Head;
                     if( branchName == current.FriendlyName )
                     {
                         if( commitSha == current.Tip.Sha )
@@ -891,11 +397,11 @@ namespace CK.Env
                             m.Info( $"Current branch '{current}' is alredy on restored state." );
                             return true;
                         }
-                        _git.Reset( ResetMode.Hard, commitSha );
+                        Git.Reset( ResetMode.Hard, commitSha );
                         m.Info( $"Current branch '{current}' has been restored to {commitSha}." );
                         return true;
                     }
-                    var b = _git.Branches[branchName];
+                    var b = Git.Branches[branchName];
                     if( b == null )
                     {
                         m.Warn( $"Branch '{branchName}' not found." );
@@ -906,10 +412,10 @@ namespace CK.Env
                         m.Info( $"Current branch '{branchName}' is alredy on restored state." );
                         return true;
                     }
-                    Commands.Checkout( _git, b );
-                    _git.Reset( ResetMode.Hard, commitSha );
+                    Commands.Checkout( Git, b );
+                    Git.Reset( ResetMode.Hard, commitSha );
                     m.Info( $"Branch '{branchName}' has been restored to {commitSha}." );
-                    Commands.Checkout( _git, current );
+                    Commands.Checkout( Git, current );
                     return true;
                 }
                 catch( Exception ex )
@@ -938,7 +444,7 @@ namespace CK.Env
             {
                 try
                 {
-                    Branch develop = _git.Branches[World.DevelopBranchName];
+                    Branch develop = Git.Branches[World.DevelopBranchName];
                     if( develop == null )
                     {
                         m.Error( $"Unable to find branch '{World.DevelopBranchName}'." );
@@ -946,7 +452,7 @@ namespace CK.Env
                     }
                     // Auto merge from Ours or Theirs: we privilegiate the current branch.
                     MergeFileFavor mergeFileFavor = MergeFileFavor.Normal;
-                    Branch local = _git.Branches[World.LocalBranchName];
+                    Branch local = Git.Branches[World.LocalBranchName];
                     if( local == null || !local.IsCurrentRepositoryHead )
                     {
                         if( !develop.IsCurrentRepositoryHead )
@@ -965,14 +471,15 @@ namespace CK.Env
                         if( local == null )
                         {
                             m.Info( $"Creating the {World.LocalBranchName}." );
-                            local = _git.CreateBranch( World.LocalBranchName );
+                            local = Git.CreateBranch( World.LocalBranchName );
                         }
                         else
                         {
                             m.Info( "Coming from develop: privilegiates 'develop' file changes during merge." );
                             mergeFileFavor = MergeFileFavor.Theirs;
                         }
-                        CheckoutWithPlugins( m, local );
+                        Commands.Checkout( Git, local );
+                        OnNewCurrentBranch( m );
                     }
                     else
                     {
@@ -980,8 +487,8 @@ namespace CK.Env
                         mergeFileFavor = MergeFileFavor.Ours;
                         EnsureCurrentBranchPlugins( m );
                     }
-                    var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
-                    var r = _git.Merge( develop, merger, new MergeOptions
+                    var merger = Git.Config.BuildSignature( DateTimeOffset.Now );
+                    var r = Git.Merge( develop, merger, new MergeOptions
                     {
                         MergeFileFavor = mergeFileFavor,
                         FastForwardStrategy = FastForwardStrategy.NoFastForward,
@@ -1055,13 +562,13 @@ namespace CK.Env
             {
                 try
                 {
-                    Branch bDevelop = _git.Branches[World.DevelopBranchName];
+                    Branch bDevelop = Git.Branches[World.DevelopBranchName];
                     if( bDevelop == null )
                     {
                         m.Error( $"Unable to find branch '{World.DevelopBranchName}'." );
                         return false;
                     }
-                    Branch master = _git.Branches[World.MasterBranchName];
+                    Branch master = Git.Branches[World.MasterBranchName];
                     if( master == null || !master.IsCurrentRepositoryHead )
                     {
                         if( !bDevelop.IsCurrentRepositoryHead )
@@ -1073,17 +580,18 @@ namespace CK.Env
                         if( master == null )
                         {
                             m.Info( $"Creating the {World.MasterBranchName }." );
-                            master = _git.CreateBranch( World.MasterBranchName );
+                            master = Git.CreateBranch( World.MasterBranchName );
                         }
-                        CheckoutWithPlugins( m, master );
+                        Commands.Checkout( Git, master );
+                        OnNewCurrentBranch( m );
                     }
                     else
                     {
                         m.Trace( $"Already on {World.MasterBranchName}." );
                     }
 
-                    var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
-                    var r = _git.Merge( bDevelop, merger, new MergeOptions
+                    var merger = Git.Config.BuildSignature( DateTimeOffset.Now );
+                    var r = Git.Merge( bDevelop, merger, new MergeOptions
                     {
                         FastForwardStrategy = FastForwardStrategy.NoFastForward,
                         CommitOnSuccess = true,
@@ -1120,13 +628,13 @@ namespace CK.Env
             {
                 try
                 {
-                    Branch bDevelop = _git.Branches[World.DevelopBranchName];
+                    Branch bDevelop = Git.Branches[World.DevelopBranchName];
                     if( bDevelop == null )
                     {
                         m.Error( $"Unable to find '{World.DevelopBranchName}' branch." );
                         return false;
                     }
-                    Branch bLocal = _git.Branches[World.LocalBranchName];
+                    Branch bLocal = Git.Branches[World.LocalBranchName];
                     if( bLocal == null )
                     {
                         m.Error( $"Unable to find '{World.LocalBranchName}' branch." );
@@ -1144,7 +652,8 @@ namespace CK.Env
                     {
                         if( !RaiseEnteredLocalBranch( m, false ) ) return false;
                         if( !AmendCommit( m ) ) return false;
-                        CheckoutWithPlugins( m, bDevelop );
+                        Commands.Checkout( Git, bDevelop );
+                        OnNewCurrentBranch( m );
                         m.Info( $"Coming from {World.LocalBranchName}: privilegiates 'local' file changes during merge." );
                         mergeFileFavor = MergeFileFavor.Theirs;
                     }
@@ -1156,8 +665,8 @@ namespace CK.Env
                         mergeFileFavor = MergeFileFavor.Ours;
                     }
 
-                    var merger = _git.Config.BuildSignature( DateTimeOffset.Now );
-                    var r = _git.Merge( bLocal, merger, new MergeOptions
+                    var merger = Git.Config.BuildSignature( DateTimeOffset.Now );
+                    var r = Git.Merge( bLocal, merger, new MergeOptions
                     {
                         MergeFileFavor = mergeFileFavor,
                         FastForwardStrategy = FastForwardStrategy.NoFastForward,
@@ -1195,13 +704,13 @@ namespace CK.Env
             {
                 try
                 {
-                    Branch develop = _git.Branches[World.DevelopBranchName];
+                    Branch develop = Git.Branches[World.DevelopBranchName];
                     if( develop == null )
                     {
                         m.Error( $"Unable to find '{World.DevelopBranchName}' branch." );
                         return false;
                     }
-                    Branch master = _git.Branches[World.MasterBranchName];
+                    Branch master = Git.Branches[World.MasterBranchName];
                     if( !develop.IsCurrentRepositoryHead && (master == null || !master.IsCurrentRepositoryHead) )
                     {
                         m.Error( $"Must be on '{World.MasterBranchName}' or '{World.DevelopBranchName}' branch." );
@@ -1210,7 +719,8 @@ namespace CK.Env
                     if( master != null && master.IsCurrentRepositoryHead )
                     {
                         if( !CheckCleanCommit( m ) ) return false;
-                        CheckoutWithPlugins( m, develop );
+                        Commands.Checkout( Git, develop );
+                        OnNewCurrentBranch( m );
                     }
                     return true;
                 }
@@ -1226,7 +736,7 @@ namespace CK.Env
         {
             ProtoGitFolder.CommandRegister.Unregister( this );
             ((IDisposable)PluginManager).Dispose();
-            _git.Dispose();
+            Git.Dispose();
         }
 
         public override string ToString() => $"{FullPhysicalPath} ({CurrentBranchName ?? "<no branch>" }).";
@@ -1288,7 +798,7 @@ namespace CK.Env
                 _f = f;
             }
 
-            public override DateTimeOffset LastModified => _f._git.Head.Tip.Committer.When;
+            public override DateTimeOffset LastModified => _f.Git.Head.Tip.Committer.When;
 
             public override string PhysicalPath => _f.FullPhysicalPath.Path;
 
@@ -1410,7 +920,7 @@ namespace CK.Env
                 _isRemote = isRemote;
             }
 
-            public override DateTimeOffset LastModified => _f._git.Head.Tip.Committer.When;
+            public override DateTimeOffset LastModified => _f.Git.Head.Tip.Committer.When;
 
             internal bool Add( Branch b )
             {
@@ -1506,7 +1016,7 @@ namespace CK.Env
         {
             if( !_branchRefreshed )
             {
-                foreach( var b in _git.Branches )
+                foreach( var b in Git.Branches )
                 {
                     if( !b.IsRemote ) _branchesFolder.Add( b );
                     else _remoteBranchesFolder.Add( b );
@@ -1562,7 +1072,7 @@ namespace CK.Env
                 sub = sub.RemoveFirstPart();
                 return true;
             }
-            if( sub.Parts.Count > 1 && _git.Head.FriendlyName == sub.Parts[1] )
+            if( sub.Parts.Count > 1 && Git.Head.FriendlyName == sub.Parts[1] )
             {
                 sub = sub.RemoveParts( 0, 2 );
                 return true;

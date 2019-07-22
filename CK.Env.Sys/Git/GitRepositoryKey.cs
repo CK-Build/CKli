@@ -58,7 +58,7 @@ namespace CK.Env
         public bool IsPublic { get; }
 
         /// <summary>
-        /// Gets the current remote origin url.
+        /// Gets the remote origin url.
         /// </summary>
         public Uri OriginUrl { get; }
 

@@ -36,7 +36,8 @@ namespace CK.Env
         public abstract IReadOnlyList<IRootedWorldName> ReadWorlds( IActivityMonitor m );
 
         /// <summary>
-        /// Creates a new world in this store or returns null if the world already exists.
+        /// Creates a new world in this store or returns null if the world already exists or if an error
+        /// prevents it to be created.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="name">The name of the world. See <see cref="IWorldName"/>.</param>
@@ -169,7 +170,7 @@ namespace CK.Env
         /// <returns>The path to use to read/write the local state.</returns>
         protected virtual NormalizedPath ToLocalStateFilePath( IWorldName w )
         {
-            var p = WorldLocalMapping.GetRootPath( w );
+            var p = w is IRootedWorldName r ? r.Root : WorldLocalMapping.GetRootPath( w );
             return p.AppendPart( w.FullName + ".World.State.xml" );
         }
     }

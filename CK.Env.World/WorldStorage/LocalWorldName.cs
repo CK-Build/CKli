@@ -7,13 +7,20 @@ using System.IO;
 namespace CK.Env
 {
     /// <summary>
-    /// Local world name is a <see cref="IRootedWorldName"/> defined by its
-    /// definition file path (<see cref="XmlDescriptionFilePath"/>).
+    /// Local world name is a <see cref="IRootedWorldName"/> that also carries
+    /// its definition file path (<see cref="XmlDescriptionFilePath"/>).
     /// </summary>
     public class LocalWorldName : WorldName, IRootedWorldName
     {
-        internal LocalWorldName( NormalizedPath xmlDescriptionFilePath, string worldName, string parallelName, IWorldLocalMapping localMap )
-            : base( worldName, parallelName )
+        /// <summary>
+        /// Initializes a new <see cref="LocalWorldName"/>.
+        /// </summary>
+        /// <param name="xmlDescriptionFilePath">Path of the definition file.</param>
+        /// <param name="stackName">The stack name.</param>
+        /// <param name="parallelName">The optional parallel name. Can be null or empty.</param>
+        /// <param name="localMap">Required to compute the <see cref="Root"/> folder.</param>
+        public LocalWorldName( NormalizedPath xmlDescriptionFilePath, string stackName, string parallelName, IWorldLocalMapping localMap )
+            : base( stackName, parallelName )
         {
             if( String.IsNullOrWhiteSpace( xmlDescriptionFilePath ) ) throw new ArgumentNullException( nameof( xmlDescriptionFilePath ) );
             XmlDescriptionFilePath = xmlDescriptionFilePath;

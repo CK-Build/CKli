@@ -34,10 +34,9 @@ namespace CK.Env
             }
         }
 
-        protected void Save()
+        void Save()
         {
-            var text = _map.OrderBy( k => k.Key ).Select( k => k.Key + " > " + k.Value ).Concatenate( Environment.NewLine );
-            File.WriteAllText( _filePath, text );
+            File.WriteAllLines( _filePath, _map.OrderBy( k => k.Key ).Select( k => k.Key + " > " + k.Value ) );
         }
 
         /// <summary>
@@ -80,6 +79,7 @@ namespace CK.Env
             }
             if( !mappedPath.IsRooted ) throw new ArgumentException( "Path must be rooted.", nameof( mappedPath ) );
             _map[worldFullName] = mappedPath;
+            Save();
             return true;
         }
     }
