@@ -102,6 +102,7 @@ namespace CK.Env
             if( g == null )
             {
                 g = proto.CreateGitFolder( m );
+                // TODO: this SHOULD be done in ProtoGitFolder.EnsureWorkingFolder!
                 if( g != null )
                 {
                     g.EnsureBranch( m, proto.World.DevelopBranchName );

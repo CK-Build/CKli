@@ -33,6 +33,7 @@ namespace CK.Env
             StacksFilePath = userHostPath.AppendPart( "Stacks.txt" );
             _stacks = new List<StackDef>();
             Stacks = _stacks;
+            _repos = new List<StackRepo>();
             commandRegister.Register( this );
         }
 
@@ -43,6 +44,63 @@ namespace CK.Env
         SecretKeyStore SecretKeyStore { get; }
 
         NormalizedPath StacksFilePath { get; }
+
+        /// <summary>
+        /// Reads the Stacks.txt file and instanciates the <see cref="StackDef"/> objects:
+        /// this registers the required PAT in the key store.
+        /// Optionally opens the repositories (the required secrets must be available)
+        /// and reads the list of all the worlds.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="openRepositories">True to clone/open the repositories.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool Initialize( IActivityMonitor m, bool openRepositories )
+        {
+            if( !File.Exists( StacksFilePath ) )
+            {
+                m.Warn( $"File '{StacksFilePath}' not found." );
+                return false;
+            }
+            bool success = true;
+            using( m.OpenInfo( $"Reading '{StacksFilePath}'." ) )
+            {
+                foreach( var line in File.ReadAllLines( StacksFilePath ) )
+                {
+                    Exception severe = null;
+                    try
+                    {
+                        var l = line.Split( '>' );
+                        if( l.Length >= 3 )
+                        {
+                            var name = l[0].Trim();
+                            if( name.Length > 0 )
+                            {
+                                var url = l[1].Trim();
+                                if( Uri.TryCreate( url, UriKind.Absolute, out var uri ) )
+                                {
+                                    var pubTxt = l[2].Trim();
+                                    bool isPublic = pubTxt.Equals( "Public", StringComparison.OrdinalIgnoreCase );
+                                    string branchName = l.Length >= 4 ? l[3].Trim() : null;
+                                    EnsureStackDefinition( m, name, url, isPublic, branchName );
+                                    continue;
+                                }
+                                else m.Error( $"Invalid repository url '{url}'." );
+                            }
+                            else m.Error( $"Missing stack name." );
+                        }
+                        else m.Error( $"Invalid line format." );
+                    }
+                    catch( Exception ex )
+                    {
+                        severe = ex;
+                    }
+                    m.Error( $"Unable to read line '{line}'.", severe );
+                    success = false;
+                }
+            }
+            if( success ) OnStacksChanged( m, openRepositories );
+            return success;
+        }
 
         #region Stack Definition
 
@@ -80,56 +138,6 @@ namespace CK.Env
                 if( BranchName != "master" ) m += " > " + BranchName;
                 return m;
             }
-        }
-
-        /// <summary>
-        /// Reads the Stacks.txt file, opens the repositories
-        /// and reads the list of all the worlds.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        public void Initialize( IActivityMonitor m, bool openRepositories )
-        {
-            if( !File.Exists( StacksFilePath ) )
-            {
-                m.Warn( $"File '{StacksFilePath}' not found." );
-                return;
-            }
-            using( m.OpenInfo( $"Reading '{StacksFilePath}'." ) )
-            {
-                foreach( var line in File.ReadAllLines( StacksFilePath ) )
-                {
-                    Exception severe = null;
-                    try
-                    {
-                        var l = line.Split( '>' );
-                        if( l.Length >= 3 )
-                        {
-                            var name = l[0].Trim();
-                            if( name.Length > 0 )
-                            {
-                                var url = l[1].Trim();
-                                if( Uri.TryCreate( url, UriKind.Absolute, out var uri ) )
-                                {
-                                    var pubTxt = l[2].Trim();
-                                    bool isPublic = pubTxt.Equals( "Public", StringComparison.OrdinalIgnoreCase );
-                                    string branchName = l.Length >= 4 ? l[3].Trim() : null;
-                                    EnsureStackDefinition( m, name, url, isPublic, branchName );
-                                    continue;
-                                }
-                                else m.Error( $"Invalid repository url '{url}'." );
-                            }
-                            else m.Error( $"Missing stack name." );
-                        }
-                        else m.Error( $"Invalid line format." );
-                    }
-                    catch( Exception ex )
-                    {
-                        severe = ex;
-                    }
-                    m.Error( $"Unable to read line '{line}'.", severe );
-                }
-            }
-            OnStacksChanged( m, true );
         }
 
         /// <summary>
@@ -221,15 +229,16 @@ namespace CK.Env
             readonly GitWorldStore _store;
             readonly NormalizedPath _root;
             int _syncCount;
-            StackDef[] _expectedStacks;
 
+            StackDef[] _stacks;
             Repository _git;
-
+            
             public StackRepo( GitWorldStore store, Uri uri )
             {
                 _store = store;
                 OriginUrl = uri;
-                var cleanPath = uri.AbsolutePath.Replace( "_git", "" )
+                var cleanPath = uri.AbsolutePath
+                                   .Replace( "_git", "" )
                                    .Replace( "_", "" )
                                    .Replace( '/', '_' )
                                    .Replace( "__", "_" )
@@ -239,18 +248,29 @@ namespace CK.Env
 
             bool IsOpen => _git != null;
 
+            bool EnsureOpen( IActivityMonitor m )
+            {
+                if( !IsOpen )
+                {
+                    var gitKey = _stacks[0];
+                    Debug.Assert( _stacks.All( d => d.OriginUrl == gitKey.OriginUrl && d.IsPublic == gitKey.IsPublic ) );
+                    Debug.Assert( _stacks.All( d => d.BranchName == gitKey.BranchName ) );
+                    _git = ProtoGitFolder.EnsureWorkingFolder( m, gitKey, _root, false, gitKey.BranchName, true );
+                }
+                return IsOpen;
+            }
+
             internal void Synchronize(
                 IActivityMonitor m,
                 IEnumerable<StackDef> expectedStacks,
                 bool openRepositories,
                 Action<LocalWorldName> addWorld )
             {
+                Debug.Assert( expectedStacks.All( d => d.OriginUrl == OriginUrl ) );
                 _syncCount = _store._syncCount;
-                if( !IsOpen && openRepositories )
-                {
-
-                }
-                if( IsOpen ) ReadWorlds( m, expectedStacks, addWorld );
+                _stacks = expectedStacks.ToArray();
+                if( openRepositories ) EnsureOpen( m );
+                if( IsOpen ) ReadWorlds( m, addWorld );
             }
 
             internal bool PostSynchronize( IActivityMonitor m )
@@ -275,14 +295,14 @@ namespace CK.Env
                 return false;
             }
 
-            void ReadWorlds( IActivityMonitor m, IEnumerable<StackDef> expectedStacks, Action<LocalWorldName> addWorld )
+            void ReadWorlds( IActivityMonitor m, Action<LocalWorldName> addWorld )
             {
                 Debug.Assert( IsOpen );
                 var worldNames = Directory.GetFiles( _root, "*.World.xml" )
                                     .Select( p => LocalWorldName.TryParse( m, p, _store.WorldLocalMapping ) )
                                     .Where( w => w != null )
                                     .ToList();
-                var missing = expectedStacks
+                var missing = _stacks
                                 .Where( s => !worldNames.Any( w => w.FullName.Equals( s.StackName, StringComparison.OrdinalIgnoreCase ) ) );
                 foreach( var s in missing )
                 {
@@ -292,7 +312,7 @@ namespace CK.Env
                 {
                     var w = worldNames[i];
                     if( w.ParallelName == null
-                        && !expectedStacks.Any( s => s.StackName.Equals( w.FullName, StringComparison.OrdinalIgnoreCase ) ) )
+                        && !_stacks.Any( s => s.StackName.Equals( w.FullName, StringComparison.OrdinalIgnoreCase ) ) )
                     {
                         m.Warn( $"Unexpected '{w.FullName}' stack found. It is ignored." );
                         worldNames.RemoveAt( i-- );
@@ -311,7 +331,18 @@ namespace CK.Env
             ++_syncCount;
             foreach( var gD in _stacks.GroupBy( d => d.OriginUrl ) )
             {
-                EnsureRepo( gD.Key ).Synchronize( m, gD, openRepositories, newWorlds.Add );
+                if( gD.Any( d => d.IsPublic ) && gD.Any( d => !d.IsPublic ) )
+                {
+                    m.Error( $"Repository {gD.Key} contains a mix of public and private Stacks. All stacks in this repository are ignored." );
+                }
+                else if( gD.Select( d => d.BranchName ).Distinct().Count() > 1 )
+                {
+                    m.Error( $"Repository {gD.Key} contains Stacks bound to different branches: it must be the same branch for all stacks. All stacks in this repository are ignored." );
+                }
+                else
+                {
+                    EnsureRepo( gD.Key ).Synchronize( m, gD, openRepositories, newWorlds.Add );
+                }
             }
             for( int i = 0; i < _repos.Count; ++i )
             {
@@ -378,7 +409,7 @@ namespace CK.Env
         /// <returns>True on success, false on error.</returns>
         public bool Refresh( IActivityMonitor m, bool withPull )
         {
-            throw new NotImplementedException( "WIP" );
+            throw new NotImplementedException( "Soon!" );
         }
  
         void SetWorlds( IActivityMonitor m, List<LocalWorldName> newWorlds )

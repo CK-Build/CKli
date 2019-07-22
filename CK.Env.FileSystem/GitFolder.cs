@@ -45,11 +45,12 @@ namespace CK.Env
             data.CommandRegister.Register( this );
         }
 
+        // This method SHOULD not exist...
+        // The ctor above should be internal and every checks should have been done before.
         internal static GitFolder Create( IActivityMonitor m, Repository r, ProtoGitFolder data )
         {
-            // 1 - Checks everything we can based on Repository and ProtoGitFolder.
             var g = new GitFolder( r, data );
-            // 2 - Now checks everything that requires an actual GitFolder.
+            // Now checks everything that requires an actual GitFolder.
             //@Nico... Is this REALLY required?
             // Upt to me, everything should be done above, BEFORE creating the instance...
             if( !g.CheckValid( m ) )
@@ -254,7 +255,7 @@ namespace CK.Env
             if( b == null )
             {
                 m.Log( noWarnOnCreate ? Core.LogLevel.Info : Core.LogLevel.Warn, $"Branch '{branchName}' does not exist. Creating local branch." ); ;
-                _ = _git.CreateBranch( branchName );
+                b = _git.CreateBranch( branchName );
             }
         }
 

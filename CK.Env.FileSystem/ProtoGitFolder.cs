@@ -82,21 +82,30 @@ namespace CK.Env
         public GitPluginRegistry PluginRegistry { get; }
 
         /// <summary>
-        /// Checks out a working folder if needed or check that an existing one is
+        /// Checks out a working folder if needed or checks that an existing one is
         /// bound to the <see cref="GitRepositoryKey.OriginUrl"/> 'origin' remote.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="git">The Git key.</param>
         /// <param name="workingFolder">The local working folder.</param>
         /// <param name="ensureHooks">True to create the standard hooks.</param>
-        /// <param name="clonedBranchName">The initial branch name if cloning is done.</param>
+        /// <param name="branchName">
+        /// The initial branch name if cloning is done and the branch that must be
+        /// checked out if <paramref name="checkOutBranchName"/> is true.
+        /// This branch is always created as needed (just like <see cref="GitFolder.EnsureBranch"/> does).
+        /// </param>
+        /// <param name="checkOutBranchName">
+        /// True to always check out the <paramref name="branchName"/>
+        /// even if the repository already exists.
+        /// </param>
         /// <returns>The LibGit2Sharp repository object or null on error.</returns>
         public static Repository EnsureWorkingFolder(
             IActivityMonitor m,
             GitRepositoryKey git,
             NormalizedPath workingFolder,
             bool ensureHooks,
-            string clonedBranchName )
+            string branchName,
+            bool checkOutBranchName )
         {
             using( m.OpenTrace( $"Ensuring working folder '{workingFolder}' on '{git.OriginUrl}'." ) )
             {
@@ -105,14 +114,16 @@ namespace CK.Env
                     var gitFolderPath = Path.Combine( workingFolder, ".git" );
                     if( !Directory.Exists( gitFolderPath ) )
                     {
-                        using( m.OpenInfo( $"Checking out '{workingFolder}' from '{git.OriginUrl}' on {clonedBranchName}." ) )
+                        using( m.OpenInfo( $"Checking out '{workingFolder}' from '{git.OriginUrl}' on {branchName}." ) )
                         {
                             Repository.Clone( git.OriginUrl.ToString(), workingFolder, new CloneOptions()
                             {
                                 CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, git ),
-                                BranchName = clonedBranchName,
+                                BranchName = branchName,
                                 Checkout = true
                             } );
+                            // Since we cloned on the branchName, there is no need to check it out again.
+                            checkOutBranchName = false;
                         }
                     }
                     else if( !Repository.IsValid( gitFolderPath ) )
@@ -128,6 +139,11 @@ namespace CK.Env
                         r.Dispose();
                         return null;
                     }
+                    if( checkOutBranchName )
+                    {
+                        // TODO: Ensure here that what seems to be done in CheckValid is done
+                        // here and that finally, the expected branch is checked out...
+                    }
                     if( ensureHooks ) EnsureHooks( m, workingFolder );
                     m.CloseGroup( "Repository is checked out." );
                     return r;
@@ -142,13 +158,13 @@ namespace CK.Env
 
         /// <summary>
         /// Ensures that the Git working folder actually exists and creates a
-        /// GitFolder instance or returns null on error.
+        /// GitFolder instance where the checked out  or returns null on error.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The GitFolder instance or null on error.</returns>
         public GitFolder CreateGitFolder( IActivityMonitor m )
         {
-            var r = EnsureWorkingFolder( m, this, FullPhysicalPath, true, World.DevelopBranchName );
+            var r = EnsureWorkingFolder( m, this, FullPhysicalPath, true, World.DevelopBranchName, false );
             if( r == null ) return null;
             return GitFolder.Create( m, r, this );
         }
