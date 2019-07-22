@@ -978,7 +978,7 @@ namespace CK.Env
                     if( oldBranchName == WorldName.MasterBranchName || oldBranchName == WorldName.DevelopBranchName )
                     {
                         string url = (string)branch.Parent.AttributeRequired( "Url" );
-                        var repo = _gitRepositories.Single( p => url == p.OriginUrl );
+                        var repo = _gitRepositories.Single( p => url.Equals( p.OriginUrl.ToString(), StringComparison.OrdinalIgnoreCase ) );
                         repo.EnsureBranch( m, branchName, true );
                         m.Trace( $"Branch '{oldBranchName}' renamed to '{branchName}'." );
                         oldBranch.Value = branchName;

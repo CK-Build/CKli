@@ -11,7 +11,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the Origin URL of the Git repository
         /// </summary>
-        string OriginUrl { get; }
+        Uri OriginUrl { get; }
 
         /// <summary>
         /// Ensures that a local branch exists.
