@@ -81,6 +81,40 @@ namespace CK.Env
         /// </summary>
         public GitPluginRegistry PluginRegistry { get; }
 
+
+        static Repository EnsureWorkingFolder(
+            IActivityMonitor m,
+            GitRepositoryKey git,
+            NormalizedPath workingFolder,
+            string clonedBranchName )
+        {
+            using( m.OpenTrace( $"Ensuring git repository {workingFolder}" ) )
+            {
+                var gitFolderPath = Path.Combine( workingFolder, ".git" );
+                if( !Directory.Exists( gitFolderPath ) )
+                {
+                    using( m.OpenInfo( $"Checking out '{workingFolder}' from '{git.OriginUrl}' on {clonedBranchName}." ) )
+                    {
+                        Repository.Clone( git.OriginUrl.ToString(), workingFolder, new CloneOptions()
+                        {
+                            CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, git ),
+                            BranchName = clonedBranchName,
+                            Checkout = true
+                        } );
+                    }
+                }
+                else if( !Repository.IsValid( gitFolderPath ) )
+                {
+                    throw new InvalidOperationException( $"Git folder {gitFolderPath} exists but is not a valid Repository." );
+                }
+                else
+                {
+
+                    m.CloseGroup( "Repository is checked out." );
+                }
+            }
+        }
+
         /// <summary>
         /// Ensures that the Git working folder actually exists and creates a
         /// GitFolder instance.
@@ -91,7 +125,6 @@ namespace CK.Env
         {
             using( m.OpenTrace( $"Ensuring git repository {FullPhysicalPath}" ) )
             {
-
                 var gitFolderPath = Path.Combine( FullPhysicalPath, ".git" );
                 if( !Directory.Exists( gitFolderPath ) )
                 {
@@ -107,30 +140,41 @@ namespace CK.Env
                 }
                 else if( !Repository.IsValid( gitFolderPath ) )
                 {
-                    throw new InvalidOperationException( $"Git folder {gitFolderPath} exists but is not a valid Repository" );
+                    throw new InvalidOperationException( $"Git folder {gitFolderPath} exists but is not a valid Repository." );
                 }
                 else
                 {
                     m.Trace( "Repository is checked out." );
                 }
-
                 EnsureHooks( m );
                 return GitFolder.EnsureGitFolderCorrectSetup( m, this );
 
             }
         }
 
-        internal Credentials PATCredentialsHandler( IActivityMonitor m )
+        /// <summary>
+        /// Credentials is read from the <see cref="GitRepositoryKey.SecretKeyStore"/>.
+        /// This can not be implemented by GitRepositoryKey since LibGit2Sharp is not
+        /// a dependency of CK.Env.Sys. 
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="git">The repository key.</param>
+        /// <returns>The Credentials object that is null or a <see cref="UsernamePasswordCredentials"/>.</returns>
+        static Credentials PATCredentialsHandler( IActivityMonitor m, GitRepositoryKey git )
         {
-            if( KnownGitProvider == KnownGitProvider.Unknown ) throw new InvalidOperationException( "Unknown Git provider." );
-            string pat = SecretKeyStore.GetSecretKey( m, ReadPATKeyName, !IsPublic );
-            return new UsernamePasswordCredentials()
-            {
-                Username = "CKli",
-                Password = pat
-            };
+            if( git.KnownGitProvider == KnownGitProvider.Unknown ) throw new InvalidOperationException( "Unknown Git provider." );
+            string pat = git.SecretKeyStore.GetSecretKey( m, git.ReadPATKeyName, !git.IsPublic );
+            return pat != null
+                    ? new UsernamePasswordCredentials() { Username = "CKli", Password = pat }
+                    : null;
         }
 
+        /// <summary>
+        /// Binds this <see cref="GitRepositoryKey"/> to the static  <see cref="PATCredentialsHandler(IActivityMonitor, GitRepositoryKey)"/>.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>The Credentials object that is null or a <see cref="UsernamePasswordCredentials"/>.</returns>
+        internal Credentials PATCredentialsHandler( IActivityMonitor m ) => PATCredentialsHandler( m, this );
 
         #region GitHooks
 

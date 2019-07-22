@@ -1,3 +1,4 @@
+using CK.Core;
 using CK.Text;
 using System;
 using System.Collections.Generic;
@@ -70,10 +71,16 @@ namespace CK.Env
 
         internal bool IsMapped( string worldFullName ) => _map.ContainsKey( worldFullName );
 
-        internal void SetMap( string worldFullName, NormalizedPath mappedPath )
+        internal bool SetMap( IActivityMonitor m, string worldFullName, NormalizedPath mappedPath )
         {
-            Debug.Assert( mappedPath.IsRooted );
+            if( _map.TryGetValue( worldFullName, out var exists )
+                && (exists == mappedPath || mappedPath.IsEmptyPath) )
+            {
+                return false;
+            }
+            if( !mappedPath.IsRooted ) throw new ArgumentException( "Path must be rooted.", nameof( mappedPath ) );
             _map[worldFullName] = mappedPath;
+            return true;
         }
     }
 
