@@ -41,37 +41,53 @@ namespace CKli
 
         static void Main( string[] args )
         {
-            var rootPath = GetRootPath( args );
-            LogFile.RootLogPath = Path.Combine( rootPath, "Logs" );
-            var goc = new GrandOutputConfiguration();
-            goc.Handlers.Add( new CK.Monitoring.Handlers.TextFileConfiguration() { Path = "Text" } );
-            GrandOutput.EnsureActiveDefault( goc );
+            NormalizedPath userHostPath = Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData );
+            userHostPath = userHostPath.AppendPart( "CKli" );
+
+            LogFile.RootLogPath = userHostPath.AppendPart( "Logs" );
+            var logConfig = new GrandOutputConfiguration().AddHandler(
+                                new CK.Monitoring.Handlers.TextFileConfiguration() { Path = "Text" } );
+            GrandOutput.EnsureActiveDefault( logConfig );
 
             var monitor = new ActivityMonitor();
             monitor.Output.RegisterClient( new ColoredActivityMonitorConsoleClient() );
 
-            var xFactory = new XTypedFactory();
-            xFactory.AutoRegisterFromLoadedAssemblies( monitor );
             IBasicApplicationLifetime appLife = new FakeApplicationLifetime();
-            using( var global = new GlobalContext( monitor, xFactory, rootPath, appLife ) )
+            try
             {
-                if( !InteractiveRun( monitor, global, appLife ) ) Console.ReadLine();
+                var host = new UserHost( appLife, userHostPath );
+                host.Initialize( monitor );
+                InteractiveRun( monitor, host );
+            }
+            catch( Exception ex )
+            {
+                monitor.Fatal( ex );
             }
         }
 
-        static bool InteractiveRun( ActivityMonitor monitor, GlobalContext global, IBasicApplicationLifetime appLife )
+        static void InteractiveRun( IActivityMonitor monitor, UserHost host )
         {
-            if( !global.Open() ) return false;
+            const string textCommands = "[run <globbed command name> | list [<globbed command name>] | cls | exit]";
             for(; ; )
             {
-                if( appLife.CanCancelStopRequest ) appLife.CancelStopRequest();
+                if( host.ApplicationLifetime.CanCancelStopRequest ) host.ApplicationLifetime.CancelStopRequest();
+
+                bool hasWorld = host.WorldSelector.CurrentWorld != null;
                 Console.WriteLine();
-                Console.WriteLine( $"> World: {global.CurrentWorld.FullName} - [run <globbed command name> | list [<globbed command name>] | cls | restart | exit]" );
+                if( hasWorld )
+                {
+                    Console.WriteLine( $"> World: {host.WorldSelector.CurrentWorld.WorldName.FullName} - {textCommands }" );
+                }
+                else
+                {
+                    Console.WriteLine( $"> {textCommands}" );
+                }
                 Console.Write( "> " );
                 string rep = Console.ReadLine().Trim();
                 if( rep.Length == 0 )
                 {
-                    global.CommandRegister["World/DumpWorldState"].Execute( monitor, null );
+                    if( hasWorld ) host.CommandRegister["World/DumpWorldState"].Execute( monitor, null );
+                    else DumpWorlds( host.WorldStore.ReadWorlds( monitor ) );
                     continue;
                 }
                 if( rep == "cls" )
@@ -86,12 +102,12 @@ namespace CKli
                     if( rep.Length == 0 )
                     {
                         Console.Write( $"Available Commands:" );
-                        commands = global.CommandRegister.GetAllCommands();
+                        commands = host.CommandRegister.GetAllCommands();
                     }
                     else
                     {
                         Console.Write( $"Available Commands matching '{rep}':" );
-                        commands = global.CommandRegister.GetCommands( rep );
+                        commands = host.CommandRegister.GetCommands( rep );
                     }
 
                     bool atLeastOne = false;
@@ -108,25 +124,59 @@ namespace CKli
                     if( !atLeastOne ) Console.WriteLine( " (none)" );
                     continue;
                 }
-                if( rep == "exit" ) return true;
-                if( rep == "restart" )
-                {
-                    if( !global.Open() ) return false;
-                    continue;
-                }
+                if( rep == "exit" ) return;
                 if( rep.StartsWith( "run " ) )
                 {
                     rep = rep.Substring( 4 ).Trim();
-                    RunCommand( monitor, global, appLife, rep );
+                    RunCommand( monitor, host, rep );
                     continue;
                 }
                 Console.WriteLine( "Unrecognized command." );
             }
         }
 
-        static void RunCommand( ActivityMonitor m, GlobalContext global, IBasicApplicationLifetime appLife, string rep )
+        IRootedWorldName ChooseWorld( IActivityMonitor m, UserHost host )
         {
-            var handlers = global.CommandRegister.GetCommands( rep );
+            var worlds = host.WorldStore.ReadWorlds( m ).ToList();
+            for(; ; )
+            {
+                DumpWorlds( worlds );
+                Console.WriteLine( "-------------" );
+                Console.WriteLine( "   > x - Exit" );
+                string r = Console.ReadLine();
+                if( Int32.TryParse( r, out int result ) && result >= 1 && result <= worlds.Count )
+                {
+                    return worlds[result - 1];
+                }
+                if( r == "x" ) return null;
+            }
+        }
+
+        static void DumpWorlds( IEnumerable<IRootedWorldName> worlds )
+        {
+            foreach( var g in worlds.GroupBy( f => f.Name ) )
+            {
+                Console.WriteLine( $"- {g.Key}" );
+                int idx = 0;
+                foreach( var w in g )
+                {
+                    string key;
+                    if( w.ParallelName == null )
+                    {
+                        key = "<Default>";
+                    }
+                    else
+                    {
+                        key = $"[{w.ParallelName}]";
+                    }
+                    Console.WriteLine( $"   > {++idx} {key} => {(w.Root.IsEmptyPath ? "(No local mapping)" : w.Root.Path)}" );
+                }
+            }
+        }
+
+        static void RunCommand( IActivityMonitor m, UserHost host, string rep )
+        {
+            var handlers = host.CommandRegister.GetCommands( rep );
             var handlersBySig = handlers
                                     .GroupBy( c => c.PayloadSignature )
                                     .ToList();
@@ -198,13 +248,11 @@ namespace CKli
 
             if( !parallelRun.Value )
             {
-
                 foreach( var h in handlers )
                 {
-                    if( appLife.StopRequested( m ) ) break;
+                    if( host.ApplicationLifetime.StopRequested( m ) ) break;
                     h.Execute( m, payload );
                 }
-
             }
             else
             {
@@ -217,7 +265,6 @@ namespace CKli
             }
             
         }
-
 
         static bool YesOrNo()
         {
@@ -242,7 +289,7 @@ namespace CKli
             }
         }
 
-        static bool ReadPayload( ActivityMonitor monitor, object payload )
+        static bool ReadPayload( IActivityMonitor monitor, object payload )
         {
             if( payload == null ) return true;
             if( !(payload is SimplePayload simple) )

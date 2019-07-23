@@ -1,3 +1,4 @@
+using CK.Core;
 using CK.Text;
 using System;
 using System.Collections.Generic;
@@ -10,24 +11,34 @@ namespace CK.Env
         public static readonly NormalizedPath HomeCommandPath = "Home";
 
         readonly XTypedFactory _xTypedObjectfactory;
-        readonly CommandRegister _commandRegister;
         readonly UserKeyVault _keyVault;
         readonly SimpleWorldLocalMapping _worldMapping;
         readonly GitWorldStore _store;
-        readonly WorldSelector _selector;
 
-        public UserHost( IBasicApplicationLifetime lifetime )
+        public UserHost( IBasicApplicationLifetime lifetime, NormalizedPath userHostPath )
         {
-            NormalizedPath userHostPath = Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData );
-            userHostPath = userHostPath.AppendPart( "CKli" );
-
+            ApplicationLifetime = lifetime;
+            CommandRegister = new CommandRegister();
             _xTypedObjectfactory = new XTypedFactory();
-            _commandRegister = new CommandRegister();
-            _keyVault = new UserKeyVault( userHostPath, _commandRegister );
+            _keyVault = new UserKeyVault( userHostPath, CommandRegister );
             _worldMapping = new SimpleWorldLocalMapping( userHostPath.AppendPart( "WorldLocalMapping.txt" ) );
-            _store = new GitWorldStore( userHostPath, _worldMapping, _keyVault.KeyStore, _commandRegister );
-            _selector = new WorldSelector( _store, _commandRegister, _xTypedObjectfactory, _keyVault.KeyStore, lifetime );
+            _store = new GitWorldStore( userHostPath, _worldMapping, _keyVault.KeyStore, CommandRegister );
+            WorldSelector = new WorldSelector( _store, CommandRegister, _xTypedObjectfactory, _keyVault.KeyStore, lifetime );
         }
 
+        public CommandRegister CommandRegister { get; }
+
+        public IBasicApplicationLifetime ApplicationLifetime { get; }
+
+        public WorldStore WorldStore => _store;
+
+        public WorldSelector WorldSelector { get; }
+
+
+        public void Initialize( IActivityMonitor m )
+        {
+            _xTypedObjectfactory.AutoRegisterFromLoadedAssemblies( m );
+            _store.ReadStacksFromFile( m );
+        }
     }
 }

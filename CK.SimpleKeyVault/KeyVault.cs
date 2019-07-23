@@ -102,7 +102,7 @@ namespace CK.SimpleKeyVault
                         || kv.Key.IndexOf( '\r' ) >= 0
                         || kv.Key.IndexOf( ' ' ) >= 0 )
                     {
-                        throw new ArgumentException( $"Key must not be null, empty or contain \\r or \\n characters: {kv.Key}", nameof( values ) );
+                        throw new ArgumentException( $"Key must not be null, empty or contain \\r or \\n or space characters: {kv.Key}", nameof( values ) );
                     }
                     b.AppendLine( kv.Key );
                     w.Write( kv.Key );

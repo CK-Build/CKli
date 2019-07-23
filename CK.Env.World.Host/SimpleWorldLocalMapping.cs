@@ -75,10 +75,12 @@ namespace CK.Env
             if( _map.TryGetValue( worldFullName, out var exists )
                 && (exists == mappedPath || mappedPath.IsEmptyPath) )
             {
+                m.Trace( $"Mapping not changed: '{worldFullName}' -> '{exists}'." );
                 return false;
             }
             if( !mappedPath.IsRooted ) throw new ArgumentException( "Path must be rooted.", nameof( mappedPath ) );
             _map[worldFullName] = mappedPath;
+            m.Info( $"Mapping updated: '{worldFullName}' -> '{mappedPath}'." );
             Save();
             return true;
         }

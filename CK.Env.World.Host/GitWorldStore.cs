@@ -46,7 +46,7 @@ namespace CK.Env
 
         /// <summary>
         /// Reads the Stacks.txt file and instanciates the <see cref="StackDef"/> objects:
-        /// this registers the required PAT in the key store.
+        /// this registers the required secrets in the key store.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         public void ReadStacksFromFile( IActivityMonitor m )
@@ -55,7 +55,7 @@ namespace CK.Env
             {
                 m.Warn( $"File '{StacksFilePath}' not found." );
             }
-            using( m.OpenInfo( $"Reading '{StacksFilePath}'." ) )
+            else using( m.OpenInfo( $"Reading '{StacksFilePath}'." ) )
             {
                 foreach( var line in File.ReadAllLines( StacksFilePath ) )
                 {
@@ -88,6 +88,15 @@ namespace CK.Env
                         severe = ex;
                     }
                     m.Error( $"Unable to read line '{line}'.", severe );
+                }
+            }
+            if( _stacks.Count == 0 )
+            {
+                using( m.OpenInfo( "Since there is no Stack defined, we initialize CK and CK-Build mapped to '/Dev/CK' by default." ) )
+                {
+                    m.Info( $"Use Home/{nameof( SetWorldMapping )} command to update the mapping." );
+                    EnsureStackDefinition( m, "CK-Build", "https://github.com/signature-opensource/CK-Stack.git", true, "/Dev/CK" );
+                    EnsureStackDefinition( m, "CK", "https://github.com/signature-opensource/CK-Stack.git", true, "/Dev/CK" );
                 }
             }
         }
@@ -197,10 +206,14 @@ namespace CK.Env
             if( idx >= 0 )
             {
                 if( _stacks[idx].ToString() == def.ToString() ) return false;
-                m.Trace( $"Replacing existing: '{_stacks[idx]}'." );
+                m.Info( $"Replaced existing Stack: '{_stacks[idx]}' with '{def}'." );
                 _stacks[idx] = def;
             }
-            else _stacks.Add( def );
+            else
+            {
+                m.Info( $"Added Stack: '{def}'." );
+                _stacks.Add( def );
+            }
             return true;
         }
 

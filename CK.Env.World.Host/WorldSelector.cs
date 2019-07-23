@@ -54,20 +54,20 @@ namespace CK.Env
         NormalizedPath ICommandMethodsProvider.CommandProviderName => UserHost.HomeCommandPath;
 
         /// <summary>
-        /// Tries to open a world in <see cref="Store"/> by its full name (or its index).
+        /// Tries to open a world in <see cref="Store"/> by its full name (or its One based index).
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="worldFullName">The name or the index in the store.</param>
+        /// <param name="worldFullNameOr1BasedIndex">The name or the index in the store.</param>
         /// <returns>True on success, false on error.</returns>
         [CommandMethod]
-        public bool OpenWorld( IActivityMonitor m, string worldFullName )
+        public bool OpenWorld( IActivityMonitor m, string worldFullNameOr1BasedIndex )
         {
             var all = Store.ReadWorlds( m );
             if( all == null ) return false;
             IRootedWorldName w;
-            if( Int32.TryParse( worldFullName, out var idx ) )
+            if( Int32.TryParse( worldFullNameOr1BasedIndex, out var idx ) )
             {
-                if( idx >= 0 && idx < all.Count ) w = all[idx];
+                if( idx >= 1 && idx <= all.Count ) w = all[idx-1];
                 else
                 {
                     m.Error( $"Invalid index: {idx} out of {all.Count}." );
@@ -76,10 +76,10 @@ namespace CK.Env
             }
             else
             {
-                w = all.FirstOrDefault( x => x.FullName.Equals( worldFullName, StringComparison.OrdinalIgnoreCase ) );
+                w = all.FirstOrDefault( x => x.FullName.Equals( worldFullNameOr1BasedIndex, StringComparison.OrdinalIgnoreCase ) );
                 if( w == null )
                 {
-                    m.Error( $"Unable to find World {worldFullName} among {all.Select( x => x.FullName ).Concatenate()}." );
+                    m.Error( $"Unable to find World {worldFullNameOr1BasedIndex} among {all.Select( x => x.FullName ).Concatenate()}." );
                     return false;
                 }
             }

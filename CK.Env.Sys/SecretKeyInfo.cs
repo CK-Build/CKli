@@ -127,14 +127,13 @@ namespace CK.Env
         {
             get
             {
-                var curr = this;
-                while( true )
+                var k = this;
+                while( k.SubKey != null )
                 {
-                    var previous = curr;
-                    if(  curr.SubKey == null) return previous;
-                    curr = curr.SubKey;
-                    if( previous == curr ) throw new InvalidOperationException( "Cycle detected." );
+                    k = k.SubKey;
+                    Debug.Assert( k != this, "The way we initialize these objects cannot create cycles." );
                 }
+                return k;
             }
         }
 
@@ -152,24 +151,28 @@ namespace CK.Env
         /// </summary>
         public string Secret => _secret;
 
-
         /// <summary>
-        /// Sets the secret for this key an its <see cref="SubKey"/> (recursively) if any.
+        /// Sets the secret for this key and its <see cref="SubKey"/> (recursively) if any.
         /// If the current secret is provided by the <see cref="SuperKey"/>, this
         /// raises an <see cref="InvalidOperationException"/>.
         /// </summary>
         /// <param name="secret">The secret to set. Can be null to clear it.</param>
-        public void SetSecret( string secret )
+        /// <returns>True if a secret has been updated, false if nothing has changed.</returns>
+        public bool SetSecret( string secret )
         {
             CheckSecretPropagation();
             if( SuperKey != null && SuperKey.IsSecretAvailable ) throw new InvalidOperationException( $"Secret is defined by the SuperKey '{SuperKey.Name}'." );
+            if( String.IsNullOrEmpty( secret ) ) secret = null;
+            bool changed = false;
             SecretKeyInfo k = this;
             do
             {
+                changed |= k._secret != secret;
                 k._secret = secret;
                 k = k.SubKey;
             }
             while( k != null );
+            return changed;
         }
 
         /// <summary>

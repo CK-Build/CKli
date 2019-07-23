@@ -62,12 +62,30 @@ namespace CK.Env
         NormalizedPath ICommandMethodsProvider.CommandProviderName => _commandProviderName;
 
         /// <summary>
+        /// Updates or clears the secret of a declared key in the <see cref="KeyStore"/>.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="key">The secret name to update.</param>
+        /// <param name="secret">The secret to update. Null or empty clears the secret.</param>
+        /// <param name="autoSave">False to not automatically saves the vault.</param>
+        [CommandMethod( confirmationRequired: false )]
+        public void UpdateSecret( IActivityMonitor m, string key, string secret, bool autoSave = true )
+        {
+            if( _store.SetSecret( m, key, secret )
+                && autoSave
+                && IsKeyVaultOpened )
+            {
+                DoSaveKeyVault( m );
+            }
+        }
+
+        /// <summary>
         /// Gets whether the key vault is closed.
         /// </summary>
         public bool CanOpenKeyVault => !IsKeyVaultOpened;
 
         /// <summary>
-        /// Opens the key vault bound to the current <see cref="IWorldName"/>.
+        /// Opens the key vault.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="passPhrase">The key vault pass phrase.</param>
@@ -123,8 +141,8 @@ namespace CK.Env
         public bool CanSaveKeyVault => IsKeyVaultOpened;
 
         /// <summary>
-        /// Saves the current secrets to the previously opened key vault bound to the current <see cref="IWorldName"/>
-        /// with a new passphrase or uses the existing one.
+        /// Saves the current secrets to the key vault with a new passphrase
+        /// or uses the existing one.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="newPassPhrase">Optional new passphrase.</param>

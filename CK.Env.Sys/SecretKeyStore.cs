@@ -110,6 +110,39 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Sets or clears a secret that must have been declared.
+        /// Updates it when <paramref name="secret"/> is not null or empty, otherwise clears it.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="name">The secret name.</param>
+        /// <param name="secret">The secret value. Null or empty clears the secret.</param>
+        /// <returns>True if secret has been changed, false otherwise.</returns>
+        public bool SetSecret( IActivityMonitor m, string name, string secret )
+        {
+            if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
+            bool clear = String.IsNullOrEmpty( secret );
+            if( !_keyInfos.TryGetValue( name, out var info ) )
+            {
+                m.Error( $"Secret '{name}' is not declared." );
+                return false;
+            }
+            if( info.IsSecretAvailable
+                && info.SuperKey != null
+                && info.SuperKey.IsSecretAvailable )
+            {
+                m.Error( $"Secret '{name}' is defined by its super key '{info.SuperKey.Name}'." );
+                return false;
+            }
+            if( info.SetSecret( secret ) )
+            {
+                m.Info( $"Secret '{name}' has been {(clear ? "cleared" : "updated")}." );
+                return true;
+            }
+            m.Trace( $"Secret '{name}' unchanged." );
+            return false;
+        }
+
+        /// <summary>
         /// Declares a secret key.
         /// Can be called as many times as needed: the <paramref name="descriptionBuilder"/> can
         /// compose the final description as long as the <paramref name="subKey"/> is always the same (if
