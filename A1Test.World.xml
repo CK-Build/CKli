@@ -15,23 +15,27 @@
   <NuGetClient />
   <WorldState IsPublic="True" />
 
-  <ArtifactRepositories>
-    <Repository Type="NuGetAzure"
-                Organization="Signature-OpenSource"
-                FeedName="CKEnvTest3"
-                CheckName="NuGetAzure:Signature-OpenSource-CKEnvTest3"
-                CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
-  </ArtifactRepositories>
+
+  <Artifacts>
+    <SourceFeeds>
+      <Feed Type="NuGet" Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json" >
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
+      </Feed>
+      <Feed Type="NuGet" Name="CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/CKEnvTest3/nuget/v3/index.json" >
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
+      </Feed>
+    </SourceFeeds>
+    <TargetRepositories>
+      <Repository Type="NuGetAzure"
+                  Organization="Signature-OpenSource"
+                  FeedName="CKEnvTest3"
+                  CheckName="NuGet:Azure:Signature-OpenSource-CKEnvTest3"
+                  CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
+    </TargetRepositories>
+  </Artifacts>
+
 
   <SharedSolutionSpec>
-    <NuGetSources>
-      <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json" >
-        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
-      </add>
-      <add Name="CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/CKEnvTest3/nuget/v3/index.json" >
-        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
-      </add>
-    </NuGetSources>
     <RemoveNuGetSourceNames>
       <add Name="CKEnvTest" />
       <add Name="Invenietis - Release" />
@@ -39,18 +43,18 @@
       <add Name="Invenietis - CI" />
     </RemoveNuGetSourceNames>
     <ArtifactTargets>
-      <add Name="NuGetAzure:Signature-OpenSource-CKEnvTest3" />
+      <add Name="NuGet:Azure:Signature-OpenSource-CKEnvTest3" />
     </ArtifactTargets>
   </SharedSolutionSpec>
 
   <Folder Name="Projects">
-    
+
     <GitFolder Name="CK-UnitsOfMeasure" Url="https://github.com/Invenietis/CK-UnitsOfMeasure.git">
       <Branch Name="develop">
         <SolutionSpec />
       </Branch>
     </GitFolder>
-    
+
     <GitFolder Name="CodeCake" Url="https://github.com/SimpleGitVersion/CodeCake.git">
       <Branch Name="develop">
         <SolutionSpec NoDotNetUnitTests="true" NoStrongNameSigning="true" />
@@ -68,13 +72,13 @@
         <SolutionSpec />
       </Branch>
     </GitFolder>
-    
+
     <GitFolder Name="CK-Core" Url="https://github.com/Invenietis/CK-Core.git">
       <Branch Name="develop">
         <SolutionSpec />
       </Branch>
     </GitFolder>
-    
+
     <GitFolder Name="SGV-Net" Url="https://github.com/SimpleGitVersion/SGV-Net.git">
       <Branch Name="develop">
         <SolutionSpec DisableSourceLink="true"  />
@@ -94,5 +98,5 @@
     </GitFolder>
 
   </Folder>
-    
+
 </A1Test>

@@ -166,7 +166,7 @@ namespace CK.Env
             SecretKeyInfo k = this;
             do
             {
-                _secret = secret;
+                k._secret = secret;
                 k = k.SubKey;
             }
             while( k != null );

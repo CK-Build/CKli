@@ -14,42 +14,40 @@
   <NuGetClient />
   <NPMClient />
   <CKSetupClient />
-  <WorldState />
+  <WorldState IsPublic="False"/>
 
-  <ArtifactRepositories>
-
-    <Repository Type="NuGetAzure" Organization="Signature-Code" FeedName="Default"
-                CheckName="NuGetAzure:Signature-Code-Default"
+  <Artifacts>
+    <SourceFeeds>
+      <Feed Type="NuGet" Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json" >
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
+      </Feed>
+      <Feed Type="NuGet" Name="Signature-Code" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/Default/nuget/v3/index.json">
+        <Credentials UserName="SignatureCode" PasswordSecretKeyName="SIGNATURE_CODE_READ_PAT" />
+      </Feed>
+      <Feed Type="NPM" Scope="@signature" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/npm/registry/" >
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
+      </Feed>
+      <Feed Type="NPM" Scope="@signature-code" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/Default/npm/registry/" >
+        <Credentials UserName="SignatureCode" PasswordSecretKeyName="SIGNATURE_CODE_READ_PAT" />
+      </Feed>
+    </SourceFeeds>
+    <TargetRepositories>
+      <Repository Type="NuGetAzure" Organization="Signature-Code" FeedName="Default"
+                CheckName="NuGet:Azure:Signature-Code-Default"
                 CheckSecretKeyName="AZURE_FEED_SIGNATURE_CODE_PAT" />
 
-    <Repository Type="NPMAzure" Organization="Signature-Code" FeedName="Default"
-                NPMScope="@signature-code"
-                CheckName="NPMAzure:@signature-code->Signature-Code-Default"
-                CheckSecretKeyName="AZURE_FEED_SIGNATURE_CODE_PAT" />
+      <Repository Type="NPMAzure" Organization="Signature-Code" FeedName="Default"
+                  NPMScope="@signature-code"
+                  CheckName="NPM:Azure:@signature-code->Signature-Code-Default"
+                  CheckSecretKeyName="AZURE_FEED_SIGNATURE_CODE_PAT" />
 
-    <Repository Type="CKSetup"
-                CheckName="CKSetup:Public"
-                CheckSecretKeyName="CKSETUPREMOTESTORE_PUSH_API_KEY" />
+      <Repository Type="CKSetup"
+                  CheckName="CKSetup:Public"
+                  CheckSecretKeyName="CKSETUPREMOTESTORE_PUSH_API_KEY" />
+    </TargetRepositories>
+  </Artifacts>
 
-  </ArtifactRepositories>
-  
   <SharedSolutionSpec>
-    <NuGetSources>
-      <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json" >
-        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
-      </add>
-      <add Name="Signature-Code" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/Default/nuget/v3/index.json">
-        <Credentials UserName="SignatureCode" PasswordSecretKeyName="SIGNATURE_CODE_READ_PAT" />
-      </add>
-    </NuGetSources>>
-    <NPMSources>
-      <add Scope="@signature" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/npm/registry/" >
-        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
-      </add>
-      <add Scope="@signature-code" Url="https://pkgs.dev.azure.com/Signature-Code/_packaging/Default/npm/registry/" >
-        <Credentials UserName="SignatureCode" PasswordSecretKeyName="SIGNATURE_CODE_READ_PAT" />
-      </add>
-    </NPMSources>
     <RemoveNuGetSourceNames>
       <add Name="CKEnvTest" />
       <add Name="CKEnvTest3" />
@@ -58,12 +56,12 @@
       <add Name="Invenietis - CI" />
     </RemoveNuGetSourceNames>
     <ArtifactTargets>
-      <add Name="NPMAzure:@signature-code->Signature-Code-Default" />
-      <add Name="NuGetAzure:Signature-Code-Default" />
+      <add Name="NPM:Azure:@signature-code->Signature-Code-Default" />
+      <add Name="NuGet:Azure:Signature-Code-Default" />
       <add Name="CKSetup:Public" />
     </ArtifactTargets>
   </SharedSolutionSpec>
-  
+
   <Folder Name="CK-Core-Projects">
 
     <GitFolder Name="CK-Observable-Domain" Url="https://gitlab.com/Signature-Code/CK-Observable-Domain.git">
@@ -75,7 +73,7 @@
         </SolutionSpec>
       </Branch>
     </GitFolder>
-    
+
   </Folder>
 
 </SC-World>

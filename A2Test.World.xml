@@ -15,56 +15,63 @@
   <NPMClient />
   <CKSetupClient />
   <WorldState IsPublic="True" />
-  
-  <ArtifactRepositories>
 
-    <Repository Type="NuGetAzure" Organization="Signature-OpenSource" FeedName="CKEnvTest3"
-                CheckName="NuGetAzure:Signature-OpenSource-CKEnvTest3"
-                CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
 
-    <Repository Type="NPMAzure" Organization="Signature-OpenSource" FeedName="CKEnvTest3"
-                NPMScope="@signature"
-                CheckName="NPMAzure:@signature->Signature-OpenSource-CKEnvTest3"
-                CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
+  <Artifacts>
+    <SourceFeeds>
+      <Feed Type="NuGet" Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json" >
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
+      </Feed>
+      <Feed Type="NuGet" Name="CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/CKEnvTest3/nuget/v3/index.json" >
+        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
+      </Feed>
+    </SourceFeeds>
+    <TargetRepositories>
+      <Repository Type="NuGetAzure" Organization="Signature-OpenSource" FeedName="CKEnvTest3"
+                  CheckName="NuGet:Azure:Signature-OpenSource-CKEnvTest3"
+                  CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
 
-    <Repository Type="NuGetStandard" Name="nuget.org" Url="https://api.nuget.org/v3/index.json"
-                CheckName="NuGetStandard:nuget.org"
-                QualityFilter="ReleaseCandidate,Release"
-                SecretKeyName="NUGET_ORG_PUSH_API_KEY" />
+      <Repository Type="NPMAzure" Organization="Signature-OpenSource" FeedName="CKEnvTest3"
+                  NPMScope="@signature"
+                  CheckName="NPM:Azure:@signature->Signature-OpenSource-CKEnvTest3"
+                  CheckSecretKeyName="AZURE_FEED_SIGNATURE_OPENSOURCE_PAT" />
 
-    <Repository Type="NPMStandard" Name="npmjs.org" Url="https://registry.npmjs.org/"
-                QualityFilter="ReleaseCandidate,Release"
-                CheckName="NPMStandard:npmjs.org"
-                SecretKeyName="NPMJS_ORG_PUSH_PAT" />
+      <Repository Type="NuGetStandard" Name="nuget.org" Url="https://api.nuget.org/v3/index.json"
+                  CheckName="NuGet:nuget.org"
+                  QualityFilter="ReleaseCandidate,Release"
+                  SecretKeyName="NUGET_ORG_PUSH_API_KEY" />
 
-    <Repository Type="CKSetup"
-                Name="CKEnvTest"
-                Url="https://ckenvtest.cksetup.invenietis.net"
-                CheckName="CKSetup:CKEnvTest"
-                CheckSecretKeyName="CKSETUPREMOTESTORE_CKENVTEST_PUSH_API_KEY" />
-    
-  </ArtifactRepositories>
+      <Repository Type="NPMStandard" Name="npmjs.org" Url="https://registry.npmjs.org/"
+                  QualityFilter="ReleaseCandidate,Release"
+                  CheckName="NPM:npmjs.org"
+                  SecretKeyName="NPMJS_ORG_PUSH_PAT" />
+
+      <Repository Type="CKSetup"
+                  Name="CKEnvTest"
+                  Url="https://ckenvtest.cksetup.invenietis.net"
+                  CheckName="CKSetup:CKEnvTest"
+                  CheckSecretKeyName="CKSETUPREMOTESTORE_CKENVTEST_PUSH_API_KEY" />
+    </TargetRepositories>
+  </Artifacts>
 
   <SharedSolutionSpec>
-    <NuGetSources>
-      <add Name="Signature-OpenSource" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/Default/nuget/v3/index.json" >
-        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
-      </add>
-      <add Name="CKEnvTest3" Url="https://pkgs.dev.azure.com/Signature-OpenSource/_packaging/CKEnvTest3/nuget/v3/index.json" >
-        <Credentials UserName="SignatureOpenSource" PasswordSecretKeyName="SIGNATURE_OPENSOURCE_READ_PAT" />
-      </add>
-    </NuGetSources>
     <RemoveNuGetSourceNames>
       <add Name="CKEnvTest" />
       <add Name="Invenietis - Release" />
       <add Name="Invenietis - Preview" />
       <add Name="Invenietis - CI" />
     </RemoveNuGetSourceNames>
+
+    <ArtifactSources>
+      <add Name="NuGet:Signature-OpenSource" />
+      <add Name="NuGet:CKEnvTest3"/>
+    </ArtifactSources>
+
     <ArtifactTargets>
-      <add Name="NuGetAzure:Signature-OpenSource-CKEnvTest3" />
-      <add Name="NuGetStandard:nuget.org" />
-      <add Name="NPMAzure:@signature->Signature-OpenSource-CKEnvTest3" />
-      <add Name="NPMStandard:npmjs.org" />
+      <add Name="NuGet:Azure:Signature-OpenSource-CKEnvTest3" />
+      <add Name="NuGet:Standard:nuget.org" />
+      <add Name="NPM:Azure:@signature->Signature-OpenSource-CKEnvTest3" />
+      <add Name="NPM:Standard:npmjs.org" />
       <add Name="CKSetup:CKEnvTest" />
     </ArtifactTargets>
 
@@ -78,7 +85,7 @@
         <SolutionSpec SqlServer="2016" />
       </Branch>
     </GitFolder>
-    
+
     <GitFolder Name="CK-SqlServer-Dapper" Url="https://github.com/Invenietis/CK-SqlServer-Dapper.git">
       <Branch Name="develop">
         <SolutionSpec SqlServer="2017" />
@@ -101,11 +108,11 @@
           <CKSetupComponentProjects>
             <add Name="CK.Sqlite.Setup.Model" />
             <add Name="CK.Sqlite.Setup.Runtime" />
-          </CKSetupComponentProjects>           
+          </CKSetupComponentProjects>
         </SolutionSpec>
       </Branch>
     </GitFolder>
-    
+
   </Folder>
-    
+
 </A2Test>
