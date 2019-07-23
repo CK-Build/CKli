@@ -352,11 +352,11 @@ namespace CK.Env.MSBuildSln
         /// <param name="m">The monitor to use.</param>
         /// <param name="isPackable">The new IsPackable or <see langword="null"/> to remove it.</param>
         /// <returns></returns>
-        public bool SetIsPackable(IActivityMonitor m, bool? isPackable)
+        public bool SetIsPackable( IActivityMonitor m, bool? isPackable )
         {
-            if(isPackable != IsPackable)
+            if( isPackable != IsPackable )
             {
-                DoSetSimpleProperty( m, "IsPackable", isPackable.ToString() );
+                DoSetSimpleProperty( m, "IsPackable", isPackable?.ToString() );
             }
             return true;
         }

@@ -54,6 +54,28 @@ namespace CK.Env
         NormalizedPath ICommandMethodsProvider.CommandProviderName => UserHost.HomeCommandPath;
 
         /// <summary>
+        /// Closing current world: current world must not be null.
+        /// </summary>
+        public bool CanCloseWorld => CurrentWorld != null;
+
+        /// <summary>
+        /// Closes the current world.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        [CommandMethod]
+        public void CloseWorld( IActivityMonitor m )
+        {
+            if( !CanCloseWorld ) throw new InvalidOperationException();
+            m.Info( $"Closing current world: {CurrentWorld.WorldName.FullName}." );
+            Close();
+        }
+
+        /// <summary>
+        /// Opening a world requires the current world to be closed first.
+        /// </summary>
+        public bool CanOpenWorld => CurrentWorld == null;
+
+        /// <summary>
         /// Tries to open a world in <see cref="Store"/> by its full name (or its One based index).
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -62,6 +84,7 @@ namespace CK.Env
         [CommandMethod]
         public bool OpenWorld( IActivityMonitor m, string worldFullNameOr1BasedIndex )
         {
+            if( !CanOpenWorld ) throw new InvalidOperationException();
             var all = Store.ReadWorlds( m );
             if( all == null ) return false;
             IRootedWorldName w;

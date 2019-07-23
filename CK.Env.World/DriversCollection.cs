@@ -87,7 +87,7 @@ namespace CK.Env
                         m.Error( $"Failed to load and configure solution from '{d.GitRepository.SubPath}'." );
                         idxSolution = -1;
                     }
-                    if( idxSolution != -1 ) solutions[idxSolution] = s;
+                    if( idxSolution != -1 ) solutions[idxSolution++] = s;
                 }
                 if( idxSolution == -1 ) return false;
 

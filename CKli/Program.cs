@@ -46,7 +46,7 @@ namespace CKli
 
         static void InteractiveRun( IActivityMonitor monitor, UserHost host )
         {
-            const string textCommands = "[run <globbed command name> | list [<globbed command name>] | cls | exit]";
+            const string textCommands = "[run <globbed command name> | list [<globbed command name>] | cls | secret [clear NAME|set NAME] | exit]";
             for(; ; )
             {
                 if( host.ApplicationLifetime.CanCancelStopRequest ) host.ApplicationLifetime.CancelStopRequest();
@@ -72,6 +72,46 @@ namespace CKli
                 if( rep == "cls" )
                 {
                     Console.Clear();
+                    continue;
+                }
+                if( rep.StartsWith( "secret" ) )
+                {
+                    if( !host.UserKeyVault.IsKeyVaultOpened )
+                    {
+                        Console.WriteLine( "Your personal KeyVault is not opened." );
+                        if( host.UserKeyVault.KeyVaultFileExists )
+                        {
+                            Console.Write( "Enter the passphrase to open it: " );
+                        }
+                        else
+                        {
+                            Console.Write( "It must be created. Enter its passphrase: " );
+                        }
+                        var s = ReadSecret();
+                        if( s != null ) host.UserKeyVault.OpenKeyVault( monitor, s );
+                        else Console.WriteLine( "KeyVault opening cancelled." );
+                        Console.WriteLine();
+                    }
+                    rep = rep.Substring( 6 ).Trim();
+                    if( rep.Length > 0 )
+                    {
+                        var two = rep.Split( ' ' ).Where( t => t.Length > 0 ).ToArray();
+                        if( two.Length == 2 )
+                        {
+                            if( two[0].Equals( "clear", StringComparison.OrdinalIgnoreCase ) )
+                            {
+                                host.UserKeyVault.UpdateSecret( monitor, two[1], null );
+                            }
+                            else if( two[0].Equals( "set", StringComparison.OrdinalIgnoreCase ) )
+                            {
+                                Console.Write( $"Enter '{two[1]}' secret (empty to cancel): " );
+                                var s = ReadSecret();
+                                if( s != null ) host.UserKeyVault.UpdateSecret( monitor, two[1], s );
+                            }
+                        }
+                        else Console.WriteLine( "Invalid syntax. Expected: clear NAME or NAME value." );
+                    }
+                    DumpSecrets( host.UserKeyVault );
                     continue;
                 }
                 if( rep.StartsWith( "list" ) )
@@ -134,6 +174,34 @@ namespace CKli
                 Console.WriteLine( $"   > {++idx} {key} => {(w.Root.IsEmptyPath ? "(No local mapping)" : w.Root.Path)}" );
             }
         }
+
+        static void DumpSecrets( UserKeyVault v )
+        {
+            StringBuilder b = new StringBuilder();
+
+            foreach( var k in v.KeyStore.Infos )
+            {
+                if( k.SuperKey != null ) continue;
+                b.Append( k.IsSecretAvailable ? "          " : "[Missing] " );
+                b.AppendLine( k.Name );
+                b.AppendMultiLine( "          ", k.Description, true, false );
+                b.AppendLine();
+
+                var sub = k.SubKey;
+                while( sub != null )
+                {
+                    b.Append( sub.IsSecretAvailable ? " |          " : " | [Missing] " );
+                    b.AppendLine( sub.Name );
+                    b.AppendMultiLine( " |          ", sub.Description, true, false );
+                    b.AppendLine();
+                    sub = sub.SubKey;
+                }
+                b.AppendLine();
+            }
+            Console.WriteLine( b.ToString() );
+        }
+
+
 
         static void RunCommand( IActivityMonitor m, UserHost host, string rep )
         {

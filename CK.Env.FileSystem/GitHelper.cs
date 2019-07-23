@@ -494,7 +494,8 @@ namespace CK.Env
         /// the current branch is tracked and is ahead of the remote branch.
         /// </summary>
         /// <returns></returns>
-        public bool CanPush => (Git.Head.TrackingDetails.AheadBy ?? 0) > 0;
+        public bool CanPush => RepositoryKey.SecretKeyStore.IsSecretKeyAvailable( RepositoryKey.WritePATKeyName ) == true
+                               && (Git.Head.TrackingDetails.AheadBy ?? 0) > 0;
 
         /// <summary>
         /// Pushes changes from the current branch to the origin.
