@@ -32,12 +32,14 @@ namespace CK.Env
         {
             RepositoryKey = repositoryKey ?? throw new ArgumentNullException( nameof(repositoryKey));
             Git = libRepository ?? throw new ArgumentNullException( nameof( libRepository ) ); ;
-            SubPath = SubPath;
+            FullPhysicalPath = fullPath;
+            SubPath = subPath;
+
             if( FullPhysicalPath != libRepository.Info.WorkingDirectory )
             {
                 throw new ArgumentException( "Path mismatch.", nameof( fullPath ) );
             }
-            if( !FullPhysicalPath.EndsWith( subPath ) )
+            if( !FullPhysicalPath.EndsWith( SubPath ) )
             {
                 throw new ArgumentException( "Path mismatch.", nameof( subPath ) );
             }
@@ -595,7 +597,6 @@ namespace CK.Env
                             Repository.Clone( git.OriginUrl.ToString(), workingFolder, new CloneOptions()
                             {
                                 CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, git ),
-                                BranchName = branchName,
                                 Checkout = true
                             } );
                         }
@@ -613,7 +614,15 @@ namespace CK.Env
                         r.Dispose();
                         return null;
                     }
-                    if( r.Head?.CanonicalName != branchName )
+                    if( !r.Commits.Any() )
+                    {
+                        m.Info( $"Unitialized repository: automatically creating an initial commit." );
+                        var date = DateTimeOffset.Now;
+                        Signature author = r.Config.BuildSignature( date );
+                        var committer = new Signature( "CKli", "none", date );
+                        r.Commit( "Initial commit automatically created.", author, committer, new CommitOptions { AllowEmptyCommit = true } );
+                    }
+                    if( r.Head?.FriendlyName != branchName )
                     {
                         DoEnsureBranch( m, r, branchName, false, workingFolder );
                     }

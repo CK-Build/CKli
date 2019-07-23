@@ -101,6 +101,7 @@ namespace CK.Env
 
         /// <summary>
         /// Initializes this world state by loading the local state.
+        /// This initializes the user log level.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>

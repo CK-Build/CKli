@@ -17,28 +17,6 @@ namespace CKli
 {
     class Program
     {
-        static string GetThisFilePath( [CallerFilePath]string p = null ) => p;
-
-        static string GetRootPath( string[] args )
-        {
-            if( args.Length > 0 )
-            {
-                return args[0];
-            }
-            var p = GetThisFilePath();
-            while( !String.IsNullOrEmpty( p ) && Path.GetFileName( p ) != "CKli" ) p = Path.GetDirectoryName( p );
-            if( !String.IsNullOrEmpty( p ) )
-            {
-                var ckEnv = Path.GetDirectoryName( p );
-                if( Path.GetFileName( ckEnv ) == "CK-Env" )
-                {
-                    return Path.GetDirectoryName( ckEnv );
-                }
-            }
-            throw new InvalidOperationException( "Must be in CK-Env/CKli source." );
-        }
-
-
         static void Main( string[] args )
         {
             NormalizedPath userHostPath = Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData );
@@ -62,6 +40,7 @@ namespace CKli
             catch( Exception ex )
             {
                 monitor.Fatal( ex );
+                Console.ReadLine();
             }
         }
 
@@ -124,59 +103,41 @@ namespace CKli
                     if( !atLeastOne ) Console.WriteLine( " (none)" );
                     continue;
                 }
-                if( rep == "exit" ) return;
                 if( rep.StartsWith( "run " ) )
                 {
                     rep = rep.Substring( 4 ).Trim();
                     RunCommand( monitor, host, rep );
                     continue;
                 }
-                Console.WriteLine( "Unrecognized command." );
-            }
-        }
-
-        IRootedWorldName ChooseWorld( IActivityMonitor m, UserHost host )
-        {
-            var worlds = host.WorldStore.ReadWorlds( m ).ToList();
-            for(; ; )
-            {
-                DumpWorlds( worlds );
-                Console.WriteLine( "-------------" );
-                Console.WriteLine( "   > x - Exit" );
-                string r = Console.ReadLine();
-                if( Int32.TryParse( r, out int result ) && result >= 1 && result <= worlds.Count )
+                if( rep == "exit" ) return;
+                if( !hasWorld && Int32.TryParse( rep, out var idx ) )
                 {
-                    return worlds[result - 1];
+                    host.WorldSelector.OpenWorld( monitor, idx.ToString() );
+                    continue;
                 }
-                if( r == "x" ) return null;
+                Console.WriteLine( "Unrecognized command." );
             }
         }
 
         static void DumpWorlds( IEnumerable<IRootedWorldName> worlds )
         {
-            foreach( var g in worlds.GroupBy( f => f.Name ) )
+            string name = null;
+            int idx = 0;
+            foreach( var w in worlds )
             {
-                Console.WriteLine( $"- {g.Key}" );
-                int idx = 0;
-                foreach( var w in g )
+                if( name != w.Name )
                 {
-                    string key;
-                    if( w.ParallelName == null )
-                    {
-                        key = "<Default>";
-                    }
-                    else
-                    {
-                        key = $"[{w.ParallelName}]";
-                    }
-                    Console.WriteLine( $"   > {++idx} {key} => {(w.Root.IsEmptyPath ? "(No local mapping)" : w.Root.Path)}" );
+                    Console.WriteLine( $"- {w.Name}" );
+                    name = w.Name;
                 }
+                string key = w.ParallelName == null ? "<Default>" : $"[{w.ParallelName}]";
+                Console.WriteLine( $"   > {++idx} {key} => {(w.Root.IsEmptyPath ? "(No local mapping)" : w.Root.Path)}" );
             }
         }
 
         static void RunCommand( IActivityMonitor m, UserHost host, string rep )
         {
-            var handlers = host.CommandRegister.GetCommands( rep );
+            var handlers = host.CommandRegister.GetCommands( rep ).ToList();
             var handlersBySig = handlers
                                     .GroupBy( c => c.PayloadSignature )
                                     .ToList();
@@ -196,7 +157,7 @@ namespace CKli
                 }
                 return;
             }
-            var firstHandler = handlers.First();
+            var firstHandler = handlers[0];
             bool? parallelRun = firstHandler.ParallelRun;
             bool? globalConfirm = firstHandler.ConfirmationRequired;
             bool? backgroundRun = firstHandler.BackgroundRun;
@@ -221,13 +182,13 @@ namespace CKli
 
             if( parallelRun == null )
             {
-                Console.WriteLine( "The selected command(s) can be run in parallel. Do you want to run them in parallel ?" );
+                Console.WriteLine( "The selected command(s) can run in parallel. Do you want to run in parallel ?" );
                 parallelRun = YesOrNo();
             }
 
             if( backgroundRun == null )
             {
-                Console.WriteLine( "The selected command(s) can be run in background. Do you want to run them in background ?" );
+                Console.WriteLine( "The selected command(s) can run in background. Do you want to run in background ?" );
                 backgroundRun = YesOrNo();
             }
 

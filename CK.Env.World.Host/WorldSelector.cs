@@ -91,7 +91,8 @@ namespace CK.Env
             baseProvider.Add<ISimpleObjectActivator>( new SimpleObjectActivator() );
             baseProvider.Add( _command );
             baseProvider.Add( _fs );
-            baseProvider.Add( w );
+            baseProvider.Add<IWorldName>( w );
+            baseProvider.Add<WorldStore>( Store );
             baseProvider.Add( _appLife );
             baseProvider.Add( _userKeyStore );
             var original = Store.ReadWorldDescription( m, w ).Root;

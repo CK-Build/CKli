@@ -158,19 +158,21 @@ namespace CK.Env
         /// Gets all the descendants of a given type.
         /// </summary>
         /// <typeparam name="T">Type of the descendants that must be enumerated.</typeparam>
-        /// <param name="breadthFirst">False to enumerate the nodes in depth-first order rather than breadth-first.</param>
+        /// <param name="breadthFirst">
+        /// False to enumerate the nodes in depth-first order rather than breadth-first.
+        /// </param>
+        /// <param name="withSelf">
+        /// True to consider <paramref name="this"/> element. Defaults to consider only the children elements.
+        /// </param>
         /// <returns>The set of typed descendants.</returns>
-        public IEnumerable<T> Descendants<T>( bool breadthFirst = true )
+        public IEnumerable<T> Descendants<T>( bool breadthFirst = true, bool withSelf = false )
         {
+            if( breadthFirst && withSelf && this is T tTb ) yield return tTb;
             foreach( var c in Children )
             {
-                if( breadthFirst && c is T tCb ) yield return tCb;
-                foreach( var d in c.Descendants<T>() )
-                {
-                    if( d is T tD ) yield return tD;
-                }
-                if( !breadthFirst && c is T tCd ) yield return tCd;
+                foreach( var d in c.Descendants<T>( breadthFirst, true ) ) yield return d;
             }
+            if( !breadthFirst && withSelf && this is T tTd ) yield return tTd;
         }
 
         /// <summary>

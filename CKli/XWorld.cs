@@ -13,17 +13,16 @@ namespace CKli
     /// A world is public (ie. Open Source) or not. We decided to consider that mixing public/private repositories 
     /// inside the same world (even if it is technically possible) was not a good idea.
     /// </summary>
-    public class XWorldState : XTypedObject
+    public class XWorld : XTypedObject, IXTypedObjectProvider<World>
     {
-        readonly IWorldName _world;
         readonly FileSystem _fileSystem;
         readonly IEnvLocalFeedProvider _localFeeds;
-        readonly World _worldState;
+        readonly World _world;
         readonly IActivityMonitorFilteredClient _userMonitorFilter;
 
-        public XWorldState(
+        public XWorld(
             FileSystem fileSystem,
-            IWorldName world,
+            IWorldName worldName,
             WorldStore worldStore,
             IEnvLocalFeedProvider localFeeds,
             ArtifactCenter artifacts,
@@ -32,7 +31,6 @@ namespace CKli
             Initializer initializer )
             : base( initializer )
         {
-            _world = world;
             _localFeeds = localFeeds;
             _fileSystem = fileSystem;
 
@@ -40,19 +38,14 @@ namespace CKli
             if( _userMonitorFilter == null ) throw new InvalidOperationException();
 
             bool isPublic = initializer.Reader.HandleRequiredAttribute<bool>( "IsPublic" );
-            _worldState = new World( commandRegister, artifacts, worldStore, world, isPublic, _localFeeds, _userMonitorFilter, appLife )
+            _world = new World( commandRegister, artifacts, worldStore, worldName, isPublic, _localFeeds, _userMonitorFilter, appLife )
             {
                 VersionSelector = new ReleaseVersionSelector()
             };
-            _worldState.DumpWorldStatus += ( o, e ) => OnDumpWorldStatus( e.Monitor );
-            initializer.Services.Add( _worldState );
-            fileSystem.ServiceContainer.Add<ISolutionDriverWorld>( _worldState );
+            _world.DumpWorldStatus += ( o, e ) => OnDumpWorldStatus( e.Monitor );
+            initializer.Services.Add( _world );
+            fileSystem.ServiceContainer.Add<ISolutionDriverWorld>( _world );
         }
-
-        /// <summary>
-        /// Gets the current world.
-        /// </summary>
-        public IWorldName World => _world;
 
         /// <summary>
         /// Initializes the world state.
@@ -61,7 +54,7 @@ namespace CKli
         /// <returns>True on success, false on error.</returns>
         protected override bool OnSiblingsCreated( IActivityMonitor monitor )
         {
-            return _worldState.Initialize( monitor );
+            return _world.Initialize( monitor );
         }
 
         /// <summary>
@@ -69,42 +62,40 @@ namespace CKli
         /// <see cref="XGitFolder.ProtoGitFolder"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <returns>True on success, false on error.</returns>
-        public bool Initialize( IActivityMonitor monitor )
+        /// <returns>The world  on success, null on error.</returns>
+        World IXTypedObjectProvider<World>.GetObject( IActivityMonitor m )
         {
             var proto = Parent.Descendants<XGitFolder>().Select( g => g.ProtoGitFolder ).ToList();
             List<GitFolder> gitFolders = new List<GitFolder>();
 
-            using( monitor.OpenInfo( $"Initializing {proto.Count} Git folders." ) )
+            using( m.OpenInfo( $"Initializing {proto.Count} Git folders." ) )
             {
                 try
                 {
                     foreach( var p in proto )
                     {
-                        var g = _fileSystem.EnsureGitFolder( monitor, p );
+                        var g = _fileSystem.EnsureGitFolder( m, p );
                         if( g != null ) gitFolders.Add( g );
                         else
                         {
-                            monitor.Error( $"GitFolder creation failed for {p.FolderPath}." );
-                            return false;
+                            m.Error( $"GitFolder creation failed for {p.FolderPath}." );
+                            return null;
                         }
                     }
-                    DumpGitFolders( monitor, gitFolders );
-                    return true;
+                    DumpGitFolders( m, gitFolders );
+                    return _world;
                 }
                 catch( Exception ex )
                 {
-                    monitor.Error( ex );
-                    return false;
+                    m.Error( ex );
+                    return null;
                 }
             }
-            
         }
-
 
         void OnDumpWorldStatus( IActivityMonitor m )
         {
-            var worldCtx = _worldState.SolutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
+            var worldCtx = _world.SolutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
             if( worldCtx == null ) return;
             var gitFolders = worldCtx.Drivers.Select( x => (GitFolder)x.GitRepository );
             DumpGitFolders( m, gitFolders );
@@ -128,7 +119,7 @@ namespace CKli
             foreach( var git in gitFolders )
             {
                 ++gitFoldersCount;
-                string commitAhead = git.AheadOriginCommitCount != null ? $"{git.AheadOriginCommitCount} commits ahead origin" : "Untracked";
+                string commitAhead = git.Head.AheadOriginCommitCount != null ? $"{git.Head.AheadOriginCommitCount} commits ahead origin" : "Untracked";
                 using( m.OpenInfo( $"{git.SubPath} - branch: {git.CurrentBranchName} ({commitAhead})." ) )
                 {
                     string pluginInfo;
@@ -187,5 +178,6 @@ namespace CKli
             }
             return !hasPluginInitError;
         }
+
     }
 }

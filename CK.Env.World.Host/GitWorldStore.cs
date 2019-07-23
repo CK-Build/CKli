@@ -99,6 +99,7 @@ namespace CK.Env
                     EnsureStackDefinition( m, "CK", "https://github.com/signature-opensource/CK-Stack.git", true, "/Dev/CK" );
                 }
             }
+            else UpdateReposFromDefinitions( m, StackInitializeOption.None );
         }
 
         /// <summary>
@@ -124,11 +125,11 @@ namespace CK.Env
         /// </summary>
         public class StackDef : GitRepositoryKey
         {
-            internal StackDef( SecretKeyStore secretKeyStore, string stackName, Uri url, bool isPublic, string branchName = "master" )
+            internal StackDef( SecretKeyStore secretKeyStore, string stackName, Uri url, bool isPublic, string branchName = null )
                 : base( secretKeyStore, url, isPublic )
             {
                 StackName = stackName;
-                BranchName = branchName;
+                BranchName = branchName ?? "master";
             }
 
             /// <summary>
@@ -181,8 +182,10 @@ namespace CK.Env
             string branchName = "master")
         {
             if( String.IsNullOrWhiteSpace( stackName ) ) throw new ArgumentException( "Must not be empty.", nameof(stackName) );
-            bool change = WorldLocalMapping.SetMap( m, stackName, mappedPath )
-                          || FindOrCreateStackDef( m, stackName, url, isPublic, branchName );
+
+            bool change = WorldLocalMapping.SetMap( m, stackName, mappedPath );
+            if( FindOrCreateStackDef( m, stackName, url, isPublic, branchName ) ) change = true;
+
             if( change )
             {
                 UpdateReposFromDefinitions( m, StackInitializeOption.None );
@@ -243,7 +246,6 @@ namespace CK.Env
         {
             public readonly Uri OriginUrl;
             readonly GitWorldStore _store;
-            readonly NormalizedPath _root;
             int _syncCount;
 
             StackDef[] _stacks;
@@ -254,12 +256,13 @@ namespace CK.Env
                 _store = store;
                 OriginUrl = uri;
                 var cleanPath = uri.AbsolutePath
+                                   .Replace( ".git", "" )
                                    .Replace( "_git", "" )
-                                   .Replace( "_", "" )
                                    .Replace( '/', '_' )
                                    .Replace( "__", "_" )
+                                   .Trim( '_' )
                                    .ToLowerInvariant();
-                _root = store._rootPath.AppendPart( cleanPath );
+                Root = store._rootPath.AppendPart( cleanPath );
             }
 
             /// <summary>
@@ -272,9 +275,9 @@ namespace CK.Env
                 return EnsureOpen( m ) && _git.Pull( m, MergeFileFavor.Theirs ).ReloadNeeded;
             }
 
-            internal NormalizedPath Root => _git != null ? _git.FullPhysicalPath : new NormalizedPath();
-
             bool IsOpen => _git != null;
+
+            public NormalizedPath Root { get; }
 
             internal bool EnsureOpen( IActivityMonitor m )
             {
@@ -283,7 +286,7 @@ namespace CK.Env
                     var gitKey = _stacks[0];
                     Debug.Assert( _stacks.All( d => d.OriginUrl == gitKey.OriginUrl && d.IsPublic == gitKey.IsPublic ) );
                     Debug.Assert( _stacks.All( d => d.BranchName == gitKey.BranchName ) );
-                    _git = GitRepository.Create( m, gitKey, _root, _root.LastPart, false, gitKey.BranchName, true );
+                    _git = GitRepository.Create( m, gitKey, Root, Root.LastPart, false, gitKey.BranchName, true );
                 }
                 return IsOpen;
             }
@@ -303,7 +306,7 @@ namespace CK.Env
             internal bool PostSynchronize( IActivityMonitor m )
             {
                 if( _syncCount == _store._syncCount ) return true;
-                using( m.OpenInfo( $"Removing stack repository '{_root.LastPart}' => '{OriginUrl}'." ) )
+                using( m.OpenInfo( $"Removing stack repository '{Root.LastPart}' => '{OriginUrl}'." ) )
                 {
                     try
                     {
@@ -312,7 +315,7 @@ namespace CK.Env
                             _git.Dispose();
                             _git = null;
                         }
-                        FileHelper.RawDeleteLocalDirectory( m, _root );
+                        FileHelper.RawDeleteLocalDirectory( m, Root );
                     }
                     catch( Exception ex )
                     {
@@ -328,7 +331,7 @@ namespace CK.Env
                 else if( option == StackInitializeOption.OpenAndPullRepository ) Pull( m );
                 if( !IsOpen ) return;
 
-                var worldNames = Directory.GetFiles( _root, "*.World.xml" )
+                var worldNames = Directory.GetFiles( Root, "*.World.xml" )
                                     .Select( p => LocalWorldName.TryParse( m, p, _store.WorldLocalMapping ) )
                                     .Where( w => w != null )
                                     .ToList();
@@ -440,7 +443,7 @@ namespace CK.Env
                 return null;
             }
             var home = _repos.FirstOrDefault( r => r.OriginUrl == _stacks[idx].OriginUrl );
-            if( home == null || home.Root.IsEmptyPath )
+            if( home == null )
             {
                 m.Error( $"Repository initialization error for stack '{_stacks[idx]}'." );
                 return null;
@@ -468,7 +471,12 @@ namespace CK.Env
 
         IReadOnlyList<IRootedWorldName> SetWorlds( IActivityMonitor m, List<LocalWorldName> newWorlds )
         {
-            newWorlds.Sort( ( w1, w2 ) => w1.FullName.CompareTo( w2.FullName ) );
+            Debug.Assert( '[' > 'A', "Unfortunately..." );
+            newWorlds.Sort( ( w1, w2 ) =>
+            {
+                int cmp = w1.Name.CompareTo( w2.Name );
+                return cmp != 0 ? cmp : w1.ParallelName.CompareTo( w2.ParallelName );
+            } );
             return _worldNames = newWorlds;
         }
 

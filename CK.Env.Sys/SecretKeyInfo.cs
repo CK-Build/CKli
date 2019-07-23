@@ -74,6 +74,7 @@ namespace CK.Env
         {
             Name = name ?? throw new ArgumentNullException( nameof( name ) );
             SetDescription( descriptionBuilder );
+            _tags = TagsContext.EmptyTrait;
         }
 
         internal void Reconfigure( Func<SecretKeyInfo, string> descriptionBuilder, bool isRequired )
@@ -184,7 +185,7 @@ namespace CK.Env
             get => _tags;
             set
             {
-                if( value == null ) _tags = TagsContext.EmptyTrait;
+                if( value == null ) value = TagsContext.EmptyTrait;
                 else if( value.Context != TagsContext ) throw new ArgumentException( "Tag context mismatch." );
                 _tags = value;
             }

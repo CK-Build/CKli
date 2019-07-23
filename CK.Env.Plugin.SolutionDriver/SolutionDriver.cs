@@ -129,7 +129,7 @@ namespace CK.Env.Plugin
         /// <returns>The solution or null if unable to load the solution.</returns>
         public ISolution GetSolution( IActivityMonitor monitor, bool allowInvalidSolution, bool reloadSolution = false )
         {
-            if( _sln == null || reloadSolution )
+            if( !_isSolutionValid || reloadSolution )
             {
                 using( monitor.OpenInfo( $"Loading solution '{GitFolder.SubPath}'." ) )
                 {

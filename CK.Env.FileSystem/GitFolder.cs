@@ -31,7 +31,7 @@ namespace CK.Env
         public ProtoGitFolder ProtoGitFolder => (ProtoGitFolder)RepositoryKey;
 
         GitFolder( Repository r, ProtoGitFolder data )
-            : base( data, r, data.FolderPath, data.FullPhysicalPath )
+            : base( data, r, data.FullPhysicalPath, data.FolderPath )
         {
             _headFolder = new HeadFolder( this );
             _branchesFolder = new BranchesFolder( this, "branches", isRemote: false );
@@ -329,6 +329,19 @@ namespace CK.Env
         }
 
         public FileSystem FileSystem => ProtoGitFolder.FileSystem;
+
+        /// <summary>
+        /// Pulls current branch by merging changes from remote 'orgin' branch into this repository.
+        /// The current head must be clean.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>
+        /// Success is true on success, false on error (such as merge conflicts) and in case of success,
+        /// the result states whether a reload should be required or if nothing changed.
+        /// </returns>
+        public (bool Success, bool ReloadNeeded) Pull( IActivityMonitor m ) => Pull( m, FileSystem.ServerMode
+                                                                                            ? MergeFileFavor.Theirs
+                                                                                            : MergeFileFavor.Ours ); 
 
         /// <summary>
         /// Resets the index to the tree recorded by the commit and updates the working directory to
