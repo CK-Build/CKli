@@ -15,6 +15,7 @@ namespace Npm.Net.Tests
     public class NpmPublishTests
     {
         [Test]
+        [Explicit]
         public void PublishOnNpm()
         {
             string pat = "";

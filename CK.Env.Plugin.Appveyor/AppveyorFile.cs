@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.SimpleKeyVault;
 using CK.Text;
 using SharpYaml.Model;
 using System;
@@ -10,19 +11,22 @@ namespace CK.Env.Plugin
     {
         readonly SolutionDriver _driver;
         readonly SolutionSpec _solutionSpec;
-        readonly SecretKeyStore _secretStore;
+        readonly SecretKeyStore _keyStore;
+        readonly SharedWorldState _sharedState;
 
+        /// <summary>
+        /// This must be the CODECAKEBUILDER_SECRET_KEY encrypted by the Appveyor account's secret key that will
+        /// run the build: https://ci.appveyor.com/tools/encrypt.
+        /// </summary>
         const string APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY = "APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY";
 
-
-        public AppveyorFile( GitFolder f, SolutionDriver driver, SolutionSpec settings, SecretKeyStore secretStore, NormalizedPath branchPath )
+        public AppveyorFile( GitFolder f, SolutionDriver driver, SolutionSpec settings, SecretKeyStore keyStore, SharedWorldState sharedState, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "appveyor.yml" ) )
         {
             _driver = driver;
             _solutionSpec = settings;
-            _secretStore = secretStore;
-            _secretStore.DeclareSecretKey( APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY, current => current?.Description
-                ?? "This must be the CODECAKEBUILDER_SECRET_KEY encrypted by the Appveyor account's secret key that will run the build: https://ci.appveyor.com/tools/encrypt." );
+            _keyStore = keyStore;
+            _sharedState = sharedState;
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
@@ -51,14 +55,23 @@ namespace CK.Env.Plugin
             // We currently always use AppVeyor when the repository is public.
             YamlMapping env = FindOrCreateYamlElement( m, firstMapping, "environment" );
             if( env == null ) return;
-            string appveyorSecure = _secretStore.GetSecretKey( m, APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY, false );
-            if( appveyorSecure != null )
+
+            var passphrase = _keyStore.GetSecretKey( m, SolutionDriver.CODECAKEBUILDER_SECRET_KEY, false );
+            if( passphrase != null )
             {
-                env[ SolutionDriver.CODECAKEBUILDER_SECRET_KEY ] = CreateKeyValue( "secure", appveyorSecure );
+                var central = KeyVault.DecryptValues( _sharedState.CICDKeyVault, passphrase );
+                if( central.TryGetValue( APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY, out var appveyorSecure ) )
+                {
+                    env[SolutionDriver.CODECAKEBUILDER_SECRET_KEY] = CreateKeyValue( "secure", appveyorSecure );
+                }
+                else
+                {
+                    m.Warn( $"Update of {SolutionDriver.CODECAKEBUILDER_SECRET_KEY} encrypted secure key has been skipped: {APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY} key should be defined in CICDKeyVault." );
+                }
             }
             else
             {
-                m.Warn( $"Update of {SolutionDriver.CODECAKEBUILDER_SECRET_KEY} encrypted secure key has been skipped." );
+                m.Info( $"Update of {SolutionDriver.CODECAKEBUILDER_SECRET_KEY} encrypted secure skipped." );
             }
             // Remove obsolete environment variables definitions.
             env.Remove( "NUGET_API_KEY" );

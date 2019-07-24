@@ -47,6 +47,11 @@ namespace CK.Env
         public bool IsStateDirty { get; private set; }
 
         /// <summary>
+        /// Fires whenever an actual save occurred.
+        /// </summary>
+        public event EventHandler<EventMonitoredArgs> Saved;
+
+        /// <summary>
         /// Saves this state. If <see cref="IsStateDirty"/> is false, nothing is done.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -57,6 +62,7 @@ namespace CK.Env
             {
                 if( !_store.SaveState( m, this ) ) return false;
                 IsStateDirty = false;
+                Saved?.Invoke( this, new EventMonitoredArgs( m ) );
             }
             return true;
         }

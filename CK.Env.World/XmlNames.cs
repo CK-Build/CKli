@@ -42,6 +42,7 @@ namespace CK.Env
         public static readonly XName xGitSnapshot = XNamespace.None + "GitSnapshot";
         public static readonly XName xUserLogFilter = XNamespace.None + "UserLogFilter";
         public static readonly XName xRoadmap = XNamespace.None + "Roadmap";
+        public static readonly XName xCICDKeyVault = XNamespace.None + "CICDKeyVault";
 
     }
 }

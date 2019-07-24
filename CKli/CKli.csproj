@@ -1,17 +1,12 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.1</TargetFramework>
     <OutputType>Exe</OutputType>
-    <ProjectView>ShowAllFiles</ProjectView>
-    <LangVersion>latest</LangVersion>
-    <Platforms>AnyCPU;x64</Platforms>
+    <LangVersion>7.3</LangVersion>
+    <PackAsTool>True</PackAsTool>
   </PropertyGroup>
-
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <PlatformTarget>AnyCPU</PlatformTarget>
-  </PropertyGroup>
-
+  
   <ItemGroup>
     <ProjectReference Include="..\CK.Env.Plugin.Appveyor\CK.Env.Plugin.Appveyor.csproj" />
     <ProjectReference Include="..\CK.Env.Plugin.Basics\CK.Env.Plugin.Basics.csproj" />
@@ -26,9 +21,6 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.FileProviders.Physical" Version="2.2.0" />
-    <PackageReference Include="SharpYaml" Version="1.6.5" />
-    <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
     <!-- Fix run: cannot find git2-8e0b172.dll-->
     <PackageReference Include="LibGit2Sharp" Version="0.26.0" />
   </ItemGroup>

@@ -12,6 +12,7 @@ namespace CK.Env.Plugin
         readonly SolutionDriver _driver;
         readonly SolutionSpec _solutionSpec;
         readonly SecretKeyStore _secretStore;
+        readonly SharedWorldState _sharedState;
         readonly ArtifactCenter _artifacts;
 
         public CodeCakeBuilderKeyVaultFile(
@@ -19,6 +20,7 @@ namespace CK.Env.Plugin
             SolutionDriver driver,
             SolutionSpec solutionSpec,
             SecretKeyStore secretStore,
+            SharedWorldState sharedState,
             ArtifactCenter artifacts,
             NormalizedPath branchPath )
             : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilderKeyVault.txt" ) )
@@ -26,10 +28,11 @@ namespace CK.Env.Plugin
             _f = f;
             _driver = driver;
             _secretStore = secretStore;
+            _sharedState = sharedState;
             _artifacts = artifacts;
             _solutionSpec = solutionSpec;
             _secretStore.DeclareSecretKey( SolutionDriver.CODECAKEBUILDER_SECRET_KEY, current => current?.Description
-                                                ?? $"Required to update CodeCakeBuilderKeyVault.txt used by CI processes." );
+                                                ?? $"Allows update of CodeCakeBuilderKeyVault.txt used by CI/CD processes. This secret must be managed only by people that have access to the CI/CD processes and their configuration." );
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
@@ -43,19 +46,29 @@ namespace CK.Env.Plugin
             if( !_f.EnsureDirectory( m ) ) return;
             var s = _driver.GetSolution( m, allowInvalidSolution: true );
             if( s == null ) return;
+            if( _driver.BuildRequiredSecrets.Count == 0 )
+            {
+                m.Warn( "No build secrets collected for this solution. Skipping KeyVault configuration." );
+                return;
+            }
 
             var passPhrase = _secretStore.GetSecretKey( m, SolutionDriver.CODECAKEBUILDER_SECRET_KEY, true );
 
+            // Opens the actual current vault: if more secrets are defined we keep them.
             Dictionary<string,string> current = KeyVault.DecryptValues( TextContent, passPhrase );
+
+            // The central CICDKeyVault is protected with the same CODECAKEBUILDER_SECRET_KEY secret.
+            Dictionary<string, string> centralized = KeyVault.DecryptValues( _sharedState.CICDKeyVault, passPhrase );
+
             bool complete = true;
-            foreach( var secret in _driver.BuildRequiredSecrets )
+            foreach( var name in _driver.BuildRequiredSecrets.Select( x => x.SecretKeyName ) )
             {
-                if( secret.Secret == null )
+                if( !centralized.TryGetValue( name, out var secret ) )
                 {
-                    m.Error( $"Missing secret {secret.SecretKeyName}." );
+                    m.Error( $"Missing required build secret '{name}' in central CICDKeyVault. It must be added." );
                     complete = false;
                 }
-                else current[secret.SecretKeyName] = secret.Secret;
+                else current[name] = secret;
             }
             if( complete )
             {

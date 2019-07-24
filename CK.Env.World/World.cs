@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Env.DependencyModel;
+using CK.SimpleKeyVault;
 using CK.Text;
 using CSemVer;
 using System;
@@ -21,6 +22,7 @@ namespace CK.Env
     {
         readonly WorldStore _store;
         readonly IEnvLocalFeedProvider _localFeedProvider;
+        readonly SecretKeyStore _keyStore;
         readonly ArtifactCenter _artifacts;
 
         readonly DriversCollection _solutionDrivers;
@@ -30,6 +32,7 @@ namespace CK.Env
         readonly IBasicApplicationLifetime _appLife;
 
         LocalWorldState _localState;
+        SharedWorldState _sharedState;
         StandardGitStatus _cachedGlobalGitStatus;
 
         /// <summary>
@@ -37,10 +40,12 @@ namespace CK.Env
         /// </summary>
         /// <param name="commandRegister">The command register.</param>
         /// <param name="artifacts">The artifact center.</param>
-        /// <param name="store">The store. Can not be null.</param>
+        /// <param name="store">The world store. Can not be null.</param>
         /// <param name="worldName">The world name.</param>
         /// <param name="isPublicWorld">Whether this world is public or private.</param>
         /// <param name="localFeedProvider">Local feed provider. Can not be null. (Required for the Zero builder.)</param>
+        /// <param name="keyStore">User key store. Must not be null.</param>
+        /// <param name="userMonitorClient">Used to set the log level.</param>
         /// <param name="appLife">Application lifetime controller.</param>
         public World(
             CommandRegister commandRegister,
@@ -49,6 +54,7 @@ namespace CK.Env
             IWorldName worldName,
             bool isPublicWorld,
             IEnvLocalFeedProvider localFeedProvider,
+            SecretKeyStore keyStore,
             IActivityMonitorFilteredClient userMonitorClient,
             IBasicApplicationLifetime appLife )
         {
@@ -56,6 +62,7 @@ namespace CK.Env
             _store = store ?? throw new ArgumentNullException( nameof( store ) );
             WorldName = worldName ?? throw new ArgumentNullException( nameof( worldName ) );
             _localFeedProvider = localFeedProvider ?? throw new ArgumentNullException( nameof( localFeedProvider ) );
+            _keyStore = keyStore ?? throw new ArgumentNullException( nameof( keyStore ) );
             IsPublicWorld = isPublicWorld;
             _appLife = appLife;
             _solutionDrivers = new DriversCollection();
@@ -100,7 +107,7 @@ namespace CK.Env
         public IWorldName WorldName { get; }
 
         /// <summary>
-        /// Initializes this world state by loading the local state.
+        /// Initializes this world state by loading the local and shared states.
         /// This initializes the user log level.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
@@ -112,6 +119,7 @@ namespace CK.Env
             {
                 _localState = _store.GetOrCreateLocalState( monitor, WorldName );
                 DoSetUserLogFilter( monitor, _localState.UserLogFilter, false );
+                _sharedState = _store.GetOrCreateSharedState( monitor, WorldName );
             }
             return true;
         }
@@ -131,6 +139,16 @@ namespace CK.Env
                 DumpWorldStatus?.Invoke( this, ev );
             } );
         }
+
+        /// <summary>
+        /// Gets the shared state.
+        /// </summary>
+        public SharedWorldState SharedWorldState => _sharedState;
+
+        /// <summary>
+        /// Gets the local state.
+        /// </summary>
+        public LocalWorldState LocalWorldState => _localState;
 
         /// <summary>
         /// Raised by <see cref="DumpWorldState(IActivityMonitor)"/>.
@@ -177,6 +195,48 @@ namespace CK.Env
             }
             return _cachedGlobalGitStatus;
         }
+
+        /// <summary>
+        /// Gets whether the CODECAKEBUILDER_SECRET_KEY is known to the user.
+        /// </summary>
+        public bool CanCICDKeyVaultUpdate => _keyStore.IsSecretKeyAvailable( "CODECAKEBUILDER_SECRET_KEY" ) == true;
+
+        /// <summary>
+        /// Updates a secret in the <see cref="SharedWorldState.CICDKeyVault"/>.
+        /// When <paramref name="secret"/> is null, it is removed.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="name">The secret name. Must not be null or white space.</param>
+        /// <param name="secret">The secret. Null or empty to remove it.</param>
+        [CommandMethod]
+        public void CICDKeyVaultUpdate( IActivityMonitor m, string name, string secret )
+        {
+            if( !CanCICDKeyVaultUpdate ) throw new InvalidOperationException( nameof( CanCICDKeyVaultUpdate ) );
+            if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
+
+            var passPhrase = _keyStore.GetSecretKey( m, "CODECAKEBUILDER_SECRET_KEY", true );
+            var vault = KeyVault.DecryptValues( _sharedState.CICDKeyVault, passPhrase );
+
+            bool exists = vault.ContainsKey( name );
+            if( String.IsNullOrEmpty( secret ) )
+            {
+                if( exists )
+                {
+                    m.Info( $"Removing secret '{name}' from CICDKeyVault." );
+                    vault.Remove( name );
+                }
+                else m.Warn( $"Secret '{name}' not found in CICDKeyVault." );
+            }
+            else
+            {
+                if( exists ) m.Info( $"Updating secret '{name}' in CICDKeyVault." );
+                else m.Info( $"Adding new secret '{name}' in CICDKeyVault." );
+                vault[name] = secret;
+            }
+            _sharedState.CICDKeyVault = KeyVault.EncryptValuesToString( vault, passPhrase );
+            _sharedState.SaveState( m );
+        }
+
 
         /// <summary>
         /// Calls <see cref="UpdateGlobalGitStatus"/> and checks the curent Git status.
@@ -228,14 +288,9 @@ namespace CK.Env
         /// Sets the <see cref="WorkStatus"/>.
         /// </summary>
         /// <param name="s">The work status.</param>
-        public void SetWorkStatus( GlobalWorkStatus s )
-        {
-            if( WorkStatus != s ) _localState.WorkStatus = s;
-        }
-
         bool SetWorkStatusAndSave( IActivityMonitor m, GlobalWorkStatus s )
         {
-            SetWorkStatus( s );
+            if( WorkStatus != s ) _localState.WorkStatus = s;
             return _localState.SaveState( m );
         }
 
@@ -283,8 +338,6 @@ namespace CK.Env
                 ?? throw new Exception( $"No solution context available for branch {branchName}. GitBranchPlugins are not initialized or a ISolutionDriver plugin implementation is missing." );
             return c.Refresh( monitor, reloadSolutions ) ? c : null;
         }
-
-
 
         /// <summary>
         /// Gets whether the <see cref="WorkStatus"/> is not <see cref="GlobalWorkStatus.Idle"/>
@@ -337,8 +390,6 @@ namespace CK.Env
             if( !SetWorkStatusAndSave( monitor, GlobalWorkStatus.SwitchingToLocal ) ) return false;
             return DoSwitchToLocal( monitor );
         }
-
-
 
         bool DoSwitchToLocal( IActivityMonitor monitor )
         {
@@ -717,9 +768,8 @@ namespace CK.Env
             var roadmap = DoEditRoadmap( monitor, resetRoadmap );
             if( roadmap == null ) return false;
 
-            SetWorkStatus( GlobalWorkStatus.Releasing );
-            if( !_localState.SaveState( monitor ) ) return false;
-
+            if( !SetWorkStatusAndSave( monitor, GlobalWorkStatus.Releasing ) ) return false;
+            
             return DoReleasing( monitor );
         }
 

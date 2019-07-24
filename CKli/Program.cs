@@ -170,8 +170,7 @@ namespace CKli
                     Console.WriteLine( $"- {w.Name}" );
                     name = w.Name;
                 }
-                string key = w.ParallelName == null ? "<Default>" : $"[{w.ParallelName}]";
-                Console.WriteLine( $"   > {++idx} {key} => {(w.Root.IsEmptyPath ? "(No local mapping)" : w.Root.Path)}" );
+                Console.WriteLine( $"   > {++idx} {w.FullName} => {(w.Root.IsEmptyPath ? "(No local mapping)" : w.Root.Path)}" );
             }
         }
 

@@ -275,7 +275,19 @@ namespace CK.Env
                 return EnsureOpen( m ) && _git.Pull( m, MergeFileFavor.Theirs ).ReloadNeeded;
             }
 
-            bool IsOpen => _git != null;
+            /// <summary>
+            /// Commits and push changes to the remote.
+            /// </summary>
+            /// <param name="m">The monitor to use.</param>
+            /// <returns>True on success, false on error.</returns>
+            internal bool PushChanges( IActivityMonitor m )
+            {
+                Debug.Assert( IsOpen );
+                return _git.Commit( m, "Automatic synchronization commit." )
+                       && _git.Push( m );
+            }
+
+            public bool IsOpen => _git != null;
 
             public NormalizedPath Root { get; }
 
@@ -496,7 +508,9 @@ namespace CK.Env
         public override bool WriteWorldDescription( IActivityMonitor m, IWorldName w, XDocument content )
         {
             if( content == null ) throw new ArgumentNullException( nameof( content ) );
-            content.Save( ToLocal( w ).XmlDescriptionFilePath );
+            var local = ToLocal( w );
+            content.Save( local.XmlDescriptionFilePath );
+            OnWorkingFolderChanged( m, local );
             return true;
         }
 
@@ -539,7 +553,7 @@ namespace CK.Env
 
         public override SharedWorldState GetOrCreateSharedState( IActivityMonitor m, IWorldName w )
         {
-            var p = ToSharedStateFilePath( w );
+            var p = ToSharedStateFilePath( w ).Item2;
             if( File.Exists( p ) ) return new SharedWorldState( this, w, XDocument.Load( p, LoadOptions.SetLineInfo ) );
             m.Info( $"Creating new shared state for {w.FullName}." );
             return new SharedWorldState( this, w );
@@ -548,20 +562,39 @@ namespace CK.Env
         protected override bool SaveSharedState( IActivityMonitor m, IWorldName w, XDocument d )
         {
             var p = ToSharedStateFilePath( w );
-            d.Save( p );
+            d.Save( p.Item2 );
+            OnWorkingFolderChanged( m, p.Item1 );
             return true;
+        }
+
+        void OnWorkingFolderChanged( IActivityMonitor m, LocalWorldName local )
+        {
+            var repo = _repos.FirstOrDefault( r => local.XmlDescriptionFilePath.StartsWith( r.Root ) );
+            if( repo == null )
+            {
+                m.Warn( $"Unable to find the local repository for {local.FullName}." );
+            }
+            else if( !repo.IsOpen )
+            {
+                m.Warn( $"Local repository {local.FullName} ({repo.Root}) is not opened." );
+            }
+            else
+            {
+                repo.PushChanges( m );
+            }
         }
 
         /// <summary>
         /// Computes the path of the shared state file: it is next to the definition file.
         /// </summary>
         /// <param name="w">The world name.</param>
-        /// <returns>The path to use to read/write the shared state.</returns>
-        NormalizedPath ToSharedStateFilePath( IWorldName w )
+        /// <returns>The LocalWorldName and the path to use to read/write the shared state.</returns>
+        (LocalWorldName, NormalizedPath) ToSharedStateFilePath( IWorldName w )
         {
-            var def = ToLocal( w ).XmlDescriptionFilePath;
+            var local = ToLocal( w );
+            var def = local.XmlDescriptionFilePath;
             Debug.Assert( def.EndsWith( ".World.xml" ) );
-            return def.RemoveLastPart().AppendPart( def.LastPart.Substring( def.LastPart.Length - 3 ) + "SharedState.xml" );
+            return (local, def.RemoveLastPart().AppendPart( def.LastPart.Substring( def.LastPart.Length - 3 ) + "SharedState.xml" ));
         }
 
     }

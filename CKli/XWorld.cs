@@ -25,6 +25,7 @@ namespace CKli
             IWorldName worldName,
             WorldStore worldStore,
             IEnvLocalFeedProvider localFeeds,
+            SecretKeyStore keyStore,
             ArtifactCenter artifacts,
             CommandRegister commandRegister,
             IBasicApplicationLifetime appLife,
@@ -38,7 +39,7 @@ namespace CKli
             if( _userMonitorFilter == null ) throw new InvalidOperationException();
 
             bool isPublic = initializer.Reader.HandleRequiredAttribute<bool>( "IsPublic" );
-            _world = new World( commandRegister, artifacts, worldStore, worldName, isPublic, _localFeeds, _userMonitorFilter, appLife )
+            _world = new World( commandRegister, artifacts, worldStore, worldName, isPublic, _localFeeds, keyStore, _userMonitorFilter, appLife )
             {
                 VersionSelector = new ReleaseVersionSelector()
             };
@@ -48,13 +49,17 @@ namespace CKli
         }
 
         /// <summary>
-        /// Initializes the world state.
+        /// Initializes the world state and publishes the <see cref="World.LocalWorldState"/>
+        /// and <see cref="World.SharedWorldState"/> in the <see cref="FileSystem.ServiceContainer"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
         protected override bool OnSiblingsCreated( IActivityMonitor monitor )
         {
-            return _world.Initialize( monitor );
+            if( !_world.Initialize( monitor ) ) return false;
+            _fileSystem.ServiceContainer.Add( _world.SharedWorldState );
+            _fileSystem.ServiceContainer.Add( _world.LocalWorldState );
+            return true;
         }
 
         /// <summary>

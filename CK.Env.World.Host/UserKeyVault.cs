@@ -12,7 +12,7 @@ namespace CK.Env
 {
     public sealed class UserKeyVault : ICommandMethodsProvider, IDisposable
     {
-        static readonly NormalizedPath _commandProviderName = "KeyVault";
+        static readonly NormalizedPath _commandProviderName = "UserKeyVault";
 
         readonly SecretKeyStore _store;
         readonly Dictionary<string,string> _vaultContent;
