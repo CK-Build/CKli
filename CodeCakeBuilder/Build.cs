@@ -3,8 +3,11 @@ using Cake.Common.Solution;
 using Cake.Core;
 using Cake.Core.Diagnostics;
 using Cake.Core.IO;
+using CodeCake.Abstractions;
 using SimpleGitVersion;
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace CodeCake
@@ -65,6 +68,20 @@ namespace CodeCake
                 .WithCriteria( () => gitInfo.IsValid )
                 .Does( () =>
                 {
+                    // Cheat here for this build.cs to avoid changing the default
+                    //
+                    //      protected override IEnumerable<ArtifactFeed> GetRemoteFeeds()
+                    //      {
+                    //          yield return new SignatureVSTSFeed( this, "Signature-Code", "CKEnvTest3" );
+                    //      }
+                    //
+                    // that is targeted by the CK.Env.Plugin.NuGetCodeCakeBuilderFolder.AdaptBuildNugetRepositoryForPushFeeds
+                    // method.
+                    //
+                    var nuGetType = globalInfo.ArtifactTypes.OfType<NuGetArtifactType>().Single();
+                    IList<ArtifactFeed> feeds = nuGetType.GetTargetFeeds();
+                    Debug.Assert( feeds.Last().GetType() == typeof( SignatureVSTSFeed ), "The default remote is the last one." );
+                    feeds[feeds.Count - 1] = new RemoteFeed( nuGetType, "nuget.org", "https://api.nuget.org/v3/index.json", "NUGET_ORG_PUSH_API_KEY" ); ;
                     globalInfo.PushArtifacts();
                 } );
 

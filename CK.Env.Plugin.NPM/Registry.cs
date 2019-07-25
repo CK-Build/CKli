@@ -21,7 +21,7 @@ namespace CK.Env.NPM
 {
     public class Registry
     {
-        static readonly string _userAgent = CSemVer.InformationalVersion.ReadFromAssembly( typeof(Registry).Assembly ).ToString();
+        static readonly string _userAgent = "CKli";
 
         static readonly Uri _npmjs = new Uri( "https://registry.npmjs.org/" );
         readonly HttpClient _httpClient;
