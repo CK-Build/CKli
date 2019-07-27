@@ -153,6 +153,35 @@ namespace CK.Env
         public string Secret => _secret;
 
         /// <summary>
+        /// Imports a secret, typically stored in an external safe place.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="secret">The secret to set. Must not be null or empty.</param>
+        /// <returns>True if the secret has been updated, false if nothing has changed.</returns>
+        public bool ImportSecret( IActivityMonitor m, string secret )
+        {
+            if( String.IsNullOrEmpty( secret ) ) throw new ArgumentNullException( nameof( secret ) );
+            if( IsSecretAvailable )
+            {
+                if( SuperKey != null && SuperKey.IsSecretAvailable )
+                {
+                    m.Info( $"Secret '{Name}' already set by it SuperKey ('{SuperKey.Name}')." );
+                }
+                else if( SetSecret( secret ) )
+                {
+                    m.Info( $"Imported secret '{Name}' has replaced the previous one." );
+                    return true;
+                }
+            }
+            else if( SetSecret( secret ) )
+            {
+                m.Info( $"Imported secret '{Name}'." );
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
         /// Sets the secret for this key and its <see cref="SubKey"/> (recursively) if any.
         /// If the current secret is provided by the <see cref="SuperKey"/>, this
         /// raises an <see cref="InvalidOperationException"/>.

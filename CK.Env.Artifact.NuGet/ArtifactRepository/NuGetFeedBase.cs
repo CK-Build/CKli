@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace CK.Env.NuGet
 {
-    class NuGetFeedBase 
+    abstract class NuGetFeedBase 
     {
         private protected readonly NuGetClient Client;
         private protected readonly SourceRepository _sourceRepository;
@@ -44,9 +44,7 @@ namespace CK.Env.NuGet
 
             public async Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, string artifactName )
             {
-                var logger = _feed.EnsureInitialization( m );
-                var meta = await _feed._meta;
-                return await GetAvailable( meta, logger, artifactName );
+                return await _feed.SafeCall( m, ( meta, logger ) => GetAvailable( meta, logger, artifactName ) );
             }
 
             async Task<ArtifactAvailableInstances> GetAvailable( MetadataResource meta, NuGetLoggerAdapter logger, string name )
@@ -95,12 +93,32 @@ namespace CK.Env.NuGet
             return _feed = new ReadFeed( this, name, creds );
         }
 
-        protected virtual NuGetLoggerAdapter EnsureInitialization( IActivityMonitor m )
+        protected async Task<T> SafeCall<T>( IActivityMonitor m, Func<MetadataResource,NuGetLoggerAdapter, Task<T>> f )
         {
+            bool retry = false;
             var logger = new NuGetLoggerAdapter( m );
             NuGetClient.Initalize( logger );
-            return logger;
+            MetadataResource meta = null; 
+            again:
+            try
+            {
+                if( meta == null ) meta = await _meta;
+                return await f( meta, logger );
+            }
+            catch( Exception ex ) 
+            {
+                if( !retry )
+                {
+                    retry = true;
+                    if( CanRetry( meta, logger, ex ) )
+                    {
+                        goto again;
+                    }
+                }
+                throw;
+            }
         }
 
+        private protected abstract bool CanRetry( MetadataResource meta, NuGetLoggerAdapter logger, Exception ex );
     }
 }

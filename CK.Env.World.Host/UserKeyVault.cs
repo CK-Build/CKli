@@ -21,6 +21,7 @@ namespace CK.Env
         public UserKeyVault( NormalizedPath userHostPath, CommandRegister commandRegister )
         {
             _store = new SecretKeyStore();
+            _store.SecretDeclared += OnSecretDeclared;
             _vaultContent = new Dictionary<string, string>();
             KeyVaultKeyName = "CKLI-" + Environment.UserDomainName
                                          .Replace( '-', '_' )
@@ -30,6 +31,14 @@ namespace CK.Env
                                          .ToUpperInvariant();
             KeyVaultPath = userHostPath.AppendPart( KeyVaultKeyName + ".KeyVault.txt" );
             commandRegister.Register( this );
+        }
+
+        void OnSecretDeclared( object sender, SecretKeyInfoDeclaredArgs e )
+        {
+            if( IsKeyVaultOpened && _vaultContent.TryGetValue( e.Declared.Name, out var secret ) )
+            {
+                e.Declared.SetSecret( secret );
+            }
         }
 
         /// <summary>

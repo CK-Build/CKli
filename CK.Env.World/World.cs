@@ -494,54 +494,49 @@ namespace CK.Env
         }
 
         [CommandMethod]
-        public void UpgradeDependency( IActivityMonitor m, string packageTypedName, string versionToUpgrade = null )
+        public void UpgradeDependency( IActivityMonitor m, string packageName, string versionToUpgrade = null )
         {
             var worldCtx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
             if( worldCtx == null ) return;
             SVersion version;
-            var analyzer = worldCtx.DependencyContext.Analyzer;
-            List<PackageReference> artifactUses = analyzer.ExternalReferences
-                    .Where( p => p.Target.Artifact.TypedName == packageTypedName ).ToList();
-            if( artifactUses.Count() == 0 )
+            var externalReferences = worldCtx.DependencyContext.Analyzer.ExternalReferences;
+            List<PackageReference> artifactUses = externalReferences
+                    .Where( p => p.Target.Artifact.TypedName == packageName || p.Target.Artifact.Name == packageName )
+                    .ToList();
+            if( artifactUses.Count == 0 )
             {
-                m.Error( $"No solution contain the package {packageTypedName}." );
+                m.Error( $"No solution contain the package {packageName}." );
                 return;
             }
-            if( versionToUpgrade == null )
+            var types = new HashSet<ArtifactType>( artifactUses.Select( p => p.Target.Artifact.Type ) );
+            if( types.Count > 1 )
             {
-                version = analyzer.ExternalReferences
-                    .Where( p => p.Target.Artifact.TypedName == packageTypedName )
-                    .Max( pckg => pckg.Target.Version );
-
-                if( version == null )
-                {
-                    m.Fatal( $"Unable to find the package {packageTypedName}." );
-                    return;
-                }
+                m.Error( $"Ambiguous package name '{packageName}', use its TypedName to disambiguate: {types.Select( t => t.Name + ':' + packageName ).Concatenate( " or " )}." );
+                return;
+            }
+            versionToUpgrade = versionToUpgrade?.Trim();
+            if( String.IsNullOrEmpty( versionToUpgrade ) )
+            {
+                version = artifactUses.Max( pckg => pckg.Target.Version );
+                m.Info( $"No target version provided: automatically using the maximal {version} currently referenced." );
             }
             else
             {
                 if( !SVersion.TryParse( versionToUpgrade, out version ) )
                 {
-                    m.Fatal( $"Invalid version {versionToUpgrade} string." );
+                    m.Fatal( $"Unable to parse target version '{versionToUpgrade}' string." );
                     return;
                 }
             }
             var artifactToUpgrade = artifactUses.Where( p => p.Target.Version != version ).ToList();
             if( artifactToUpgrade.Count == 0 )
             {
-                m.Info( "No package to upgrade." );
+                m.Info( $"No package to upgrade: {artifactUses.Count} references to {packageName} already use version {version}." );
                 return;
             }
-            using( m.OpenInfo( $"{artifactToUpgrade.Count} packages to upgrade." ) )
+            using( m.OpenInfo( $"{artifactToUpgrade.Count} packages to upgrade (out of {artifactUses.Count} package references)." ) )
             {
-                var filtered = artifactUses.Where( s => s.Target.Artifact.TypedName == "NuGet:NUnit" && s.Target.Version == SVersion.Create( 2, 6, 4 ) ).ToList();
-                if( filtered.Count != artifactUses.Count )
-                {
-                    m.Warn( "Skipping NUnit Upgrade from 2.6.4" );
-                }
-                artifactUses.RemoveAll( p => filtered.Contains( p ) );
-                foreach( var slnGroupedPackage in artifactUses.GroupBy( s => s.Owner.Solution ) )
+                foreach( var slnGroupedPackage in artifactToUpgrade.GroupBy( s => s.Owner.Solution ) )
                 {
                     var sln = worldCtx.Solutions.First( s => s.Solution.Solution == slnGroupedPackage.Key );
                     sln.Driver.UpdatePackageDependencies( m,

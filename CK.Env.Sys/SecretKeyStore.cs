@@ -56,6 +56,11 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Raised each time a secret is declared.
+        /// </summary>
+        public event EventHandler<SecretKeyInfoDeclaredArgs> SecretDeclared;
+
+        /// <summary>
         /// Gets the list of <see cref="SecretKeyInfo"/> that have been declared with the
         /// guaranty that Super keys appear before their respective subordinated key.
         /// </summary>
@@ -100,12 +105,15 @@ namespace CK.Env
         /// <returns>The secret key info.</returns>
         public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo, string> descriptionBuilder, bool isRequired = false )
         {
+            bool redeclaration = true;
             if( !_keyInfos.TryGetValue( name, out var info ) )
             {
+                redeclaration = false;
                 _keyInfos.Add( name, info = new SecretKeyInfo( name, descriptionBuilder, isRequired ) );
                 _orderedInfos.Add( info );
             }
             else info.Reconfigure( descriptionBuilder, isRequired );
+            SecretDeclared?.Invoke( this, new SecretKeyInfoDeclaredArgs( info, redeclaration ) );
             return info;
         }
 
@@ -190,23 +198,7 @@ namespace CK.Env
             {
                 if( secrets.TryGetValue( info.Name, out var secret ) )
                 {
-                    if( info.IsSecretAvailable )
-                    {
-                        if( info.SuperKey != null && info.SuperKey.IsSecretAvailable )
-                        {
-                            m.Info( $"Secret '{info.Name}' already set by it SuperKey ('{info.SuperKey.Name}')." );
-                        }
-                        else
-                        {
-                            info.SetSecret( secret );
-                            m.Info( $"Imported secret '{info.Name}' has replaced the previous one." );
-                        }
-                    }
-                    else
-                    {
-                        info.SetSecret( secret );
-                        m.Info( $"Imported secret '{info.Name}'." );
-                    }
+                    info.ImportSecret( m, secret );
                 }
             }
         }

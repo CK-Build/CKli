@@ -113,6 +113,7 @@ namespace CK.Env.Plugin
             {
                 _sln.Saved -= OnSolutionSaved;
                 m.Info( $"Solution '{GitFolder.SubPath}' must be reloaded." );
+                _isSolutionValid = false;
                 _sln = null;
             }
         }
