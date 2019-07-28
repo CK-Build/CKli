@@ -33,7 +33,9 @@ namespace CK.Env.Plugin
 
         void KeyVaultFileUpdating( object sender, CodeCakeBuilderKeyVaultUpdatingArgs e )
         {
-            var store = e.Solution.ArtifactTargets.OfType<CKSetupStore>().SingleOrDefault();
+            CKSetupStore store = e.SolutionSpec.UseCKSetup
+                                    ? e.Solution.ArtifactTargets.OfType<CKSetupStore>().SingleOrDefault()
+                                    : null;
             if( store != null  && e.Secrets.TryGetValue( store.SecretKeyName, out var apiKey ) )
             {
                 // The actual key contains both the url and the secret.
@@ -44,11 +46,12 @@ namespace CK.Env.Plugin
 
         void OnSolutionConfiguration( object sender, SolutionConfigurationEventArgs e )
         {
-            if( e.SolutionSpec.UseCKSetup
-                && e.Solution.ArtifactTargets.OfType<CKSetupStore>().SingleOrDefault() == null )
+            bool targetCKSetup = e.Solution.GeneratedArtifacts.Any( a => a.Artifact.Type == CKSetupClient.CKSetupType );
+            var stores = e.Solution.ArtifactTargets.OfType<CKSetupStore>().ToList();
+            if( !targetCKSetup && stores.Any() )
             {
-                e.PreventSolutionUse( $"Single CKSetup Artifact target not found. Since UseCKSetup is true, one and only one CKSetup store target must be available." );
-                return;
+                e.Monitor.Info( $"Removing {stores.Select( s => s.UniqueRepositoryName ).Concatenate()} since no CKSetup artifacts are produced." );
+                foreach( var t in stores ) e.Solution.RemoveArtifactTarget( t );
             }
         }
 

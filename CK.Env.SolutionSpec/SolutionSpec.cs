@@ -25,6 +25,7 @@ namespace CK.Env
 
             CKSetupComponentProjects = e.Elements( nameof( CKSetupComponentProjects ) )
                             .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Name" ) );
+            UseCKSetup |= CKSetupComponentProjects.Count > 0;
 
             PublishedProjects = e.Elements( nameof( PublishedProjects ) )
                             .ApplyAddRemoveClear( s => new NormalizedPath( (string)s.AttributeRequired( "Folder" ) ) );
@@ -36,9 +37,12 @@ namespace CK.Env
 
         /// <summary>
         /// Gets whether the solution uses CKSetup components (defaults to false).
-        /// When true (and when <see cref="NoDotNetUnitTests"/> is false), a RemoteStore.TestHelper.config file
-        /// is created during build so that stores in CK-Env local folders are used instead of the default
-        /// local (%UserProfile%AppData\Local\CKSetupStore) and default remote (https://cksetup.invenietis.net).
+        /// When true (and when <see cref="SharedSolutionSpec.NoDotNetUnitTests"/> is false), a
+        /// RemoteStore.TestHelper.config file is created during build so that stores in /LocalFeed
+        /// folders are used instead of the default local (%UserProfile%AppData\Local\CKSetupStore) and default
+        /// remote (https://cksetup.invenietis.net).
+        /// Note that <see cref="CKSetupComponentProjects"/> (that describes CKSetup produceds components) is
+        /// independent of this configuration (using CKSetup components is independent of producing them).
         /// </summary>
         public bool UseCKSetup { get; }
 

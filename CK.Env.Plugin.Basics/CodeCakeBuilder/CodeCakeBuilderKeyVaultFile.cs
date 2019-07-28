@@ -63,6 +63,7 @@ namespace CK.Env.Plugin
 
             // Opens the actual current vault: if more secrets are defined we keep them.
             Dictionary<string,string> current = KeyVault.DecryptValues( TextContent, passPhrase );
+            current.Clear();
 
             // The central CICDKeyVault is protected with the same CODECAKEBUILDER_SECRET_KEY secret.
             Dictionary<string, string> centralized = KeyVault.DecryptValues( _sharedState.CICDKeyVault, passPhrase );
@@ -79,7 +80,7 @@ namespace CK.Env.Plugin
             }
             if( complete )
             {
-                Updating?.Invoke( this, new CodeCakeBuilderKeyVaultUpdatingArgs( m, s, current ) );
+                Updating?.Invoke( this, new CodeCakeBuilderKeyVaultUpdatingArgs( m, _solutionSpec, s, current ) );
                 string result = KeyVault.EncryptValuesToString( current, passPhrase );
                 CreateOrUpdate( m, result );
             }

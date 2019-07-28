@@ -223,7 +223,7 @@ namespace CK.Env.Plugin
             }
             foreach( var noMore in projectsToRemove ) _solution.RemoveProject( noMore );
 
-            List<(string SecretKeyName, string Secret)> buildSecrets = _artifactCenter.ResolveSecrets( m, _solution.ArtifactTargets, false );
+            var buildSecrets = new List<(string SecretKeyName, string Secret)>();
             _isSolutionValid = !badPack;
             var h = OnSolutionConfiguration;
             if( h != null )
@@ -234,6 +234,13 @@ namespace CK.Env.Plugin
                 {
                     m.Error( "Solution initialization failed: " + e.FailureMessage );
                     _isSolutionValid = false;
+                }
+            }
+            foreach( var sc in _artifactCenter.ResolveSecrets( m, _solution.ArtifactTargets, false ) )
+            {
+                if( buildSecrets.IndexOf( s => s.SecretKeyName == sc.SecretKeyName ) < 0 )
+                {
+                    buildSecrets.Add( sc );
                 }
             }
             _buildSecrets = buildSecrets;

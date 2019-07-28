@@ -15,10 +15,13 @@ namespace CK.Env.Plugin
         /// Initializes a new <see cref="CodeCakeBuilderKeyVaultUpdatingArgs"/>.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
+        /// <param name="spec">Specification of the current solution.</param>
+        /// <param name="solution">Current solution.</param>
         /// <param name="secrets">The secrets ready to be written.</param>
-        public CodeCakeBuilderKeyVaultUpdatingArgs( IActivityMonitor m, ISolution solution, IDictionary<string,string> secrets )
+        public CodeCakeBuilderKeyVaultUpdatingArgs( IActivityMonitor m, SolutionSpec spec, ISolution solution, IDictionary<string,string> secrets )
             : base( m )
         {
+            SolutionSpec = spec;
             Solution = solution;
             Secrets = secrets ?? throw new ArgumentNullException( nameof( secrets ) );
         }
@@ -29,9 +32,14 @@ namespace CK.Env.Plugin
         public IDictionary<string,string> Secrets { get; }
 
         /// <summary>
-        /// Gets the solution being updated.
+        /// Gets the specfication of the solution being updated.
         /// </summary>
         public ISolution Solution { get; }
+
+        /// <summary>
+        /// Gets the solution being updated.
+        /// </summary>
+        public SolutionSpec SolutionSpec { get; }
 
     }
 }
