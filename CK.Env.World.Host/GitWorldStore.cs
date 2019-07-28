@@ -445,7 +445,6 @@ namespace CK.Env
             return true;
         }
 
-
         StackRepo FindRepo( IActivityMonitor m, string stackName )
         {
             int idx = _stacks.IndexOf( d => d.StackName == stackName );
@@ -550,7 +549,6 @@ namespace CK.Env
             return null;
         }
 
-
         public override SharedWorldState GetOrCreateSharedState( IActivityMonitor m, IWorldName w )
         {
             var p = ToSharedStateFilePath( w ).Item2;
@@ -594,7 +592,22 @@ namespace CK.Env
             var local = ToLocal( w );
             var def = local.XmlDescriptionFilePath;
             Debug.Assert( def.EndsWith( ".World.xml" ) );
-            return (local, def.RemoveLastPart().AppendPart( def.LastPart.Substring( def.LastPart.Length - 3 ) + "SharedState.xml" ));
+            return (local, def.RemoveLastPart().AppendPart( def.LastPart.Substring( 0, def.LastPart.Length - 3 ) + "SharedState.xml" ));
+        }
+
+        /// <summary>
+        /// Pulls all repositories and returns true if something changed.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>True if something changed.</returns>
+        public bool PullAll( IActivityMonitor m )
+        {
+            bool changed = false;
+            foreach( var r in _repos )
+            {
+                changed |= r.Pull( m );
+            }
+            return changed;
         }
 
     }

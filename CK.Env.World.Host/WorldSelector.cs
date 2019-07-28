@@ -85,64 +85,67 @@ namespace CK.Env
         public bool OpenWorld( IActivityMonitor m, string worldFullNameOr1BasedIndex )
         {
             if( !CanOpenWorld ) throw new InvalidOperationException();
-            var all = Store.ReadWorlds( m );
-            if( all == null ) return false;
-            IRootedWorldName w;
-            if( Int32.TryParse( worldFullNameOr1BasedIndex, out var idx ) )
+            using( m.OpenInfo( $"Opening  world '{worldFullNameOr1BasedIndex}'." ) )
             {
-                if( idx >= 1 && idx <= all.Count ) w = all[idx-1];
-                else
+                var all = Store.ReadWorlds( m );
+                if( all == null ) return false;
+                IRootedWorldName w;
+                if( Int32.TryParse( worldFullNameOr1BasedIndex, out var idx ) )
                 {
-                    m.Error( $"Invalid index: {idx} out of {all.Count}." );
-                    return false;
-                }
-            }
-            else
-            {
-                w = all.FirstOrDefault( x => x.FullName.Equals( worldFullNameOr1BasedIndex, StringComparison.OrdinalIgnoreCase ) );
-                if( w == null )
-                {
-                    m.Error( $"Unable to find World {worldFullNameOr1BasedIndex} among {all.Select( x => x.FullName ).Concatenate()}." );
-                    return false;
-                }
-            }
-            Debug.Assert( w != null );
-            Close();
-            var keySnapshot = _userKeyStore.CreateSnapshot();
-            var baseProvider = new SimpleServiceContainer();
-            _fs = new FileSystem( w.Root, _command, _userKeyStore, baseProvider );
-            baseProvider.Add<ISimpleObjectActivator>( new SimpleObjectActivator() );
-            baseProvider.Add( _command );
-            baseProvider.Add( _fs );
-            baseProvider.Add<IWorldName>( w );
-            baseProvider.Add<WorldStore>( Store );
-            baseProvider.Add( _appLife );
-            baseProvider.Add( _userKeyStore );
-            var original = Store.ReadWorldDescription( m, w ).Root;
-            var expanded = XTypedFactory.PreProcess( m, original );
-            if( expanded.Errors.Count > 0 ) return false;
-            _root = _factory.CreateInstance<XTypedObject>( m, expanded.Result, baseProvider );
-            if( _root != null )
-            {
-                var xW = _root.Descendants<IXTypedObjectProvider<World>>().FirstOrDefault();
-                if( xW != null )
-                {
-                    if( _userKeyStore.Infos.All( secret => !secret.IsRequired || secret.IsSecretAvailable ) )
-                    {
-                        CurrentWorld = xW.GetObject( m );
-                        if( CurrentWorld != null ) return true;
-                    }
+                    if( idx >= 1 && idx <= all.Count ) w = all[idx - 1];
                     else
                     {
-                        var missing = _userKeyStore.Infos.Where( secret => secret.IsRequired && !secret.IsSecretAvailable ).Select( s => s.Name ).Concatenate();
-                        m.Error( $"Missing one or more secrets. These are required to continue: {missing}." );
+                        m.Error( $"Invalid index: {idx} out of {all.Count}." );
+                        return false;
                     }
                 }
-                else m.Error( "Missing expected World definition element." );
+                else
+                {
+                    w = all.FirstOrDefault( x => x.FullName.Equals( worldFullNameOr1BasedIndex, StringComparison.OrdinalIgnoreCase ) );
+                    if( w == null )
+                    {
+                        m.Error( $"Unable to find World {worldFullNameOr1BasedIndex} among {all.Select( x => x.FullName ).Concatenate()}." );
+                        return false;
+                    }
+                }
+                Debug.Assert( w != null );
+                Close();
+                var keySnapshot = _userKeyStore.CreateSnapshot();
+                var baseProvider = new SimpleServiceContainer();
+                _fs = new FileSystem( w.Root, _command, _userKeyStore, baseProvider );
+                baseProvider.Add<ISimpleObjectActivator>( new SimpleObjectActivator() );
+                baseProvider.Add( _command );
+                baseProvider.Add( _fs );
+                baseProvider.Add<IWorldName>( w );
+                baseProvider.Add<WorldStore>( Store );
+                baseProvider.Add( _appLife );
+                baseProvider.Add( _userKeyStore );
+                var original = Store.ReadWorldDescription( m, w ).Root;
+                var expanded = XTypedFactory.PreProcess( m, original );
+                if( expanded.Errors.Count > 0 ) return false;
+                _root = _factory.CreateInstance<XTypedObject>( m, expanded.Result, baseProvider );
+                if( _root != null )
+                {
+                    var xW = _root.Descendants<IXTypedObjectProvider<World>>().FirstOrDefault();
+                    if( xW != null )
+                    {
+                        if( _userKeyStore.Infos.All( secret => !secret.IsRequired || secret.IsSecretAvailable ) )
+                        {
+                            CurrentWorld = xW.GetObject( m );
+                            if( CurrentWorld != null ) return true;
+                        }
+                        else
+                        {
+                            var missing = _userKeyStore.Infos.Where( secret => secret.IsRequired && !secret.IsSecretAvailable ).Select( s => s.Name ).Concatenate();
+                            m.Error( $"Missing one or more secrets. These are required to continue: {missing}." );
+                        }
+                    }
+                    else m.Error( "Missing expected World definition element." );
+                }
+                keySnapshot.RestoreTo( _userKeyStore );
+                Close();
+                return false;
             }
-            keySnapshot.RestoreTo( _userKeyStore );
-            Close();
-            return false;
         }
 
         void Close()

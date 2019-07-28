@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.SimpleKeyVault;
 using CK.Text;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -37,6 +38,11 @@ namespace CK.Env.Plugin
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
+        /// <summary>
+        /// Raised before writing the build secrets to the CodeCakeBuyilder key vault.
+        /// </summary>
+        public event EventHandler<CodeCakeBuilderKeyVaultUpdatingArgs> Updating;
+
         public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart
                                         && _secretStore.IsSecretKeyAvailable( SolutionDriver.CODECAKEBUILDER_SECRET_KEY ) == true;
 
@@ -46,6 +52,7 @@ namespace CK.Env.Plugin
             if( !_f.EnsureDirectory( m ) ) return;
             var s = _driver.GetSolution( m, allowInvalidSolution: true );
             if( s == null ) return;
+
             if( _driver.BuildRequiredSecrets.Count == 0 )
             {
                 m.Warn( "No build secrets collected for this solution. Skipping KeyVault configuration." );
@@ -72,6 +79,7 @@ namespace CK.Env.Plugin
             }
             if( complete )
             {
+                Updating?.Invoke( this, new CodeCakeBuilderKeyVaultUpdatingArgs( m, s, current ) );
                 string result = KeyVault.EncryptValuesToString( current, passPhrase );
                 CreateOrUpdate( m, result );
             }

@@ -8,7 +8,7 @@ using System.Diagnostics;
 
 namespace CK.Env.Plugin
 {
-    public class NPMProjectsDriver : GitBranchPluginBase, ICommandMethodsProvider
+    public class NPMProjectsDriver : GitBranchPluginBase, ICommandMethodsProvider, IDisposable
     {
         readonly SolutionDriver _driver;
         readonly SolutionSpec _spec;
@@ -100,5 +100,10 @@ namespace CK.Env.Plugin
             }
         }
 
+        void IDisposable.Dispose()
+        {
+            _driver.OnSolutionConfiguration -= OnSolutionConfiguration;
+            _driver.OnUpdatePackageDependency -= OnUpdatePackageDependency;
+        }
     }
 }

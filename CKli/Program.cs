@@ -35,6 +35,8 @@ namespace CKli
             {
                 var host = new UserHost( appLife, userHostPath );
                 host.Initialize( monitor );
+                OpenKeyVault( monitor, host );
+                DumpWorlds( host.WorldStore.ReadWorlds( monitor ) );
                 InteractiveRun( monitor, host );
             }
             catch( Exception ex )
@@ -79,24 +81,23 @@ namespace CKli
                     if( !host.UserKeyVault.IsKeyVaultOpened )
                     {
                         Console.WriteLine( "Your personal KeyVault is not opened." );
-                        if( host.UserKeyVault.KeyVaultFileExists )
-                        {
-                            Console.Write( "Enter the passphrase to open it: " );
-                        }
-                        else
-                        {
-                            Console.Write( "It must be created. Enter its passphrase: " );
-                        }
-                        var s = ReadSecret();
-                        if( s != null ) host.UserKeyVault.OpenKeyVault( monitor, s );
-                        else Console.WriteLine( "KeyVault opening cancelled." );
-                        Console.WriteLine();
+                        OpenKeyVault( monitor, host );
                     }
                     rep = rep.Substring( 6 ).Trim();
                     if( rep.Length > 0 )
                     {
                         var two = rep.Split( ' ' ).Where( t => t.Length > 0 ).ToArray();
-                        if( two.Length == 2 )
+                        if( two.Length == 1 )
+                        {
+                            if( two[0].Equals( "save", StringComparison.OrdinalIgnoreCase ) )
+                            {
+                                Console.Write( $"Enter new passphrase (empty to cancel): " );
+                                var s = ReadSecret();
+                                if( s != null ) host.UserKeyVault.SaveKeyVault( monitor, s );
+                            }
+                            else two = null;
+                        }
+                        else if( two.Length == 2 )
                         {
                             if( two[0].Equals( "clear", StringComparison.OrdinalIgnoreCase ) )
                             {
@@ -108,8 +109,12 @@ namespace CKli
                                 var s = ReadSecret();
                                 if( s != null ) host.UserKeyVault.UpdateSecret( monitor, two[1], s );
                             }
+                            else two = null;
                         }
-                        else Console.WriteLine( "Invalid syntax. Expected: clear NAME or NAME value." );
+                        if( two == null )
+                        {
+                            Console.WriteLine( "Invalid syntax. Expected: 'clear NAME', 'set NAME' or 'save'." );
+                        }
                     }
                     DumpSecrets( host.UserKeyVault );
                     continue;
@@ -159,18 +164,53 @@ namespace CKli
             }
         }
 
+        static void OpenKeyVault( IActivityMonitor monitor, UserHost host )
+        {
+            string prompt;
+            if( host.UserKeyVault.KeyVaultFileExists )
+            {
+                Console.WriteLine( "Your personal KeyVault should be opened." );
+                prompt = "Enter the passphrase to open it: ";
+            }
+            else
+            {
+                Console.WriteLine( $"Personal KeyVault not found at: '{host.UserKeyVault.KeyVaultPath}'" );
+                Console.WriteLine( "It will contain encrypted secrets required by the different operations on all stacks." );
+                prompt = "It should be created. Enter its passphrase (and memorize it!): ";
+            }
+
+            Console.Write( prompt );
+            var s = ReadSecret();
+            if( s != null ) host.UserKeyVault.OpenKeyVault( monitor, s );
+            else Console.WriteLine( "KeyVault opening cancelled." );
+
+            if( host.UserKeyVault.IsKeyVaultOpened )
+            {
+                Console.WriteLine( "KeyVault opened." );
+            }
+            else
+            {
+                Console.WriteLine( "KeyVault not opened. You may open it later by using the 'secret' command." );
+                Console.WriteLine( "Some features will be unavailable or fail miserably when secrets are unavailable." );
+            }
+            Console.WriteLine( "Note:" );
+            Console.WriteLine( " - You can always use 'secret set NAME' or 'secret clear NAME' commands at anytime to upsert or remove secrets." );
+            Console.WriteLine( " - You can also change the KeyVault passphrase thanks to 'secret save'." );
+        }
+
         static void DumpWorlds( IEnumerable<IRootedWorldName> worlds )
         {
+            Console.WriteLine( "--------- Worlds ---------" );
             string name = null;
             int idx = 0;
             foreach( var w in worlds )
             {
                 if( name != w.Name )
                 {
-                    Console.WriteLine( $"- {w.Name}" );
+                    Console.WriteLine( $"  - {w.Name}" );
                     name = w.Name;
                 }
-                Console.WriteLine( $"   > {++idx} {w.FullName} => {(w.Root.IsEmptyPath ? "(No local mapping)" : w.Root.Path)}" );
+                Console.WriteLine( $"     > {++idx} {w.FullName} => {(w.Root.IsEmptyPath ? "(No local mapping)" : w.Root.Path)}" );
             }
         }
 

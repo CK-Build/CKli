@@ -6,7 +6,7 @@ using System.Text;
 
 namespace CK.Env
 {
-    public sealed class UserHost
+    public sealed class UserHost : ICommandMethodsProvider
     {
         public static readonly NormalizedPath HomeCommandPath = "Home";
 
@@ -23,7 +23,10 @@ namespace CK.Env
             _worldMapping = new SimpleWorldLocalMapping( userHostPath.AppendPart( "WorldLocalMapping.txt" ) );
             _store = new GitWorldStore( userHostPath, _worldMapping, UserKeyVault.KeyStore, CommandRegister );
             WorldSelector = new WorldSelector( _store, CommandRegister, _xTypedObjectfactory, UserKeyVault.KeyStore, lifetime );
+            CommandRegister.Register( this );
         }
+
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => UserHost.HomeCommandPath;
 
         public CommandRegister CommandRegister { get; }
 
@@ -35,11 +38,25 @@ namespace CK.Env
 
         public UserKeyVault UserKeyVault { get; }
 
-
         public void Initialize( IActivityMonitor m )
         {
             _xTypedObjectfactory.AutoRegisterFromLoadedAssemblies( m );
             _store.ReadStacksFromFile( m );
+        }
+
+        [CommandMethod]
+        public void Refresh( IActivityMonitor m )
+        {
+            _store.PullAll( m );
+            if( WorldSelector.CanCloseWorld )
+            {
+                var opened = WorldSelector.CurrentWorld.WorldName.FullName;
+                if( opened != null )
+                {
+                    WorldSelector.CloseWorld( m );
+                    WorldSelector.OpenWorld( m, opened );
+                }
+            }
         }
     }
 }

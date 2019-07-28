@@ -23,7 +23,8 @@ namespace CK.Env.NPM
     {
         static readonly string _userAgent = "CKli";
 
-        static readonly Uri _npmjs = new Uri( "https://registry.npmjs.org/" );
+        public static readonly Uri NPMJSOrgUri = new Uri( "https://registry.npmjs.org/" );
+
         readonly HttpClient _httpClient;
         AuthenticationHeaderValue _authHeader;
         readonly string _session = GenerateSessionId();
@@ -43,37 +44,37 @@ namespace CK.Env.NPM
         }
 
         /// <summary>
-        /// No auth
+        /// Initializes a new Registry without any authentication.
         /// </summary>
-        /// <param name="httpClient"></param>
-        /// <param name="uri"></param>
-        public Registry( HttpClient httpClient, Uri uri = null )
+        /// <param name="httpClient">The http client that will be used.</param>
+        /// <param name="uri">The uri of the npm repository.</param>
+        public Registry( HttpClient httpClient, Uri uri )
         {
-            RegistryUri = uri ?? _npmjs;
+            RegistryUri = uri;
             _httpClient = httpClient;
         }
 
         /// <summary>
-        ///
+        /// Initializes a new Registry that uses a Authentication bearer token.
         /// </summary>
-        /// <param name="httpClient"></param>
-        /// <param name="token"></param>
-        /// <param name="uri">if null the Uri is https://registry.npmjs.org/ </param>
+        /// <param name="httpClient">The http client to use.</param>
+        /// <param name="token">The token to use.</param>
+        /// <param name="uri">Defaults to https://registry.npmjs.org/ </param>
         public Registry( HttpClient httpClient, string token, Uri uri = null )
-            : this( httpClient, uri )
+            : this( httpClient, uri ?? NPMJSOrgUri )
         {
             _authHeader = new AuthenticationHeaderValue( "Bearer", token );
         }
 
         /// <summary>
-        /// 
+        /// Initializes a new Registry that uses basic authentication.
         /// </summary>
-        /// <param name="httpClient"></param>
-        /// <param name="username"></param>
-        /// <param name="password"></param>
-        /// <param name="uri">if null the Uri is https://registry.npmjs.org/ </param>
+        /// <param name="httpClient">The http client to use.</param>
+        /// <param name="username">The user name.</param>
+        /// <param name="password">The password.</param>
+        /// <param name="uri">Defaults to https://registry.npmjs.org/ </param>
         public Registry( HttpClient httpClient, string username, string password, Uri uri = null )
-            : this( httpClient, uri )
+            : this( httpClient, uri ?? NPMJSOrgUri )
         {
             _username = username;
             _password = password;
@@ -300,7 +301,7 @@ namespace CK.Env.NPM
         /// <param name="version">The info on the package on a specified versions, return a json containing the info of all the version if it's not specified</param>
         /// <param name="abbreviatedResponse">Ask the server to abreviate the info
         /// </param>
-        /// <returns></returns>
+        /// <returns>The JSON response body and a success flag.</returns>
         public async Task<(string viewJson, bool exist)> View( IActivityMonitor m, string packageName, SVersion version = null, bool abbreviatedResponse = true )
         {
             if( version == null )
@@ -308,7 +309,11 @@ namespace CK.Env.NPM
                 // We can't optimise it unless we know the fallback feed, and we can't know with azure because the api ask for a version.
                 m.Debug( "Getting all the versions of the package." );
                 (string body, HttpStatusCode statusCode) = await ViewRequest( m, packageName, abbreviatedResponse );
-                return (body, IsSuccessStatusCode( statusCode ));
+
+                bool success = IsSuccessStatusCode( statusCode );
+                if( !success ) m.Warn( $"Failed status code {statusCode} for '{RegistryUri}'." );
+
+                return (body, success);
             }
             // Here we know that the user specified the version
             return await LegacyViewWithVersion( m, packageName, version, abbreviatedResponse );

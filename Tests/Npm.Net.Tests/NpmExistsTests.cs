@@ -12,7 +12,7 @@ namespace Npm.Net.Tests
         readonly Registry _registry;
         public NpmExistsTests()
         {
-            _registry = new Registry( TestHelperHttpClient.HttpClient );
+            _registry = new Registry( TestHelperHttpClient.HttpClient, Registry.NPMJSOrgUri );
         }
 
         [Test]
