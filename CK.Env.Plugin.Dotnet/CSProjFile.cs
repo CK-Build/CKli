@@ -38,13 +38,15 @@ namespace CK.Env.Plugin
             {
                 if( project.IsPublished )
                 {
-                    //For test projects we want the IsPackable element to be explicit.
+                    // For test projects we want the IsPackable element to be explicit.
                     msproject.SetIsPackable( m, project.IsTestProject ? true : (bool?)null );
                 }
                 else
                 {
                     msproject.SetIsPackable( m, false );
                 }
+                // Saves the project.
+                if( !msproject.Save( m ) ) return false;
             }
             return true;
         }

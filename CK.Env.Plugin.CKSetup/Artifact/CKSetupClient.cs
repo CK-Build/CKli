@@ -55,7 +55,10 @@ namespace CK.Env.CKSetup
             return store;
         }
 
-        public IArtifactFeed CreateFeed( in XElementReader r, IReadOnlyList<IArtifactRepository> repositories, IReadOnlyList<IArtifactFeed> feeds ) => null;
+        public IArtifactFeed CreateFeed( in XElementReader r, IReadOnlyList<IArtifactRepository> repositories, IReadOnlyList<IArtifactFeed> feeds )
+        {
+            return null;
+        }
 
     }
 }

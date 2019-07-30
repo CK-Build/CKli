@@ -155,6 +155,27 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Gets all the descendants of a given type.
+        /// </summary>
+        /// <typeparam name="T">Type of the descendants that must be enumerated.</typeparam>
+        /// <param name="breadthFirst">
+        /// False to enumerate the nodes in depth-first order rather than breadth-first.
+        /// </param>
+        /// <param name="withSelf">
+        /// True to consider <paramref name="this"/> element. Defaults to consider only the children elements.
+        /// </param>
+        /// <returns>The set of typed descendants.</returns>
+        public IEnumerable<T> Descendants<T>( bool breadthFirst = true, bool withSelf = false )
+        {
+            if( breadthFirst && withSelf && this is T tTb ) yield return tTb;
+            foreach( var c in Children )
+            {
+                foreach( var d in c.Descendants<T>( breadthFirst, true ) ) yield return d;
+            }
+            if( !breadthFirst && withSelf && this is T tTd ) yield return tTd;
+        }
+
+        /// <summary>
         /// Gets the next sibling.
         /// Null if this is the last children of the <see cref="Parent"/>.
         /// </summary>
@@ -192,23 +213,6 @@ namespace CK.Env
         protected virtual bool OnCreated( Initializer initializer )
         {
             return true;
-        }
-
-        /// <summary>
-        /// Gets all the descendants of a given type.
-        /// </summary>
-        /// <typeparam name="T">Type of the descendants that must be enumerated.</typeparam>
-        /// <returns>The set of typed descendants.</returns>
-        public IEnumerable<T> Descendants<T>()
-        {
-            foreach( var c in Children )
-            {
-                if( c is T tC ) yield return tC;
-                foreach( var d in c.Descendants<T>() )
-                {
-                    if( d is T tD ) yield return tD;
-                }
-            }
         }
 
         internal bool OnChildrenCreated( Initializer initializer, IReadOnlyList<XTypedObject> children )

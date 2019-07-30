@@ -31,8 +31,6 @@ namespace CK.Env.NuGet
 
         internal static readonly List<Lazy<INuGetResourceProvider>> StaticProviders;
 
-        //readonly Dictionary<string, IArtifactRepository> _repositories;
-        //readonly List<InternalFeed> _internalFeeds;
         readonly SourcePackageProvider _sourcePackageProvider;
         internal readonly SourceCacheContext SourceCache;
 
@@ -46,30 +44,47 @@ namespace CK.Env.NuGet
         {
             lock( _secretKeysLock )
             {
-                if( !_secretAzureKeys.ContainsKey( url ) )
+                bool newRepo = !_secretAzureKeys.ContainsKey( url );
+                bool updateExisitng = !newRepo && _secretAzureKeys[url] != secret;
+
+                if( newRepo || updateExisitng )
                 {
-                    _secretAzureKeys.Add( url, secret );
-                    // The VSS_NUGET_EXTERNAL_FEED_ENDPOINTS is used by Azure Credential Provider to handle authentication
-                    // for the feed.
-                    StringBuilder b = new StringBuilder( @"{""endpointCredentials"":[" );
-                    bool already = false;
-                    foreach( var kv in _secretAzureKeys )
+                    if( newRepo )
                     {
-                        if( already ) b.Append( ',' );
-                        else already = true;
-
-                        b.Append( @"{""endpoint"":""" ).AppendJSONEscaped( kv.Key ).Append( @"""," )
-                            .Append( @"""username"":""Unused"",""password"":""" ).AppendJSONEscaped( kv.Value ).Append( @"""" )
-                            .Append( "}" );
+                        m.Info( $"Registering credential for '{url}' access." );
+                        _secretAzureKeys.Add( url, secret );
                     }
-                    b.Append( "]}" );
-                    var json = b.ToString();
-                    m.Info( $"Updated VSS_NUGET_EXTERNAL_FEED_ENDPOINTS with {_secretAzureKeys.Count} endpoints." );
-
-                    Debug.Assert( Newtonsoft.Json.Linq.JObject.Parse( json )["endpointCredentials"] != null );
-                    Environment.SetEnvironmentVariable( "VSS_NUGET_EXTERNAL_FEED_ENDPOINTS", json );
+                    else
+                    {
+                        m.Info( $"Updating credential for '{url}' access." );
+                        _secretAzureKeys[url] = secret;
+                    }
+                    GenerateNuGetCredentialsEnvironmentVariable( m );
                 }
             }
+        }
+
+        static void GenerateNuGetCredentialsEnvironmentVariable( IActivityMonitor m )
+        {
+            // The VSS_NUGET_EXTERNAL_FEED_ENDPOINTS is used by Azure Credential Provider to handle authentication
+            // for the feed.
+            StringBuilder b = new StringBuilder( @"{""endpointCredentials"":[" );
+            bool already = false;
+            foreach( var kv in _secretAzureKeys )
+            {
+                if( already ) b.Append( ',' );
+                else already = true;
+
+                b.Append( @"{""endpoint"":""" ).AppendJSONEscaped( kv.Key ).Append( @"""," )
+                    .Append( @"""username"":""Unused"",""password"":""" ).AppendJSONEscaped( kv.Value ).Append( @"""" )
+                    .Append( "}" );
+            }
+            b.Append( "]}" );
+            var json = b.ToString();
+            m.Info( $"Updated VSS_NUGET_EXTERNAL_FEED_ENDPOINTS with {_secretAzureKeys.Count} endpoints." );
+
+            Debug.Assert( Newtonsoft.Json.Linq.JObject.Parse( json )["endpointCredentials"] != null );
+            Environment.SetEnvironmentVariable( "VSS_NUGET_EXTERNAL_FEED_ENDPOINTS", json );
         }
 
         static async Task<IEnumerable<ICredentialProvider>> GetCredentialProvidersAsync( ILogger logger )
@@ -80,7 +95,7 @@ namespace CK.Env.NuGet
             return providers;
         }
 
-        internal static void Initalize( NuGetLoggerAdapter logger )
+        internal static bool Initalize( NuGetLoggerAdapter logger )
         {
             if( !_initialized )
             {
@@ -113,10 +128,11 @@ namespace CK.Env.NuGet
                                 providers: credProviders,
                                 nonInteractive: true,
                                 handlesDefaultCredentials: true ) );
-                        _initialized = true;
+                        return _initialized = true;
                     }
                 }
             }
+            return false;
         }
         #endregion
 
@@ -276,9 +292,10 @@ namespace CK.Env.NuGet
             var xCreds = r.Element.Element( "Credentials" );
             var creds = xCreds != null ? new SimpleCredentials( r.WithElement( xCreds ) ) : null;
 
+            SecretKeyInfo secretKeyed = null;
             if( creds.IsSecretKeyName )
             {
-                SecretKeyStore.DeclareSecretKey( creds.PasswordOrSecretKeyName, desc => desc
+                secretKeyed = SecretKeyStore.DeclareSecretKey( creds.PasswordOrSecretKeyName, current => current?.Description
                                     ?? $"Required for NuGet.config file to retrieve packages from '{name}' feed." );
             }
 
@@ -291,9 +308,26 @@ namespace CK.Env.NuGet
                     return i.HandleFeed( url, name, creds );
                 }
             }
-            var feed = new NuGetFeedBase( this, url, name, creds );
+            var feed = new PureFeed( this, url, name, creds, secretKeyed );
             _sourcePackageProvider.SetPackageSources( internals.Append( feed ) );
             return feed.Feed;
+        }
+
+        class PureFeed : NuGetFeedBase
+        {
+            readonly SecretKeyInfo _secretKeyed;
+
+            public PureFeed( NuGetClient c, string url, string name, SimpleCredentials creds, SecretKeyInfo secretKeyed )
+                : base( c, url, name, creds )
+            {
+                _secretKeyed = secretKeyed;
+            }
+
+            private protected override bool CanRetry( MetadataResource meta, NuGetLoggerAdapter logger, Exception ex )
+            {
+                logger.Monitor.Fatal( "Pure feed implementation is unable to retry the call. Rethrowing the exception." );
+                return false;
+            }
         }
 
     }

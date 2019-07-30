@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Env.NPM;
 using CK.Env.Tests;
 using FluentAssertions;
 using Newtonsoft.Json.Linq;
@@ -14,6 +15,7 @@ namespace Npm.Net.Tests
     public class NpmPublishTests
     {
         [Test]
+        [Explicit]
         public void PublishOnNpm()
         {
             string pat = "";

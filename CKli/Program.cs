@@ -17,66 +17,107 @@ namespace CKli
 {
     class Program
     {
-        static string GetThisFilePath( [CallerFilePath]string p = null ) => p;
-
-        static string GetRootPath( string[] args )
-        {
-            if( args.Length > 0 )
-            {
-                return args[0];
-            }
-            var p = GetThisFilePath();
-            while( !String.IsNullOrEmpty( p ) && Path.GetFileName( p ) != "CKli" ) p = Path.GetDirectoryName( p );
-            if( !String.IsNullOrEmpty( p ) )
-            {
-                var ckEnv = Path.GetDirectoryName( p );
-                if( Path.GetFileName( ckEnv ) == "CK-Env" )
-                {
-                    return Path.GetDirectoryName( ckEnv );
-                }
-            }
-            throw new InvalidOperationException( "Must be in CK-Env/CKli source." );
-        }
-
-
         static void Main( string[] args )
         {
-            var rootPath = GetRootPath( args );
-            LogFile.RootLogPath = Path.Combine( rootPath, "Logs" );
-            var goc = new GrandOutputConfiguration();
-            goc.Handlers.Add( new CK.Monitoring.Handlers.TextFileConfiguration() { Path = "Text" } );
-            GrandOutput.EnsureActiveDefault( goc );
+            NormalizedPath userHostPath = Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData );
+            userHostPath = userHostPath.AppendPart( "CKli" );
+
+            LogFile.RootLogPath = userHostPath.AppendPart( "Logs" );
+            var logConfig = new GrandOutputConfiguration().AddHandler(
+                                new CK.Monitoring.Handlers.TextFileConfiguration() { Path = "Text" } );
+            GrandOutput.EnsureActiveDefault( logConfig );
 
             var monitor = new ActivityMonitor();
             monitor.Output.RegisterClient( new ColoredActivityMonitorConsoleClient() );
 
-            var xFactory = new XTypedFactory();
-            xFactory.AutoRegisterFromLoadedAssemblies( monitor );
             IBasicApplicationLifetime appLife = new FakeApplicationLifetime();
-            using( var global = new GlobalContext( monitor, xFactory, rootPath, appLife ) )
+            try
             {
-                if( !InteractiveRun( monitor, global, appLife ) ) Console.ReadLine();
+                var host = new UserHost( appLife, userHostPath );
+                host.Initialize( monitor );
+                OpenKeyVault( monitor, host );
+                if( host.UserKeyVault.IsKeyVaultOpened ) host.Initialize( monitor );
+                DumpWorlds( host.WorldStore.ReadWorlds( monitor ) );
+                InteractiveRun( monitor, host );
+            }
+            catch( Exception ex )
+            {
+                monitor.Fatal( ex );
+                Console.ReadLine();
             }
         }
 
-        static bool InteractiveRun( ActivityMonitor monitor, GlobalContext global, IBasicApplicationLifetime appLife )
+        static void InteractiveRun( IActivityMonitor monitor, UserHost host )
         {
-            if( !global.Open() ) return false;
+            const string textCommands = "[run <globbed command name> | list [<globbed command name>] | cls | secret [clear NAME|set NAME|save] | exit]";
             for(; ; )
             {
-                if( appLife.CanCancelStopRequest ) appLife.CancelStopRequest();
+                if( host.ApplicationLifetime.CanCancelStopRequest ) host.ApplicationLifetime.CancelStopRequest();
+
+                bool hasWorld = host.WorldSelector.CurrentWorld != null;
                 Console.WriteLine();
-                Console.WriteLine( $"> World: {global.CurrentWorld.FullName} - [run <globbed command name> | list [<globbed command name>] | cls | restart | exit]" );
+                if( hasWorld )
+                {
+                    Console.WriteLine( $"> World: {host.WorldSelector.CurrentWorld.WorldName.FullName} - {textCommands }" );
+                }
+                else
+                {
+                    Console.WriteLine( $"> {textCommands}" );
+                }
                 Console.Write( "> " );
                 string rep = Console.ReadLine().Trim();
                 if( rep.Length == 0 )
                 {
-                    global.CommandRegister["World/DumpWorldState"].Execute( monitor, null );
+                    if( hasWorld ) host.CommandRegister["World/DumpWorldState"].Execute( monitor, null );
+                    else DumpWorlds( host.WorldStore.ReadWorlds( monitor ) );
                     continue;
                 }
                 if( rep == "cls" )
                 {
                     Console.Clear();
+                    continue;
+                }
+                if( rep.StartsWith( "secret" ) )
+                {
+                    if( !host.UserKeyVault.IsKeyVaultOpened )
+                    {
+                        Console.WriteLine( "Your personal KeyVault is not opened." );
+                        OpenKeyVault( monitor, host );
+                    }
+                    rep = rep.Substring( 6 ).Trim();
+                    if( rep.Length > 0 )
+                    {
+                        var two = rep.Split( ' ' ).Where( t => t.Length > 0 ).ToArray();
+                        if( two.Length == 1 )
+                        {
+                            if( two[0].Equals( "save", StringComparison.OrdinalIgnoreCase ) )
+                            {
+                                Console.Write( $"Enter new passphrase (empty to cancel): " );
+                                var s = ReadSecret();
+                                if( s != null ) host.UserKeyVault.SaveKeyVault( monitor, s );
+                            }
+                            else two = null;
+                        }
+                        else if( two.Length == 2 )
+                        {
+                            if( two[0].Equals( "clear", StringComparison.OrdinalIgnoreCase ) )
+                            {
+                                host.UserKeyVault.UpdateSecret( monitor, two[1], null );
+                            }
+                            else if( two[0].Equals( "set", StringComparison.OrdinalIgnoreCase ) )
+                            {
+                                Console.Write( $"Enter '{two[1]}' secret (empty to cancel): " );
+                                var s = ReadSecret();
+                                if( s != null ) host.UserKeyVault.UpdateSecret( monitor, two[1], s );
+                            }
+                            else two = null;
+                        }
+                        if( two == null )
+                        {
+                            Console.WriteLine( "Invalid syntax. Expected: 'clear NAME', 'set NAME' or 'save'." );
+                        }
+                    }
+                    DumpSecrets( host.UserKeyVault );
                     continue;
                 }
                 if( rep.StartsWith( "list" ) )
@@ -86,12 +127,12 @@ namespace CKli
                     if( rep.Length == 0 )
                     {
                         Console.Write( $"Available Commands:" );
-                        commands = global.CommandRegister.GetAllCommands();
+                        commands = host.CommandRegister.GetAllCommands();
                     }
                     else
                     {
                         Console.Write( $"Available Commands matching '{rep}':" );
-                        commands = global.CommandRegister.GetCommands( rep );
+                        commands = host.CommandRegister.GetCommands( rep );
                     }
 
                     bool atLeastOne = false;
@@ -108,25 +149,103 @@ namespace CKli
                     if( !atLeastOne ) Console.WriteLine( " (none)" );
                     continue;
                 }
-                if( rep == "exit" ) return true;
-                if( rep == "restart" )
-                {
-                    if( !global.Open() ) return false;
-                    continue;
-                }
                 if( rep.StartsWith( "run " ) )
                 {
                     rep = rep.Substring( 4 ).Trim();
-                    RunCommand( monitor, global, appLife, rep );
+                    RunCommand( monitor, host, rep );
+                    continue;
+                }
+                if( rep == "exit" ) return;
+                if( !hasWorld && Int32.TryParse( rep, out var idx ) )
+                {
+                    host.WorldSelector.OpenWorld( monitor, idx.ToString() );
                     continue;
                 }
                 Console.WriteLine( "Unrecognized command." );
             }
         }
 
-        static void RunCommand( ActivityMonitor m, GlobalContext global, IBasicApplicationLifetime appLife, string rep )
+        static void OpenKeyVault( IActivityMonitor monitor, UserHost host )
         {
-            var handlers = global.CommandRegister.GetCommands( rep );
+            string prompt;
+            if( host.UserKeyVault.KeyVaultFileExists )
+            {
+                Console.WriteLine( "Your personal KeyVault should be opened." );
+                prompt = "Enter the passphrase to open it: ";
+            }
+            else
+            {
+                Console.WriteLine( $"Personal KeyVault not found at: '{host.UserKeyVault.KeyVaultPath}'" );
+                Console.WriteLine( "It will contain encrypted secrets required by the different operations on all stacks." );
+                prompt = "It should be created. Enter its passphrase (and memorize it!): ";
+            }
+
+            Console.Write( prompt );
+            var s = ReadSecret();
+            if( s != null ) host.UserKeyVault.OpenKeyVault( monitor, s );
+            else Console.WriteLine( "KeyVault opening cancelled." );
+
+            if( host.UserKeyVault.IsKeyVaultOpened )
+            {
+                Console.WriteLine( "KeyVault opened." );
+            }
+            else
+            {
+                Console.WriteLine( "KeyVault not opened. You may open it later by using the 'secret' command." );
+                Console.WriteLine( "Some features will be unavailable or fail miserably when secrets are unavailable." );
+            }
+            Console.WriteLine( "Note:" );
+            Console.WriteLine( " - You can always use 'secret set NAME' or 'secret clear NAME' commands at anytime to upsert or remove secrets." );
+            Console.WriteLine( " - You can also change the KeyVault passphrase thanks to 'secret save'." );
+        }
+
+        static void DumpWorlds( IEnumerable<IRootedWorldName> worlds )
+        {
+            Console.WriteLine( "--------- Worlds ---------" );
+            string name = null;
+            int idx = 0;
+            foreach( var w in worlds )
+            {
+                if( name != w.Name )
+                {
+                    Console.WriteLine( $"  - {w.Name}" );
+                    name = w.Name;
+                }
+                Console.WriteLine( $"     > {++idx} {w.FullName} => {(w.Root.IsEmptyPath ? "(No local mapping)" : w.Root.Path)}" );
+            }
+        }
+
+        static void DumpSecrets( UserKeyVault v )
+        {
+            StringBuilder b = new StringBuilder();
+
+            foreach( var k in v.KeyStore.Infos )
+            {
+                if( k.SuperKey != null ) continue;
+                b.Append( k.IsSecretAvailable ? "          " : "[Missing] " );
+                b.AppendLine( k.Name );
+                b.AppendMultiLine( "          ", k.Description, true, false );
+                b.AppendLine();
+
+                var sub = k.SubKey;
+                while( sub != null )
+                {
+                    b.Append( sub.IsSecretAvailable ? " |          " : " | [Missing] " );
+                    b.AppendLine( sub.Name );
+                    b.AppendMultiLine( " |          ", sub.Description, true, false );
+                    b.AppendLine();
+                    sub = sub.SubKey;
+                }
+                b.AppendLine();
+            }
+            Console.WriteLine( b.ToString() );
+        }
+
+
+
+        static void RunCommand( IActivityMonitor m, UserHost host, string rep )
+        {
+            var handlers = host.CommandRegister.GetCommands( rep ).ToList();
             var handlersBySig = handlers
                                     .GroupBy( c => c.PayloadSignature )
                                     .ToList();
@@ -146,7 +265,7 @@ namespace CKli
                 }
                 return;
             }
-            var firstHandler = handlers.First();
+            var firstHandler = handlers[0];
             bool? parallelRun = firstHandler.ParallelRun;
             bool? globalConfirm = firstHandler.ConfirmationRequired;
             bool? backgroundRun = firstHandler.BackgroundRun;
@@ -171,13 +290,13 @@ namespace CKli
 
             if( parallelRun == null )
             {
-                Console.WriteLine( "The selected command(s) can be run in parallel. Do you want to run them in parallel ?" );
+                Console.WriteLine( "The selected command(s) can run in parallel. Do you want to run in parallel ?" );
                 parallelRun = YesOrNo();
             }
 
             if( backgroundRun == null )
             {
-                Console.WriteLine( "The selected command(s) can be run in background. Do you want to run them in background ?" );
+                Console.WriteLine( "The selected command(s) can run in background. Do you want to run in background ?" );
                 backgroundRun = YesOrNo();
             }
 
@@ -198,13 +317,11 @@ namespace CKli
 
             if( !parallelRun.Value )
             {
-
                 foreach( var h in handlers )
                 {
-                    if( appLife.StopRequested( m ) ) break;
+                    if( host.ApplicationLifetime.StopRequested( m ) ) break;
                     h.Execute( m, payload );
                 }
-
             }
             else
             {
@@ -217,7 +334,6 @@ namespace CKli
             }
             
         }
-
 
         static bool YesOrNo()
         {
@@ -242,7 +358,7 @@ namespace CKli
             }
         }
 
-        static bool ReadPayload( ActivityMonitor monitor, object payload )
+        static bool ReadPayload( IActivityMonitor monitor, object payload )
         {
             if( payload == null ) return true;
             if( !(payload is SimplePayload simple) )

@@ -29,7 +29,7 @@ namespace CK.Env.CKSetup
                             ? $"CKSETUPREMOTESTORE_{name.ToUpperInvariant()}_PUSH_API_KEY"
                             : "CKSETUPREMOTESTORE_PUSH_API_KEY"; 
             UniqueRepositoryName = CKSetupClient.CKSetupType.Name + ':' + name;
-            _keyStore.DeclareSecretKey( SecretKeyName, d => d ?? $"Required to push to '{UniqueRepositoryName}'." );
+            _keyStore.DeclareSecretKey( SecretKeyName, current => current?.Description ?? $"Required to push to '{UniqueRepositoryName}'." );
         }
 
         public CKSetupStore( SecretKeyStore keyStore, HttpClient sharedHttpClient )

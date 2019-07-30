@@ -27,6 +27,8 @@ namespace CK.Env
         /// Initializes a new <see cref="FileSystem"/> on a physical root path.
         /// </summary>
         /// <param name="rootPath">Physical root path.</param>
+        /// <param name="commandRegister">Command register.</param>
+        /// <param name="sp">Optional base services.</param>
         public FileSystem(
             string rootPath,
             CommandRegister commandRegister,
@@ -78,7 +80,7 @@ namespace CK.Env
             ProtoGitFolder g = _protoGits.FirstOrDefault( f => f.FolderPath == folderPath );
             if( g == null )
             {
-                g = new ProtoGitFolder( urlRepository, isPublic, folderPath, world, _secretKeyStore, this, _commandRegister );
+                g = new ProtoGitFolder( new Uri( urlRepository ), isPublic, folderPath, world, _secretKeyStore, this, _commandRegister );
                 _protoGits.Add( g );
             }
             return g;
@@ -91,7 +93,7 @@ namespace CK.Env
         /// <param name="folderPath">
         /// The folder path is a sub path of <see cref="Root"/> and contains the .git sub folder.
         /// </param>
-        /// <returns>The <see cref="GitFolder"/> or null if not found.</returns>
+        /// <returns>The <see cref="GitFolder"/> or null on error.</returns>
         public GitFolder EnsureGitFolder( IActivityMonitor m, ProtoGitFolder proto )
         {
             if( proto == null ) throw new ArgumentNullException( nameof( proto ) );
@@ -100,8 +102,12 @@ namespace CK.Env
             if( g == null )
             {
                 g = proto.CreateGitFolder( m );
-                g.EnsureBranch( m, proto.World.DevelopBranchName );
-                _gits.Add( g );
+                // TODO: this SHOULD be done in ProtoGitFolder.EnsureWorkingFolder!
+                if( g != null )
+                {
+                    g.EnsureBranch( m, proto.World.DevelopBranchName );
+                    _gits.Add( g );
+                }
             }
             return g;
         }

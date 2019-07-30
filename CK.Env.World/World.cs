@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Env.DependencyModel;
+using CK.SimpleKeyVault;
 using CK.Text;
 using CSemVer;
 using System;
@@ -14,12 +15,14 @@ using System.Xml.Linq;
 namespace CK.Env
 {
     /// <summary>
-    /// 
+    /// Primary World object. Handles the solutions, the solution drivers, the local
+    /// and shared states and supports numerous commands.
     /// </summary>
-    public partial class WorldState : ISolutionDriverWorld, ICommandMethodsProvider
+    public partial class World : ISolutionDriverWorld, ICommandMethodsProvider
     {
-        readonly IWorldStore _store;
+        readonly WorldStore _store;
         readonly IEnvLocalFeedProvider _localFeedProvider;
+        readonly SecretKeyStore _keyStore;
         readonly ArtifactCenter _artifacts;
 
         readonly DriversCollection _solutionDrivers;
@@ -28,27 +31,30 @@ namespace CK.Env
 
         readonly IBasicApplicationLifetime _appLife;
 
-        RawXmlWorldState _rawState;
+        LocalWorldState _localState;
+        SharedWorldState _sharedState;
         StandardGitStatus _cachedGlobalGitStatus;
-        bool _isStateDirty;
 
         /// <summary>
-        /// Initializes a new WorldState.
+        /// Initializes a new World.
         /// </summary>
         /// <param name="commandRegister">The command register.</param>
         /// <param name="artifacts">The artifact center.</param>
-        /// <param name="store">The store. Can not be null.</param>
+        /// <param name="store">The world store. Can not be null.</param>
         /// <param name="worldName">The world name.</param>
         /// <param name="isPublicWorld">Whether this world is public or private.</param>
-        /// <param name="localFeedProvider">Local feed provider. Can not be null. (Required for the Zro builder.)</param>
+        /// <param name="localFeedProvider">Local feed provider. Can not be null. (Required for the Zero builder.)</param>
+        /// <param name="keyStore">User key store. Must not be null.</param>
+        /// <param name="userMonitorClient">Used to set the log level.</param>
         /// <param name="appLife">Application lifetime controller.</param>
-        public WorldState(
+        public World(
             CommandRegister commandRegister,
             ArtifactCenter artifacts,
-            IWorldStore store,
+            WorldStore store,
             IWorldName worldName,
             bool isPublicWorld,
             IEnvLocalFeedProvider localFeedProvider,
+            SecretKeyStore keyStore,
             IActivityMonitorFilteredClient userMonitorClient,
             IBasicApplicationLifetime appLife )
         {
@@ -56,6 +62,7 @@ namespace CK.Env
             _store = store ?? throw new ArgumentNullException( nameof( store ) );
             WorldName = worldName ?? throw new ArgumentNullException( nameof( worldName ) );
             _localFeedProvider = localFeedProvider ?? throw new ArgumentNullException( nameof( localFeedProvider ) );
+            _keyStore = keyStore ?? throw new ArgumentNullException( nameof( keyStore ) );
             IsPublicWorld = isPublicWorld;
             _appLife = appLife;
             _solutionDrivers = new DriversCollection();
@@ -68,7 +75,7 @@ namespace CK.Env
 
         public NormalizedPath CommandProviderName { get; }
 
-        bool IsInitialized => _rawState != null;
+        bool IsInitialized => _localState != null;
 
         SolutionContext ISolutionDriverWorld.Register( ISolutionDriver driver )
         {
@@ -89,35 +96,10 @@ namespace CK.Env
             UpdateGlobalGitStatus();
         }
 
-        void RawStateChanged( object sender, XObjectChangeEventArgs e )
-        {
-            _isStateDirty = true;
-        }
-
         /// <summary>
         /// Gets whether this world is public.
         /// </summary>
         public bool IsPublicWorld { get; }
-
-        /// <summary>
-        /// Gets whether this state is dirty.
-        /// </summary>
-        public bool IsDirty => _isStateDirty;
-
-        /// <summary>
-        /// Saves this state. If <see cref="IsDirty"/> is false, nothing is done.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <returns>True on success, false on error.</returns>
-        public bool SaveState( IActivityMonitor m )
-        {
-            if( _isStateDirty )
-            {
-                if( !_store.SetLocalState( m, _rawState ) ) return false;
-                _isStateDirty = false;
-            }
-            return true;
-        }
 
         /// <summary>
         /// Gets the world name.
@@ -125,19 +107,19 @@ namespace CK.Env
         public IWorldName WorldName { get; }
 
         /// <summary>
-        /// Initializes this world state by loading the local state.
+        /// Initializes this world state by loading the local and shared states.
+        /// This initializes the user log level.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
         public bool Initialize( IActivityMonitor monitor )
         {
-            bool alreadyInitialized = _rawState != null;
+            bool alreadyInitialized = _localState != null;
             if( !alreadyInitialized )
             {
-                _rawState = _store.GetOrCreateLocalState( monitor, WorldName );
-                LogFilter.TryParse( (string)_rawState.GeneralState.Attribute( "UserLogFilter" ) ?? "", out var logFilter );
-                DoSetUserLogFilter( monitor, logFilter, false );
-                _rawState.Document.Changed += RawStateChanged;
+                _localState = _store.GetOrCreateLocalState( monitor, WorldName );
+                DoSetUserLogFilter( monitor, _localState.UserLogFilter, false );
+                _sharedState = _store.GetOrCreateSharedState( monitor, WorldName );
             }
             return true;
         }
@@ -157,6 +139,16 @@ namespace CK.Env
                 DumpWorldStatus?.Invoke( this, ev );
             } );
         }
+
+        /// <summary>
+        /// Gets the shared state.
+        /// </summary>
+        public SharedWorldState SharedWorldState => _sharedState;
+
+        /// <summary>
+        /// Gets the local state.
+        /// </summary>
+        public LocalWorldState LocalWorldState => _localState;
 
         /// <summary>
         /// Raised by <see cref="DumpWorldState(IActivityMonitor)"/>.
@@ -205,6 +197,48 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Gets whether the CODECAKEBUILDER_SECRET_KEY is known to the user.
+        /// </summary>
+        public bool CanCICDKeyVaultUpdate => _keyStore.IsSecretKeyAvailable( "CODECAKEBUILDER_SECRET_KEY" ) == true;
+
+        /// <summary>
+        /// Updates a secret in the <see cref="SharedWorldState.CICDKeyVault"/>.
+        /// When <paramref name="secret"/> is null, it is removed.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="name">The secret name. Must not be null or white space.</param>
+        /// <param name="secret">The secret. Null or empty to remove it.</param>
+        [CommandMethod]
+        public void CICDKeyVaultUpdate( IActivityMonitor m, string name, string secret )
+        {
+            if( !CanCICDKeyVaultUpdate ) throw new InvalidOperationException( nameof( CanCICDKeyVaultUpdate ) );
+            if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
+
+            var passPhrase = _keyStore.GetSecretKey( m, "CODECAKEBUILDER_SECRET_KEY", true );
+            var vault = KeyVault.DecryptValues( _sharedState.CICDKeyVault, passPhrase );
+
+            bool exists = vault.ContainsKey( name );
+            if( String.IsNullOrEmpty( secret ) )
+            {
+                if( exists )
+                {
+                    m.Info( $"Removing secret '{name}' from CICDKeyVault." );
+                    vault.Remove( name );
+                }
+                else m.Warn( $"Secret '{name}' not found in CICDKeyVault." );
+            }
+            else
+            {
+                if( exists ) m.Info( $"Updating secret '{name}' in CICDKeyVault." );
+                else m.Info( $"Adding new secret '{name}' in CICDKeyVault." );
+                vault[name] = secret;
+            }
+            _sharedState.CICDKeyVault = KeyVault.EncryptValuesToString( vault, passPhrase );
+            _sharedState.SaveState( m );
+        }
+
+
+        /// <summary>
         /// Calls <see cref="UpdateGlobalGitStatus"/> and checks the curent Git status.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
@@ -248,27 +282,16 @@ namespace CK.Env
         /// Gets the global work status.
         /// Null when <see cref="IsInitialized"/> is false.
         /// </summary>
-        public GlobalWorkStatus? WorkStatus => _rawState?.WorkStatus;
-
-        /// <summary>
-        /// Gets the mutable <see cref="XElement"/> general state.
-        /// This is where state information are stored.
-        /// </summary>
-        public XElement GeneralState => _rawState?.GeneralState;
+        public GlobalWorkStatus? WorkStatus => _localState?.WorkStatus;
 
         /// <summary>
         /// Sets the <see cref="WorkStatus"/>.
         /// </summary>
         /// <param name="s">The work status.</param>
-        public void SetWorkStatus( GlobalWorkStatus s )
-        {
-            if( WorkStatus != s ) _rawState.WorkStatus = s;
-        }
-
         bool SetWorkStatusAndSave( IActivityMonitor m, GlobalWorkStatus s )
         {
-            SetWorkStatus( s );
-            return SaveState( m );
+            if( WorkStatus != s ) _localState.WorkStatus = s;
+            return _localState.SaveState( m );
         }
 
         [CommandMethod( confirmationRequired: false )]
@@ -279,9 +302,9 @@ namespace CK.Env
             if( _userMonitorClient.MinimalFilter != filter )
             {
                 _userMonitorClient.MinimalFilter = filter;
-                _rawState.GeneralState.SetAttributeValue( "UserLogFilter", filter.ToString() );
+                _localState.UserLogFilter = filter;
                 m.UnfilteredLog( ActivityMonitor.Tags.Empty, LogLevel.Info, $"User Log Filter level set to '{filter}' (actual filter is '{m.ActualFilter}').", m.NextLogTime(), null );
-                if( saveOnChange ) SaveState( m );
+                if( saveOnChange ) _localState.SaveState( m );
             }
         }
 
@@ -315,8 +338,6 @@ namespace CK.Env
                 ?? throw new Exception( $"No solution context available for branch {branchName}. GitBranchPlugins are not initialized or a ISolutionDriver plugin implementation is missing." );
             return c.Refresh( monitor, reloadSolutions ) ? c : null;
         }
-
-
 
         /// <summary>
         /// Gets whether the <see cref="WorkStatus"/> is not <see cref="GlobalWorkStatus.Idle"/>
@@ -369,8 +390,6 @@ namespace CK.Env
             if( !SetWorkStatusAndSave( monitor, GlobalWorkStatus.SwitchingToLocal ) ) return false;
             return DoSwitchToLocal( monitor );
         }
-
-
 
         bool DoSwitchToLocal( IActivityMonitor monitor )
         {
@@ -475,54 +494,49 @@ namespace CK.Env
         }
 
         [CommandMethod]
-        public void UpgradeDependency( IActivityMonitor m, string packageTypedName, string versionToUpgrade = null )
+        public void UpgradeDependency( IActivityMonitor m, string packageName, string versionToUpgrade = null )
         {
             var worldCtx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
             if( worldCtx == null ) return;
             SVersion version;
-            var analyzer = worldCtx.DependencyContext.Analyzer;
-            List<PackageReference> artifactUses = analyzer.ExternalReferences
-                    .Where( p => p.Target.Artifact.TypedName == packageTypedName ).ToList();
-            if( artifactUses.Count() == 0 )
+            var externalReferences = worldCtx.DependencyContext.Analyzer.ExternalReferences;
+            List<PackageReference> artifactUses = externalReferences
+                    .Where( p => p.Target.Artifact.TypedName == packageName || p.Target.Artifact.Name == packageName )
+                    .ToList();
+            if( artifactUses.Count == 0 )
             {
-                m.Error( $"No solution contain the package {packageTypedName}." );
+                m.Error( $"No solution contain the package {packageName}." );
                 return;
             }
-            if( versionToUpgrade == null )
+            var types = new HashSet<ArtifactType>( artifactUses.Select( p => p.Target.Artifact.Type ) );
+            if( types.Count > 1 )
             {
-                version = analyzer.ExternalReferences
-                    .Where( p => p.Target.Artifact.TypedName == packageTypedName )
-                    .Max( pckg => pckg.Target.Version );
-
-                if( version == null )
-                {
-                    m.Fatal( $"Unable to find the package {packageTypedName}." );
-                    return;
-                }
+                m.Error( $"Ambiguous package name '{packageName}', use its TypedName to disambiguate: {types.Select( t => t.Name + ':' + packageName ).Concatenate( " or " )}." );
+                return;
+            }
+            versionToUpgrade = versionToUpgrade?.Trim();
+            if( String.IsNullOrEmpty( versionToUpgrade ) )
+            {
+                version = artifactUses.Max( pckg => pckg.Target.Version );
+                m.Info( $"No target version provided: automatically using the maximal {version} currently referenced." );
             }
             else
             {
                 if( !SVersion.TryParse( versionToUpgrade, out version ) )
                 {
-                    m.Fatal( $"Invalid version {versionToUpgrade} string." );
+                    m.Fatal( $"Unable to parse target version '{versionToUpgrade}' string." );
                     return;
                 }
             }
             var artifactToUpgrade = artifactUses.Where( p => p.Target.Version != version ).ToList();
             if( artifactToUpgrade.Count == 0 )
             {
-                m.Info( "No package to upgrade." );
+                m.Info( $"No package to upgrade: {artifactUses.Count} references to {packageName} already use version {version}." );
                 return;
             }
-            using( m.OpenInfo( $"{artifactToUpgrade.Count} packages to upgrade." ) )
+            using( m.OpenInfo( $"{artifactToUpgrade.Count} packages to upgrade (out of {artifactUses.Count} package references)." ) )
             {
-                var filtered = artifactUses.Where( s => s.Target.Artifact.TypedName == "NuGet:NUnit" && s.Target.Version == SVersion.Create( 2, 6, 4 ) ).ToList();
-                if( filtered.Count != artifactUses.Count )
-                {
-                    m.Warn( "Skipping NUnit Upgrade from 2.6.4" );
-                }
-                artifactUses.RemoveAll( p => filtered.Contains( p ) );
-                foreach( var slnGroupedPackage in artifactUses.GroupBy( s => s.Owner.Solution ) )
+                foreach( var slnGroupedPackage in artifactToUpgrade.GroupBy( s => s.Owner.Solution ) )
                 {
                     var sln = worldCtx.Solutions.First( s => s.Solution.Solution == slnGroupedPackage.Key );
                     sln.Driver.UpdatePackageDependencies( m,
@@ -603,8 +617,8 @@ namespace CK.Env
                     m.Info( $"{a.Key} => {a.Select( p => p.Artifact.Artifact.Name + '/' + p.Artifact.Version + " -> " + p.TargetName ).Concatenate()}" );
                 }
             }
-            _rawState.SetBuildResult( result );
-            return SaveState( m );
+            _localState.SetBuildResult( result );
+            return _localState.SaveState( m );
         }
 
         /// <summary>
@@ -668,8 +682,7 @@ namespace CK.Env
         {
             var depContext = GetWorldSolutionContext( monitor );
             if( depContext == null ) return null;
-            var previous = GeneralState.EnsureElement( "Roadmap" );
-            return ReleaseRoadmap.Create( monitor, depContext, previous );
+            return ReleaseRoadmap.Create( monitor, depContext, _localState.Roadmap );
         }
 
         /// <summary>
@@ -702,8 +715,8 @@ namespace CK.Env
             if( roadmap == null ) return null;
             bool editSucceed = roadmap.UpdateRoadmap( monitor, VersionSelector, forgetAllExistingRoadmapVersions );
             // Always saves state to preserve any change in the roadmap, even on error.
-            GeneralState.ReplaceElementByName( roadmap.ToXml() );
-            if( !SaveState( monitor ) || !editSucceed ) return null;
+            _localState.Roadmap = roadmap.ToXml();
+            if( !_localState.SaveState( monitor ) || !editSucceed ) return null;
             return roadmap;
         }
 
@@ -750,9 +763,8 @@ namespace CK.Env
             var roadmap = DoEditRoadmap( monitor, resetRoadmap );
             if( roadmap == null ) return false;
 
-            SetWorkStatus( GlobalWorkStatus.Releasing );
-            if( !SaveState( monitor ) ) return false;
-
+            if( !SetWorkStatusAndSave( monitor, GlobalWorkStatus.Releasing ) ) return false;
+            
             return DoReleasing( monitor );
         }
 
@@ -760,7 +772,7 @@ namespace CK.Env
         {
             return RunSafe( monitor, $"Starting Release.", ( m, error ) =>
             {
-                bool firstRun = GeneralState.Element( XmlNames.xGitSnapshot ) == null;
+                bool firstRun = _localState.GetGitSnapshot() == null;
                 if( firstRun )
                 {
                     using( m.OpenInfo( $"First run: capturing {WorldName.DevelopBranchName} and {WorldName.MasterBranchName} branches positions." ) )
@@ -770,8 +782,8 @@ namespace CK.Env
                                                             new XAttribute( XmlNames.xP, g.SubPath ),
                                                             new XAttribute( XmlNames.xD, g.GetBranchSha( m, WorldName.DevelopBranchName ) ),
                                                             new XAttribute( XmlNames.xM, g.GetBranchSha( m, WorldName.MasterBranchName ) ?? "" ) ) ) );
-                        GeneralState.Add( snapshot );
-                        if( !SaveState( m ) ) return;
+                        _localState.SetGitSnapshot( snapshot );
+                        if( !_localState.SaveState( m ) ) return;
                         if( !_localFeedProvider.Release.RemoveAll( m ) ) return;
                     }
                 }
@@ -823,28 +835,28 @@ namespace CK.Env
             return RunSafe( monitor, $"Cancelling current Release.", ( m, error ) =>
             {
                 if( !HandleReleaseVersionTags( m, false ) ) return;
-                var snapshot = GeneralState.Element( "GitSnapshot" );
+                var snapshot = _localState.GetGitSnapshot();
                 if( snapshot != null )
                 {
                     using( m.OpenInfo( $"Restoring '{WorldName.DevelopBranchName}' and '{WorldName.MasterBranchName}' branches positions." ) )
                     {
                         foreach( var e in snapshot.Elements() )
                         {
-                            var path = (string)e.AttributeRequired( "P" );
+                            var path = (string)e.AttributeRequired( XmlNames.xP );
                             var git = _gitRepositories.FirstOrDefault( g => g.SubPath == path );
                             if( git == null )
                             {
                                 m.Error( $"Unable to find Git repository for {path}." );
                                 return;
                             }
-                            if( !git.ResetBranchState( m, WorldName.MasterBranchName, (string)e.AttributeRequired( "M" ) )
-                                || !git.ResetBranchState( m, WorldName.DevelopBranchName, (string)e.AttributeRequired( "D" ) ) )
+                            if( !git.ResetBranchState( m, WorldName.MasterBranchName, (string)e.AttributeRequired( XmlNames.xM ) )
+                                || !git.ResetBranchState( m, WorldName.DevelopBranchName, (string)e.AttributeRequired( XmlNames.xD ) ) )
                             {
                                 return;
                             }
                         }
                     }
-                    snapshot.Remove();
+                    _localState.ClearGitSnapshot();
                 }
                 GetWorldSolutionContext( m, true );
                 _localFeedProvider.Release.RemoveAll( m );
@@ -862,8 +874,8 @@ namespace CK.Env
                                 ? "Pushing version tags and branches."
                                 : "Clearing version tags." ) )
             {
-                var versions = ReleaseRoadmap.Load( GeneralState.Element( "Roadmap" ) )
-                                           .Select( e => (e.SubPath, e.Info, Git: _gitRepositories.FirstOrDefault( g => e.SubPath.StartsWith( g.SubPath ) )) );
+                var versions = ReleaseRoadmap.Load( _localState.Roadmap )
+                                             .Select( e => (e.SubPath, e.Info, Git: _gitRepositories.FirstOrDefault( g => e.SubPath.StartsWith( g.SubPath ) )) );
                 foreach( var (SubPath, Info, Git) in versions )
                 {
                     if( Git == null )
@@ -917,7 +929,7 @@ namespace CK.Env
         /// CI can be published when <see cref="GlobalWorkStatus.Idle"/> and a CI build result is available.
         /// </summary>
         public bool CanPublishCI => WorkStatus == GlobalWorkStatus.Idle
-                                    && _rawState.GetBuildResult( BuildResultType.CI ) != null
+                                    && _localState.GetBuildResult( BuildResultType.CI ) != null
                                     && ((int)_cachedGlobalGitStatus & (int)StandardGitStatus.MasterOrDevelop) > 0;
 
         [CommandMethod]
@@ -926,7 +938,7 @@ namespace CK.Env
             if( !CanPublishCI ) throw new InvalidOperationException( nameof( CanPublishCI ) );
             return RunSafe( monitor, $"Publishing CI.", ( m, error ) =>
             {
-                var buildResults = _rawState.GetBuildResult( BuildResultType.CI );
+                var buildResults = _localState.GetBuildResult( BuildResultType.CI );
                 if( !DoPushArtifacts( m, buildResults ) ) return;
                 bool success = true;
                 foreach( var g in _gitRepositories )
@@ -934,8 +946,8 @@ namespace CK.Env
                     success &= g.Push( m, WorldName.DevelopBranchName );
                 }
                 if( !success ) return;
-                _rawState.PublishBuildResult( buildResults.Type );
-                SaveState( m );
+                _localState.PublishBuildResult( buildResults.Type );
+                _localState.SaveState( m );
             } );
         }
 
@@ -943,13 +955,13 @@ namespace CK.Env
         {
             return RunSafe( monitor, $"Publishing Release.", ( m, error ) =>
             {
-                var buildResults = _rawState.GetBuildResult( BuildResultType.Release );
+                var buildResults = _localState.GetBuildResult( BuildResultType.Release );
                 if( buildResults != null && !DoPushArtifacts( m, buildResults ) ) return;
                 if( !HandleReleaseVersionTags( m, true ) ) return;
-                _rawState.PublishBuildResult( buildResults.Type );
+                _localState.PublishBuildResult( buildResults.Type );
                 if( !error() )
                 {
-                    GeneralState.Element( "GitSnapshot" )?.Remove();
+                    if( _localState.GetGitSnapshot() != null ) _localState.ClearGitSnapshot();
                     SetWorkStatusAndSave( m, GlobalWorkStatus.Idle );
                 }
             } );
@@ -1012,7 +1024,7 @@ namespace CK.Env
                     if( oldBranchName == WorldName.MasterBranchName || oldBranchName == WorldName.DevelopBranchName )
                     {
                         string url = (string)branch.Parent.AttributeRequired( "Url" );
-                        var repo = _gitRepositories.Single( p => url == p.OriginUrl );
+                        var repo = _gitRepositories.Single( p => url.Equals( p.OriginUrl.ToString(), StringComparison.OrdinalIgnoreCase ) );
                         repo.EnsureBranch( m, branchName, true );
                         m.Trace( $"Branch '{oldBranchName}' renamed to '{branchName}'." );
                         oldBranch.Value = branchName;

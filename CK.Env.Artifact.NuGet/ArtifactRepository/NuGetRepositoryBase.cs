@@ -103,6 +103,23 @@ namespace CK.Env.NuGet
         {
         }
 
+        private protected override bool CanRetry( MetadataResource meta, NuGetLoggerAdapter logger, Exception ex )
+        {
+            var secretName = SecretKeyName;
+            if( !String.IsNullOrWhiteSpace( secretName ) )
+            {
+                var updated = Client.SecretKeyStore.GetSecretKey( logger.Monitor, secretName, false );
+                if( updated != null && updated != _secret )
+                {
+                    OnSecretResolved( logger.Monitor, _secret = updated );
+                    logger.Monitor.Warn( "NuGet request failed but an updated secret is available. Retrying.", ex );
+                    return true;
+                }
+            }
+            logger.Monitor.Trace( "NuGet request failed. No updated secret available. Rethrowing the exception." );
+            return false;
+        }
+
         /// <summary>
         /// Cheks whether a versioned package exists in this feed.
         /// </summary>
@@ -115,9 +132,7 @@ namespace CK.Env.NuGet
             if( packageId == null ) throw new ArgumentNullException( nameof( packageId ) );
             if( version == null ) throw new ArgumentNullException( nameof( version ) );
             var p = new PackageIdentity( packageId, NuGetVersion.Parse( version.ToString() ) );
-            var logger = EnsureInitialization( m );
-            var meta = await _meta;
-            return await meta.Exists( p, Client.SourceCache, logger, CancellationToken.None ); 
+            return await SafeCall( m, ( meta, logger ) => meta.Exists( p, Client.SourceCache, logger, CancellationToken.None ) );
         }
 
 
@@ -138,35 +153,37 @@ namespace CK.Env.NuGet
             }
             try
             {
-                var logger = EnsureInitialization( m );
-                var meta = await _meta;
-                var exist = files.Select( file => (file, id: new PackageIdentity( file.PackageId, NuGetVersion.Parse( file.Version.ToNuGetPackageString() ) ) ) )
-                                 .Select( fId => (fId.file, exists: meta.Exists( fId.id, Client.SourceCache, logger, CancellationToken.None ) ) )
-                                 .ToArray();
-                await Task.WhenAll( exist.Select( e => e.exists ) );
+                await SafeCall( m, async ( meta, logger ) =>
+                {
+                    var exist = files.Select( file => (file, id: new PackageIdentity( file.PackageId, NuGetVersion.Parse( file.Version.ToNuGetPackageString() ) )) )
+                                     .Select( fId => (fId.file, exists: meta.Exists( fId.id, Client.SourceCache, logger, CancellationToken.None )) )
+                                     .ToArray();
+                    await Task.WhenAll( exist.Select( e => e.exists ) );
 
-                var toSkip = exist.Where( e => e.exists.Result ).Select( e => e.file ).ToArray();
-                if( toSkip.Length > 0 )
-                {
-                    var existing = toSkip.Select( f => f.ToString() ).Concatenate();
-                    m.Info( $"Already existing packages, push skipped for: " + existing );
-                }
-                var toPush = exist.Where( e => !e.exists.Result ).Select( e => e.file ).ToArray();
-                var updater = await _updater;
-                foreach( var f in toPush )
-                {
-                    await updater.Push(
-                        f.FullPath,
-                        String.Empty, // no Symbol source.
-                        timeoutSeconds,
-                        disableBuffering: false,
-                        getApiKey: endpoint => apiKey,
-                        getSymbolApiKey: symbolsEndpoint => null,
-                        noServiceEndpoint: false,
-                        log: logger );
-                    await OnPackagePushed( logger, f );
-                }
-                await OnAllPackagesPushed( logger, toSkip, toPush );                
+                    var toSkip = exist.Where( e => e.exists.Result ).Select( e => e.file ).ToArray();
+                    if( toSkip.Length > 0 )
+                    {
+                        var existing = toSkip.Select( f => f.ToString() ).Concatenate();
+                        m.Info( $"Already existing packages, push skipped for: " + existing );
+                    }
+                    var toPush = exist.Where( e => !e.exists.Result ).Select( e => e.file ).ToArray();
+                    var updater = await _updater;
+                    foreach( var f in toPush )
+                    {
+                        await updater.Push(
+                            f.FullPath,
+                            String.Empty, // no Symbol source.
+                            timeoutSeconds,
+                            disableBuffering: false,
+                            getApiKey: endpoint => apiKey,
+                            getSymbolApiKey: symbolsEndpoint => null,
+                            noServiceEndpoint: false,
+                            log: logger );
+                        await OnPackagePushed( logger, f );
+                    }
+                    await OnAllPackagesPushed( logger, toSkip, toPush );
+                    return 0;
+                } );
             }
             catch( Exception ex )
             {

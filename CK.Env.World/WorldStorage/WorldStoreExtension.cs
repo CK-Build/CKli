@@ -13,10 +13,10 @@ namespace CK.Env
         /// <param name="state">The state to save.</param>
         /// <param name="a">The state modifier.</param>
         /// <returns>True on succes, false on error.</returns>
-        public static bool SetLocalState( this IWorldStore @this, IActivityMonitor m, RawXmlWorldState state, Action<RawXmlWorldState> a )
+        public static bool SetLocalState( this WorldStore @this, IActivityMonitor m, LocalWorldState state, Action<LocalWorldState> a )
         {
             a( state );
-            return @this.SetLocalState( m, state );
+            return @this.SaveState( m, state );
         }
     }
 }

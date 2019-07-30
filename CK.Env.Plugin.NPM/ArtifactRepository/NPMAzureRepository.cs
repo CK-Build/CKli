@@ -1,6 +1,5 @@
 using CK.Core;
 using CSemVer;
-using Npm.Net;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,7 +25,7 @@ namespace CK.Env.NPM
         {
             Organization = organization;
             FeedName = feedName;
-            NPMScope = scope;
+            Scope = scope;
         }
 
         /// <summary>
@@ -42,7 +41,7 @@ namespace CK.Env.NPM
         /// <summary>
         /// Gets the "@Scope" string: it MUST start with a @ and be a non empty scope name.
         /// </summary>
-        public string NPMScope { get; }
+        public string Scope { get; }
 
         /// <summary>
         /// The secret key name is:

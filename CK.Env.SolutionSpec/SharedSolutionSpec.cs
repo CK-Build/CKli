@@ -66,7 +66,7 @@ namespace CK.Env
                                 eR => eR.HandleRequiredAttribute<string>( "Name" ) );
 
             ArtifactSources = r.HandleCollection(
-                                nameof( ArtifactTargets ),
+                                nameof( ArtifactSources ),
                                 new HashSet<string>( other.ArtifactSources ),
                                 eR => eR.HandleRequiredAttribute<string>( "Name" ) );
 

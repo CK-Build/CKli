@@ -19,10 +19,10 @@ namespace CK.Env
         /// <returns>The set of diff or null on error.</returns>
         public IDiffResult GetDiff( IActivityMonitor m, string previousVersionCommitSha, IEnumerable<IDiffRoot> roots )
         {
-            Commit commit = _git.Lookup<Commit>( previousVersionCommitSha );
-            var commits = _git.Commits.QueryBy( new CommitFilter()
+            Commit commit = Git.Lookup<Commit>( previousVersionCommitSha );
+            var commits = Git.Commits.QueryBy( new CommitFilter()
             {
-                IncludeReachableFrom = _git.Head.Tip,
+                IncludeReachableFrom = Git.Head.Tip,
                 ExcludeReachableFrom = commit
             } );
             return GetReleaseDiff( m, roots, commits.ToList() );
@@ -31,7 +31,7 @@ namespace CK.Env
         DiffResult GetReleaseDiff( IActivityMonitor m, IEnumerable<IDiffRoot> roots, List<Commit> commits )
         {
             DiffResultBuilder builder = new DiffResultBuilder(
-                _git,
+                Git,
                 roots.Select(
                     r => new DiffRootResultBuilder( r ) ).ToList(),
                     new DiffRootResultBuilderOther(new DiffRoot("Others", new List<NormalizedPath>()) )
@@ -42,7 +42,7 @@ namespace CK.Env
         IEnumerable<Commit> GetCommitsBetweenDates( DateTimeOffset beginning, DateTimeOffset ending )
         {
             if( ending < beginning ) throw new ArgumentException( $"{nameof( ending )}<{nameof( beginning )}" );
-            return _git.Head.Commits.SkipWhile( p => p.Committer.When > ending ).TakeWhile( p => p.Committer.When > beginning );
+            return Git.Head.Commits.SkipWhile( p => p.Committer.When > ending ).TakeWhile( p => p.Committer.When > beginning );
         }
 
         public void ShowLogsBetweenDates(

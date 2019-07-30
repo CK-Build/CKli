@@ -113,6 +113,7 @@ namespace CK.Env.Plugin
             {
                 _sln.Saved -= OnSolutionSaved;
                 m.Info( $"Solution '{GitFolder.SubPath}' must be reloaded." );
+                _isSolutionValid = false;
                 _sln = null;
             }
         }
@@ -129,7 +130,7 @@ namespace CK.Env.Plugin
         /// <returns>The solution or null if unable to load the solution.</returns>
         public ISolution GetSolution( IActivityMonitor monitor, bool allowInvalidSolution, bool reloadSolution = false )
         {
-            if( _sln == null || reloadSolution )
+            if( !_isSolutionValid || reloadSolution )
             {
                 using( monitor.OpenInfo( $"Loading solution '{GitFolder.SubPath}'." ) )
                 {
@@ -222,7 +223,7 @@ namespace CK.Env.Plugin
             }
             foreach( var noMore in projectsToRemove ) _solution.RemoveProject( noMore );
 
-            List<(string SecretKeyName, string Secret)> buildSecrets = _artifactCenter.ResolveSecrets( m, _solution.ArtifactTargets, false );
+            var buildSecrets = new List<(string SecretKeyName, string Secret)>();
             _isSolutionValid = !badPack;
             var h = OnSolutionConfiguration;
             if( h != null )
@@ -233,6 +234,13 @@ namespace CK.Env.Plugin
                 {
                     m.Error( "Solution initialization failed: " + e.FailureMessage );
                     _isSolutionValid = false;
+                }
+            }
+            foreach( var sc in _artifactCenter.ResolveSecrets( m, _solution.ArtifactTargets, false ) )
+            {
+                if( buildSecrets.IndexOf( s => s.SecretKeyName == sc.SecretKeyName ) < 0 )
+                {
+                    buildSecrets.Add( sc );
                 }
             }
             _buildSecrets = buildSecrets;

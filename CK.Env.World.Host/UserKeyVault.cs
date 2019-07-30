@@ -8,28 +8,37 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
-namespace CKli
+namespace CK.Env
 {
-    public class CKEnvKeyVault : ICommandMethodsProvider, IDisposable
+    public sealed class UserKeyVault : ICommandMethodsProvider, IDisposable
     {
-        static readonly NormalizedPath _commandProviderName = new NormalizedPath("KeyVault");
+        static readonly NormalizedPath _commandProviderName = "UserKeyVault";
 
         readonly SecretKeyStore _store;
         readonly Dictionary<string,string> _vaultContent;
-        readonly IWorldName _worldName;
         string _passPhrase;
 
-        public CKEnvKeyVault(
-            IWorldName worldName,
-            NormalizedPath localWorldPath,
-            CommandRegister commandRegister)
+        public UserKeyVault( NormalizedPath userHostPath, CommandRegister commandRegister )
         {
             _store = new SecretKeyStore();
+            _store.SecretDeclared += OnSecretDeclared;
             _vaultContent = new Dictionary<string, string>();
-            _worldName = worldName;
-            KeyVaultPath = localWorldPath.AppendPart( $"CKEnv-{_worldName.Name}-KeyVault.txt" );
-            KeyVaultKeyName = $"CKENV_{_worldName.Name.ToUpperInvariant().Replace( '-', '_' )}_KEY_VAULT_SECRET_KEY";
+            KeyVaultKeyName = "CKLI-" + Environment.UserDomainName
+                                         .Replace( '-', '_' )
+                                         .Replace( '/', '_' )
+                                         .Replace( '\\', '_' )
+                                         .Replace( '.', '_' )
+                                         .ToUpperInvariant();
+            KeyVaultPath = userHostPath.AppendPart( KeyVaultKeyName + ".KeyVault.txt" );
             commandRegister.Register( this );
+        }
+
+        void OnSecretDeclared( object sender, SecretKeyInfoDeclaredArgs e )
+        {
+            if( IsKeyVaultOpened && _vaultContent.TryGetValue( e.Declared.Name, out var secret ) )
+            {
+                e.Declared.SetSecret( secret );
+            }
         }
 
         /// <summary>
@@ -44,7 +53,8 @@ namespace CKli
 
         /// <summary>
         /// Gets the name of the primary secret required to open the key vault.
-        /// This is built from the <see cref="IWorldName.Name"/> (CKENV_XXX_KEY_VAULT_SECRET_KEY).
+        /// This is: "CKLI_" + <see cref="Environment.UserDomainName"/> in upper
+        /// case where '\', '/', '.' and '-' are replaced with '_'.
         /// </summary>
         public string KeyVaultKeyName { get; }
 
@@ -61,12 +71,30 @@ namespace CKli
         NormalizedPath ICommandMethodsProvider.CommandProviderName => _commandProviderName;
 
         /// <summary>
+        /// Updates or clears the secret of a declared key in the <see cref="KeyStore"/>.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="key">The secret name to update.</param>
+        /// <param name="secret">The secret to update. Null or empty clears the secret.</param>
+        /// <param name="autoSave">False to not automatically saves the vault.</param>
+        [CommandMethod( confirmationRequired: false )]
+        public void UpdateSecret( IActivityMonitor m, string key, string secret, bool autoSave = true )
+        {
+            if( _store.SetSecret( m, key, secret )
+                && autoSave
+                && IsKeyVaultOpened )
+            {
+                DoSaveKeyVault( m );
+            }
+        }
+
+        /// <summary>
         /// Gets whether the key vault is closed.
         /// </summary>
         public bool CanOpenKeyVault => !IsKeyVaultOpened;
 
         /// <summary>
-        /// Opens the key vault bound to the current <see cref="IWorldName"/>.
+        /// Opens the key vault.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="passPhrase">The key vault pass phrase.</param>
@@ -122,8 +150,8 @@ namespace CKli
         public bool CanSaveKeyVault => IsKeyVaultOpened;
 
         /// <summary>
-        /// Saves the current secrets to the previously opened key vault bound to the current <see cref="IWorldName"/>
-        /// with a new passphrase or uses the existing one.
+        /// Saves the current secrets to the key vault with a new passphrase
+        /// or uses the existing one.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="newPassPhrase">Optional new passphrase.</param>

@@ -43,11 +43,11 @@ namespace CK.Env
         {
             foreach( var r in repositories )
             {
-                _repositories.Add( InstanciateRepository( r ) );
+                InstanciateRepository( r );
             }
             foreach( var r in feeds )
             {
-                _feeds.Add( InstanciateFeed( r ) );
+                InstanciateFeed( r );
             }
         }
 

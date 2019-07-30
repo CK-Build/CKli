@@ -8,7 +8,7 @@ namespace CKli
     {
         readonly List<XBranch> _branches;
 
-        public XGitFolder( Initializer initializer, XPathItem parent, WorldState world )
+        public XGitFolder( Initializer initializer, XPathItem parent, World world )
             : base( initializer, parent.FileSystem, parent )
         {
             _branches = new List<XBranch>();

@@ -10,16 +10,49 @@ using System.Text.RegularExpressions;
 
 namespace CK.Env.Plugin
 {
-    public class CKSetupCodeCakeBuilderFolder : PluginFolderBase
+    public class CKSetupCodeCakeBuilderFolder : PluginFolderBase, IDisposable
     {
         readonly SolutionDriver _driver;
         readonly SolutionSpec _solutionSpec;
+        readonly CodeCakeBuilderKeyVaultFile _keyVaultFile;
 
-        public CKSetupCodeCakeBuilderFolder( GitFolder f, SolutionDriver driver, SolutionSpec solutionSpec, NormalizedPath branchPath )
+        public CKSetupCodeCakeBuilderFolder(
+            GitFolder f,
+            SolutionDriver driver,
+            CodeCakeBuilderKeyVaultFile keyVaultFile,
+            SolutionSpec solutionSpec,
+            NormalizedPath branchPath )
             : base( f, branchPath, "CodeCakeBuilder", "CKSetup/Res" )
         {
             _driver = driver;
             _solutionSpec = solutionSpec;
+            _keyVaultFile = keyVaultFile;
+            _driver.OnSolutionConfiguration += OnSolutionConfiguration;
+            _keyVaultFile.Updating += KeyVaultFileUpdating;
+        }
+
+        void KeyVaultFileUpdating( object sender, CodeCakeBuilderKeyVaultUpdatingArgs e )
+        {
+            CKSetupStore store = e.SolutionSpec.UseCKSetup
+                                    ? e.Solution.ArtifactTargets.OfType<CKSetupStore>().SingleOrDefault()
+                                    : null;
+            if( store != null  && e.Secrets.TryGetValue( store.SecretKeyName, out var apiKey ) )
+            {
+                // The actual key contains both the url and the secret.
+                e.Secrets["CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL"] = apiKey + '|' + store.Url;
+                e.Secrets.Remove( store.SecretKeyName );
+            }
+        }
+
+        void OnSolutionConfiguration( object sender, SolutionConfigurationEventArgs e )
+        {
+            bool targetCKSetup = e.Solution.GeneratedArtifacts.Any( a => a.Artifact.Type == CKSetupClient.CKSetupType );
+            var stores = e.Solution.ArtifactTargets.OfType<CKSetupStore>().ToList();
+            if( !targetCKSetup && stores.Any() )
+            {
+                e.Monitor.Info( $"Removing {stores.Select( s => s.UniqueRepositoryName ).Concatenate()} since no CKSetup artifacts are produced." );
+                foreach( var t in stores ) e.Solution.RemoveArtifactTarget( t );
+            }
         }
 
         /// <summary>
@@ -33,6 +66,7 @@ namespace CK.Env.Plugin
         {
             var s = _driver.GetSolution( m, allowInvalidSolution: true );
             if( s == null ) return;
+
             bool produceCKSetupComponents = s.GeneratedArtifacts.Any( g => g.Artifact.Type == CKSetupClient.CKSetupType );
             if( produceCKSetupComponents == true )
             {
@@ -71,6 +105,12 @@ namespace CK.Env.Plugin
             text = text.Replace( m.Value, b.ToString() );
             return text;
 
+        }
+
+        void IDisposable.Dispose()
+        {
+            _driver.OnSolutionConfiguration -= OnSolutionConfiguration;
+            _keyVaultFile.Updating -= KeyVaultFileUpdating;
         }
     }
 }

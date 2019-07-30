@@ -1,6 +1,5 @@
 using CK.Core;
 using CK.Text;
-using CKli;
 using FluentAssertions;
 using Microsoft.Extensions.FileProviders;
 using NUnit.Framework;
@@ -22,6 +21,7 @@ namespace CK.Env.Tests
         [Test]
         public void FileSystem_sees_physical_files()
         {
+            _commandRegister.UnregisterAll();
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
                 fs.GetDirectoryContents( "" ).Select( f => $"{f.Name} - {f.IsDirectory}" )
@@ -35,11 +35,12 @@ namespace CK.Env.Tests
         [Test]
         public void FileSystem_sees_Git_repo_with_a_null_PhysicalPath()
         {
+            _commandRegister.UnregisterAll();
             var w = new WorldMock();
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
                 var proto = fs.FindOrCreateProtoGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
-                fs.EnsureGitFolder( TestHelper.Monitor, proto );
+                fs.EnsureGitFolder( TestHelper.Monitor, proto ).Should().NotBeNull();
                 CheckRoot( fs.GetFileInfo( "TestGitRepository" ) );
                 CheckRoot( fs.GetFileInfo( "/TestGitRepository" ) );
                 CheckRoot( fs.GetFileInfo( "TestGitRepository/" ) );
@@ -60,6 +61,7 @@ namespace CK.Env.Tests
         [Test]
         public void FileSystem_sees_Git_repo_with_head_and_branches_subfolder()
         {
+            _commandRegister.UnregisterAll();
             var w = new WorldMock();
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
@@ -86,6 +88,7 @@ namespace CK.Env.Tests
         [Test]
         public void FileSystem_sees_Git_head_as_the_PhysicalDirectory()
         {
+            _commandRegister.UnregisterAll();
             var w = new WorldMock();
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
@@ -130,6 +133,7 @@ namespace CK.Env.Tests
         [Test]
         public void FileSystem_sees_the_branches_as_directories()
         {
+            _commandRegister.UnregisterAll();
             var w = new WorldMock();
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
@@ -151,6 +155,7 @@ namespace CK.Env.Tests
         [Test]
         public void GitFolder_CheckCleanCommit_detects_new_deleted_and_modified_files()
         {
+            _commandRegister.UnregisterAll();
             var w = new WorldMock();
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
@@ -188,11 +193,12 @@ namespace CK.Env.Tests
         [Test]
         public void FileSystem_remotes_contains_the_remote_branches()
         {
+            _commandRegister.UnregisterAll();
             var w = new WorldMock();
-            var keyVault = new CKEnvKeyVault( w, LocalTestHelper.WorldFolder, _commandRegister );
-            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, keyVault.KeyStore, new SimpleServiceContainer() ) )
+            SecretKeyStore keyStore = new SecretKeyStore();
+            using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, keyStore, new SimpleServiceContainer() ) )
             {
-                fs.ServiceContainer.Add( keyVault.KeyStore );
+                fs.ServiceContainer.Add( keyStore );
                 var proto = fs.FindOrCreateProtoGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
                 fs.EnsureGitFolder( TestHelper.Monitor, proto );
 
@@ -242,6 +248,7 @@ namespace CK.Env.Tests
         [Test]
         public void when_the_branch_is_the_current_one_we_have_access_to_the_physical_files()
         {
+            _commandRegister.UnregisterAll();
             var w = new WorldMock();
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
@@ -287,6 +294,7 @@ namespace CK.Env.Tests
         [Test]
         public void once_in_a_branch_we_have_access_to_directory_content_in_read_only_or_writable_if_in_current_head()
         {
+            _commandRegister.UnregisterAll();
             var w = new WorldMock();
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {

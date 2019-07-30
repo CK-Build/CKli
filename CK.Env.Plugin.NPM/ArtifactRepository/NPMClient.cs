@@ -69,7 +69,10 @@ namespace CK.Env.NPM
             return result;
         }
 
-        public IArtifactFeed CreateFeed( in XElementReader r, IReadOnlyList<IArtifactRepository> repositories, IReadOnlyList<IArtifactFeed> feeds )
+        public IArtifactFeed CreateFeed(
+            in XElementReader r,
+            IReadOnlyList<IArtifactRepository> repositories,
+            IReadOnlyList<IArtifactFeed> feeds )
         {
             if( r.HandleOptionalAttribute<string>( "Type", null ) != NPMType.Name ) return null;
             var url = r.HandleRequiredAttribute<string>( "Url" );
@@ -78,10 +81,17 @@ namespace CK.Env.NPM
             var xCreds = r.Element.Element( "Credentials" );
             var creds = xCreds != null ? new SimpleCredentials( r.WithElement( xCreds ) ) : null;
             r.WarnUnhandled();
+
             var npmFeeds = feeds.OfType<NPMFeed>();
             if( npmFeeds.Any( f => f.Scope == scope ) ) r.ThrowXmlException( $"NPM feed with the same scope '{scope}' is already defined." );
             if( npmFeeds.Any( f => StringComparer.OrdinalIgnoreCase.Equals( f.Url, url ) ) ) r.ThrowXmlException( $"NPM feed with the same url '{url}' is already defined." );
-            return new NPMFeed( scope, url, creds );
+
+            NPMRepositoryBase repository = repositories.OfType<NPMAzureRepository>().FirstOrDefault( repo => repo.Scope == scope );
+            if( repository == null )
+            {
+                repository = repositories.OfType<NPMStandardRepository>().FirstOrDefault( repo => repo.Url.Equals( url, StringComparison.OrdinalIgnoreCase ) );
+            }
+            return new NPMFeed( this, scope, url, creds, repository );
         }
     }
 }

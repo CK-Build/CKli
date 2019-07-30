@@ -48,7 +48,6 @@ namespace CK.Env
             return Add( m, new[] { info }, skipExisting );
         }
 
-
         /// <summary>
         /// Registers multiple packages at once. Any <see cref="PackageInfo.Dependencies"/> must
         /// be already registered or appear before the dependent package.

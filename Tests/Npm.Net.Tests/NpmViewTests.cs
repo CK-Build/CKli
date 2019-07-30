@@ -1,3 +1,4 @@
+using CK.Env.NPM;
 using CK.Env.Tests;
 using CSemVer;
 using FluentAssertions;
@@ -12,7 +13,7 @@ namespace Npm.Net.Tests
         readonly Registry _registry;
         public NpmViewTests()
         {
-            _registry = new Registry( TestHelperHttpClient.HttpClient );
+            _registry = new Registry( TestHelperHttpClient.HttpClient, Registry.NPMJSOrgUri );
         }
 
         [Test]
@@ -24,6 +25,7 @@ namespace Npm.Net.Tests
             json["versions"]["0.0.1"]["version"].ToString().Should().Be( "0.0.1" );
             json["versions"]["0.0.1"]["name"].ToString().Should().Be( "@signature/json-graph-serializer" );
         }
+
         [Test]
         public async Task ViewWithVersionReturnValidJson()
         {

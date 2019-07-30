@@ -66,15 +66,17 @@ namespace CK.Env.Plugin
 
         void OnSolutionConfiguration( object sender, SolutionConfigurationEventArgs e )
         {
+            // These values are not build secrets. They are required by ApplySettings to configure
+            // the NuGet.config file: once done, restore can be made and having these keys available
+            // as environement variables will not help.
             var creds = e.Solution.ArtifactSources.OfType<INuGetFeed>()
                             .Where( s => s.Credentials != null && s.Credentials.IsSecretKeyName )
                             .Select( s => s.Credentials.PasswordOrSecretKeyName );
             foreach( var c in creds )
             {
-                _secretStore.DeclareSecretKey( c, desc => desc ?? "Needed to configure NuGet.config file." );
+                _secretStore.DeclareSecretKey( c, current => current?.Description ?? "Needed to configure NuGet.config file." );
             }
         }
-
 
         void IDisposable.Dispose()
         {
@@ -112,6 +114,12 @@ namespace CK.Env.Plugin
                     if( password != null )
                     {
                         EnsureFeedCredentials( m, s.Name, s.Credentials.UserName, password );
+                    }
+                    else
+                    {
+                        if( s.Credentials.IsSecretKeyName )
+                            m.Warn( $"Secret '{s.Credentials.PasswordOrSecretKeyName}' is not known. Configuration for feed '{s.Name}' skipped." );
+                        else m.Warn( $"Empty feed password. Configuration for feed '{s.Name}' skipped." );
                     }
                 }
             }

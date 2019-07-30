@@ -17,11 +17,20 @@ namespace CK.Env
             _commands = new Dictionary<NormalizedPath, ICommandHandler>();
         }
 
+        /// <summary>
+        /// Registers a command. Its <see cref="ICommandHandler.UniqueName"/> must not
+        /// already be registered otherwise an exception is thrown.
+        /// </summary>
+        /// <param name="h">The command handler.</param>
         public void Register( ICommandHandler h )
         {
             _commands.Add( h.UniqueName, h );
         }
 
+        /// <summary>
+        /// Unregisters a command.
+        /// </summary>
+        /// <param name="uniqueName">The commande name.</param>
         public void Unregister( NormalizedPath uniqueName )
         {
             _commands.Remove( uniqueName );
@@ -100,6 +109,15 @@ namespace CK.Env
             }
         }
 
+        /// <summary>
+        /// Registers a method that can be called as a command.
+        /// </summary>
+        /// <param name="confirmationRequired">True to confirm the command before its execution.</param>
+        /// <param name="uniqueName">The unique command name.</param>
+        /// <param name="o">The object instance that holds the method.</param>
+        /// <param name="method">The method.</param>
+        /// <param name="enabled">A companion function that knows how to compte whether the command is enabled or not.</param>
+        /// <returns>The registered command handler.</returns>
         public ICommandHandler Register( bool confirmationRequired, NormalizedPath uniqueName, object o, MethodInfo method, Func<bool> enabled = null )
         {
             if( _commands.ContainsKey( uniqueName ) )
@@ -120,17 +138,13 @@ namespace CK.Env
             return h;
         }
 
-        public ICommandHandler Register( bool confirmationRequired, NormalizedPath uniqueName, object o, string commandMethodName )
-        {
-            var methods = o.GetType().GetMethods();
-            var m = methods.Single( method => method.Name == commandMethodName );
-            var enabled = GetEnabledMethod( o, methods, m.Name );
-            return Register( confirmationRequired, uniqueName, o, m, enabled );
-        }
-
+        /// <summary>
+        /// Registers a <see cref="ICommandMethodsProvider"/> by analysing its public methods.
+        /// </summary>
+        /// <param name="provider">The command provider.</param>
         public void Register( ICommandMethodsProvider provider )
         {
-            var methods = provider.GetType().GetMethods();
+            var methods = provider?.GetType().GetMethods() ?? throw new ArgumentNullException( nameof( provider ) );
             foreach( var m in methods ) 
             {
                 var attr = m.GetCustomAttribute<CommandMethodAttribute>();
@@ -159,6 +173,10 @@ namespace CK.Env
             return null;
         }
 
+        /// <summary>
+        /// Unregisters all commands from a <see cref="ICommandMethodsProvider"/>.
+        /// </summary>
+        /// <param name="provider">The command provider.</param>
         public void Unregister( ICommandMethodsProvider provider )
         {
             var r = GetCommands( provider.CommandProviderName.AppendPart( "*" ) ).ToList();
@@ -168,9 +186,21 @@ namespace CK.Env
             }
         }
 
-        public void UnregisterAll()
+        /// <summary>
+        /// Unregisters all commands, optionally keeping some of them.
+        /// </summary>
+        /// <param name="keepFilter">Optional function that can return true to keep the handler registered.</param>
+        public void UnregisterAll( Func<ICommandHandler,bool> keepFilter = null )
         {
-            _commands.Clear();
+            if( keepFilter == null ) _commands.Clear();
+            else
+            {
+                var cmd = _commands.Values.ToArray();
+                foreach( var c in cmd )
+                {
+                    if( !keepFilter( c ) ) _commands.Remove( c.UniqueName );
+                }
+            }
         }
 
         /// <summary>

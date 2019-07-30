@@ -14,6 +14,39 @@ namespace CK.Env
         readonly List<SecretKeyInfo> _orderedInfos;
 
         /// <summary>
+        /// Opaque capture of a <see cref="SecretKeyStore"/> content.
+        /// </summary>
+        public struct Snapshot
+        {
+            readonly (string name, string description, string secret, bool isRequired, string tags, string subKey)[] _data;
+
+            internal Snapshot( SecretKeyStore store )
+            {
+                _data = new (string name, string description, string secret, bool isRequired, string tags, string subKey)[store._orderedInfos.Count];
+                for( int i = 0; i < store._orderedInfos.Count; i++ )
+                {
+                    _data[i] = store._orderedInfos[i].GetData();
+                }
+            }
+
+            /// <summary>
+            /// Restores this snapshot content into the <paramref name="store"/>.
+            /// </summary>
+            /// <param name="store">The target store.</param>
+            public void RestoreTo( SecretKeyStore store )
+            {
+                store.Clear();
+                int max = _data.Length - 1;
+                for( int i = 0; i <= max; i++ )
+                {
+                    var s = new SecretKeyInfo( _data[max - i], store._keyInfos );
+                    store._orderedInfos.Add( s );
+                    store._keyInfos.Add( s.Name, s );
+                }
+            }
+        }
+
+        /// <summary>
         /// Initializes a new empty key store.
         /// </summary>
         public SecretKeyStore()
@@ -21,6 +54,11 @@ namespace CK.Env
             _keyInfos = new Dictionary<string, SecretKeyInfo>();
             _orderedInfos = new List<SecretKeyInfo>();
         }
+
+        /// <summary>
+        /// Raised each time a secret is declared.
+        /// </summary>
+        public event EventHandler<SecretKeyInfoDeclaredArgs> SecretDeclared;
 
         /// <summary>
         /// Gets the list of <see cref="SecretKeyInfo"/> that have been declared with the
@@ -42,6 +80,12 @@ namespace CK.Env
         public SecretKeyInfo Find( string name ) => _keyInfos.GetValueWithDefault( name, null );
 
         /// <summary>
+        /// Creates a new <see cref="Snapshot"/>.
+        /// </summary>
+        /// <returns>The snapshot.</returns>
+        public Snapshot CreateSnapshot() => new Snapshot( this );
+
+        /// <summary>
         /// Clears this store.
         /// </summary>
         public void Clear()
@@ -59,15 +103,51 @@ namespace CK.Env
         /// <param name="descriptionBuilder">Description builder function.</param>
         /// <param name="isRequired">True if this key is required to initialize a World.</param>
         /// <returns>The secret key info.</returns>
-        public SecretKeyInfo DeclareSecretKey( string name, Func<string, string> descriptionBuilder, bool isRequired = false )
+        public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo, string> descriptionBuilder, bool isRequired = false )
         {
+            bool redeclaration = true;
             if( !_keyInfos.TryGetValue( name, out var info ) )
             {
+                redeclaration = false;
                 _keyInfos.Add( name, info = new SecretKeyInfo( name, descriptionBuilder, isRequired ) );
                 _orderedInfos.Add( info );
             }
             else info.Reconfigure( descriptionBuilder, isRequired );
+            SecretDeclared?.Invoke( this, new SecretKeyInfoDeclaredArgs( info, redeclaration ) );
             return info;
+        }
+
+        /// <summary>
+        /// Sets or clears a secret that must have been declared.
+        /// Updates it when <paramref name="secret"/> is not null or empty, otherwise clears it.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="name">The secret name.</param>
+        /// <param name="secret">The secret value. Null or empty clears the secret.</param>
+        /// <returns>True if secret has been changed, false otherwise.</returns>
+        public bool SetSecret( IActivityMonitor m, string name, string secret )
+        {
+            if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
+            bool clear = String.IsNullOrEmpty( secret );
+            if( !_keyInfos.TryGetValue( name, out var info ) )
+            {
+                m.Error( $"Secret '{name}' is not declared." );
+                return false;
+            }
+            if( info.IsSecretAvailable
+                && info.SuperKey != null
+                && info.SuperKey.IsSecretAvailable )
+            {
+                m.Error( $"Secret '{name}' is defined by its super key '{info.SuperKey.Name}'." );
+                return false;
+            }
+            if( info.SetSecret( secret ) )
+            {
+                m.Info( $"Secret '{name}' has been {(clear ? "cleared" : "updated")}." );
+                return true;
+            }
+            m.Trace( $"Secret '{name}' unchanged." );
+            return false;
         }
 
         /// <summary>
@@ -80,7 +160,7 @@ namespace CK.Env
         /// <param name="descriptionBuilder">Description builder function.</param>
         /// <param name="subKey">The sub key.</param>
         /// <returns>The secret key info.</returns>
-        public SecretKeyInfo DeclareSecretKey( string name, Func<string, string> descriptionBuilder, SecretKeyInfo subKey )
+        public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo, string> descriptionBuilder, SecretKeyInfo subKey )
         {
             if( !_keyInfos.TryGetValue( name, out var info ) )
             {
@@ -118,23 +198,7 @@ namespace CK.Env
             {
                 if( secrets.TryGetValue( info.Name, out var secret ) )
                 {
-                    if( info.IsSecretAvailable )
-                    {
-                        if( info.SuperKey != null && info.SuperKey.IsSecretAvailable )
-                        {
-                            m.Info( $"Secret '{info.Name}' already set by it SuperKey ('{info.SuperKey.Name}')." );
-                        }
-                        else
-                        {
-                            info.SetSecret( secret );
-                            m.Info( $"Imported secret '{info.Name}' has replaced the previous one." );
-                        }
-                    }
-                    else
-                    {
-                        info.SetSecret( secret );
-                        m.Info( $"Imported secret '{info.Name}'." );
-                    }
+                    info.ImportSecret( m, secret );
                 }
             }
         }

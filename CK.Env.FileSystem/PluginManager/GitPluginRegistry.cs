@@ -105,7 +105,7 @@ namespace CK.Env
             {
                 foreach( var a in AppDomain.CurrentDomain.GetAssemblies() )
                 {
-                    if( _analyzed.Add( a ) )
+                    if( !a.IsDynamic && _analyzed.Add( a ) )
                     {
                         _plugins.AddRange( a.ExportedTypes.Where( t => !t.IsAbstract && typeof( IGitPlugin ).IsAssignableFrom( t ) ) );
                     }

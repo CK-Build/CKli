@@ -47,13 +47,13 @@ namespace CK.Env
         /// <summary>
         /// Initializes a new <see cref="WorldName"/> instance.
         /// </summary>
-        /// <param name="worldName">The name. Must not be null or empty.</param>
+        /// <param name="stackName">The name. Must not be null or empty.</param>
         /// <param name="parallelName">The parallel world. Can be null or empty.</param>
-        public WorldName( string worldName, string parallelName )
+        public WorldName( string stackName, string parallelName )
         {
-            if( String.IsNullOrWhiteSpace( worldName ) ) throw new ArgumentNullException( nameof( worldName ) );
-            if( worldName.IndexOf( '.' ) >= 0 ) throw new ArgumentException( nameof( worldName ) + " can't contain a '.' character" );
-            Name = worldName;
+            if( String.IsNullOrWhiteSpace( stackName ) ) throw new ArgumentNullException( nameof( stackName ) );
+            if( stackName.IndexOf( '.' ) >= 0 ) throw new ArgumentException( nameof( stackName ) + " can't contain a '.' character" );
+            Name = stackName;
             if( !String.IsNullOrWhiteSpace( parallelName ) )
             {
                 ParallelName = parallelName;

@@ -1,6 +1,5 @@
 using CK.Core;
 using CSemVer;
-using Npm.Net;
 using System;
 
 namespace CK.Env.NPM

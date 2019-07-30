@@ -7,7 +7,7 @@ namespace CK.Env.Plugin
 {
     public class CKSetupStoreTestHelperConfigFile : TextFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider, IDisposable
     {
-        readonly SolutionSpec _settings;
+        readonly SolutionSpec _solutionSpec;
         readonly SolutionDriver _solutionDriver;
         readonly IEnvLocalFeedProvider _localFeedProvider;
 
@@ -19,7 +19,7 @@ namespace CK.Env.Plugin
             NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "RemoteStore.TestHelper.config" ) )
         {
-            _settings = settings;
+            _solutionSpec = settings;
             _solutionDriver = solutionDriver;
             _localFeedProvider = localFeedProvider;
             // Always monitor branch change even if _settings.ProduceCKSetupComponents is false
@@ -30,7 +30,7 @@ namespace CK.Env.Plugin
                 f.OnLocalBranchLeaving += OnLocalBranchLeaving;
             }
             // If the settings states that CKSetup is not used, there is no need to react to builds.
-            if( _settings.UseCKSetup )
+            if( _solutionSpec.UseCKSetup )
             {
                 _solutionDriver.OnStartBuild += OnStartBuild;
                 _solutionDriver.OnBuildSucceed += OnBuildEnd;
@@ -40,7 +40,7 @@ namespace CK.Env.Plugin
 
         void OnStartBuild( object sender, BuildStartEventArgs e )
         {
-            Debug.Assert( _settings.UseCKSetup );
+            Debug.Assert( _solutionSpec.UseCKSetup );
             if( !e.IsUsingDirtyFolder ) return;
 
             // The CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL environment variable is always required
@@ -59,7 +59,7 @@ namespace CK.Env.Plugin
             if( !_localFeedProvider.EnsureCKSetupStores( e.Monitor ) ) return;
 
             var targetStore = _localFeedProvider.GetCKSetupStorePath( e.Monitor, e.BuildType );
-            if( !_settings.NoDotNetUnitTests )
+            if( !_solutionSpec.NoDotNetUnitTests )
             {
                 EnsureStorePath( e.Monitor, targetStore );
             }
@@ -81,7 +81,9 @@ namespace CK.Env.Plugin
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
-            if( PluginBranch == StandardGitStatus.Local && _settings.UseCKSetup && !_settings.NoDotNetUnitTests )
+            if( PluginBranch == StandardGitStatus.Local
+                && _solutionSpec.UseCKSetup
+                && !_solutionSpec.NoDotNetUnitTests )
             {
                 EnsureStorePath( m, _localFeedProvider.Local.GetCKSetupStorePath() );
             }
@@ -104,7 +106,7 @@ namespace CK.Env.Plugin
 
         void OnLocalBranchEntered( object sender, EventMonitoredArgs e )
         {
-            if( _settings.UseCKSetup ) EnsureStorePath( e.Monitor, _localFeedProvider.Local.GetCKSetupStorePath() );
+            if( _solutionSpec.UseCKSetup ) EnsureStorePath( e.Monitor, _localFeedProvider.Local.GetCKSetupStorePath() );
         }
 
         public bool EnsureStorePath( IActivityMonitor m, string storePath )

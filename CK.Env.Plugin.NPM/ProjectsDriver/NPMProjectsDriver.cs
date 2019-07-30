@@ -8,7 +8,7 @@ using System.Diagnostics;
 
 namespace CK.Env.Plugin
 {
-    public class NPMProjectsDriver : GitBranchPluginBase, ICommandMethodsProvider
+    public class NPMProjectsDriver : GitBranchPluginBase, ICommandMethodsProvider, IDisposable
     {
         readonly SolutionDriver _driver;
         readonly SolutionSpec _spec;
@@ -38,6 +38,7 @@ namespace CK.Env.Plugin
                 e.PreventSolutionUse( "NPM project error." );
                 return;
             }
+            bool somePublished = false;
             foreach( var p in _npmProjects )
             {
                 var (project,isNew) = e.Solution.AddOrFindProject( p.Specification.Folder, "js", p.PackageJson.SafeName );
@@ -47,6 +48,7 @@ namespace CK.Env.Plugin
                     if( p.PackageJson.IsPublished )
                     {
                         project.AddGeneratedArtifacts( new Artifact( NPMClient.NPMType, p.PackageJson.Name ) );
+                        somePublished = true;
                     }
                 }
                 p.SynchronizePackageReferences( e.Monitor );
@@ -56,6 +58,24 @@ namespace CK.Env.Plugin
                 if( !p.SynchronizeProjectReferences( e.Monitor ) )
                 {
                     e.PreventSolutionUse( "NPM project path relative error." );
+                }
+            }
+            if( _npmProjects.Length == 0 )
+            {
+                var sources = e.Solution.ArtifactSources.Where( s => s.ArtifactType == NPMClient.NPMType ).ToList();
+                if( sources.Count > 0 )
+                {
+                    e.Monitor.Info( $"Removing sources: {sources.Select( t => t.TypedName ).Concatenate()} since there is no NPM projetcs." );
+                    foreach( var s in sources ) e.Solution.RemoveArtifactSource( s );
+                }
+            }
+            if( !somePublished )
+            {
+                var targets = e.Solution.ArtifactTargets.Where( t => t.HandleArtifactType( NPMClient.NPMType ) ).ToList();
+                if( targets.Count > 0 )
+                {
+                    e.Monitor.Info( $"Removing targets: {targets.Select( t => t.UniqueRepositoryName ).Concatenate()} since no published NPM projetcs exist." );
+                    foreach( var t in targets ) e.Solution.RemoveArtifactTarget( t );
                 }
             }
         }
@@ -100,5 +120,10 @@ namespace CK.Env.Plugin
             }
         }
 
+        void IDisposable.Dispose()
+        {
+            _driver.OnSolutionConfiguration -= OnSolutionConfiguration;
+            _driver.OnUpdatePackageDependency -= OnUpdatePackageDependency;
+        }
     }
 }

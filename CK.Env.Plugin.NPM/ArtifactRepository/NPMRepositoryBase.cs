@@ -1,6 +1,5 @@
 using CK.Core;
 using CSemVer;
-using Npm.Net;
 using System;
 using System.Collections.Generic;
 using System.IO;
