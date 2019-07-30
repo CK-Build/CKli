@@ -142,7 +142,7 @@ namespace CK.Env
         void CheckSecretPropagation()
         {
             bool isValidNull = _secret == null && (SuperKey == null || !SuperKey.IsSecretAvailable);
-            bool isValidAvailable = _secret != null && (SuperKey == null || SuperKey._secret == _secret);
+            bool isValidAvailable = _secret != null && (SuperKey?._secret == null || SuperKey._secret == _secret);
             Debug.Assert( isValidNull || isValidAvailable );
         }
 
