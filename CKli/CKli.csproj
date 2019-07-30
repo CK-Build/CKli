@@ -7,10 +7,6 @@
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <PackAsTool>True</PackAsTool>
   </PropertyGroup>
-
-  <ItemGroup>
-    <None Include="LICENSE.txt" Pack="True" PackagePath=""/>
-  </ItemGroup>
   
   <ItemGroup>
     <ProjectReference Include="..\CK.Env.Plugin.Appveyor\CK.Env.Plugin.Appveyor.csproj" />

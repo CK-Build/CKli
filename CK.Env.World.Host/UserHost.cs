@@ -40,8 +40,16 @@ namespace CK.Env
 
         public void Initialize( IActivityMonitor m )
         {
-            _xTypedObjectfactory.AutoRegisterFromLoadedAssemblies( m );
-            _store.ReadStacksFromFile( m );
+            if( !UserKeyVault.IsKeyVaultOpened )
+            {
+                // First initialization: the key vault is not opened.
+                _xTypedObjectfactory.AutoRegisterFromLoadedAssemblies( m );
+                _store.ReadStacksFromFile( m );
+            }
+            else
+            {
+                _store.PullAll( m );
+            }
         }
 
         [CommandMethod]

@@ -36,6 +36,7 @@ namespace CKli
                 var host = new UserHost( appLife, userHostPath );
                 host.Initialize( monitor );
                 OpenKeyVault( monitor, host );
+                if( host.UserKeyVault.IsKeyVaultOpened ) host.Initialize( monitor );
                 DumpWorlds( host.WorldStore.ReadWorlds( monitor ) );
                 InteractiveRun( monitor, host );
             }
@@ -48,7 +49,7 @@ namespace CKli
 
         static void InteractiveRun( IActivityMonitor monitor, UserHost host )
         {
-            const string textCommands = "[run <globbed command name> | list [<globbed command name>] | cls | secret [clear NAME|set NAME] | exit]";
+            const string textCommands = "[run <globbed command name> | list [<globbed command name>] | cls | secret [clear NAME|set NAME|save] | exit]";
             for(; ; )
             {
                 if( host.ApplicationLifetime.CanCancelStopRequest ) host.ApplicationLifetime.CancelStopRequest();
