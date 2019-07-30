@@ -47,7 +47,7 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the current world.
-        /// Can be null if <see cref="OpenWorld(IActivityMonitor, string)"/> failed.
+        /// Can be null if <see cref="Open(IActivityMonitor, string)"/> failed.
         /// </summary>
         public World CurrentWorld { get; private set; }
 
@@ -56,16 +56,16 @@ namespace CK.Env
         /// <summary>
         /// Closing current world: current world must not be null.
         /// </summary>
-        public bool CanCloseWorld => CurrentWorld != null;
+        public bool CanClose => CurrentWorld != null;
 
         /// <summary>
         /// Closes the current world.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         [CommandMethod]
-        public void CloseWorld( IActivityMonitor m )
+        public void Close( IActivityMonitor m )
         {
-            if( !CanCloseWorld ) throw new InvalidOperationException();
+            if( !CanClose ) throw new InvalidOperationException();
             m.Info( $"Closing current world: {CurrentWorld.WorldName.FullName}." );
             Close();
         }
@@ -73,7 +73,7 @@ namespace CK.Env
         /// <summary>
         /// Opening a world requires the current world to be closed first.
         /// </summary>
-        public bool CanOpenWorld => CurrentWorld == null;
+        public bool CanOpen => CurrentWorld == null;
 
         /// <summary>
         /// Tries to open a world in <see cref="Store"/> by its full name (or its One based index).
@@ -82,9 +82,9 @@ namespace CK.Env
         /// <param name="worldFullNameOr1BasedIndex">The name or the index in the store.</param>
         /// <returns>True on success, false on error.</returns>
         [CommandMethod]
-        public bool OpenWorld( IActivityMonitor m, string worldFullNameOr1BasedIndex )
+        public bool Open( IActivityMonitor m, string worldFullNameOr1BasedIndex )
         {
-            if( !CanOpenWorld ) throw new InvalidOperationException();
+            if( !CanOpen ) throw new InvalidOperationException();
             using( m.OpenInfo( $"Opening  world '{worldFullNameOr1BasedIndex}'." ) )
             {
                 var all = Store.ReadWorlds( m );

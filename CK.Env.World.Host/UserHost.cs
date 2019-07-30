@@ -56,13 +56,13 @@ namespace CK.Env
         public void Refresh( IActivityMonitor m )
         {
             _store.PullAll( m );
-            if( WorldSelector.CanCloseWorld )
+            if( WorldSelector.CanClose )
             {
                 var opened = WorldSelector.CurrentWorld.WorldName.FullName;
                 if( opened != null )
                 {
-                    WorldSelector.CloseWorld( m );
-                    WorldSelector.OpenWorld( m, opened );
+                    WorldSelector.Close( m );
+                    WorldSelector.Open( m, opened );
                 }
             }
         }
