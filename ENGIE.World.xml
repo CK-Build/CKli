@@ -8,7 +8,8 @@
   <LoadLibrary Name="CK.Env.Plugin.NPM" />
   <LoadLibrary Name="CK.Env.Plugin.CKSetup" />
   <LoadLibrary Name="CK.Env.Plugin.NuGet" />
-
+  <LoadLibrary Name="CK.Env.Plugin.Dotnet" />
+  
   <SharedHttpClient />
   <ArtifactCenter />
   <LocalFeedProvider />
