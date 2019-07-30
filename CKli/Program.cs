@@ -332,7 +332,7 @@ namespace CKli
                 } ) ).ToArray();
                 Task.WaitAll( tasks );
             }
-            
+
         }
 
         static bool YesOrNo()
@@ -429,6 +429,11 @@ namespace CKli
                     {
                         monitor.Error( $"Unable to parse: '{s}' as {f.Type.Name} enum." );
                     }
+                }
+                else if( f.Type == typeof( NormalizedPath ) )
+                {
+                    Console.Write( "Enter path: " );
+                    f.SetValue( new NormalizedPath( ReadNullableString() ) );
                 }
                 else
                 {
