@@ -158,7 +158,7 @@ namespace CKli
                 if( rep == "exit" ) return;
                 if( !hasWorld && Int32.TryParse( rep, out var idx ) )
                 {
-                    host.WorldSelector.OpenWorld( monitor, idx.ToString() );
+                    host.WorldSelector.Open( monitor, idx.ToString() );
                     continue;
                 }
                 Console.WriteLine( "Unrecognized command." );
