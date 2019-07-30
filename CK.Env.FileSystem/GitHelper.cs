@@ -30,7 +30,7 @@ namespace CK.Env
             NormalizedPath fullPath,
             NormalizedPath subPath )
         {
-            RepositoryKey = repositoryKey ?? throw new ArgumentNullException( nameof(repositoryKey));
+            RepositoryKey = repositoryKey ?? throw new ArgumentNullException( nameof( repositoryKey ) );
             Git = libRepository ?? throw new ArgumentNullException( nameof( libRepository ) ); ;
             FullPhysicalPath = fullPath;
             SubPath = subPath;
@@ -142,7 +142,7 @@ namespace CK.Env
 
         Branch GetBranch( IActivityMonitor m, string branchName, bool logErrorMissingLocalAndRemote )
         {
-            return DoGetBranch(m, Git, branchName, logErrorMissingLocalAndRemote, SubPath );
+            return DoGetBranch( m, Git, branchName, logErrorMissingLocalAndRemote, SubPath );
         }
 
         static Branch DoGetBranch( IActivityMonitor m, Repository r, string branchName, bool logErrorMissingLocalAndRemote, NormalizedPath subPath )
@@ -242,6 +242,8 @@ namespace CK.Env
                     return (false, false);
                 }
 
+                EnsureBranch( m, CurrentBranchName );
+
                 try
                 {
                     return DoPull( m, false, mergeFileFavor );
@@ -302,6 +304,11 @@ namespace CK.Env
         (bool Success, bool ReloadNeeded) DoPull( IActivityMonitor m, bool alreadyReloadNeeded, MergeFileFavor mergeFileFavor )
         {
             var merger = Git.Config.BuildSignature( DateTimeOffset.Now ) ?? new Signature( "CKli", "none", DateTimeOffset.Now );
+            if( Git.Head.TrackedBranch.Tip == null )
+            {
+                m.Warn( "This branch has no tracking branch. Skipping pull." );
+                return (false, false);
+            }
             var result = Commands.Pull( Git, merger, new PullOptions
             {
                 FetchOptions = new FetchOptions
