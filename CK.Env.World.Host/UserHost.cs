@@ -19,7 +19,7 @@ namespace CK.Env
             ApplicationLifetime = lifetime;
             CommandRegister = new CommandRegister();
             _xTypedObjectfactory = new XTypedFactory();
-            UserKeyVault = new UserKeyVault( userHostPath, CommandRegister );
+            UserKeyVault = new UserKeyVault( userHostPath );
             _worldMapping = new SimpleWorldLocalMapping( userHostPath.AppendPart( "WorldLocalMapping.txt" ) );
             _store = new GitWorldStore( userHostPath, _worldMapping, UserKeyVault.KeyStore, CommandRegister );
             WorldSelector = new WorldSelector( _store, CommandRegister, _xTypedObjectfactory, UserKeyVault.KeyStore, lifetime );

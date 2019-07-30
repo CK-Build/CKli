@@ -10,15 +10,13 @@ using System.Linq;
 
 namespace CK.Env
 {
-    public sealed class UserKeyVault : ICommandMethodsProvider, IDisposable
+    public sealed class UserKeyVault : IDisposable
     {
-        static readonly NormalizedPath _commandProviderName = "UserKeyVault";
-
         readonly SecretKeyStore _store;
         readonly Dictionary<string,string> _vaultContent;
         string _passPhrase;
 
-        public UserKeyVault( NormalizedPath userHostPath, CommandRegister commandRegister )
+        public UserKeyVault( NormalizedPath userHostPath )
         {
             _store = new SecretKeyStore();
             _store.SecretDeclared += OnSecretDeclared;
@@ -30,7 +28,6 @@ namespace CK.Env
                                          .Replace( '.', '_' )
                                          .ToUpperInvariant();
             KeyVaultPath = userHostPath.AppendPart( KeyVaultKeyName + ".KeyVault.txt" );
-            commandRegister.Register( this );
         }
 
         void OnSecretDeclared( object sender, SecretKeyInfoDeclaredArgs e )
@@ -68,8 +65,6 @@ namespace CK.Env
         /// </summary>
         public bool IsKeyVaultOpened => _passPhrase != null;
 
-        NormalizedPath ICommandMethodsProvider.CommandProviderName => _commandProviderName;
-
         /// <summary>
         /// Updates or clears the secret of a declared key in the <see cref="KeyStore"/>.
         /// </summary>
@@ -77,7 +72,6 @@ namespace CK.Env
         /// <param name="key">The secret name to update.</param>
         /// <param name="secret">The secret to update. Null or empty clears the secret.</param>
         /// <param name="autoSave">False to not automatically saves the vault.</param>
-        [CommandMethod( confirmationRequired: false )]
         public void UpdateSecret( IActivityMonitor m, string key, string secret, bool autoSave = true )
         {
             if( _store.SetSecret( m, key, secret )
@@ -99,7 +93,6 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="passPhrase">The key vault pass phrase.</param>
         /// <returns>True on success.</returns>
-        [CommandMethod(confirmationRequired:false)]
         public bool OpenKeyVault( IActivityMonitor m, string passPhrase )
         {
             if( !CheckPassPhraseConstraints( m, passPhrase ) ) return false;
@@ -156,7 +149,6 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="newPassPhrase">Optional new passphrase.</param>
         /// <returns>True on success, false on error.</returns>
-        [CommandMethod( confirmationRequired: false )]
         public bool SaveKeyVault( IActivityMonitor m, string newPassPhrase = null )
         {
             if( _passPhrase == null )
@@ -188,11 +180,9 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Clears the current secrets that may exist in memory and the persisted key vault bound
-        /// to the current <see cref="IWorldName"/> and closes the vault.
+        /// Clears the current secrets that may exist in memory and the persisted key vault.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        [CommandMethod]
         public void DeleteKeyVault( IActivityMonitor m )
         {
             if( IsKeyVaultOpened )
