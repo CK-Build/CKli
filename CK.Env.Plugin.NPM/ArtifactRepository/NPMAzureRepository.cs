@@ -52,7 +52,6 @@ namespace CK.Env.NPM
         protected override Registry CreateRegistry( IActivityMonitor m )
         {
             string pat = ResolveSecret( m, true );
-            pat = Convert.ToBase64String( System.Text.Encoding.UTF8.GetBytes( pat ) );
             return new Registry( Client.HttpClient, "CKli", pat, new Uri( Url ) );
         }
 

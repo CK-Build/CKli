@@ -228,7 +228,6 @@ namespace CK.Env.NPM
                 {
                     await HandleResponse( m, response );
                     var body = await response.Content.ReadAsStringAsync();
-                    m.Debug( body );
                     return (body, response.StatusCode);
                 }
             }
