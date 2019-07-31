@@ -217,28 +217,51 @@ namespace CKli
 
         static void DumpSecrets( UserKeyVault v )
         {
-            StringBuilder b = new StringBuilder();
-
             foreach( var k in v.KeyStore.Infos )
             {
                 if( k.SuperKey != null ) continue;
-                b.Append( k.IsSecretAvailable ? "          " : "[Missing] " );
-                b.AppendLine( k.Name );
+                if( k.IsSecretAvailable )
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.Write( "          " );
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.Write( "[Missing] " );
+                }
+                Console.WriteLine( k.Name );
+                Console.ForegroundColor = ConsoleColor.Gray;
+                StringBuilder b = new StringBuilder();
                 b.AppendMultiLine( "          ", k.Description, true, false );
                 b.AppendLine();
-
+                Console.Write( b );
                 var sub = k.SubKey;
+                bool displayedAvailable = k.IsSecretAvailable;
                 while( sub != null )
                 {
-                    b.Append( sub.IsSecretAvailable ? " |          " : " | [Missing] " );
-                    b.AppendLine( sub.Name );
+                    if( sub.IsSecretAvailable )
+                    {
+                        Console.Write( " |          " );
+                        Console.ForegroundColor = displayedAvailable ? ConsoleColor.Gray : ConsoleColor.Green;
+                        displayedAvailable = true;
+                    }
+                    else
+                    {
+                        Console.Write( " |        " );
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.Write( "[Missing] " );
+                    }
+                    Console.WriteLine( sub.Name );
+                    Console.ForegroundColor = ConsoleColor.Gray;
+                    b.Clear();
                     b.AppendMultiLine( " |          ", sub.Description, true, false );
                     b.AppendLine();
+                    Console.Write( b.ToString() );
                     sub = sub.SubKey;
                 }
-                b.AppendLine();
+                Console.WriteLine();
             }
-            Console.WriteLine( b.ToString() );
         }
 
 

@@ -185,6 +185,7 @@ namespace CK.Env
                 m.Log( noWarnOnCreate ? Core.LogLevel.Info : Core.LogLevel.Warn, $"Branch '{branchName}' does not exist. Creating local branch." ); ;
                 b = r.CreateBranch( branchName );
             }
+            Commands.Checkout( r, b );
         }
 
         /// <summary>
@@ -591,7 +592,7 @@ namespace CK.Env
             GitRepositoryKey git,
             NormalizedPath workingFolder,
             bool ensureHooks,
-            string branchName )
+            string branchName = null)
         {
             using( m.OpenTrace( $"Ensuring working folder '{workingFolder}' on '{git.OriginUrl}'." ) )
             {
@@ -734,7 +735,7 @@ namespace CK.Env
             if( !hookPresent )
             {
                 File.WriteAllText( hookPath, HookPrePushScript( hookName ) );
-                m.Info( $"Created dispatcher for {hookName} hooks" );
+                m.Info( $"Created dispatcher for {hookName} hooks." );
             }
         }
 

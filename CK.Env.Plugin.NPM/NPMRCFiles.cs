@@ -13,7 +13,7 @@ namespace CK.Env.Plugin
     /// <summary>
     /// 
     /// </summary>
-    public class NPMRCFiles : GitBranchPluginBase, ICommandMethodsProvider
+    public class NPMRCFiles : GitBranchPluginBase, IDisposable, ICommandMethodsProvider
     {
         readonly SolutionSpec _solutionSpec;
         readonly NPMProjectsDriver _driver;
@@ -27,6 +27,7 @@ namespace CK.Env.Plugin
             _solutionSpec = solutionSpec;
             _driver = driver;
             _secretStore = secretStore;
+            _solutionDriver.OnSolutionConfiguration += OnSolutionConfiguration;
         }
 
 
@@ -86,6 +87,20 @@ namespace CK.Env.Plugin
 
         }
 
+
+        void OnSolutionConfiguration( object sender, SolutionConfigurationEventArgs e )
+        {
+            // These values are not build secrets. They are required by ApplySettings to configure
+            // the NuGet.config file: once done, restore can be made and having these keys available
+            // as environement variables will not help.
+            var creds = e.Solution.ArtifactSources.OfType<INPMFeed>()
+                            .Where( s => s.Credentials != null && s.Credentials.IsSecretKeyName )
+                            .Select( s => s.Credentials.PasswordOrSecretKeyName );
+            foreach( var c in creds )
+            {
+                _secretStore.DeclareSecretKey( c, current => current?.Description ?? "Needed to configure .npmrc file." );
+            }
+        }
         void ApplySettings( IActivityMonitor m, NormalizedPath f )
         {
             var s = _solutionDriver.GetSolution( m, allowInvalidSolution: true );
@@ -150,6 +165,11 @@ namespace CK.Env.Plugin
             int idx = lines.IndexOf( line => line.FullKey == key );
             if( idx < 0 ) lines.Add( new Line( key, value ) );
             else lines[idx] = new Line( key, value );
+        }
+
+        public void Dispose()
+        {
+            _solutionDriver.OnSolutionConfiguration -= OnSolutionConfiguration;
         }
     }
 }
