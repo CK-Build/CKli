@@ -19,7 +19,7 @@ namespace CK.Env
             ApplicationLifetime = lifetime;
             CommandRegister = new CommandRegister();
             _xTypedObjectfactory = new XTypedFactory();
-            UserKeyVault = new UserKeyVault( userHostPath, CommandRegister );
+            UserKeyVault = new UserKeyVault( userHostPath );
             _worldMapping = new SimpleWorldLocalMapping( userHostPath.AppendPart( "WorldLocalMapping.txt" ) );
             _store = new GitWorldStore( userHostPath, _worldMapping, UserKeyVault.KeyStore, CommandRegister );
             WorldSelector = new WorldSelector( _store, CommandRegister, _xTypedObjectfactory, UserKeyVault.KeyStore, lifetime );
@@ -56,13 +56,13 @@ namespace CK.Env
         public void Refresh( IActivityMonitor m )
         {
             _store.PullAll( m );
-            if( WorldSelector.CanCloseWorld )
+            if( WorldSelector.CanClose )
             {
                 var opened = WorldSelector.CurrentWorld.WorldName.FullName;
                 if( opened != null )
                 {
-                    WorldSelector.CloseWorld( m );
-                    WorldSelector.OpenWorld( m, opened );
+                    WorldSelector.Close( m );
+                    WorldSelector.Open( m, opened );
                 }
             }
         }
