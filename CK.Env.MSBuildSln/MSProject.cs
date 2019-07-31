@@ -245,6 +245,11 @@ namespace CK.Env.MSBuildSln
             foreach( var p in _dependencies.Packages.Where( p => p.PackageId == packageId
                                                                  && !(pFrameworks = p.Frameworks.Intersect( actualFrameworks )).IsEmpty ) )
             {
+                if( p.VersionLocked )
+                {
+                    m.Warn( $"The version({p.Version}) of the package {packageId} was manually locked. You need to change it manually." );
+                    continue;
+                }
                 actualFrameworks = actualFrameworks.Except( pFrameworks );
                 var currentVersion = p.Version;
                 if( currentVersion != version )

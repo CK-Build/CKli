@@ -20,6 +20,7 @@ namespace CK.Env.MSBuildSln
             OriginElement = originElement;
             PropertyVersionElement = finalDeclaration;
             Frameworks = frameworks;
+            VersionLocked = versionLocked;
         }
 
         /// <summary>
