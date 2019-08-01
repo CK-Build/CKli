@@ -43,7 +43,7 @@ namespace CK.Env.Plugin
             if( solution == null ) return;
 
             // We don't use AppVeyor for private repositories.
-            if( !GitFolder.IsPublic ) 
+            if( !GitFolder.IsPublic )
             {
                 if( TextContent != null )
                 {
@@ -107,9 +107,31 @@ namespace CK.Env.Plugin
             firstMapping["image"] = new YamlValue( "Visual Studio 2017" );
             firstMapping["clone_folder"] = new YamlValue( "C:\\CKli-World\\" + GitFolder.SubPath.Path.Replace( '/', '\\' ) );
             EnsureDefaultBranches( firstMapping );
-            EnsureSequence( firstMapping, "build_script", "dotnet run --project CodeCakeBuilder -nointeraction" );
+            SetSequence( firstMapping, "build_script", new YamlValue( "dotnet run --project CodeCakeBuilder -nointeraction" ) );
             firstMapping["test"] = new YamlValue( "off" );
-
+            firstMapping["artifacts"] = new YamlSequence()
+            {
+                new YamlMapping()
+                {
+                    ["path"] = new YamlValue(@"'**\*.log'"),
+                    ["name"] = new YamlValue("Log file")
+                },
+                new YamlMapping()
+                {
+                    ["path"] = new YamlValue(@"'**\*.trx'"),
+                    ["name"] = new YamlValue("Visual studio test results file")
+                },
+                new YamlMapping()
+                {
+                    ["path"] = new YamlValue(@"'**\Tests\**\TestResult*.xml'"),
+                    ["name"] = new YamlValue("NUnit tests result files")
+                },
+                new YamlMapping()
+                {
+                    ["path"] = new YamlValue(@"'**Tests\**\Logs\**\*'"),
+                    ["name"] = new YamlValue("Log files")
+                }
+            };
             CreateOrUpdate( m, YamlMappingToString( m ) );
         }
 
@@ -118,7 +140,7 @@ namespace CK.Env.Plugin
             YamlElement branches = firstMapping["branches"];
             if( branches == null )
             {
-                firstMapping["branches"] = EnsureSequence( new YamlMapping(), "only", "master", "develop" );
+                firstMapping["branches"] = SetSequence( new YamlMapping(), "only", new YamlValue( "master"), new YamlValue ("develop") );
             }
         }
 

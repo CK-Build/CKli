@@ -37,8 +37,22 @@ namespace CK.Env.Plugin
             }
             // We use GitLab when the repository is private.
             YamlMapping codeCakeJob = FindOrCreateYamlElement( m, firstMapping, "codecakebuilder" );
-            EnsureSequence( codeCakeJob, "tags", "windows" );
-            EnsureSequence( codeCakeJob, "script", "dotnet run --project CodeCakeBuilder -nointeraction" );
+            SetSequence( codeCakeJob, "tags", new YamlValue( "windows" ) );
+            SetSequence( codeCakeJob, "script",
+                new YamlValue( "dotnet run --project CodeCakeBuilder -nointeraction" ),
+                new YamlMapping()
+                {
+                    ["paths"] = new YamlSequence()
+                    {
+                        new YamlValue(@"'**\*.log'"),
+                        new YamlValue(@"'**\*.trx'"),
+                        new YamlValue(@"'**\Tests\**\TestResult*.xml'"),
+                        new YamlValue(@"'**Tests\**\Logs\**\*'"),
+                    },
+                    ["when"] = new YamlValue("always"),
+                    ["expire_in"] = new YamlValue("6 month")
+                }
+            );
             CreateOrUpdate( m, YamlMappingToString( m ) );
         }
 

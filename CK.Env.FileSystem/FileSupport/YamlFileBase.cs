@@ -75,10 +75,25 @@ namespace CK.Env
             return kv;
         }
 
-        protected static YamlMapping EnsureSequence( YamlMapping m, string key, params string[] values )
+        protected static YamlSequence EnsureSequenceContent(YamlSequence s)
+        {
+            //s.Add(new YamlElement() )
+            return s;
+        }
+
+        protected static YamlMapping EnsureSequence(YamlMapping m, string key)
+        {
+            if(m[key] == null)
+            {
+                m[key] = new YamlSequence();
+            }
+            return m;
+        }
+
+        protected static YamlMapping SetSequence( YamlMapping m, string key, params YamlElement[] values )
         {
             var seq = new YamlSequence();
-            foreach( var v in values ) seq.Add( new YamlValue( v ) );
+            seq.AddRange( values );
             m[key] = seq;
             return m;
         }
