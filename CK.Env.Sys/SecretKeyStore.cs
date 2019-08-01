@@ -40,7 +40,7 @@ namespace CK.Env
                 for( int i = 0; i <= max; i++ )
                 {
                     var s = new SecretKeyInfo( _data[max - i], store._keyInfos );
-                    store._orderedInfos.Add( s );
+                    store._orderedInfos.Insert(0, s );
                     store._keyInfos.Add( s.Name, s );
                 }
             }
@@ -214,12 +214,25 @@ namespace CK.Env
         public string GetSecretKey( IActivityMonitor m, string name, bool throwOnUnavailable )
         {
             if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentException( nameof( name ) );
-            if( !_keyInfos.TryGetValue( name, out var info ) )
+            if( !_keyInfos.TryGetValue( name, out SecretKeyInfo keyInfo ) )
             {
                 throw new InvalidOperationException( $"Secret '{name}' must be declared before any use of it." );
             }
-            if( !info.IsSecretAvailable && throwOnUnavailable ) throw new Exception( info.ToString() );
-            return info.Secret;
+            if( !keyInfo.IsSecretAvailable && throwOnUnavailable )
+            {
+                string exceptionInfo = keyInfo.ToString();
+                if( keyInfo.SuperKey != null )
+                {
+                    var k = keyInfo.SuperKey;
+                    do
+                    {
+                        exceptionInfo += "\nOr better: " + k.ToString();
+                        k = k.SuperKey;
+                    } while( k != null );
+                }
+                throw new Exception( exceptionInfo );
+            }
+            return keyInfo.Secret;
         }
 
 

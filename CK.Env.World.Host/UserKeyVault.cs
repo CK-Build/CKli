@@ -13,7 +13,7 @@ namespace CK.Env
     public sealed class UserKeyVault : IDisposable
     {
         readonly SecretKeyStore _store;
-        readonly Dictionary<string,string> _vaultContent;
+        readonly Dictionary<string, string> _vaultContent;
         string _passPhrase;
 
         public UserKeyVault( NormalizedPath userHostPath )
@@ -42,7 +42,7 @@ namespace CK.Env
         /// Gets the actual key store.
         /// </summary>
         public SecretKeyStore KeyStore => _store;
-        
+
         /// <summary>
         /// Gets the key vault file path.
         /// </summary>
@@ -78,6 +78,10 @@ namespace CK.Env
                 && autoSave
                 && IsKeyVaultOpened )
             {
+                if( string.IsNullOrEmpty( secret ) )
+                {
+                    _vaultContent.Remove( key );
+                }
                 DoSaveKeyVault( m );
             }
         }
