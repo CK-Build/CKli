@@ -113,7 +113,7 @@ namespace CK.Core
         /// </summary>
         /// <param name="other">The other artifact.</param>
         /// <returns>True when equals, false otherwise.</returns>
-        public bool Equals( Artifact other ) => Type == other.Type && Name == other.Name;
+        public bool Equals( Artifact other ) => Type == other.Type &&  Name.Equals(other.Name, StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
         /// Overridden to call <see cref="Equals(Artifact)"/>.
@@ -126,7 +126,7 @@ namespace CK.Core
         /// Overrsidden to combine <see cref="Type"/> and <see cref="Name"/>.
         /// </summary>
         /// <returns>The hash code.</returns>
-        public override int GetHashCode() => Type.GetHashCode() ^ Name.GetHashCode();
+        public override int GetHashCode() => Type.GetHashCode() ^ StringComparer.OrdinalIgnoreCase.GetHashCode(Name);
 
         /// <summary>
         /// Implements == operator.

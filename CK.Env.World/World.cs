@@ -463,7 +463,9 @@ namespace CK.Env
                         if( externalVersionDisplay.Length > 0 ) externalVersionDisplay = " <= " + externalVersionDisplay;
                         Console.Write( $"    |" );
                         Console.Write( byName.Key.Name );
+                        Console.ForegroundColor = ConsoleColor.Green;
                         Console.WriteLine( externalVersionDisplay );
+                        Console.ForegroundColor = stdForeColor;
                         if( byVersion.Count() > 1 ) Console.ForegroundColor = ConsoleColor.DarkYellow;
                         if( compact )
                         {
