@@ -160,9 +160,9 @@ namespace CK.Env
                     }
                     _root = null;
                 }
+                _command.UnregisterAll( keepFilter: _existingCommands.Contains );
                 if( CurrentWorld != null )
                 {
-                    _command.UnregisterAll( keepFilter: _existingCommands.Contains );
                     CurrentWorld = null;
                 }
                 _fs.Dispose();
