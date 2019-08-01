@@ -305,18 +305,16 @@ namespace CK.Env
         (bool Success, bool ReloadNeeded) DoPull( IActivityMonitor m, bool alreadyReloadNeeded, MergeFileFavor mergeFileFavor )
         {
             var merger = Git.Config.BuildSignature( DateTimeOffset.Now ) ?? new Signature( "CKli", "none", DateTimeOffset.Now );
-            if( Git.Head.TrackedBranch.Tip == null )
+            if(Git.Branches.Count() == 1 && Git.Branches.Single().TrackedBranch?.Tip == null)
             {
-                m.Warn( "This branch has no tracking branch. Skipping pull." );
-                return (false, false);
+                //The remote repository is not initialized and have 0 commits.
+                //We can't pull since there is only 1 branch, and this branch is local.
+                Debug.Assert( !Git.Branches.Single().IsRemote );
+                Debug.Assert( Git.Branches.Single().FriendlyName == "master" );
+                return (true, false);
             }
             var result = Commands.Pull( Git, merger, new PullOptions
             {
-                FetchOptions = new FetchOptions
-                {
-                    TagFetchMode = TagFetchMode.All,
-                    CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m )
-                },
                 MergeOptions = new MergeOptions
                 {
                     MergeFileFavor = mergeFileFavor,
@@ -592,7 +590,7 @@ namespace CK.Env
             GitRepositoryKey git,
             NormalizedPath workingFolder,
             bool ensureHooks,
-            string branchName = null)
+            string branchName = null )
         {
             using( m.OpenTrace( $"Ensuring working folder '{workingFolder}' on '{git.OriginUrl}'." ) )
             {
@@ -603,11 +601,21 @@ namespace CK.Env
                     {
                         using( m.OpenInfo( $"Checking out '{workingFolder}' from '{git.OriginUrl}' on {branchName}." ) )
                         {
-                            Repository.Clone( git.OriginUrl.ToString(), workingFolder, new CloneOptions()
+                            try
                             {
-                                CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, git ),
-                                Checkout = true
-                            } );
+                                Repository.Clone( git.OriginUrl.ToString(), workingFolder, new CloneOptions()
+                                {
+                                    CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, git ),
+                                    Checkout = true
+                                } );
+                            }
+                            catch
+                            {
+                                m.Error( "Git clone failed. Deleting the repository." );
+                                Directory.Delete( workingFolder );
+                                throw;
+                            }
+
                         }
                     }
                     else if( !Repository.IsValid( gitFolderPath ) )
