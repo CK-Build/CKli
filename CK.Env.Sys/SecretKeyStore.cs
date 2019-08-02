@@ -230,11 +230,18 @@ namespace CK.Env
                         k = k.SuperKey;
                     } while( k != null );
                 }
-                throw new Exception( exceptionInfo );
+                throw new MissingRequiredSecretException( exceptionInfo );
             }
             return keyInfo.Secret;
         }
 
 
+    }
+
+    public class MissingRequiredSecretException : Exception
+    {
+        public MissingRequiredSecretException(string message) : base(message)
+        {
+        }
     }
 }

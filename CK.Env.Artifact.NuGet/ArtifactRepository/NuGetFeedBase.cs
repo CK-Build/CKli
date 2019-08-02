@@ -105,6 +105,10 @@ namespace CK.Env.NuGet
                 if( meta == null ) meta = await _meta;
                 return await f( meta, logger );
             }
+            catch(MissingRequiredSecretException)
+            {
+                throw;//It's useless to retry in this case
+            } 
             catch( Exception ex ) 
             {
                 if( !retry )

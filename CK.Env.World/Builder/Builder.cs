@@ -67,7 +67,7 @@ namespace CK.Env
                 }
                 else
                 {
-                    // This is not really optimal but it is required only for DeveloPbuilder
+                    // This is not really optimal but it is required only for DevelopBuilder
                     // (where version numbers are not fully known upfront AND commit may not be
                     // amendable (when on a fresh checkout).
                     // We may have resolved and applied the buildUpgrades in a tight dedicated loop
