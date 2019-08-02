@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using CK.Core;
@@ -33,13 +34,13 @@ namespace CK.Env
 
         protected override (SVersion Version, bool MustBuild) PrepareBuild( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades )
         {
-            if( !driver.UpdatePackageDependencies( m, upgrades ) ) return (null,false);
+            if( !driver.UpdatePackageDependencies( m, upgrades ) ) return (null, false);
 
             // Note that a commit is not necessarily created here if the dependencies have not changed!
             // (When working folder is up-to-date.)
-            var upText = upgrades.Select( u => u.PackageUpdate.ToString() ).Concatenate();
-            var msg = $"CI build: Upgrading dependencies: {upText}.";
-            if( !driver.GitRepository.Commit( m, msg ) ) return (null,false);
+            var upText = upgrades.Select( u => u.PackageUpdate.ToString() ).Concatenate( Environment.NewLine );
+            var msg = $"CI build: Upgrading dependencies:{Environment.NewLine}{Environment.NewLine}{upText}.";
+            if( !driver.GitRepository.Commit( m, msg ) ) return (null, false);
             _commits[s.Index] = driver.GitRepository.Head.CommitSha;
             return (driver.GitRepository.GetCommitVersionInfo( m ).AssemblyBuildInfo.NuGetVersion, true);
         }

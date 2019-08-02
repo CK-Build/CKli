@@ -148,7 +148,7 @@ namespace CK.Env.NPM
                 {
                     Directory.CreateDirectory( tempDirectory );
                     m.Debug( $"Creating temp directory {tempDirectory}." );
-                    using( m.OpenInfo( "Creating .npmrc. with content:" ) )
+                    using( m.OpenInfo( "Creating .npmrc with content:" ) )
                     using( StreamWriter w = File.CreateText( Path.Combine( tempDirectory, ".npmrc" ) ) )
                     {
                         string uriString = RegistryUri.ToString();
@@ -166,7 +166,7 @@ namespace CK.Env.NPM
                             w.WriteLine( $"{uriConfig}:always-auth=true" );
                             m.Debug( $"{uriConfig}:always-auth=true" );
 
-                            w.WriteLine( $"{uriConfig}:_password={_password}" );
+                            w.WriteLine( $"{uriConfig}:_password={Convert.ToBase64String( Encoding.UTF8.GetBytes( _password ) )}" );
                             m.Debug( $"{uriConfig}:_password=[REDACTED]" );
 
                             w.WriteLine( $"{uriConfig}:username={_username}" );
@@ -193,7 +193,7 @@ namespace CK.Env.NPM
                     {
                         throw new PlatformNotSupportedException( "Linux not supported yet." );
                     }
-                    return ProcessRunner.Run( m, tempDirectory, "cmd.exe", $"/C npm publish \"{tarPath}\" --access {access} {distTagArg}", LogLevel.Trace );
+                    return ProcessRunner.Run( m, tempDirectory, "cmd.exe", $"/C npm publish \"{tarPath}\" --access {access} {distTagArg}", LogLevel.Info );
                 }
                 catch( Exception ex )
                 {
@@ -263,8 +263,7 @@ namespace CK.Env.NPM
         {
             if( string.IsNullOrEmpty( _username ) ) throw new InvalidOperationException( "Azure username must not be empty." );
             var oldAuth = _authHeader;
-            string realPassword = Encoding.UTF8.GetString( Convert.FromBase64String( _password ) );
-            string basic = Convert.ToBase64String( Encoding.ASCII.GetBytes( $"{_username}:{realPassword}" ) );
+            string basic = Convert.ToBase64String( Encoding.ASCII.GetBytes( $"{_username}:{_password}" ) );
             _authHeader = new AuthenticationHeaderValue( "Basic", basic );
             (string organization, string feedId) = GetAzureInfoFromUri();
             string url = $"https://pkgs.dev.azure.com/" +
