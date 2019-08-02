@@ -23,33 +23,21 @@ namespace CK.Env
             if( _root == null && (_currentText = TextContent) != null )
             {
                 _root = JObject.Parse( _currentText );
-                _root.CollectionChanged += OnRootChanged;
-                _root.PropertyChanged += OnRootChanged;
             }
             return _root;
-        }
-
-        void OnRootChanged( object sender, EventArgs e )
-        {
-            _currentText = null;
         }
 
         void ClearRoot()
         {
             if( _root != null )
             {
-                _root.CollectionChanged -= OnRootChanged;
-                _root.PropertyChanged -= OnRootChanged;
                 _root = null;
             }
         }
 
         string GetCurrentText()
         {
-            if( _currentText == null && GetRoot() != null )
-            {
-                _currentText = _root.ToString( Newtonsoft.Json.Formatting.Indented );
-            }
+            _currentText = GetRoot().ToString( Newtonsoft.Json.Formatting.Indented );
             return _currentText;
         }
 
@@ -67,11 +55,7 @@ namespace CK.Env
                 if( value != _root )
                 {
                     ClearRoot();
-                    if( (_root = value) != null )
-                    {
-                        _root.CollectionChanged += OnRootChanged;
-                        _root.PropertyChanged += OnRootChanged;
-                    }
+                    _root = value;
                 }
             }
         }
@@ -97,7 +81,7 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="forceSave">True to ignore <see cref="IsDirty"/> and always save the file.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool Save( IActivityMonitor m, bool forceSave = false )
+        public virtual bool Save( IActivityMonitor m, bool forceSave = false )
         {
             if( !IsDirty && !forceSave ) return true;
             return CreateOrUpdate( m, GetCurrentText(), forceSave );

@@ -4,6 +4,7 @@ using CSemVer;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace CK.Env.Plugin
@@ -14,11 +15,12 @@ namespace CK.Env.Plugin
     public class PackageJsonFile : JsonFileBase
     {
         readonly List<NPMDep> _deps;
-
+        readonly List<NPMDep> _unsavedDeps;
         internal PackageJsonFile( NPMProject p )
             : base( p.Driver.GitFolder.FileSystem, p.FullPath.AppendPart( "package.json" ) )
         {
             _deps = new List<NPMDep>();
+            _unsavedDeps = new List<NPMDep>();
         }
 
         /// <summary>
@@ -85,16 +87,36 @@ namespace CK.Env.Plugin
         {
             var idx = _deps.FindIndex( dep => dep.Name == name );
             if( idx < 0 ) throw new ArgumentException( $"Dependency '{name}' not found.", nameof( name ) );
-            var dOrig = _deps[idx];
+            NPMDep dOrig = _deps[idx];
             if( dOrig.MinVersion != v )
             {
-                m.Info( $"Updated dependency {dOrig.ToString()} to version {v}." );
                 var d = new NPMDep( dOrig.Name, dOrig.Kind, v );
+                m.Info( $"Updated dependency {dOrig.ToString()} to version {d.RawDep}." );
                 Root[d.Kind.ToPackageJsonKey()][d.Name] = d.RawDep;
+                _unsavedDeps.Add( d );
                 _deps[idx] = d;
                 return true;
             }
             return false;
+        }
+
+        public override bool Save( IActivityMonitor m, bool forceSave = false )
+        {
+            if( _unsavedDeps.Any() )
+            {
+                if(!NpmInstall( m, _unsavedDeps.Select( p => (p.Name, p.MinVersion.ToNuGetPackageString()) ).ToArray() ) )
+                {
+                    m.Error( "Failed to npm install the dependencies. The package-lock.json will be wrong. This need manual fix." );
+                }
+            }
+            return base.Save( m, forceSave );
+        }
+
+        bool NpmInstall( IActivityMonitor m, (string packageName, string version)[] packages )
+        {
+            return ProcessRunner.Run(
+                m, FileSystem.GetFileInfo( FilePath.RemoveLastPart() ).PhysicalPath, "cmd.exe",
+                "/C npm install " + string.Join( ' ', packages.Select( p => $"{p.packageName}@{p.version}" ).ToArray() ) );
         }
 
         /// <summary>
@@ -163,9 +185,9 @@ namespace CK.Env.Plugin
                 }
                 else return (null, NPMVersionDependencyType.LocalPath);
             }
-            else if( value.IndexOf("://") > 0 )
+            else if( value.IndexOf( "://" ) > 0 )
             {
-                
+
                 if( value.StartsWith( "http://" ) || value.StartsWith( "https://" ) ) return (null, NPMVersionDependencyType.UrlTar);
                 if( value.StartsWith( "git://" )
                     || value.StartsWith( "git+ssh://" )

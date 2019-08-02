@@ -315,6 +315,11 @@ namespace CK.Env
             }
             var result = Commands.Pull( Git, merger, new PullOptions
             {
+                FetchOptions = new FetchOptions
+                {
+                    TagFetchMode = TagFetchMode.All,
+                    CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m )
+                },
                 MergeOptions = new MergeOptions
                 {
                     MergeFileFavor = mergeFileFavor,

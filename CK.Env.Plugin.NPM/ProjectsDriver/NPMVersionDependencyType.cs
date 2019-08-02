@@ -49,7 +49,7 @@ namespace CK.Env.Plugin
         MinVersion,
 
         /// <summary>
-        /// Any other version specification (range, exact, caret, tilde, etc.).
+        /// Any other version specification.
         /// </summary>
         OtherVersionSpec
     }

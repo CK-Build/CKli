@@ -503,7 +503,9 @@ namespace CK.Env
             SVersion version;
             var externalReferences = worldCtx.DependencyContext.Analyzer.ExternalReferences;
             List<PackageReference> artifactUses = externalReferences
-                    .Where( p => p.Target.Artifact.TypedName == packageName || p.Target.Artifact.Name == packageName )
+                    .Where( p =>
+                        p.Target.Artifact.TypedName.Equals(packageName, StringComparison.OrdinalIgnoreCase)
+                        || p.Target.Artifact.Name.Equals(packageName, StringComparison.OrdinalIgnoreCase))
                     .ToList();
             if( artifactUses.Count == 0 )
             {
