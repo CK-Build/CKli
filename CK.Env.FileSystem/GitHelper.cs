@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Text;
+using CSemVer;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
@@ -305,7 +306,7 @@ namespace CK.Env
         (bool Success, bool ReloadNeeded) DoPull( IActivityMonitor m, bool alreadyReloadNeeded, MergeFileFavor mergeFileFavor )
         {
             var merger = Git.Config.BuildSignature( DateTimeOffset.Now ) ?? new Signature( "CKli", "none", DateTimeOffset.Now );
-            if(Git.Branches.Count() == 1 && Git.Branches.Single().TrackedBranch?.Tip == null)
+            if( Git.Branches.Count() == 1 && Git.Branches.Single().TrackedBranch?.Tip == null )
             {
                 //The remote repository is not initialized and have 0 commits.
                 //We can't pull since there is only 1 branch, and this branch is local.
@@ -505,7 +506,7 @@ namespace CK.Env
         /// the current branch is tracked and is ahead of the remote branch.
         /// </summary>
         /// <returns></returns>
-        public bool CanPush => RepositoryKey.SecretKeyStore.IsSecretKeyAvailable( RepositoryKey.WritePATKeyName ) == true
+        public bool CanPush => RepositoryKey.WritePATKeyName == null || RepositoryKey.SecretKeyStore.IsSecretKeyAvailable( RepositoryKey.WritePATKeyName ) == true
                                && (Git.Head.TrackingDetails.AheadBy ?? 0) > 0;
 
         /// <summary>
@@ -689,25 +690,27 @@ namespace CK.Env
 
         static void EnsureHooks( IActivityMonitor m, NormalizedPath root )
         {
-            const string prepush = "pre_push";
+            const string prepush = "pre-push";
             EnsureHookDispatcher( m, root, prepush );
             EnsureHookFile( m, root, prepush, "check_not_local_branch", _hook_check_not_local );
             EnsureHookFile( m, root, prepush, "check_no_commit_nopush", _hook_check_no_commit_nopush );
         }
 
 
-        static bool CheckHookDispatcherVersion( string scriptString )
+        static SVersion CheckHookDispatcherVersion( string scriptString )
         {
             string[] lines = scriptString.Split( '\n' );
-            if( lines.Length <= 2 ) return false;
-            if( lines[1].Contains( "#script-dispatcher-0.0.0" ) ) return true;
-            if( lines[1].Contains( "script-dispatcher" ) )
+            if( lines.Length <= 2 ) return null;
+            if( !lines[1].Contains( "script-dispatcher-" ) ) return null;
+            if( !SVersion.TryParse(
+                lines[1].Replace( "#script-dispatcher-", "" )
+                .Trim(),
+                out SVersion version ) )
             {
-                throw new NotImplementedException( "Upgrade version of hook dispatcher is not implemented yet." );
+                throw new InvalidDataException( "Git hook script version badly forged" );
             }
-            return false;
+            return version;
         }
-
         static NormalizedPath GetHooksDir( NormalizedPath root ) => root.AppendPart( ".git" ).AppendPart( "hooks" );
 
         static NormalizedPath GetHookPath( NormalizedPath root, string hookName ) => GetHooksDir( root ).AppendPart( hookName );
@@ -722,26 +725,23 @@ namespace CK.Env
             Directory.CreateDirectory( multiHookDirectory );
             if( hookPresent )
             {
-                string currentScript = File.ReadAllText( hookPath );
-                if( currentScript == _hook_check_not_local )
+                string installedScript = File.ReadAllText( hookPath );
+                SVersion installedScriptVersion = CheckHookDispatcherVersion( installedScript );
+                //replacing the hook dispatcher on a new version is not implemented yet, we just save the script to not destroy user hooks.
+                if( installedScriptVersion == null )
                 {
-                    m.Info( "Detected our old prepush script. It's not an userscript, we can remove it." );
-                    File.Delete( hookPath );
+                    File.Move( hookPath, Path.Combine( multiHookDirectory, hookName ) );
+                    m.Info( $"Git hook {hookName} was not the dispatcher. Moved user hook to {multiHookDirectory}." );
                     hookPresent = false;
                 }
                 else
                 {
-                    //replacing the hook dispatcher on a new version is not implemented yet, we just save the script to not destroy user hooks.
-                    if( !CheckHookDispatcherVersion( currentScript ) )
+                    SVersion currentScriptVersion = CheckHookDispatcherVersion( HookPrePushScript(hookName) );
+                    if(currentScriptVersion > installedScriptVersion)
                     {
-                        File.Move( hookPath, Path.Combine( multiHookDirectory, hookName ) );
-                        m.Info( $"Git hook {hookName} was not the dispatcher. Moved user hook to {multiHookDirectory}." );
-                        hookPresent = false;
+                        m.Info( $"Git hook {hookName} was an old dispatched. Removing it." );
                     }
-                    else
-                    {
-                        m.Trace( $"The current {hookName} hook is our dispatcher." );
-                    }
+                    m.Trace( $"The current {hookName} hook is our dispatcher." );
                 }
             }
             // Now hook file may not exist event if it did.
@@ -818,11 +818,11 @@ do
 	fi
 done
 echo ""No commit found with NOPUSH. Push can continue.""
-exit 1
+exit 0
 ";
         static string HookPrePushScript( string hookName ) =>
 $@"#!/bin/sh
-#script-dispatcher-0.0.0
+#script-dispatcher-0.0.1
 # Hook that execute all scripts in a directory
 
 remote=""$1"";
@@ -835,16 +835,16 @@ i=0
 for scriptFile in ""$search_path""/*; do
   i=$((i+=1))
   echo ""Running script $scriptFile"";
-  exitCode=exec ""$scriptFile"" ""$@"" || break;  # execute successfully or break
-  # Or more explicitly: if this execution fails, then stop the `for`:
-   if ! bash ""$scriptFile""; then
+  $scriptFile $@;  # execute successfully or break
+    # Or more explicitly: if this execution fails, then stop the `for`:
+   if [ $? -ne 0 ] ; then
    >&2 echo ""Script $scriptFile failed. Aborting push."";
-   exit $exitCode;
+   exit $?;
    break;
    fi
 done
 echo ""Executed successfully $i scripts.""
-exit 1
+exit 0
 ";
 
         #endregion GitHooks

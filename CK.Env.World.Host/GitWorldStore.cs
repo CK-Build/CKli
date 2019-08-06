@@ -259,6 +259,7 @@ namespace CK.Env
                                    .Replace( ".git", "" )
                                    .Replace( "_git", "" )
                                    .Replace( '/', '_' )
+                                   .Replace( ':', '_')
                                    .Replace( "__", "_" )
                                    .Trim( '_' )
                                    .ToLowerInvariant();
