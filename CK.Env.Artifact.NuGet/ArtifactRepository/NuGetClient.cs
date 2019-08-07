@@ -293,7 +293,7 @@ namespace CK.Env.NuGet
             var creds = xCreds != null ? new SimpleCredentials( r.WithElement( xCreds ) ) : null;
 
             SecretKeyInfo secretKeyed = null;
-            if( creds.IsSecretKeyName )
+            if( creds?.IsSecretKeyName == true )
             {
                 secretKeyed = SecretKeyStore.DeclareSecretKey( creds.PasswordOrSecretKeyName, current => current?.Description
                                     ?? $"Required for NuGet.config file to retrieve packages from '{name}' feed." );

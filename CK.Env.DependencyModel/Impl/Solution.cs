@@ -100,7 +100,7 @@ namespace CK.Env.DependencyModel
                 {
                     if( value != null )
                     {
-                        if( value.Solution != this ) throw new ArgumentException( "Solution mismatch.", nameof(value) );
+                        if( value.Solution != this ) throw new ArgumentException( "Solution mismatch.", nameof( value ) );
                         if( value.IsPublished || value.IsTestProject )
                         {
                             throw new InvalidOperationException( $"Project {ToString()} must not be Published nor be a Test project to be the Solution's BuildProject." );
@@ -226,6 +226,7 @@ namespace CK.Env.DependencyModel
         /// <param name="newOne">New artifact source.</param>
         public void AddArtifactSource( IArtifactFeed newOne )
         {
+            if( newOne == null ) throw new ArgumentNullException( nameof( newOne ) );
             if( _artifactSources.Contains( newOne ) ) throw new InvalidOperationException( $"Artifact source already registered." );
             _artifactSources.Add( newOne );
             OnArtifactSourceAdded( newOne );
