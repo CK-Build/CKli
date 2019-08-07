@@ -163,7 +163,11 @@ namespace CK.Env.Plugin
                 foreach( var sourceName in _solutionSpec.ArtifactSources )
                 {
                     var f = _artifactCenter.Feeds.FirstOrDefault( feed => feed.TypedName == sourceName );
-                    if( f == null ) m.Error( $"Unable to find the feed named '{sourceName}' (available sources: {_artifactCenter.Feeds.Select( feed => feed.TypedName ).Concatenate()})." );
+                    if( f == null )
+                    {
+                        m.Error( $"Unable to find the feed named '{sourceName}' (available sources: {_artifactCenter.Feeds.Select( feed => feed.TypedName ).Concatenate()})." );
+                        continue;
+                    }
                     _solution.AddArtifactSource( f );
                 }
             }
@@ -270,12 +274,12 @@ namespace CK.Env.Plugin
                 {
                     bool notPublished = !spec.NotPublishedProjects.Contains( project.SolutionRelativeFolderPath );
                     bool notRootDirectory = project.SolutionRelativeFolderPath.Parts.Count == 1;
-                    
+
 
 
                     bool ignoreNotRoot = spec.PublishProjectInDirectories && !project.IsTestProject;
                     // We bindly follow the <IsPackable> element. Only if it's not defined (ie. it's null) we must "think".
-                    mustPublish = msProject.IsPackable 
+                    mustPublish = msProject.IsPackable
                                     ?? (notPublished &&
                                             (notRootDirectory || ignoreNotRoot || (project.IsTestProject && spec.TestProjectsArePublished)));
                 }

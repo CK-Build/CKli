@@ -147,6 +147,7 @@ namespace CK.Env.Plugin
             section.SetContent(
                 XElement.Parse(
 $@"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
+  <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
   <Deterministic>true</Deterministic>
   <PathMap>'$(SolutionDir)'=C:\CKli-World\{GitFolder.SubPath.Path.Replace( '/', '\\' )}</PathMap>
 </PropertyGroup>" ) );
@@ -186,13 +187,17 @@ $@"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
 
         bool EnsureSourceLink( IActivityMonitor m )
         {
-            var linkNames = new string[] { null, "GitHub", "GitLab", "Vsts.Git", "Bitbucket.Git" };
+            var linkNames = new string[] { null, "GitHub", "GitLab", "Vsts.Git", "Bitbucket.Git", "FileSystem" };
 
             var linkName = linkNames[(int)GitFolder.KnownGitProvider];
             if( linkName == null )
             {
                 m.Error( $"SourceLink is not supported on {GitFolder} ({GitFolder.KnownGitProvider})." );
                 return false;
+            } else if(linkName == "FileSystem")
+            {
+                m.Info( "We didn't implemented the sourcelink configuration on for a git hosted on the filesystem." );
+                return true;
             }
             var section = XCommentSection.FindOrCreate( Document.Root, "SourceLink", true );
             section.StartComment = ": is enabled only for Cake build. ";

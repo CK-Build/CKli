@@ -146,7 +146,7 @@ namespace CK.Env
             return DoGetBranch( m, Git, branchName, logErrorMissingLocalAndRemote, SubPath );
         }
 
-        static Branch DoGetBranch( IActivityMonitor m, Repository r, string branchName, bool logErrorMissingLocalAndRemote, NormalizedPath subPath )
+        static Branch DoGetBranch( IActivityMonitor m, Repository r, string branchName, bool logErrorMissingLocalAndRemote, string repoDisplayName )
         {
             var b = r.Branches[branchName];
             if( b == null )
@@ -155,12 +155,12 @@ namespace CK.Env
                 var remote = r.Branches[remoteName];
                 if( remote == null )
                 {
-                    var msg = $"Repository '{subPath}': Both local '{branchName}' and remote '{remoteName}' not found.";
+                    var msg = $"Repository '{repoDisplayName}': Both local '{branchName}' and remote '{remoteName}' not found.";
                     if( logErrorMissingLocalAndRemote ) m.Error( msg );
                     else m.Warn( msg );
                     return null;
                 }
-                m.Info( $"Creating local branch on remote '{remoteName}' in repository '{subPath}'." );
+                m.Info( $"Creating local branch on remote '{remoteName}' in repository '{repoDisplayName}'." );
                 b = r.Branches.Add( branchName, remote.Tip );
                 b = r.Branches.Update( b, u => u.TrackedBranch = remote.CanonicalName );
             }
@@ -177,16 +177,23 @@ namespace CK.Env
             DoEnsureBranch( m, Git, branchName, noWarnOnCreate, SubPath );
         }
 
-        static void DoEnsureBranch( IActivityMonitor m, Repository r, string branchName, bool noWarnOnCreate, NormalizedPath subPath )
+        /// <summary>
+        /// Ensure that a branch exist.
+        /// </summary>
+        /// <param name="m">The monitor.</param>
+        /// <param name="r">The repository.</param>
+        /// <param name="branchName">The name of the branch.</param>
+        /// <param name="noWarnOnCreate">Log as warning if the branch is created.</param>
+        /// <param name="repoDisplayName">Name of the repo displayed in the logs.</param>
+        static void DoEnsureBranch( IActivityMonitor m, Repository r, string branchName, bool noWarnOnCreate, string repoDisplayName )
         {
             if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
-            var b = DoGetBranch( m, r, branchName, logErrorMissingLocalAndRemote: false, subPath: subPath );
+            var b = DoGetBranch( m, r, branchName, logErrorMissingLocalAndRemote: false, repoDisplayName: repoDisplayName );
             if( b == null )
             {
                 m.Log( noWarnOnCreate ? Core.LogLevel.Info : Core.LogLevel.Warn, $"Branch '{branchName}' does not exist. Creating local branch." ); ;
-                b = r.CreateBranch( branchName );
+                r.CreateBranch( branchName );
             }
-            Commands.Checkout( r, b );
         }
 
         /// <summary>
@@ -731,20 +738,24 @@ namespace CK.Env
                 if( installedScriptVersion == null )
                 {
                     File.Move( hookPath, Path.Combine( multiHookDirectory, hookName ) );
-                    m.Info( $"Git hook {hookName} was not the dispatcher. Moved user hook to {multiHookDirectory}." );
-                    hookPresent = false;
+                    m.Info( $"Git hook {hookName} was not our dispatcher. Moved user hook to {multiHookDirectory}." );
                 }
                 else
                 {
                     SVersion currentScriptVersion = CheckHookDispatcherVersion( HookPrePushScript(hookName) );
                     if(currentScriptVersion > installedScriptVersion)
                     {
-                        m.Info( $"Git hook {hookName} was an old dispatched. Removing it." );
+                        m.Info( $"Git hook {hookName} was an old dispatcher. Removing it." );
+                        File.Delete( hookPath );
                     }
-                    m.Trace( $"The current {hookName} hook is our dispatcher." );
+                    else
+                    {
+                        m.Trace( $"The current {hookName} hook is our dispatcher." );
+                    }
                 }
             }
             // Now hook file may not exist event if it did.
+            hookPresent = File.Exists( hookPath );
             if( !hookPresent )
             {
                 File.WriteAllText( hookPath, HookPrePushScript( hookName ) );
@@ -822,7 +833,7 @@ exit 0
 ";
         static string HookPrePushScript( string hookName ) =>
 $@"#!/bin/sh
-#script-dispatcher-0.0.1
+#script-dispatcher-0.0.2
 # Hook that execute all scripts in a directory
 
 remote=""$1"";
@@ -832,15 +843,16 @@ search_dir=""{hookName}_scripts""
 
 search_path=""$hook_directory/$search_dir""
 i=0
+stdin=`cat`
 for scriptFile in ""$search_path""/*; do
   i=$((i+=1))
   echo ""Running script $scriptFile"";
-  $scriptFile $@;  # execute successfully or break
+  $scriptFile $@ <<< ""$stdin"";  # execute successfully or break
     # Or more explicitly: if this execution fails, then stop the `for`:
-   if [ $? -ne 0 ] ; then
-   >&2 echo ""Script $scriptFile failed. Aborting push."";
-   exit $?;
-   break;
+   exitCode=$?
+   if [ $exitCode -ne 0 ] ; then
+   echo >&2 ""Script $scriptFile exit code is $exitCode. Aborting push."";
+   exit $exitCode;
    fi
 done
 echo ""Executed successfully $i scripts.""

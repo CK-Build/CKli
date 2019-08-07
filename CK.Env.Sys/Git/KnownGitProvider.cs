@@ -31,7 +31,12 @@ namespace CK.Env
         /// <summary>
         /// BitBucket site.
         /// </summary>
-        Bitbucket = 4
+        Bitbucket = 4,
+
+        /// <summary>
+        /// A filesystem (file:// uri).
+        /// </summary>
+        FileSystem = 5
     }
 
 }

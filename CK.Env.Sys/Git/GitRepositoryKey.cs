@@ -30,7 +30,7 @@ namespace CK.Env
             else if( url.Authority.Equals( "gitlab.com", StringComparison.OrdinalIgnoreCase ) ) KnownGitProvider = KnownGitProvider.GitLab;
             else if( url.Authority.Equals( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) ) KnownGitProvider = KnownGitProvider.AzureDevOps;
             else if( url.Authority.Equals( "bitbucket.org", StringComparison.OrdinalIgnoreCase ) ) KnownGitProvider = KnownGitProvider.Bitbucket;
-
+            else if( url.Scheme == Uri.UriSchemeFile ) KnownGitProvider = KnownGitProvider.FileSystem;
             if( KnownGitProvider != KnownGitProvider.Unknown )
             {
                 string GetReadPATDescription( SecretKeyInfo current )
