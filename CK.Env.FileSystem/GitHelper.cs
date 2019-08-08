@@ -178,22 +178,24 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Ensure that a branch exist.
+        /// Ensure that a branch exists.
         /// </summary>
         /// <param name="m">The monitor.</param>
         /// <param name="r">The repository.</param>
         /// <param name="branchName">The name of the branch.</param>
         /// <param name="noWarnOnCreate">Log as warning if the branch is created.</param>
         /// <param name="repoDisplayName">Name of the repo displayed in the logs.</param>
-        static void DoEnsureBranch( IActivityMonitor m, Repository r, string branchName, bool noWarnOnCreate, string repoDisplayName )
+        /// <returns>The Branch.</returns>
+        static Branch DoEnsureBranch( IActivityMonitor m, Repository r, string branchName, bool noWarnOnCreate, string repoDisplayName )
         {
             if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
             var b = DoGetBranch( m, r, branchName, logErrorMissingLocalAndRemote: false, repoDisplayName: repoDisplayName );
             if( b == null )
             {
                 m.Log( noWarnOnCreate ? Core.LogLevel.Info : Core.LogLevel.Warn, $"Branch '{branchName}' does not exist. Creating local branch." ); ;
-                r.CreateBranch( branchName );
+                b = r.CreateBranch( branchName );
             }
+            return b;
         }
 
         /// <summary>
@@ -652,9 +654,10 @@ namespace CK.Env
                         var committer = new Signature( "CKli", "none", date );
                         r.Commit( "Initial commit automatically created.", author, committer, new CommitOptions { AllowEmptyCommit = true } );
                     }
-                    if( r.Head?.FriendlyName != branchName )
+                    if( r.Head?.FriendlyName != branchName && branchName != null)
                     {
-                        DoEnsureBranch( m, r, branchName, false, workingFolder );
+                        Branch branch = DoEnsureBranch( m, r, branchName, false, workingFolder );
+                        Commands.Checkout( r, branch );
                     }
                     if( ensureHooks ) EnsureHooks( m, workingFolder );
                     m.CloseGroup( "Repository is checked out." );
