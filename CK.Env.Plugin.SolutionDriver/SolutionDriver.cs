@@ -624,8 +624,12 @@ namespace CK.Env.Plugin
 
             monitor.Info( $"Version to build: '{v}'." );
 
-            var missing = feed.GetMissing( monitor, solution.GeneratedArtifacts.Select( g => g.Artifact.WithVersion( v ) ) );
-            if( missing.Count == 0 )
+
+            var expectedArtifacts = solution.GeneratedArtifacts.Select( g => g.Artifact.WithVersion( v ) );
+            var missing = feed.GetMissing( monitor, expectedArtifacts );
+
+            bool buildRequired = missing.Count > 0 || !expectedArtifacts.Any();
+            if( !buildRequired )
             {
                 monitor.Info( $"All artifacts are already available in {feed.PhysicalPath.LastPart} with version {v}: {solution.GeneratedArtifacts.Select( a => a.Artifact.ToString() ).Concatenate()}." );
                 if( !withUnitTest )
@@ -638,6 +642,10 @@ namespace CK.Env.Plugin
                     monitor.Info( $"Solution settings: NoDotNetUnitTests is true. Build is skipped." );
                     return true;
                 }
+            }
+            else if( missing.Count == 0 )
+            {
+                monitor.Info( $"No artifacts have to be generated. Build is required." );
             }
             if( withUnitTest && !_solutionSpec.NoDotNetUnitTests ) buildType |= BuildType.WithUnitTests;
             if( withPushToRemote )
@@ -691,7 +699,7 @@ namespace CK.Env.Plugin
             }
             var ev = new BuildStartEventArgs(
                             monitor,
-                            missing.Count > 0,
+                            buildRequired,
                             solution,
                             v,
                             buildType,
