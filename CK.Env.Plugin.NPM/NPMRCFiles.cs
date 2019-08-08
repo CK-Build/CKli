@@ -134,8 +134,15 @@ namespace CK.Env.Plugin
                     EnsureLine( lines, scopeUrl, "username", p.Credentials.UserName );
                     EnsureLine( lines, scopeUrl, "always-auth", "true" );
                     string password = p.Credentials.IsSecretKeyName
-                                        ? _secretStore.GetSecretKey( m, p.Credentials.PasswordOrSecretKeyName, throwOnUnavailable: true )
+                                        ? _secretStore.GetSecretKey( m, p.Credentials.PasswordOrSecretKeyName, false )
                                         : p.Credentials.PasswordOrSecretKeyName;
+                    if( password == null )
+                    {
+                        if( p.Credentials.IsSecretKeyName )
+                            m.Warn( $"Secret '{p.Credentials.PasswordOrSecretKeyName}' is not known. Configuration for feed '{s.Name}' skipped." );
+                        else m.Warn( $"Empty feed password. Configuration for feed '{s.Name}' skipped." );
+                        continue;
+                    }
                     if( p.Url.IndexOf( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) >= 0 )
                     {
                         password = Convert.ToBase64String( Encoding.UTF8.GetBytes( password ) );
