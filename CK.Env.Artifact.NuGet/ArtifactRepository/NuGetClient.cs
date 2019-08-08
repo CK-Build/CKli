@@ -199,12 +199,12 @@ namespace CK.Env.NuGet
                 throw new NotSupportedException( "Should not be called in this scenario." );
             }
 
-            void IPackageSourceProvider.AddPackageSource( PackageSource source )
+            void IPackageSourceProvider.AddPackageSource(PackageSource source)
             {
                 throw new NotSupportedException( "Should not be called in this scenario." );
             }
 
-            void IPackageSourceProvider.UpdatePackageSource( PackageSource source, bool updateCredentials, bool updateEnabled )
+            void IPackageSourceProvider.UpdatePackageSource(PackageSource source, bool updateCredentials, bool updateEnabled)
             {
                 throw new NotSupportedException( "Should not be called in this scenario." );
             }
@@ -269,12 +269,7 @@ namespace CK.Env.NuGet
                     {
                         var name = r.HandleRequiredAttribute<string>( "Name" );
                         var url = r.HandleRequiredAttribute<string>( "Url" );
-                        if( !Uri.TryCreate( url, UriKind.Absolute, out Uri uri ) ) throw new InvalidOperationException( "The url is incorrectly formatted." );
-                        string secretKeyName = null;
-                        if( uri.Scheme != Uri.UriSchemeFile )
-                        {
-                            secretKeyName = r.HandleRequiredAttribute<string>( "SecretKeyName" );
-                        }
+                        var secretKeyName = r.HandleRequiredAttribute<string>( "SecretKeyName" );
                         result = new NuGetStandardRepository( this, url, name, qualityFilter, secretKeyName );
                         break;
                     }

@@ -146,11 +146,6 @@ namespace CK.Env.NuGet
         public async Task PushPackagesAsync( IActivityMonitor m, IEnumerable<LocalNuGetPackageFile> files, int timeoutSeconds = 20 )
         {
             string apiKey = ResolvePushAPIKey( m );
-            if( string.IsNullOrEmpty( apiKey ) )
-            {
-                m.Warn( $"Could not resolve API key. Push to '{UniqueRepositoryName}' is skipped." );
-                return;
-            }
             try
             {
                 await SafeCall( m, async ( meta, logger ) =>
