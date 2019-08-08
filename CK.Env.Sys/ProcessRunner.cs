@@ -36,7 +36,7 @@ namespace CK.Env
             var a = '"' + scriptFileName + '"';
             foreach( var arg in arguments )
             {
-                a += " " + arg; 
+                a += " " + arg;
             }
             return Run( m, workingDir, "Powershell.exe", a, stdErrorLevel, environmentVariables );
         }
@@ -71,7 +71,10 @@ namespace CK.Env
             };
             if( environmentVariables != null )
             {
-                foreach( var kv in environmentVariables ) cmdStartInfo.EnvironmentVariables.Add( kv.Item1, kv.Item2 );
+                foreach( (string key, string value) in environmentVariables )
+                {
+                    cmdStartInfo.EnvironmentVariables[key] = value;
+                }
             }
             cmdStartInfo.Arguments = arguments;
             using( m.OpenTrace( $"{fileName} {cmdStartInfo.Arguments}" ) )
