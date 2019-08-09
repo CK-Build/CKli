@@ -217,50 +217,69 @@ namespace CKli
 
         static void DumpSecrets( UserKeyVault v )
         {
+            string FirstPadding( bool missing )
+            {
+                return missing ? "[Missing]" : "         ";
+            }
+
+            string PaddingByDepth( int depth ) => new string( ' ', depth * 5 );
+
+            void DoesThingWithGray( Action action )
+            {
+                var prev = Console.ForegroundColor;
+                Console.ForegroundColor = ConsoleColor.Gray;
+                action();
+                Console.ForegroundColor = prev;
+            }
+
+            void WhitePipe() => DoesThingWithGray( () => Console.Write( "│" ) );
+            void RightArrow()
+            {
+                DoesThingWithGray( () => Console.Write( "└────┬> " ) );
+            }
+
+            var a = v.KeyStore.DeclareSecretKey( "toto", p => "does toto" );
+            var e = v.KeyStore.DeclareSecretKey( "tata", p => "does tata", a );
+            var c = v.KeyStore.DeclareSecretKey( "titi", p => "does titi", e );
             foreach( var k in v.KeyStore.Infos )
             {
                 if( k.SuperKey != null ) continue;
-                if( k.IsSecretAvailable )
-                {
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.Write( "          " );
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.Write( "[Missing] " );
-                }
+                Console.ForegroundColor = k.IsSecretAvailable ? ConsoleColor.Green : ConsoleColor.Red;
+                Console.Write( FirstPadding( !k.IsSecretAvailable ) );
+                WhitePipe();
                 Console.WriteLine( k.Name );
                 Console.ForegroundColor = ConsoleColor.Gray;
                 StringBuilder b = new StringBuilder();
-                b.AppendMultiLine( "          ", k.Description, true, false );
+                b.AppendMultiLine( FirstPadding( false ) + "│", k.Description, true, false );
                 b.AppendLine();
                 Console.Write( b );
                 var sub = k.SubKey;
                 bool displayedAvailable = k.IsSecretAvailable;
+                int depth = 0;
                 while( sub != null )
                 {
                     if( sub.IsSecretAvailable )
                     {
-                        Console.Write( " |          " );
-                        Console.ForegroundColor = displayedAvailable ? ConsoleColor.Gray : ConsoleColor.Green;
+                        Console.ForegroundColor = displayedAvailable ? ConsoleColor.DarkGreen : ConsoleColor.Green;
                         displayedAvailable = true;
                     }
                     else
                     {
-                        Console.Write( " |        " );
                         Console.ForegroundColor = ConsoleColor.Red;
-                        Console.Write( "[Missing] " );
                     }
+                    Console.Write( FirstPadding( !sub.IsSecretAvailable ) );
+                    Console.Write( PaddingByDepth( depth ) );
+                    RightArrow();
                     Console.WriteLine( sub.Name );
                     Console.ForegroundColor = ConsoleColor.Gray;
+                    depth++;
                     b.Clear();
-                    b.AppendMultiLine( " |          ", sub.Description, true, false );
+                    b.AppendMultiLine( FirstPadding( false ) + PaddingByDepth( depth ) + "│ ", sub.Description, true, false );
                     b.AppendLine();
                     Console.Write( b.ToString() );
                     sub = sub.SubKey;
                 }
-                Console.WriteLine();
+                Console.WriteLine( FirstPadding( false ) );
             }
         }
 
