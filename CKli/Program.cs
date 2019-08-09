@@ -238,9 +238,6 @@ namespace CKli
                 DoesThingWithGray( () => Console.Write( "└────┬> " ) );
             }
 
-            var a = v.KeyStore.DeclareSecretKey( "toto", p => "does toto" );
-            var e = v.KeyStore.DeclareSecretKey( "tata", p => "does tata", a );
-            var c = v.KeyStore.DeclareSecretKey( "titi", p => "does titi", e );
             foreach( var k in v.KeyStore.Infos )
             {
                 if( k.SuperKey != null ) continue;
