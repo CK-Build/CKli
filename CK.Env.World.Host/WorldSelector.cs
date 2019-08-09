@@ -62,7 +62,7 @@ namespace CK.Env
         /// Closes the current world.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        [CommandMethod]
+        [CommandMethod( confirmationRequired: false )]
         public void Close( IActivityMonitor m )
         {
             if( !CanClose ) throw new InvalidOperationException();
