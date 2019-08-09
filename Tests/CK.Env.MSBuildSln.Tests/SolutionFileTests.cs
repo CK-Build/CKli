@@ -20,7 +20,7 @@ namespace CK.Env.MSBuildSln.Tests
             {
                 var s = SolutionFile.Read( fs, TestHelper.Monitor, "CK-Env.sln", true );
 
-                s.Children.Should().HaveCount( 26, "There must be 26 projects!" );
+                s.Children.Should().HaveCount( 33, "There must be 33 projects!" );
                 var folders = s.Children.OfType<SolutionFolder>();
 
                 folders.Select( p => p.ProjectName ).Should().BeEquivalentTo( "Solution Items", "Tests" );
