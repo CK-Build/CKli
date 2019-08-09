@@ -53,7 +53,7 @@ namespace CK.SimpleKeyVault.Tests
         [TestCase( "\r" )]
         [TestCase( "\n" )]
         [TestCase( "x\ny" )]
-        public void inavlid_keys( string k )
+        public void invalid_keys( string k )
         {
             var vals = new Dictionary<string,string> {
                 { "A", "a1" },
