@@ -118,6 +118,34 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Declares a secret key.
+        /// Can be called as many times as needed: the <paramref name="descriptionBuilder"/> can
+        /// compose the final description as long as the <paramref name="subKey"/> is always the same (if
+        /// the subKey differs, an <see cref="InvalidOperationException"/> is thrown).
+        /// </summary>
+        /// <param name="name">The name of the secret key.</param>
+        /// <param name="descriptionBuilder">Description builder function.</param>
+        /// <param name="subKey">The sub key.</param>
+        /// <returns>The secret key info.</returns>
+        public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo, string> descriptionBuilder, SecretKeyInfo subKey )
+        {
+            bool redeclaration = true;
+            if( !_keyInfos.TryGetValue( name, out var info ) )
+            {
+                redeclaration = false;
+                _keyInfos.Add( name, info = new SecretKeyInfo( name, descriptionBuilder, subKey, _keyInfos ) );
+                _orderedInfos.Insert( 0, info );
+            }
+            else
+            {
+                info.Reconfigure( descriptionBuilder, subKey );
+            }
+
+            SecretDeclared?.Invoke( this, new SecretKeyInfoDeclaredArgs( info, redeclaration ) );
+            return info;
+        }
+
+        /// <summary>
         /// Sets or clears a secret that must have been declared.
         /// Updates it when <paramref name="secret"/> is not null or empty, otherwise clears it.
         /// </summary>
@@ -150,26 +178,7 @@ namespace CK.Env
             return false;
         }
 
-        /// <summary>
-        /// Declares a secret key.
-        /// Can be called as many times as needed: the <paramref name="descriptionBuilder"/> can
-        /// compose the final description as long as the <paramref name="subKey"/> is always the same (if
-        /// the subKey differs, an <see cref="InvalidOperationException"/> is thrown).
-        /// </summary>
-        /// <param name="name">The name of the secret key.</param>
-        /// <param name="descriptionBuilder">Description builder function.</param>
-        /// <param name="subKey">The sub key.</param>
-        /// <returns>The secret key info.</returns>
-        public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo, string> descriptionBuilder, SecretKeyInfo subKey )
-        {
-            if( !_keyInfos.TryGetValue( name, out var info ) )
-            {
-                _keyInfos.Add( name, info = new SecretKeyInfo( name, descriptionBuilder, subKey, _keyInfos ) );
-                _orderedInfos.Insert( 0, info );
-            }
-            else info.Reconfigure( descriptionBuilder, subKey );
-            return info;
-        }
+        
 
         /// <summary>
         /// Gets whether a secret key has been declared (the returned is not null) and if whether the
