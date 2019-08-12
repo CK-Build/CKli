@@ -8,12 +8,22 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
 namespace CK.Env
 {
+    static class StringBuilderExtension
+    {
+        public static StringBuilder AppendGraphName( this StringBuilder b, string name ) =>
+            b.Append( "\"" )
+                .Append( name )
+                .Append( "\"" );
+    }
+
     /// <summary>
     /// Primary World object. Handles the solutions, the solution drivers, the local
     /// and shared states and supports numerous commands.
@@ -138,6 +148,75 @@ namespace CK.Env
                 var ev = new EventMonitoredArgs( monitor );
                 DumpWorldStatus?.Invoke( this, ev );
             } );
+        }
+
+        class OpenGraph : IDisposable
+        {
+            readonly StringBuilder _b;
+            public OpenGraph( StringBuilder b ) => _b = b.AppendLine( " {" );
+            public void Dispose() => _b.AppendLine( "}" );
+        }
+
+
+
+        [CommandMethod]
+        public bool DumpWorldGraph( IActivityMonitor m )
+        {
+            StringBuilder b = new StringBuilder();
+            var ctx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
+            if( ctx == null ) return false;
+            b.Append( "digraph " )
+                .AppendGraphName( WorldName.Name );
+            using( new OpenGraph( b ) )
+            {
+                b.AppendLine( "concentrate=true" )
+                    .AppendLine( "compound=true" );
+
+                int i = 0;
+                foreach( var sln in ctx.Solutions )
+                {
+                    b.Append( "subgraph " )
+                        .Append( "cluster_" )
+                        .Append( i );
+                    i++;
+                    using( new OpenGraph( b ) )
+                    {
+                        b.Append( "label=" )
+                            .AppendGraphName( sln.Solution.Solution.Name )
+                            .AppendLine( ";" )
+                            .AppendLine( "style=filled;" )
+                            .AppendLine( "node [style=filled];" )
+                            .Append( "rank=" )
+                            .Append( sln.Solution.Rank )
+                            .AppendLine( ";" );
+                        foreach( var proj in sln.Solution.Solution.Projects.Where( p => p.IsPublished ) )
+                        {
+                            b.AppendGraphName( proj.Name )
+                                    .AppendLine( ";" );
+                            foreach( var projDep in proj.ProjectReferences.Where( p => p.Target.IsPublished ) )
+                            {
+                                b.AppendGraphName( proj.Name )
+                                    .Append( " -> " )
+                                    .AppendGraphName( projDep.Target.Name )
+                                    .AppendLine( ";" );
+                            }
+                        }
+
+                    }
+                }
+
+                foreach( var dep in ctx.DependencyContext.PackageDependencies )
+                {
+                    if( !dep.OriginProject.IsPublished ) continue;
+                    b.AppendGraphName( dep.OriginProject.Name )
+                        .Append( " -> " )
+                        .AppendGraphName( dep.TargetProject.Name )
+                        .AppendLine( ";" );
+                }
+            }
+            File.WriteAllText( "graph.gv", b.ToString() );
+            m.Info( "Generated graph.gv..." );
+            return true;
         }
 
         /// <summary>
@@ -504,8 +583,8 @@ namespace CK.Env
             var externalReferences = worldCtx.DependencyContext.Analyzer.ExternalReferences;
             List<PackageReference> artifactUses = externalReferences
                     .Where( p =>
-                        p.Target.Artifact.TypedName.Equals(packageName, StringComparison.OrdinalIgnoreCase)
-                        || p.Target.Artifact.Name.Equals(packageName, StringComparison.OrdinalIgnoreCase))
+                        p.Target.Artifact.TypedName.Equals( packageName, StringComparison.OrdinalIgnoreCase )
+                        || p.Target.Artifact.Name.Equals( packageName, StringComparison.OrdinalIgnoreCase ) )
                     .ToList();
             if( artifactUses.Count == 0 )
             {
@@ -768,7 +847,7 @@ namespace CK.Env
             if( roadmap == null ) return false;
 
             if( !SetWorkStatusAndSave( monitor, GlobalWorkStatus.Releasing ) ) return false;
-            
+
             return DoReleasing( monitor );
         }
 
