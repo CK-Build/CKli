@@ -4,6 +4,7 @@ using CK.Env.DependencyModel;
 using CK.Text;
 using CSemVer;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace CKli
@@ -29,7 +30,7 @@ namespace CKli
                     return;
                 }
 
-                if( diffResult.Diffs.All(d=>d.DiffType== DiffRootResultType.None ) && diffResult.Others.DiffType == DiffRootResultType.None )
+                if( diffResult.Diffs.All( d => d.DiffType == DiffRootResultType.None ) && diffResult.Others.DiffType == DiffRootResultType.None )
                 {
                     Console.WriteLine( $" (No change in {c.Solution.Solution.GeneratedArtifacts.Select( p => p.Artifact.Name ).Concatenate()})" );
                 }
@@ -45,9 +46,48 @@ namespace CKli
                 Console.WriteLine( "(No previous released version)" );
             }
 
+            var projExRefNotRelease = c.Solution.Solution.Projects
+                .Where( p => p.IsPublished && p.PackageReferences.Any( q => q.Kind == ArtifactDependencyKind.Transitive ) )
+                .Select( p =>
+                {
+                    List<PackageReference> pcks = p.PackageReferences.Where( q => q.Kind == ArtifactDependencyKind.Transitive ).ToList();
+                    PackageQuality worstQuality = pcks.Select( q => q.Target.Version.PackageQuality ).Min();
+                    return (p, pcks.Where( q => q.Target.Version.PackageQuality == worstQuality ));
+                } )//There should be at least one package reference
+                .GroupBy( p => p.Item2.First().Target.Version.PackageQuality ).ToList();
+            var worst = projExRefNotRelease.SingleOrDefault( p => p.Key == projExRefNotRelease.Min( q => q.Key ) ); //ugliest LINQ i ever wrote, should take 3 lines.
+            if( worst == null || worst.Key == PackageQuality.Release )
+            {
+                Console.WriteLine( "Nothing prevent to choose the Release quality." );
+            }
+            else
+            {
+                var prev = Console.ForegroundColor;
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine( $"Best quality is {worst.Key} because of projects:" );
+                foreach( var proj in worst )
+                {
+                    Console.WriteLine( "    => " + proj.p.Name + " caused by packages references " +
+                        string.Join( ", ", proj.Item2.Select( p => p.Target.ToString() ).ToArray() ) );
+                }
+                Console.ForegroundColor = prev;
+            }
+
             foreach( var kv in c.PossibleVersions )
             {
-                Console.WriteLine( $"= {(int)kv.Key} - {kv.Key} => {kv.Value.Select( v => v.NormalizedText ).Concatenate()}" );
+                Console.Write( $"= {(int)kv.Key} - {kv.Key} => " );
+                for( int i = 0; i < kv.Value.Count; i++ )
+                {
+                    CSVersion version = kv.Value[i];
+                    var prev = Console.ForegroundColor;
+                    Console.ForegroundColor = kv.Key != ReleaseLevel.None
+                        ? version.PackageQuality > (worst?.Key ?? PackageQuality.Release) ? ConsoleColor.Red : ConsoleColor.Green
+                        : ConsoleColor.White;
+                    Console.Write( version.NormalizedText );
+                    if( i < kv.Value.Count - 1 ) Console.Write( ", " );
+                    Console.ForegroundColor = prev;
+                }
+                Console.WriteLine();
             }
             if( c.CanUsePreviouslyResolvedInfo )
             {
@@ -69,6 +109,7 @@ namespace CKli
                     level = (ReleaseLevel)(a - '0');
                 }
             }
+
             while( !c.IsAnswered && c.PossibleVersions[level].Count == 0 );
             if( !c.IsAnswered )
             {

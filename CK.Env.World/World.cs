@@ -158,9 +158,49 @@ namespace CK.Env
         }
 
 
-
         [CommandMethod]
         public bool DumpWorldGraph( IActivityMonitor m )
+        {
+            StringBuilder b = new StringBuilder();
+            var ctx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
+            if( ctx == null ) return false;
+            b.Append( "digraph " )
+                .AppendGraphName( WorldName.Name );
+            using( new OpenGraph( b ) )
+            {
+                foreach( var slnGroupped in ctx.Solutions.GroupBy( p => p.Solution.Rank ) )
+                {
+                    b.Append( "subgraph " )
+                        .Append( "rank_" )
+                        .Append( slnGroupped.Key );
+                    using( new OpenGraph( b ) )
+                    {
+                        b.Append( "rank=" )
+                            .Append( slnGroupped.Key )
+                            .AppendLine(";");
+                        foreach( var sln in slnGroupped )
+                        {
+
+                            b.AppendGraphName( sln.Solution.Solution.Name )
+                           .AppendLine( ";" );
+                            foreach( var slnDep in sln.Solution.PublishedRequirements )
+                            {
+                                b.AppendGraphName( sln.Solution.Solution.Name )
+                                    .Append( " -> " )
+                                    .AppendGraphName( slnDep.Solution.Name  )
+                                    .AppendLine( ";" );
+                            }
+                        }
+                    }
+                }
+            }
+            File.WriteAllText( "graph.gv", b.ToString() );
+            m.Info( "Generated graph.gv..." );
+            return true;
+        }
+
+        [CommandMethod]
+        public bool DumpWorldGraphWithProj( IActivityMonitor m )
         {
             StringBuilder b = new StringBuilder();
             var ctx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );

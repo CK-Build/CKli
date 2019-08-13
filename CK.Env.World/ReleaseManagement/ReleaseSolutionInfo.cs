@@ -101,8 +101,7 @@ namespace CK.Env
         class PossibleVersions : IReadOnlyDictionary<ReleaseLevel, IReadOnlyList<CSVersion>>
         {
             static readonly ReleaseLevel[] _levels = new[] { ReleaseLevel.None, ReleaseLevel.Fix, ReleaseLevel.Feature, ReleaseLevel.BreakingChange };
-
-            IReadOnlyList<CSVersion>[] _versionList;
+            readonly IReadOnlyList<CSVersion>[] _versionList;
 
             public PossibleVersions( ReleaseInfo requirement, CSVersion lastRelease, IReadOnlyList<CSVersion> possibles )
             {
@@ -196,7 +195,7 @@ namespace CK.Env
                 if( !_diffsComputed )
                 {
                     _diffsComputed = true;
-                    var diffRoots = Solution.Solution.GeneratedArtifacts.Select( g => new DiffRoot( g.Artifact.TypedName, g.Project.ProjectSources ));
+                    var diffRoots = Solution.Solution.GeneratedArtifacts.Select( g => new DiffRoot( g.Artifact.TypedName, g.Project.ProjectSources ) );
                     _diffResult = _info._repository.GetDiff( m, PreviousVersionCommitSha, diffRoots );
                 }
                 return _diffResult;
@@ -222,7 +221,7 @@ namespace CK.Env
             {
                 if( HasChoice ) throw new InvalidOperationException( nameof( HasChoice ) );
                 if( IsCanceled ) throw new InvalidOperationException( nameof( IsCanceled ) );
-                if( !PossibleVersions[level].Contains( version ) ) throw new ArgumentException( "Not a version for level.", nameof(version) );
+                if( !PossibleVersions[level].Contains( version ) ) throw new ArgumentException( "Not a version for level.", nameof( version ) );
                 FinalLevel = level;
                 FinalVersion = version;
             }
@@ -231,6 +230,7 @@ namespace CK.Env
         ReleaseInfo ComputeReleaseInfo( IActivityMonitor m, IReleaseVersionSelector versionSelector )
         {
             ReleaseInfo requirements = new ReleaseInfo();
+
             // Here we could have processed only the MinimalRequirements (so that the global process ordering
             // matches the dependency order).
             // But, we need to iterate though all Requirements in order to not miss a version
@@ -317,26 +317,22 @@ namespace CK.Env
             {
                 filtered = filtered.Where( v => v.Major == 0 || v.IsPrerelease );
             }
+            // 2 If it has no feature, it can only be a patch.
+            if( (c & ReleaseConstraint.HasFeatures) == 0 )
+            {
+                // When there is no breaking change nor feature, this is necessarily a Patch.
+                return filtered.Where( v => v.IsPatch );
+            }
+            filtered = filtered.Where( v => !v.IsPatch );
+
             // 2 - If a breaking change or a feature occurred, this can not be a Patch, regardless
             //     of the Official vs. PreRelease status of the version.
             //     This filter is applied to the 0 major since the 0 major can perfectly handle this.
-            if( (c & (ReleaseConstraint.HasBreakingChanges | ReleaseConstraint.HasFeatures)) != 0 )
+            if( (c & ReleaseConstraint.HasBreakingChanges) != ReleaseConstraint.HasFeatures )
             {
-                filtered = filtered.Where( v => !v.IsPatch );
+                return filtered.Where( p => p.Minor == 0 || p.Major == 0 );
             }
-            else 
-            {
-                // When there is no breaking change nor feature, this is necessarily a Patch.
-                filtered = filtered.Where( v => v.IsPatch );
-            }
-
-            // 3 - On a breaking change, Official version must have their Major bumped (ie. their Minor and Patch must be 0).
-            //     The 0 major is excluded from this filter.
-            if( (c & ReleaseConstraint.HasBreakingChanges) == ReleaseConstraint.HasBreakingChanges )
-            {
-                filtered = filtered.Where( v => v.Major == 0 || v.IsPrerelease || (v.Minor == 0 && v.Patch == 0) );
-            }
-            return filtered;
+            return filtered.Where( p => p.Minor != 0 || p.Major == 0 );
         }
 
         internal XElement ToXml()
@@ -346,7 +342,7 @@ namespace CK.Env
                         new XAttribute( XmlNames.xSubPath, Solution.Solution.FullPath ),
                         new XAttribute( XmlNames.xCommitSha, _commitVersionInfo.CommitSha ),
                         _releaseInfo.ToXml(),
-                        new XElement( XmlNames.xReleaseNote, new XCData( ReleaseNote ?? String.Empty ) ));
+                        new XElement( XmlNames.xReleaseNote, new XCData( ReleaseNote ?? String.Empty ) ) );
         }
     }
 }
