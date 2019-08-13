@@ -13,7 +13,8 @@ namespace CK.Env.MSBuildSln
             SVersion version,
             XElement originElement,
             XElement finalDeclaration,
-            CKTrait frameworks )
+            CKTrait frameworks,
+            string privateAsset)
         {
             Owner = owner;
             Package = new ArtifactInstance( ArtifactType.Single( "NuGet" ), packageId, version );
@@ -21,7 +22,10 @@ namespace CK.Env.MSBuildSln
             PropertyVersionElement = finalDeclaration;
             Frameworks = frameworks;
             VersionLocked = versionLocked;
+            PrivateAsset = privateAsset;
         }
+
+        public string PrivateAsset { get; }
 
         /// <summary>
         /// Gets the project that owns this dependency.

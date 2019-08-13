@@ -17,7 +17,7 @@ namespace CK.Env.MSBuildSln
         /// The <see cref="CKTraitContext.Separator"/> is the ';' to match the one used by csproj (parsing and
         /// string representation becomes straightforward).
         /// </summary>
-        public static readonly CKTraitContext Savors = ArtifactType.Register("NuGet",true,';').ContextSavors;
+        public static readonly CKTraitContext Savors = ArtifactType.Register( "NuGet", true, ';' ).ContextSavors;
 
         /// <summary>
         /// Captures <see cref="DeclaredPackageDependency"/> and <see cref="ProjectToProjectDependency"/>.
@@ -451,7 +451,9 @@ namespace CK.Env.MSBuildSln
                                                                      || e.Name.LocalName == "ProjectReference" ) )
                              .Select( e => (Origin: e,
                                             PackageId: (string)e.Attribute( "Include" ),
-                                            RawVersion: (string)e.Attribute( "Version" )) );
+                                            RawVersion: (string)e.Attribute( "Version" ) ?? (string)e.Element( "Version" ),
+                                            PrivateAssets: (string)e.Attribute( "PrivateAssets" ) ?? ( string)e.Element( "PrivateAssets" ) ?? ""
+                                            ) );
 
             var conditionEvaluator = new PartialEvaluator();
             var deps = new List<DeclaredPackageDependency>();
@@ -488,6 +490,9 @@ namespace CK.Env.MSBuildSln
                             }
                             return;
                         }
+
+                        string[] defaultValues = new string[] { "compile", "runtime", "contentFiles", "build", "analyzers", "native" };
+
                         XElement propertyDef = null;
                         if( isPropVersion )
                         {
@@ -502,7 +507,7 @@ namespace CK.Env.MSBuildSln
                             uselessDeps.Add( p.Origin );
                             continue;
                         }
-                        deps.Add( new DeclaredPackageDependency( this, p.PackageId, versionLocked, version, p.Origin, propertyDef, frameworks ) );
+                        deps.Add( new DeclaredPackageDependency( this, p.PackageId, versionLocked, version, p.Origin, propertyDef, frameworks, p.PrivateAssets ) );
                     }
                 }
                 else
@@ -566,7 +571,7 @@ namespace CK.Env.MSBuildSln
             return frameworks;
         }
 
-        XElement FollowRefPropertyVersion( IActivityMonitor m, (XElement Origin, string PackageId, string RawVersion) p, ref bool versionLocked, ref SVersion version )
+        XElement FollowRefPropertyVersion( IActivityMonitor m, (XElement Origin, string PackageId, string RawVersion, string) p, ref bool versionLocked, ref SVersion version )
         {
             if( !p.RawVersion.EndsWith( "Version)" ) )
             {

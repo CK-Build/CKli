@@ -14,8 +14,10 @@ namespace CK.Env.DependencyModel
     public class DependencyAnalyzer
     {
         readonly IReadOnlyCollection<ISolution> _solutions;
+        /// <summary>
+        /// May be null !
+        /// </summary>
         readonly ISolutionContext _solutionContext;
-        readonly Dictionary<Artifact, LocalPackageItem> _packages;
         readonly ProjectItem.Cache _projects;
         readonly IReadOnlyList<PackageReference> _externalRefs;
         readonly int _version;
@@ -171,7 +173,6 @@ namespace CK.Env.DependencyModel
             IActivityMonitor m,
             IReadOnlyCollection<ISolution> solutions,
             ISolutionContext solutionCtx,
-            Dictionary<Artifact, LocalPackageItem> packages,
             ProjectItem.Cache projects,
             List<PackageReference> externalRefs,
             bool traceGraphDetails )
@@ -179,16 +180,10 @@ namespace CK.Env.DependencyModel
             _solutions = solutions;
             _solutionContext = solutionCtx;
             _version = _solutionContext?.Version ?? 0;
-            _packages = packages;
             _projects = projects;
             _externalRefs = externalRefs;
             _defaultDependencyContext = CreateDependencyContext( m, traceGraphDetails );
         }
-
-        /// <summary>
-        /// Gets the set of solutions.
-        /// </summary>
-        public IReadOnlyCollection<ISolution> Solutions => _solutions;
 
         /// <summary>
         /// Gets whether the <see cref="Solutions"/> has changed and this analyzer is no more
@@ -208,7 +203,7 @@ namespace CK.Env.DependencyModel
         /// <param name="m">The monitor to use.</param>
         /// <param name="traceGraphDetails">True to trace the details of the input and output (sorted) graphs.</param>
         /// <returns>The build projects information.</returns>
-        BuildProjectsInfo GetBuildProjectInfo( IActivityMonitor m, bool traceGraphDetails )
+        BuildProjectsInfo GetBuildProjectInfo( IActivityMonitor m )
         {
             Debug.Assert( !_projects.PureProjectsMode );
             _projects.PureProjectsMode = true;
@@ -226,8 +221,7 @@ namespace CK.Env.DependencyModel
                     {
                         var rankedProjects = rBuildProjects.SortedItems
                                                     .Where( i => i.Item is ProjectItem )
-                                                    .Select( i => (i.Rank,
-                                                                   Project: ((ProjectItem)i.Item).Project,
+                                                    .Select( i => (i.Rank, ((ProjectItem)i.Item).Project,
                                                                    DirectDeps: i.Requires
                                                                                 .Select( s => s.Item )
                                                                                 .OfType<ProjectItem>()
@@ -281,7 +275,7 @@ namespace CK.Env.DependencyModel
         class SolutionItem : IDependentItemContainer
         {
             readonly ISolution _solution;
-            IEnumerable<IDependentItemRef> _projects;
+            readonly IEnumerable<IDependentItemRef> _projects;
 
             internal SolutionItem( ISolution f, IEnumerable<IDependentItemRef> projects )
             {
@@ -349,7 +343,7 @@ namespace CK.Env.DependencyModel
             if( !result.IsComplete )
             {
                 result.LogError( m );
-                return new SolutionDependencyContext( this, result, GetBuildProjectInfo( m, traceGraphDetails ) );
+                return new SolutionDependencyContext( this, result, GetBuildProjectInfo( m ) );
             }
             // Building the list of SolutionDependencyContext.DependencyRow.
             var table = result.SortedItems
@@ -408,7 +402,7 @@ namespace CK.Env.DependencyModel
             } );
             for( int i = 0; i < depSolutions.Length; ++i ) depSolutions[i].Index = i;
 
-            return new SolutionDependencyContext( this, index, result, table, depSolutions, GetBuildProjectInfo( m, traceGraphDetails ) );
+            return new SolutionDependencyContext( this, index, result, table, depSolutions, GetBuildProjectInfo( m ) );
         }
 
         public static DependencyAnalyzer Create( IActivityMonitor m, IReadOnlyCollection<ISolution> solutions, bool traceGraphDetails )
@@ -416,6 +410,14 @@ namespace CK.Env.DependencyModel
             return Create( m, solutions, traceGraphDetails, null );
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="m"></param>
+        /// <param name="solutions"></param>
+        /// <param name="traceGraphDetails"></param>
+        /// <param name="solutionCtx">May be null, used to construct the <see cref="DependencyAnalyzer"/></param>
+        /// <returns></returns>
         internal static DependencyAnalyzer Create( IActivityMonitor m, IReadOnlyCollection<ISolution> solutions, bool traceGraphDetails, ISolutionContext solutionCtx )
         {
             var packages = new Dictionary<Artifact, LocalPackageItem>();
@@ -501,7 +503,6 @@ namespace CK.Env.DependencyModel
                         m,
                         solutions,
                         solutionCtx,
-                        packages,
                         projectItems,
                         externalRefs,
                         traceGraphDetails );

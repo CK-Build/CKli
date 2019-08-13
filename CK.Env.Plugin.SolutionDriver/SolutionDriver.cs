@@ -306,7 +306,10 @@ namespace CK.Env.Plugin
             foreach( var dep in p.Deps.Packages )
             {
                 toRemove.Remove( dep.Package.Artifact );
-                project.EnsurePackageReference( dep.Package, ArtifactDependencyKind.Transitive, dep.Frameworks );
+                project.EnsurePackageReference(
+                    dep.Package,
+                    dep.PrivateAsset.Equals("all", StringComparison.OrdinalIgnoreCase) ? ArtifactDependencyKind.Private : ArtifactDependencyKind.Transitive,
+                    dep.Frameworks );
             }
             foreach( var noMore in toRemove ) project.RemovePackageReference( noMore );
         }
