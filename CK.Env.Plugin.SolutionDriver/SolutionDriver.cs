@@ -22,8 +22,6 @@ namespace CK.Env.Plugin
         /// </summary>
         public const string CODECAKEBUILDER_SECRET_KEY = "CODECAKEBUILDER_SECRET_KEY";
 
-
-        readonly SecretKeyStore _keyStore;
         readonly ISolutionDriverWorld _world;
         readonly IEnvLocalFeedProvider _localFeedProvider;
         readonly ArtifactCenter _artifactCenter;
@@ -36,7 +34,6 @@ namespace CK.Env.Plugin
         bool _isSolutionValid;
 
         public SolutionDriver(
-                SecretKeyStore keyStore,
                 ISolutionDriverWorld w,
                 GitFolder f,
                 ArtifactCenter artifactCenter,
@@ -48,7 +45,6 @@ namespace CK.Env.Plugin
             _solutionContext = w.Register( this );
             _world = w;
             _artifactCenter = artifactCenter;
-            _keyStore = keyStore;
             _solutionSpec = spec;
             _localFeedProvider = localFeedProvider;
         }

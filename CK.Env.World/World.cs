@@ -239,6 +239,13 @@ namespace CK.Env
         /// </summary>
         public DriversCollection SolutionDrivers => _solutionDrivers;
 
+        /// <summary>
+        /// Secure the execution of the lambda in a try/catch.
+        /// </summary>
+        /// <param name="m"></param>
+        /// <param name="message"></param>
+        /// <param name="action"></param>
+        /// <returns></returns>
         bool RunSafe( IActivityMonitor m, string message, Action<IActivityMonitor, Func<bool>> action )
         {
             bool result = true;
@@ -304,7 +311,10 @@ namespace CK.Env
                     m.Info( $"Removing secret '{name}' from CICDKeyVault." );
                     vault.Remove( name );
                 }
-                else m.Warn( $"Secret '{name}' not found in CICDKeyVault." );
+                else
+                {
+                    m.Warn( $"Secret '{name}' not found in CICDKeyVault." );
+                }
             }
             else
             {
