@@ -10,11 +10,11 @@ namespace CK.Env
     /// </summary>
     public class NPMProjectSpec : INPMProjectSpec
     {
-        internal NPMProjectSpec( XElement e )
+        internal NPMProjectSpec( XElementReader r  )
         {
-            IsPrivate = (bool?)e.Attribute( nameof(IsPrivate) ) ?? false;
-            Folder = new NormalizedPath( (string)e.AttributeRequired( nameof( Folder ) ) ).With( NormalizedPathRootKind.None );
-            PackageName = (string)e.Attribute( nameof( PackageName ) );
+            IsPrivate = r.HandleOptionalAttribute( nameof( IsPrivate ), false );
+            Folder =  new NormalizedPath(r.HandleRequiredAttribute<string>( nameof( Folder ))).With( NormalizedPathRootKind.None );
+            PackageName = r.HandleRequiredAttribute<string>( nameof( PackageName ) );
             if( String.IsNullOrWhiteSpace( PackageName ) )
             {
                 if( Folder.IsEmptyPath && !IsPrivate )

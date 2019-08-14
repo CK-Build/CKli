@@ -125,9 +125,14 @@ namespace CK.Env.Plugin
                 lines.RemoveAll( line => line.FullKey == p.Scope + ":username" );
                 lines.RemoveAll( line => line.FullKey == p.Scope + ":always-auth" );
                 lines.RemoveAll( line => line.FullKey == p.Scope + ":_password" );
-
-                // Auth is carried by registry url (from which 'https:' prefix is removed).
-                if( !p.Url.StartsWith( "https://" ) ) throw new Exception( $"NPM registry url must start with 'https://': {p.Url}" );
+                Uri uri = new Uri( p.Url );
+                if(uri.IsFile)
+                {
+                    m.Info( "Npm does not support file repository. Skipping." );
+                    continue;
+                }
+                if( uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) throw new Exception( $"NPM registry url must start with 'https://': {p.Url}" );
+                // Auth is carried by registry url (from which 'http(s):' prefix is removed).
                 var scopeUrl = p.Url.Substring( "https:".Length );
                 if( p.Credentials != null )
                 {

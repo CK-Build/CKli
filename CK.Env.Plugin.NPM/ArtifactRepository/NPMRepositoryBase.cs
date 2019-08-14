@@ -11,7 +11,7 @@ namespace CK.Env.NPM
     /// <summary>
     /// Internal implementation that may be made public once.
     /// </summary>
-    abstract class NPMRepositoryBase : IArtifactRepository
+    abstract class NPMRepositoryBase
     {
         protected readonly NPMClient Client;
         string _secret;

@@ -7,7 +7,7 @@ namespace CK.Env.NPM
     /// <summary>
     /// Internal implementation that may be made public once.
     /// </summary>
-    class NPMStandardRepository : NPMRepositoryBase
+    class NPMStandardRepository : NPMRepositoryBase, INPMStandardRepository
     {
         public NPMStandardRepository(
             NPMClient c,

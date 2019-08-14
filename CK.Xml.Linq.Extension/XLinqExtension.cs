@@ -300,7 +300,7 @@ namespace System.Xml.Linq
             }
         }
 
-        public static Dictionary<string, T> ApplyAddRemoveClear<T>(
+        internal static Dictionary<string, T> ApplyAddRemoveClear<T>(
             this XElement @this,
             Dictionary<string, T> map,
             Func<XElement, string> keyReader,
@@ -326,7 +326,7 @@ namespace System.Xml.Linq
             return map;
         }
 
-        public static HashSet<T> ApplyAddRemoveClear<T>(
+        internal static HashSet<T> ApplyAddRemoveClear<T>(
             this XElement @this,
             HashSet<T> set,
             Func<XElement, T> builder )
@@ -351,7 +351,7 @@ namespace System.Xml.Linq
         }
 
         #region IEnumerable<XElement> ApplyAddRemoveClear extensions.
-        public static Dictionary<string, T> ApplyAddRemoveClear<T>(
+        internal static Dictionary<string, T> ApplyAddRemoveClear<T>(
             this IEnumerable<XElement> @this,
             Func<XElement, string> keyReader,
             Func<XElement, T> builder )
@@ -359,7 +359,7 @@ namespace System.Xml.Linq
             return ApplyAddRemoveClear( @this, new Dictionary<string, T>(), keyReader, builder );
         }
 
-        public static Dictionary<string, T> ApplyAddRemoveClear<T>(
+        internal static Dictionary<string, T> ApplyAddRemoveClear<T>(
             this IEnumerable<XElement> @this,
             Dictionary<string, T> map,
             Func<XElement, string> keyReader,
@@ -372,7 +372,7 @@ namespace System.Xml.Linq
             return map;
         }
 
-        public static HashSet<T> ApplyAddRemoveClear<T>(
+        internal static HashSet<T> ApplyAddRemoveClear<T>(
             this IEnumerable<XElement> @this,
             Func<XElement, T> builder,
             IEqualityComparer<T> comparer = null )
@@ -380,7 +380,7 @@ namespace System.Xml.Linq
             return ApplyAddRemoveClear( @this, new HashSet<T>( comparer ), builder );
         }
 
-        public static HashSet<T> ApplyAddRemoveClear<T>(
+        internal static HashSet<T> ApplyAddRemoveClear<T>(
             this IEnumerable<XElement> @this,
             HashSet<T> set,
             Func<XElement, T> builder )

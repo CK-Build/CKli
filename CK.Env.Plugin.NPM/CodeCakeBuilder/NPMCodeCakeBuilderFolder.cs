@@ -102,13 +102,24 @@ namespace CK.Env.Plugin
                             .AppendLine( "\" );" );
                         break;
                     case INPMStandardRepository n:
-                        b.Append( "yield return new NPMRemoteFeed( this, \"" )
-                            .Append( n.SecretKeyName )
-                            .Append( "\", \"" )
-                            .Append( n.Url )
-                            .Append( "\", " )
-                            .Append( n.UsePassword ? "true" : "false" )
-                            .AppendLine( " );" );
+                        Uri uri = new Uri( n.Url );
+                        if( uri.IsFile )
+                        {
+                            b.Append( "yield return new NPMLocalFeed( this, \"" )
+                            .Append( uri.AbsolutePath )
+                            .AppendLine( "\" );" );
+                        }
+                        else
+                        {
+                            b.Append( "yield return new NPMRemoteFeed( this, \"" )
+                           .Append( n.SecretKeyName )
+                           .Append( "\", \"" )
+                           .Append( n.Url )
+                           .Append( "\", " )
+                           .Append( n.UsePassword ? "true" : "false" )
+                           .AppendLine( " );" );
+                        }
+
                         break;
                 }
             }

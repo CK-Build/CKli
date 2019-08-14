@@ -13,26 +13,31 @@ namespace CK.Env
         public SolutionSpec( SharedSolutionSpec shared, in XElementReader r )
             : base( shared, r )
         {
-            var e = r.Element;
 
             UseCKSetup = r.HandleOptionalAttribute( nameof( UseCKSetup ), false );
             SqlServer = r.HandleOptionalAttribute<string>( nameof( SqlServer ), null );
             TestProjectsArePublished = r.HandleOptionalAttribute( nameof( TestProjectsArePublished ), false );
             PublishProjectInDirectories = r.HandleOptionalAttribute( nameof( PublishProjectInDirectories ), false );
-            NPMProjects = e.Elements( nameof( NPMProjects ) )
-                .ApplyAddRemoveClear( p => (string)p.AttributeRequired( "Folder" ), p => new NPMProjectSpec( p ) )
-                .Values;
-
-            CKSetupComponentProjects = e.Elements( nameof( CKSetupComponentProjects ) )
-                            .ApplyAddRemoveClear( s => (string)s.AttributeRequired( "Name" ) );
+            NPMProjects = r.HandleCollection(
+                nameof( NPMProjects ),
+                new HashSet<NPMProjectSpec>(),
+                eR => new NPMProjectSpec( eR ) );
+            CKSetupComponentProjects = r.HandleCollection(
+                    nameof( CKSetupComponentProjects ),
+                    new HashSet<string>(),
+                    eR => eR.HandleRequiredAttribute<string>( "Name" )
+                );
             UseCKSetup |= CKSetupComponentProjects.Count > 0;
-
-            PublishedProjects = e.Elements( nameof( PublishedProjects ) )
-                            .ApplyAddRemoveClear( s => new NormalizedPath( (string)s.AttributeRequired( "Folder" ) ) );
-
-
-            NotPublishedProjects = e.Elements( nameof( NotPublishedProjects ) )
-                            .ApplyAddRemoveClear( s => new NormalizedPath( (string)s.AttributeRequired( "Folder" ) ) );
+            PublishedProjects = r.HandleCollection(
+                 nameof( PublishedProjects ),
+                    new HashSet<NormalizedPath>(),
+                    eR => new NormalizedPath( eR.HandleRequiredAttribute<string>( "Folder" ) )
+                );
+            NotPublishedProjects = r.HandleCollection(
+                    nameof( NotPublishedProjects ),
+                    new HashSet<NormalizedPath>(),
+                    eR => new NormalizedPath( eR.HandleRequiredAttribute<string>( "Folder" ) )
+                );
         }
 
         /// <summary>
