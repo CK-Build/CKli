@@ -116,6 +116,11 @@ namespace CK.Env.NPM
 
         public async Task<bool> AddDistTag( IActivityMonitor m, string packageName, SVersion version, string tagName )
         {
+            if(RegistryUri.IsFile)
+            {
+                m.Warn( "Dist tags are not supported on a filesystem registry." );
+                return true;
+            }
             if( String.IsNullOrWhiteSpace( tagName ) ) throw new ArgumentNullException( nameof( tagName ) );
             tagName = tagName.ToLowerInvariant();
             packageName = WebUtility.UrlEncode( packageName );
@@ -141,6 +146,21 @@ namespace CK.Env.NPM
         /// <returns></returns>
         public bool Publish( IActivityMonitor m, NormalizedPath tarballPath, bool isPublic, string scope = null, string distTag = null )
         {
+            if( RegistryUri.IsFile )
+            {
+                var path = Path.Combine( RegistryUri.AbsolutePath, tarballPath.LastPart );
+                if( File.Exists( path ) ) return true;
+                try
+                {
+                    File.Copy( tarballPath, path );
+                    return true;
+                }
+                catch( Exception e )
+                {
+                    m.Error( e );
+                }
+                return false;
+            }
             string tempDirectory = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
             using( m.OpenInfo( "Using 'npm publish'." ) )
             {
@@ -254,10 +274,8 @@ namespace CK.Env.NPM
             return (match.Groups[1].Value, match.Groups[2].Value);
         }
 
-        bool IsAzureRepository()
-        {
-            return RegistryUri.Host == "pkgs.dev.azure.com";
-        }
+        bool IsAzureRepository => RegistryUri.Host == "pkgs.dev.azure.com";
+
 
         async Task<(string body, bool found)> AzureSpecialVersionRequest( IActivityMonitor m, string packageName, string version )
         {
@@ -281,7 +299,12 @@ namespace CK.Env.NPM
 
         public async Task<bool> ExistAsync( IActivityMonitor m, string packageName, SVersion version )
         {
-            if( IsAzureRepository() )
+            if( RegistryUri.IsFile )
+            {
+                return File.Exists( Path.Combine( RegistryUri.AbsolutePath, +'-' + version.ToNuGetPackageString() + ".tgz" ) );
+            }
+
+            if( IsAzureRepository )
             {
                 (_, bool found) = await AzureSpecialVersionRequest( m, packageName, version.ToNuGetPackageString() );
                 return found;
