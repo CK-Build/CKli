@@ -16,6 +16,11 @@ namespace CK.Env.Plugin
         LocalPath,
 
         /// <summary>
+        ///  'file:' url that reference a tarball in a local feed.
+        /// </summary>
+        LocalFeedTarball,
+
+        /// <summary>
         /// 'http://' or 'https://' url to a tarball (.tar.gz).
         /// </summary>
         UrlTar,

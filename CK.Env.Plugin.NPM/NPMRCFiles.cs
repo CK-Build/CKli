@@ -119,6 +119,12 @@ namespace CK.Env.Plugin
 
             foreach( var p in s.ArtifactSources.OfType<INPMFeed>() )
             {
+
+                if( p.Url.StartsWith( "file:" ) )
+                {
+                    m.Info( "Npm does not support file repository. Skipping." );
+                    continue;
+                }
                 EnsureLine( lines, p.Scope, "registry", p.Url );
 
                 // Scope doesn't carry auth info:
@@ -126,12 +132,7 @@ namespace CK.Env.Plugin
                 lines.RemoveAll( line => line.FullKey == p.Scope + ":always-auth" );
                 lines.RemoveAll( line => line.FullKey == p.Scope + ":_password" );
                 Uri uri = new Uri( p.Url );
-                if(uri.IsFile)
-                {
-                    m.Info( "Npm does not support file repository. Skipping." );
-                    continue;
-                }
-                if( uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) throw new Exception( $"NPM registry url must start with 'https://': {p.Url}" );
+                if( uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps ) throw new Exception( $"NPM registry url must start with 'https://': {p.Url}" );
                 // Auth is carried by registry url (from which 'http(s):' prefix is removed).
                 var scopeUrl = p.Url.Substring( "https:".Length );
                 if( p.Credentials != null )

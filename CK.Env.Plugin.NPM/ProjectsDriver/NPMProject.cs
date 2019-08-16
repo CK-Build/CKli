@@ -126,7 +126,7 @@ namespace CK.Env.Plugin
             {
                 if( dep.MinVersion == null && dep.Type != NPMVersionDependencyType.LocalPath )
                 {
-                    m.Warn( $"Unable to handle NPM {dep.Kind.ToPackageJsonKey()} '{dep.RawDep}' in {PackageJson.FilePath}. Only simple minimal version and 'file:' relative paths are handled." );
+                    m.Warn( $"Unable to handle NPM {dep.Kind.ToPackageJsonKey()} '{dep.RawDep}' in {PackageJson.FilePath}. Only simple minimal version, or 'file:' relative paths, or 'file' absolute path pointing to a tarball are handled." );
                 }
                 if( dep.MinVersion != null )
                 {

@@ -1,7 +1,9 @@
 using CK.Core;
 using CK.Env.DependencyModel;
+using CK.Text;
 using CSemVer;
 using System;
+using System.IO;
 
 namespace CK.Env.Plugin
 {
@@ -32,17 +34,50 @@ namespace CK.Env.Plugin
 
         /// <summary>
         /// Gets the dependency version if <see cref="Type"/>
-        /// is <see cref="NPMVersionDependencyType.MinVersion"/>, otherwise it is null.
+        /// is <see cref="NPMVersionDependencyType.MinVersion"/> or <see cref="NPMVersionDependencyType.LocalFeedTarball"/>, otherwise it is null.
         /// </summary>
         public SVersion MinVersion { get; }
 
-        public NPMDep( string name, ArtifactDependencyKind kind, SVersion minVersion )
+        public static NPMDep CreateNPMDepMinVersion( string name, ArtifactDependencyKind kind, SVersion minVersion )
         {
-            Name = name;
-            Type = NPMVersionDependencyType.MinVersion;
-            Kind = kind;
-            MinVersion = minVersion ?? throw new ArgumentNullException( nameof( minVersion ) );
-            RawDep = ">=" + minVersion.ToNuGetPackageString();
+            return new NPMDep( name, NPMVersionDependencyType.MinVersion, kind, ">=" + minVersion.ToNuGetPackageString(), minVersion );
+        }
+
+        public static NPMDep CreateNPMDepLocalPath(NormalizedPath path, string name, ArtifactDependencyKind kind )
+        {
+            return new NPMDep( name, NPMVersionDependencyType.LocalPath, kind, $"file:{path.ToString()}", null );
+        }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="dirPath">The dir path must exist.</param>
+        /// <param name="name"></param>
+        /// <param name="kind"></param>
+        /// <returns></returns>
+        public static NPMDep CreateNPMDepLocalFeedTarball( NormalizedPath dirPath, string name, ArtifactDependencyKind kind, SVersion version )
+        {
+            string fileName = $"{name.Replace( "@", "" ).Replace( "/", "-" )}-{version.ToNuGetPackageString()}.tgz";
+            return new NPMDep( name,
+                NPMVersionDependencyType.LocalFeedTarball,
+                kind,
+                $"file:{ dirPath.AppendPart( fileName ).ToString()}",
+                version );
+        }
+        public static NPMDep CreateNPMDepLocalFeedTarballFromRawDep(string rawDep, string name, ArtifactDependencyKind kind, SVersion version )
+        {
+            return CreateNPMDepLocalFeedTarball(
+                Path.GetDirectoryName( rawDep.Remove(0, 5 ) ),
+                name,
+                kind,
+                version
+                );
+        }
+
+        internal static SVersion GetVersionOutOfTarballPath(string path, string packageName)
+        {
+            path = Path.GetFileNameWithoutExtension( path );
+            path = path.Remove( packageName.Length + 1 ); //remove the package name
+            return SVersion.TryParse( path );
         }
 
         public NPMDep( string name, NPMVersionDependencyType type, ArtifactDependencyKind kind, string rawDep, SVersion minVersion )

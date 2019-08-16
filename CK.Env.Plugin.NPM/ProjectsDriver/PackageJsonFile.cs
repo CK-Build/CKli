@@ -4,6 +4,7 @@ using CSemVer;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 
@@ -90,9 +91,17 @@ namespace CK.Env.Plugin
             NPMDep dOrig = _deps[idx];
             if( dOrig.MinVersion != v )
             {
-                var d = new NPMDep( dOrig.Name, dOrig.Kind, v );
-                m.Info( $"Updated dependency {dOrig.ToString()} to version {d.RawDep}." );
+                NPMDep d;
+                if( dOrig.Type == NPMVersionDependencyType.LocalFeedTarball )
+                {
+                    d = NPMDep.CreateNPMDepLocalFeedTarballFromRawDep( dOrig.RawDep, dOrig.Name, dOrig.Kind, v );
+                }
+                else
+                {
+                    d = NPMDep.CreateNPMDepMinVersion( dOrig.Name, dOrig.Kind, v );
+                }
                 Root[d.Kind.ToPackageJsonKey()][d.Name] = d.RawDep;
+                m.Info( $"Updated {dOrig.ToString()} to version {d.RawDep}." );
                 _unsavedDeps.Add( d );
                 _deps[idx] = d;
                 return true;
@@ -104,7 +113,11 @@ namespace CK.Env.Plugin
         {
             if( _unsavedDeps.Any() )
             {
-                if(!NpmInstall( m, _unsavedDeps.Select( p => (p.Name, p.MinVersion.ToNuGetPackageString()) ).ToArray() ) )
+                if( NpmInstall( m, _unsavedDeps.ToArray() ) )
+                {
+                    _unsavedDeps.Clear();
+                }
+                else
                 {
                     m.Error( "Failed to npm install the dependencies. The package-lock.json will be wrong. This need manual fix." );
                 }
@@ -112,26 +125,11 @@ namespace CK.Env.Plugin
             return base.Save( m, forceSave );
         }
 
-        bool NpmInstall( IActivityMonitor m, (string packageName, string version)[] packages )
+        bool NpmInstall( IActivityMonitor m, NPMDep[] packages )
         {
             return ProcessRunner.Run(
                 m, FileSystem.GetFileInfo( FilePath.RemoveLastPart() ).PhysicalPath, "cmd.exe",
-                "/C npm install " + string.Join( ' ', packages.Select( p => $"{p.packageName}@{p.version}" ).ToArray() ) );
-        }
-
-        /// <summary>
-        /// Ensures that a dependency exist with a given minimal version.
-        /// </summary>
-        /// <param name="name">The dependency name.</param>
-        /// <param name="v">The minimal version. Must not be null.</param>
-        /// <param name="kind">The kind of the dependency.</param>
-        public void EnsureDependency( string name, SVersion v, ArtifactDependencyKind kind )
-        {
-            var d = new NPMDep( name, kind, v );
-            Root[d.Kind.ToPackageJsonKey()][d.Name] = d.RawDep;
-            var idx = _deps.FindIndex( dep => dep.Name == name );
-            if( idx >= 0 ) _deps[idx] = d;
-            else _deps.Add( d );
+                "/C npm install " + string.Join( ' ', packages.Select( p => p.RawDep ).ToArray() ) );
         }
 
         /// <summary>
@@ -178,12 +176,26 @@ namespace CK.Env.Plugin
         {
             if( value.StartsWith( "file:" ) )
             {
-                if( !value.StartsWith( "file:.." ) )
+                string path;
+                if( value.EndsWith( ".tgz" ) )
                 {
-                    m.Error( $"Dependency '{value}' for {depNameKind}/{name} must be relative and starts with 'file:..'." );
-                    return (null, NPMVersionDependencyType.None);
+                    path = value.Substring( 5 );
+                    path = Path.GetFileNameWithoutExtension( path );
+                    path = path.Remove(0, name.Length ); //remove the package name
+                    SVersion version = SVersion.TryParse( path );
+                    if( !version.IsValid )
+                    {
+                        m.Error( $"Error while parsing version of a local feed package" );
+                        return (null, NPMVersionDependencyType.LocalFeedTarball);
+                    }
+                    return (version, NPMVersionDependencyType.LocalFeedTarball);
                 }
-                else return (null, NPMVersionDependencyType.LocalPath);
+                if( value.StartsWith( "file:.." ) )
+                {
+                    return (null, NPMVersionDependencyType.LocalPath);
+                }
+                m.Error( $"Dependency '{value}' for {depNameKind}/{name} must be relative and starts with 'file:..'." );
+                return (null, NPMVersionDependencyType.None);
             }
             else if( value.IndexOf( "://" ) > 0 )
             {
