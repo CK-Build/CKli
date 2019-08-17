@@ -217,7 +217,7 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the registered commands that match a pattern.
+        /// Gets the registered commands that match a pattern with wildcards ('*' and '?').
         /// </summary>
         /// <param name="pattern">The pattern. Must not be null or empty.</param>
         /// <param name="checkEnabled">False to also return currently disabled commands.</param>
