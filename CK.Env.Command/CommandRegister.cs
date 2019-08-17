@@ -1,10 +1,10 @@
 using CK.Core;
 using CK.Text;
-using DotNet.Globbing;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 
 namespace CK.Env
 {
@@ -24,6 +24,8 @@ namespace CK.Env
         /// <param name="h">The command handler.</param>
         public void Register( ICommandHandler h )
         {
+            if( h.UniqueName.IsEmptyPath
+                || h.UniqueName.Path.IndexOfAny( new char[] { '*', '?' } ) >= 0 ) throw new ArgumentException( "Command name must not be empty nor contain '*' or '?'.", nameof(ICommandHandler.UniqueName) );
             _commands.Add( h.UniqueName, h );
         }
 
@@ -217,14 +219,19 @@ namespace CK.Env
         /// <summary>
         /// Gets the registered commands that match a pattern.
         /// </summary>
-        /// <param name="globPattern">The pattern. Must not be null or empty.</param>
+        /// <param name="pattern">The pattern. Must not be null or empty.</param>
         /// <param name="checkEnabled">False to also return currently disabled commands.</param>
         /// <returns>The set of commands.</returns>
-        public IEnumerable<ICommandHandler> GetCommands( string globPattern, bool checkEnabled = true )
+        public IEnumerable<ICommandHandler> GetCommands( string pattern, bool checkEnabled = true )
         {
-            if( String.IsNullOrWhiteSpace( globPattern ) ) throw new ArgumentNullException( nameof( globPattern ) );
-            var p = Glob.Parse( globPattern );
-            return _commands.Values.Where( c => p.IsMatch( c.UniqueName ) && (!checkEnabled || c.GetEnabled()) );
+            if( String.IsNullOrWhiteSpace( pattern ) ) throw new ArgumentNullException( nameof( pattern ) );
+            // Escaping is not required (ther cannot be * or ? in name, this is tested in registration): the pattern is simple.
+            // Nevertheless, we must check for stupid patterns (or so-to-speak smart people trying to DoS us...):
+            string cleaned;
+            while( (cleaned = pattern.Replace( "**", "*" ).Replace( "*?", "*" ).Replace( "?*", "*" )) != pattern ) pattern = cleaned;
+            pattern = '^' + Regex.Escape( cleaned ).Replace( "\\*", ".*" ).Replace( "\\?", "." ) + '$';
+            return _commands.Values.Where( c => Regex.IsMatch( c.UniqueName, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant )
+                                                && (!checkEnabled || c.GetEnabled()) );
         }
 
         /// <summary>

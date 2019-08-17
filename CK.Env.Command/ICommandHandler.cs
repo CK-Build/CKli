@@ -7,6 +7,7 @@ namespace CK.Env
     {
         /// <summary>
         /// Gets this command name.
+        /// It must not contain * or ? characters.
         /// </summary>
         NormalizedPath UniqueName { get; }
 
