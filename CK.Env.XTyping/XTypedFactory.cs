@@ -65,9 +65,12 @@ namespace CK.Env
 
         public void AutoRegisterFromdAssembly( IActivityMonitor monitor, Assembly a )
         {
-            var allTypes = a.ExportedTypes
+            if( !a.IsDynamic )
+            {
+                var allTypes = a.ExportedTypes
                             .Where( t => !t.IsAbstract && typeof( XTypedObject ).IsAssignableFrom( t ) );
-            RegisterNames( monitor, allTypes, AutoNamesFromType );
+                RegisterNames( monitor, allTypes, AutoNamesFromType );
+            }
         }
 
         public IEnumerable<XName> AutoNamesFromType( Type t )

@@ -181,7 +181,20 @@ namespace CK.Env
             NormalizedPath mappedPath = default,
             string branchName = "master")
         {
-            if( String.IsNullOrWhiteSpace( stackName ) ) throw new ArgumentException( "Must not be empty.", nameof(stackName) );
+            DoEnsureStackDefinition( m, stackName, url, isPublic, true, mappedPath, branchName );
+        }
+
+        public void DoEnsureStackDefinition(
+             IActivityMonitor m,
+            string stackName,
+            string url,
+            bool isPublic,
+            bool saveIfNeeded,
+            NormalizedPath mappedPath = default,
+            string branchName = "master"
+            )
+        {
+            if( String.IsNullOrWhiteSpace( stackName ) ) throw new ArgumentException( "Must not be empty.", nameof( stackName ) );
 
             bool change = WorldLocalMapping.SetMap( m, stackName, mappedPath );
             if( FindOrCreateStackDef( m, stackName, url, isPublic, branchName ) ) change = true;
@@ -189,7 +202,7 @@ namespace CK.Env
             if( change )
             {
                 UpdateReposFromDefinitions( m, StackInitializeOption.None );
-                WriteStacksToFile( m );
+                if( saveIfNeeded ) WriteStacksToFile( m );
             }
         }
 

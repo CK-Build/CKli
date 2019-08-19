@@ -3,7 +3,7 @@ using CK.Env;
 
 namespace CKli
 {
-    class FakeApplicationLifetime : IBasicApplicationLifetime
+    public class FakeApplicationLifetime : IBasicApplicationLifetime
     {
         public FakeApplicationLifetime()
         {

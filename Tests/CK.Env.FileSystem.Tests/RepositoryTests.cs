@@ -3,7 +3,6 @@ using CK.Text;
 using FluentAssertions;
 using Microsoft.Extensions.FileProviders;
 using NUnit.Framework;
-using System;
 using System.IO;
 using System.Linq;
 using static CK.Testing.MonitorTestHelper;
