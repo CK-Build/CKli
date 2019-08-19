@@ -166,7 +166,7 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="stackName">The name of the stack. This is the key.</param>
         /// <param name="url">The remote repository url.</param>
-        /// <param name="isPublic">Whether this stack is public (Open Source).</param>
+        /// <param name="isPublic">Whether this stack is public (Open Source). This will set whether the git repository hosting the stack is public or not</param>
         /// <param name="mappedPath">
         /// The mapped path used if no existing mapping already exists.
         /// This is required if no mapping currently already exists, it must be a local rooted path.
@@ -181,20 +181,7 @@ namespace CK.Env
             NormalizedPath mappedPath = default,
             string branchName = "master")
         {
-            DoEnsureStackDefinition( m, stackName, url, isPublic, true, mappedPath, branchName );
-        }
-
-        public void DoEnsureStackDefinition(
-             IActivityMonitor m,
-            string stackName,
-            string url,
-            bool isPublic,
-            bool saveIfNeeded,
-            NormalizedPath mappedPath = default,
-            string branchName = "master"
-            )
-        {
-            if( String.IsNullOrWhiteSpace( stackName ) ) throw new ArgumentException( "Must not be empty.", nameof( stackName ) );
+            if( String.IsNullOrWhiteSpace( stackName ) ) throw new ArgumentException( "Must not be empty.", nameof(stackName) );
 
             bool change = WorldLocalMapping.SetMap( m, stackName, mappedPath );
             if( FindOrCreateStackDef( m, stackName, url, isPublic, branchName ) ) change = true;
@@ -202,7 +189,7 @@ namespace CK.Env
             if( change )
             {
                 UpdateReposFromDefinitions( m, StackInitializeOption.None );
-                if( saveIfNeeded ) WriteStacksToFile( m );
+                WriteStacksToFile( m );
             }
         }
 

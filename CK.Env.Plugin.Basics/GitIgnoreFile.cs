@@ -35,18 +35,19 @@ namespace CK.Env.Plugin
             EnsureLine( lines, ".vs/" );
             EnsureLine( lines, "*.suo" );
             EnsureLine( lines, "*.user" );
+            RemoveLine( lines, "CodeCakeBuilder/UnitTestsDone.*.txt" );
 
             if( !_solutionSpec.NoDotNetUnitTests )
             {
                 EnsureLine( lines, "Tests/**/TestResult*.xml" );
-                EnsureLine( lines, "CodeCakeBuilder/UnitTestsDone.*.txt" );
+                EnsureLine( lines, "CodeCakeBuilder/MemoryKey.*.txt" );
                 EnsureLine( lines, "Tests/**/Logs/" );
                 EnsureLine( lines, "Tests/**/CKSetup-WorkingDir/" );
             }
             else
             {
                 RemoveLine( lines, "Tests/**/TestResult*.xml" );
-                RemoveLine( lines, "CodeCakeBuilder/UnitTestsDone.*.txt" );
+                RemoveLine( lines, "CodeCakeBuilder/MemoryKey.*.txt" );
                 RemoveLine( lines, "Tests/**/Logs/" );
                 RemoveLine( lines, "Tests/**/CKSetup-WorkingDir/" );
             }

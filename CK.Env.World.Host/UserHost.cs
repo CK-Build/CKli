@@ -32,7 +32,7 @@ namespace CK.Env
 
         public IBasicApplicationLifetime ApplicationLifetime { get; }
 
-        public WorldStore WorldStore => _store;
+        public GitWorldStore WorldStore => _store;
 
         public WorldSelector WorldSelector { get; }
 

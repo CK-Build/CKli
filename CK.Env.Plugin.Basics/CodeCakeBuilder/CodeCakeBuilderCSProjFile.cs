@@ -73,7 +73,7 @@ namespace CK.Env.Plugin
             {
                 DeleteProjectReference( "Cake.Npm" );
             }
-            EnsureProjectReference( "CK.Text", "8.0.2" );
+            EnsureProjectReference( "CK.Text", "8.0.3" );
             DeleteProjectReference( "SimpleGitVersion.Core" ); //imported by SimpleGitVersion.Cake
             DeleteProjectReference( "Code.Cake" ); //imported by SimpleGitVersion.Cake
             DeleteProjectReference( "Cake.Common" ); //imported by Code.Cake
