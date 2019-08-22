@@ -6,7 +6,7 @@ using System.Text;
 
 namespace CK.Env
 {
-    public sealed class UserHost : ICommandMethodsProvider
+    public sealed class UserHost : ICommandMethodsProvider, IDisposable
     {
         public static readonly NormalizedPath HomeCommandPath = "Home";
 
@@ -65,6 +65,12 @@ namespace CK.Env
                     WorldSelector.Open( m, opened );
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            WorldSelector.Dispose();
+            _store.Dispose();
         }
     }
 }

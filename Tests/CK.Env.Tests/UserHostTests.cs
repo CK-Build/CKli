@@ -11,7 +11,7 @@ namespace CK.Env.Tests
         [Test]
         public void can_create_and_initiliaze_temp_UserHost()
         {
-            var host = TestHost.CreateTestHost();
+            using(var host = TestHost.CreateTestHost()) {}
         }
     }
 }

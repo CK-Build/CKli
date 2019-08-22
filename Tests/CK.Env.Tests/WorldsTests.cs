@@ -2,7 +2,7 @@ using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Text;
-
+using static CK.Testing.MonitorTestHelper;
 namespace CK.Env.Tests
 {
     [TestFixture]
@@ -11,9 +11,18 @@ namespace CK.Env.Tests
         [Test]
         public void tests_stacks_exists()
         {
-            var testHost = TestHost.CreateTestHost();
-            testHost.AddTestStack();
-            //testHost.UserHost.WorldStore
+            TestHelper.LogToConsole = true;
+            using( var testHost = TestHost.CreateTestHost() )
+            {
+                var stacks = testHost.AddTestStack();
+                foreach( string worldName in stacks )
+                {
+                    using( var w = testHost.OpenWorld( worldName ) )
+                    {
+                        w.World.AllBuild( TestHelper.Monitor );
+                    }
+                }
+            }
         }
     }
 }

@@ -33,12 +33,14 @@ namespace CKli
             IBasicApplicationLifetime appLife = new FakeApplicationLifetime();
             try
             {
-                var host = new UserHost( appLife, userHostPath );
-                host.Initialize( monitor );
-                OpenKeyVault( monitor, host );
-                if( host.UserKeyVault.IsKeyVaultOpened ) host.Initialize( monitor );
-                DumpWorlds( host.WorldStore.ReadWorlds( monitor ) );
-                InteractiveRun( monitor, host );
+                using( var host = new UserHost( appLife, userHostPath ) )
+                {
+                    host.Initialize( monitor );
+                    OpenKeyVault( monitor, host );
+                    if( host.UserKeyVault.IsKeyVaultOpened ) host.Initialize( monitor );
+                    DumpWorlds( host.WorldStore.ReadWorlds( monitor ) );
+                    InteractiveRun( monitor, host );
+                }
             }
             catch( Exception ex )
             {

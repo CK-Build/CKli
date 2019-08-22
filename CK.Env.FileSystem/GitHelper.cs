@@ -783,17 +783,21 @@ namespace CK.Env
 
         const string _hook_check_not_local =
 @"#!/bin/sh
-# Abort push on -local branches
-
+# Abort push on local branches
 while read local_ref local_sha remote_ref remote_sha 
 do 
-	if [[ $local_ref == *-local ]]
+	regexp='(?i)(^|[^a-z0-9]+)local($|[^a-z0-9]+)'
+	result=$( echo ""$local_ref"" | grep -P $regexp )
+	if [[ ""$result"" != """" ]];
 	then
-		echo >&2 ""Pushing on a -local branch, aborting!""
+		RED='\e[33;41m'
+		NC='\e[0m' # No Color
+		echo -e >&2 ""${RED}Pushing on a local branch, aborting!${NC}""
         exit 1
 	fi
 done
 exit 0
+
 ";
         const string _hook_check_no_commit_nopush =
 @"#!/bin/sh
@@ -817,7 +821,7 @@ do
 			range=""$local_sha""
 		else
 			# Update to existing branch, examine new commits
-			range=""$remote_sha..$local_sha""
+			range=""${remote_sha}..${local_sha}""
 		fi
 
 		# Check for foo commit
@@ -836,21 +840,19 @@ exit 0
 ";
         static string HookPrePushScript( string hookName ) =>
 $@"#!/bin/sh
-#script-dispatcher-0.0.2
+#script-dispatcher-0.0.3
 # Hook that execute all scripts in a directory
-
 remote=""$1"";
 url=""$2"";
 hook_directory="".git/hooks""
-search_dir=""{hookName}_scripts""
-
+search_dir=""pre-push_scripts""
 search_path=""$hook_directory/$search_dir""
 i=0
 stdin=`cat`
 for scriptFile in ""$search_path""/*; do
   i=$((i+=1))
   echo ""Running script $scriptFile"";
-  $scriptFile $@ <<< ""$stdin"";  # execute successfully or break
+  echo ""$stdin"" | $scriptFile $@;  # execute successfully or break
     # Or more explicitly: if this execution fails, then stop the `for`:
    exitCode=$?
    if [ $exitCode -ne 0 ] ; then

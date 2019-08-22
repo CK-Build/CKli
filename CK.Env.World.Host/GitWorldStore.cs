@@ -11,13 +11,12 @@ using LibGit2Sharp;
 
 namespace CK.Env
 {
-    public sealed class GitWorldStore : WorldStore, ICommandMethodsProvider
+    public sealed class GitWorldStore : WorldStore, ICommandMethodsProvider, IDisposable
     {
         readonly NormalizedPath _rootPath;
         readonly List<StackDef> _stacks;
         readonly List<StackRepo> _repos;
 
-        IReadOnlyList<LocalWorldName> _worldNames;
         int _syncCount;
 
         public GitWorldStore(
@@ -242,7 +241,7 @@ namespace CK.Env
         #endregion
 
         #region Repository
-        class StackRepo
+        class StackRepo : IDisposable
         {
             public readonly Uri OriginUrl;
             readonly GitWorldStore _store;
@@ -369,6 +368,15 @@ namespace CK.Env
                     }
                 }
             }
+
+            public void Dispose()
+            {
+                if(IsOpen)
+                {
+                    _git.Dispose();
+                    _git = null;
+                }
+            }
         }
 
 
@@ -395,6 +403,7 @@ namespace CK.Env
             {
                 if( !_repos[i].PostSynchronize( m ) )
                 {
+                    _repos[i].Dispose();
                     _repos.RemoveAt( i-- );                  
                 }
             }
@@ -489,7 +498,7 @@ namespace CK.Env
                 int cmp = w1.Name.CompareTo( w2.Name );
                 return cmp != 0 ? cmp : w1.ParallelName.CompareTo( w2.ParallelName );
             } );
-            return _worldNames = newWorlds;
+            return newWorlds;
         }
 
         LocalWorldName ToLocal( IWorldName w )
@@ -611,5 +620,12 @@ namespace CK.Env
             return changed;
         }
 
+        public void Dispose()
+        {
+            foreach( var repo in _repos )
+            {
+                repo.Dispose();
+            }
+        }
     }
 }
