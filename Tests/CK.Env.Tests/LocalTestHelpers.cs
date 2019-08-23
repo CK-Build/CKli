@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using CK.Core;
 using CK.Text;
@@ -31,7 +32,7 @@ namespace CK.Env.Tests
         /// Create a test host in a temp directory with initialized tests stacks.
         /// </summary>
         /// <returns></returns>
-        public static TestHost CreateTestHost()
+        public static TestHost Create()
         {
             FakeApplicationLifetime appLife = new FakeApplicationLifetime();
             NormalizedPath tempPath = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
@@ -87,12 +88,7 @@ namespace CK.Env.Tests
             public string SourceFeedNpm { get; set; }
         }
 
-        static NormalizedPath CKTestZipPath => TestHelper.TestProjectFolder.AppendPart( "CKTest.zip" );
-
-        static ZipArchive CKTestZipArchive => new ZipArchive( File.OpenRead( CKTestZipPath ) );
-
-        static IEnumerable<ZipArchiveEntry> CKTestZipWorldEntries => CKTestZipArchive.Entries.Where( p => new NormalizedPath( p.FullName ).FirstPart == "Worlds" );
-
+        static NormalizedPath TestsUniverseFolder => TestHelper.TestProjectFolder.AppendPart( "UniversesTestsZips" );
 
 
         NormalizedPath WorldsFolder => _tempPath.AppendPart( "Worlds" );
@@ -101,9 +97,67 @@ namespace CK.Env.Tests
 
         NormalizedPath DevDirectory => _tempPath.AppendPart( _devDirectoryName );
 
-        void DezipCKTest()
+
+        IEnumerable<NormalizedPath> AllGitRepos =>
+            new List<NormalizedPath>
+            (
+                Directory.GetDirectories( WorldsFolder ).SelectMany( p => Directory.GetDirectories( p ) ).Select( p => new NormalizedPath( p ) )
+            ) { new NormalizedPath( StackGitPath ) };
+
+        public bool EqualToSnapshot( string snapShotName )
         {
-            NormalizedPath zipPath = CKTestZipPath;
+            using( var truth = CreateWithUniverse( snapShotName ) )
+            {
+                var repos = AllGitRepos.Select( p => new Repository( p ) );
+                var truthRepo = truth.AllGitRepos.Select( p => new Repository( p ) );
+
+                var truthpath = GetAllPathOfRepos( truthRepo );
+                var paths = GetAllPathOfRepos( repos );
+
+                foreach( var path in paths )
+                {
+                    Console.WriteLine( path );
+                }
+                Console.WriteLine( "**************************" );
+                foreach( var path in truthpath )
+                {
+                    Console.WriteLine( path );
+                }
+                return true;
+            }
+        }
+        IEnumerable<NormalizedPath> GetAllPathOfRepos( IEnumerable<Repository> repos )
+        {
+            return repos.SelectMany( p =>
+            {
+                var a = p.Branches.Select( q => q.Tip ).ToList();
+                if( a.Count == 0 ) return new NormalizedPath[0];
+                return AllFileFullPath( p.Info.Path, a.MaxBy( r => r.Author.When ).Tree );
+            } );
+        }
+        IEnumerable<NormalizedPath> AllFileFullPath( NormalizedPath treePath, Tree tree )
+        {
+            return tree.Where( x => x.TargetType == TreeEntryTargetType.Tree )
+                 .SelectMany( x => AllFileFullPath( treePath.AppendPart( x.Name ), (Tree)x.Target ) )
+                 .Concat( tree.Where( x => x.TargetType == TreeEntryTargetType.Blob ).Select( p => treePath.AppendPart( p.Name+"-"+p.Target.Sha ) ) );
+        }
+
+        /// <summary>
+        /// Create a test host and add the worlds of a universe, based on the callerName
+        /// </summary>
+        /// <param name="arbitraryName">Arbitrary optional name, take <see cref="callerMemberName"/> if null </param>
+        /// <param name="callerMemberName"></param>
+        /// <returns></returns>
+        public static TestHost CreateWithUniverse( string arbitraryName = null, [CallerMemberName] string callerMemberName = null )
+        {
+            var host = Create();
+            host.AddTestStackFromUniverseZip( arbitraryName ?? callerMemberName );
+            return host;
+        }
+
+        void DezipUniverse( string universeName )
+        {
+            NormalizedPath zipPath = TestsUniverseFolder.AppendPart( universeName + ".zip" );
             ZipFile.ExtractToDirectory( zipPath, _tempPath );
         }
 
@@ -131,7 +185,7 @@ namespace CK.Env.Tests
         /// From https://github.com/libgit2/libgit2sharp/blob/f8e2d42ed9051fa5a5348c1a13d006f0cc069bc7/LibGit2Sharp.Tests/TestHelpers/DirectoryHelper.cs#L40
         /// </summary>
         /// <param name="directoryPath"></param>
-        public static void DeleteDirectory(IActivityMonitor m, string directoryPath )
+        public static void DeleteDirectory( IActivityMonitor m, string directoryPath )
         {
             // From http://stackoverflow.com/questions/329355/cannot-delete-directory-with-directory-deletepath-true/329502#329502
 
@@ -141,10 +195,10 @@ namespace CK.Env.Tests
                 return;
             }
             NormalizeAttributes( directoryPath );
-            DeleteDirectory(m, directoryPath, maxAttempts: 5, initialTimeout: 16, timeoutFactor: 2 );
+            DeleteDirectory( m, directoryPath, maxAttempts: 5, initialTimeout: 16, timeoutFactor: 2 );
         }
         static readonly Type[] _whitelist = { typeof( IOException ), typeof( UnauthorizedAccessException ) };
-        private static void DeleteDirectory(IActivityMonitor m, string directoryPath, int maxAttempts, int initialTimeout, int timeoutFactor )
+        private static void DeleteDirectory( IActivityMonitor m, string directoryPath, int maxAttempts, int initialTimeout, int timeoutFactor )
         {
             for( int attempt = 1; attempt <= maxAttempts; attempt++ )
             {
@@ -209,41 +263,12 @@ namespace CK.Env.Tests
             UserHost.WorldStore.DeleteStackDefinition( TestHelper.Monitor, "CK-Build" );
         }
 
-        public string[] AddTestStack()
+        public string[] AddTestStackFromUniverseZip( string universeZipName )
         {
-            DezipCKTest(); // We now have two directories: CKTest-Stack(The git containing the .Worlds) and Worlds repositories.
+            DezipUniverse( universeZipName ); // We now have two directories: CKTest-Stack(The git containing the .Worlds) and Worlds repositories.
             string[] worlds = SetStacksDefaultConfig();
             EnsureStacks( worlds );
             return worlds;
-        }
-
-
-
-        /// <summary>
-        /// Get the default world configuration with the placeholders.
-        /// The xml is not valid !
-        /// </summary>
-        /// <param name="worldName"></param>
-        /// <returns></returns>
-        static string GetDefaultWorld( string worldName )
-        {
-            using( Stream fileStream = CKTestZipWorldEntries.Single( p => new NormalizedPath( p.FullName ).LastPart == worldName ).Open() )
-            using( StreamReader reader = new StreamReader( fileStream ) )
-            {
-                return reader.ReadToEnd();
-            }
-        }
-
-        /// <summary>
-        /// Get a default configured world config file.
-        /// </summary>
-        /// <param name="worldName"></param>
-        /// <param name="worldsGitPath"></param>
-        /// <param name="fakeRemoteFeedPath"></param>
-        /// <returns></returns>
-        public static string GetWorldWithDefaultConfiguration( string worldName, NormalizedPath worldsGitPath, NormalizedPath fakeRemoteFeedPath )
-        {
-            return ReplaceWorldPlaceHolder( GetDefaultWorld( worldName ), TestWorldConfig.DefaultConfig( worldsGitPath, fakeRemoteFeedPath ) );
         }
 
         /// <summary>
