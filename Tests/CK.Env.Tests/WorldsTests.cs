@@ -3,40 +3,55 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
+using FluentAssertions;
+
 using static CK.Testing.MonitorTestHelper;
 namespace CK.Env.Tests
 {
     [TestFixture]
     public class WorldsTests
     {
-
-        
-
-        [Test]
-        public void tests_stacks_exists()
+        [OneTimeSetUp]
+        public void Init()
         {
             TestHelper.LogToConsole = true;
-            using( var testHost = TestHost.Create() )
+        }
+        [Test]
+        public void regenerate_image_from_scratch()
+        {
+            Assume.That( TestHelper.IsExplicitAllowed );
+            things_work_on_a_world_with_one_project( true );
+        }
+
+        [TestCase( false )]
+        public void things_work_on_a_world_with_one_project( bool chained )
+        {
+            using( var testHost = TestHost.CreateWithUniverse( false ) ) //The first test does'nt pickup the image from the Generated Images folder.
             {
-                var stacks = testHost.AddTestStackFromUniverseZip( "CKTest.zip" );
-                foreach( string worldName in stacks )
+                using( var w = testHost.OpenWorld( "CKTest-Build" ) )
                 {
-                    using( var w = testHost.OpenWorld( worldName ) )
-                    {
-                        w.World.AllBuild( TestHelper.Monitor );
-                    }
+                    w.Should().NotBeNull();
+                    w.World.AllBuild( TestHelper.Monitor );
+                    w.World.AllBuild( TestHelper.Monitor );
                 }
+                testHost.BuildImageThenChainOrTest( chained, two_project_interdepending );
             }
         }
 
-        [Test]
-        public void CKTest()
+        [TestCase( false )]
+        public void two_project_interdepending( bool chained )
         {
-            Console.WriteLine( "next test" );
-            using(var h = TestHost.CreateWithUniverse())
+            using( var testHost = TestHost.CreateWithUniverse( chained ) )
             {
-                h.EqualToSnapshot( "CKTest2" );
-                //Scenario
+                using( var w = testHost.OpenWorld( "CKTest-Build" ) )
+                {
+                    w.Should().NotBeNull();
+
+
+
+                    w.World.AllBuild( TestHelper.Monitor );
+                    w.World.AllBuild( TestHelper.Monitor );
+                }
             }
         }
     }

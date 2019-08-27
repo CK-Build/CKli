@@ -17,11 +17,39 @@ namespace CK.Env.Tests
 {
     public class TestHost : IDisposable
     {
+        /// <summary>
+        /// Temp path of the TestHost.
+        /// </summary>
         readonly NormalizedPath _tempPath;
+
+        /// <summary>
+        /// The <see cref="UserHost"/> used to run tests on.
+        /// </summary>
         public readonly UserHost UserHost;
+
         const string _fakeRemoteFeedName = "FakeRemoteFeed";
+
+        /// <summary>
+        /// Name of the Git Folder in a Universe Zip storing all the Worlds.
+        /// </summary>
+        const string _worldsFolderName = "Worlds";
+
+        /// <summary>
+        /// Name of the Git Folder in a Universe Zip storing all the stacks.
+        /// </summary>
+        const string _stackFolderName = "CKTest-Stack";
+
+        /// <summary>
+        /// Name of the directory used to clone all the repositories.
+        /// </summary>
         const string _devDirectoryName = "dev";
-        TestHost( NormalizedPath tempPath, FakeApplicationLifetime fakeApplicationLifetime, UserHost userHost )
+
+        /// <summary>
+        /// Instantiate a new <see cref="TestHost"/>.
+        /// </summary>
+        /// <param name="tempPath">Path of the TestHost.</param>
+        /// <param name="userHost">The UserHost instantied with this path.</param>
+        TestHost( NormalizedPath tempPath, UserHost userHost )
         {
             _tempPath = tempPath;
             UserHost = userHost;
@@ -29,7 +57,8 @@ namespace CK.Env.Tests
 
 
         /// <summary>
-        /// Create a test host in a temp directory with initialized tests stacks.
+        /// Create a test host in a temp directory.
+        /// This TestHost has no stacks.
         /// </summary>
         /// <returns></returns>
         public static TestHost Create()
@@ -39,13 +68,16 @@ namespace CK.Env.Tests
             Directory.CreateDirectory( tempPath );
             var userHost = new UserHost( appLife, tempPath );
             userHost.Initialize( TestHelper.Monitor );
+            userHost.WorldStore.DeleteStackDefinition( TestHelper.Monitor, "CK" );
+            userHost.WorldStore.DeleteStackDefinition( TestHelper.Monitor, "CK-Build" );
             Directory.CreateDirectory( tempPath.AppendPart( _fakeRemoteFeedName ) );
             Directory.CreateDirectory( tempPath.AppendPart( _devDirectoryName ) );
-            return new TestHost( tempPath, appLife, userHost );
+            return new TestHost( tempPath, userHost );
         }
 
-        public OpenedWorld OpenWorld( string worldName ) => OpenedWorld.OpenWorld( UserHost.WorldSelector, worldName );
-
+        /// <summary>
+        /// Simple class encapsulating an opened World.
+        /// </summary>
         public class OpenedWorld : IDisposable
         {
             public World World => _worldSelector.CurrentWorld;
@@ -55,13 +87,20 @@ namespace CK.Env.Tests
             {
                 _worldSelector = worldSelector;
             }
-
+            /// <summary>
+            /// Open a World and encapsulate it in an OpenedWorld.
+            /// </summary>
+            /// <param name="worldSelector"></param>
+            /// <param name="worldName"></param>
+            /// <returns></returns>
             public static OpenedWorld OpenWorld( WorldSelector worldSelector, string worldName )
             {
                 if( !worldSelector.Open( TestHelper.Monitor, worldName ) ) return null;
                 return new OpenedWorld( worldSelector );
             }
-
+            /// <summary>
+            /// Close the world.
+            /// </summary>
             public void Dispose()
             {
                 _worldSelector.Close( TestHelper.Monitor );
@@ -88,79 +127,136 @@ namespace CK.Env.Tests
             public string SourceFeedNpm { get; set; }
         }
 
-        static NormalizedPath TestsUniverseFolder => TestHelper.TestProjectFolder.AppendPart( "UniversesTestsZips" );
+        /// <summary>
+        /// Path to the folder storing the **Universe Zips** used for the Tests.
+        /// </summary>
+        static NormalizedPath TestsUniverseFolder => TestHelper.TestProjectFolder.AppendPart( "UniverseZips" );
 
+        /// <summary>
+        /// Path to the folder storing the builded **Images**.
+        /// </summary>
+        static NormalizedPath BuildedImageFolder => TestHelper.TestProjectFolder.AppendPart( "Images" );
 
-        NormalizedPath WorldsFolder => _tempPath.AppendPart( "Worlds" );
-        NormalizedPath StackGitPath => _tempPath.AppendPart( "CKTest-Stack" );
+        /// <summary>
+        /// Path to the folder storing the **Modification** to apply while testing.
+        /// </summary>
+        static NormalizedPath ModificationsFolder => TestHelper.TestProjectFolder.AppendPart( "Modifications" );
+
+        /// <summary>
+        /// Path to the Folder where all the Worlds are stored.
+        /// </summary>
+        NormalizedPath WorldsFolder => _tempPath.AppendPart( _worldsFolderName );
+
+        /// <summary>
+        /// Path to the <see cref="Repository"/> storing the Stacks.
+        /// </summary>
+        NormalizedPath StackGitPath => _tempPath.AppendPart( _stackFolderName );
+
+        /// <summary>
+        /// Path to the Folder used as a Remote Feed.
+        /// </summary>
         NormalizedPath FakeRemoteFeedPath => _tempPath.AppendPart( _fakeRemoteFeedName );
 
+        /// <summary>
+        /// Path to the Folder used to clone the Worlds Repositories.
+        /// </summary>
         NormalizedPath DevDirectory => _tempPath.AppendPart( _devDirectoryName );
 
-
+        /// <summary>
+        /// Return all the Repositories' worlds.
+        /// </summary>
         IEnumerable<NormalizedPath> AllGitRepos =>
-            new List<NormalizedPath>
-            (
-                Directory.GetDirectories( WorldsFolder ).SelectMany( p => Directory.GetDirectories( p ) ).Select( p => new NormalizedPath( p ) )
-            ) { new NormalizedPath( StackGitPath ) };
+            Directory.GetDirectories( WorldsFolder )
+            .SelectMany( p => Directory.GetDirectories( p ) )
+            .Select( p => new NormalizedPath( p ) );
 
-        public bool EqualToSnapshot( string snapShotName )
+        /// <summary>
+        /// Test the equality with an Image.
+        /// </summary>
+        /// <param name="imageName">Image to use to do the comparison.</param>
+        /// <param name="inGeneratedFolder">Whether the image is stored in <see cref="BuildedImageFolder"/>(<see langword="true"/>) or </param>
+        /// <returns></returns>
+        public bool IsEqualToImage( string imageName, bool inGeneratedFolder )
         {
-            using( var truth = CreateWithUniverse( snapShotName ) )
+            using( var truth = CreateWithUniverse( inGeneratedFolder, null, imageName ) )
             {
-                var repos = AllGitRepos.Select( p => new Repository( p ) );
-                var truthRepo = truth.AllGitRepos.Select( p => new Repository( p ) );
-
-                var truthpath = GetAllPathOfRepos( truthRepo );
-                var paths = GetAllPathOfRepos( repos );
-
-                foreach( var path in paths )
-                {
-                    Console.WriteLine( path );
-                }
-                Console.WriteLine( "**************************" );
-                foreach( var path in truthpath )
-                {
-                    Console.WriteLine( path );
-                }
-                return true;
+                return IsEqualToTestHost( truth );
             }
         }
-        IEnumerable<NormalizedPath> GetAllPathOfRepos( IEnumerable<Repository> repos )
+
+        public bool IsEqualToTestHost(TestHost testHost)
+        {
+            var repos = AllGitRepos.Select( p => new Repository( p ) );
+            var truthRepo = testHost.AllGitRepos.Select( p => new Repository( p ) );
+
+            var truthpath = GetAllFilePathOfRepos( truthRepo ).ToList();
+            var paths = GetAllFilePathOfRepos( repos ).ToList();
+            foreach( NormalizedPath path in paths )
+            {
+                if( !truthpath.Remove( path ) )
+                {
+                    if( truthpath.Contains( path ) ) throw new InvalidOperationException();//Should be true ... Maybe concurrent acces ?
+                    return false;
+                }
+            }
+            return truthpath.Count() == 0;
+        }
+        IEnumerable<NormalizedPath> GetAllFilePathOfRepos( IEnumerable<Repository> repos )
         {
             return repos.SelectMany( p =>
             {
                 var a = p.Branches.Select( q => q.Tip ).ToList();
                 if( a.Count == 0 ) return new NormalizedPath[0];
-                return AllFileFullPath( p.Info.Path, a.MaxBy( r => r.Author.When ).Tree );
+                return AllFileFullPath( "/", a.MaxBy( r => r.Author.When ).Tree );
             } );
         }
+
         IEnumerable<NormalizedPath> AllFileFullPath( NormalizedPath treePath, Tree tree )
         {
             return tree.Where( x => x.TargetType == TreeEntryTargetType.Tree )
                  .SelectMany( x => AllFileFullPath( treePath.AppendPart( x.Name ), (Tree)x.Target ) )
-                 .Concat( tree.Where( x => x.TargetType == TreeEntryTargetType.Blob ).Select( p => treePath.AppendPart( p.Name+"-"+p.Target.Sha ) ) );
+                 .Concat( tree.Where( x => x.TargetType == TreeEntryTargetType.Blob ).Select( p => treePath.AppendPart( p.Name + "-" + p.Target.Sha ) ) );
         }
 
         /// <summary>
-        /// Create a test host and add the worlds of a universe, based on the callerName
+        /// Create a test host and add the worlds of a universe, based on the callerName.
         /// </summary>
+        /// <param name="recreateUniverseFromScratch">Should the image used to start this universe be recreated from scratch ?</param>
+        /// <param name="imageParentCreator">This should be the method that recreate the image and store it in <see cref="BuildedImageFolder"/>.</param>
         /// <param name="arbitraryName">Arbitrary optional name, take <see cref="callerMemberName"/> if null </param>
         /// <param name="callerMemberName"></param>
         /// <returns></returns>
-        public static TestHost CreateWithUniverse( string arbitraryName = null, [CallerMemberName] string callerMemberName = null )
+        public static TestHost CreateWithUniverse( bool recreateUniverseFromScratch, Action<bool> imageParentCreator, string arbitraryName = null, [CallerMemberName] string callerMemberName = null )
         {
+            if( recreateUniverseFromScratch && imageParentCreator != null ) imageParentCreator( true );
             var host = Create();
-            host.AddTestStackFromUniverseZip( arbitraryName ?? callerMemberName );
+            host.LoadUniverse( arbitraryName ?? callerMemberName, recreateUniverseFromScratch );
             return host;
         }
 
-        void DezipUniverse( string universeName )
+        /// <summary>
+        /// Load an image in the current TestHost. Should be run only once.
+        /// </summary>
+        /// <param name="universeName"></param>
+        /// <param name="generatedImage"></param>
+        void LoadImage( string universeName, bool generatedImage )
         {
-            NormalizedPath zipPath = TestsUniverseFolder.AppendPart( universeName + ".zip" );
-            ZipFile.ExtractToDirectory( zipPath, _tempPath );
+            var folder = generatedImage ? BuildedImageFolder : TestsUniverseFolder;
+            ZipFile.ExtractToDirectory( folder.AppendPart( universeName + ".zip" ), _tempPath );
         }
 
+        /// <summary>
+        /// Apply the modifications stored as a zip in the Folder Modifications
+        /// </summary>
+        void ApplyModifications( string modificationName )
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Replace the placeholders in the configs with the default config.
+        /// </summary>
+        /// <returns></returns>
         string[] SetStacksDefaultConfig()
         {
             string[] worlds;
@@ -175,100 +271,39 @@ namespace CK.Env.Tests
                 }
                 Commands.Stage( repo, files );
                 Signature signature = new Signature( new Identity( "CKli_UnitTest", "test@signature-code.com" ), DateTimeOffset.UtcNow );
-                repo.Commit( "Replaced placeholds", signature, signature );
+
+                if( repo.RetrieveStatus().IsDirty ) repo.Commit( "Replaced placeholds", signature, signature );
                 repo.Network.Push( repo.Head );
             }
-            DeleteDirectory( TestHelper.Monitor, tempGit );
+            FileHelper.DeleteDirectory( TestHelper.Monitor, tempGit );
             return worlds;
         }
-        /// <summary>
-        /// From https://github.com/libgit2/libgit2sharp/blob/f8e2d42ed9051fa5a5348c1a13d006f0cc069bc7/LibGit2Sharp.Tests/TestHelpers/DirectoryHelper.cs#L40
-        /// </summary>
-        /// <param name="directoryPath"></param>
-        public static void DeleteDirectory( IActivityMonitor m, string directoryPath )
-        {
-            // From http://stackoverflow.com/questions/329355/cannot-delete-directory-with-directory-deletepath-true/329502#329502
 
-            if( !Directory.Exists( directoryPath ) )
-            {
-                m.Trace( string.Format( "Directory '{0}' is missing and can't be removed.", directoryPath ) );
-                return;
-            }
-            NormalizeAttributes( directoryPath );
-            DeleteDirectory( m, directoryPath, maxAttempts: 5, initialTimeout: 16, timeoutFactor: 2 );
-        }
-        static readonly Type[] _whitelist = { typeof( IOException ), typeof( UnauthorizedAccessException ) };
-        private static void DeleteDirectory( IActivityMonitor m, string directoryPath, int maxAttempts, int initialTimeout, int timeoutFactor )
-        {
-            for( int attempt = 1; attempt <= maxAttempts; attempt++ )
-            {
-                try
-                {
-                    Directory.Delete( directoryPath, true );
-                    return;
-                }
-                catch( Exception ex )
-                {
-                    var caughtExceptionType = ex.GetType();
-
-                    if( !_whitelist.Any( knownExceptionType => knownExceptionType.GetTypeInfo().IsAssignableFrom( caughtExceptionType ) ) )
-                    {
-                        throw;
-                    }
-
-                    if( attempt < maxAttempts )
-                    {
-                        Thread.Sleep( initialTimeout * (int)Math.Pow( timeoutFactor, attempt - 1 ) );
-                        continue;
-                    }
-
-                    m.Trace( string.Format( "{0}The directory '{1}' could not be deleted ({2} attempts were made) due to a {3}: {4}" +
-                                                  "{0}Most of the time, this is due to an external process accessing the files in the temporary repositories created during the test runs, and keeping a handle on the directory, thus preventing the deletion of those files." +
-                                                  "{0}Known and common causes include:" +
-                                                  "{0}- Windows Search Indexer (go to the Indexing Options, in the Windows Control Panel, and exclude the bin folder of LibGit2Sharp.Tests)" +
-                                                  "{0}- Antivirus (exclude the bin folder of LibGit2Sharp.Tests from the paths scanned by your real-time antivirus)" +
-                                                  "{0}- TortoiseGit (change the 'Icon Overlays' settings, e.g., adding the bin folder of LibGit2Sharp.Tests to 'Exclude paths' and appending an '*' to exclude all subfolders as well)",
-                        Environment.NewLine, Path.GetFullPath( directoryPath ), maxAttempts, caughtExceptionType, ex.Message ) );
-                }
-            }
-        }
-
-        private static void NormalizeAttributes( string directoryPath )
-        {
-            string[] filePaths = Directory.GetFiles( directoryPath );
-            string[] subdirectoryPaths = Directory.GetDirectories( directoryPath );
-
-            foreach( string filePath in filePaths )
-            {
-                File.SetAttributes( filePath, FileAttributes.Normal );
-            }
-            foreach( string subdirectoryPath in subdirectoryPaths )
-            {
-                NormalizeAttributes( subdirectoryPath );
-            }
-            File.SetAttributes( directoryPath, FileAttributes.Normal );
-        }
 
         /// <summary>
-        /// Ensure the stacks given, will remove the stacks CK and CK-Build.
+        /// Ensure the given stacks in the WorldStore.
         /// </summary>
-        /// <param name="worlds"></param>
+        /// <param name="worlds">Worlds to ensure.</param>
         void EnsureStacks( string[] worlds )
         {
             foreach( string world in worlds )
             {
                 UserHost.WorldStore.EnsureStackDefinition( TestHelper.Monitor, world, new Uri( StackGitPath ).AbsoluteUri, true, DevDirectory );
             }
-            UserHost.WorldStore.DeleteStackDefinition( TestHelper.Monitor, "CK" );
-            UserHost.WorldStore.DeleteStackDefinition( TestHelper.Monitor, "CK-Build" );
         }
 
-        public string[] AddTestStackFromUniverseZip( string universeZipName )
+        /// <summary>
+        /// Unzip in the <see cref="_tempPath"/> a zip representing an universe.
+        /// </summary>
+        /// <param name="universeName">Name of the universe to add.</param>
+        /// <param name="generatedImage"></param>
+        /// <returns></returns>
+        public string[] LoadUniverse( string universeName, bool generatedImage )
         {
-            DezipUniverse( universeZipName ); // We now have two directories: CKTest-Stack(The git containing the .Worlds) and Worlds repositories.
-            string[] worlds = SetStacksDefaultConfig();
-            EnsureStacks( worlds );
-            return worlds;
+            LoadImage( universeName, generatedImage ); // We now have two directories: CKTest-Stack(The git containing the .Worlds) and Worlds repositories.
+            string[] stacks = SetStacksDefaultConfig();
+            EnsureStacks( stacks );
+            return stacks;
         }
 
         /// <summary>
@@ -294,15 +329,46 @@ namespace CK.Env.Tests
             return output;
         }
 
+        /// <summary>
+        /// Replace the placeholders in the World file.
+        /// </summary>
+        /// <param name="configPath">Path of the World file.</param>
+        /// <param name="worldConfig">The config to apply on the World.</param>
         public static void ReplacePlaceHolderInConfig( NormalizedPath configPath, TestWorldConfig worldConfig )
         {
             File.WriteAllText( configPath, ReplaceWorldPlaceHolder( File.ReadAllText( configPath ), worldConfig ) );
         }
 
+
+        /// <summary>
+        /// Build an image from the current TestHost.
+        /// Allow to restore a TestHost with the FileSystem same state.
+        /// </summary>
+        /// <param name="arbitraryName">The name of the image to generate. Default to <paramref name="callerMemberName"/> if null.</param>
+        /// <param name="callerMemberName"></param>
+        public void BuildImage( string arbitraryName = null, [CallerMemberName] string callerMemberName = null )
+        {
+            string universeName = arbitraryName ?? callerMemberName;
+            string zipPath = BuildedImageFolder.AppendPart( universeName + ".zip" );
+            File.Delete( zipPath );
+            ZipFile.CreateFromDirectory( _tempPath, zipPath );
+            using( ZipArchive archive = ZipFile.Open( zipPath, ZipArchiveMode.Update ) )
+            {
+                var entries = archive.Entries.Where( p => !p.FullName.StartsWith( _stackFolderName ) && !p.FullName.StartsWith( _worldsFolderName ) ).ToList();
+                foreach( var toDelete in entries )
+                {
+                    toDelete.Delete();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Dispose the <see cref="UserHost"/> and delete the temporary test.
+        /// </summary>
         public void Dispose()
         {
             UserHost.Dispose();
-            DeleteDirectory( TestHelper.Monitor, _tempPath );
+            FileHelper.DeleteDirectory( TestHelper.Monitor, _tempPath );
         }
     }
 }

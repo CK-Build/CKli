@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.1</TargetFramework>
@@ -23,7 +23,7 @@
   
   <ItemGroup>
     <!-- Fix run: cannot find git2-8e0b172.dll-->
-    <PackageReference Include="LibGit2Sharp" Version="0.26.0" />
+    <PackageReference Include="LibGit2Sharp" Version="0.26.1" />
   </ItemGroup>
   
 </Project>

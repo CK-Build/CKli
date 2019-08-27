@@ -138,12 +138,10 @@ namespace CK.Env.NuGet
 
         class SourcePackageProvider : IPackageSourceProvider
         {
-            readonly NuGetClient _c;
             readonly List<PackageSource> _packageSources;
 
-            public SourcePackageProvider( NuGetClient c )
+            public SourcePackageProvider()
             {
-                _c = c;
                 _packageSources = new List<PackageSource>();
             }
 
@@ -235,7 +233,7 @@ namespace CK.Env.NuGet
             SecretKeyStore = keyStore;
             var c = new SourceCacheContext() { NoCache = true };
             SourceCache = c.WithRefreshCacheTrue();
-            _sourcePackageProvider = new SourcePackageProvider( this );
+            _sourcePackageProvider = new SourcePackageProvider();
         }
 
         public SecretKeyStore SecretKeyStore { get; }
@@ -308,19 +306,16 @@ namespace CK.Env.NuGet
                     return i.HandleFeed( url, name, creds );
                 }
             }
-            var feed = new PureFeed( this, url, name, creds, secretKeyed );
+            var feed = new PureFeed(this, url, name, creds);
             _sourcePackageProvider.SetPackageSources( internals.Append( feed ) );
             return feed.Feed;
         }
 
         class PureFeed : NuGetFeedBase
         {
-            readonly SecretKeyInfo _secretKeyed;
-
-            public PureFeed( NuGetClient c, string url, string name, SimpleCredentials creds, SecretKeyInfo secretKeyed )
+            public PureFeed(NuGetClient c, string url, string name, SimpleCredentials creds)
                 : base( c, url, name, creds )
             {
-                _secretKeyed = secretKeyed;
             }
 
             private protected override bool CanRetry( MetadataResource meta, NuGetLoggerAdapter logger, Exception ex )
