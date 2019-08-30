@@ -50,7 +50,7 @@ namespace CodeCake
 
                 public PackageSource FindOrCreateFromUrl( string name, string urlV3 )
                 {
-                    if( string.IsNullOrEmpty( urlV3 ) || (!new Uri( urlV3 ).IsFile && urlV3.EndsWith( "/v3/index.json" )) )
+                    if( string.IsNullOrEmpty( urlV3 ) || (!new Uri( urlV3 ).IsFile && !urlV3.EndsWith( "/v3/index.json" )) )
                     {
                         throw new ArgumentException( "Feed requires a /v3/index.json url.", nameof( urlV3 ) );
                     }
