@@ -134,23 +134,32 @@ namespace CK.Env.Plugin
         void HandleReproducibleBuilds( IActivityMonitor m )
         {
             const string sectionName = "ReproducibleBuilds";
-            var section = XCommentSection.FindOrCreate( Document.Root, sectionName, false );
-            if( section == null )
+            // This may be temporary: see https://github.com/dotnet/sourcelink/issues/91
+            // For the moment, when SourceLink is disabled, we also disable the reproducible builds.
+            if( _solutionSpec.DisableSourceLink )
             {
-                // Removes previously non sectioned property group.
-                Document.Root.Elements( "PropertyGroup" ).Where( e => e.Element( "CKliWorldPath" ) != null )
-                    .Select( e => e.ClearCommentsBeforeAndNewLineAfter() )
-                    .Remove();
-                section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
+                XCommentSection.FindOrCreate( Document.Root, sectionName, false )?.Remove();
             }
-            section.StartComment = ": See http://blog.paranoidcoding.com/2016/04/05/deterministic-builds-in-roslyn.html.";
-            section.SetContent(
-                XElement.Parse(
+            else
+            {
+                var section = XCommentSection.FindOrCreate( Document.Root, sectionName, false );
+                if( section == null )
+                {
+                    // Removes previously non sectioned property group.
+                    Document.Root.Elements( "PropertyGroup" ).Where( e => e.Element( "CKliWorldPath" ) != null )
+                        .Select( e => e.ClearCommentsBeforeAndNewLineAfter() )
+                        .Remove();
+                    section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
+                }
+                section.StartComment = ": See http://blog.paranoidcoding.com/2016/04/05/deterministic-builds-in-roslyn.html.";
+                section.SetContent(
+                    XElement.Parse(
 $@"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
   <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
   <Deterministic>true</Deterministic>
   <PathMap>'$(SolutionDir)'=C:\CKli-World\{GitFolder.SubPath.Path.Replace( '/', '\\' )}</PathMap>
 </PropertyGroup>" ) );
+            }
         }
 
         void HandleZeroVersion( IActivityMonitor m )
