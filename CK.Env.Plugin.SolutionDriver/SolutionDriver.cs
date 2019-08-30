@@ -477,7 +477,7 @@ namespace CK.Env.Plugin
 
             ICommitAssemblyBuildInfo b = CommitAssemblyBuildInfo.ZeroBuildInfo;
             string commonArgs = $@" --no-dependencies";
-            string versionArgs = $@" --configuration {b.BuildConfiguration} /p:Version=""{b.NuGetVersion}"" /p:AssemblyVersion=""{b.AssemblyVersion}"" /p:FileVersion=""{b.FileVersion}"" /p:InformationalVersion=""{b.InformationalVersion}"" ";
+            string versionArgs = $@" --configuration {b.BuildConfiguration} /p:Version=""{b.Version}"" /p:AssemblyVersion=""{b.AssemblyVersion}"" /p:FileVersion=""{b.FileVersion}"" /p:InformationalVersion=""{b.InformationalVersion}"" ";
             var args = info.MustPack
                         ? $@"pack --output ""{_localFeedProvider.ZeroBuild.PhysicalPath}"""
                         : $@"publish --output ""{_localFeedProvider.GetZeroVersionCodeCakeBuilderExecutablePath( solution.Name ).RemoveLastPart()}""";
@@ -593,7 +593,7 @@ namespace CK.Env.Plugin
             if( solution == null ) return false;
 
             // Version is always provided by the current commit point.
-            var v = GitFolder.ReadRepositoryVersionInfo( monitor )?.FinalNuGetVersion;
+            var v = GitFolder.ReadRepositoryVersionInfo( monitor )?.FinalVersion;
             if( v == null ) return false;
 
             BuildType buildType;

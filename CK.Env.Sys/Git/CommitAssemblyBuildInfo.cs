@@ -18,9 +18,7 @@ namespace CK.Env
 
             public string InformationalVersion => CSemVer.InformationalVersion.ZeroInformationalVersion;
 
-            public SVersion SemVersion => SVersion.ZeroVersion;
-
-            public SVersion NuGetVersion => SVersion.ZeroVersion;
+            public SVersion Version => SVersion.ZeroVersion;
 
             public string AssemblyVersion => CSemVer.InformationalVersion.ZeroAssemblyVersion;
 
@@ -44,21 +42,15 @@ namespace CK.Env
             if( String.IsNullOrWhiteSpace( commitSha ) ) throw new ArgumentNullException( nameof( commitSha ) );
             if( commitDateUtc.Kind != DateTimeKind.Utc ) throw new ArgumentException( "Must be Utc.", nameof( commitSha ) );
 
-            // Take no risk: normalize the raw text.
-            NuGetVersion = SVersion.Parse( releaseVersion.ToString( CSVersionFormat.NuGetPackage ) );
-            SemVersion = SVersion.Parse( releaseVersion.ToString( CSVersionFormat.Normalized ) );
-
+            Version = releaseVersion.ToNormalizedForm();
             CommitDateUtc = commitDateUtc;
             CommitSha = commitSha;
-
             BuildConfiguration = releaseVersion.Prerelease.Length == 0 || releaseVersion.Prerelease == "rc"
                                    ? "Release"
                                    : "Debug";
-
             AssemblyVersion = $"{releaseVersion.Major}.{releaseVersion.Minor}";
             FileVersion = releaseVersion.ToStringFileVersion( false );
-
-            InformationalVersion = CSemVer.InformationalVersion.BuildInformationalVersion( SemVersion.ToString(), NuGetVersion.ToString(), CommitSha, CommitDateUtc );
+            InformationalVersion = Version.GetInformationalVersion( CommitSha, CommitDateUtc );
         }
 
         /// <summary>
@@ -87,16 +79,10 @@ namespace CK.Env
         public string InformationalVersion { get; }
 
         /// <summary>
-        /// Gets the semantic version (long form) that must be used to build this commit
-        /// point. Never null: defaults to <see cref="SVersion.ZeroVersion"/>.
-        /// </summary>
-        public SVersion SemVersion { get; }
-
-        /// <summary>
-        /// Gets the NuGet version (short form) that must be used to build this commit point.
+        /// Gets the normalized version (short form) that must be used to build this commit point.
         /// Never null: defaults to <see cref="SVersion.ZeroVersion"/>.
         /// </summary>
-        public SVersion NuGetVersion { get; }
+        public SVersion Version { get; }
 
         /// <summary>
         /// Gets the "Major.Minor" string.

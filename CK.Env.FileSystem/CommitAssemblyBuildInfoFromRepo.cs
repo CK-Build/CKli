@@ -13,10 +13,10 @@ namespace CK.Env
         {
             Debug.Assert( info != null );
             _info = info;
-            BuildConfiguration = info.FinalNuGetVersion.Prerelease.Length == 0 || info.FinalNuGetVersion.Prerelease == "rc"
+            BuildConfiguration = info.FinalVersion.Prerelease.Length == 0 || info.FinalVersion.AsCSVersion?.PrereleaseName == "rc"
                                    ? "Release"
                                    : "Debug";
-            AssemblyVersion = $"{info.FinalNuGetVersion.Major}.{info.FinalNuGetVersion.Minor}";
+            AssemblyVersion = $"{info.FinalVersion.Major}.{info.FinalVersion.Minor}";
             if( info.CIRelease != null )
             {
                 FileVersion = info.CIRelease.BaseTag.ToStringFileVersion( true );
@@ -39,9 +39,7 @@ namespace CK.Env
 
         public string InformationalVersion => _info.FinalInformationalVersion;
 
-        public SVersion SemVersion => _info.FinalSemVersion;
-
-        public SVersion NuGetVersion => _info.FinalNuGetVersion;
+        public SVersion Version => _info.FinalVersion;
 
         public string AssemblyVersion { get; }
 

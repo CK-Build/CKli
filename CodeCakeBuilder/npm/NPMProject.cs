@@ -34,7 +34,7 @@ namespace CodeCake
                 _savedPackageJson = File.ReadAllText( p.PackageJson.JsonFilePath );
 
                 JObject json = JObject.Parse( _savedPackageJson );
-                json["version"] = version.ToNuGetPackageString();
+                json["version"] = version.ToNormalizedString();
                 if( preparePack )
                 {
                     json.Remove( "devDependencies" );

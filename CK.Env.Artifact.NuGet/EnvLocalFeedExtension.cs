@@ -48,7 +48,7 @@ namespace CK.Env
 
         static internal string GetPackagePath( string path, string packageId, SVersion v )
         {
-            return System.IO.Path.Combine( path, packageId + '.' + v.ToNuGetPackageString() + ".nupkg" );
+            return System.IO.Path.Combine( path, packageId + '.' + v.ToNormalizedString() + ".nupkg" );
         }
 
     }

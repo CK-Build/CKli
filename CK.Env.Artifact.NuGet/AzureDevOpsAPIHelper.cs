@@ -108,7 +108,7 @@ namespace CK.Env
                 b.Append( @"{""id"": """ )
                     .AppendJSONEscaped( p.Artifact.Name )
                     .Append( @""",""version"": """ )
-                    .AppendJSONEscaped( p.Version.ToNuGetPackageString() )
+                    .AppendJSONEscaped( p.Version.ToNormalizedString() )
                     .Append( @""",""protocolType"": """ )
                     .Append( npm ? "Npm" : "NuGet" ).Append( @"""}" );
             }

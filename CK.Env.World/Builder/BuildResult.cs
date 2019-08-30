@@ -109,7 +109,7 @@ namespace CK.Env
             var artifacts = GeneratedArtifacts.Select( a => new XElement( XmlNames.xA,
                                                                    new XAttribute( XmlNames.xType, a.Artifact.Artifact.Type ),
                                                                    new XAttribute( XmlNames.xName, a.Artifact.Artifact.Name ),
-                                                                   new XAttribute( XmlNames.xVersion, a.Artifact.Version.ToNuGetPackageString() ),
+                                                                   new XAttribute( XmlNames.xVersion, a.Artifact.Version.ToNormalizedString() ),
                                                                    new XAttribute( XmlNames.xSolution, a.SolutionName ),
                                                                    new XAttribute( XmlNames.xTarget, a.TargetName ) ) );
             var releaseNotes = ReleaseNotes != null

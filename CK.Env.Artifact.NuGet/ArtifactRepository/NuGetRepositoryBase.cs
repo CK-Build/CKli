@@ -150,7 +150,7 @@ namespace CK.Env.NuGet
             {
                 await SafeCall( m, async ( meta, logger ) =>
                 {
-                    var exist = files.Select( file => (file, id: new PackageIdentity( file.PackageId, NuGetVersion.Parse( file.Version.ToNuGetPackageString() ) )) )
+                    var exist = files.Select( file => (file, id: new PackageIdentity( file.PackageId, NuGetVersion.Parse( file.Version.ToNormalizedString() ) )) )
                                      .Select( fId => (fId.file, exists: meta.Exists( fId.id, Client.SourceCache, logger, CancellationToken.None )) )
                                      .ToArray();
                     await Task.WhenAll( exist.Select( e => e.exists ) );
