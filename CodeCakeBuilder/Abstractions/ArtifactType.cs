@@ -134,6 +134,7 @@ namespace CodeCake.Abstractions
         /// <summary>
         /// Must get the remote target feeds into which artifacts of this
         /// type should be pushed.
+        /// This is used only in the constructor
         /// </summary>
         /// <returns>A set of remote feed.</returns>
         protected abstract IEnumerable<ArtifactFeed> GetRemoteFeeds();
