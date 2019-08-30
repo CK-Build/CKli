@@ -124,10 +124,8 @@ namespace CK.Env.Tests.LocalTestHelper
         public void ReloadConfig()
         {
             var path = TempPath.AppendPart( _ckliMapping );
-            var files = Directory.EnumerateDirectories( path )
-                .Where( p => p != "Logs" )
-                .SelectMany( p => Directory.EnumerateFiles( p ) )
-                .Where( p => !p.Contains( ".git" ) && !p.Contains( "SharedState" ) );
+            var files = Directory.EnumerateFiles( path, "*.World.xml", SearchOption.AllDirectories)
+                .Where( p => !p.Contains( ".git" ) );
             var config = new Dictionary<string, StackConfig>();
             foreach( string fileName in files )
             {

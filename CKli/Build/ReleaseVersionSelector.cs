@@ -50,12 +50,19 @@ namespace CKli
                 .Where( p => p.IsPublished && p.PackageReferences.Any( q => q.Kind == ArtifactDependencyKind.Transitive ) )
                 .Select( p =>
                 {
-                    List<PackageReference> pcks = p.PackageReferences.Where( q => q.Kind == ArtifactDependencyKind.Transitive ).ToList();
+                    List<PackageReference> pcks = p.PackageReferences
+                    .Where( q => q.Kind == ArtifactDependencyKind.Transitive )
+                    .Where(
+                        q => !c.Solution.ImportedLocalPackages
+                                .Any( s => s.Package.Artifact == q.Target.Artifact )
+                         )
+                    .ToList();
                     PackageQuality worstQuality = pcks.Select( q => q.Target.Version.PackageQuality ).Min();
                     return (p, pcks.Where( q => q.Target.Version.PackageQuality == worstQuality ));
                 } )//There should be at least one package reference
                 .GroupBy( p => p.Item2.First().Target.Version.PackageQuality ).ToList();
-            var worst = projExRefNotRelease.SingleOrDefault( p => p.Key == projExRefNotRelease.Min( q => q.Key ) ); //ugliest LINQ i ever wrote, should take 3 lines.
+            var min = projExRefNotRelease.Min( q => q.Key );
+            var worst = projExRefNotRelease.SingleOrDefault( p => p.Key == min ); //ugliest LINQ i ever wrote, should take 3 lines.
             if( worst == null || worst.Key == PackageQuality.Release )
             {
                 Console.WriteLine( "Nothing prevent to choose the Release quality." );
@@ -68,7 +75,7 @@ namespace CKli
                 foreach( var proj in worst )
                 {
                     Console.WriteLine( "    => " + proj.p.Name + " caused by packages references " +
-                        string.Join( ", ", proj.Item2.Select( p => p.Target.ToString() ).ToArray() ) );
+                        string.Join( ", ", proj.Item2.Select( p => p.ToString() ).ToArray() ) );
                 }
                 Console.ForegroundColor = prev;
             }
