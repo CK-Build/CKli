@@ -2,6 +2,7 @@ using CK.Core;
 using CK.Text;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 
 namespace CK.Env
@@ -16,6 +17,7 @@ namespace CK.Env
 
         public UserHost( IBasicApplicationLifetime lifetime, NormalizedPath userHostPath )
         {
+            Directory.CreateDirectory( userHostPath );
             ApplicationLifetime = lifetime;
             CommandRegister = new CommandRegister();
             _xTypedObjectfactory = new XTypedFactory();
@@ -26,7 +28,7 @@ namespace CK.Env
             CommandRegister.Register( this );
         }
 
-        NormalizedPath ICommandMethodsProvider.CommandProviderName => UserHost.HomeCommandPath;
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => HomeCommandPath;
 
         public CommandRegister CommandRegister { get; }
 
