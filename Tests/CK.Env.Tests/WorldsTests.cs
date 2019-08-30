@@ -31,6 +31,7 @@ namespace CK.Env.Tests
             using( var testHost = _imageManager.InstantiateImage( false ) ) //The first test does'nt pickup the image from the Generated Images folder.
             {
                 testHost.UserHost.WorldStore.EnsureStackDefinition( TestHelper.Monitor, "CKTest-Build", testHost.StackBareGitPath, true, testHost.UserLocalDirectory);
+                testHost.ReloadConfig();
                 testHost.UserHost.WorldSelector.Open( TestHelper.Monitor, "CKTest-Build" ).Should().BeTrue();
                 var w = testHost.UserHost.WorldSelector.CurrentWorld;
                 w.Should().NotBeNull();
