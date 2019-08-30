@@ -69,7 +69,7 @@ namespace CK.Env.Plugin
                 var v = (string)Root["version"];
                 return v != null ? SVersion.TryParse( v ) : null;
             }
-            set => SetNonNullProperty( Root, "version", value?.ToNuGetPackageString() );
+            set => SetNonNullProperty( Root, "version", value?.ToNormalizedString() );
         }
 
         /// <summary>

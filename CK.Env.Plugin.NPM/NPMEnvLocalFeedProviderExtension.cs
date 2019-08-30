@@ -18,7 +18,7 @@ namespace CK.Env
 
         internal static string GetNPMPackagePath( string path, string packageId, SVersion v )
         {
-            return System.IO.Path.Combine( path, packageId.Replace( "@", "" ).Replace( '/', '-' ) + '-' + v.ToNuGetPackageString() + ".tgz" );
+            return System.IO.Path.Combine( path, packageId.Replace( "@", "" ).Replace( '/', '-' ) + '-' + v.ToNormalizedString() + ".tgz" );
         }
     }
 }

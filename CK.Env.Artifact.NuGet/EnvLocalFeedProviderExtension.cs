@@ -25,8 +25,7 @@ namespace CK.Env
 
         internal static void DoRemoveFromNuGetCache( IActivityMonitor m, string packageId, SVersion version )
         {
-            var packageVersion = version.AsCSVersion?.ToString( CSVersionFormat.NuGetPackage ) ?? version.NormalizedText;
-            var dirPath = _localNuGetCache.AppendPart( packageId ).AppendPart( packageVersion );
+            var dirPath = _localNuGetCache.AppendPart( packageId ).AppendPart( version.ToNormalizedString() );
             if( FileHelper.RawDeleteLocalDirectory( m, dirPath ) )
             {
                 m.Info( $"Removed {packageId} package in version {version} from local NuGet cache." );
@@ -42,8 +41,7 @@ namespace CK.Env
         /// <returns>True if found, false otherwise.</returns>
         public static bool ExistsInNuGetCache( this IEnvLocalFeedProvider @this, IActivityMonitor m, string packageId, SVersion version )
         {
-            var packageVersion = version.AsCSVersion?.ToString( CSVersionFormat.NuGetPackage ) ?? version.NormalizedText;
-            var dirPath = _localNuGetCache.AppendPart( packageId ).AppendPart( packageVersion );
+            var dirPath = _localNuGetCache.AppendPart( packageId ).AppendPart( version.ToNormalizedString() );
             return System.IO.Directory.Exists( dirPath );
         }
 

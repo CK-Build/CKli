@@ -126,7 +126,7 @@ namespace CK.Env.NPM
             packageName = WebUtility.UrlEncode( packageName );
             using( HttpRequestMessage req = NpmRequestMessage( m, $"/-/package/{packageName}/dist-tags/{tagName}", HttpMethod.Put ) )
             {
-                req.Content = new StringContent( "\"" + version.ToNuGetPackageString() + "\"" );
+                req.Content = new StringContent( "\"" + version.ToNormalizedString() + "\"" );
                 req.Content.Headers.ContentType.MediaType = "application/json";
                 req.Content.Headers.ContentType.CharSet = "";
                 using( HttpResponseMessage response = await _httpClient.SendAsync( req ) )
@@ -262,7 +262,7 @@ namespace CK.Env.NPM
             }
             // Here the request is successful so we should have valid json.
             JObject fullData = JObject.Parse( body );
-            var v = fullData["versions"][version.ToNuGetPackageString()];
+            var v = fullData["versions"][version.ToNormalizedString()];
             return (v?.ToString() ?? "", v != null);
         }
 
@@ -301,12 +301,12 @@ namespace CK.Env.NPM
         {
             if( RegistryUri.IsFile )
             {
-                return File.Exists( Path.Combine( RegistryUri.AbsolutePath, +'-' + version.ToNuGetPackageString() + ".tgz" ) );
+                return File.Exists( Path.Combine( RegistryUri.AbsolutePath, +'-' + version.ToNormalizedString() + ".tgz" ) );
             }
 
             if( IsAzureRepository )
             {
-                (_, bool found) = await AzureSpecialVersionRequest( m, packageName, version.ToNuGetPackageString() );
+                (_, bool found) = await AzureSpecialVersionRequest( m, packageName, version.ToNormalizedString() );
                 return found;
             }
             (_, bool exist) = await View( m, packageName, version );

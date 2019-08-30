@@ -40,7 +40,7 @@ namespace CK.Env.Plugin
 
         public static NPMDep CreateNPMDepMinVersion( string name, ArtifactDependencyKind kind, SVersion minVersion )
         {
-            return new NPMDep( name, NPMVersionDependencyType.MinVersion, kind, ">=" + minVersion.ToNuGetPackageString(), minVersion );
+            return new NPMDep( name, NPMVersionDependencyType.MinVersion, kind, ">=" + minVersion.ToNormalizedString(), minVersion );
         }
 
         public static NPMDep CreateNPMDepLocalPath(NormalizedPath path, string name, ArtifactDependencyKind kind )
@@ -56,7 +56,7 @@ namespace CK.Env.Plugin
         /// <returns></returns>
         public static NPMDep CreateNPMDepLocalFeedTarball( NormalizedPath dirPath, string name, ArtifactDependencyKind kind, SVersion version )
         {
-            string fileName = $"{name.Replace( "@", "" ).Replace( "/", "-" )}-{version.ToNuGetPackageString()}.tgz";
+            string fileName = $"{name.Replace( "@", "" ).Replace( "/", "-" )}-{version.ToNormalizedString()}.tgz";
             return new NPMDep( name,
                 NPMVersionDependencyType.LocalFeedTarball,
                 kind,

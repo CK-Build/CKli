@@ -36,16 +36,10 @@ namespace CK.Env
         string InformationalVersion { get; }
 
         /// <summary>
-        /// Gets the semantic version (long form) that must be used to build this commit
-        /// point. Never null: defaults to <see cref="SVersion.ZeroVersion"/>.
-        /// </summary>
-        SVersion SemVersion { get; }
-
-        /// <summary>
-        /// Gets the NuGet version (short form) that must be used to build this commit point.
+        /// Gets the normalized version (short form) that must be used to build this commit point.
         /// Never null: defaults to <see cref="SVersion.ZeroVersion"/>.
         /// </summary>
-        SVersion NuGetVersion { get; }
+        SVersion Version { get; }
 
         /// <summary>
         /// Gets the "Major.Minor" string.
@@ -62,23 +56,4 @@ namespace CK.Env
         string FileVersion { get; }
     }
 
-    /// <summary>
-    /// Extends <see cref="ICommitAssemblyBuildInfo"/>.
-    /// </summary>
-    public static class CommitAssemblyBuildInfoExtension
-    {
-        /// <summary>
-        /// Returns a <see cref="ICommitAssemblyBuildInfo"/> for a release version.
-        /// </summary>
-        /// <param name="this">This build info.</param>
-        /// <param name="release">The release version.</param>
-        /// <returns>This or a new build info.</returns>
-        public static ICommitAssemblyBuildInfo WithReleaseVersion( this ICommitAssemblyBuildInfo @this, CSVersion release )
-        {
-            if( release == null ) throw new ArgumentNullException( nameof( release ) );
-            return @this.NuGetVersion == release || @this.SemVersion == release
-                    ? @this
-                    : new CommitAssemblyBuildInfo( release, @this.CommitSha, @this.CommitDateUtc );
-        }
-    }
 }
