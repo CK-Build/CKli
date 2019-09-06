@@ -6,13 +6,29 @@ using System.Text;
 
 namespace CK.Env.ArtifactCache
 {
+    /// <summary>
+    /// Small wrapper around the immutable <see cref="PackageDB"/> object.
+    /// </summary>
     class ArtifactModelLocalCache
     {
         PackageDB _db;
 
+        /// <summary>
+        /// Initializes a new empty cache.
+        /// </summary>
         public ArtifactModelLocalCache()
         {
             _db = new PackageDB();
+        }
+
+        /// <summary>
+        /// Writes this cache into a binary stream.
+        /// </summary>
+        /// <param name="w">The writer to use.</param>
+        public void Write( CKBinaryWriter w )
+        {
+            w.Write( 0 ); // Version.
+            _db.Write( w );
         }
 
         /// <summary>
@@ -34,7 +50,7 @@ namespace CK.Env.ArtifactCache
 
         /// <summary>
         /// Registers multiple packages at once. Any <see cref="PackageInfo.Dependencies"/> must
-        /// be already registered or appear before the dependent package.
+        /// be already registered or appear before the dependent package in the <paramref name="infos"/> enumerable.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="infos">The package informations.</param>

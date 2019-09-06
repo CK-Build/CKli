@@ -11,6 +11,11 @@ namespace CK.Env
 {
     public partial class PackageDB
     {
+        /// <summary>
+        /// Fundamental core of all the package cache system: this encapsulates a single compact
+        /// array of <see cref="PackageInstance"/> ordered by ArtifactType, ArtifactName and ultimately
+        /// by the full ArtifactInstance (type/name/version).
+        /// </summary>
         internal class InstanceStore : IReadOnlyList<PackageInstance>
         {
             readonly PackageInstance[] _instances;
@@ -19,6 +24,68 @@ namespace CK.Env
             {
                 _instances = Array.Empty<PackageInstance>();
             }
+
+            public InstanceStore( int version, ICKBinaryReader r )
+            {
+                int len = r.ReadInt32();
+                _instances = new PackageInstance[len];
+                ArtifactType type = null;
+                string name = null;
+                for( int i = 0; i < _instances.Length; ++i )
+                {
+                    switch( r.ReadByte() )
+                    {
+                        case 2:
+                            type = ArtifactType.Single( r.ReadString() ); goto case 1;
+                        case 1:
+                            name = r.ReadString(); break;
+                    }
+                    ArtifactInstance instance = new ArtifactInstance( type, name, CSemVer.SVersion.Parse( r.ReadString() ) );
+                    var regDate = r.ReadDateTime();
+                }
+            }
+
+            public void Write( ICKBinaryWriter w )
+            {
+                w.Write( _instances.Length );
+                string type = null;
+                string name = null;
+                for( int i = 0; i < _instances.Length; ++i )
+                {
+                    var p = _instances[i];
+                    if( p.Key.Artifact.Type.Name != type )
+                    {
+                        w.Write( (byte)2 );
+                        w.Write( type = p.Key.Artifact.Type.Name );
+                        w.Write( name = p.Key.Artifact.Name );
+                    }
+                    else if( p.Key.Artifact.Name != name )
+                    {
+                        w.Write( (byte)1 );
+                        w.Write( name = p.Key.Artifact.Name );
+                    }
+                    else w.Write( (byte)0 );
+                    w.Write( p.Key.Version.NormalizedText );
+                    w.Write( p.RegistrationDate );
+                    if( p.Savors != null )
+                    {
+                        w.WriteSharedString( p.Savors.Context.Name );
+                        w.WriteSharedString( p.Savors.ToString() );
+                    }
+                    else w.WriteNullableString( null );
+                    Debug.Assert( Enum.GetValues( typeof( ArtifactDependencyKind ) ).Cast<int>().All( v => v >= 0 && v <= 256 ) );
+                    w.WriteNonNegativeSmallInt32( p.Dependencies.Count );
+                    foreach( var dep in p.Dependencies )
+                    {
+                        w.WriteSharedString( dep.ApplicableSavors.ToString() );
+                        w.Write( (byte)dep.DependencyKind );
+                        var cc = new Comparable( pInstance => dep.Target.Key.CompareTo( pInstance.Key ) );
+                        // Lookup only from 0 to our index: our dependencies are before us.
+                        w.Write( _instances.AsSpan(0,i).BinarySearch( cc ) );
+                    }
+                }
+            }
+
 
             public InstanceStore( PackageInstance first )
             {

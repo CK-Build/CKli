@@ -560,11 +560,14 @@ namespace CK.Env
             {
                 m.Warn( "This World doesn't have any external references." );
             }
-            using( m.OpenInfo( $"Refreshing external versions for {externals.Count} packages." ) )
+            else
             {
-                foreach( var e in externals )
+                using( m.OpenInfo( $"Refreshing external versions for {externals.Count} packages." ) )
                 {
-                    _artifacts.GetExternalVersions( m, e.Target.Artifact );
+                    foreach( var e in externals )
+                    {
+                        _artifacts.GetExternalVersions( m, e.Target.Artifact );
+                    }
                 }
             }
             ConsoleColor stdForeColor = Console.ForegroundColor;

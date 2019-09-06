@@ -25,6 +25,15 @@ namespace CK.Env
             _lastUpdate = DateTime.UtcNow;
         }
 
+        /// <summary>
+        /// Writes this database into a binary stream.
+        /// </summary>
+        /// <param name="w">The writer to use.</param>
+        public void Write( CKBinaryWriter w )
+        {
+            w.Write( 0 ); // Version.
+        }
+
         PackageDB( PackageDB origin, InstanceStore store, Dictionary<string, PackageFeed> newFeeds, DateTime lastUpdate )
         {
             _version = origin._version + 1;
@@ -71,7 +80,9 @@ namespace CK.Env
             for( int i = 0; i < initialization.Length; ++i )
             {
                 var init = initialization[i];
+                // CheckValidAndParseFeedNames returned a null feedNames array if anything was not valid.
                 if( init.feedNames == null ) return null;
+                Debug.Assert( init.info.Key.IsValid && init.feedNames.All( f => f.IsValid ) );
                 if( init.idx < 0 )
                 {
                     if( !skipExisting )
