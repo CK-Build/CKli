@@ -161,7 +161,7 @@ namespace CK.Env
             var eParent = parent.XElement;
             foreach( var child in eParent.Elements() )
             {
-                if( typeFactory == null ) typeFactory = parentConfig.ChildServices.GetService<XTypedFactory>();
+                if( typeFactory == null ) typeFactory = parentConfig.ChildServices.GetService<XTypedFactory>( true );
                 var rChild = parentConfig.Reader.WithElement( child );
                 var tChild = typeFactory.GetMappping( rChild );
                 if( tChild != null )

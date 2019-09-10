@@ -601,7 +601,7 @@ namespace CK.Env.Plugin
             IEnvLocalFeed feed;
             if( PluginBranch == StandardGitStatus.Local )
             {
-                if( !v.NormalizedText.EndsWith( "-local" ) )
+                if( !v.WithBuildMetaData(null).NormalizedText.EndsWith( "-local" ) )
                 {
                     monitor.Warn( $"Version {v} is not a -local version. It has already been built." );
                     return true;

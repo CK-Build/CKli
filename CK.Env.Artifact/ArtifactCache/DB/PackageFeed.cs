@@ -13,6 +13,7 @@ namespace CK.Env
     /// </summary>
     public class PackageFeed : IArtifactFeedIdentity
     {
+        // We need a name that is a Artifact type and a name: Artifact does the job.
         readonly Artifact _name;
         readonly PackageDB.InstanceStore _instances;
 
@@ -26,6 +27,21 @@ namespace CK.Env
         {
             _name = other._name;
             _instances = other._instances.Add( newPackages );
+        }
+
+        internal PackageFeed( PackageDB.InstanceStore allInstances, DeserializerContext ctx )
+        {
+            var type = Core.ArtifactType.Single( ctx.Reader.ReadSharedString() );
+            var name = ctx.Reader.ReadString();
+            _name = new Artifact( type, name );
+            _instances = new PackageDB.InstanceStore( ctx, allInstances );
+        }
+
+        internal void Write( PackageDB.InstanceStore allInstances, SerializerContext ctx )
+        {
+            ctx.Writer.WriteSharedString( _name.Type.Name );
+            ctx.Writer.Write( _name.Name );
+            _instances.WriteIndices(ctx, allInstances);
         }
 
         /// <summary>

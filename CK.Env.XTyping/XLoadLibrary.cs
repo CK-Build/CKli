@@ -9,7 +9,7 @@ namespace CK.Env
         public XLoadLibrary( Initializer initializer )
             : base( initializer )
         {
-            Load( initializer.Services.GetService<XTypedFactory>(), initializer.Monitor );
+            Load( initializer.Services.GetService<XTypedFactory>(true), initializer.Monitor );
         }
 
         public string Name { get; set; }

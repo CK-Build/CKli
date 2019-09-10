@@ -26,12 +26,37 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Initializes a database from its serialized binary data.
+        /// </summary>
+        /// <param name="r">The reader to use.</param>
+        public PackageDB( ICKBinaryReader r )
+        {
+            var ctx = new DeserializerContext( r );
+            _instances = new InstanceStore( ctx );
+            int nbFeeds = ctx.Reader.ReadNonNegativeSmallInt32();
+            _feeds = new Dictionary<string, PackageFeed>( nbFeeds );
+            while( --nbFeeds >= 0 )
+            {
+                var f = new PackageFeed( _instances, ctx );
+                _feeds.Add( f.TypedName, f );
+            }
+            _lastUpdate = DateTime.UtcNow;
+        }
+
+        /// <summary>
         /// Writes this database into a binary stream.
         /// </summary>
         /// <param name="w">The writer to use.</param>
-        public void Write( CKBinaryWriter w )
+        public void Write( ICKBinaryWriter w )
         {
-            w.Write( 0 ); // Version.
+            var ctx = new SerializerContext( w, 0 );
+            _instances.Write( ctx );
+            ctx.Writer.WriteNonNegativeSmallInt32( _feeds.Count );
+            foreach( var kv in _feeds )
+            {
+                kv.Value.Write( _instances, ctx );
+            }
+            ctx.Writer.Write( _lastUpdate );
         }
 
         PackageDB( PackageDB origin, InstanceStore store, Dictionary<string, PackageFeed> newFeeds, DateTime lastUpdate )

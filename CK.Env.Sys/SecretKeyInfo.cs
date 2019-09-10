@@ -19,7 +19,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the <see cref="Tags"/>'s context.
         /// </summary>
-        public static CKTraitContext TagsContext = new CKTraitContext( "SecretCategory", '|' );
+        public static CKTraitContext TagsContext = CKTraitContext.Create( "SecretCategory", '|' );
 
         internal SecretKeyInfo( string name, Func<SecretKeyInfo, string> descriptionBuilder, bool isRequired )
             : this( name, descriptionBuilder )

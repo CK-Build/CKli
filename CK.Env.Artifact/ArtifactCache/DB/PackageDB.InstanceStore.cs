@@ -25,29 +25,41 @@ namespace CK.Env
                 _instances = Array.Empty<PackageInstance>();
             }
 
-            public InstanceStore( int version, ICKBinaryReader r )
+            public InstanceStore( in DeserializerContext ctx )
             {
-                int len = r.ReadInt32();
+                int len = ctx.Reader.ReadInt32();
                 _instances = new PackageInstance[len];
                 ArtifactType type = null;
                 string name = null;
                 for( int i = 0; i < _instances.Length; ++i )
                 {
-                    switch( r.ReadByte() )
+                    switch( ctx.Reader.ReadByte() )
                     {
                         case 2:
-                            type = ArtifactType.Single( r.ReadString() ); goto case 1;
+                            type = ArtifactType.Single( ctx.Reader.ReadString() ); goto case 1;
                         case 1:
-                            name = r.ReadString(); break;
+                            name = ctx.Reader.ReadString(); break;
                     }
-                    ArtifactInstance instance = new ArtifactInstance( type, name, CSemVer.SVersion.Parse( r.ReadString() ) );
-                    var regDate = r.ReadDateTime();
+                    ArtifactInstance instance = new ArtifactInstance( type, name, CSemVer.SVersion.Parse( ctx.Reader.ReadString() ) );
+                    var regDate = ctx.Reader.ReadDateTime();
+                    var savors = ctx.ReadCKTrait();
+                    int dependenciesCount = ctx.Reader.ReadNonNegativeSmallInt32();
+                    var dependencies = new PackageInstance.Reference[dependenciesCount];
+                    for( int j = 0; j < dependencies.Length; j++ )
+                    {
+                        var applicableSavors = savors != null ? ctx.ReadExistingTrait( savors.Context ) : null;
+                        ArtifactDependencyKind kind = (ArtifactDependencyKind)ctx.Reader.ReadByte();
+                        int idx = ctx.Reader.ReadInt32();
+                        dependencies[j] = new PackageInstance.Reference( _instances[idx], kind, applicableSavors );
+                    }
+                    _instances[i] = new PackageInstance( instance, savors, dependencies, regDate );
                 }
             }
 
-            public void Write( ICKBinaryWriter w )
+
+            public void Write( in SerializerContext ctx )
             {
-                w.Write( _instances.Length );
+                ctx.Writer.Write( _instances.Length );
                 string type = null;
                 string name = null;
                 for( int i = 0; i < _instances.Length; ++i )
@@ -55,34 +67,48 @@ namespace CK.Env
                     var p = _instances[i];
                     if( p.Key.Artifact.Type.Name != type )
                     {
-                        w.Write( (byte)2 );
-                        w.Write( type = p.Key.Artifact.Type.Name );
-                        w.Write( name = p.Key.Artifact.Name );
+                        ctx.Writer.Write( (byte)2 );
+                        ctx.Writer.Write( type = p.Key.Artifact.Type.Name );
+                        ctx.Writer.Write( name = p.Key.Artifact.Name );
                     }
                     else if( p.Key.Artifact.Name != name )
                     {
-                        w.Write( (byte)1 );
-                        w.Write( name = p.Key.Artifact.Name );
+                        ctx.Writer.Write( (byte)1 );
+                        ctx.Writer.Write( name = p.Key.Artifact.Name );
                     }
-                    else w.Write( (byte)0 );
-                    w.Write( p.Key.Version.NormalizedText );
-                    w.Write( p.RegistrationDate );
-                    if( p.Savors != null )
-                    {
-                        w.WriteSharedString( p.Savors.Context.Name );
-                        w.WriteSharedString( p.Savors.ToString() );
-                    }
-                    else w.WriteNullableString( null );
+                    else ctx.Writer.Write( (byte)0 );
+                    ctx.Writer.Write( p.Key.Version.NormalizedText );
+                    ctx.Writer.Write( p.RegistrationDate );
+                    ctx.Write( p.Savors );
                     Debug.Assert( Enum.GetValues( typeof( ArtifactDependencyKind ) ).Cast<int>().All( v => v >= 0 && v <= 256 ) );
-                    w.WriteNonNegativeSmallInt32( p.Dependencies.Count );
+                    ctx.Writer.WriteNonNegativeSmallInt32( p.Dependencies.Count );
                     foreach( var dep in p.Dependencies )
                     {
-                        w.WriteSharedString( dep.ApplicableSavors.ToString() );
-                        w.Write( (byte)dep.DependencyKind );
+                        if( p.Savors != null ) ctx.WriteExistingTrait( dep.ApplicableSavors );
+                        ctx.Writer.Write( (byte)dep.DependencyKind );
                         var cc = new Comparable( pInstance => dep.Target.Key.CompareTo( pInstance.Key ) );
                         // Lookup only from 0 to our index: our dependencies are before us.
-                        w.Write( _instances.AsSpan(0,i).BinarySearch( cc ) );
+                        Debug.Assert( _instances.AsSpan( 0, i ).BinarySearch( cc ) >= 0 );
+                        ctx.Writer.Write( _instances.AsSpan(0,i).BinarySearch( cc ) );
                     }
+                }
+            }
+
+            internal InstanceStore( DeserializerContext ctx, InstanceStore allInstances )
+            {
+                _instances = new PackageInstance[ctx.Reader.ReadInt32()];
+                for( int i = 0; i < _instances.Length; ++i )
+                {
+                    _instances[i] = allInstances[ ctx.Reader.ReadInt32() ];
+                }
+            }
+
+            internal void WriteIndices( SerializerContext ctx, InstanceStore allInstances )
+            {
+                ctx.Writer.Write( _instances.Length );
+                for( int i = 0; i < _instances.Length; ++i )
+                {
+                    ctx.Writer.Write( allInstances.IndexOf( _instances[i].Key ) );
                 }
             }
 
