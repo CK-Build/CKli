@@ -33,8 +33,7 @@ namespace CK.Env.Plugin
             if( _solutionSpec.UseCKSetup )
             {
                 _solutionDriver.OnStartBuild += OnStartBuild;
-                _solutionDriver.OnBuildSucceed += OnBuildEnd;
-                _solutionDriver.OnBuildFailed += OnBuildEnd;
+                _solutionDriver.OnEndBuild += OnEndBuild;
             }
         }
 
@@ -66,7 +65,7 @@ namespace CK.Env.Plugin
             e.EnvironmentVariables.Add( ("CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL", targetStore) );
         }
 
-        void OnBuildEnd( object sender, EventMonitoredArgs e )
+        void OnEndBuild( object sender, EventMonitoredArgs e )
         {
             // This is an untracked file. It has to be removed, even with BuildType.IsUsingDirtyFolder
             // (except of course on the local branch).
@@ -99,6 +98,11 @@ namespace CK.Env.Plugin
             {
                 GitFolder.OnLocalBranchEntered -= OnLocalBranchEntered;
                 GitFolder.OnLocalBranchLeaving -= OnLocalBranchLeaving;
+            }
+            if( _solutionSpec.UseCKSetup )
+            {
+                _solutionDriver.OnStartBuild -= OnStartBuild;
+                _solutionDriver.OnEndBuild -= OnEndBuild;
             }
         }
 

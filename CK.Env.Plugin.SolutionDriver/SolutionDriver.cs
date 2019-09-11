@@ -538,14 +538,9 @@ namespace CK.Env.Plugin
         public event EventHandler<BuildStartEventArgs> OnStartBuild;
 
         /// <summary>
-        /// Fires after a successful build.
+        /// Fires after a build.
         /// </summary>
-        public event EventHandler<EventMonitoredArgs> OnBuildSucceed;
-
-        /// <summary>
-        /// Fires after a failed build.
-        /// </summary>
-        public event EventHandler<EventMonitoredArgs> OnBuildFailed;
+        public event EventHandler<BuildEndEventArgs> OnEndBuild;
 
         /// <summary>
         /// The solution must be valid (see <see cref="IsSolutionValid"/>) and all build secrets
@@ -712,8 +707,7 @@ namespace CK.Env.Plugin
             }
             if( hasError ) return false;
             var r = DoBuild( ev );
-            if( r ) OnBuildSucceed?.Invoke( this, ev );
-            else OnBuildFailed?.Invoke( this, ev );
+            OnEndBuild?.Invoke( this, new BuildEndEventArgs( ev, r ) );
             if( ev.IsUsingDirtyFolder ) GitFolder.ResetHard( ev.Monitor );
             return r;
         }

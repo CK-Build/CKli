@@ -8,7 +8,7 @@ namespace CK.Env.Plugin
 {
     /// <summary>
     /// Defines build context: it contains everything that is required to actually build a solution.
-    /// The only mutable information here is the <see cref="EnvironmentVariables"/>.
+    /// The only mutable information here is the <see cref="EnvironmentVariables"/> and the .
     /// </summary>
     public class BuildStartEventArgs : EventMonitoredArgs
     {
@@ -44,7 +44,8 @@ namespace CK.Env.Plugin
         public BuildType BuildType { get; }
 
         /// <summary>
-        /// Gets whether the build uses a dirty folder.
+        /// Gets whether the build uses a dirty folder: a <see cref="GitFolder.ResetHard(IActivityMonitor)"/> will be executed after
+        /// the build to restore the solution folder.
         /// </summary>
         public bool IsUsingDirtyFolder => (BuildType & BuildType.IsUsingDirtyFolder) != 0;
 
@@ -74,6 +75,12 @@ namespace CK.Env.Plugin
         /// be directly called.
         /// </summary>
         public bool BuildCodeCakeBuilderIsRequired { get; }
+
+        /// <summary>
+        /// Gets a bag of objects that enables state sharing between participants and from <see cref="BuildStartEventArgs"/>
+        /// to <see cref="BuildEndEventArgs"/>.
+        /// </summary>
+        public IDictionary<object,object> Memory { get; }
 
         public BuildStartEventArgs(
             IActivityMonitor m,

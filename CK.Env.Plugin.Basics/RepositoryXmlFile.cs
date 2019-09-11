@@ -9,9 +9,9 @@ namespace CK.Env.Plugin
     public class RepositoryXmlFile : XmlFilePluginBase, IDisposable, IGitBranchPlugin, ICommandMethodsProvider
     {
         static readonly XNamespace SVGNS = XNamespace.Get( "http://csemver.org/schemas/2015" );
-        static readonly XName XRootName = SVGNS + "RepositoryInfo";
-        static readonly XName XBranchesName = SVGNS + "Branches";
-        static readonly XName XDebugName = SVGNS + "Debug";
+        static readonly XName xRootName = SVGNS + "RepositoryInfo";
+        static readonly XName xBranchesName = SVGNS + "Branches";
+        static readonly XName xDebugName = SVGNS + "Debug";
         static readonly XName XBranchName = SVGNS + "Branch";
 
         public readonly SolutionDriver _driver;
@@ -27,13 +27,32 @@ namespace CK.Env.Plugin
             }
             _driver = driver;
             _driver.OnStartBuild += OnStartBuild;
+            _driver.OnEndBuild += OnEndBuild;
         }
 
         void OnStartBuild( object sender, BuildStartEventArgs e )
         {
-            if( e.IsUsingDirtyFolder )
+            var debug = EnsureDocument().Root.Element( xDebugName );
+            if( debug == null )
             {
-                SetIgnoreDirtyFolders();
+                EnsureDocument().Root.Add( debug = new XElement( xDebugName ) );
+                e.Memory.Add( this, debug );
+            }
+            if( (bool?)debug.Attribute( "IgnoreDirtyWorkingFolder" ) != true )
+            {
+                debug.SetAttributeValue( "IgnoreDirtyWorkingFolder", "true" );
+                e.Memory[this] = null;
+            }
+            Save( e.Monitor );
+        }
+
+        void OnEndBuild( object sender, BuildEndEventArgs e )
+        {
+            if( !e.BuildStartArgs.IsUsingDirtyFolder
+                && e.BuildStartArgs.Memory.TryGetValue( this, out object mark ) )
+            {
+                if( mark != null ) ((XElement)mark).Remove();
+                else EnsureDocument().Root.Element( xDebugName ).SetAttributeValue( "IgnoreDirtyWorkingFolder", "false" );
                 Save( e.Monitor );
             }
         }
@@ -56,6 +75,8 @@ namespace CK.Env.Plugin
         {
             GitFolder.OnLocalBranchEntered -= OnLocalBranchEntered;
             GitFolder.OnLocalBranchLeaving -= OnLocalBranchLeaving;
+            _driver.OnStartBuild -= OnStartBuild;
+            _driver.OnEndBuild -= OnEndBuild;
         }
 
         public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
@@ -73,7 +94,8 @@ namespace CK.Env.Plugin
             {
                 RemoveLocalBranch( m );
             }
-            Document.Root.Elements( XDebugName ).Remove();
+            // If the <Debug > element exists, we set the IgnoreDirtyWorkingFolder attribute to false.
+            EnsureDocument().Root.Element( xDebugName )?.SetAttributeValue( "IgnoreDirtyWorkingFolder", "false" );
             // Obsolete:
             Document.Root.Elements( SVGNS+"PossibleVersionsMode" ).Remove();
             Save( m );
@@ -83,13 +105,13 @@ namespace CK.Env.Plugin
         /// Ensures that the <see cref="XmlFilePluginBase.Document"/> exists.
         /// </summary>
         /// <returns>The xml document.</returns>
-        public XDocument EnsureDocument() => Document ?? (Document = new XDocument( new XElement( XRootName ) ));
+        public XDocument EnsureDocument() => Document ?? (Document = new XDocument( new XElement( xRootName ) ));
 
         /// <summary>
         /// Ensures that Branches element exists in the non null <see cref="XmlFilePluginBase.Document"/>.
         /// If the Document is null, this is null.
         /// </summary>
-        public XElement Branches => _branches ?? (_branches = Document?.Root.EnsureElement( XBranchesName ) );
+        public XElement Branches => _branches ?? (_branches = Document?.Root.EnsureElement( xBranchesName ) );
 
         /// <summary>
         /// Ensures that document and the branches element exists.
@@ -98,16 +120,6 @@ namespace CK.Env.Plugin
         {
             EnsureDocument();
             return Branches;
-        }
-
-        /// <summary>
-        /// Sets the IgnoreDirtyWorkingFolder to true.
-        /// There is no associated remove/clear since this is used locally
-        /// by the builder that calls git reset once done. 
-        /// </summary>
-        public void SetIgnoreDirtyFolders()
-        {
-            EnsureDocument().Root.EnsureElement( XDebugName ).SetAttributeValue( "IgnoreDirtyWorkingFolder", true );
         }
 
         /// <summary>
@@ -139,7 +151,7 @@ namespace CK.Env.Plugin
         /// <param name="branchName">The actual branch name (ex: "develop-local").</param>
         void RemoveBranchMapping( IActivityMonitor m, string branchName )
         {
-            Document?.Root.Element( XBranchesName )
+            Document?.Root.Element( xBranchesName )
                              .Elements( XBranchName )
                              .Where( b => (string)b.Attribute( "Name" ) == branchName )
                              .Remove();
