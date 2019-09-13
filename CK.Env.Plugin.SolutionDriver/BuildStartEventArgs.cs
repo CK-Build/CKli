@@ -82,7 +82,7 @@ namespace CK.Env.Plugin
         /// </summary>
         public IDictionary<object,object> Memory { get; }
 
-        public BuildStartEventArgs(
+        internal BuildStartEventArgs(
             IActivityMonitor m,
             bool buildRequired,
             ISolution solution,
@@ -101,6 +101,7 @@ namespace CK.Env.Plugin
             BuildType = buildType;
             SolutionPhysicalPath = solutionPhysicalPath;
             CodeCakeBuilderExecutableFile = codeCakeBuilderExecutableFile;
+            Memory = new Dictionary<object, object>();
         }
     }
 }

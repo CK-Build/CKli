@@ -700,16 +700,28 @@ namespace CK.Env.Plugin
                             GitFolder.FullPhysicalPath,
                             ccbPath );
 
-            bool hasError = false;
-            using( ev.Monitor.OnError( () => hasError = true ) )
+            bool FireEvent( bool start, bool success )
             {
-                OnStartBuild?.Invoke( this, ev );
+                using( ev.Monitor.OnError( () => success = false ) )
+                {
+                    try
+                    {
+                        if( start ) OnStartBuild?.Invoke( this, ev );
+                        else OnEndBuild?.Invoke( this, new BuildEndEventArgs( ev, success ) );
+                    }
+                    catch( Exception ex )
+                    {
+                        monitor.Error( ex );
+                    }
+                }
+                return success;
             }
-            if( hasError ) return false;
-            var r = DoBuild( ev );
-            OnEndBuild?.Invoke( this, new BuildEndEventArgs( ev, r ) );
+
+            bool ok = FireEvent( true, true );
+            if( ok ) ok = DoBuild( ev );
+            ok = FireEvent( false, ok );
             if( ev.IsUsingDirtyFolder ) GitFolder.ResetHard( ev.Monitor );
-            return r;
+            return ok;
         }
 
         bool DoBuild( BuildStartEventArgs ev )
