@@ -538,14 +538,9 @@ namespace CK.Env.Plugin
         public event EventHandler<BuildStartEventArgs> OnStartBuild;
 
         /// <summary>
-        /// Fires after a successful build.
+        /// Fires after a build.
         /// </summary>
-        public event EventHandler<EventMonitoredArgs> OnBuildSucceed;
-
-        /// <summary>
-        /// Fires after a failed build.
-        /// </summary>
-        public event EventHandler<EventMonitoredArgs> OnBuildFailed;
+        public event EventHandler<BuildEndEventArgs> OnEndBuild;
 
         /// <summary>
         /// The solution must be valid (see <see cref="IsSolutionValid"/>) and all build secrets
@@ -601,7 +596,7 @@ namespace CK.Env.Plugin
             IEnvLocalFeed feed;
             if( PluginBranch == StandardGitStatus.Local )
             {
-                if( !v.NormalizedText.EndsWith( "-local" ) )
+                if( !v.WithBuildMetaData(null).NormalizedText.EndsWith( "-local" ) )
                 {
                     monitor.Warn( $"Version {v} is not a -local version. It has already been built." );
                     return true;
@@ -705,17 +700,28 @@ namespace CK.Env.Plugin
                             GitFolder.FullPhysicalPath,
                             ccbPath );
 
-            bool hasError = false;
-            using( ev.Monitor.OnError( () => hasError = true ) )
+            bool FireEvent( bool start, bool success )
             {
-                OnStartBuild?.Invoke( this, ev );
+                using( ev.Monitor.OnError( () => success = false ) )
+                {
+                    try
+                    {
+                        if( start ) OnStartBuild?.Invoke( this, ev );
+                        else OnEndBuild?.Invoke( this, new BuildEndEventArgs( ev, success ) );
+                    }
+                    catch( Exception ex )
+                    {
+                        monitor.Error( ex );
+                    }
+                }
+                return success;
             }
-            if( hasError ) return false;
-            var r = DoBuild( ev );
-            if( r ) OnBuildSucceed?.Invoke( this, ev );
-            else OnBuildFailed?.Invoke( this, ev );
+
+            bool ok = FireEvent( true, true );
+            if( ok ) ok = DoBuild( ev );
+            ok = FireEvent( false, ok );
             if( ev.IsUsingDirtyFolder ) GitFolder.ResetHard( ev.Monitor );
-            return r;
+            return ok;
         }
 
         bool DoBuild( BuildStartEventArgs ev )

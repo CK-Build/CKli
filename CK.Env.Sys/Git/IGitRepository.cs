@@ -83,8 +83,12 @@ namespace CK.Env
         /// <param name="editDate">
         /// Optional date transformer. By returning null, the operation is canceled and false is returned.
         /// </param>
+        /// <param name="skipIfNothingToCommit">
+        /// By default, no amend is done if working folder is up to date.
+        /// False will force the amend to be done if the date or message changed even if the working folder is clean.
+        /// </param>
         /// <returns>True on success, false on error.</returns>
-        bool AmendCommit( IActivityMonitor m, Func<string, string> editMessage = null, Func<DateTimeOffset, DateTimeOffset?> editDate = null );
+        bool AmendCommit( IActivityMonitor m, Func<string, string> editMessage = null, Func<DateTimeOffset, DateTimeOffset?> editDate = null, bool skipIfNothingToCommit = true );
 
         /// <summary>
         /// Gets the version information from a branch.

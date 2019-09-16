@@ -56,7 +56,7 @@ namespace CK.Env
             }
             else using( m.OpenInfo( $"Reading '{StacksFilePath}'." ) )
             {
-                foreach( var line in File.ReadAllLines( StacksFilePath ) )
+                foreach( var line in File.ReadAllLines( StacksFilePath ).Where( line => !String.IsNullOrWhiteSpace( line ) ) )
                 {
                     Exception severe = null;
                     try

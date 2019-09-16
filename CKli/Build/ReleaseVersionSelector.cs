@@ -57,12 +57,20 @@ namespace CKli
                                 .Any( s => s.Package.Artifact == q.Target.Artifact )
                          )
                     .ToList();
-                    PackageQuality worstQuality = pcks.Select( q => q.Target.Version.PackageQuality ).Min();
-                    return (p, pcks.Where( q => q.Target.Version.PackageQuality == worstQuality ));
+                    if( pcks.Any() )
+                    {
+                        PackageQuality worstQuality = pcks.Select( q => q.Target.Version.PackageQuality ).Min();
+                        return (p, pcks.Where( q => q.Target.Version.PackageQuality == worstQuality ));
+                    }
+                    p = null;
+                    return (p, Array.Empty<PackageReference>());
                 } )//There should be at least one package reference
-                .GroupBy( p => p.Item2.First().Target.Version.PackageQuality ).ToList();
-            var min = projExRefNotRelease.Min( q => q.Key );
-            var worst = projExRefNotRelease.SingleOrDefault( p => p.Key == min ); //ugliest LINQ i ever wrote, should take 3 lines.
+                .Where( x => x.p != null )
+                .GroupBy( p => p.Item2.First().Target.Version.PackageQuality ).ToList(); //ugliest LINQ i ever wrote, should take 3 lines.
+            var min = projExRefNotRelease.Any() ? projExRefNotRelease.Min( q => q.Key ) : PackageQuality.None;
+            var worst = min != PackageQuality.None
+                            ? projExRefNotRelease.SingleOrDefault( p => p.Key == min )
+                            : null; 
             if( worst == null || worst.Key == PackageQuality.Release )
             {
                 Console.WriteLine( "Nothing prevent to choose the Release quality." );

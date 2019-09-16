@@ -380,8 +380,8 @@ namespace CKli
         {
             char c;
             Console.WriteLine( "Y/N?" );
-            while( "YN".IndexOf( (c = Console.ReadKey().KeyChar) ) < 0 ) ;
-            return c == 'Y';
+            while( "YNyn".IndexOf( (c = Console.ReadKey().KeyChar) ) < 0 ) Console.Write( '\b' );
+            return c == 'Y' || c == 'y';
         }
 
         static void DumpPayLoad( object payload )

@@ -6,7 +6,7 @@ namespace CK.Core
     /// <summary>
     /// Immutable description of artifacts type that can be registered
     /// from independent modules.
-    /// Implements vaule equality through reference equality.
+    /// Implements value equality through reference equality.
     /// </summary>
     public class ArtifactType : IComparable<ArtifactType>
     {
@@ -38,7 +38,7 @@ namespace CK.Core
         {
             Name = name;
             IsInstallable = installable;
-            ContextSavors = savorSeparator == 0 ? null : new CKTraitContext( "ArtifactType:" + name, savorSeparator );
+            ContextSavors = savorSeparator == 0 ? null : CKTraitContext.Create( "ArtifactType:" + name, savorSeparator );
         }
 
         /// <summary>
@@ -93,17 +93,20 @@ namespace CK.Core
                 return t;
             }
             var exists = FindSame();
-            lock( _lock )
+            if( exists == null )
             {
-                exists = FindSame();
-                if( exists == null )
+                lock( _lock )
                 {
-                    exists = new ArtifactType( name, isInstallable, savorSeparator );
-                    Array.Resize( ref _types, _types.Length + 1 );
-                    _types[_types.Length - 1] = exists;
+                    exists = FindSame();
+                    if( exists == null )
+                    {
+                        exists = new ArtifactType( name, isInstallable, savorSeparator );
+                        Array.Resize( ref _types, _types.Length + 1 );
+                        _types[_types.Length - 1] = exists;
+                    }
                 }
-                return exists;
             }
+            return exists;
         }
 
         /// <summary>

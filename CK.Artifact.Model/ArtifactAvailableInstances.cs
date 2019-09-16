@@ -7,7 +7,7 @@ namespace CK.Core
 {
     /// <summary>
     /// Immutable that defines an Artifact associated to a set of available versions (a <see cref="PackageQualityVersions"/>)
-    /// in a <see cref="Feed"/>.
+    /// in a specific <see cref="Feed"/>.
     /// </summary>
     public class ArtifactAvailableInstances
     {

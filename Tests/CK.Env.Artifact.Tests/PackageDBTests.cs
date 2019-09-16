@@ -4,6 +4,7 @@ using FluentAssertions;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using static CK.Testing.MonitorTestHelper;
@@ -122,6 +123,22 @@ namespace CK.Env.Tests
             return db;
         }
 
+        static PackageDB CloneBySerialization( PackageDB db )
+        {
+            using( var m = new MemoryStream() )
+            {
+                using( var w = new CKBinaryWriter( m, Encoding.UTF8, true ) )
+                {
+                    db.Write( w );
+                }
+                m.Position = 0;
+                using( var r = new CKBinaryReader( m, Encoding.UTF8, true ) )
+                {
+                    return new PackageDB( r );
+                }
+            }
+        }
+
         [Test]
         public void mutliple_packages_with_no_dependencies()
         {
@@ -157,5 +174,16 @@ namespace CK.Env.Tests
             db.GetInstances( T1 ).Should().HaveCount( 80 );
             db.GetInstances( T2 ).Should().HaveCount( 80 );
         }
+
+        [Test]
+        public void package_serialization_with_no_dependencies()
+        {
+            var db = CreatePackageLevel0DB( true, true );
+            var dbD = CloneBySerialization( db );
+            dbD.Instances.Should().BeEquivalentTo( db.Instances, o => o.WithStrictOrdering() );
+            dbD.Feeds.Should().BeEquivalentTo( db.Feeds );
+        }
+
+
     }
 }

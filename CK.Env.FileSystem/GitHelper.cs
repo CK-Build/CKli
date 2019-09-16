@@ -375,11 +375,11 @@ namespace CK.Env
                         break;
                     case CommitBehavior.AmendIfPossibleAndAppendPreviousMessage:
                         if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
-                        modified = p => $"{p} (...)\r\n{commitMessage}";
+                        modified = p => $"{commitMessage}(...)\r\n{p}";
                         break;
                     case CommitBehavior.AmendIfPossibleAndPrependPreviousMessage:
                         if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
-                        modified = p => $"{commitMessage}(...)\r\n{p}";
+                        modified = p => $"{p} (...)\r\n{commitMessage}";
                         break;
                     case CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage:
                         if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
@@ -415,8 +415,16 @@ namespace CK.Env
         /// <param name="editDate">
         /// Optional date transformer. By returning null, the operation is canceled and false is returned.
         /// </param>
+        /// <param name="skipIfNothingToCommit">
+        /// By default, no amend is done if working folder is up to date.
+        /// False will force the amend to be done if the date or message changed even if the working folder is clean.
+        /// </param>
         /// <returns>True on success, false on error.</returns>
-        public bool AmendCommit( IActivityMonitor m, Func<string, string> editMessage = null, Func<DateTimeOffset, DateTimeOffset?> editDate = null )
+        public bool AmendCommit(
+            IActivityMonitor m,
+            Func<string, string> editMessage = null,
+            Func<DateTimeOffset, DateTimeOffset?> editDate = null,
+            bool skipIfNothingToCommit = true )
         {
             if( !CanAmendCommit ) throw new InvalidOperationException( nameof( CanAmendCommit ) );
             using( m.OpenInfo( $"Amending Commit in '{SubPath}' (branch '{CurrentBranchName}')." ) )
@@ -447,28 +455,32 @@ namespace CK.Env
                         date = DateTimeOffset.Now;
                         if( date < minDate )
                         {
-                            m.Trace( "Adusted commit date to the next second." );
+                            m.Trace( "Adjusted commit date to the next second." );
                             date = minDate;
                         }
                     }
                 }
                 else
                 {
-                    bool messageUpdate = message != Git.Head.Tip.Message;
-                    bool dateUpdate = date.Value != Git.Head.Tip.Committer.When;
-                    if( messageUpdate && dateUpdate )
+                    if( !skipIfNothingToCommit )
                     {
-                        m.Info( "Updating message and date." );
+                        bool messageUpdate = message != Git.Head.Tip.Message;
+                        bool dateUpdate = date.Value != Git.Head.Tip.Committer.When;
+                        if( messageUpdate && dateUpdate )
+                        {
+                            m.Info( "Updating message and date." );
+                        }
+                        else if( dateUpdate )
+                        {
+                            m.Info( "Updating commit date." );
+                        }
+                        else if( messageUpdate )
+                        {
+                            m.Info( "Only updating message." );
+                        }
+                        else skipIfNothingToCommit = true;
                     }
-                    else if( dateUpdate )
-                    {
-                        m.Info( "Updating commit date." );
-                    }
-                    else if( messageUpdate )
-                    {
-                        m.Info( "Only updating message." );
-                    }
-                    else
+                    if( skipIfNothingToCommit )
                     {
                         m.CloseGroup( "Working folder is up-to-date." );
                         return true;
