@@ -257,7 +257,7 @@ namespace CK.Env
 
                 try
                 {
-                    return DoPull( m, false, mergeFileFavor );
+                    return DoPull(m, mergeFileFavor);
                 }
                 catch( Exception ex )
                 {
@@ -302,7 +302,8 @@ namespace CK.Env
                         OnNewCurrentBranch( m );
                         reloadNeeded = true;
                     }
-                    return DoPull( m, reloadNeeded, MergeFileFavor.Theirs );
+                    (bool Success, bool ReloadNeeded) = DoPull(m, MergeFileFavor.Theirs);
+                    return (Success, reloadNeeded || ReloadNeeded);
                 }
                 catch( Exception ex )
                 {
@@ -312,7 +313,7 @@ namespace CK.Env
             }
         }
 
-        (bool Success, bool ReloadNeeded) DoPull( IActivityMonitor m, bool alreadyReloadNeeded, MergeFileFavor mergeFileFavor )
+        (bool Success, bool ReloadNeeded) DoPull(IActivityMonitor m, MergeFileFavor mergeFileFavor)
         {
             var merger = Git.Config.BuildSignature( DateTimeOffset.Now ) ?? new Signature( "CKli", "none", DateTimeOffset.Now );
             if( Git.Branches.Count() == 1 && Git.Branches.Single().TrackedBranch?.Tip == null )
@@ -344,7 +345,7 @@ namespace CK.Env
                 m.Error( "Merge conflicts occurred. Unable to merge changes from the remote." );
                 return (false, false);
             }
-            return (true, alreadyReloadNeeded || result.Status != MergeStatus.UpToDate);
+            return (true, result.Status != MergeStatus.UpToDate);
         }
 
         /// <summary>

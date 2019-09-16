@@ -287,10 +287,19 @@ namespace CK.Env
                        && _git.Push( m );
             }
 
+            /// <summary>
+            /// Return true if the Git Repository is open.
+            /// </summary>
             public bool IsOpen => _git != null;
 
             public NormalizedPath Root { get; }
 
+            /// <summary>
+            /// Ensure that the the Git Repository is Opened.
+            /// Return <see cref="IsOpen"/>.
+            /// </summary>
+            /// <param name="m">The monitor to use.</param>
+            /// <returns><see cref="IsOpen"/></returns>
             internal bool EnsureOpen( IActivityMonitor m )
             {
                 if( !IsOpen )
