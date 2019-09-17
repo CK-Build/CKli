@@ -1,5 +1,6 @@
 using CK.Text;
 using Microsoft.Extensions.FileProviders;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -42,6 +43,12 @@ namespace CK.Env
                 string line;
                 while( (line = t.ReadLine()) != null ) yield return line;
             }
+        }
+
+
+        public static JObject ReadAsJObject( this IFileInfo @this )
+        {
+            return JObject.Parse( @this.ReadAsText() );
         }
 
         public static XDocument ReadAsXDocument( this IFileInfo @this )
@@ -107,7 +114,7 @@ namespace CK.Env
             string _text;
             byte[] _bin;
 
-            public Transformed( ITextFileInfo source, Func<string,string> trans )
+            public Transformed( ITextFileInfo source, Func<string, string> trans )
             {
                 Debug.Assert( source.Exists && !source.IsDirectory );
                 Debug.Assert( trans != null );
@@ -127,7 +134,7 @@ namespace CK.Env
 
             public bool IsDirectory => false;
 
-            public string TextContent => _text ?? (_text = _trans( _source.TextContent ) );
+            public string TextContent => _text ?? (_text = _trans( _source.TextContent ));
 
             public byte[] BinContent => _bin ?? (_bin = Encoding.UTF8.GetBytes( TextContent ));
 
@@ -157,7 +164,7 @@ namespace CK.Env
             return new Origin( f );
         }
 
-        public static ITextFileInfo WithTransformedText( this ITextFileInfo f, Func<string,string> trans )
+        public static ITextFileInfo WithTransformedText( this ITextFileInfo f, Func<string, string> trans )
         {
             return new Transformed( f, trans );
         }
