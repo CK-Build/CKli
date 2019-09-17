@@ -10,19 +10,33 @@ namespace CK.Env
     /// </summary>
     public class NPMProjectSpec : INPMProjectSpec
     {
-        internal NPMProjectSpec( XElementReader r  )
+        internal NPMProjectSpec( XElementReader r )
         {
             IsPrivate = r.HandleOptionalAttribute( nameof( IsPrivate ), false );
-            Folder =  new NormalizedPath(r.HandleRequiredAttribute<string>( nameof( Folder ))).With( NormalizedPathRootKind.None );
-            PackageName = r.HandleRequiredAttribute<string>( nameof( PackageName ) );
-            if( String.IsNullOrWhiteSpace( PackageName ) )
+            Folder = new NormalizedPath( r.HandleRequiredAttribute<string>( nameof( Folder ) ) ).With( NormalizedPathRootKind.None );
+            PackageName = HandlePackageName(r.HandleOptionalAttribute( nameof( PackageName ), "" ));
+
+        }
+
+        
+        public NPMProjectSpec( NormalizedPath folderPath, string packageName, bool isPrivate = false )
+        {
+            IsPrivate = isPrivate;
+            Folder = folderPath;
+            PackageName = HandlePackageName(packageName);
+        }
+
+        string HandlePackageName( string attributeValue )
+        {
+            if( !String.IsNullOrWhiteSpace( attributeValue ) )
             {
-                if( Folder.IsEmptyPath && !IsPrivate )
-                {
-                    throw new Exception( "NPMProject specified as a public root project (Folder attribute is missing, empty or '/') must specify a PackageName or IsPrivate must be true." );
-                }
-                PackageName = Folder.LastPart.ToLowerInvariant();
+                return attributeValue;
             }
+            if( Folder.IsEmptyPath && !IsPrivate )
+            {
+                throw new Exception( "NPMProject specified as a public root project (Folder attribute is missing, empty or '/') must specify a PackageName or IsPrivate must be true." );
+            }
+            return Folder.LastPart.ToLowerInvariant();
         }
 
         /// <summary>

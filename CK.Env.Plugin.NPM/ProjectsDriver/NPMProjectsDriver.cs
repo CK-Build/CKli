@@ -13,8 +13,8 @@ namespace CK.Env.Plugin
         readonly SolutionDriver _driver;
         readonly SolutionSpec _spec;
         NPMProject[] _npmProjects;
-
-        public NPMProjectsDriver( GitFolder f, NormalizedPath branchPath, SolutionDriver driver, SolutionSpec spec, IEnvLocalFeedProvider localFeedProvider )
+        
+        public NPMProjectsDriver( GitFolder f, NormalizedPath branchPath, SolutionDriver driver, SolutionSpec spec )
             : base( f, branchPath )
         {
             _driver = driver;
