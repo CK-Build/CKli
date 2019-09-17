@@ -11,19 +11,16 @@ namespace CK.Env.Plugin
 {
     public class NPMProject
     {
-        readonly PackageJsonFile _packageFile;
-        INPMProjectSpec _spec;
-        NPMProjectStatus _status;
         Project _project;
 
         internal NPMProject( NPMProjectsDriver driver, IActivityMonitor m, INPMProjectSpec spec )
         {
             Driver = driver;
-            _spec = spec;
+            Specification = spec;
             FullPath = Driver.BranchPath.Combine( spec.Folder );
-            _packageFile = new PackageJsonFile( this );
-            _status = RefreshStatus( m );
-            _packageFile.OnSavedOrDeleted += (s,e) => driver.SetSolutionDirty( e.Monitor );
+            PackageJson = new PackageJsonFile( Driver.GitFolder.FileSystem, FullPath );
+            Status = RefreshStatus( m );
+            PackageJson.OnSavedOrDeleted += ( s, e ) => driver.SetSolutionDirty( e.Monitor );
         }
 
         /// <summary>
@@ -36,12 +33,12 @@ namespace CK.Env.Plugin
         /// <summary>
         /// Gets the project specification.
         /// </summary>
-        public INPMProjectSpec Specification => _spec;
+        public INPMProjectSpec Specification { get; }
 
         /// <summary>
         /// Gets the project status (that can be on error).
         /// </summary>
-        public NPMProjectStatus Status => _status;
+        public NPMProjectStatus Status { get; }
 
         /// <summary>
         /// Gets the project folder path relative to the <see cref="FileSystem"/>.
@@ -51,7 +48,7 @@ namespace CK.Env.Plugin
         /// <summary>
         /// Gets the package.json file object.
         /// </summary>
-        public PackageJsonFile PackageJson => _packageFile;
+        public PackageJsonFile PackageJson { get; }
 
         public NPMProjectStatus RefreshStatus( IActivityMonitor m )
         {
@@ -62,26 +59,26 @@ namespace CK.Env.Plugin
             }
             try
             {
-                if( _packageFile.Root == null )
+                if( PackageJson.Root == null )
                 {
                     return Driver.GitFolder.FileSystem.GetDirectoryContents( FullPath ).Exists
                         ? Error( NPMProjectStatus.ErrorMissingPackageJson )
                         : Error( NPMProjectStatus.FatalInitializationError );
                 }
-                if( _spec.IsPrivate )
+                if( Specification.IsPrivate )
                 {
-                    if( !_packageFile.IsPrivate ) return Error( NPMProjectStatus.ErrorPackageMustBePrivate );
+                    if( !PackageJson.IsPrivate ) return Error( NPMProjectStatus.ErrorPackageMustBePrivate );
                 }
                 else
                 {
-                    if( _packageFile.IsPrivate ) return Error( NPMProjectStatus.ErrorPackageMustNotBePrivate );
-                    if( _packageFile.Name == null ) return Error( NPMProjectStatus.ErrorPackageNameMissing );
-                    if( _packageFile.Name != _spec.PackageName )
+                    if( PackageJson.IsPrivate ) return Error( NPMProjectStatus.ErrorPackageMustNotBePrivate );
+                    if( PackageJson.Name == null ) return Error( NPMProjectStatus.ErrorPackageNameMissing );
+                    if( PackageJson.Name != Specification.PackageName )
                     {
-                        return Error( NPMProjectStatus.ErrorPackageInvalidName, $"Expected package name is '{_spec.PackageName}' but found '{_packageFile.Name}'." );
+                        return Error( NPMProjectStatus.ErrorPackageInvalidName, $"Expected package name is '{Specification.PackageName}' but found '{PackageJson.Name}'." );
                     }
                 }
-                return _packageFile.Refresh( m );
+                return PackageJson.Refresh( m );
             }
             catch( Exception ex )
             {
@@ -99,7 +96,7 @@ namespace CK.Env.Plugin
         public XElement ToXml()
         {
             return new XElement( "Project",
-                        new XAttribute( "Path", _spec.Folder ),
+                        new XAttribute( "Path", Specification.Folder ),
                         new XAttribute( "IsPublished", PackageJson.IsPublished ),
                         PackageJson.Name != null ? new XAttribute( "ExpectedName", PackageJson.Name ) : null );
         }
@@ -166,6 +163,6 @@ namespace CK.Env.Plugin
             return true;
         }
 
-        public override string ToString() => _packageFile.ToString();
+        public override string ToString() => PackageJson.ToString();
     }
 }

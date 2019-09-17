@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Env.DependencyModel;
+using CK.Text;
 using CSemVer;
 using Newtonsoft.Json.Linq;
 using System;
@@ -17,8 +18,8 @@ namespace CK.Env.Plugin
     {
         readonly List<NPMDep> _deps;
         readonly List<NPMDep> _unsavedDeps;
-        internal PackageJsonFile( NPMProject p )
-            : base( p.Driver.GitFolder.FileSystem, p.FullPath.AppendPart( "package.json" ) )
+        internal PackageJsonFile( FileSystem fs, NormalizedPath directoryPath )
+            : base( fs, directoryPath.AppendPart( "package.json" ) )
         {
             _deps = new List<NPMDep>();
             _unsavedDeps = new List<NPMDep>();
