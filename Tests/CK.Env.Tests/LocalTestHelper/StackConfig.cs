@@ -17,6 +17,7 @@ namespace CK.Env.Tests.LocalTestHelper
         {
             _universePath = universePath;
             _configPath = path;
+            Config = config;
             config.Changed += Config_Changed;
         }
 
@@ -49,7 +50,14 @@ namespace CK.Env.Tests.LocalTestHelper
         /// </summary>
         /// <param name="path"></param>
         /// <param name="replacePlaceHolder">When true, replace placeHolder with path, when false, replace the path with the placeholder.</param>
-        public void PlaceHolderSwap( bool replacePlaceHolder ) => PlaceHolderSwap( Config.Root, replacePlaceHolder );
+        public void PlaceHolderSwap( bool replacePlaceHolder )
+        {
+            PlaceHolderSwap(
+                Config.Root,
+                replacePlaceHolder ? _placeHolderString : _universePath,
+                replacePlaceHolder ? _universePath : _placeHolderString
+            );
+        }
 
 
         /// <summary>
@@ -58,10 +66,8 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <param name="configNode"></param>
         /// <param name="path"></param>
         /// <param name="replacePlaceHolder">When true, replace placeHolder with path, when false, replace the path with the placeholder.</param>
-        void PlaceHolderSwap(XElement configNode, bool replacePlaceHolder )
+        void PlaceHolderSwap(XElement configNode, string thingToReplace, string overridingThing )
         {
-            string thingToReplace = replacePlaceHolder ? _placeHolderString : _universePath;
-            string overridingThing = replacePlaceHolder ? _universePath : _placeHolderString;
             foreach( var attribute in configNode.Attributes().Where( p => p.Value.Contains( thingToReplace ) ) )
             {
                 attribute.Value = attribute.Value.Replace( thingToReplace, overridingThing );
@@ -76,7 +82,7 @@ namespace CK.Env.Tests.LocalTestHelper
             }
             foreach( var elem in configNode.Elements() )
             {
-                PlaceHolderSwap( elem, replacePlaceHolder );
+                PlaceHolderSwap( elem, thingToReplace, overridingThing );
             }
         }
 

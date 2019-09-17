@@ -123,14 +123,14 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public void ReloadConfig()
         {
-            var path = TempPath.AppendPart( _ckliMapping );
-            var files = Directory.EnumerateFiles( path, "*.World.xml", SearchOption.AllDirectories)
+            var files = Directory.EnumerateFiles( TempPath.AppendPart( _ckliMapping ), "*.World.xml", SearchOption.AllDirectories)
                 .Where( p => !p.Contains( ".git" ) );
             var config = new Dictionary<string, StackConfig>();
             foreach( string fileName in files )
             {
-                var newConfig = StackConfig.Create( path, fileName );
+                var newConfig = StackConfig.Create( TempPath, fileName );
                 newConfig.PlaceHolderSwap( true );
+                newConfig.Save();
                 config.Add( fileName, newConfig);
             }
         }
