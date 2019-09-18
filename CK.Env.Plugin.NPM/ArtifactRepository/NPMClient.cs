@@ -79,7 +79,7 @@ namespace CK.Env.NPM
             var scope = r.HandleRequiredAttribute<string>( "Scope" );
             if( !scope.StartsWith( "@" ) ) r.ThrowXmlException( $"Scope attribute must start with @." );
             var xCreds = r.Element.Element( "Credentials" );
-            var creds = xCreds != null ? new SimpleCredentials( r.WithElement( xCreds ) ) : null;
+            var creds = xCreds != null ? new SimpleCredentials( r.WithElement( xCreds, true ) ) : null;
             r.WarnUnhandled();
 
             var npmFeeds = feeds.OfType<NPMFeed>();

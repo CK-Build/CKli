@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Text;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -23,7 +24,7 @@ namespace System.Xml.Linq
         public XElementReader(
             IActivityMonitor m,
             XElement element,
-            HashSet<XObject> handled )
+           HashSet<XObject> handled )
         {
             if( element == null ) throw new ArgumentNullException( nameof( element ) );
             _handled = handled;
@@ -93,11 +94,15 @@ namespace System.Xml.Linq
         /// </summary>
         /// <param name="e">The element to be read.</param>
         /// <param name="handleElement">
-        /// By default <see cref="Handle(XObject)"/> is called with <paramref name="e"/>.
-        /// False to obtain a reader withiut handling the element.
+        /// By default, you get a reader without handling the element.
+        /// If <see langword="true"/> <see cref="Handle(XObject)"/> is called with <paramref name="e"/>.
         /// </param>
+        /// <remarks>
+        /// The handleElement is false by default: the purpose is to not handle by accident and silence the warning.
+        /// This will generate more false positive, but will avoid handling things you didn't meant to.
+        /// </remarks>
         /// <returns>A reader.</returns>
-        public XElementReader WithElement( XElement e, bool handleElement = true )
+        public XElementReader WithElement( XElement e, bool handleElement = false )
         {
             var r = e == Element ? this : new XElementReader( Monitor, e, _handled );
             if( handleElement ) _handled.Add( e );
@@ -114,7 +119,7 @@ namespace System.Xml.Linq
         {
             var c = Element.Element( name );
             if( c == null ) ThrowXmlException( $"Required '{name}' element." );
-            return WithElement( c );
+            return WithElement( c, true );
         }
 
         /// <summary>
@@ -125,7 +130,7 @@ namespace System.Xml.Linq
         public IEnumerable<XElementReader> WithChildren()
         {
             var r = this;
-            return Element.Elements().Select( e => r.WithElement( e ) );
+            return Element.Elements().Select( e => r.WithElement( e, true ) );
         }
 
         /// <summary>
@@ -157,7 +162,10 @@ namespace System.Xml.Linq
         /// </summary>
         /// <param name="o">The object to register.</param>
         /// <returns>True if it is the first time thios object is handled, false if it has already been handled.</returns>
-        public bool Handle( XObject o ) => _handled.Add( o );
+        public bool Handle( XObject o )
+        {
+            return _handled.Add( o );
+        }
 
         /// <summary>
         /// Registers a set of object as beeing handled.
@@ -258,7 +266,7 @@ namespace System.Xml.Linq
         /// </param>
         /// <param name="set">Current object set with a <see cref="HashSet{T}.Comparer"/> correctly configured.</param>
         /// <param name="builder">
-        /// The builder that knons how to instanciate a <typeparamref name="T"/>
+        /// The builder that knows how to instanciate a <typeparamref name="T"/>
         /// from a &lt;add ... or a &lt;remove ... element.
         /// </param>
         /// <returns>The updated item <paramref name="set"/>.</returns>
@@ -272,10 +280,10 @@ namespace System.Xml.Linq
                     switch( e.Name.LocalName )
                     {
                         case "clear": set.Clear(); _handled.Add( e ); break;
-                        case "remove": set.Remove( builder( WithElement( e ) ) ); break;
+                        case "remove": set.Remove( builder( WithElement( e, true ) ) ); break;
                         case "add":
                             {
-                                var item = builder( WithElement( e ) );
+                                var item = builder( WithElement( e, true ) );
                                 if( !set.Add( item ) ) Throw( e, $"Item '{item}' already exists. There must be a <remove> first." );
                                 break;
                             }

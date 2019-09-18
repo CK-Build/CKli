@@ -288,7 +288,7 @@ namespace CK.Env.NuGet
             var url = r.HandleRequiredAttribute<string>( "Url" );
             var name = r.HandleRequiredAttribute<string>( "Name" );
             var xCreds = r.Element.Element( "Credentials" );
-            var creds = xCreds != null ? new SimpleCredentials( r.WithElement( xCreds ) ) : null;
+            var creds = xCreds != null ? new SimpleCredentials( r.WithElement( xCreds, true ) ) : null;
 
             SecretKeyInfo secretKeyed = null;
             if( creds?.IsSecretKeyName == true )

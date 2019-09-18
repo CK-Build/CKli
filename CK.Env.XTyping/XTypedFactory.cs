@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Xml.Linq;
 using System.Xml.XPath;
+using static System.Xml.Linq.XElementReader;
 
 namespace CK.Env
 {
@@ -162,7 +163,7 @@ namespace CK.Env
             foreach( var child in eParent.Elements() )
             {
                 if( typeFactory == null ) typeFactory = parentConfig.ChildServices.GetService<XTypedFactory>( true );
-                var rChild = parentConfig.Reader.WithElement( child );
+                var rChild = parentConfig.Reader.WithElement( child, false );
                 var tChild = typeFactory.GetMappping( rChild );
                 if( tChild != null )
                 {
