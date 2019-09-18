@@ -339,9 +339,7 @@ namespace CK.Env
         /// Success is true on success, false on error (such as merge conflicts) and in case of success,
         /// the result states whether a reload should be required or if nothing changed.
         /// </returns>
-        public (bool Success, bool ReloadNeeded) Pull( IActivityMonitor m ) => Pull( m, FileSystem.ServerMode
-                                                                                            ? MergeFileFavor.Theirs
-                                                                                            : MergeFileFavor.Ours ); 
+        public (bool Success, bool ReloadNeeded) Pull( IActivityMonitor m ) => Pull( m, MergeFileFavor.Theirs ); 
 
         /// <summary>
         /// Resets the index to the tree recorded by the commit and updates the working directory to
