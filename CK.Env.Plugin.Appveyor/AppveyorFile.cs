@@ -2,7 +2,6 @@ using CK.Core;
 using CK.SimpleKeyVault;
 using CK.Text;
 using SharpYaml.Model;
-using System;
 using System.Linq;
 
 namespace CK.Env.Plugin

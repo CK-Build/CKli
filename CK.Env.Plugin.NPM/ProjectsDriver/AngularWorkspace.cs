@@ -1,13 +1,9 @@
 using CK.Core;
-using CK.Env.DependencyModel;
 using CK.Text;
 using Newtonsoft.Json.Linq;
-using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Xml.Linq;
 
 namespace CK.Env.Plugin

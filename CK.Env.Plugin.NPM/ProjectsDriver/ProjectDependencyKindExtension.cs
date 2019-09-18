@@ -1,5 +1,4 @@
 using CK.Core;
-using CK.Env.DependencyModel;
 using System;
 
 namespace CK.Env.Plugin

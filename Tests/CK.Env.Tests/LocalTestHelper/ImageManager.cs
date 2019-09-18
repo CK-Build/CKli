@@ -1,13 +1,9 @@
 using CK.Text;
-using CKli;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
 
 namespace CK.Env.Tests.LocalTestHelper

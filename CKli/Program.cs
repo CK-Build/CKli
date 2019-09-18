@@ -1,7 +1,5 @@
 using CK.Core;
 using System;
-using System.IO;
-using System.Runtime.CompilerServices;
 using System.Linq;
 using CK.Env;
 using System.Text.RegularExpressions;
@@ -9,8 +7,6 @@ using System.Collections.Generic;
 using CK.Text;
 using CK.Monitoring;
 using System.Threading.Tasks;
-using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Text;
 
 namespace CKli

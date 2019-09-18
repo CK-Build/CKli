@@ -6,7 +6,6 @@ using System.Linq;
 using System.Reflection;
 using System.Xml.Linq;
 using System.Xml.XPath;
-using static System.Xml.Linq.XElementReader;
 
 namespace CK.Env
 {

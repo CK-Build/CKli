@@ -9,7 +9,6 @@ using CK.Env.Diff;
 using CK.Env.MSBuildSln;
 using CK.Text;
 using CSemVer;
-using CK.Env;
 
 namespace CK.Env.Plugin
 {

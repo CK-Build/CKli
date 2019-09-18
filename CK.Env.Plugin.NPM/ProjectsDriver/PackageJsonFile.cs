@@ -1,5 +1,4 @@
 using CK.Core;
-using CK.Env.DependencyModel;
 using CK.Text;
 using CSemVer;
 using Newtonsoft.Json.Linq;

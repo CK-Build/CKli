@@ -1,8 +1,4 @@
 using CK.Core;
-using CK.Env.DependencyModel;
-using CSemVer;
-using System;
-using System.Collections.Generic;
 
 namespace CK.Env.Plugin
 {

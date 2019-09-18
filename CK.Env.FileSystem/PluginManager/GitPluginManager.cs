@@ -2,9 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using CK.Core;
-using CK.Text;
 
 namespace CK.Env
 {

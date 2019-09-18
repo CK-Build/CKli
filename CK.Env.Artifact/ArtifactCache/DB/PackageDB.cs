@@ -2,7 +2,6 @@ using System;
 using CK.Core;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using CK.Text;
 using System.Diagnostics;
 

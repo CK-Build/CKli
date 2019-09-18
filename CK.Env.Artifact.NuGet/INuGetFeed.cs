@@ -1,7 +1,3 @@
-using CK.Core;
-using System.Linq;
-using System.Xml.Linq;
-
 namespace CK.Env
 {
     /// <summary>

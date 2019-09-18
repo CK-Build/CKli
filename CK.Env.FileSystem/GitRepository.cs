@@ -2,8 +2,6 @@ using CK.Core;
 using CK.Text;
 using LibGit2Sharp;
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace CK.Env
 {

@@ -1,6 +1,5 @@
 using CK.Core;
 using CK.Env;
-using System.Linq;
 
 namespace CKli
 {
