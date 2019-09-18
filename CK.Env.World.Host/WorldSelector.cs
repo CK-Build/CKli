@@ -85,14 +85,18 @@ namespace CK.Env
         public bool Open( IActivityMonitor m, string worldFullNameOr1BasedIndex )
         {
             if( !CanOpen ) throw new InvalidOperationException();
-            using( m.OpenInfo( $"Opening  world '{worldFullNameOr1BasedIndex}'." ) )
+            using( m.OpenInfo( $"Opening world '{worldFullNameOr1BasedIndex}'." ) )
             {
                 var all = Store.ReadWorlds( m );
                 if( all == null ) return false;
                 IRootedWorldName w;
                 if( Int32.TryParse( worldFullNameOr1BasedIndex, out var idx ) )
                 {
-                    if( idx >= 1 && idx <= all.Count ) w = all[idx - 1];
+                    if( idx >= 1 && idx <= all.Count )
+                    {
+                        w = all[idx - 1];
+                        m.Info( $"World '{worldFullNameOr1BasedIndex}' is world {w.FullName}." );
+                    }
                     else
                     {
                         m.Error( $"Invalid index: {idx} out of {all.Count}." );
