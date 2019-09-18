@@ -13,7 +13,9 @@ namespace CK.Env.Plugin
         readonly SolutionDriver _driver;
         readonly SolutionSpec _spec;
         NPMProject[] _npmProjects;
-        
+        AngularWorkspace[] _angularWorkspaces;
+
+        IEnumerable<NPMProject> AllNpmProjects => _npmProjects.Concat( _angularWorkspaces.SelectMany( p => p.Projects ) );
         public NPMProjectsDriver( GitFolder f, NormalizedPath branchPath, SolutionDriver driver, SolutionSpec spec )
             : base( f, branchPath )
         {
@@ -38,14 +40,20 @@ namespace CK.Env.Plugin
                 e.PreventSolutionUse( "NPM project error." );
                 return;
             }
-            bool somePublished = false;
-            foreach( var p in _npmProjects )
+            if( !ReadAngularWorkspace( e.Monitor ) )
             {
-                var (project,isNew) = e.Solution.AddOrFindProject( p.Specification.Folder, "js", p.PackageJson.SafeName );
+                e.PreventSolutionUse( "NPM project error inside an Angular Workspace." );
+            }
+
+            bool somePublished = false;
+            //Dependency model stuff: ensuring project, adding generated artifacts and synchronize the package references.
+            foreach( var p in AllNpmProjects )
+            {
+                var (project, isNew) = e.Solution.AddOrFindProject( p.Specification.Folder, "js", p.PackageJson.SafeName );
                 p.Associate( project );
                 if( isNew )
                 {
-                    if( p.PackageJson.IsPublished )
+                    if( p.PackageJson.IsPublished )//add generated artifact if needed.
                     {
                         project.AddGeneratedArtifacts( new Artifact( NPMClient.NPMType, p.PackageJson.Name ) );
                         somePublished = true;
@@ -53,14 +61,16 @@ namespace CK.Env.Plugin
                 }
                 p.SynchronizePackageReferences( e.Monitor );
             }
-            foreach( var p in _npmProjects )
+
+
+            foreach( var p in AllNpmProjects )
             {
-                if( !p.SynchronizeProjectReferences( e.Monitor ) )
+                if( !p.SynchronizeProjectReferences( e.Monitor ) ) //Project reference
                 {
                     e.PreventSolutionUse( "NPM project path relative error." );
                 }
             }
-            if( _npmProjects.Length == 0 )
+            if( !AllNpmProjects.Any() )
             {
                 var sources = e.Solution.ArtifactSources.Where( s => s.ArtifactType == NPMClient.NPMType ).ToList();
                 if( sources.Count > 0 )
@@ -85,21 +95,36 @@ namespace CK.Env.Plugin
             if( _npmProjects == null )
             {
                 _npmProjects = new NPMProject[_spec.NPMProjects.Count];
-                bool valid = false;
                 int i = 0;
                 foreach( var spec in _spec.NPMProjects )
                 {
-                    var p = new NPMProject( this, m, spec );
-                    _npmProjects[i++] = p;
-                    valid &= p.Status == NPMProjectStatus.Valid;
+                    _npmProjects[i++] = new NPMProject( this, m, spec );
                 }
             }
             return _npmProjects.All( p => p.RefreshStatus( m ) == NPMProjectStatus.Valid );
         }
 
+        bool ReadAngularWorkspace( IActivityMonitor m )
+        {
+            if( _angularWorkspaces == null )
+            {
+                _angularWorkspaces = new AngularWorkspace[_spec.AngularWorkspaces.Count];
+                int i = 0;
+                foreach( var spec in _spec.AngularWorkspaces )
+                {
+                    _angularWorkspaces[i++] = AngularWorkspace.LoadAngularSolution( this, m, spec );
+                }
+            }
+            return _angularWorkspaces.SelectMany( s => s.Projects ).All( p => p.RefreshStatus( m ) == NPMProjectStatus.Valid );
+        }
+
         public IReadOnlyList<NPMProject> GetNPMProjects( IActivityMonitor m )
         {
             return _driver.GetSolution( m, allowInvalidSolution: true ) != null ? _npmProjects : null;
+        }
+        public IReadOnlyList<AngularWorkspace> GetAngularWorkspaces( IActivityMonitor m )
+        {
+            return _driver.GetSolution( m, allowInvalidSolution: true ) != null ? _angularWorkspaces : null;
         }
 
         void OnUpdatePackageDependency( object sender, UpdatePackageDependencyEventArgs e )

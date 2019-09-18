@@ -29,6 +29,7 @@ namespace CK.Env.Plugin
         {
             if( !_f.EnsureDirectory( m ) ) return;
             var projects = _driver.GetNPMProjects( m );
+            var workspace = _driver.GetAngularWorkspaces( m );
             if( projects == null ) return;
             if( projects.Count == 0 )
             {
@@ -36,7 +37,11 @@ namespace CK.Env.Plugin
             }
             else
             {
-                var root = new XElement( "NPMSolution", projects.OrderBy( p => p.FullPath ).Select( p => p.ToXml() ) );
+                var root = new XElement( "NPMSolution",
+                    projects.OrderBy( p => p.FullPath ).Select( p => p.ToXml() )
+                    .Concat(
+                        workspace.OrderBy( p => p.FullPath ).Select( s => s.ToXml() ) )
+                    );
                 Document = new XDocument( root );
             }
             Save( m );

@@ -22,6 +22,10 @@ namespace CK.Env
                 nameof( NPMProjects ),
                 new HashSet<NPMProjectSpec>(),
                 eR => new NPMProjectSpec( eR ) );
+            AngularWorkspaces = r.HandleCollection(
+                nameof( AngularWorkspaces ),
+                new HashSet<AngularWorkspaceSpec>(),
+                eR => new AngularWorkspaceSpec( eR ) );
             CKSetupComponentProjects = r.HandleCollection(
                     nameof( CKSetupComponentProjects ),
                     new HashSet<string>(),
@@ -70,6 +74,11 @@ namespace CK.Env
         /// Gets the list of npm projects specifications.
         /// </summary>
         public IReadOnlyCollection<INPMProjectSpec> NPMProjects { get; }
+
+        /// <summary>
+        /// Gets the list of angular workspace specifications.
+        /// </summary>
+        public IReadOnlyCollection<IAngularWorkspaceSpec> AngularWorkspaces { get; }
 
         /// <summary>
         /// Gets the list of .Net project names that are CKSetup components.
