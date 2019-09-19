@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 
 namespace CK.Env
 {
@@ -218,7 +219,7 @@ namespace CK.Env
         /// <param name="content">The content text.</param>
         /// <param name="destination">The target path in this file system.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool CopyTo( IActivityMonitor m, string content, NormalizedPath destination )
+        public bool CopyTo( IActivityMonitor m, string content, NormalizedPath destination, Encoding encoding = null )
         {
             if( content == null ) throw new ArgumentNullException( nameof( content ) );
             var fDest = GetWritableDestination( m, ref destination );
@@ -227,7 +228,14 @@ namespace CK.Env
             {
                 try
                 {
-                    File.WriteAllText( fDest.PhysicalPath, content );
+                    if( encoding == null )
+                    {
+                        File.WriteAllText( fDest.PhysicalPath, content );
+                    }
+                    else
+                    {
+                        File.WriteAllText( fDest.PhysicalPath, content, encoding );
+                    }
                     return true;
                 }
                 catch( Exception ex )

@@ -1,5 +1,6 @@
 using CK.Text;
 using System;
+using System.Text;
 using System.Xml.Linq;
 
 namespace CK.Env.Plugin
@@ -11,8 +12,8 @@ namespace CK.Env.Plugin
     {
         readonly GitBranchPluginImpl _pluginImpl;
 
-        public XmlFilePluginBase( GitFolder f, NormalizedPath branchPath, NormalizedPath filePath )
-            : base( f.FileSystem, filePath )
+        public XmlFilePluginBase( GitFolder f, NormalizedPath branchPath, NormalizedPath filePath, Encoding encoding )
+            : base( f.FileSystem, filePath, encoding )
         {
             if( !filePath.StartsWith( branchPath ) ) throw new ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
             _pluginImpl = new GitBranchPluginImpl( f, branchPath );

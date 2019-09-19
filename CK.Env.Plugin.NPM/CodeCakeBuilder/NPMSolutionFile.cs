@@ -14,7 +14,7 @@ namespace CK.Env.Plugin
             NPMCodeCakeBuilderFolder f,
             NPMProjectsDriver driver,
             NormalizedPath branchPath )
-            : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "NPMSolution.xml" ) )
+            : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "NPMSolution.xml" ), null )
         {
             _f = f;
             _driver = driver;

@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Text;
 using System;
+using System.Text;
 
 namespace CK.Env
 {
@@ -10,11 +11,13 @@ namespace CK.Env
     public abstract class TextFileBase
     {
         ITextFileInfo _file;
+        readonly Encoding _encoding;
 
-        protected TextFileBase( FileSystem fs, NormalizedPath filePath )
+        protected TextFileBase( FileSystem fs, NormalizedPath filePath, Encoding encoding = null )
         {
             FileSystem = fs;
             FilePath = filePath;
+            _encoding = encoding;
         }
 
         /// <summary>
@@ -96,7 +99,7 @@ namespace CK.Env
                 Delete( m );
                 return true;
             }
-            if( !FileSystem.CopyTo( m, newContent, FilePath ) )
+            if( !FileSystem.CopyTo( m, newContent, FilePath, _encoding ) )
             {
                 return false;
             }

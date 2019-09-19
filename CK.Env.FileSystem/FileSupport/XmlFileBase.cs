@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Text;
+using System.Text;
 using System.Xml.Linq;
 
 namespace CK.Env
@@ -12,8 +13,8 @@ namespace CK.Env
         XDocument _doc;
         string _currentText;
 
-        public XmlFileBase( FileSystem fs, NormalizedPath filePath )
-            : base( fs, filePath )
+        public XmlFileBase( FileSystem fs, NormalizedPath filePath, Encoding encoding )
+            : base( fs, filePath, encoding )
         {
         }
 
@@ -45,7 +46,7 @@ namespace CK.Env
         {
             if( _currentText == null && GetDocument() != null )
             {
-                _currentText = _doc.Beautify().ToString();
+                _currentText =  _doc.Beautify().ToString();
             }
             return _currentText;
         }
