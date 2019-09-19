@@ -4,6 +4,7 @@ using CK.Text;
 using CSemVer;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace CK.Env.Plugin
 {
@@ -14,7 +15,7 @@ namespace CK.Env.Plugin
         readonly SolutionDriver _solutionDriver;
 
         public CodeCakeBuilderCSProjFile( CodeCakeBuilderFolder f, SolutionSpec solutionSpec, NormalizedPath branchPath, SolutionDriver solutionDriver )
-            : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" ) )
+            : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" ), Encoding.UTF8 )
         {
             _f = f;
             _solutionSpec = solutionSpec;
