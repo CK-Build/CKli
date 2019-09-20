@@ -18,7 +18,7 @@ namespace CK.Env.Plugin
         XElement _branches;
 
         public RepositoryXmlFile( GitFolder f, NormalizedPath branchPath, SolutionDriver driver )
-            : base( f, branchPath, branchPath.AppendPart( "RepositoryInfo.xml" ) )
+            : base( f, branchPath, branchPath.AppendPart( "RepositoryInfo.xml" ), null )
         {
             if( PluginBranch == StandardGitStatus.Local )
             {

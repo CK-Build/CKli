@@ -11,7 +11,7 @@ namespace CK.Env.Plugin
         readonly SolutionSpec _solutionSpec;
 
         public SharedPropsFile( CommonFolder f, SolutionSpec solutionSpec, NormalizedPath branchPath )
-            : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "Shared.props" ) )
+            : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "Shared.props" ), null )
         {
             _commonFolder = f;
             _solutionSpec = solutionSpec;

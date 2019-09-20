@@ -5,5 +5,6 @@ namespace CK.Env
     public interface IAngularWorkspaceSpec
     {
         NormalizedPath Path { get; }
+        NormalizedPath OutputPath { get; }
     }
 }

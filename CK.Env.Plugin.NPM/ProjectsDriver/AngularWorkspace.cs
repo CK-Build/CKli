@@ -48,6 +48,8 @@ namespace CK.Env.Plugin
 
         public IReadOnlyCollection<NPMProject> Projects { get; }
 
+        public NormalizedPath OutputDir { get; }
+
         /// <summary>
         /// Gets the driver plugin.
         /// </summary>
@@ -66,7 +68,8 @@ namespace CK.Env.Plugin
         public XElement ToXml()
         {
             return new XElement( "AngularWorkspace",
-                new XAttribute( "Path", Specification.Path ) );
+                new XAttribute( "Path", Specification.Path ),
+                new XAttribute( "OutputDir", Specification.OutputPath) );
         }
     }
 }

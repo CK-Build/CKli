@@ -15,7 +15,7 @@ namespace CK.Env.Plugin
         XElement _packageSources;
 
         public NugetConfigFile( GitFolder f, SolutionDriver driver, IEnvLocalFeedProvider localFeedProvider, SecretKeyStore secretStore, SolutionSpec s, NormalizedPath branchPath )
-            : base( f, branchPath, branchPath.AppendPart( "NuGet.config" ) )
+            : base( f, branchPath, branchPath.AppendPart( "NuGet.config" ), null )
         {
             _localFeedProvider = localFeedProvider;
             _solutionSpec = s;
