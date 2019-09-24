@@ -37,7 +37,7 @@ namespace CodeCake
 
             public NPMSolution Solution { get; }
 
-            protected override IEnumerable<ILocalArtifact> GetLocalArtifacts() => Solution.SimplePublishedProjects;
+            protected override IEnumerable<ILocalArtifact> GetLocalArtifacts() => Solution.AllPublishedProjects;
 
 
             protected override IEnumerable<ArtifactFeed> GetRemoteFeeds()
