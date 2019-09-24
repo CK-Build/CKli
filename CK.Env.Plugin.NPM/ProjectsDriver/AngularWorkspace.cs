@@ -23,23 +23,27 @@ namespace CK.Env.Plugin
             NormalizedPath packageJsonPath = spec.Path.AppendPart( "package.json" );
             NormalizedPath angularJsonPath = spec.Path.AppendPart( "angular.json" );
             var fs = driver.GitFolder.FileSystem;
-            JObject packageJson = fs.GetFileInfo( packageJsonPath ).ReadAsJObject();
-            JObject angularJson = fs.GetFileInfo( angularJsonPath ).ReadAsJObject();
-            if( !angularJson["private"].ToObject<bool>() ) throw new InvalidDataException( "A workspace project should be private." );
+            NormalizedPath path = driver.BranchPath;
+            JObject packageJson = fs.GetFileInfo( path.Combine( packageJsonPath ) ).ReadAsJObject();
+            JObject angularJson = fs.GetFileInfo( path.Combine( angularJsonPath ) ).ReadAsJObject();
+            if( !(packageJson["private"]?.ToObject<bool?>() ?? false) ) throw new InvalidDataException( "A workspace project should be private." );
             string solutionName = packageJson["name"].ToString();
-            List<string> names = angularJson["projects"].ToObject<JObject>().Properties().Select( p => p.Name ).ToList();
+            List<string> unscopedNames = angularJson["projects"].ToObject<JObject>().Properties().Select( p => p.Name ).ToList();
 
-            List<NPMProject> projects = names.Select(
-                p =>
+            List<NPMProject> projects = unscopedNames.Select(
+                unscopedName =>
                 {
-                    var projectPath = new NormalizedPath( angularJson["projects"][p]["root"].ToString() );
+                    var projPathRelativeToWorkspace = new NormalizedPath( angularJson["projects"][unscopedName]["root"].ToString() );
+                    var projPathRelativeToGitRepo = spec.Path.Combine( projPathRelativeToWorkspace );
+                    var projectPathVirtualPath = driver.BranchPath.Combine( projPathRelativeToGitRepo );
+                    JObject json = fs.GetFileInfo( projectPathVirtualPath.AppendPart( "package.json" ) ).ReadAsJObject();
                     return new NPMProject(
                         driver,
                         m,
                         new NPMProjectSpec(
-                            projectPath,
-                            p,
-                            fs.GetFileInfo( spec.Path.AppendPart( projectPath ).AppendPart( "package.json" ) ).ReadAsJObject()["private"].ToObject<bool>()
+                            projPathRelativeToGitRepo,
+                            json["name"].ToString(),
+                            json["private"]?.ToObject<bool>() ?? false
                         )
                     );
                 } ).ToList();
@@ -69,7 +73,7 @@ namespace CK.Env.Plugin
         {
             return new XElement( "AngularWorkspace",
                 new XAttribute( "Path", Specification.Path ),
-                new XAttribute( "OutputDir", Specification.OutputPath) );
+                new XAttribute( "OutputFolder", Specification.OutputFolder ) );
         }
     }
 }

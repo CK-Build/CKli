@@ -13,16 +13,16 @@ namespace CK.Env
         {
             IsPrivate = r.HandleOptionalAttribute( nameof( IsPrivate ), false );
             Folder = new NormalizedPath( r.HandleRequiredAttribute<string>( nameof( Folder ) ) ).With( NormalizedPathRootKind.None );
-            PackageName = HandlePackageName(r.HandleOptionalAttribute( nameof( PackageName ), "" ));
-
+            PackageName = HandlePackageName( r.HandleOptionalAttribute( nameof( PackageName ), "" ) );
+            OutputFolder = r.HandleRequiredAttribute<string>( nameof( OutputFolder ) );
         }
 
-        
+
         public NPMProjectSpec( NormalizedPath folderPath, string packageName, bool isPrivate = false )
         {
             IsPrivate = isPrivate;
             Folder = folderPath;
-            PackageName = HandlePackageName(packageName);
+            PackageName = HandlePackageName( packageName );
         }
 
         string HandlePackageName( string attributeValue )
@@ -54,5 +54,9 @@ namespace CK.Env
         /// </summary>
         public NormalizedPath Folder { get; }
 
+        /// <summary>
+        /// Gets the folder where the project build output.
+        /// </summary>
+        public NormalizedPath OutputFolder { get; }
     }
 }

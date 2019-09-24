@@ -19,6 +19,17 @@ namespace CK.Env.Plugin
             Specification = spec;
             FullPath = Driver.BranchPath.Combine( spec.Folder );
             PackageJson = new PackageJsonFile( Driver.GitFolder.FileSystem, FullPath );
+            if( PackageJson.Root == null )
+            {
+                if( Driver.GitFolder.FileSystem.GetDirectoryContents( FullPath ).Exists )
+                {
+                    Error( m, NPMProjectStatus.ErrorMissingPackageJson );
+                }
+                else
+                {
+                    Error( m, NPMProjectStatus.FatalInitializationError );
+                }
+            }
             Status = RefreshStatus( m );
             PackageJson.OnSavedOrDeleted += ( s, e ) => driver.SetSolutionDirty( e.Monitor );
         }
@@ -50,32 +61,33 @@ namespace CK.Env.Plugin
         /// </summary>
         public PackageJsonFile PackageJson { get; }
 
+        NPMProjectStatus Error( IActivityMonitor m, NPMProjectStatus s, string msg = null )
+        {
+            m.Error( msg ?? $"Error: {s}" );
+            return s;
+        }
+
         public NPMProjectStatus RefreshStatus( IActivityMonitor m )
         {
-            NPMProjectStatus Error( NPMProjectStatus s, string msg = null )
-            {
-                m.Error( msg ?? $"Error: {s}" );
-                return s;
-            }
             try
             {
                 if( PackageJson.Root == null )
                 {
                     return Driver.GitFolder.FileSystem.GetDirectoryContents( FullPath ).Exists
-                        ? Error( NPMProjectStatus.ErrorMissingPackageJson )
-                        : Error( NPMProjectStatus.FatalInitializationError );
+                        ? Error( m, NPMProjectStatus.ErrorMissingPackageJson )
+                        : Error( m, NPMProjectStatus.FatalInitializationError );
                 }
                 if( Specification.IsPrivate )
                 {
-                    if( !PackageJson.IsPrivate ) return Error( NPMProjectStatus.ErrorPackageMustBePrivate );
+                    if( !PackageJson.IsPrivate ) return Error(m, NPMProjectStatus.ErrorPackageMustBePrivate );
                 }
                 else
                 {
-                    if( PackageJson.IsPrivate ) return Error( NPMProjectStatus.ErrorPackageMustNotBePrivate );
-                    if( PackageJson.Name == null ) return Error( NPMProjectStatus.ErrorPackageNameMissing );
+                    if( PackageJson.IsPrivate ) return Error( m, NPMProjectStatus.ErrorPackageMustNotBePrivate );
+                    if( PackageJson.Name == null ) return Error( m, NPMProjectStatus.ErrorPackageNameMissing );
                     if( PackageJson.Name != Specification.PackageName )
                     {
-                        return Error( NPMProjectStatus.ErrorPackageInvalidName, $"Expected package name is '{Specification.PackageName}' but found '{PackageJson.Name}'." );
+                        return Error( m, NPMProjectStatus.ErrorPackageInvalidName, $"Expected package name is '{Specification.PackageName}' but found '{PackageJson.Name}'." );
                     }
                 }
                 return PackageJson.Refresh( m );
@@ -98,6 +110,7 @@ namespace CK.Env.Plugin
             return new XElement( "Project",
                         new XAttribute( "Path", Specification.Folder ),
                         new XAttribute( "IsPublished", PackageJson.IsPublished ),
+                        new XAttribute( "OutputFolder", Specification.OutputFolder ),
                         PackageJson.Name != null ? new XAttribute( "ExpectedName", PackageJson.Name ) : null );
         }
 

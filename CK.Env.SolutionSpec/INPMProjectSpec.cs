@@ -20,5 +20,10 @@ namespace CK.Env
         /// </summary>
         NormalizedPath Folder { get; }
 
+        /// <summary>
+        /// Gets the folder where the project build output.
+        /// </summary>
+        NormalizedPath OutputFolder { get; }
+
     }
 }

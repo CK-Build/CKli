@@ -8,9 +8,9 @@ namespace CK.Env
         internal AngularWorkspaceSpec( XElementReader r )
         {
             Path = r.HandleRequiredAttribute<NormalizedPath>( nameof( Path ) );
-            OutputPath = r.HandleRequiredAttribute<NormalizedPath>( nameof( OutputPath ) );
+            OutputFolder = r.HandleRequiredAttribute<NormalizedPath>( nameof( OutputFolder ) );
         }
         public NormalizedPath Path { get; }
-        public NormalizedPath OutputPath { get; }
+        public NormalizedPath OutputFolder { get; }
     }
 }
