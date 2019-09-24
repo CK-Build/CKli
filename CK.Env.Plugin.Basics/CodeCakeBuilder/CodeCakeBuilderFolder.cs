@@ -43,6 +43,8 @@ namespace CK.Env.Plugin
             DeleteFile( m, "npm/Build.NpmRepository.cs" );
             DeleteFile( m, "npm/Build.StandardNpmBuild.cs" );
             DeleteFile( m, "npm/Build.StandardNpmUnitTests.cs" );
+            DeleteFile( m, "Abstractions/ISolutionProducingArtifact.cs" );
+            DeleteFile( m, "Abstractions/ISolution.cs" );
 
 
             // Root files
@@ -60,8 +62,8 @@ namespace CK.Env.Plugin
             SetTextResource( m, "Abstractions/ArtifactPush.cs" );
             SetTextResource( m, "Abstractions/ArtifactType.cs" );
             SetTextResource( m, "Abstractions/ILocalArtifact.cs" );
-            SetTextResource( m, "Abstractions/ISolution.cs" );
-            SetTextResource( m, "Abstractions/ISolutionProducingArtifact.cs" );
+            SetTextResource( m, "Abstractions/ICIPublishWorkflow.cs" );
+            SetTextResource( m, "Abstractions/ICIWorkflow.cs" );
 
             if( needDotNetBuild )
             {
