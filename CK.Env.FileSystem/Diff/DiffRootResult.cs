@@ -4,7 +4,7 @@ using System.Text;
 namespace CK.Env.Diff
 {
     /// <summary>
-    /// Captures the 
+    /// Object representation of multiples diffs.
     /// </summary>
     public class DiffRootResult : IDiffRootResult
     {
@@ -29,6 +29,37 @@ namespace CK.Env.Diff
         public override string ToString()
         {
             var sb = new StringBuilder();
+            void DisplayAdded()
+            {
+                sb.AppendLine( $"=    =    => Added({AddedDiffs.Count}):" );
+                foreach( var f in AddedDiffs )
+                {
+                    sb.Append( $"=    =    =|" )
+                        .AppendLine( f.Path );
+                }
+            }
+            void DisplayDeleted()
+            {
+                sb.AppendLine( $"=    =    =>Deleted({DeletedDiffs.Count}):" );
+                foreach( var f in DeletedDiffs )
+                {
+                    sb.Append( $"=    =    =|" ).AppendLine( f.Path );
+                }
+            }
+            void DisplayModified()
+            {
+                sb.AppendLine( $"=    =    =>Modified({ModifiedDiffs.Count}):" );
+                foreach( var f in ModifiedDiffs )
+                {
+                    sb.Append( $"=    =    =|" );
+                    if( f.NewPath != f.OldPath )
+                    {
+                        sb.Append( f.OldPath )
+                          .Append( "=>" );
+                    }
+                    sb.AppendLine( f.NewPath );
+                }
+            }
             sb.AppendLine( $"=> {Definition.Name}: {DiffType}" );
             if( DiffType == DiffRootResultType.Changed || DiffType == DiffRootResultType.NewPackage )
             {
@@ -39,12 +70,7 @@ namespace CK.Env.Diff
                 }
                 else
                 {
-                    sb.AppendLine( $"=    =    =>Added({AddedDiffs.Count}):" );
-                    foreach( var f in AddedDiffs )
-                    {
-                        sb.Append( $"=    =    =|" )
-                            .AppendLine( f.Path );
-                    }
+                    DisplayAdded();
                 }
 
                 if( DeletedDiffs.Count == 0 )
@@ -53,12 +79,7 @@ namespace CK.Env.Diff
                 }
                 else
                 {
-                    sb.AppendLine( $"=    =    =>Deleted({DeletedDiffs.Count}):" );
-                    foreach( var f in DeletedDiffs )
-                    {
-                        sb.Append( $"=    =    =|" )
-                            .AppendLine( f.Path );
-                    }
+                    DisplayDeleted();
                 }
                 if( ModifiedDiffs.Count == 0 )
                 {
@@ -66,17 +87,7 @@ namespace CK.Env.Diff
                 }
                 else
                 {
-                    sb.AppendLine( $"=    =    =>Modified({ModifiedDiffs.Count}):" );
-                    foreach( var f in ModifiedDiffs )
-                    {
-                        sb.Append( $"=    =    =|" );
-                        if( f.NewPath != f.OldPath )
-                        {
-                            sb.Append( f.OldPath )
-                              .Append( "=>" );
-                        }
-                        sb.AppendLine( f.NewPath );
-                    }
+                    DisplayModified();
                 }
             }
             return sb.ToString();
