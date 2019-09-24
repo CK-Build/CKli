@@ -10,6 +10,9 @@ using LibGit2Sharp;
 
 namespace CK.Env
 {
+    /// <summary>
+    /// Encapsulates a whole context.
+    /// </summary>
     public sealed class GitWorldStore : WorldStore, ICommandMethodsProvider, IDisposable
     {
         readonly NormalizedPath _rootPath;

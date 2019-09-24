@@ -54,7 +54,7 @@ namespace CK.Core
         public PackageQualityVersions Versions { get; }
 
         /// <summary>
-        /// Retuns this <see cref="ArtifactAvailableInstances"/> or a new one that combines a new version.
+        /// Returns this <see cref="ArtifactAvailableInstances"/> or a new one that combines a new version.
         /// </summary>
         /// <param name="v">Version to handle. May be null or invalid.</param>
         /// <returns>The new available instances.</returns>
@@ -65,7 +65,7 @@ namespace CK.Core
         }
 
         /// <summary>
-        /// Retuns this <see cref="ArtifactAvailableInstances"/> or a new one that combines a new set of available versions.
+        /// Returns this <see cref="ArtifactAvailableInstances"/> or a new one that combines a new set of available versions.
         /// </summary>
         /// <param name="versions">Versions to combine.</param>
         /// <returns>The new available instances.</returns>
@@ -119,6 +119,10 @@ namespace CK.Core
         /// Gets the best exploratory compatible version or an invalid instance (<see cref="ArtifactInstance.IsValid"/> is false) if
         /// no such version exist .
         public ArtifactInstance Exloratory => Versions.Exploratory != null ? new ArtifactInstance( Artifact, Versions.Exploratory ) : new ArtifactInstance();
+
+        /// <summary>
+        /// Gets the best CI version or an invalid instance (<see cref="ArtifactInstance.IsValid"/> is false) if no such version exist .
+        public ArtifactInstance CI => Versions.CI != null ? new ArtifactInstance( Artifact, Versions.CI ) : new ArtifactInstance();
 
         /// <summary>
         /// Returns the "<see cref="Artifact"/> (<see cref="Versions"/>)" if this artifact is valid.

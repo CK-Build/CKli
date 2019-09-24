@@ -1,22 +1,44 @@
 using CK.Core;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace CK.Env.ArtifactCache
+namespace CK.Env
 {
     /// <summary>
     /// Small wrapper around the immutable <see cref="PackageDB"/> object.
     /// </summary>
-    class ArtifactModelLocalCache
+    public class ArtifactCache
     {
         PackageDB _db;
 
         /// <summary>
         /// Initializes a new empty cache.
         /// </summary>
-        public ArtifactModelLocalCache()
+        public ArtifactCache()
         {
             _db = new PackageDB();
+        }
+
+        /// <summary>
+        /// Reads this cache from a serialized data.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="reader">The deserializer to use.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool Read( IActivityMonitor monitor, ICKBinaryReader reader )
+        {
+            if( reader == null ) throw new ArgumentNullException( nameof( reader ) );
+            try
+            {
+                _db = new PackageDB( reader );
+                return true;
+            }
+            catch( Exception ex )
+            {
+                monitor.Error( "Unable to read package database.", ex );
+                return false;
+            }
         }
 
         /// <summary>
@@ -25,7 +47,6 @@ namespace CK.Env.ArtifactCache
         /// <param name="w">The writer to use.</param>
         public void Write( CKBinaryWriter w )
         {
-            w.Write( 0 ); // Version.
             _db.Write( w );
         }
 
