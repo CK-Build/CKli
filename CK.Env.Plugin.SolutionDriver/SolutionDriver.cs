@@ -199,7 +199,7 @@ namespace CK.Env.Plugin
                     }
                     else
                     {
-                        m.Info( $"Project {p.ProjectName} will be publised." );
+                        m.Info( $"Project {p.ProjectName} will be published." );
                     }
                 }
                 else
