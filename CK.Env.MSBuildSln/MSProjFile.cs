@@ -76,7 +76,7 @@ namespace CK.Env.MSBuildSln
                         return null;
                     }
                     XDocument content = fP.ReadAsXDocument();
-                    var imports = new List<MSProjFile.Import>();
+                    var imports = new List<Import>();
                     f = new MSProjFile( path, content, imports );
                     cache[path] = f;
                     var folder = path.RemoveLastPart();

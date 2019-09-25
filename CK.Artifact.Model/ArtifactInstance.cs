@@ -85,7 +85,7 @@ namespace CK.Core
 
         /// <summary>
         /// Simple parse of the "Type:Name/Version" format that may return an invalid
-        /// instance (see <see cref="ArtifactInstance.IsValid"/>).
+        /// instance (see <see cref="IsValid"/>).
         /// This never throws.
         /// </summary>
         /// <param name="instanceName">The string to parse.</param>

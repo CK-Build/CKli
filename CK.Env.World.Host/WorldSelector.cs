@@ -120,7 +120,7 @@ namespace CK.Env
                 baseProvider.Add( _command );
                 baseProvider.Add( _fs );
                 baseProvider.Add<IWorldName>( w );
-                baseProvider.Add<WorldStore>( Store );
+                baseProvider.Add( Store );
                 baseProvider.Add( _appLife );
                 baseProvider.Add( _userKeyStore );
                 var original = Store.ReadWorldDescription( m, w ).Root;

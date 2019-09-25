@@ -184,7 +184,7 @@ namespace System.Xml.Linq
         public T HandleRequiredAttribute<T>( XName name )
         {
             var a = Element.Attribute( name );
-            if( a == null ) throw new System.Xml.XmlException( $"Required attribute '{name}'{Element.GetLineColumnString()}." );
+            if( a == null ) throw new XmlException( $"Required attribute '{name}'{Element.GetLineColumnString()}." );
             return HandleAttribute<T>( a );
         }
 

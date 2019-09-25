@@ -47,7 +47,7 @@ namespace CK.Core
 
         /// <summary>
         /// Simple parse of the "Type:Name" format that may return an invalid
-        /// type (see <see cref="Artifact.IsValid"/>).
+        /// type (see <see cref="IsValid"/>).
         /// This never throws.
         /// </summary>
         /// <param name="typedName">The string to parse.</param>

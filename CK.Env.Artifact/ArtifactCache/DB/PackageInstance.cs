@@ -25,7 +25,7 @@ namespace CK.Env
             public ArtifactDependencyKind DependencyKind { get; }
 
             /// <summary>
-            /// Gets the savors that, when not null, is a subset of the <see cref="PackageInstance.Savors"/> (or all the
+            /// Gets the savors that, when not null, is a subset of the <see cref="Savors"/> (or all the
             /// owner's savors) and cannot be empty.
             /// </summary>
             public CKTrait ApplicableSavors { get; }
