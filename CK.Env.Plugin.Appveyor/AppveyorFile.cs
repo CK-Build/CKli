@@ -104,7 +104,7 @@ namespace CK.Env.Plugin
             firstMapping["install"] = install;
 
             firstMapping["version"] = new YamlValue( "build{build}" );
-            firstMapping["image"] = new YamlValue( "Visual Studio 2017" );
+            firstMapping["image"] = new YamlValue( "Visual Studio 2019" );
             firstMapping["clone_folder"] = new YamlValue( "C:\\CKli-World\\" + GitFolder.SubPath.Path.Replace( '/', '\\' ) );
             EnsureDefaultBranches( firstMapping );
             SetSequence( firstMapping, "build_script", new YamlValue( "dotnet run --project CodeCakeBuilder -nointeraction" ) );
