@@ -25,6 +25,7 @@ namespace CKli
 
             var monitor = new ActivityMonitor();
             monitor.Output.RegisterClient( new ColoredActivityMonitorConsoleClient() );
+            monitor.MinimalFilter = LogFilter.Debug;
 
             IBasicApplicationLifetime appLife = new FakeApplicationLifetime();
             try

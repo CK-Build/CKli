@@ -20,6 +20,7 @@ namespace CK.Env
         readonly XElement _publishedBuildHistory;
         readonly BuildResult[] _buildResults;
         LogFilter _logFilter;
+        LogFilter _monitorLogFilter;
 
         public LocalWorldState( WorldStore store, IWorldName w, XDocument d = null )
             : base( store, w, true, d )
@@ -61,6 +62,25 @@ namespace CK.Env
             set
             {
                 if( value != _logFilter ) _generalState.SetAttributeValue( XmlNames.xUserLogFilter, (_logFilter = value).ToString() );
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the monitor log filter: the actual level of the logs.
+        /// </summary>
+        public LogFilter MonitorLogFilter
+        {
+            get
+            {
+                if( _monitorLogFilter == LogFilter.Undefined )
+                {
+                    LogFilter.TryParse( (string)_generalState.Attribute( XmlNames.xMonitorLogFilter ) ?? "", out _monitorLogFilter );
+                }
+                return _logFilter;
+            }
+            set
+            {
+                if( value != _monitorLogFilter ) _generalState.SetAttributeValue( XmlNames.xUserLogFilter, (_monitorLogFilter = value).ToString() );
             }
         }
 

@@ -125,7 +125,7 @@ namespace CK.Env
             if( !alreadyInitialized )
             {
                 _localState = _store.GetOrCreateLocalState( monitor, WorldName );
-                DoSetUserLogFilter( monitor, _localState.UserLogFilter, false );
+                DoSetLogLevel( monitor, _localState.UserLogFilter, _localState.MonitorLogFilter, false );
                 _sharedState = _store.GetOrCreateSharedState( monitor, WorldName );
             }
             return true;
@@ -421,17 +421,24 @@ namespace CK.Env
         }
 
         [CommandMethod( confirmationRequired: false )]
-        public void SetUserLogFilter( IActivityMonitor m, LogFilter filter ) => DoSetUserLogFilter( m, filter, true );
+        public void SetLogLevel( IActivityMonitor m, LogFilter userLevel, LogFilter monitorLevel ) => DoSetLogLevel( m, userLevel, monitorLevel, true );
 
-        void DoSetUserLogFilter( IActivityMonitor m, LogFilter filter, bool saveOnChange )
+        void DoSetLogLevel( IActivityMonitor m, LogFilter userLevel, LogFilter monitorLevel, bool saveOnChange )
         {
-            if( _userMonitorClient.MinimalFilter != filter )
+            if( _userMonitorClient.MinimalFilter != userLevel )
             {
-                _userMonitorClient.MinimalFilter = filter;
-                _localState.UserLogFilter = filter;
-                m.UnfilteredLog( ActivityMonitor.Tags.Empty, LogLevel.Info, $"User Log Filter level set to '{filter}' (actual filter is '{m.ActualFilter}').", m.NextLogTime(), null );
-                if( saveOnChange ) _localState.SaveState( m );
+                _userMonitorClient.MinimalFilter = userLevel;
+                _localState.UserLogFilter = userLevel;
             }
+            if( m.MinimalFilter != monitorLevel )
+            {
+                m.MinimalFilter = monitorLevel;
+                _localState.MonitorLogFilter = monitorLevel;
+            }
+            var msg = $"Log levels: UserLevel = '{userLevel}', MonitorLevel = {monitorLevel}.";
+            Console.WriteLine( msg );
+            m.UnfilteredLog( ActivityMonitor.Tags.Empty, LogLevel.Info, msg, m.NextLogTime(), null );
+            if( saveOnChange ) _localState.SaveState( m );
         }
 
         string GetCleanBranchName( IActivityMonitor monitor )
