@@ -3,6 +3,7 @@ using CK.Env.DependencyModel;
 using CK.Env.NuGet;
 using CK.Text;
 using System;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -49,10 +50,10 @@ namespace CK.Env.Plugin
 
         string AdaptBuildNugetRepositoryForPushFeeds( string text, ISolution solution )
         {
-            Match m = Regex.Match( text, @"yield return new SignatureVSTSFeed\( this,.*?;", RegexOptions.Singleline | RegexOptions.CultureInvariant );
+            Match m = Regex.Match( text, @"protected\s*override\s*IEnumerable<ArtifactFeed>*\sGetRemoteFeeds\(\)[^{]*\{((?>{(?<opening>)|[^{}]|}(?<-opening>))*(?(opening)(?!)))\}" );
             if( !m.Success )
             {
-                throw new Exception( "Expected pattern yield return new SignatureVSTSFeed( this, ...); in Build.NuGetArtifactType.cs." );
+                throw new Exception( "Expected method with signature protected override IEnumerable<ArtifactFeed> GetRemoteFeed() ; in Build.NuGetArtifactType.cs." );
             }
             StringBuilder b = new StringBuilder();
             bool atLeastOne = false;
@@ -81,9 +82,10 @@ namespace CK.Env.Plugin
                 {
                     case INuGetAzureRepository a:
                         b.Append( "yield return new SignatureVSTSFeed( this, \"" )
-                            .Append( a.Organization ).Append( "\", \"" )
-                            .Append( a.FeedName )
-                            .AppendLine( "\" );" );
+                            .Append( a.Organization ).Append( "\"," )
+                            .Append( $"\"{a.FeedName}\"" ).Append(", ")
+                            .Append( a.ProjectName != null ? $"\"{a.ProjectName}\"" : "null" )
+                            .AppendLine( ");" );
                         break;
                     case INuGetStandardRepository n:
                         b.Append( "yield return new RemoteFeed( this, \"" )
@@ -95,7 +97,7 @@ namespace CK.Env.Plugin
                 }
             }
             if( !atLeastOne ) b.AppendLine().Append( "yield break;" );
-            text = text.Replace( m.Value, b.ToString() );
+            text = text.Replace( m.Groups[1].Value, b.ToString() );
             return text;
         }
 

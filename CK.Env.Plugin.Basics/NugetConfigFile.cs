@@ -122,6 +122,15 @@ namespace CK.Env.Plugin
                         else m.Warn( $"Empty feed password. Configuration for feed '{s.Name}' skipped." );
                     }
                 }
+                else
+                {
+                    DeleteFeedCredentials( m, s.Name );
+                }
+            }
+            var packages = EnsureDocument().Root.Element( "packageSourceCredentials" );
+            if( !packages?.Nodes().Any() ?? false )
+            {
+                packages.Remove();
             }
             foreach( var name in _solutionSpec.RemoveNuGetSourceNames )
             {
@@ -195,6 +204,18 @@ namespace CK.Env.Plugin
             var entry = rootCred.EnsureElement( safeName );
             entry.EnsureAddKeyValue( "Username", userName );
             entry.EnsureAddKeyValue( "ClearTextPassword", clearTextPassword );
+        }
+
+        public void DeleteFeedCredentials( IActivityMonitor m, string feedName)
+        {
+            if( String.IsNullOrWhiteSpace( feedName ) ) throw new ArgumentNullException( nameof( feedName ) );
+            var rootCred = EnsureDocument().Root.EnsureElement( "packageSourceCredentials" );
+            var element = rootCred.Element( feedName );
+            if(element != null)
+            {
+                m.Info( $"Removing Credentials of feed {feedName}." );
+                element.Remove();
+            }
         }
 
         /// <summary>

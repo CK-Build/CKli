@@ -14,17 +14,23 @@ namespace CK.Env.NuGet
     {
         internal NuGetAzureRepository(
             NuGetClient c,
-            string url,
             string name,
             PackageQualityFilter qualityFilter,
             string organization,
             string feedName,
-            string label )
-            : base( c, new PackageSource( url, name ), qualityFilter )
+            string label,
+            string projectName )
+            : base( c, new PackageSource(
+                projectName != null ?
+                  $"https://pkgs.dev.azure.com/{organization}/{projectName}/_packaging/{feedName}{label}/nuget/v3/index.json"
+                : $"https://pkgs.dev.azure.com/{organization}/_packaging/{feedName}{label}/nuget/v3/index.json"
+
+            , name ), qualityFilter )
         {
             Organization = organization;
             FeedName = feedName;
             Label = label;
+            ProjectName = projectName;
         }
 
         /// <summary>
@@ -48,6 +54,12 @@ namespace CK.Env.NuGet
         /// </summary>
         public string Label { get; }
 
+
+        /// <summary>
+        /// Gets the project name of this Repository. Can be null.
+        /// </summary>
+        public string ProjectName { get; }
+
         /// <summary>
         /// Always "VSTS" or null if <see cref="ResolveSecret"/> returns null.
         /// </summary>
@@ -68,7 +80,7 @@ namespace CK.Env.NuGet
         /// <returns>The url.</returns>
         protected string GetAzureDevOpsUrlAPI( string point = "packagesBatch", string version = "api-version=5.0-preview.1" )
         {
-            return AzureDevOpsAPIHelper.GetUrl( Organization, FeedName, false, point, version );
+            return AzureDevOpsAPIHelper.GetUrl( ProjectName, Organization, FeedName, false, point, version );
         }
 
         /// <summary>
@@ -82,7 +94,7 @@ namespace CK.Env.NuGet
         {
             string personalAccessToken = ResolveSecret( logger.Monitor );
             var packages = skipped.Concat( pushed ).Select( i => i.Instance );
-            return AzureDevOpsAPIHelper.PromotePackagesAync( logger.Monitor, Client.HttpClient, Organization, FeedName, personalAccessToken, packages, false );
+            return AzureDevOpsAPIHelper.PromotePackagesAync( logger.Monitor, Client.HttpClient, ProjectName, Organization, FeedName, personalAccessToken, packages, false );
         }
 
     }

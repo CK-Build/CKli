@@ -42,11 +42,12 @@ namespace CK.Env.NPM
                         var organization = r.HandleRequiredAttribute<string>( "Organization" );
                         var feedName = r.HandleRequiredAttribute<string>( "FeedName" );
                         var npmScope = r.HandleRequiredAttribute<string>( "NPMScope" );
+                        var projectName = r.HandleOptionalAttribute<string>( "ProjectName", null );
                         if( npmScope.Length <= 2 || npmScope[0] != '@' )
                         {
                             r.ThrowXmlException( $"Invalid NPScope '{npmScope}' (must start with a @)." );
                         }
-                        result = new NPMAzureRepository( this, qualityFilter, organization, feedName, npmScope );
+                        result = new NPMAzureRepository( this, qualityFilter, organization, feedName, npmScope, projectName );
                         break;
                     }
                 case "NPMStandard":
@@ -81,7 +82,19 @@ namespace CK.Env.NPM
             var xCreds = r.Element.Element( "Credentials" );
             var creds = xCreds != null ? new SimpleCredentials( r.WithElement( xCreds, true ) ) : null;
             r.WarnUnhandled();
-
+            var uri = new Uri( url );
+            if( uri.Host == "pkgs.dev.azure.com" )
+            {
+                bool privateFeed = uri.Segments[2] == "_packaging/";
+                if( privateFeed && (creds == null) )
+                {
+                    r.ThrowXmlException( "Detected an azure private feed. Credentials are expected." );
+                }
+                if( !privateFeed && (creds != null) )
+                {
+                    r.ThrowXmlException( "Detected an azure public feed. There should be no credentials." );
+                }
+            }
             var npmFeeds = feeds.OfType<NPMFeed>();
             if( npmFeeds.Any( f => f.Scope == scope ) ) r.ThrowXmlException( $"NPM feed with the same scope '{scope}' is already defined." );
             if( npmFeeds.Any( f => StringComparer.OrdinalIgnoreCase.Equals( f.Url, url ) ) ) r.ThrowXmlException( $"NPM feed with the same url '{url}' is already defined." );

@@ -17,15 +17,19 @@ namespace CK.Env.NPM
             PackageQualityFilter qualityFilter,
             string organization,
             string feedName,
-            string scope )
+            string scope,
+            string projectName )
             : base( c,
                     qualityFilter,
                     $"Azure:{scope}->{organization}-{feedName}",
-                    $"https://pkgs.dev.azure.com/{organization}/_packaging/{feedName}/npm/registry/" )
+                    projectName != null ?
+                      $"https://pkgs.dev.azure.com/{organization}/{projectName}/_packaging/{feedName}/npm/registry/"
+                    : $"https://pkgs.dev.azure.com/{organization}/_packaging/{feedName}/npm/registry/" )
         {
             Organization = organization;
             FeedName = feedName;
             Scope = scope;
+            ProjectName = projectName;
         }
 
         /// <summary>
@@ -42,6 +46,11 @@ namespace CK.Env.NPM
         /// Gets the "@Scope" string: it MUST start with a @ and be a non empty scope name.
         /// </summary>
         public string Scope { get; }
+
+        /// <summary>
+        /// Gets the project name of this Repository. Can be null.
+        /// </summary>
+        public string ProjectName { get; }
 
         /// <summary>
         /// The secret key name is:
@@ -63,7 +72,7 @@ namespace CK.Env.NPM
         /// <returns>The url.</returns>
         protected string GetAzureDevOpsUrlAPI( string point = "packagesBatch", string version = "api-version=5.0-preview.1" )
         {
-            return AzureDevOpsAPIHelper.GetUrl( Organization, FeedName, true, point, version );
+            return AzureDevOpsAPIHelper.GetUrl( ProjectName, Organization, FeedName, true, point, version );
         }
 
         /// <summary>
@@ -77,7 +86,7 @@ namespace CK.Env.NPM
         {
             string personalAccessToken = ResolveSecret( m );
             var packages = skipped.Concat( pushed ).Select( i => i.Instance );
-            return AzureDevOpsAPIHelper.PromotePackagesAync( m, Client.HttpClient, Organization, FeedName, personalAccessToken, packages, true );
+            return AzureDevOpsAPIHelper.PromotePackagesAync( m, Client.HttpClient, ProjectName, Organization, FeedName, personalAccessToken, packages, true );
         }
 
     }

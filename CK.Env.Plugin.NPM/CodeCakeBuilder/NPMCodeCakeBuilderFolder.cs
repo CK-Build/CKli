@@ -69,7 +69,7 @@ namespace CK.Env.Plugin
 
         string AdaptBuildNPMArtifactForPushFeeds( string text, ISolution s )
         {
-            Match m = Regex.Match( text, @"yield return new AzureNPMFeed\( this,.*?;", RegexOptions.Singleline | RegexOptions.CultureInvariant );
+            Match m = Regex.Match( text, @"protected\s*override\s*IEnumerable<ArtifactFeed>*\sGetRemoteFeeds()[^{]*\{((?>{(?<opening>)|[^{}]|}(?<-opening>))*(?(opening)(?!)))\}" );
             if( !m.Success )
             {
                 throw new Exception( "Expected pattern yield return new AzureNPMFeed( this, ...); in Build.NPMArtifactType.cs." );
@@ -101,9 +101,10 @@ namespace CK.Env.Plugin
                 {
                     case INPMAzureRepository a:
                         b.Append( "yield return new AzureNPMFeed( this, \"" )
-                            .Append( a.Organization ).Append( "\", \"" )
-                            .Append( a.FeedName )
-                            .AppendLine( "\" );" );
+                            .Append( a.Organization ).Append( "\", " )
+                            .Append( $"\"{a.FeedName}\"" ).Append( "\", " )
+                            .Append( a.ProjectName != null ? $"\"{a.ProjectName}\"" : "null")
+                            .AppendLine( " );" );
                         break;
                     case INPMStandardRepository n:
                         Uri uri = new Uri( n.Url );
@@ -128,7 +129,7 @@ namespace CK.Env.Plugin
                 }
             }
             if( !atLeastOne ) b.AppendLine().Append( "yield break;" );
-            text = text.Replace( m.Value, b.ToString() );
+            text = text.Replace( m.Groups[1].Value, b.ToString() );
             return text;
         }
 

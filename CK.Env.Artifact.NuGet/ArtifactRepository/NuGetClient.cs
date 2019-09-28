@@ -197,12 +197,12 @@ namespace CK.Env.NuGet
                 throw new NotSupportedException( "Should not be called in this scenario." );
             }
 
-            void IPackageSourceProvider.AddPackageSource(PackageSource source)
+            void IPackageSourceProvider.AddPackageSource( PackageSource source )
             {
                 throw new NotSupportedException( "Should not be called in this scenario." );
             }
 
-            void IPackageSourceProvider.UpdatePackageSource(PackageSource source, bool updateCredentials, bool updateEnabled)
+            void IPackageSourceProvider.UpdatePackageSource( PackageSource source, bool updateCredentials, bool updateEnabled )
             {
                 throw new NotSupportedException( "Should not be called in this scenario." );
             }
@@ -255,12 +255,12 @@ namespace CK.Env.NuGet
                     {
                         var organization = r.HandleRequiredAttribute<string>( "Organization" );
                         var feedName = r.HandleRequiredAttribute<string>( "FeedName" );
+                        var projectName = r.HandleOptionalAttribute<string>( "ProjectName", null );
                         var label = r.HandleOptionalAttribute<string>( "Label", null );
                         var name = "Azure:" + organization + '-' + feedName;
                         if( label != null ) name += '-' + label;
                         if( label != null ) label = "@" + label;
-                        var url = $"https://pkgs.dev.azure.com/{organization}/_packaging/{feedName}{label}/nuget/v3/index.json";
-                        result = new NuGetAzureRepository( this, url, name, qualityFilter, organization, feedName, label );
+                        result = new NuGetAzureRepository( this, name, qualityFilter, organization, feedName, label, projectName );
                         break;
                     }
                 case "NuGetStandard":
@@ -289,7 +289,19 @@ namespace CK.Env.NuGet
             var name = r.HandleRequiredAttribute<string>( "Name" );
             var xCreds = r.Element.Element( "Credentials" );
             var creds = xCreds != null ? new SimpleCredentials( r.WithElement( xCreds, true ) ) : null;
-
+            var uri = new Uri( url );
+            if( uri.Host == "pkgs.dev.azure.com" )
+            {
+                bool privateFeed = uri.Segments[2] == "_packaging/";
+                if(privateFeed && (creds == null) )
+                {
+                    r.ThrowXmlException( "Detected an azure private feed. Credentials are expected." );
+                }
+                if(!privateFeed && (creds!=null))
+                {
+                    r.ThrowXmlException( "Detected an azure public feed. There should be no credentials." );
+                }
+            }
             SecretKeyInfo secretKeyed = null;
             if( creds?.IsSecretKeyName == true )
             {
@@ -306,14 +318,14 @@ namespace CK.Env.NuGet
                     return i.HandleFeed( url, name, creds );
                 }
             }
-            var feed = new PureFeed(this, url, name, creds);
+            var feed = new PureFeed( this, url, name, creds );
             _sourcePackageProvider.SetPackageSources( internals.Append( feed ) );
             return feed.Feed;
         }
 
         class PureFeed : NuGetFeedBase
         {
-            public PureFeed(NuGetClient c, string url, string name, SimpleCredentials creds)
+            public PureFeed( NuGetClient c, string url, string name, SimpleCredentials creds )
                 : base( c, url, name, creds )
             {
             }

@@ -20,5 +20,10 @@ namespace CK.Env.NuGet
         /// Gets the "@Label" string or null.
         /// </summary>
         string Label { get; }
+
+        /// <summary>
+        /// Gets the project name of this Repository. Can be null.
+        /// </summary>
+        string ProjectName { get; }
     }
 }
