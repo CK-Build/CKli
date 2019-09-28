@@ -23,6 +23,7 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="git">The Git key.</param>
         /// <param name="workingFolder">The local working folder.</param>
+        /// <param name="subPath"></param>
         /// <param name="ensureHooks">True to create the standard hooks.</param>
         /// <param name="branchName">
         /// The initial branch name if cloning is done and the branch that must be

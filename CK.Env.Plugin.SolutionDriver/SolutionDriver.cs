@@ -46,6 +46,12 @@ namespace CK.Env.Plugin
             _artifactCenter = artifactCenter;
             _solutionSpec = spec;
             _localFeedProvider = localFeedProvider;
+            f.Reset += OnReset;
+        }
+
+        private void OnReset(IActivityMonitor m)
+        {
+            SetSolutionDirty( m );
         }
 
         void IDisposable.Dispose()
@@ -302,7 +308,7 @@ namespace CK.Env.Plugin
         {
             var toRemove = new HashSet<Artifact>( project.PackageReferences.Select( r => r.Target.Artifact ) );
             var p = project.Tag<MSProject>();
-            foreach( var dep in p.Deps.Packages )
+            foreach( DeclaredPackageDependency dep in p.Deps.Packages )
             {
                 toRemove.Remove( dep.Package.Artifact );
                 project.EnsurePackageReference(
