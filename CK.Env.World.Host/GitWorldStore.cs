@@ -352,7 +352,7 @@ namespace CK.Env
             {
                 if( option == StackInitializeOption.OpenRepository ) EnsureOpen( m );
                 else if( option == StackInitializeOption.OpenAndPullRepository ) Pull( m );
-                if( !IsOpen ) return;
+                EnsureOpen( m );
 
                 var worldNames = Directory.GetFiles( Root, "*.World.xml" )
                                     .Select( p => LocalWorldName.TryParse( m, p, _store.WorldLocalMapping ) )
@@ -397,11 +397,11 @@ namespace CK.Env
             ++_syncCount;
             foreach( var gD in _stacks.GroupBy( d => d.OriginUrl ) )
             {
-                if( gD.Any( d => d.IsPublic ) && gD.Any( d => !d.IsPublic ) )
+                if( gD.Any( d => d.IsPublic ) && gD.Any( d => !d.IsPublic ) )//Filter out repos with mixed public/private
                 {
                     m.Error( $"Repository {gD.Key} contains a mix of public and private Stacks. All stacks in this repository are ignored." );
                 }
-                else if( gD.Select( d => d.BranchName ).Distinct().Count() > 1 )
+                else if( gD.Select( d => d.BranchName ).Distinct().Count() > 1 )//Filter 
                 {
                     m.Error( $"Repository {gD.Key} contains Stacks bound to different branches: it must be the same branch for all stacks. All stacks in this repository are ignored." );
                 }
