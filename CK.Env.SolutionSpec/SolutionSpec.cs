@@ -88,7 +88,7 @@ namespace CK.Env
         public IReadOnlyCollection<string> CKSetupComponentProjects { get; }
 
         /// <summary>
-        /// Gets wether the projects not defined at the solution level should be published.
+        /// Gets whether the projects not defined at the solution level should be published.
         /// This does not impact the projects in the Tests folder.
         /// Defaults to false.
         /// </summary>

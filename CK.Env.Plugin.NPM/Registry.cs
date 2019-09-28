@@ -86,7 +86,7 @@ namespace CK.Env.NPM
         public Uri RegistryUri { get; }
 
         /// <summary>
-        /// Gets or Sets wether we are running in CI or not.
+        /// Gets or Sets whether we are running in CI or not.
         /// The fields is automatically setted based on the environement variables with the same bahavior of npm.
         /// </summary>
         public bool NpmInCi { get; set; } = Environment.GetEnvironmentVariable( "CI" ) == "true" ||
