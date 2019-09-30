@@ -9,14 +9,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
 		.gitignore = .gitignore
-		A1Test.World.xml = A1Test.World.xml
-		A2Test.World.xml = A2Test.World.xml
-		A2TestPrivate.World.xml = A2TestPrivate.World.xml
-		ENGIE.World.xml = ENGIE.World.xml
 		ENGIE[refactoring].World.xml = ENGIE[refactoring].World.xml
-		LocalWorldRootPathMapping.txt = LocalWorldRootPathMapping.txt
 		nuget.config = nuget.config
-		SC.World.xml = SC.World.xml
 		Common\SharedKey.snk = Common\SharedKey.snk
 	EndProjectSection
 EndProject
