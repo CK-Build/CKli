@@ -8,17 +8,14 @@ namespace CK.Env.Plugin
 {
     public class CSProjFile : GitBranchPluginBase, ICommandMethodsProvider
     {
-        private readonly SolutionSpec _solutionSpec;
         private readonly SolutionDriver _solutionDriver;
 
         public CSProjFile(
              GitFolder f,
              NormalizedPath branchPath,
-            SolutionSpec solutionSpec,
             SolutionDriver solutionDriver )
              : base( f, branchPath )
         {
-            _solutionSpec = solutionSpec;
             _solutionDriver = solutionDriver;
         }
 

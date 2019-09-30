@@ -4,11 +4,12 @@ using CKli;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 
-using static CK.Testing.MonitorTestHelper;
+using static CK.Testing.BasicTestHelper;
 
 namespace CK.Env.Tests.LocalTestHelper
 {
@@ -33,8 +34,8 @@ namespace CK.Env.Tests.LocalTestHelper
 
         const string _ckliMapping = "CKli";
 
-        const string _userLocalDirectoryName = "Local";
-
+        const string _userLocalDirectoryName = "dev";
+        private readonly IActivityMonitor _m;
         private readonly ImageManager _imageManager;
 
         /// <summary>
@@ -44,14 +45,30 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <param name="userHost">The UserHost instantied with this path.</param>
         /// <param name="imageName">Name of the image this <see cref="TestUniverse"/> is based on.</param>
         /// <param name="configs">The stacks configs.</param>
-        TestUniverse( ImageManager imageManager, NormalizedPath tempPath, UserHost userHost, string imageName )
+        TestUniverse( IActivityMonitor m, ImageManager imageManager, NormalizedPath tempPath, UserHost userHost, string imageName )
         {
+            _m = m;
             _imageManager = imageManager;
             TempPath = tempPath;
             UserHost = userHost;
             ImageName = imageName;
             Configs = new Dictionary<string, StackConfig>();
-            ReloadConfig();
+            ReloadConfigAndGitsWithNewPaths( m );
+        }
+
+        public void ReloadConfigAndGitsWithNewPaths( IActivityMonitor m )
+        {
+            int cnt = SwapAllGitOriginPlaceholders( m, ImageManager.PlaceHolderString, TempPath );
+            var files = Directory.EnumerateFiles( TempPath.AppendPart( _ckliMapping ), "*.World.xml", SearchOption.AllDirectories )
+                .Where( p => !p.Contains( ".git" ) );
+            var config = new Dictionary<string, StackConfig>();
+            foreach( string fileName in files )
+            {
+                var newConfig = StackConfig.Create( TempPath, fileName );
+                newConfig.PlaceHolderSwap( true, ImageManager.PlaceHolderString );
+                newConfig.Save();
+                config.Add( fileName, newConfig );
+            }
         }
 
         /// <summary>
@@ -105,33 +122,23 @@ namespace CK.Env.Tests.LocalTestHelper
         /// </summary>
         /// <param name="path"> The path where the <see cref="TestUniverse"/> will be. The Directory will be deleted when disposed.</param>
         /// <returns></returns>
-        public static TestUniverse Create( ImageManager imageManager, NormalizedPath path, string imageName )
+        public static TestUniverse Create( IActivityMonitor m, ImageManager imageManager, NormalizedPath path, string imageName )
         {
             FakeApplicationLifetime appLife = new FakeApplicationLifetime();
             var userHost = new UserHost( appLife, path.AppendPart( _ckliMapping ) );
-            userHost.Initialize( TestHelper.Monitor );
-            userHost.WorldStore.DeleteStackDefinition( TestHelper.Monitor, "CK" );
-            userHost.WorldStore.DeleteStackDefinition( TestHelper.Monitor, "CK-Build" );
+            userHost.Initialize( m );
+            userHost.WorldStore.DeleteStackDefinition( m, "CK" );
+            userHost.WorldStore.DeleteStackDefinition( m, "CK-Build" );
 
-
-
-            return new TestUniverse( imageManager, path, userHost, imageName );
+            return new TestUniverse( m, imageManager, path, userHost, imageName );
         }
 
-
-        public void ReloadConfig()
+        public int SwapAllGitOriginPlaceholders( IActivityMonitor m, string oldString, string newString )
         {
-            var files = Directory.EnumerateFiles( TempPath.AppendPart( _ckliMapping ), "*.World.xml", SearchOption.AllDirectories)
-                .Where( p => !p.Contains( ".git" ) );
-            var config = new Dictionary<string, StackConfig>();
-            foreach( string fileName in files )
-            {
-                var newConfig = StackConfig.Create( TempPath, fileName );
-                newConfig.PlaceHolderSwap( true );
-                newConfig.Save();
-                config.Add( fileName, newConfig);
-            }
+            using( m.OpenInfo( "Replacing Git Remotes URL." ) ) return Directory.EnumerateDirectories( TempPath, "*.git" ).Select( s => new Repository( s ) ).Select( s => (s, s.Network.Remotes, s.Network.Remotes.Single()) ).Count( ( s ) => { string oldUri = s.Item3.PushUrl; s.Remotes.Update( s.Item3.Name, a => { a.Url = s.Item3.Url.Replace( oldString, newString ); a.PushUrl = s.Item3.PushUrl.Replace( oldString, newString ); } ); m.Info( $"Replaced origin of repo {s.s.Info.Path} from {oldUri} to {s.Item3.Url}" ); s.s.Dispose(); return true; } );
         }
+
+
 
         /// <summary>
         /// Apply the modifications stored as a zip in the Folder Modifications
@@ -157,9 +164,9 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <param name="fromTempImage">Whether the image is stored in <see cref="BuildedImageFolder"/>(<see langword="true"/>)
         /// or in <see cref="TestsUniverseFolder"/></param>
         /// <returns></returns>
-        public bool IsEqualToImage( string imageName, bool fromTempImage )
+        public bool IsEqualToImage( IActivityMonitor m, string imageName, bool fromTempImage )
         {
-            using( var truth = _imageManager.InstantiateImage( fromTempImage, imageName ) )
+            using( var truth = _imageManager.InstantiateImage( m, fromTempImage, imageName ) )
             {
                 return IsEqualToTestUniverse( truth );
             }
@@ -183,9 +190,9 @@ namespace CK.Env.Tests.LocalTestHelper
             return truthpath.Count() == 0;
         }
 
-        public void BuildImage()
+        public void BuildImage( IActivityMonitor m )
         {
-            _imageManager.BuildImage( this );
+            _imageManager.BuildImage( m, this );
         }
 
         IEnumerable<NormalizedPath> GetAllFilePathOfRepos( IEnumerable<Repository> repos )
@@ -208,7 +215,7 @@ namespace CK.Env.Tests.LocalTestHelper
         public void Dispose()
         {
             UserHost.Dispose();
-            FileHelper.RawDeleteLocalDirectory( TestHelper.Monitor, TempPath );
+            FileHelper.RawDeleteLocalDirectory( _m, TempPath );
         }
     }
 }

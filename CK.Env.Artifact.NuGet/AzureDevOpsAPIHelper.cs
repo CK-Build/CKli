@@ -38,9 +38,13 @@ namespace CK.Env
         /// <param name="point">The API point (after the /npm/ or /nuget/).</param>
         /// <param name="version">The API version.</param>
         /// <returns>The url.</returns>
-        public static string GetUrl( string organization, string feedName, bool isNPM, string point = "packagesBatch", string version = "api-version=5.0-preview.1" )
+        public static string GetUrl( string projectName, string organization, string feedName, bool isNPM, string point = "packagesBatch", string version = "api-version=5.0-preview.1" )
         {
-            return $"https://pkgs.dev.azure.com/{organization}/_apis/packaging/feeds/{feedName}/{(isNPM ? "npm" : "nuget" )}/{point}?{version}";
+            if( projectName == null )
+            {
+                return $"https://pkgs.dev.azure.com/{organization}/_apis/packaging/feeds/{feedName}/{(isNPM ? "npm" : "nuget")}/{point}?{version}";
+            }
+            return $"https://pkgs.dev.azure.com/{organization}/{projectName}/_apis/packaging/feeds/{feedName}/{(isNPM ? "npm" : "nuget")}/{point}?{version}";
         }
 
 
@@ -58,13 +62,14 @@ namespace CK.Env
         public static async Task PromotePackagesAync(
             IActivityMonitor m,
             HttpClient httpClient,
+            string projectName,
             string organization,
             string feedName,
             string personalAccessToken,
             IEnumerable<ArtifactInstance> packages,
             bool isNPM )
         {
-            string apiUrl = AzureDevOpsAPIHelper.GetUrl( organization, feedName, isNPM, "packagesBatch", "api-version=5.0-preview.1" );
+            string apiUrl = AzureDevOpsAPIHelper.GetUrl(projectName, organization, feedName, isNPM, "packagesBatch", "api-version=5.0-preview.1" );
             var basicAuth = Convert.ToBase64String( Encoding.ASCII.GetBytes( ":" + personalAccessToken ) );
             var byLabels = packages
                                 .SelectMany( p => p.Version.PackageQuality.GetLabels().Select( label => (label, p) ) )

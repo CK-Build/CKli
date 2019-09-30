@@ -24,7 +24,6 @@ namespace CK.Env
         readonly BranchesFolder _branchesFolder;
         readonly RemotesFolder _remoteBranchesFolder;
         bool _branchRefreshed;
-
         /// <summary>
         /// Gets the <see cref="ProtoGitFolder"/>.
         /// </summary>
@@ -137,6 +136,12 @@ namespace CK.Env
         /// Fires whenever we are up to leave the local branch back to the develop one.
         /// </summary>
         public event EventHandler<EventMonitoredArgs> OnLocalBranchLeaving;
+
+        /// <summary>
+        /// Fires whenever the repo is reset.
+        /// </summary>
+        public event Action<IActivityMonitor> Reset;
+
 
         /// <summary>
         /// Gets the standard git status, based on the <see cref="CurrentBranchName"/>.
@@ -352,6 +357,7 @@ namespace CK.Env
         {
             using( m.OpenInfo( $"Reset --hard changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
             {
+                Reset.Invoke(m);
                 try
                 {
                     Git.Reset( ResetMode.Hard );

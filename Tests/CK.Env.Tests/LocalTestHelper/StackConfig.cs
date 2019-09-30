@@ -40,20 +40,17 @@ namespace CK.Env.Tests.LocalTestHelper
             Dirty = false;
         }
 
-        const string _placeHolderString = "PLACEHOLDER_CKLI_TESTS";
-
-
         /// <summary>
         /// Replace the placeHolder or the temp path by the other one.
         /// </summary>
         /// <param name="path"></param>
         /// <param name="replacePlaceHolder">When true, replace placeHolder with path, when false, replace the path with the placeholder.</param>
-        public void PlaceHolderSwap( bool replacePlaceHolder )
+        public void PlaceHolderSwap( bool replacePlaceHolder, string placeHolderString )
         {
             PlaceHolderSwap(
                 Config.Root,
-                replacePlaceHolder ? _placeHolderString : _universePath,
-                replacePlaceHolder ? _universePath : _placeHolderString
+                replacePlaceHolder ? placeHolderString : _universePath,
+                replacePlaceHolder ? _universePath : placeHolderString
             );
         }
 
@@ -76,7 +73,7 @@ namespace CK.Env.Tests.LocalTestHelper
                     .Cast<XText>()
                     .Where( p => p.Value.Contains( thingToReplace ) ) )
             {
-                text.Value = text.Value.Replace( _placeHolderString, overridingThing );
+                text.Value = text.Value.Replace( thingToReplace, overridingThing );
             }
             foreach( var elem in configNode.Elements() )
             {

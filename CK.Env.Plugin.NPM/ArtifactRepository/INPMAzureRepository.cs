@@ -15,5 +15,10 @@ namespace CK.Env.NPM
         /// </summary>
         string FeedName { get; }
 
+        /// <summary>
+        /// Gets the project name of this Repository. Can be null.
+        /// </summary>
+        string ProjectName { get; }
+
     }
 }

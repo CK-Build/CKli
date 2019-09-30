@@ -22,22 +22,31 @@ namespace CK.Env.Tests
         public void regenerate_image_from_scratch()
         {
             Assume.That( TestHelper.IsExplicitAllowed );
-            //things_work_on_a_world_with_one_project( true );
+            applysettings_work_on_single_project( true );
         }
 
-        [Test]
-        public void things_work_on_a_world_with_one_project()
+        [TestCase( false )]
+        public void a_simple_project_can_be_build( bool uselessButNeededArg )
         {
-            using( var testHost = _imageManager.InstantiateImage( false ) ) //The first test does'nt pickup the image from the Generated Images folder.
+            using( var testHost = _imageManager.InstantiateImage( TestHelper.Monitor, false ) ) //The first test does'nt pickup the image from the Generated Images folder.
             {
-                testHost.UserHost.WorldStore.EnsureStackDefinition( TestHelper.Monitor, "CKTest-Build", testHost.StackBareGitPath, true, testHost.UserLocalDirectory);
+                testHost.UserHost.WorldStore.EnsureStackDefinition( TestHelper.Monitor, "CKTest-Build", testHost.StackBareGitPath, true, testHost.UserLocalDirectory );
+                testHost.ReloadConfigAndGitsWithNewPaths( TestHelper.Monitor );
                 testHost.UserHost.WorldStore.PullAll( TestHelper.Monitor ).Should().BeFalse();//The repo was previously cloned, pulling should do nothing.
-                testHost.ReloadConfig();
                 testHost.UserHost.WorldSelector.Open( TestHelper.Monitor, "CKTest-Build" ).Should().BeTrue();
                 var w = testHost.UserHost.WorldSelector.CurrentWorld;
                 w.Should().NotBeNull();
                 w.AllBuild( TestHelper.Monitor ).Should().BeTrue();
-                testHost.BuildImage();
+                testHost.BuildImage( TestHelper.Monitor );
+            }
+        }
+
+        [TestCase( false )]
+        public void applysettings_work_on_single_project( bool generateAndUseParentImage )
+        {
+            using( var testHost = _imageManager.InstantiateAndGenerateImageIfNeeded( TestHelper.Monitor, generateAndUseParentImage, a_simple_project_can_be_build ) )
+            {
+
             }
         }
 

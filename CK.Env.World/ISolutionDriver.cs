@@ -40,7 +40,7 @@ namespace CK.Env
         ISolution GetSolution( IActivityMonitor monitor, bool allowInvalidSolution, bool reloadSolution );
 
         /// <summary>
-        /// Gets wether the Solution that this driver handles is valid or not.
+        /// Gets whether the Solution that this driver handles is valid or not.
         /// </summary>
         /// <returns></returns>
         bool IsSolutionValid { get; }
