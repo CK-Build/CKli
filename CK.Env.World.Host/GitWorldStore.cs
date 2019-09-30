@@ -507,7 +507,7 @@ namespace CK.Env
             newWorlds.Sort( ( w1, w2 ) =>
             {
                 int cmp = w1.Name.CompareTo( w2.Name );
-                return cmp != 0 ? cmp : w1.ParallelName.CompareTo( w2.ParallelName );
+                return cmp != 0 ? cmp : string.Compare(w1.ParallelName, w2.ParallelName );
             } );
             return newWorlds;
         }
