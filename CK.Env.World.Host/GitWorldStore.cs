@@ -144,7 +144,7 @@ namespace CK.Env
             public string BranchName { get; }
 
             /// <summary>
-            /// Overridden to return the one line format saved in tthe text file.
+            /// Overridden to return the one line format saved in the text file.
             /// </summary>
             /// <returns>This defintion on one line.</returns>
             public override string ToString()
@@ -189,7 +189,7 @@ namespace CK.Env
 
             if( change )
             {
-                UpdateReposFromDefinitions( m, StackInitializeOption.None );
+                UpdateReposFromDefinitions( m, StackInitializeOption.OpenAndPullRepository );
                 WriteStacksToFile( m );
             }
         }
@@ -251,7 +251,7 @@ namespace CK.Env
 
             StackDef[] _stacks;
             GitRepository _git;
-            
+
             public StackRepo( GitWorldStore store, Uri uri )
             {
                 _store = store;
@@ -260,7 +260,7 @@ namespace CK.Env
                                    .Replace( ".git", "" )
                                    .Replace( "_git", "" )
                                    .Replace( '/', '_' )
-                                   .Replace( ':', '_')
+                                   .Replace( ':', '_' )
                                    .Replace( "__", "_" )
                                    .Trim( '_' )
                                    .ToLowerInvariant();
@@ -352,8 +352,11 @@ namespace CK.Env
             {
                 if( option == StackInitializeOption.OpenRepository ) EnsureOpen( m );
                 else if( option == StackInitializeOption.OpenAndPullRepository ) Pull( m );
-                EnsureOpen( m );
-
+                if( !IsOpen )
+                {
+                    m.Warn( $"Repository '{OriginUrl}' for stacks '{_stacks.Select( s => s.StackName ).Concatenate("', '")}' is not opened. Skipping Worlds reading from them." );
+                    return;
+                }
                 var worldNames = Directory.GetFiles( Root, "*.World.xml" )
                                     .Select( p => LocalWorldName.TryParse( m, p, _store.WorldLocalMapping ) )
                                     .Where( w => w != null )
@@ -382,7 +385,7 @@ namespace CK.Env
 
             public void Dispose()
             {
-                if(IsOpen)
+                if( IsOpen )
                 {
                     _git.Dispose();
                     _git = null;

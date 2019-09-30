@@ -626,7 +626,7 @@ namespace CK.Env
                     var gitFolderPath = Path.Combine( workingFolder, ".git" );
                     if( !Directory.Exists( gitFolderPath ) )
                     {
-                        using( m.OpenInfo( $"Checking out '{workingFolder}' from '{git.OriginUrl}' on {branchName}." ) )
+                        using( m.OpenInfo( $"Cloning '{workingFolder}' from '{git.OriginUrl}' on {branchName}." ) )
                         {
                             try
                             {
@@ -636,18 +636,18 @@ namespace CK.Env
                                     Checkout = true
                                 } );
                             }
-                            catch
+                            catch( Exception ex )
                             {
-                                m.Error( "Git clone failed. Deleting the repository." );
-                                Directory.Delete( workingFolder );
-                                throw;
+                                m.Error( "Git clone failed. Deleting the repository.", ex );
+                                FileHelper.RawDeleteLocalDirectory( m, workingFolder );
+                                return null;
                             }
-
                         }
                     }
                     else if( !Repository.IsValid( gitFolderPath ) )
                     {
-                        throw new InvalidOperationException( $"Git folder {gitFolderPath} exists but is not a valid Repository." );
+                        m.Fatal( $"Git folder '{gitFolderPath}' exists but is not a valid Repository." );
+                        return null;
                     }
                     Repository r = new Repository( workingFolder );
                     var remote = r.Network.Remotes.FirstOrDefault( rem => rem.Url.Equals( git.OriginUrl.ToString(), StringComparison.OrdinalIgnoreCase ) );

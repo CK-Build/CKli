@@ -362,7 +362,7 @@ namespace CK.Env
                     if( info.IsDirectory )
                     {
                         m.Info( $"Deleting folder '{subPath}'." );
-                        Directory.Delete( info.PhysicalPath, true );
+                        FileHelper.RawDeleteLocalDirectory( m, info.PhysicalPath );
                     }
                     else
                     {
