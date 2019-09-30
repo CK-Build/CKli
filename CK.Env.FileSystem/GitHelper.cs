@@ -256,7 +256,7 @@ namespace CK.Env
 
                 try
                 {
-                    return DoPull(m, mergeFileFavor);
+                    return DoPull( m, mergeFileFavor );
                 }
                 catch( Exception ex )
                 {
@@ -301,7 +301,7 @@ namespace CK.Env
                         OnNewCurrentBranch( m );
                         reloadNeeded = true;
                     }
-                    (bool Success, bool ReloadNeeded) = DoPull(m, MergeFileFavor.Theirs);
+                    (bool Success, bool ReloadNeeded) = DoPull( m, MergeFileFavor.Theirs );
                     return (Success, reloadNeeded || ReloadNeeded);
                 }
                 catch( Exception ex )
@@ -312,7 +312,7 @@ namespace CK.Env
             }
         }
 
-        (bool Success, bool ReloadNeeded) DoPull(IActivityMonitor m, MergeFileFavor mergeFileFavor)
+        (bool Success, bool ReloadNeeded) DoPull( IActivityMonitor m, MergeFileFavor mergeFileFavor )
         {
             var merger = Git.Config.BuildSignature( DateTimeOffset.Now ) ?? new Signature( "CKli", "none", DateTimeOffset.Now );
             if( Git.Branches.Count() == 1 && Git.Branches.Single().TrackedBranch?.Tip == null )
@@ -666,7 +666,7 @@ namespace CK.Env
                         var committer = new Signature( "CKli", "none", date );
                         r.Commit( "Initial commit automatically created.", author, committer, new CommitOptions { AllowEmptyCommit = true } );
                     }
-                    if( r.Head?.FriendlyName != branchName && branchName != null)
+                    if( r.Head?.FriendlyName != branchName && branchName != null )
                     {
                         Branch branch = DoEnsureBranch( m, r, branchName, false, workingFolder );
                         Commands.Checkout( r, branch );
@@ -757,8 +757,8 @@ namespace CK.Env
                 }
                 else
                 {
-                    SVersion currentScriptVersion = CheckHookDispatcherVersion( HookPrePushScript(hookName) );
-                    if(currentScriptVersion > installedScriptVersion)
+                    SVersion currentScriptVersion = CheckHookDispatcherVersion( HookPrePushScript( hookName ) );
+                    if( currentScriptVersion > installedScriptVersion )
                     {
                         m.Info( $"Git hook {hookName} was an old dispatcher. Removing it." );
                         File.Delete( hookPath );
