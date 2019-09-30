@@ -33,11 +33,9 @@ namespace CK.Env
             {
                 ReleaseNote = previous.Element( "ReleaseNote" ).Value;
                 var releaseInfoXml = previous.Element( "ReleaseInfo" );
-                if( releaseInfoXml != null ) _previouslyResolvedInfo = new ReleaseInfo( releaseInfoXml );
-                bool isSame = (string)previous.Attribute( "CommitSha" ) == versionInfo.CommitSha;
-                if( isSame )
+                if( releaseInfoXml != null )
                 {
-                    _releaseInfo = _previouslyResolvedInfo;
+                    _releaseInfo = _previouslyResolvedInfo = new ReleaseInfo( releaseInfoXml );
                 }
             }
         }
