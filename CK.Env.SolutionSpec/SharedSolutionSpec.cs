@@ -20,6 +20,7 @@ namespace CK.Env
             NoStrongNameSigning = r.HandleOptionalAttribute( nameof( NoStrongNameSigning ), false );
             NoSharedPropsFile = r.HandleOptionalAttribute( nameof( NoSharedPropsFile ), false );
             DisableSourceLink = r.HandleOptionalAttribute( nameof(DisableSourceLink), false );
+            GlobalJsonSdkVersion = r.HandleOptionalAttribute<string>( nameof( GlobalJsonSdkVersion ), null );
 
             ArtifactTargets = r.HandleCollection(
                     nameof( ArtifactTargets ),
@@ -55,6 +56,7 @@ namespace CK.Env
             NoDotNetUnitTests = r.HandleOptionalAttribute( nameof( NoDotNetUnitTests ), other.NoDotNetUnitTests );
             NoStrongNameSigning = r.HandleOptionalAttribute( nameof( NoStrongNameSigning ), other.NoStrongNameSigning );
             NoSharedPropsFile = r.HandleOptionalAttribute( nameof( NoSharedPropsFile ), other.NoSharedPropsFile );
+            GlobalJsonSdkVersion = r.HandleOptionalAttribute( nameof( GlobalJsonSdkVersion ), other.GlobalJsonSdkVersion );
 
             var excludedNuGetSourceNames = new HashSet<string>( other.RemoveNuGetSourceNames );
             var excludedNPMScopeNames = new HashSet<string>( other.RemoveNPMScopeNames );
@@ -82,6 +84,12 @@ namespace CK.Env
 
 
         }
+
+        /// <summary>
+        /// Gets the SDK version that must appear in the global.json file at the root.
+        /// Defaults to null: no global.json file appear at the root and the latest installed SDK is used. 
+        /// </summary>
+        public string GlobalJsonSdkVersion { get; }
 
         /// <summary>
         /// Gets whether the solution has no unit tests.

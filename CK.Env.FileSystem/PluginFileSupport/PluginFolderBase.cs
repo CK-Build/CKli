@@ -70,6 +70,13 @@ namespace CK.Env.Plugin
         /// <returns>The command name.</returns>
         protected virtual NormalizedPath GetCommandProviderName() => FolderPath;
 
+        /// <summary>
+        /// Ensures that this <see cref="FolderPath"/> exists.
+        /// Calls <see cref="GitBranchPluginExtension.CheckCurrentBranch"/> before (and returns false
+        /// if the current branch differ).
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>True on success, false on error.</returns>
         public bool EnsureDirectory( IActivityMonitor m )
         {
             return this.CheckCurrentBranch( m ) && GitFolder.FileSystem.EnsureDirectory( m, FolderPath );

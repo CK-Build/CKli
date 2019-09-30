@@ -44,7 +44,7 @@ namespace CK.Env.Plugin
             if( projects == null ) return;
             foreach( var f in projects.Select( p => p.FullPath.AppendPart( ".npmrc" ) ) )
             {
-                ApplySettings( m, f );
+                DoApplySettings( m, f );
             }
         }
 
@@ -101,7 +101,8 @@ namespace CK.Env.Plugin
                 _secretStore.DeclareSecretKey( c, current => current?.Description ?? "Needed to configure .npmrc file." );
             }
         }
-        void ApplySettings( IActivityMonitor m, NormalizedPath f )
+
+        void DoApplySettings( IActivityMonitor m, NormalizedPath f )
         {
             var s = _solutionDriver.GetSolution( m, allowInvalidSolution: true );
             if( s == null ) return;

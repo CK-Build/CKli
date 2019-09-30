@@ -26,8 +26,6 @@ namespace CK.Env.Plugin
 
         public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
 
-
-
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
         {

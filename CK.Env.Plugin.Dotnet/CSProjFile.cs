@@ -21,13 +21,15 @@ namespace CK.Env.Plugin
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => _solutionDriver.BranchPath.AppendPart( nameof( CSProjFile ) );
 
+        public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
+
         [CommandMethod]
-        public bool ApplySettings( IActivityMonitor m )
+        public void ApplySettings( IActivityMonitor m )
         {
-            if( !this.CheckCurrentBranch( m ) ) return false;
+            if( !this.CheckCurrentBranch( m ) ) return;
 
             var solution = _solutionDriver.GetSolution( m, allowInvalidSolution: true );
-            if( solution == null ) return false;
+            if( solution == null ) return;
 
             var csprojs = solution.Projects.Select<IProject, (IProject project, MSProject msproject)>( p => (p, p.Tag<MSProject>()) ).Where( p => p.Item2 != null );
 
@@ -43,9 +45,8 @@ namespace CK.Env.Plugin
                     msproject.SetIsPackable( m, false );
                 }
                 // Saves the project.
-                if( !msproject.Save( m ) ) return false;
+                msproject.Save( m );
             }
-            return true;
         }
     }
 }
