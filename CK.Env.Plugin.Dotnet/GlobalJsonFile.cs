@@ -8,7 +8,7 @@ namespace CK.Env.Plugin
         readonly SolutionSpec _solutionSpec;
 
         public GlobalJsonFile( GitFolder f, NormalizedPath branchPath, SolutionSpec solutionSpec )
-             : base( f, branchPath, f.SubPath.AppendPart( "global.json" ) )
+             : base( f, branchPath, branchPath.AppendPart( "global.json" ) )
         {
             _solutionSpec = solutionSpec;
         }

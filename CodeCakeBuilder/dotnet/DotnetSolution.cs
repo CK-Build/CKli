@@ -179,7 +179,7 @@ namespace CodeCake
                                 NoBuild = true,
                                 Logger = "trx"
                             };
-                            if(Environment.GetEnvironmentVariable("DisableNodeReUse") != null)
+                            if( _globalInfo.Cake.Environment.GetEnvironmentVariable( "DisableNodeReUse" ) != null )
                             {
                                 options.ArgumentCustomization = args => args.Append( "/nodeReuse:false" );
                             }
