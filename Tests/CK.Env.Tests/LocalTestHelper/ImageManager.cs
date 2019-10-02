@@ -89,29 +89,51 @@ namespace CK.Env.Tests.LocalTestHelper
         public const string PlaceHolderString = "PLACEHOLDER_CKLI_TESTS";
 
 
-        class ZipEntryComparer : IEqualityComparer<ZipArchiveEntry>
+
+
+        public class ZipComparer : IDisposable
         {
-            public bool Equals( ZipArchiveEntry x, ZipArchiveEntry y )
+            readonly ZipArchive _a;
+            readonly ZipArchive _b;
+            static readonly ZipEntryComparer _comparer = new ZipEntryComparer();
+            class ZipEntryComparer : IEqualityComparer<ZipArchiveEntry>
             {
-                return x.Crc32 == y.Crc32 && x.FullName == y.FullName;
+                public bool Equals( ZipArchiveEntry x, ZipArchiveEntry y )
+                {
+                    return x.Crc32 == y.Crc32 && x.FullName == y.FullName;
+                }
+
+                public int GetHashCode( ZipArchiveEntry obj )
+                {
+                    return (int)obj.Crc32;
+                }
+            }
+            public ZipComparer( ZipArchive a, ZipArchive b )
+            {
+                _a = a;
+                _b = b;
+
             }
 
-            public int GetHashCode( ZipArchiveEntry obj )
+            public void Dispose()
             {
-                return (int)obj.Crc32;
+                _a.Dispose();
+                _b.Dispose();
             }
+
+
+            public IEnumerable<ZipArchiveEntry> AExceptB => _a.Entries.Except( _b.Entries, _comparer );
+
+            public IEnumerable<ZipArchiveEntry> BExceptA => _b.Entries.Except( _a.Entries, _comparer );
+
         }
 
-        public static bool CompareImages( string imageAPath, string imageBPath )
+
+        public static ZipComparer CompareBuildedImages( string imageAName, string imageBName )
         {
-            using( var imageA = ZipFile.OpenRead( imageAPath ) )
-            using( var imageB = ZipFile.OpenRead( imageBPath ) )
-            {
-                var comparer = new ZipEntryComparer();
-                var imageAItems = imageA.Entries.Except( imageB.Entries, comparer ).ToList();
-                var imageBItems = imageB.Entries.Except( imageA.Entries, comparer ).ToList();
-            }
-            return true;
+            return new ZipComparer(
+                ZipFile.OpenRead( GetImagePath( imageAName, false, true ) ),
+                ZipFile.OpenRead( GetImagePath( imageBName, false, true ) ) );
         }
     }
 }

@@ -54,6 +54,7 @@ namespace CK.Env.Tests.LocalTestHelper
 
         static Dictionary<string, StackConfig> LoadConfig( NormalizedPath ckliMapping )
         {
+            if( !Directory.Exists( ckliMapping ) ) return new Dictionary<string, StackConfig>();
             return Directory.EnumerateFiles( ckliMapping, "*.World.xml", SearchOption.AllDirectories ).Where( p => !p.Contains( ".git" ) ).ToDictionary( kS => kS, eS => StackConfig.Create( eS ) );
         }
 

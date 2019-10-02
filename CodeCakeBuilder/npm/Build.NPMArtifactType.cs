@@ -13,7 +13,7 @@ namespace CodeCake
         {
             get
             {
-                if( _artifactType == null ) _artifactType = new NPMArtifactType(_globalInfo, this);
+                if( _artifactType == null ) _artifactType = new NPMArtifactType( _globalInfo, this );
                 return _artifactType;
             }
         }
@@ -21,7 +21,7 @@ namespace CodeCake
         public void Pack() => RunPack();
     }
 
-    
+
     public partial class Build
     {
         /// <summary>
@@ -42,9 +42,8 @@ namespace CodeCake
 
             protected override IEnumerable<ArtifactFeed> GetRemoteFeeds()
             {
-                yield return new AzureNPMFeed( this, "Signature-OpenSource", "Default", null);
-if( GlobalInfo.Version.PackageQuality >= CSemVer.PackageQuality.ReleaseCandidate ) yield return new NPMRemoteFeed( this, "NPMJS_ORG_PUSH_PAT", "https://registry.npmjs.org/", false );
-
+                yield return new AzureNPMFeed( this, "Signature-OpenSource", "Default", null );
+                if( GlobalInfo.Version.PackageQuality >= CSemVer.PackageQuality.ReleaseCandidate ) yield return new NPMRemoteFeed( this, "NPMJS_ORG_PUSH_PAT", "https://registry.npmjs.org/", false );
             }
 
             protected override IEnumerable<ArtifactFeed> GetLocalFeeds()

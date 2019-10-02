@@ -4,6 +4,7 @@ using FluentAssertions;
 using static CK.Testing.MonitorTestHelper;
 using CK.Env.Tests.LocalTestHelper;
 using System.IO;
+using System.Linq;
 
 namespace CK.Env.Tests
 {
@@ -18,7 +19,7 @@ namespace CK.Env.Tests
         }
 
         [Test]
-        public void a_simple_project_can_be_build()
+        public void  a_simple_project_can_be_build ()
         {
             using( var testHost = ImageManager.InstantiateImage( TestHelper.Monitor, true ) )
             {
@@ -33,16 +34,17 @@ namespace CK.Env.Tests
         }
 
         [Test]
-        public void applysettings_work_on_single_project()
+        public void dll_should_not_change_after_rebuild()
         {
-            using( var testHost = ImageManager.InstantiateAndGenerateImageIfNeeded( TestHelper.Monitor, a_simple_project_can_be_build ) )
+            using( var testHost = ImageManager.InstantiateAndGenerateImageIfNeeded( TestHelper.Monitor,  a_simple_project_can_be_build  ) )
             {
                 testHost.UserHost.WorldSelector.Open( TestHelper.Monitor, "CKTest-Build" ).Should().BeTrue();
                 var w = testHost.UserHost.WorldSelector.CurrentWorld;
                 w.Should().NotBeNull();
                 w.AllBuild( TestHelper.Monitor, true ).Should().BeTrue();
             }
-            ImageManager.CompareImages( ImageManager.GetImagePath( nameof( applysettings_work_on_single_project ), false, true ), ImageManager.GetImagePath( nameof( a_simple_project_can_be_build ), false, true ) );
+            var compare = ImageManager.CompareBuildedImages( nameof(dll_should_not_change_after_rebuild), nameof( a_simple_project_can_be_build ) );
+            compare.AExceptB.Where( p => p.FullName.EndsWith( ".dll" ) ).Should().BeEmpty();
         }
 
         //[TestCase( false )]
