@@ -104,7 +104,7 @@ namespace CK.Env
             }
         }
 
-        static void NormalizeAttributes( string directoryPath )
+        public static void NormalizeAttributes( string directoryPath )
         {
             string[] filePaths = Directory.GetFiles( directoryPath );
             string[] subdirectoryPaths = Directory.GetDirectories( directoryPath );

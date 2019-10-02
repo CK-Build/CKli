@@ -243,6 +243,16 @@ namespace CK.Env
         #endregion
 
         #region Repository
+
+        public static string CleanPathDirName( string path ) =>
+                path.Replace( ".git", "" )
+                    .Replace( "_git", "" )
+                    .Replace( '/', '_' )
+                    .Replace( ':', '_' )
+                    .Replace( "__", "_" )
+                    .Trim( '_' )
+                    .ToLowerInvariant();
+
         class StackRepo : IDisposable
         {
             public readonly Uri OriginUrl;
@@ -252,18 +262,13 @@ namespace CK.Env
             StackDef[] _stacks;
             GitRepository _git;
 
+            
+
             public StackRepo( GitWorldStore store, Uri uri )
             {
                 _store = store;
                 OriginUrl = uri;
-                var cleanPath = uri.AbsolutePath
-                                   .Replace( ".git", "" )
-                                   .Replace( "_git", "" )
-                                   .Replace( '/', '_' )
-                                   .Replace( ':', '_' )
-                                   .Replace( "__", "_" )
-                                   .Trim( '_' )
-                                   .ToLowerInvariant();
+                var cleanPath = CleanPathDirName(uri.AbsolutePath);
                 Root = store._rootPath.AppendPart( cleanPath );
             }
 

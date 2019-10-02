@@ -3,51 +3,46 @@ using FluentAssertions;
 
 using static CK.Testing.MonitorTestHelper;
 using CK.Env.Tests.LocalTestHelper;
+using System.IO;
 
 namespace CK.Env.Tests
 {
     [TestFixture]
     public class WorldsTests
     {
-        ImageManager _imageManager;
 
         [OneTimeSetUp]
         public void Init()
         {
             TestHelper.LogToConsole = true;
-            _imageManager = ImageManager.Create();
         }
 
         [Test]
-        public void regenerate_image_from_scratch()
+        public void a_simple_project_can_be_build()
         {
-            Assume.That( TestHelper.IsExplicitAllowed );
-            applysettings_work_on_single_project( true );
-        }
-
-        [TestCase( false )]
-        public void a_simple_project_can_be_build( bool uselessButNeededArg )
-        {
-            using( var testHost = _imageManager.InstantiateImage( TestHelper.Monitor, false ) ) //The first test does'nt pickup the image from the Generated Images folder.
+            using( var testHost = ImageManager.InstantiateImage( TestHelper.Monitor, true ) )
             {
                 testHost.UserHost.WorldStore.EnsureStackDefinition( TestHelper.Monitor, "CKTest-Build", testHost.StackBareGitPath, true, testHost.UserLocalDirectory );
-                testHost.ReloadConfigAndGitsWithNewPaths( TestHelper.Monitor );
+                TestUniverse.PlaceHolderSwapEverything( TestHelper.Monitor, testHost.TempPath , ImageManager.PlaceHolderString, testHost.TempPath );
                 testHost.UserHost.WorldStore.PullAll( TestHelper.Monitor ).Should().BeFalse();//The repo was previously cloned, pulling should do nothing.
                 testHost.UserHost.WorldSelector.Open( TestHelper.Monitor, "CKTest-Build" ).Should().BeTrue();
                 var w = testHost.UserHost.WorldSelector.CurrentWorld;
                 w.Should().NotBeNull();
                 w.AllBuild( TestHelper.Monitor ).Should().BeTrue();
-                testHost.BuildImage( TestHelper.Monitor );
             }
         }
 
-        [TestCase( false )]
-        public void applysettings_work_on_single_project( bool generateAndUseParentImage )
+        [Test]
+        public void applysettings_work_on_single_project()
         {
-            using( var testHost = _imageManager.InstantiateAndGenerateImageIfNeeded( TestHelper.Monitor, generateAndUseParentImage, a_simple_project_can_be_build ) )
+            using( var testHost = ImageManager.InstantiateAndGenerateImageIfNeeded( TestHelper.Monitor, a_simple_project_can_be_build ) )
             {
-
+                testHost.UserHost.WorldSelector.Open( TestHelper.Monitor, "CKTest-Build" ).Should().BeTrue();
+                var w = testHost.UserHost.WorldSelector.CurrentWorld;
+                w.Should().NotBeNull();
+                w.AllBuild( TestHelper.Monitor, true ).Should().BeTrue();
             }
+            ImageManager.CompareImages( ImageManager.GetImagePath( nameof( applysettings_work_on_single_project ), false, true ), ImageManager.GetImagePath( nameof( a_simple_project_can_be_build ), false, true ) );
         }
 
         //[TestCase( false )]

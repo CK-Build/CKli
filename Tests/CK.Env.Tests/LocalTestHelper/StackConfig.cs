@@ -8,21 +8,19 @@ namespace CK.Env.Tests.LocalTestHelper
     public class StackConfig : IDisposable
     {
 
-        readonly string _universePath;
         readonly NormalizedPath _configPath;
 
-        StackConfig(NormalizedPath path, XDocument config, string universePath)
+        StackConfig(NormalizedPath path, XDocument config)
         {
-            _universePath = universePath;
             _configPath = path;
             Config = config;
             config.Changed += Config_Changed;
         }
 
-        public static StackConfig Create( NormalizedPath universePath, NormalizedPath path)
+        public static StackConfig Create(NormalizedPath path)
         {
             var xml = XDocument.Load( path );
-            return new StackConfig( path, xml, universePath );
+            return new StackConfig( path, xml );
         }
 
         private void Config_Changed( object sender, XObjectChangeEventArgs e )
@@ -45,13 +43,9 @@ namespace CK.Env.Tests.LocalTestHelper
         /// </summary>
         /// <param name="path"></param>
         /// <param name="replacePlaceHolder">When true, replace placeHolder with path, when false, replace the path with the placeholder.</param>
-        public void PlaceHolderSwap( bool replacePlaceHolder, string placeHolderString )
+        public void PlaceHolderSwap( string oldString, string newString )
         {
-            PlaceHolderSwap(
-                Config.Root,
-                replacePlaceHolder ? placeHolderString : _universePath,
-                replacePlaceHolder ? _universePath : placeHolderString
-            );
+            PlaceHolderSwap( Config.Root, oldString, newString );
         }
 
 
@@ -61,23 +55,23 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <param name="configNode"></param>
         /// <param name="path"></param>
         /// <param name="replacePlaceHolder">When true, replace placeHolder with path, when false, replace the path with the placeholder.</param>
-        void PlaceHolderSwap(XElement configNode, string thingToReplace, string overridingThing )
+        void PlaceHolderSwap(XElement configNode, string oldString, string newString )
         {
-            foreach( var attribute in configNode.Attributes().Where( p => p.Value.Contains( thingToReplace ) ) )
+            foreach( var attribute in configNode.Attributes().Where( p => p.Value.Contains( oldString ) ) )
             {
-                attribute.Value = attribute.Value.Replace( thingToReplace, overridingThing );
+                attribute.Value = attribute.Value.Replace( oldString, newString );
             }
             foreach( var text in
                 configNode.Nodes()
                     .Where( p => p is XText )
                     .Cast<XText>()
-                    .Where( p => p.Value.Contains( thingToReplace ) ) )
+                    .Where( p => p.Value.Contains( oldString ) ) )
             {
-                text.Value = text.Value.Replace( thingToReplace, overridingThing );
+                text.Value = text.Value.Replace( oldString, newString );
             }
             foreach( var elem in configNode.Elements() )
             {
-                PlaceHolderSwap( elem, thingToReplace, overridingThing );
+                PlaceHolderSwap( elem, oldString, newString );
             }
         }
 

@@ -254,3 +254,4 @@ CodeCakeBuilder/Tools/
 Tests/**/TestResult*.xml
 /Tests/A1Test/
 /Tests/**/Logs/
+/Tests/CK.Env.Tests/UniverseZips/

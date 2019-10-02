@@ -36,7 +36,6 @@ namespace CK.Env.Tests.LocalTestHelper
 
         const string _userLocalDirectoryName = "dev";
         private readonly IActivityMonitor _m;
-        private readonly ImageManager _imageManager;
 
         /// <summary>
         /// Instantiate a new <see cref="TestUniverse"/>.
@@ -45,30 +44,17 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <param name="userHost">The UserHost instantied with this path.</param>
         /// <param name="imageName">Name of the image this <see cref="TestUniverse"/> is based on.</param>
         /// <param name="configs">The stacks configs.</param>
-        TestUniverse( IActivityMonitor m, ImageManager imageManager, NormalizedPath tempPath, UserHost userHost, string imageName )
+        TestUniverse( IActivityMonitor m, NormalizedPath tempPath, UserHost userHost, string imageName )
         {
             _m = m;
-            _imageManager = imageManager;
             TempPath = tempPath;
             UserHost = userHost;
             ImageName = imageName;
-            Configs = new Dictionary<string, StackConfig>();
-            ReloadConfigAndGitsWithNewPaths( m );
         }
 
-        public void ReloadConfigAndGitsWithNewPaths( IActivityMonitor m )
+        static Dictionary<string, StackConfig> LoadConfig( NormalizedPath ckliMapping )
         {
-            int cnt = SwapAllGitOriginPlaceholders( m, ImageManager.PlaceHolderString, TempPath );
-            var files = Directory.EnumerateFiles( TempPath.AppendPart( _ckliMapping ), "*.World.xml", SearchOption.AllDirectories )
-                .Where( p => !p.Contains( ".git" ) );
-            var config = new Dictionary<string, StackConfig>();
-            foreach( string fileName in files )
-            {
-                var newConfig = StackConfig.Create( TempPath, fileName );
-                newConfig.PlaceHolderSwap( true, ImageManager.PlaceHolderString );
-                newConfig.Save();
-                config.Add( fileName, newConfig );
-            }
+            return Directory.EnumerateFiles( ckliMapping, "*.World.xml", SearchOption.AllDirectories ).Where( p => !p.Contains( ".git" ) ).ToDictionary( kS => kS, eS => StackConfig.Create( eS ) );
         }
 
         /// <summary>
@@ -76,7 +62,7 @@ namespace CK.Env.Tests.LocalTestHelper
         /// </summary>
         public UserHost UserHost { get; }
 
-        public Dictionary<string, StackConfig> Configs { get; }
+        public Dictionary<string, StackConfig> Configs { get; private set; }
 
         /// <summary>
         /// Temp path of the TestHost.
@@ -122,22 +108,49 @@ namespace CK.Env.Tests.LocalTestHelper
         /// </summary>
         /// <param name="path"> The path where the <see cref="TestUniverse"/> will be. The Directory will be deleted when disposed.</param>
         /// <returns></returns>
-        public static TestUniverse Create( IActivityMonitor m, ImageManager imageManager, NormalizedPath path, string imageName )
+        public static TestUniverse Create( IActivityMonitor m, NormalizedPath path, string imageName )
         {
+            NormalizedPath ckliPath = path.AppendPart( _ckliMapping );
+            if( Directory.Exists( ckliPath ) ) ReplaceInDirectoriesPaths( ckliPath, GitWorldStore.CleanPathDirName( ImageManager.PlaceHolderString ), GitWorldStore.CleanPathDirName( path ) );
             FakeApplicationLifetime appLife = new FakeApplicationLifetime();
-            var userHost = new UserHost( appLife, path.AppendPart( _ckliMapping ) );
+            PlaceHolderSwapEverything( m, path, ImageManager.PlaceHolderString, path );
+            var userHost = new UserHost( appLife, ckliPath );
+            var output = new TestUniverse( m, path, userHost, imageName );
             userHost.Initialize( m );
             userHost.WorldStore.DeleteStackDefinition( m, "CK" );
             userHost.WorldStore.DeleteStackDefinition( m, "CK-Build" );
-
-            return new TestUniverse( m, imageManager, path, userHost, imageName );
+            return output;
         }
 
-        public int SwapAllGitOriginPlaceholders( IActivityMonitor m, string oldString, string newString )
+        /// <summary>
+        /// Replace in all the Git Repositories the
+        /// </summary>
+        /// <param name="m"></param>
+        /// <param name="oldString"></param>
+        /// <param name="newString"></param>
+        /// <returns></returns>
+        public static int SwapAllGitOriginPlaceholders( IActivityMonitor m, NormalizedPath tempPath, string oldString, string newString )
         {
-            using( m.OpenInfo( "Replacing Git Remotes URL." ) ) return Directory.EnumerateDirectories( TempPath, "*.git" ).Select( s => new Repository( s ) ).Select( s => (s, s.Network.Remotes, s.Network.Remotes.Single()) ).Count( ( s ) => { string oldUri = s.Item3.PushUrl; s.Remotes.Update( s.Item3.Name, a => { a.Url = s.Item3.Url.Replace( oldString, newString ); a.PushUrl = s.Item3.PushUrl.Replace( oldString, newString ); } ); m.Info( $"Replaced origin of repo {s.s.Info.Path} from {oldUri} to {s.Item3.Url}" ); s.s.Dispose(); return true; } );
+            //someone said "you can do that in one line". So i did.
+            using( m.OpenInfo( "Replacing Git Remotes URL." ) )
+            {
+                return Directory.EnumerateDirectories( tempPath, "*.git", SearchOption.AllDirectories )
+                    .Select( s => new Repository( s ) )
+                    .Select( s => (s, s.Network.Remotes, s.Network.Remotes.Single()) )
+                    .Count( s =>
+                    {
+                        string oldUri = s.Item3.PushUrl;
+                        s.Remotes.Update( s.Item3.Name, a =>
+                        {
+                            a.Url = s.Item3.Url.Replace( oldString, newString );
+                            a.PushUrl = s.Item3.PushUrl.Replace( oldString, newString );
+                        } );
+                        m.Info( $"Replaced origin of repo {s.s.Info.Path} from {oldUri} to {s.Item3.Url}" );
+                        s.s.Dispose();
+                        return true;
+                    } );
+            }
         }
-
 
 
         /// <summary>
@@ -148,73 +161,42 @@ namespace CK.Env.Tests.LocalTestHelper
             ZipFile.ExtractToDirectory( ModificationsFolder.AppendPart( modificationName ), TempPath );
         }
 
-        /// <summary>
-        /// Return all the Repositories' worlds.
-        /// </summary>
-        IEnumerable<NormalizedPath> AllGitRepos =>
-            Directory.GetDirectories( WorldsFolder )
-            .SelectMany( p => Directory.GetDirectories( p ) )
-            .Select( p => new NormalizedPath( p ) );
-
-
-        /// <summary>
-        /// Test the equality with an Image.
-        /// </summary>
-        /// <param name="imageName">Image to use to do the comparison.</param>
-        /// <param name="fromTempImage">Whether the image is stored in <see cref="BuildedImageFolder"/>(<see langword="true"/>)
-        /// or in <see cref="TestsUniverseFolder"/></param>
-        /// <returns></returns>
-        public bool IsEqualToImage( IActivityMonitor m, string imageName, bool fromTempImage )
+        public static void PlaceHolderSwapEverything( IActivityMonitor m, NormalizedPath tempPath, string oldString, string newString )
         {
-            using( var truth = _imageManager.InstantiateImage( m, fromTempImage, imageName ) )
+            var ckliMapping = tempPath.AppendPart( _ckliMapping );
+            var c = LoadConfig( ckliMapping );
+            foreach( StackConfig config in c.Select( p => p.Value ) )
             {
-                return IsEqualToTestUniverse( truth );
+                config.PlaceHolderSwap( oldString, newString );
+                config.Save();
             }
+            int cnt = SwapAllGitOriginPlaceholders( m, tempPath, oldString, newString);
+            ReplacePlaceHolderInFile( ckliMapping.AppendPart( "WorldLocalMapping.txt" ), oldString, newString );
+            ReplacePlaceHolderInFile( ckliMapping.AppendPart( "Stacks.txt" ), oldString, newString );
         }
 
-        public bool IsEqualToTestUniverse( TestUniverse testHost )
+        static void ReplacePlaceHolderInFile( string filePath, string oldString, string newString )
         {
-            var repos = AllGitRepos.Select( p => new Repository( p ) );
-            var truthRepo = testHost.AllGitRepos.Select( p => new Repository( p ) );
+            if( !File.Exists( filePath ) ) return;
+            File.WriteAllText( filePath, File.ReadAllText( filePath ).Replace( oldString, newString ) );
+        }
 
-            var truthpath = GetAllFilePathOfRepos( truthRepo ).ToList();
-            var paths = GetAllFilePathOfRepos( repos ).ToList();
-            foreach( NormalizedPath path in paths )
+        static void ReplaceInDirectoriesPaths( NormalizedPath ckliPath, string oldString, string newString )
+        {
+            foreach( var path in Directory.EnumerateDirectories( ckliPath, "*.*" ).Where( s => s.Contains( oldString ) ) )
             {
-                if( !truthpath.Remove( path ) )
-                {
-                    if( truthpath.Contains( path ) ) throw new InvalidOperationException();//Should be true ... Maybe concurrent acces ?
-                    return false;
-                }
+                Directory.Move( path, path.Replace( oldString, newString ) );
             }
-            return truthpath.Count() == 0;
-        }
-
-        public void BuildImage( IActivityMonitor m )
-        {
-            _imageManager.BuildImage( m, this );
-        }
-
-        IEnumerable<NormalizedPath> GetAllFilePathOfRepos( IEnumerable<Repository> repos )
-        {
-            return repos.SelectMany( p =>
-            {
-                var a = p.Branches.Select( q => q.Tip ).ToList();
-                if( a.Count == 0 ) return new NormalizedPath[0];
-                return AllFileFullPath( "/", a.MaxBy( r => r.Author.When ).Tree );
-            } );
-        }
-
-        IEnumerable<NormalizedPath> AllFileFullPath( NormalizedPath treePath, Tree tree )
-        {
-            return tree.Where( x => x.TargetType == TreeEntryTargetType.Tree )
-                 .SelectMany( x => AllFileFullPath( treePath.AppendPart( x.Name ), (Tree)x.Target ) )
-                 .Concat( tree.Where( x => x.TargetType == TreeEntryTargetType.Blob ).Select( p => treePath.AppendPart( p.Name + "-" + p.Target.Sha ) ) );
         }
 
         public void Dispose()
         {
             UserHost.Dispose();
+            PlaceHolderSwapEverything( _m, TempPath, TempPath, ImageManager.PlaceHolderString );
+            ReplaceInDirectoriesPaths( CKliMapping, GitWorldStore.CleanPathDirName( TempPath ), GitWorldStore.CleanPathDirName( ImageManager.PlaceHolderString ) );
+            string output = ImageManager.GetImagePath( ImageName, false, true );
+            File.Delete( output );
+            ZipFile.CreateFromDirectory( TempPath, output );
             FileHelper.RawDeleteLocalDirectory( _m, TempPath );
         }
     }
