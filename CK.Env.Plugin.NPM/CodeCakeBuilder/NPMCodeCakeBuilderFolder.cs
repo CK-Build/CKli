@@ -102,7 +102,7 @@ namespace CK.Env.Plugin
                     case INPMAzureRepository a:
                         b.Append( "yield return new AzureNPMFeed( this, \"" )
                             .Append( a.Organization ).Append( "\", " )
-                            .Append( $"\"{a.FeedName}\"" ).Append( "\", " )
+                            .Append( $"\"{a.FeedName}\"" ).Append( ", " )
                             .Append( a.ProjectName != null ? $"\"{a.ProjectName}\"" : "null")
                             .AppendLine( " );" );
                         break;
@@ -129,7 +129,7 @@ namespace CK.Env.Plugin
                 }
             }
             if( !atLeastOne ) b.AppendLine().Append( "yield break;" );
-            text = text.Replace( m.Groups[1].Value, b.ToString() );
+            text = text.Replace( m.Groups[2].Value, b.ToString() );
             return text;
         }
 
