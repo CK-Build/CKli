@@ -111,6 +111,7 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <returns></returns>
         public static TestUniverse Create( IActivityMonitor m, NormalizedPath path, string imageName )
         {
+            m.Info( $"Creating TestUniverse {imageName}." );
             NormalizedPath ckliPath = path.AppendPart( _ckliMapping );
             if( Directory.Exists( ckliPath ) ) ReplaceInDirectoriesPaths( ckliPath, GitWorldStore.CleanPathDirName( ImageManager.PlaceHolderString ), GitWorldStore.CleanPathDirName( path ) );
             FakeApplicationLifetime appLife = new FakeApplicationLifetime();

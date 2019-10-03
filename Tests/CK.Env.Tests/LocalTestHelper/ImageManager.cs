@@ -45,18 +45,19 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <param name="arbitraryCallName">If not null, will determine the name of the image.</param>
         /// <param name="callerMemberName">The caller member name. If <paramref name="arbitraryCallName"/> is null, it will used as the imageName</param>
         /// <returns></returns>
-        public static TestUniverse InstantiateImage( IActivityMonitor m, bool useSeedImage, string arbitraryCallName = null, [CallerMemberName] string callerMemberName = null )
+        public static TestUniverse InstantiateImageFromSeed( IActivityMonitor m, string arbitraryCallName = null, [CallerMemberName] string callerMemberName = null )
         {
             string imageName = arbitraryCallName ?? callerMemberName;
-            return InstantiateImage( m, GetImagePath( imageName, useSeedImage, false ) );
+            return InstantiateImage( m, GetImagePath( imageName, true, false ), imageName );
         }
 
-        static TestUniverse InstantiateImage( IActivityMonitor m, NormalizedPath imagePath )
+        static TestUniverse InstantiateImage( IActivityMonitor m, NormalizedPath imagePath, string imageName )
         {
             NormalizedPath tempPath = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
+            m.Info( $"Creating temp directory {tempPath} and dezipping '{imagePath}'." );
             Directory.CreateDirectory( tempPath );
             ZipFile.ExtractToDirectory( imagePath, tempPath );
-            return TestUniverse.Create( m, tempPath, imagePath.LastPart.Replace( ".zip", "" ) );
+            return TestUniverse.Create( m, tempPath, imageName );
 
         }
 
@@ -68,22 +69,22 @@ namespace CK.Env.Tests.LocalTestHelper
             [CallerMemberName] string callerMemberName = null )
         {
             string ourImageName = arbitraryCallName ?? callerMemberName;
-            NormalizedPath generatedPreviousImagePath = GetImagePath( parentImageGenerator.Method.Name, false, true );
-            if( !File.Exists( generatedPreviousImagePath ) )
+            NormalizedPath generatedBaseImagePath = GetImagePath( parentImageGenerator.Method.Name, false, true );
+            m.Trace( $"The base image '{parentImageGenerator.Method.Name}' should be located at '{generatedBaseImagePath}'" );
+
+            if( !File.Exists( generatedBaseImagePath ) )
             {
-                parentImageGenerator();
+                m.Info( "Base image not found. Generating it." );
+                using( m.OpenInfo( $"Generating the base image of TestUniverse '{ourImageName}'" ) )
+                {
+                    parentImageGenerator();
+                    if( !File.Exists( generatedBaseImagePath ) )
+                    {
+                        throw new InvalidOperationException( "The parent image generator did not generated the expected image." );
+                    }
+                }
             }
-            if( !File.Exists( generatedPreviousImagePath ) )
-            {
-                throw new InvalidOperationException( "The parent image generator did not generated the expected image." );
-            }
-            //The previous image should now exist
-            var ourImagePath = GetImagePath( ourImageName, false, false );
-            if( !File.Exists( ourImagePath ) )
-            {
-                File.Copy( generatedPreviousImagePath, ourImagePath );
-            }
-            return InstantiateImage( m, false, ourImageName );
+            return InstantiateImage( m, generatedBaseImagePath, ourImageName );
         }
 
         public const string PlaceHolderString = "PLACEHOLDER_CKLI_TESTS";
