@@ -14,7 +14,6 @@ namespace CK.Env.Plugin
         readonly SolutionSpec _solutionSpec;
         readonly SecretKeyStore _secretStore;
         readonly SharedWorldState _sharedState;
-        readonly ArtifactCenter _artifacts;
 
         public CodeCakeBuilderKeyVaultFile(
             CodeCakeBuilderFolder f,
@@ -22,7 +21,6 @@ namespace CK.Env.Plugin
             SolutionSpec solutionSpec,
             SecretKeyStore secretStore,
             SharedWorldState sharedState,
-            ArtifactCenter artifacts,
             NormalizedPath branchPath )
             : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilderKeyVault.txt" ) )
         {
@@ -30,7 +28,6 @@ namespace CK.Env.Plugin
             _driver = driver;
             _secretStore = secretStore;
             _sharedState = sharedState;
-            _artifacts = artifacts;
             _solutionSpec = solutionSpec;
             _secretStore.DeclareSecretKey( SolutionDriver.CODECAKEBUILDER_SECRET_KEY, current => current?.Description
                                                 ?? $"Allows update of CodeCakeBuilderKeyVault.txt used by CI/CD processes. This secret must be managed only by people that have access to the CI/CD processes and their configuration." );
@@ -76,7 +73,10 @@ namespace CK.Env.Plugin
                     m.Error( $"Missing required build secret '{name}' in central CICDKeyVault. It must be added." );
                     complete = false;
                 }
-                else current[name] = secret;
+                else
+                {
+                    current[name] = secret;
+                }
             }
             if( complete )
             {

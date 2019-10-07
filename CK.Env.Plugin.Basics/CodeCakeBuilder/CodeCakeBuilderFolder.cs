@@ -8,13 +8,11 @@ namespace CK.Env.Plugin
     public class CodeCakeBuilderFolder : PluginFolderBase
     {
         readonly SolutionDriver _driver;
-        readonly SolutionSpec _solutionSpec;
 
-        public CodeCakeBuilderFolder( GitFolder f, SolutionDriver driver, SolutionSpec settings, NormalizedPath branchPath )
+        public CodeCakeBuilderFolder( GitFolder f, SolutionDriver driver, NormalizedPath branchPath )
             : base( f, branchPath, "CodeCakeBuilder", "Basics/Res" )
         {
             _driver = driver;
-            _solutionSpec = settings;
         }
 
         protected override void DoApplySettings( IActivityMonitor m )
