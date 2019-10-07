@@ -143,6 +143,5 @@ namespace CK.Env.Plugin
                 firstMapping["branches"] = SetSequence( new YamlMapping(), "only", new YamlValue( "master"), new YamlValue ("develop") );
             }
         }
-
     }
 }

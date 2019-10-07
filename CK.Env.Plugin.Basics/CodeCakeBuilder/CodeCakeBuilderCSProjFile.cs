@@ -11,14 +11,12 @@ namespace CK.Env.Plugin
     public class CodeCakeBuilderCSProjFile : XmlFilePluginBase, ICommandMethodsProvider
     {
         readonly CodeCakeBuilderFolder _f;
-        readonly SolutionSpec _solutionSpec;
         readonly SolutionDriver _solutionDriver;
 
-        public CodeCakeBuilderCSProjFile( CodeCakeBuilderFolder f, SolutionSpec solutionSpec, NormalizedPath branchPath, SolutionDriver solutionDriver )
+        public CodeCakeBuilderCSProjFile(CodeCakeBuilderFolder f, NormalizedPath branchPath, SolutionDriver solutionDriver)
             : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" ), Encoding.UTF8 )
         {
             _f = f;
-            _solutionSpec = solutionSpec;
             _solutionDriver = solutionDriver;
         }
 
