@@ -17,61 +17,40 @@ namespace CK.Env.Tests
             return dllPath.EndsWith( ".dll" ) && !dllPath.EndsWith( "CodeCakeBuilder.dll" ) && !dllPath.Contains( "ZeroBuild" );
         }
 
-        [OneTimeSetUp]
-        public void Init()
+        static WorldsTests()
         {
             TestHelper.LogToConsole = true;
         }
 
         [Test]
-        public void a_simple_project_can_be_build()
-        {
-            using( var testHost = ImageManager.InstantiateImageFromSeed( TestHelper.Monitor ) )
-            {
-                testHost.UserHost.WorldStore.EnsureStackDefinition( TestHelper.Monitor, "CKTest-Build", testHost.StackBareGitPath, true, testHost.UserLocalDirectory );
-                TestUniverse.PlaceHolderSwapEverything( TestHelper.Monitor, testHost.TempPath, ImageManager.PlaceHolderString, testHost.TempPath );
-                testHost.UserHost.WorldStore.PullAll( TestHelper.Monitor ).Should().BeFalse();//The repo was previously cloned, pulling should do nothing.
-                testHost.UserHost.WorldSelector.Open( TestHelper.Monitor, "CKTest-Build" ).Should().BeTrue();
-                var w = testHost.UserHost.WorldSelector.CurrentWorld;
-                w.Should().NotBeNull();
-                w.AllBuild( TestHelper.Monitor ).Should().BeTrue();
-            }
-            var cachePath = ImageManager.GetImagePath( nameof( a_simple_project_can_be_build ), false, true );
-        }
+        public void a_simple_project_can_be_setup() => ImageLibrary.minimal_solution_setup( ( testHost ) => { }, TestHelper.IsExplicitAllowed );
+
+        [Test]
+        public void a_simple_project_can_be_build_once() => ImageLibrary.minimal_solution_first_ci_build( ( testHost ) => { }, TestHelper.IsExplicitAllowed );
+
+        [Test]
+        public void a_simple_project_can_be_build_a_second_time() => ImageLibrary.minimal_solution_second_ci_build( ( testHost ) => { }, TestHelper.IsExplicitAllowed );
+
 
         [Test]
         public void dll_should_not_change_after_rebuild()
         {
-            using( var testHost = ImageManager.InstantiateAndGenerateImageIfNeeded( TestHelper.Monitor, a_simple_project_can_be_build ) )
-            {
-                testHost.UserHost.WorldSelector.Open( TestHelper.Monitor, "CKTest-Build" ).Should().BeTrue();
-                var w = testHost.UserHost.WorldSelector.CurrentWorld;
-                w.Should().NotBeNull();
-                w.AllBuild( TestHelper.Monitor, true ).Should().BeTrue();
-            }
+            ImageLibrary.minimal_solution_second_ci_build( universe => { }, TestHelper.IsExplicitAllowed );//We are now sure this image, and it's base exist.
             using( var compare = ImageManager.CompareBuildedImages(
-                nameof( dll_should_not_change_after_rebuild ),
-                nameof( a_simple_project_can_be_build ) ) )
+                nameof( ImageLibrary.minimal_solution_first_ci_build ),
+                nameof( ImageLibrary.minimal_solution_second_ci_build ) ) )
             {
                 compare.AExceptB.Where( p => IsFileThatShouldBeDeterministic( p.FullName ) ).Should().BeEmpty();
             }
         }
 
         [Test]
-        public void non_incremental_build_should_be_deterministic()//Terrible name but i had no other idea.
+        public void building_the_same_sln_from_two_dirs_should_be_deterministic()//Terrible name but i had no other idea.
         {
-            var cachePath = ImageManager.GetImagePath( nameof( a_simple_project_can_be_build ), false, true );
-            if( !File.Exists( cachePath ) )
-            {
-                a_simple_project_can_be_build();
-            }
-            if( !File.Exists( cachePath ) ) throw new InvalidOperationException();
-            var backupName = nameof( a_simple_project_can_be_build ) + "_backup";
-            var firstRunImagePath = ImageManager.GetImagePath( backupName, false, true );
-            File.Delete( firstRunImagePath );
-            File.Move( cachePath, firstRunImagePath );
-            a_simple_project_can_be_build();
-            using( var compare = ImageManager.CompareBuildedImages( backupName, nameof( a_simple_project_can_be_build ) ) )
+            bool isExplicit = TestHelper.IsExplicitAllowed;
+            var imageA = ImageLibrary.minimal_solution_second_ci_build( null, isExplicit );
+            var imageB = ImageLibrary.another_minimal_solution_second_ci_build( null, isExplicit );
+            using( var compare = ImageManager.CompareBuildedImages( imageA, imageB ) )
             {
                 compare.AExceptB.Where( p => IsFileThatShouldBeDeterministic( p.FullName ) ).Should().BeEmpty();
             }

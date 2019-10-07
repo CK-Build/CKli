@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Text;
+using FluentAssertions;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -19,78 +20,49 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <summary>
         /// Path to the folder storing the **Universe Zips** used for the Tests.
         /// </summary>
-        static NormalizedPath TestsUniverseFolder => TestHelper.TestProjectFolder.AppendPart( "UniverseZips" );
+        public static NormalizedPath CacheUniverseFolder => TestHelper.TestProjectFolder.AppendPart( "UniverseZips" );
 
         /// <summary>
         /// Path to the folder storing the Seed Zips.
         /// </summary>
-        static NormalizedPath SeedUniverseFolder => TestHelper.TestProjectFolder.AppendPart( "SeedZips" );
+        public static NormalizedPath SeedUniverseFolder => TestHelper.TestProjectFolder.AppendPart( "SeedZips" );
 
         /// <summary>
-        /// 
+        /// Instantiate a <see cref="TestUniverse"/> from the given path.
         /// </summary>
-        /// <param name="imageName"></param>
-        /// <param name="isSeedImage"></param>
-        /// <param name="isBuildResult"><see langword="true"/> for builded, <see langword="false"/> for a base image.</param>
+        /// <param name="m"></param>
+        /// <param name="imagePath"></param>
         /// <returns></returns>
-        public static NormalizedPath GetImagePath( string imageName, bool isSeedImage, bool isBuildResult )
+        public static TestUniverse InstantiateImage( IActivityMonitor m, NormalizedPath imagePath )
         {
-            return (isSeedImage ? SeedUniverseFolder : TestsUniverseFolder).AppendPart( imageName + (isBuildResult ? "#builded" : "") + ".zip" );
-        }
-
-        /// <summary>
-        /// Instantiate an image into a <see cref="TestUniverse"/> with a working folder.
-        /// </summary>
-        /// <param name="fromBuildedImage">False if the image is stored in <see cref="TestsUniverseFolder"/> or the <see cref="ImageManager"/> temp folder.</param>
-        /// <param name="arbitraryCallName">If not null, will determine the name of the image.</param>
-        /// <param name="callerMemberName">The caller member name. If <paramref name="arbitraryCallName"/> is null, it will used as the imageName</param>
-        /// <returns></returns>
-        public static TestUniverse InstantiateImageFromSeed( IActivityMonitor m, string arbitraryCallName = null, [CallerMemberName] string callerMemberName = null )
-        {
-            string imageName = arbitraryCallName ?? callerMemberName;
-            return InstantiateImage( m, GetImagePath( imageName, true, false ), imageName );
-        }
-
-        static TestUniverse InstantiateImage( IActivityMonitor m, NormalizedPath imagePath, string imageName )
-        {
+            if( !File.Exists( imagePath ) ) throw new FileNotFoundException( nameof( imagePath ) );
             NormalizedPath tempPath = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
-            m.Info( $"Creating temp directory {tempPath} and dezipping '{imagePath}'." );
+            m.Info( $"Creating temp directory {tempPath} and dezipping '{imagePath}' into." );
             Directory.CreateDirectory( tempPath );
             ZipFile.ExtractToDirectory( imagePath, tempPath );
-            return TestUniverse.Create( m, tempPath, imageName );
+            return TestUniverse.Create( m, tempPath );
 
         }
 
-
-        public static TestUniverse InstantiateAndGenerateImageIfNeeded(
-            IActivityMonitor m,
-            Action parentImageGenerator,
-            string arbitraryCallName = null,
-            [CallerMemberName] string callerMemberName = null )
+        public static NormalizedPath EnsureImage(
+            Func<Action<TestUniverse>, bool, NormalizedPath> imageGenerator,
+            bool refreshCache )
         {
-            string ourImageName = arbitraryCallName ?? callerMemberName;
-            NormalizedPath generatedBaseImagePath = GetImagePath( parentImageGenerator.Method.Name, false, true );
-            m.Trace( $"The base image '{parentImageGenerator.Method.Name}' should be located at '{generatedBaseImagePath}'" );
-
-            if( !File.Exists( generatedBaseImagePath ) )
-            {
-                m.Info( "Base image not found. Generating it." );
-                using( m.OpenInfo( $"Generating the base image of TestUniverse '{ourImageName}'" ) )
-                {
-                    parentImageGenerator();
-                    if( !File.Exists( generatedBaseImagePath ) )
-                    {
-                        throw new InvalidOperationException( "The parent image generator did not generated the expected image." );
-                    }
-                }
-            }
-            return InstantiateImage( m, generatedBaseImagePath, ourImageName );
+            NormalizedPath generatedBaseImagePath = CacheUniverseFolder.AppendPart( imageGenerator.Method.Name );
+            if( !refreshCache && File.Exists( generatedBaseImagePath ) ) return generatedBaseImagePath;
+            File.Delete( generatedBaseImagePath );
+            return imageGenerator( null, refreshCache );
         }
 
-        public const string PlaceHolderString = "PLACEHOLDER_CKLI_TESTS";
-
-
-
+        public static TestUniverse InstantiateImage(
+            IActivityMonitor m,
+            Func<Action<TestUniverse>, bool, NormalizedPath> parentImageGenerator,
+            bool refreshCache )
+        {
+            if( parentImageGenerator == null ) throw new ArgumentNullException();
+            NormalizedPath generatedBaseImagePath = EnsureImage( parentImageGenerator, refreshCache );
+            return InstantiateImage( m, generatedBaseImagePath );
+        }
 
         public class ZipComparer : IDisposable
         {
@@ -109,7 +81,7 @@ namespace CK.Env.Tests.LocalTestHelper
                     return (int)obj.Crc32;
                 }
             }
-            public ZipComparer( ZipArchive a, ZipArchive b )
+            internal ZipComparer( ZipArchive a, ZipArchive b )
             {
                 _a = a;
                 _b = b;
@@ -130,11 +102,16 @@ namespace CK.Env.Tests.LocalTestHelper
         }
 
 
-        public static ZipComparer CompareBuildedImages( string imageAName, string imageBName )
-        {
-            return new ZipComparer(
-                ZipFile.OpenRead( GetImagePath( imageAName, false, true ) ),
-                ZipFile.OpenRead( GetImagePath( imageBName, false, true ) ) );
-        }
+        public static ZipComparer CompareBuildedImages( string imageAName, string imageBName ) =>
+            CompareBuildedImages(
+                CacheUniverseFolder.AppendPart( imageAName ),
+                CacheUniverseFolder.AppendPart( imageBName )
+            );
+
+        public static ZipComparer CompareBuildedImages( NormalizedPath imageA, NormalizedPath imageB ) =>
+            new ZipComparer(
+                ZipFile.OpenRead( imageA ),
+                ZipFile.OpenRead( imageB )
+            );
     }
 }

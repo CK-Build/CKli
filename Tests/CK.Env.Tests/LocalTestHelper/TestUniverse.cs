@@ -35,6 +35,10 @@ namespace CK.Env.Tests.LocalTestHelper
         const string _ckliMapping = "CKli";
 
         const string _userLocalDirectoryName = "dev";
+
+        public const string PlaceHolderString = "PLACEHOLDER_CKLI_TESTS";
+
+
         private readonly IActivityMonitor _m;
 
         /// <summary>
@@ -42,14 +46,11 @@ namespace CK.Env.Tests.LocalTestHelper
         /// </summary>
         /// <param name="tempPath">Path of the TestHost.</param>
         /// <param name="userHost">The UserHost instantied with this path.</param>
-        /// <param name="imageName">Name of the image this <see cref="TestUniverse"/> is based on.</param>
-        /// <param name="configs">The stacks configs.</param>
-        TestUniverse( IActivityMonitor m, NormalizedPath tempPath, UserHost userHost, string imageName )
+        TestUniverse( IActivityMonitor m, NormalizedPath tempPath, UserHost userHost )
         {
             _m = m;
-            TempPath = tempPath;
+            UniversePath = tempPath;
             UserHost = userHost;
-            ImageName = imageName;
         }
 
         static Dictionary<string, StackConfig> LoadConfig( NormalizedPath ckliMapping )
@@ -68,56 +69,54 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <summary>
         /// Temp path of the TestHost.
         /// </summary>
-        public NormalizedPath TempPath { get; }
-
-        public string ImageName { get; }
+        public NormalizedPath UniversePath { get; }
 
         /// <summary>
         /// Path to the Folder where all the Worlds are stored.
         /// </summary>
-        NormalizedPath WorldsFolder => TempPath.AppendPart( _worldsFolderName );
+        public NormalizedPath WorldsFolder => UniversePath.AppendPart( _worldsFolderName );
 
         /// <summary>
         /// Path to the "server" side of the git.
         /// </summary>
-        public NormalizedPath StackBareGitPath => TempPath.AppendPart( _stackFolderName );
+        public NormalizedPath StackBareGitPath => UniversePath.AppendPart( _stackFolderName );
 
         /// <summary>
         /// Path to the Folder used as a Remote Feed.
         /// </summary>
-        NormalizedPath FakeRemoteFeedPath => TempPath.AppendPart( _fakeRemoteFeedName );
+        public NormalizedPath FakeRemoteFeedPath => UniversePath.AppendPart( _fakeRemoteFeedName );
 
         /// <summary>
         /// Path to the Folder used to clone the Worlds Repositories.
         /// </summary>
-        public NormalizedPath DevDirectory => TempPath.AppendPart( _devDirectoryName );
+        public NormalizedPath DevDirectory => UniversePath.AppendPart( _devDirectoryName );
 
-        public NormalizedPath UserLocalDirectory => TempPath.AppendPart( _userLocalDirectoryName );
+        public NormalizedPath UserLocalDirectory => UniversePath.AppendPart( _userLocalDirectoryName );
 
-        NormalizedPath StackGitPath => DevDirectory.AppendPart( _stackFolderName );
+        public NormalizedPath StackGitPath => DevDirectory.AppendPart( _stackFolderName );
 
-        NormalizedPath CKliMapping => TempPath.AppendPart( _ckliMapping );
-
-        /// <summary>
-        /// Path to the folder storing the **Modification** to apply while testing.
-        /// </summary>
-        static NormalizedPath ModificationsFolder => TestHelper.TestProjectFolder.AppendPart( "Modifications" );
-
+        public NormalizedPath CKliMapping => UniversePath.AppendPart( _ckliMapping );
 
         /// <summary>
         /// Create a <see cref="TestUniverse"/> in a given folder.
         /// </summary>
         /// <param name="path"> The path where the <see cref="TestUniverse"/> will be. The Directory will be deleted when disposed.</param>
         /// <returns></returns>
-        public static TestUniverse Create( IActivityMonitor m, NormalizedPath path, string imageName )
+        public static TestUniverse Create( IActivityMonitor m, NormalizedPath path )
         {
-            m.Info( $"Creating TestUniverse {imageName}." );
+            m.Info( $"Creating TestUniverse from {path}." );
             NormalizedPath ckliPath = path.AppendPart( _ckliMapping );
-            if( Directory.Exists( ckliPath ) ) ReplaceInDirectoriesPaths( ckliPath, GitWorldStore.CleanPathDirName( ImageManager.PlaceHolderString ), GitWorldStore.CleanPathDirName( path ) );
-            FakeApplicationLifetime appLife = new FakeApplicationLifetime();
-            PlaceHolderSwapEverything( m, path, ImageManager.PlaceHolderString, path );
-            var userHost = new UserHost( appLife, ckliPath );
-            var output = new TestUniverse( m, path, userHost, imageName );
+            if( Directory.Exists( ckliPath ) )
+            {
+                ReplaceInDirectoriesPaths(
+                    ckliPath: ckliPath,
+                    oldString: GitWorldStore.CleanPathDirName( PlaceHolderString ),
+                    newString: GitWorldStore.CleanPathDirName( path )
+                );
+            }
+            PlaceHolderSwapEverything( m, path, PlaceHolderString, path );
+            var userHost = new UserHost( new FakeApplicationLifetime(), ckliPath );
+            var output = new TestUniverse( m, path, userHost );
             userHost.Initialize( m );
             userHost.WorldStore.DeleteStackDefinition( m, "CK" );
             userHost.WorldStore.DeleteStackDefinition( m, "CK-Build" );
@@ -131,7 +130,7 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <param name="oldString"></param>
         /// <param name="newString"></param>
         /// <returns></returns>
-        public static int SwapAllGitOriginPlaceholders( IActivityMonitor m, NormalizedPath tempPath, string oldString, string newString )
+        static int SwapAllGitOriginPlaceholders( IActivityMonitor m, NormalizedPath tempPath, string oldString, string newString )
         {
             //someone said "you can do that in one line". So i did.
             using( m.OpenInfo( "Replacing Git Remotes URL." ) )
@@ -154,15 +153,6 @@ namespace CK.Env.Tests.LocalTestHelper
             }
         }
 
-
-        /// <summary>
-        /// Apply the modifications stored as a zip in the Folder Modifications
-        /// </summary>
-        public void ApplyModifications( string modificationName )
-        {
-            ZipFile.ExtractToDirectory( ModificationsFolder.AppendPart( modificationName ), TempPath );
-        }
-
         public static void PlaceHolderSwapEverything( IActivityMonitor m, NormalizedPath tempPath, string oldString, string newString )
         {
             var ckliMapping = tempPath.AppendPart( _ckliMapping );
@@ -172,7 +162,7 @@ namespace CK.Env.Tests.LocalTestHelper
                 config.PlaceHolderSwap( oldString, newString );
                 config.Save();
             }
-            int cnt = SwapAllGitOriginPlaceholders( m, tempPath, oldString, newString);
+            int cnt = SwapAllGitOriginPlaceholders( m, tempPath, oldString, newString );
             ReplacePlaceHolderInFile( ckliMapping.AppendPart( "WorldLocalMapping.txt" ), oldString, newString );
             ReplacePlaceHolderInFile( ckliMapping.AppendPart( "Stacks.txt" ), oldString, newString );
         }
@@ -191,15 +181,22 @@ namespace CK.Env.Tests.LocalTestHelper
             }
         }
 
+        public NormalizedPath SnapshotState( string imageName )
+        {
+            NormalizedPath tempPath = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
+            FileHelper.DirectoryCopy( UniversePath, tempPath, true ); //Try to escape all handles.
+            PlaceHolderSwapEverything( _m, tempPath, UniversePath, PlaceHolderString );
+            ReplaceInDirectoriesPaths( tempPath.AppendPart( _ckliMapping ), GitWorldStore.CleanPathDirName( UniversePath ), GitWorldStore.CleanPathDirName( PlaceHolderString ) );
+            NormalizedPath output = ImageManager.CacheUniverseFolder.AppendPart( imageName );
+            File.Delete( output );
+            ZipFile.CreateFromDirectory( tempPath, output );
+            return output;
+        }
+
         public void Dispose()
         {
             UserHost.Dispose();
-            PlaceHolderSwapEverything( _m, TempPath, TempPath, ImageManager.PlaceHolderString );
-            ReplaceInDirectoriesPaths( CKliMapping, GitWorldStore.CleanPathDirName( TempPath ), GitWorldStore.CleanPathDirName( ImageManager.PlaceHolderString ) );
-            string output = ImageManager.GetImagePath( ImageName, false, true );
-            File.Delete( output );
-            ZipFile.CreateFromDirectory( TempPath, output );
-            FileHelper.RawDeleteLocalDirectory( _m, TempPath );
+            FileHelper.RawDeleteLocalDirectory( _m, UniversePath );
         }
     }
 }
