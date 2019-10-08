@@ -17,19 +17,32 @@ namespace CK.Env.Tests
             return dllPath.EndsWith( ".dll" ) && !dllPath.EndsWith( "CodeCakeBuilder.dll" ) && !dllPath.Contains( "ZeroBuild" );
         }
 
-        static WorldsTests()
+
+
+        [Test]
+        public void a_simple_project_can_be_setup() => ImageLibrary.minimal_solution_setup( ( universe ) => { }, TestHelper.IsExplicitAllowed );
+
+        [Test]
+        public void a_simple_project_can_be_build_once()
         {
-            TestHelper.LogToConsole = true;
+            bool haveRun = false;
+            ImageLibrary.minimal_solution_first_ci_build(
+            ( universe ) =>
+            {
+                var files = Directory.EnumerateFiles( universe.DevDirectory.Combine( "LocalFeed/CI" ) );
+                files.Should().HaveCount( 1 );
+                Path.GetFileName(files.Single()).Should().Be( "CKTest.Code.Cake.0.1.1--0003-develop.nupkg" );
+                haveRun = true;
+            }, TestHelper.IsExplicitAllowed );
+            haveRun.Should().BeTrue();
         }
 
         [Test]
-        public void a_simple_project_can_be_setup() => ImageLibrary.minimal_solution_setup( ( testHost ) => { }, TestHelper.IsExplicitAllowed );
+        public void a_simple_project_can_be_build_a_second_time() => ImageLibrary.minimal_solution_second_ci_build(
+            ( universe ) =>
+            {
 
-        [Test]
-        public void a_simple_project_can_be_build_once() => ImageLibrary.minimal_solution_first_ci_build( ( testHost ) => { }, TestHelper.IsExplicitAllowed );
-
-        [Test]
-        public void a_simple_project_can_be_build_a_second_time() => ImageLibrary.minimal_solution_second_ci_build( ( testHost ) => { }, TestHelper.IsExplicitAllowed );
+            }, TestHelper.IsExplicitAllowed );
 
 
         [Test]

@@ -33,7 +33,7 @@ namespace CK.Env.Tests
                         // Let any exceptions be thrown here: if we can't have a copy of the test repository, it 
                         // is too risky to Assume(false).
                         Directory.CreateDirectory( gitRepo );
-                        Repository.Clone( "https://github.com/SimpleGitVersion/TestGitRepository.git", gitRepo );
+                        gitPath = Repository.Clone( "https://github.com/SimpleGitVersion/TestGitRepository.git", gitRepo );
                     }
                     try
                     {

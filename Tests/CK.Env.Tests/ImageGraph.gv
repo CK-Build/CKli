@@ -1,5 +1,5 @@
 digraph {
-    minimal_solution_setup -> seed
+    minimal_solution_setup -> minimal_project
     minimal_solution_first_ci_build -> minimal_solution_setup
     minimal_solution_second_ci_build -> minimal_solution_first_ci_build
     another_minimal_solution_second_ci_build -> minimal_solution_first_ci_build

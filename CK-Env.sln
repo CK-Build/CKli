@@ -17,7 +17,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.FileSystem", "CK.Env
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{83CC9529-9A6D-46E5-BBE5-A1C5C6C35B7C}"
 	ProjectSection(SolutionItems) = preProject
-		TestHelper.config = TestHelper.config
+		Tests\TestHelper.config = Tests\TestHelper.config
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Tests", "Tests\CK.Env.Tests\CK.Env.Tests.csproj", "{A2F34930-E314-4ED1-8EC5-4FB932835B08}"
