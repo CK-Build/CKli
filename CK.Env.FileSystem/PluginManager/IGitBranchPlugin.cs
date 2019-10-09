@@ -4,7 +4,7 @@ using CK.Text;
 namespace CK.Env
 {
     /// <summary>
-    /// Marker interface.
+    /// Extends <see cref="IGitPlugin"/> to be bound to a branch.
     /// The single public constructor must have a parameter 'NormalizedPath branchPath'.
     /// </summary>
     public interface IGitBranchPlugin : IGitPlugin
