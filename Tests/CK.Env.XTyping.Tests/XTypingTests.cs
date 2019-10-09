@@ -1,3 +1,4 @@
+using CK.Core;
 using CK.Text;
 using FluentAssertions;
 using NUnit.Framework;
@@ -35,6 +36,17 @@ namespace CK.Env.Tests
                 .Should().BeFalse( "PreProcess creates a new deep copied element." );
             p.Descendants().Select( e => e.Name.ToString() ).Concatenate()
                 .Should().Be( "Thing1, Thing1, Thing2, Below, Thing1Override, Thing1, Thing2, Thing1, Thing2, Thing1Override, Thing1, Thing2, Thing1Override, Thing1, Thing2, Thing2Override, Thing1, Thing1, Thing2" );
+        }
+
+        [Explicit]
+        [Test]
+        public void defining_reusables_documentation()
+        {
+            Assume.That( TestHelper.IsExplicitAllowed );
+            var original = LocalTestHelper.LoadXmlInput( "ReusableDoc" );
+            var p = XTypedFactory.PreProcess( TestHelper.Monitor, original ).Result;
+            TestHelper.Monitor.Info( "Before: " + original );
+            TestHelper.Monitor.Info( "After: " + p );
         }
 
         [Test]

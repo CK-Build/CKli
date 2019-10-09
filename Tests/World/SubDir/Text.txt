@@ -3,7 +3,6 @@ using System.IO;
 using System.Linq;
 using LibGit2Sharp;
 using System.Runtime.CompilerServices;
-using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
 using CK.Text;
 

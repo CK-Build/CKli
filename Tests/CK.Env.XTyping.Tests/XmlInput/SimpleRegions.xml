@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <Root>
     <A />
-    <Region>
+    <Region Comment="A region is transparent.">
         <B />
         <C />
-        <Region>
+        <Region Desc="Any attribute can be defined.">
             <D />
         </Region>
         <E />
