@@ -45,7 +45,7 @@ namespace CK.Env
             }
             foreach( var r in feeds )
             {
-                InstanciateFeed( r );
+                InstanciateFeed(m, r );
             }
         }
 
@@ -85,11 +85,11 @@ namespace CK.Env
             return repo;
         }
 
-        IArtifactFeed InstanciateFeed( XElementReader r )
+        IArtifactFeed InstanciateFeed(IActivityMonitor m, XElementReader r )
         {
             foreach( var h in _typeHandlers )
             {
-                var f = h.CreateFeed( r, _repositories, _feeds );
+                var f = h.CreateFeedFromXML(m, r, _repositories, _feeds );
                 if( f != null )
                 {
                     if( _feeds.Any( feed => feed.TypedName == f.TypedName ) )

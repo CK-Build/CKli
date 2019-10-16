@@ -1,5 +1,6 @@
 using CK.Text;
 using System;
+using System.IO;
 using System.Xml.Linq;
 
 namespace CK.Env
@@ -15,6 +16,8 @@ namespace CK.Env
             Folder = new NormalizedPath( r.HandleRequiredAttribute<string>( nameof( Folder ) ) ).With( NormalizedPathRootKind.None );
             PackageName = HandlePackageName( r.HandleOptionalAttribute( nameof( PackageName ), "" ) );
             OutputFolder = r.HandleRequiredAttribute<string>( nameof( OutputFolder ) );
+            if( Folder.IsRooted ) throw new InvalidDataException( "Path cannot be rooted." );
+            if( OutputFolder.IsRooted ) throw new InvalidDataException( "Path cannot be rooted." );
         }
 
 

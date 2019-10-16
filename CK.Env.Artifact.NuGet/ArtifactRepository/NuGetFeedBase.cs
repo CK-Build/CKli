@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace CK.Env.NuGet
 {
-    abstract class NuGetFeedBase 
+    abstract class NuGetFeedBase
     {
         private protected readonly NuGetClient Client;
         SourceRepository _sourceRepository;
@@ -67,10 +67,23 @@ namespace CK.Env.NuGet
             PackageSource = packageSource;
         }
 
-        internal NuGetFeedBase( NuGetClient c, string url, string name, SimpleCredentials creds )
+        internal NuGetFeedBase( IActivityMonitor m, NuGetClient c, string url, string name, SimpleCredentials creds )
             : this( c, new PackageSource( url, name ) )
         {
             HandleFeed( url, name, creds );
+            string secret;
+            var secretOrName = Feed.Credentials?.PasswordOrSecretKeyName;
+            if( Feed.Credentials.IsSecretKeyName )
+            {
+                secret = Client.SecretKeyStore.GetSecretKey( m, secretOrName, false );
+                if( secret == null )
+                {
+                    m.Error( $"Missing secret key. No available secret available for {secretOrName}." );
+                    throw new InvalidOperationException();
+                }
+            }
+            else secret = secretOrName;
+            NuGetClient.EnsureVSSFeedEndPointCredentials( m, url, secret );
         }
 
         internal readonly PackageSource PackageSource;
@@ -87,7 +100,7 @@ namespace CK.Env.NuGet
             return _feed = new ReadFeed( this, name, creds );
         }
 
-        protected async Task<T> SafeCall<T>( IActivityMonitor m, Func<SourceRepository,MetadataResource, NuGetLoggerAdapter, Task<T>> f )
+        protected async Task<T> SafeCall<T>( IActivityMonitor m, Func<SourceRepository, MetadataResource, NuGetLoggerAdapter, Task<T>> f )
         {
             bool retry = false;
             var logger = new NuGetLoggerAdapter( m );
@@ -96,7 +109,7 @@ namespace CK.Env.NuGet
             {
                 _sourceRepository = new SourceRepository( PackageSource, NuGetClient.StaticProviders );
             }
-            again:
+        again:
             MetadataResource meta = null;
             try
             {

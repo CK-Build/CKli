@@ -35,7 +35,7 @@ namespace CK.Env.Plugin
             EnsureLine( lines, ".vs/" );
             EnsureLine( lines, "*.suo" );
             EnsureLine( lines, "*.user" );
-            RemoveLine( lines, "CodeCakeBuilder/UnitTestsDone.*.txt" );
+            EnsureLine( lines, "CodeCakeBuilder/UnitTestsDone.*.txt" );
 
             if( !_solutionSpec.NoDotNetUnitTests )
             {

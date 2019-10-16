@@ -40,6 +40,13 @@ namespace CK.Env.NuGet
         private static readonly Dictionary<string, string> _secretAzureKeys;
         private static bool _initialized;
 
+
+        /// <summary>
+        /// Method to call to set the credentials of nuget.
+        /// </summary>
+        /// <param name="m"></param>
+        /// <param name="url"></param>
+        /// <param name="secret"></param>
         internal static void EnsureVSSFeedEndPointCredentials( IActivityMonitor m, string url, string secret )
         {
             lock( _secretKeysLock )
@@ -286,7 +293,7 @@ namespace CK.Env.NuGet
             return result;
         }
 
-        public IArtifactFeed CreateFeed( in XElementReader r, IReadOnlyList<IArtifactRepository> repositories, IReadOnlyList<IArtifactFeed> feeds )
+        public IArtifactFeed CreateFeedFromXML( IActivityMonitor m, in XElementReader r, IReadOnlyList<IArtifactRepository> repositories, IReadOnlyList<IArtifactFeed> feeds )
         {
             if( r.HandleOptionalAttribute<string>( "Type", null ) != NuGetType.Name ) return null;
             var url = r.HandleRequiredAttribute<string>( "Url" );
@@ -322,15 +329,15 @@ namespace CK.Env.NuGet
                     return i.HandleFeed( url, name, creds );
                 }
             }
-            var feed = new PureFeed( this, url, name, creds );
+            var feed = new PureFeed(m, this, url, name, creds );
             _sourcePackageProvider.SetPackageSources( internals.Append( feed ) );
             return feed.Feed;
         }
 
         class PureFeed : NuGetFeedBase
         {
-            public PureFeed( NuGetClient c, string url, string name, SimpleCredentials creds )
-                : base( c, url, name, creds )
+            public PureFeed( IActivityMonitor m, NuGetClient c, string url, string name, SimpleCredentials creds )
+                : base( m, c, url, name, creds )
             {
             }
 
@@ -342,18 +349,15 @@ namespace CK.Env.NuGet
                     logger.Monitor.Trace( "NuGet request failed and there is no Credentials name or password defined. Rethrowing the exception." );
                     return false;                   
                 }
-                string secret;
                 if( Feed.Credentials.IsSecretKeyName )
                 {
-                    secret = Client.SecretKeyStore.GetSecretKey( logger.Monitor, secretOrName, false );
+                    var secret = Client.SecretKeyStore.GetSecretKey( logger.Monitor, secretOrName, false );
                     if( secret == null )
                     {
                         logger.Monitor.Trace( $"NuGet request failed. No available secret available for {secretOrName}. Rethrowing the exception." );
                         return false;
                     }
                 }
-                else secret = secretOrName;
-                EnsureVSSFeedEndPointCredentials( logger.Monitor, Url, secret );
                 logger.Monitor.Warn( "NuGet request failed but a secret is available. Retrying.", ex );
                 return true;
             }

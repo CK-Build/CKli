@@ -70,7 +70,8 @@ namespace CK.Env.NPM
             return result;
         }
 
-        public IArtifactFeed CreateFeed(
+        public IArtifactFeed CreateFeedFromXML(
+            IActivityMonitor m,
             in XElementReader r,
             IReadOnlyList<IArtifactRepository> repositories,
             IReadOnlyList<IArtifactFeed> feeds )
