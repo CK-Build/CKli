@@ -332,8 +332,26 @@ namespace CK.Env.NuGet
 
             private protected override bool CanRetry( MetadataResource meta, NuGetLoggerAdapter logger, Exception ex )
             {
-                logger.Monitor.Fatal( "Pure feed implementation is unable to retry the call. Rethrowing the exception." );
-                return false;
+                var secretOrName = Feed.Credentials?.PasswordOrSecretKeyName;
+                if( String.IsNullOrWhiteSpace( secretOrName ) )
+                {
+                    logger.Monitor.Trace( "NuGet request failed and there is no Credentials name or password defined. Rethrowing the exception." );
+                    return false;                   
+                }
+                string secret;
+                if( Feed.Credentials.IsSecretKeyName )
+                {
+                    secret = Client.SecretKeyStore.GetSecretKey( logger.Monitor, secretOrName, false );
+                    if( secret == null )
+                    {
+                        logger.Monitor.Trace( $"NuGet request failed. No available secret available for {secretOrName}. Rethrowing the exception." );
+                        return false;
+                    }
+                }
+                else secret = secretOrName;
+                EnsureVSSFeedEndPointCredentials( logger.Monitor, Url, secret );
+                logger.Monitor.Warn( "NuGet request failed but a secret is available. Retrying.", ex );
+                return true;
             }
         }
 
