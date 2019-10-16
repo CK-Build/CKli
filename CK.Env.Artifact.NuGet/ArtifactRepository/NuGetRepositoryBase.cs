@@ -19,7 +19,6 @@ namespace CK.Env.NuGet
     /// </summary>
     abstract class NuGetRepositoryBase : NuGetFeedBase, IArtifactRepository
     {
-        readonly AsyncLazy<PackageUpdateResource> _updater;
         string _secret;
 
         internal NuGetRepositoryBase(
@@ -29,7 +28,6 @@ namespace CK.Env.NuGet
             : base( c, source )
         {
             QualityFilter = qualityFilter;
-            _updater = new AsyncLazy<PackageUpdateResource>( () => _sourceRepository.GetResourceAsync<PackageUpdateResource>() );
             UniqueRepositoryName = NuGetClient.NuGetType.Name + ':' + source.Name;
         }
 
@@ -132,7 +130,7 @@ namespace CK.Env.NuGet
             if( packageId == null ) throw new ArgumentNullException( nameof( packageId ) );
             if( version == null ) throw new ArgumentNullException( nameof( version ) );
             var p = new PackageIdentity( packageId, NuGetVersion.Parse( version.ToString() ) );
-            return await SafeCall( m, ( meta, logger ) => meta.Exists( p, Client.SourceCache, logger, CancellationToken.None ) );
+            return await SafeCall( m, ( sources, meta, logger ) => meta.Exists( p, Client.SourceCache, logger, CancellationToken.None ) );
         }
 
 
@@ -148,7 +146,7 @@ namespace CK.Env.NuGet
             string apiKey = ResolvePushAPIKey( m );
             try
             {
-                await SafeCall( m, async ( meta, logger ) =>
+                await SafeCall( m, async ( sources, meta, logger ) =>
                 {
                     var exist = files.Select( file => (file, id: new PackageIdentity( file.PackageId, NuGetVersion.Parse( file.Version.ToNormalizedString() ) )) )
                                      .Select( fId => (fId.file, exists: meta.Exists( fId.id, Client.SourceCache, logger, CancellationToken.None )) )
@@ -162,7 +160,8 @@ namespace CK.Env.NuGet
                         m.Info( $"Already existing packages, push skipped for: " + existing );
                     }
                     var toPush = exist.Where( e => !e.exists.Result ).Select( e => e.file ).ToArray();
-                    var updater = await _updater;
+
+                    var updater = await sources.GetResourceAsync<PackageUpdateResource>();
                     foreach( var f in toPush )
                     {
                         await updater.Push(

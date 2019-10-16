@@ -97,8 +97,9 @@ namespace CK.Env.NuGet
             return providers;
         }
 
-        internal static bool Initalize( NuGetLoggerAdapter logger )
+        internal static bool Initalize( NuGetLoggerAdapter logger, out bool mustRefresh )
         {
+            mustRefresh = false;
             lock( _secretKeysLock )
             {
                 if( !_initialized )
@@ -132,6 +133,7 @@ namespace CK.Env.NuGet
                             providers: credProviders,
                             nonInteractive: true,
                             handlesDefaultCredentials: true ) );
+                    mustRefresh = true;
                 }
             }
             return _initialized;

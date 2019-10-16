@@ -13,8 +13,7 @@ namespace CK.Env.NuGet
     abstract class NuGetFeedBase 
     {
         private protected readonly NuGetClient Client;
-        private protected readonly SourceRepository _sourceRepository;
-        private protected readonly AsyncLazy<MetadataResource> _meta;
+        SourceRepository _sourceRepository;
         INuGetFeed _feed;
 
         class ReadFeed : INuGetFeed
@@ -41,7 +40,7 @@ namespace CK.Env.NuGet
 
             public async Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, string artifactName )
             {
-                return await _feed.SafeCall( m, ( meta, logger ) => GetAvailable( meta, logger, artifactName ) );
+                return await _feed.SafeCall( m, ( sources, meta, logger ) => GetAvailable( meta, logger, artifactName ) );
             }
 
             async Task<ArtifactAvailableInstances> GetAvailable( MetadataResource meta, NuGetLoggerAdapter logger, string name )
@@ -66,8 +65,6 @@ namespace CK.Env.NuGet
         {
             Client = c;
             PackageSource = packageSource;
-            _sourceRepository = new SourceRepository( PackageSource, NuGetClient.StaticProviders );
-            _meta = new AsyncLazy<MetadataResource>( () => _sourceRepository.GetResourceAsync<MetadataResource>() );
         }
 
         internal NuGetFeedBase( NuGetClient c, string url, string name, SimpleCredentials creds )
@@ -90,25 +87,29 @@ namespace CK.Env.NuGet
             return _feed = new ReadFeed( this, name, creds );
         }
 
-        protected async Task<T> SafeCall<T>( IActivityMonitor m, Func<MetadataResource,NuGetLoggerAdapter, Task<T>> f )
+        protected async Task<T> SafeCall<T>( IActivityMonitor m, Func<SourceRepository,MetadataResource, NuGetLoggerAdapter, Task<T>> f )
         {
             bool retry = false;
             var logger = new NuGetLoggerAdapter( m );
-            NuGetClient.Initalize( logger );
-            MetadataResource meta = null; 
+            NuGetClient.Initalize( logger, out var mustRefresh );
+            if( mustRefresh || _sourceRepository == null )
+            {
+                _sourceRepository = new SourceRepository( PackageSource, NuGetClient.StaticProviders );
+            }
             again:
+            MetadataResource meta = null;
             try
             {
-                if( meta == null ) meta = await _meta;
-                return await f( meta, logger );
+                meta = await _sourceRepository.GetResourceAsync<MetadataResource>();
+                return await f( _sourceRepository, meta, logger );
             }
-            catch(MissingRequiredSecretException)
+            catch( MissingRequiredSecretException )
             {
-                throw;//It's useless to retry in this case
-            } 
-            catch( Exception ex ) 
+                throw; //It's useless to retry in this case
+            }
+            catch( Exception ex )
             {
-                if( !retry )
+                if( meta != null && !retry )
                 {
                     retry = true;
                     if( CanRetry( meta, logger, ex ) )
