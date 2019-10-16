@@ -60,6 +60,8 @@ namespace CK.Env.NuGet
                         _secretAzureKeys[url] = secret;
                     }
                     GenerateNuGetCredentialsEnvironmentVariable( m );
+                    // Clears the credential service.
+                    HttpHandlerResourceV3.CredentialService = null;
                 }
             }
         }
@@ -97,42 +99,42 @@ namespace CK.Env.NuGet
 
         internal static bool Initalize( NuGetLoggerAdapter logger )
         {
-            if( !_initialized )
+            lock( _secretKeysLock )
             {
-                lock( _secretKeysLock )
+                if( !_initialized )
                 {
-                    if( !_initialized )
+                    using( logger.Monitor.OpenInfo( "Installing the Azure Artifact Credential provider (https://github.com/Microsoft/artifacts-credprovider)." ) )
                     {
-                        using( logger.Monitor.OpenInfo( "Installing the Azure Artifact Credential provider (https://github.com/Microsoft/artifacts-credprovider)." ) )
+                        var a = System.Reflection.Assembly.GetExecutingAssembly();
+                        using( var r = new StreamReader( a.GetManifestResourceStream( "CK.Env.Artifact.NuGet.Res.InstallCredentialProvider.ps1.txt" ) ) )
                         {
-                            var a = System.Reflection.Assembly.GetExecutingAssembly();
-                            using( var r = new StreamReader( a.GetManifestResourceStream( "CK.Env.Artifact.NuGet.Res.InstallCredentialProvider.ps1.txt" ) ) )
-                            {
-                                var tempPath = Path.GetTempPath();
-                                var installer = Guid.NewGuid().ToString() + ".ps1";
-                                var installerPath = Path.Combine( tempPath, installer );
-                                File.WriteAllText( installerPath, r.ReadToEnd() );
-                                ProcessRunner.RunPowerShell(
-                                    logger.Monitor,
-                                    tempPath,
-                                    installer,
-                                    new[] { "-AddNetfx" },
-                                    Core.LogLevel.Error,
-                                    new[] { ("PSExecutionPolicyPreference", "Bypass") } );
-                                File.Delete( installerPath );
-                            }
+                            var tempPath = Path.GetTempPath();
+                            var installer = Guid.NewGuid().ToString() + ".ps1";
+                            var installerPath = Path.Combine( tempPath, installer );
+                            File.WriteAllText( installerPath, r.ReadToEnd() );
+                            ProcessRunner.RunPowerShell(
+                                logger.Monitor,
+                                tempPath,
+                                installer,
+                                new[] { "-AddNetfx" },
+                                Core.LogLevel.Error,
+                                new[] { ("PSExecutionPolicyPreference", "Bypass") } );
+                            File.Delete( installerPath );
                         }
-                        var credProviders = new AsyncLazy<IEnumerable<ICredentialProvider>>( async () => await GetCredentialProvidersAsync( logger ) );
-                        HttpHandlerResourceV3.CredentialService = new Lazy<ICredentialService>(
-                            () => new CredentialService(
-                                providers: credProviders,
-                                nonInteractive: true,
-                                handlesDefaultCredentials: true ) );
-                        return _initialized = true;
                     }
+                    _initialized = true;
+                }
+                if( HttpHandlerResourceV3.CredentialService == null )
+                { 
+                    var credProviders = new AsyncLazy<IEnumerable<ICredentialProvider>>( async () => await GetCredentialProvidersAsync( logger ) );
+                    HttpHandlerResourceV3.CredentialService = new Lazy<ICredentialService>(
+                        () => new CredentialService(
+                            providers: credProviders,
+                            nonInteractive: true,
+                            handlesDefaultCredentials: true ) );
                 }
             }
-            return false;
+            return _initialized;
         }
         #endregion
 
