@@ -8,7 +8,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-
+using System.Runtime.CompilerServices;
 using static CK.Testing.BasicTestHelper;
 
 namespace CK.Env.Tests.LocalTestHelper
@@ -62,7 +62,7 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <summary>
         /// The <see cref="UserHost"/> used to run tests on.
         /// </summary>
-        public UserHost UserHost { get; }
+        public UserHost UserHost { get; private set; }
 
         public Dictionary<string, StackConfig> Configs { get; private set; }
 
@@ -187,7 +187,7 @@ namespace CK.Env.Tests.LocalTestHelper
             FileHelper.DirectoryCopy( UniversePath, tempPath, true ); //Try to escape all handles.
             PlaceHolderSwapEverything( _m, tempPath, UniversePath, PlaceHolderString );
             ReplaceInDirectoriesPaths( tempPath.AppendPart( _ckliMapping ), GitWorldStore.CleanPathDirName( UniversePath ), GitWorldStore.CleanPathDirName( PlaceHolderString ) );
-            NormalizedPath output = ImageManager.CacheUniverseFolder.AppendPart( imageName );
+            NormalizedPath output = ImageManager.CacheUniverseFolder.AppendPart( imageName + ".zip" );
             File.Delete( output );
             ZipFile.CreateFromDirectory( tempPath, output );
             return output;

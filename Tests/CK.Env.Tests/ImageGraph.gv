@@ -3,4 +3,13 @@ digraph {
     minimal_solution_first_ci_build -> minimal_solution_setup
     minimal_solution_second_ci_build -> minimal_solution_first_ci_build
     another_minimal_solution_second_ci_build -> minimal_solution_first_ci_build
+    minimal_solution_second_ci_build
+    apply_things_randomly ->  minimal_solution_second_ci_build
+    apply_everything_at_once -> minimal_solution_second_ci_build
+
+    subgraph equalities {
+        edge [constraint=false; arrowhead=none;color="black:black"]
+        minimal_solution_second_ci_build -> another_minimal_solution_second_ci_build [style=box]
+        apply_things_randomly -> apply_everything_at_once
+    }
 }

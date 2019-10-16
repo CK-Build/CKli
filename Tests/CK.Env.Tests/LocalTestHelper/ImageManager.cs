@@ -41,7 +41,6 @@ namespace CK.Env.Tests.LocalTestHelper
             Directory.CreateDirectory( tempPath );
             ZipFile.ExtractToDirectory( imagePath, tempPath );
             return TestUniverse.Create( m, tempPath );
-
         }
 
         public static NormalizedPath EnsureImage(
@@ -104,8 +103,8 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public static ZipComparer CompareBuildedImages( string imageAName, string imageBName ) =>
             CompareBuildedImages(
-                CacheUniverseFolder.AppendPart( imageAName ),
-                CacheUniverseFolder.AppendPart( imageBName )
+                CacheUniverseFolder.AppendPart( imageAName + ".zip" ),
+                CacheUniverseFolder.AppendPart( imageBName + ".zip" )
             );
 
         public static ZipComparer CompareBuildedImages( NormalizedPath imageA, NormalizedPath imageB ) =>

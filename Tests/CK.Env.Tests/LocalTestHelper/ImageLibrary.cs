@@ -1,86 +1,83 @@
 using CK.Text;
-using FluentAssertions;
 using System;
-using System.IO;
-using static CK.Testing.MonitorTestHelper;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Text;
 
+using static CK.Testing.MonitorTestHelper;
 namespace CK.Env.Tests.LocalTestHelper
 {
     public static class ImageLibrary
     {
-        /// <summary>
-        /// Input: The base seed image.
-        /// Process: CKli "EnsureStackDefinition". (Will clone the stack definition repo)
-        /// </summary>
-        /// <param name="action">Action effectued after the snapshot of the state. Change won't be saved.</param>
-        /// <returns></returns>
-        public static NormalizedPath minimal_solution_setup( Action<TestUniverse> action, bool refreshBaseImage )
+
+        static NormalizedPath ImageBuilderHelper(
+            Action<TestUniverse> action,
+            bool refreshCache,
+            Func<Action<TestUniverse>, bool, NormalizedPath> parentBuilder,
+            Action<TestUniverse> buildAction,
+            [CallerMemberName] string callerMemberName = null )
         {
-            using( TestUniverse universe = ImageManager.InstantiateImage( TestHelper.Monitor, ImageManager.SeedUniverseFolder.AppendPart( "minimal_project.zip" ) ) )
+            using( TestUniverse universe = ImageManager.InstantiateImage( TestHelper.Monitor, parentBuilder, refreshCache ) )
             {
-                universe.UserHost.WorldStore.EnsureStackDefinition(
-                    m: TestHelper.Monitor,
-                    stackName: "CKTest-Build",
-                    url: universe.StackBareGitPath,
-                    isPublic: true,
-                    mappedPath: universe.UserLocalDirectory
-                );
-                TestUniverse.PlaceHolderSwapEverything(
-                    m: TestHelper.Monitor,
-                    tempPath: universe.UniversePath,
-                    oldString: TestUniverse.PlaceHolderString,
-                    newString: universe.UniversePath
-                );
-                universe.UserHost.WorldStore.PullAll( TestHelper.Monitor ).Should().BeFalse();//The repo was previously cloned, pulling should do nothing.
-                universe.UserHost.WorldSelector.Open( TestHelper.Monitor, "CKTest-Build" ).Should().BeTrue();
+                buildAction( universe );
+                var snapshotPath = universe.SnapshotState( callerMemberName );
+                action?.Invoke( universe );
+                return snapshotPath;
+            }
+        }
+
+        public static NormalizedPath minimal_solution_setup( Action<TestUniverse> action, bool useless )
+        {
+            using( TestUniverse universe = ImageManager.InstantiateImage(
+                m: TestHelper.Monitor,
+                imagePath: ImageManager.SeedUniverseFolder.AppendPart( "minimal_project.zip" ) )
+            )
+            {
+                universe.SeedInitialSetup( TestHelper.Monitor );
                 var snapshotPath = universe.SnapshotState( nameof( minimal_solution_setup ) );
                 action?.Invoke( universe );
                 return snapshotPath;
             }
         }
 
-        public static NormalizedPath minimal_solution_first_ci_build( Action<TestUniverse> action, bool refreshBaseImage )
+        public static NormalizedPath minimal_solution_first_ci_build( Action<TestUniverse> action, bool refreshCache )
         {
-            using( var universe = ImageManager.InstantiateImage(
-                m: TestHelper.Monitor,
-                parentImageGenerator: minimal_solution_setup,
-                refreshCache: refreshBaseImage ) )
-            {
-                universe.UserHost.WorldSelector.Open( TestHelper.Monitor, "CKTest-Build" ).Should().BeTrue();
-                var w = universe.UserHost.WorldSelector.CurrentWorld;
-                w.Should().NotBeNull();
-                w.AllBuild( TestHelper.Monitor, true ).Should().BeTrue();
-                var snapshotPath = universe.SnapshotState( nameof( minimal_solution_first_ci_build ) );
-                action?.Invoke( universe );
-                return snapshotPath;
-            }
+            return ImageBuilderHelper( action, refreshCache, minimal_solution_setup, ( universe ) =>
+             {
+                 universe.AllBuild( TestHelper.Monitor, "CKTest-Build" );
+             } );
         }
 
-        static NormalizedPath second_build( Action<TestUniverse> action, bool refreshBaseImage, string buildName )
+        public static NormalizedPath minimal_solution_second_ci_build( Action<TestUniverse> action, bool refreshCache )
         {
-            using( var testHost = ImageManager.InstantiateImage(
-                m: TestHelper.Monitor,
-                parentImageGenerator: minimal_solution_first_ci_build,
-                refreshCache: refreshBaseImage ) )
+            return ImageBuilderHelper( action, refreshCache, minimal_solution_first_ci_build, ( universe ) =>
             {
-                testHost.UserHost.WorldSelector.Open( TestHelper.Monitor, "CKTest-Build" ).Should().BeTrue();
-                var w = testHost.UserHost.WorldSelector.CurrentWorld;
-                w.Should().NotBeNull();
-                w.AllBuild( TestHelper.Monitor, true ).Should().BeTrue();
-                var snapshotPath = testHost.SnapshotState( buildName );
-                action?.Invoke( testHost );
-                return snapshotPath;
-            }
-        }
-
-        public static NormalizedPath minimal_solution_second_ci_build( Action<TestUniverse> action, bool refreshBaseImage )
-        {
-            return second_build( action, refreshBaseImage, nameof( minimal_solution_second_ci_build ) );
+                universe.AllBuild( TestHelper.Monitor, "CKTest-Build" );
+            } );
         }
 
         public static NormalizedPath another_minimal_solution_second_ci_build( Action<TestUniverse> action, bool refreshCache )
         {
-            return second_build( action, refreshCache, nameof( another_minimal_solution_second_ci_build ) );
+            return ImageBuilderHelper( action, refreshCache, minimal_solution_first_ci_build, ( universe ) =>
+            {
+                universe.AllBuild( TestHelper.Monitor, "CKTest-Build" );
+            } );
+        }
+
+        public static NormalizedPath full_apply_settings_randomly_applied( Action<TestUniverse> action, bool refreshCache, int seed )
+        {
+            return ImageBuilderHelper( action, refreshCache, another_minimal_solution_second_ci_build, ( universe ) =>
+            {
+                universe.ApplyRandomly( TestHelper.Monitor, "CKTest-Build", seed );
+            } );
+        }
+
+        public static NormalizedPath full_apply_settings(Action<TestUniverse> action, bool refreshCache)
+        {
+            return ImageBuilderHelper( action, refreshCache, another_minimal_solution_second_ci_build, ( universe ) =>
+             {
+                 universe.ApplyAll( TestHelper.Monitor, "CKTest-Build" );
+             } );
         }
     }
 }
