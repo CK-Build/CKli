@@ -166,15 +166,18 @@ namespace CK.Env
         /// <returns>The context or null on error.</returns>
         public IWorldSolutionContext GetSolutionDependencyContextOnCurrentBranches( IActivityMonitor monitor, bool reloadSolutions = false )
         {
-            var currentDrivers = _perBranchContext
-                .SelectMany(
-                    p => p.Value.Drivers.Select( d => d.GetCurrentBranchDriver() )
-                ).Distinct();
+            var currentDrivers = GetDriverOnCurrentBranch();
             var c = new WorldBranchContext( currentDrivers );
             return c.Refresh( monitor, reloadSolutions ) ? c : null;
         }
 
         public IEnumerable<ISolutionDriver> AllDrivers => _solutionDrivers;
+
+        public IEnumerable<ISolutionDriver> GetDriverOnCurrentBranch() =>
+            _perBranchContext
+                .SelectMany(
+                    p => p.Value.Drivers.Select( d => d.GetCurrentBranchDriver() )
+                ).Distinct();
 
         public IEnumerable<ISolutionDriver> GetDriversOnBranch( string branchName ) => _solutionDrivers.Where( p => p.BranchName == branchName );
 

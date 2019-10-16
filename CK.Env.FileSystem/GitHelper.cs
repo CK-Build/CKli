@@ -225,7 +225,10 @@ namespace CK.Env
                 }
                 catch( Exception ex )
                 {
-                    m.Error( ex );
+                    using( m.OpenFatal( "This error need manual fix : " ) )
+                    {
+                        m.Fatal( ex );
+                    }
                     return false;
                 }
             }
@@ -489,6 +492,15 @@ namespace CK.Env
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="m"></param>
+        /// <param name="commitMessage"></param>
+        /// <param name="date"></param>
+        /// <param name="amendPreviousCommit"></param>
+        /// <param name="isDirty"></param>
+        /// <returns>False on error. True otherwise.</returns>
         bool DoCommit( IActivityMonitor m, string commitMessage, DateTimeOffset date, bool amendPreviousCommit, bool isDirty )
         {
             try

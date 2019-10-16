@@ -357,7 +357,7 @@ namespace CK.Env
         {
             using( m.OpenInfo( $"Reset --hard changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
             {
-                Reset.Invoke(m);
+                Reset?.Invoke(m);
                 try
                 {
                     Git.Reset( ResetMode.Hard );
