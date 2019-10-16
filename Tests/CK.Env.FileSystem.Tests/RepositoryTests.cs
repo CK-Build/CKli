@@ -154,6 +154,7 @@ namespace CK.Env.Tests
         [Test]
         public void GitFolder_CheckCleanCommit_detects_new_deleted_and_modified_files()
         {
+            Assume.That( TestHelper.IsExplicitAllowed );
             _commandRegister.UnregisterAll();
             var w = new WorldMock();
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
@@ -247,6 +248,7 @@ namespace CK.Env.Tests
         [Test]
         public void when_the_branch_is_the_current_one_we_have_access_to_the_physical_files()
         {
+            Assume.That( TestHelper.IsExplicitAllowed );
             _commandRegister.UnregisterAll();
             var w = new WorldMock();
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )

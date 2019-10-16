@@ -8,9 +8,9 @@ namespace Npm.Net.Tests
     public class NpmPublishTests
     {
         [Test]
-        [Explicit]
         public void PublishOnNpm()
         {
+            Assume.That( TestHelper.IsExplicitAllowed );
             string pat = "";
             var registry = new Registry( TestHelperHttpClient.HttpClient, pat );
             bool success = registry.Publish( TestHelper.Monitor, "testpackagethatnooneshoulduse-6.42.5-ci.tgz", true, "dist-tag-test" );

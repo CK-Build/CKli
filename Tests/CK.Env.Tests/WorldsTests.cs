@@ -34,11 +34,16 @@ namespace CK.Env.Tests
 
 
         [Test]
-        public void a_simple_project_can_be_setup() => ImageLibrary.minimal_solution_setup( ( universe ) => { }, TestHelper.IsExplicitAllowed );
+        public void a_simple_project_can_be_setup()
+        {
+            Assume.That( TestHelper.IsExplicitAllowed );
+            ImageLibrary.minimal_solution_setup( ( universe ) => { }, TestHelper.IsExplicitAllowed );
+        }
 
         [Test]
         public void a_simple_project_can_be_build_once()
         {
+            Assume.That( TestHelper.IsExplicitAllowed );
             EnsureCallbackIsCalled(
                 ( Action<TestUniverse> action, object[] parameters ) => ImageLibrary.minimal_solution_first_ci_build( action, (bool)parameters[0] ),
                 ( universe ) =>
@@ -52,16 +57,20 @@ namespace CK.Env.Tests
         }
 
         [Test]
-        public void a_simple_project_can_be_build_a_second_time() => ImageLibrary.minimal_solution_second_ci_build(
+        public void a_simple_project_can_be_build_a_second_time()
+        {
+            Assume.That( TestHelper.IsExplicitAllowed );
+            ImageLibrary.minimal_solution_second_ci_build(
             ( universe ) =>
             {
 
             }, TestHelper.IsExplicitAllowed );
-
+        }
 
         [Test]
         public void dll_should_not_change_after_rebuild()
         {
+            Assume.That( TestHelper.IsExplicitAllowed );
             ImageLibrary.minimal_solution_second_ci_build( universe => { }, TestHelper.IsExplicitAllowed );//We are now sure this image, and it's base exist.
             using( var compare = ImageManager.CompareBuildedImages(
                 nameof( ImageLibrary.minimal_solution_first_ci_build ),
@@ -74,6 +83,7 @@ namespace CK.Env.Tests
         [Test]
         public void building_the_same_sln_from_two_dirs_should_be_deterministic()
         {
+            Assume.That( TestHelper.IsExplicitAllowed );
             bool isExplicit = TestHelper.IsExplicitAllowed;
             var imageA = ImageLibrary.minimal_solution_second_ci_build( null, isExplicit );
             var imageB = ImageLibrary.another_minimal_solution_second_ci_build( null, isExplicit );
@@ -88,6 +98,7 @@ namespace CK.Env.Tests
         [TestCase( -1 )]
         public void running_apply_settings_does_not_throw( int seed )
         {
+            Assume.That( TestHelper.IsExplicitAllowed );
             if( seed == -1 )
             {
                 seed = new Random().Next();
@@ -102,6 +113,7 @@ namespace CK.Env.Tests
         [TestCase( -1 )]
         public void apply_settings_should_be_idempotent( int seed )
         {
+            Assume.That( TestHelper.IsExplicitAllowed );
             if( seed == -1 )
             {
                 seed = new Random().Next();

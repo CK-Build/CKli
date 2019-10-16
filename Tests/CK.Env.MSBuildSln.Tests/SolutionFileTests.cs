@@ -16,11 +16,12 @@ namespace CK.Env.MSBuildSln.Tests
         [Test]
         public void reading_this_solution_works()
         {
+            Assume.That( TestHelper.IsExplicitAllowed );
             using( var fs = new FileSystem( TestHelper.SolutionFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
                 var s = SolutionFile.Read( fs, TestHelper.Monitor, "CK-Env.sln", true );
 
-                s.Children.Should().HaveCount( 33, "There must be 33 projects!" );
+                s.Children.Should().HaveCount( 34, "There must be 34 projects!" );
                 var folders = s.Children.OfType<SolutionFolder>();
 
                 folders.Select( p => p.ProjectName ).Should().BeEquivalentTo( "Solution Items", "Tests" );
