@@ -8,22 +8,20 @@ namespace CK.Env.NPM
 {
     class NPMFeed : INPMFeed
     {
-        readonly NPMClient _client;
-        readonly NPMRepositoryBase _existingRepository;
+        readonly Registry _registry;
 
         internal NPMFeed(
-            NPMClient client,
             string scope,
             string url,
             SimpleCredentials creds,
-            NPMRepositoryBase existingRepository )
+            Registry registry )
         {
-            _client = client;
             Scope = scope;
             Url = url;
             Credentials = creds;
+            _registry = registry;
             TypedName = $"{NPMClient.NPMType.Name}:{scope}";
-            _existingRepository = existingRepository;
+            _registry = registry ?? throw new ArgumentNullException();
         }
 
         string IArtifactFeedIdentity.Name => Scope;
@@ -40,14 +38,9 @@ namespace CK.Env.NPM
 
         public async Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, string artifactName )
         {
-            if( _existingRepository == null )
-            {
-                throw new NotImplementedException( "We must build a new Registry if the feed does not correspond to an existing repository." );
-            }
-            var registry = _existingRepository.GetRegistry( m );
             var v = new ArtifactAvailableInstances( this, artifactName );
 
-            var result = await registry.View( m, artifactName );
+            var result = await _registry.View( m, artifactName );
             if( result.exist )
             {
                 JObject body = JObject.Parse( result.viewJson );
@@ -59,7 +52,10 @@ namespace CK.Env.NPM
                     {
                         m.Warn( $"Unable to parse version '{vK.Key}' for '{artifactName}': {sV.ErrorMessage}" );
                     }
-                    else v = v.WithVersion( sV );
+                    else
+                    {
+                        v = v.WithVersion( sV );
+                    }
                 }
             }
             return v;

@@ -77,6 +77,7 @@ namespace CK.Env.NPM
             IReadOnlyList<IArtifactFeed> feeds )
         {
             if( r.HandleOptionalAttribute<string>( "Type", null ) != NPMType.Name ) return null;
+            var usePassword = r.HandleOptionalAttribute( "UsePassword", false );
             var url = r.HandleRequiredAttribute<string>( "Url" );
             var scope = r.HandleRequiredAttribute<string>( "Scope" );
             if( !scope.StartsWith( "@" ) ) r.ThrowXmlException( $"Scope attribute must start with @." );
@@ -100,12 +101,19 @@ namespace CK.Env.NPM
             if( npmFeeds.Any( f => f.Scope == scope ) ) r.ThrowXmlException( $"NPM feed with the same scope '{scope}' is already defined." );
             if( npmFeeds.Any( f => StringComparer.OrdinalIgnoreCase.Equals( f.Url, url ) ) ) r.ThrowXmlException( $"NPM feed with the same url '{url}' is already defined." );
 
-            NPMRepositoryBase repository = repositories.OfType<NPMAzureRepository>().FirstOrDefault( repo => repo.Scope == scope );
+            Registry repository =
+                repositories.OfType<NPMAzureRepository>().FirstOrDefault( repo => repo.Scope == scope )?.GetRegistry( m )
+                ?? repositories.OfType<NPMStandardRepository>().FirstOrDefault( repo => repo.Url.Equals( url, StringComparison.OrdinalIgnoreCase ) )?.GetRegistry( m );
             if( repository == null )
             {
-                repository = repositories.OfType<NPMStandardRepository>().FirstOrDefault( repo => repo.Url.Equals( url, StringComparison.OrdinalIgnoreCase ) );
+                string secret = creds.IsSecretKeyName ?
+                      SecretKeyStore.GetSecretKey( m, creds.PasswordOrSecretKeyName, creds != null )
+                    : creds.PasswordOrSecretKeyName;
+                repository = usePassword ?
+                      new Registry( HttpClient, creds.UserName, secret, uri )
+                    : new Registry( HttpClient, secret, uri);
             }
-            return new NPMFeed( this, scope, url, creds, repository );
+            return new NPMFeed( scope, url, creds, repository );
         }
     }
 }

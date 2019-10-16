@@ -19,6 +19,7 @@ namespace CK.Env.NPM
             : base( c, qualityFilter, name, url )
         {
             SecretKeyName = secretKeyName;
+            UsePassword = usePassword;
         }
 
         public override string SecretKeyName { get; }
