@@ -8,20 +8,19 @@ namespace CK.Env.NPM
 {
     class NPMFeed : INPMFeed
     {
-        readonly Registry _registry;
-
+        readonly Func<Registry> _registryFactory;
+        Registry _registry = null;
         internal NPMFeed(
             string scope,
             string url,
             SimpleCredentials creds,
-            Registry registry )
+            Func<Registry> registryFactory )
         {
             Scope = scope;
             Url = url;
             Credentials = creds;
-            _registry = registry;
             TypedName = $"{NPMClient.NPMType.Name}:{scope}";
-            _registry = registry ?? throw new ArgumentNullException();
+            _registryFactory = registryFactory ?? throw new ArgumentNullException();
         }
 
         string IArtifactFeedIdentity.Name => Scope;
@@ -38,6 +37,10 @@ namespace CK.Env.NPM
 
         public async Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, string artifactName )
         {
+            if( _registry == null)
+            {
+                _registry = _registryFactory();
+            }
             var v = new ArtifactAvailableInstances( this, artifactName );
 
             var result = await _registry.View( m, artifactName );

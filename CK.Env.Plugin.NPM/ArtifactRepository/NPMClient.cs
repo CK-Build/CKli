@@ -100,20 +100,20 @@ namespace CK.Env.NPM
             var npmFeeds = feeds.OfType<NPMFeed>();
             if( npmFeeds.Any( f => f.Scope == scope ) ) r.ThrowXmlException( $"NPM feed with the same scope '{scope}' is already defined." );
             if( npmFeeds.Any( f => StringComparer.OrdinalIgnoreCase.Equals( f.Url, url ) ) ) r.ThrowXmlException( $"NPM feed with the same url '{url}' is already defined." );
-
-            Registry repository =
-                repositories.OfType<NPMAzureRepository>().FirstOrDefault( repo => repo.Scope == scope )?.GetRegistry( m )
-                ?? repositories.OfType<NPMStandardRepository>().FirstOrDefault( repo => repo.Url.Equals( url, StringComparison.OrdinalIgnoreCase ) )?.GetRegistry( m );
-            if( repository == null )
+            return new NPMFeed( scope, url, creds, () =>
             {
+                Registry registry =
+                    repositories.OfType<NPMAzureRepository>().FirstOrDefault( repo => repo.Scope == scope )?.GetRegistry( m )
+                    ?? repositories.OfType<NPMStandardRepository>().FirstOrDefault( repo => repo.Url.Equals( url, StringComparison.OrdinalIgnoreCase ) )?.GetRegistry( m );
+                if( registry != null ) return registry;
                 string secret = creds.IsSecretKeyName ?
                       SecretKeyStore.GetSecretKey( m, creds.PasswordOrSecretKeyName, creds != null )
                     : creds.PasswordOrSecretKeyName;
-                repository = usePassword ?
+                return usePassword ?
                       new Registry( HttpClient, creds.UserName, secret, uri )
-                    : new Registry( HttpClient, secret, uri);
-            }
-            return new NPMFeed( scope, url, creds, repository );
+                    : new Registry( HttpClient, secret, uri );
+                ;
+            } );
         }
     }
 }

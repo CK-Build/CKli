@@ -67,10 +67,11 @@ namespace CK.Env.NuGet
             PackageSource = packageSource;
         }
 
-        internal NuGetFeedBase( IActivityMonitor m, NuGetClient c, string url, string name, SimpleCredentials creds )
-            : this( c, new PackageSource( url, name ) )
+        bool _secretEnsured = false;
+        void EnsureSecrets( IActivityMonitor m)
         {
-            HandleFeed( url, name, creds );
+            if( _secretEnsured ) return;
+            _secretEnsured = true;
             string secret;
             var secretOrName = Feed.Credentials?.PasswordOrSecretKeyName;
             if( Feed.Credentials.IsSecretKeyName )
@@ -82,8 +83,17 @@ namespace CK.Env.NuGet
                     throw new InvalidOperationException();
                 }
             }
-            else secret = secretOrName;
-            NuGetClient.EnsureVSSFeedEndPointCredentials( m, url, secret );
+            else
+            {
+                secret = secretOrName;
+            }
+            NuGetClient.EnsureVSSFeedEndPointCredentials( m, PackageSource.Source, secret );
+        }
+
+        internal NuGetFeedBase( IActivityMonitor m, NuGetClient c, string url, string name, SimpleCredentials creds )
+            : this( c, new PackageSource( url, name ) )
+        {
+            HandleFeed( url, name, creds );
         }
 
         internal readonly PackageSource PackageSource;
@@ -102,6 +112,7 @@ namespace CK.Env.NuGet
 
         protected async Task<T> SafeCall<T>( IActivityMonitor m, Func<SourceRepository, MetadataResource, NuGetLoggerAdapter, Task<T>> f )
         {
+            EnsureSecrets( m );
             bool retry = false;
             var logger = new NuGetLoggerAdapter( m );
             NuGetClient.Initalize( logger, out var mustRefresh );
