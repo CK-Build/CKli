@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.1</TargetFramework>
@@ -9,14 +9,14 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <ProjectReference Include="..\CK.Env.Plugin.Appveyor\CK.Env.Plugin.Appveyor.csproj" />
-    <ProjectReference Include="..\CK.Env.Plugin.Basics\CK.Env.Plugin.Basics.csproj" />
-    <ProjectReference Include="..\CK.Env.Plugin.CKSetup\CK.Env.Plugin.CKSetup.csproj" />
-    <ProjectReference Include="..\CK.Env.Plugin.Dotnet\CK.Env.Plugin.Dotnet.csproj" />
-    <ProjectReference Include="..\CK.Env.Plugin.GitLab\CK.Env.Plugin.GitLab.csproj" />
-    <ProjectReference Include="..\CK.Env.Plugin.NPM\CK.Env.Plugin.NPM.csproj" />
-    <ProjectReference Include="..\CK.Env.Plugin.NuGet\CK.Env.Plugin.NuGet.csproj" />
-    <ProjectReference Include="..\CK.Env.Plugin.SolutionDriver\CK.Env.Plugin.SolutionDriver.csproj" />
+    <ProjectReference Include="..\Plugins\CK.Env.Plugin.Appveyor\CK.Env.Plugin.Appveyor.csproj" />
+    <ProjectReference Include="..\Plugins\CK.Env.Plugin.Basics\CK.Env.Plugin.Basics.csproj" />
+    <ProjectReference Include="..\Plugins\CK.Env.Plugin.CKSetup\CK.Env.Plugin.CKSetup.csproj" />
+    <ProjectReference Include="..\Plugins\CK.Env.Plugin.Dotnet\CK.Env.Plugin.Dotnet.csproj" />
+    <ProjectReference Include="..\Plugins\CK.Env.Plugin.GitLab\CK.Env.Plugin.GitLab.csproj" />
+    <ProjectReference Include="..\Plugins\CK.Env.Plugin.NPM\CK.Env.Plugin.NPM.csproj" />
+    <ProjectReference Include="..\Plugins\CK.Env.Plugin.NuGet\CK.Env.Plugin.NuGet.csproj" />
+    <ProjectReference Include="..\Plugins\CK.Env.Plugin.SolutionDriver\CK.Env.Plugin.SolutionDriver.csproj" />
     <ProjectReference Include="..\CK.Env.SolutionSpec\CK.Env.SolutionSpec.csproj" />
     <ProjectReference Include="..\CK.Env.World.Host\CK.Env.World.Host.csproj" />
   </ItemGroup>
