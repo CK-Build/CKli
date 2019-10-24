@@ -207,14 +207,14 @@ namespace CK.Env
             XElement result;
             using( monitor.CollectEntries( err => errors = err ) )
             {
-                result = RemoveRegionsAndResolveReusables( new Reusables( monitor, e ) ).Single();
+                result = (XElement)RemoveRegionsAndResolveReusables( new Reusables( monitor, e ) ).Single();
             }
             return new PreProcessResult( errors, result );
         }
 
         class Reusables
         {
-            Dictionary<string, List<XElement>> _map;
+            Dictionary<string, List<XNode>> _map;
 
             public Reusables( IActivityMonitor monitor, XElement root )
             {
@@ -239,11 +239,11 @@ namespace CK.Env
 
             public readonly IActivityMonitor Monitor;
 
-            public void Add( string name, List<XElement> e, bool replace, bool @override )
+            public void Add( string name, List<XNode> e, bool replace, bool @override )
             {
                 Monitor.Trace( $"Registering {name} reusable for {Element.ToStringPath()}." );
-                if( _map == null ) _map = new Dictionary<string, List<XElement>>();
-                bool existsAbove = Parent?.Find( name ) != null;
+                if( _map == null ) _map = new Dictionary<string, List<XNode>>();
+                bool existsAbove = Parent?.Find( name, clone: false ) != null;
                 bool existsHere = _map.ContainsKey( name );
                 if( replace && !existsHere )
                 {
@@ -264,7 +264,7 @@ namespace CK.Env
                 _map[name] = e;
             }
 
-            internal IEnumerable<XElement> Apply( XElement e )
+            internal IEnumerable<XNode> Apply( XElement e )
             {
                 using( Monitor.OpenDebug( $"Applying reusables to {e.ToStringPath()}." ) )
                 {
@@ -276,16 +276,16 @@ namespace CK.Env
                             return Array.Empty<XElement>();
                         }
                         string reusableName = (string)e.AttributeRequired( "Name" );
-                        IEnumerable<XElement> reusable = Find( reusableName );
+                        IEnumerable<XNode> reusable = Find( reusableName, clone: true );
                         if( reusable == null )
                         {
                             Monitor.Error( $"Unable to find reusable named '{reusableName}' from {e.ToStringPath()}." );
                             return Array.Empty<XElement>();
                         }
-                        Debug.Assert( reusable.DescendantsAndSelf().Any( c => c.Name == "Reuse" ) == false );
+                        Debug.Assert( reusable.OfType<XElement>().DescendantsAndSelf().Any( c => c.Name == "Reuse" ) == false );
                         Monitor.Debug( $"Expanded reusable named '{reusableName}'." );
 
-                        var reusedRoot = new XElement( e.Name, reusable.Select( c => new XElement( c ).SetLineColumnInfo( c ) ) );
+                        var reusedRoot = new XElement( e.Name, reusable );
                         var removeExpr = e.Elements().Select( r => (string)r.AttributeRequired( "Target" ) ).ToList();
                         foreach( var toRemove in removeExpr )
                         {
@@ -297,38 +297,44 @@ namespace CK.Env
                             }
                             foreach( var r in removes ) r.Remove();
                         }
-                        return reusedRoot.Elements();
+                        return reusedRoot.Nodes();
                     }
-                    var children = e.Elements().SelectMany( c => Apply( c ) );
+                    var children = e.Nodes().SelectMany( n => n is XElement c ? Apply( c ) : new[] { n.Clone() } );
                     return e.Name == "Reusable"
                                 ? children
                                 : new[] { new XElement(
                                                 e.Name,
-                                                e.Attributes().Select( a => new XAttribute( a ).SetLineColumnInfo( a ) ),
+                                                e.Attributes().Select( a => a.Clone() ),
                                                 children ).SetLineColumnInfo( e ) };
                 }
             }
 
-            IEnumerable<XElement> Find( string name )
+            IReadOnlyList<XNode> Find( string name, bool clone )
             {
                 var c = this;
                 do
                 {
-                    if( c._map != null && c._map.TryGetValue( name, out var reusable ) ) return reusable;
+                    if( c._map != null && c._map.TryGetValue( name, out var reusable ) )
+                    {
+                        if( !clone ) return reusable;
+                        var cloned = new XNode[reusable.Count];
+                        for( int i = 0; i < cloned.Length; ++i ) cloned[i] = reusable[i].Clone();
+                        return cloned;
+                    }
                 }
                 while( (c = c.Parent) != null );
                 return null;
             }
         }
 
-        static IEnumerable<XElement> RemoveRegionsAndResolveReusables( Reusables r )
+        static IEnumerable<XNode> RemoveRegionsAndResolveReusables( Reusables r )
         {
             var e = r.Element;
             using( r.Monitor.OpenDebug( $"Processing {e.ToStringPath()}." ) )
             {
                 if( e.Name == "Reuse" ) return r.Apply( e );
-                var children = e.Elements()
-                                .SelectMany( c => RemoveRegionsAndResolveReusables( new Reusables( r, c ) ) );
+                var children = e.Nodes()
+                                .SelectMany( n => n is XElement c ? RemoveRegionsAndResolveReusables( new Reusables( r, c ) ) : new[] { n } );
                 if( e.Name == "Region" ) return children;
                 if( e.Name == "Reusable" )
                 {
