@@ -17,19 +17,24 @@ namespace System.Xml.Linq
         /// <summary>
         /// Initializes a new reader bound to an <see cref="Element"/>.
         /// </summary>
-        /// <param name="m">The monitor that must be used.</param>
-        /// <param name="element">The read element.</param>
-        /// <param name="handled">The set of objects that has and will be handled by the read process.</param>
+        /// <param name="monitor">The monitor that must be used. Can not be null.</param>
+        /// <param name="element">The read element. Can not be null.</param>
+        /// <param name="handled">The set of objects that has and will be handled by the read process. Can not be null.</param>
         public XElementReader(
-            IActivityMonitor m,
+            IActivityMonitor monitor,
             XElement element,
-           HashSet<XObject> handled )
+            HashSet<XObject> handled )
         {
-            if( element == null ) throw new ArgumentNullException( nameof( element ) );
-            _handled = handled;
-            Monitor = m;
-            Element = element;
+            _handled = handled ?? throw new ArgumentNullException( nameof( handled ) );
+            Monitor = monitor ?? throw new ArgumentNullException(nameof(monitor));
+            Element = element ?? throw new ArgumentNullException( nameof( element ) );
         }
+
+        /// <summary>
+        /// Get whether this reader is valid: it is bound to a <see cref="Element"/> and
+        /// has a valid <see cref="Monitor"/>.
+        /// </summary>
+        public bool IsValid => Element != null;
 
         /// <summary>
         /// Get the monitor to use.
@@ -113,7 +118,7 @@ namespace System.Xml.Linq
         /// being <see cref="Handle(XObject)">handled</see>.
         /// </summary>
         /// <param name="name">The name of child element.</param>
-        /// <returns>A reader.</returns>
+        /// <returns>A vaild reader.</returns>
         public XElementReader WithRequiredChild( XName name )
         {
             var c = Element.Element( name );
@@ -122,14 +127,52 @@ namespace System.Xml.Linq
         }
 
         /// <summary>
+        /// Creates a reader bound to a required name child (and declares the child as
+        /// being <see cref="Handle(XObject)">handled</see>.
+        /// </summary>
+        /// <param name="name">The name of child element.</param>
+        /// <param name="r">The reader. <see cref="IsValid"/> is false and should not be used if this methid returned false.</param>
+        /// <returns>True if a child has been found, false otherwise.</returns>
+        public bool WithOptionalChild( XName name, out XElementReader r )
+        {           
+            var c = Element.Element( name );
+            if( c == null )
+            {
+                r = default;
+                return false;
+            }
+            r = WithElement( c, true );
+            return true;
+        }
+
+        /// <summary>
         /// Creates a set of readers bound to the <see cref="Element"/>'s children (and declares them as
         /// being <see cref="Handle(XObject)">handled</see>.
         /// </summary>
-        /// <returns>A the set of readers for children.</returns>
-        public IEnumerable<XElementReader> WithChildren()
+        /// <param name="handleElements">
+        /// By default, the returned readers have not handled their respective element.
+        /// When <see langword="true"/> <see cref="Handle(XObject)"/> is called with each of the chldren: all of them are handled.
+        /// </param>
+        /// <returns>A the set of valid readers for children.</returns>
+        public IEnumerable<XElementReader> WithChildren( bool handleElements = false )
         {
             var r = this;
-            return Element.Elements().Select( e => r.WithElement( e, true ) );
+            return Element.Elements().Select( e => r.WithElement( e, handleElements ) );
+        }
+
+        /// <summary>
+        /// Creates a set of readers bound to the named <see cref="Element"/>'s children (and declares them as
+        /// being <see cref="Handle(XObject)">handled</see>.
+        /// </summary>
+        /// <param name="handleElements">
+        /// By default, the returned readers have not handled their respective element.
+        /// When <see langword="true"/> <see cref="Handle(XObject)"/> is called with each of the chldren: all of them are handled.
+        /// </param>
+        /// <returns>A the set of valid readers for children.</returns>
+        public IEnumerable<XElementReader> WithChildren( XName name, bool handleElements = false )
+        {
+            var r = this;
+            return Element.Elements( name ).Select( e => r.WithElement( e, handleElements ) );
         }
 
         /// <summary>
@@ -146,6 +189,7 @@ namespace System.Xml.Linq
 
         /// <summary>
         /// Gets the raw <see cref="XElement"/>.
+        /// Never null as long as <see cref="IsValid"/> is true.
         /// </summary>
         public XElement Element { get; }
 
@@ -271,23 +315,46 @@ namespace System.Xml.Linq
         /// <returns>The updated item <paramref name="set"/>.</returns>
         public HashSet<T> HandleCollection<T>( XName elementName, HashSet<T> set, Func<XElementReader, T> builder )
         {
-            foreach( var c in Element.Elements( elementName ) )
+            if( elementName == null ) throw new ArgumentNullException( nameof( elementName ) );
+            foreach( var c in WithChildren( elementName, handleElements: true ) )
             {
-                _handled.Add( c );
-                foreach( var e in c.Elements() )
+                c.HandleAddRemoveClearChildren( set, builder );
+            }
+            return set;
+        }
+
+        /// <summary>
+        /// Handles add/remove/clear children elements of this <see cref="Element"/> (typically &lt;Things&gt;...&lt;/Things&gt;) that
+        /// must be only &lt;clear /&gt; or &lt;add .../ &lt;remove ... that the <paramref name="builder"/> function can project
+        /// into <typeparamref name="T"/> instances.
+        /// The <see cref="HashSet{T}.Comparer"/> must be correctly configured since it is the only responsible of the duplicate
+        /// handling.
+        /// </summary>
+        /// <typeparam name="T">Set item type.</typeparam>
+        /// <param name="set">Current object set with a <see cref="HashSet{T}.Comparer"/> correctly configured.</param>
+        /// <param name="builder">
+        /// The builder that knows how to instanciate a <typeparamref name="T"/>
+        /// from a &lt;add ... or a &lt;remove ... element.
+        /// </param>
+        /// <returns>The updated item <paramref name="set"/>.</returns>
+        public HashSet<T> HandleAddRemoveClearChildren<T>( HashSet<T> set, Func<XElementReader, T> builder )
+        {
+            if( !IsValid ) throw new InvalidOperationException( nameof( IsValid ) );
+            if( set == null ) throw new ArgumentNullException( nameof( set ) );
+            if( builder == null ) throw new ArgumentNullException( nameof( builder ) );
+            foreach( var e in Element.Elements() )
+            {
+                switch( e.Name.LocalName )
                 {
-                    switch( e.Name.LocalName )
-                    {
-                        case "clear": set.Clear(); _handled.Add( e ); break;
-                        case "remove": set.Remove( builder( WithElement( e, true ) ) ); break;
-                        case "add":
-                            {
-                                var item = builder( WithElement( e, true ) );
-                                if( !set.Add( item ) ) Throw( e, $"Item '{item}' already exists. There must be a <remove> first." );
-                                break;
-                            }
-                        default: Throw( e, $"Expected only <add>, <remove> or <clear/> element in '{elementName}'." ); break;
-                    }
+                    case "clear": set.Clear(); _handled.Add( e ); break;
+                    case "remove": set.Remove( builder( WithElement( e, true ) ) ); break;
+                    case "add":
+                        {
+                            var item = builder( WithElement( e, true ) );
+                            if( !set.Add( item ) ) Throw( e, $"Item '{item}' already exists. There must be a <remove> first." );
+                            break;
+                        }
+                    default: Throw( e, $"Expected only <add>, <remove> or <clear/> element in '{Element.Name}'." ); break;
                 }
             }
             return set;
