@@ -1,3 +1,4 @@
+using CK.Core;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -150,6 +151,31 @@ namespace System.Xml.Linq
         }
 
         #endregion
+
+        /// <summary>
+        /// Clones any XObject into another one.
+        /// </summary>
+        /// <param name="this">This XObject to clone.</param>
+        /// <param name="setLineColumnInfo">False to not propagate any associated <see cref="IXmlLineInfo"/> to the cloned object.</param>
+        /// <returns>A clone of this object.</returns>
+        public static T Clone<T>( this T @this, bool setLineColumnInfo = true ) where T : XObject
+        {
+            XObject o = null;
+            switch( @this )
+            {
+                case null: return null;
+                case XAttribute a: o = new XAttribute( a ); break;
+                case XElement e: o = new XElement( e.Name, e.Attributes().Select( a => a.Clone() ), e.Nodes().Select( n => n.Clone() ) ); break;
+                case XComment c: o = new XComment( c ); break;
+                case XCData d: o = new XCData( d ); break;
+                case XText t: o = new XText( t ); break;
+                case XProcessingInstruction p: o = new XProcessingInstruction( p ); break;
+                case XDocument d: o = new XDocument( new XDeclaration( d.Declaration ), d.Nodes().Select( n => n.Clone() ) ); break;
+                case XDocumentType t: o = new XDocumentType( t ); break;
+                default: throw new NotSupportedException( @this.GetType().AssemblyQualifiedName );
+            }
+            return setLineColumnInfo ? (T)o.SetLineColumnInfo( @this ) : (T)o;
+        }
 
         /// <summary>
         /// Very simple process that removes any namespace: all <see cref="XElement.Name"/> are
