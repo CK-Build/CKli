@@ -156,7 +156,7 @@ Invoke-Command -ScriptBlock $ScriptBlock";
                                                 tempPS1.Path,
                                                 new[] { script.Arguments },
                                                 stdErrorLevel: LogLevel.Warn,
-                                                currentVariables?.Select( v => (v.Name, v.Value) ) ) )
+                                                currentVariables?.Select( v => (v.Name, Environment.ExpandEnvironmentVariables( v.Value )) ) ) )
                                     {
                                         hasError |= !script.ContinueOnNonZeroExitCode;
                                         if( !hasError ) monitor.Warn( "ContinueOnNonZeroExitCode is true: error is ignored." );
