@@ -11,8 +11,8 @@ namespace CKli
             : base( initializer )
         {
             initializer.Services.Add( this );
-            var feeds = initializer.Reader.WithRequiredChild( "SourceFeeds" ).WithChildren();
-            var repositories = initializer.Reader.WithRequiredChild( "TargetRepositories" ).WithChildren();
+            var feeds = initializer.Reader.WithRequiredChild( "SourceFeeds" ).WithChildren( true );
+            var repositories = initializer.Reader.WithRequiredChild( "TargetRepositories" ).WithChildren( true );
             artifactCenter.Initialize( initializer.Monitor, feeds, repositories );
         }
     }

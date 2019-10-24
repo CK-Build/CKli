@@ -50,7 +50,7 @@ namespace CK.Env
         /// <param name="arguments">Command arguments.</param>
         /// <param name="stdErrorLevel">Trace level of Standard Error stream.</param>
         /// <param name="environmentVariables">Optional environment variables for the child process.</param>
-        /// <returns>True on success, false on error.</returns>
+        /// <returns>True on success (<see cref="Process.ExitCode"/> is equal to 0), false otherwise.</returns>
         public static bool Run(
                  IActivityMonitor m,
                  string workingDir,

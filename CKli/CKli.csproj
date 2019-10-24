@@ -19,6 +19,7 @@
     <ProjectReference Include="..\Plugins\CK.Env.Plugin.SolutionDriver\CK.Env.Plugin.SolutionDriver.csproj" />
     <ProjectReference Include="..\CK.Env.SolutionSpec\CK.Env.SolutionSpec.csproj" />
     <ProjectReference Include="..\CK.Env.World.Host\CK.Env.World.Host.csproj" />
+    <ProjectReference Include="..\Plugins\CK.Env.Plugin.Workstation\CK.Env.Plugin.Workstation.csproj" />
   </ItemGroup>
   
   <ItemGroup>

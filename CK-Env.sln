@@ -86,6 +86,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Artifact.Tests", "Te
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Plugins", "Plugins", "{60D6E9BB-13A8-463A-ACBF-66EE940FCCE5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CK.Env.Plugin.Workstation", "Plugins\CK.Env.Plugin.Workstation\CK.Env.Plugin.Workstation.csproj", "{B679ACB9-9FAA-46AB-B01E-E833722E1362}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -366,6 +368,14 @@ Global
 		{297C1A6C-4FA2-467E-9FB8-7EE49056682E}.Release|Any CPU.Build.0 = Release|Any CPU
 		{297C1A6C-4FA2-467E-9FB8-7EE49056682E}.Release|x64.ActiveCfg = Release|Any CPU
 		{297C1A6C-4FA2-467E-9FB8-7EE49056682E}.Release|x64.Build.0 = Release|Any CPU
+		{B679ACB9-9FAA-46AB-B01E-E833722E1362}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B679ACB9-9FAA-46AB-B01E-E833722E1362}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B679ACB9-9FAA-46AB-B01E-E833722E1362}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B679ACB9-9FAA-46AB-B01E-E833722E1362}.Debug|x64.Build.0 = Debug|Any CPU
+		{B679ACB9-9FAA-46AB-B01E-E833722E1362}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B679ACB9-9FAA-46AB-B01E-E833722E1362}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B679ACB9-9FAA-46AB-B01E-E833722E1362}.Release|x64.ActiveCfg = Release|Any CPU
+		{B679ACB9-9FAA-46AB-B01E-E833722E1362}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -389,6 +399,7 @@ Global
 		{88315861-9449-4347-8B69-A39A343B66BE} = {83CC9529-9A6D-46E5-BBE5-A1C5C6C35B7C}
 		{5C5B7030-95D4-4FF1-9132-897F395AF69E} = {83CC9529-9A6D-46E5-BBE5-A1C5C6C35B7C}
 		{297C1A6C-4FA2-467E-9FB8-7EE49056682E} = {83CC9529-9A6D-46E5-BBE5-A1C5C6C35B7C}
+		{B679ACB9-9FAA-46AB-B01E-E833722E1362} = {60D6E9BB-13A8-463A-ACBF-66EE940FCCE5}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {44AF4FE0-7386-4FB4-B966-0107DAE25DC4}

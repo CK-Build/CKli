@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <Root>
     <Reusable Name="One">
+      <![CDATA[
+      this
+      is
+      a
+      CDATA
+      text
+      ]]>
         <Thing1 />
     </Reusable>
     <Region>

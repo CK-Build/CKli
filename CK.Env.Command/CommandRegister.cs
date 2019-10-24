@@ -141,7 +141,7 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Registers a <see cref="ICommandMethodsProvider"/> by analysing its public methods.
+        /// Registers a <see cref="ICommandMethodsProvider"/> by analyzing its public methods.
         /// </summary>
         /// <param name="provider">The command provider.</param>
         public void Register( ICommandMethodsProvider provider )
