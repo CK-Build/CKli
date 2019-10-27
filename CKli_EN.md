@@ -2,7 +2,7 @@
 
 ## What is CKli ?
 
-CKli is a tool for <u>multi-repositories</u> stacks. It allow to automate actions, on <u>Worlds</u>, a set of repositories, and concentrate information in a single place.
+CKli is a tool for <u>multi-repositories</u> stacks. It allow to automate actions, on <u>Worlds</u>(a group of repositories), and concentrate information in a single place.
 
 ## Getting Started
 
@@ -31,7 +31,7 @@ If you installed CKli globally, you can run `ckli` in any command prompt to star
 
 ### First Run
 
-CKli will ask a password to secure your [KeyVault](docs/KeyVault.md), where all your [secrets](docs/TODO.md) are stored. Every time you start CKli, your KeyVault password will be asked.
+CKli will ask a password to secure your [KeyVault](docs/KeyVault.md), where all your secrets are stored. Every time you start CKli, your KeyVault password will be asked.
 
 By default there is 2 stack available: CK and CK-Build.
 
@@ -45,6 +45,7 @@ There is 4 <u>base commands</u> available, that allow you to:
 - `list` a set of commands
 - clear the prompt, with `cls`
 - manage your `secret`
+- `exit`
 
 These <u>base commands</u> are available everywhere.
 
@@ -64,11 +65,11 @@ Available Commands matching 'home*':
 
 You can notice that the filtering is <u>case insensitive</u>.
 
- :warning: ​`run` will only work on a set of commands with the same payload (parameters).
+ :information_source: `run` will only work on a set of commands with the same payload (parameters).
 
 `> run home*`
 
-Results in :
+Will output:
 ```
 > Warn: Pattern 'home*' matches require 4 different payloads.
 |  - Warn: (stackName, url, isPublic, mappedPath, branchName): Home/EnsureStackDefinition
@@ -85,19 +86,29 @@ A World is a group of repositories.
 
 A Stack is a World, with zero or more [Parallel World](docs/ParallelWorlds.md).
 
-The stacks are versioned in git repositories. [Stacks Location Directory](docs/TODO.md)
+The stacks are versioned in git repositories. [Stacks Index](docs/StackIndex.md)
+
+You can list the worlds by simply pressing `enter` instead of typing a command.
+
+To open a World, type its number then press `enter`.
+
+To close a world, run `Home/Close`.
 
 To add a Stack, use the command `Home/EnsureStackDefinition`  
 
 
 
-#### Ensure Stack Definition Example
+#### Add an existing Stack
 
-Lets Ensure the stack SC (for Signature-Code).
+##### Ensure Stack Definition
 
-This is a private stack, if you don't have access to https://gitlab.com/signature-code/signature-code-stack.git you can't test this example.
+In this example, we will add the stack SC (Signature-Code).
 
-Next we are asked somes informations (the parameters of the command:
+SC is a private stack, if you don't have access to https://gitlab.com/signature-code/signature-code-stack.git, you can not reproduce this example.
+
+Run `Home/EnsureStackDefinition`
+
+Fill the parameters of the command like below :
 ```bash
 > SC                                                        #stack's name
 > https://gitlab.com/signature-code/signature-code-stack.git#Git URL containing the stack
@@ -106,41 +117,24 @@ Next we are asked somes informations (the parameters of the command:
 >                                                           #leave empty
 > y                                                         #Confirm
 ```
-The local mapping is the location where the Stack will be cloned on your PC.
+:information_source: The local mapping is the location where the Stack will be cloned on your PC.
 
 Signature-Code being a private stack, CKli will not be able to clone the repository automatically.
 
-Press `Enter` to see the Worlds list (We can see a the PAT asked in the warnings)
+Press `Enter` to see the Worlds list. You can see that that CKli couldn't clone automatically the repository, because the PAT([Personal Access Token](https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html)) for GitLab is missing.
+
+##### Add the GitLab PAT
 
 
 Create your PAT on GitLab: https://gitlab.com/profile/personal_access_tokens
 
 Run `secret set GITLAB_GIT_WRITE_PAT`
 
-* Name: GITLAB_GIT_WRITE_PAT
-* check Write
-
-> `secret set GITLAB_GIT_WRITE_PAT`
-
 Paste the previously obtained token
 ``` bash
-> MGI5YzI2MjVkYzIxZWYwNWY2YWQ0ZGRmNDdjNWYy
+Enter 'GITLAB_GIT_WRITE_PAT' secret (empty to cancel): I2MjVkYzIxZWYwNWY2YWQ0ZGRmNDdjNWYy
 ```
 
-When pressing `Enter`, the repository will automaticly be cloned and the stacks defined inside will be displayed.
-To open a World, simply enter it's index and CKli Will clone every repository inside the directory.
+Then press enter, and you secret is now stored in your [KeyVault](docs/KeyVault.md).
 
-
-
-#### Commands to know
-
-- `Home/Close` to close a World.
-
-
-## Glossaire
-A `world` is a set of repositories on a defined branch and are described by a xml file.
-
-A `stack` is a set of at least one World targeting a same set of repositories but not the same branch.
-
-A `PAT`([Personal Access Token](https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html)) is like a password generated by a service for a user allowing him to authenticate and do actions in his name.
-
+CKli will also automatically clone the SC repository, and display the worlds in it.

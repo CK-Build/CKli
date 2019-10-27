@@ -50,8 +50,8 @@ CKli can configure for you a lot of settings. There is a bunch of commands that 
 
 CKli got a command for Auto Configuring the following files (The link lead to the specific autoconfig doc) :  
 
--  [appveyor.yml](In_Depth/AppVeyor.md)
-- .gitlab-ci.yml
+-  [appveyor.yml](In_Depth/CIAutoConfig.md)
+- [.gitlab-ci.yml]((In_Depth/CIAutoConfig.md))
 - CodeCakeBuilder
 - CodeCakeBuilderKeyVault
 - Common Folder
