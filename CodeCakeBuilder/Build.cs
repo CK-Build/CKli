@@ -25,8 +25,6 @@ namespace CodeCake
             //Because this CCB is our reference for the ApplySettings, we must not modify Build.NuGetArtifactType.GetRemoteFeeds
             //So here we modify the feed.
             IList<ArtifactFeed> feeds = nuGetType.GetTargetFeeds();
-            Debug.Assert( feeds.Last().GetType() == typeof( SignatureVSTSFeed ), "The default remote is the last one." );
-            feeds[feeds.Count - 1] = new RemoteFeed( nuGetType, "nuget.org", "https://api.nuget.org/v3/index.json", "NUGET_ORG_PUSH_API_KEY" );
 
             Task( "Check-Repository" )
                 .Does( () =>
