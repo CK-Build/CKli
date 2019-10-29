@@ -23,6 +23,8 @@ dotnet tool install CKli -g
 
 If you installed CKli globally, you can run `ckli` in any command prompt to start it.  
 
+:warning: On Linux, the Path environment variable of your shell need to be updated.
+
 ### First Run
 
 CKli will ask a password to secure your [KeyVault](docs/KeyVault.md), where all your secrets are stored. Every time you start CKli, your KeyVault password will be asked.

@@ -145,7 +145,6 @@ namespace CK.Env
                     }
                     else m.Error( "Missing expected World definition element." );
                 }
-                keySnapshot.RestoreTo( _userKeyStore );
                 Close();
                 return false;
             }
