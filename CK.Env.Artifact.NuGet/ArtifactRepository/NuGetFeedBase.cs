@@ -109,7 +109,7 @@ namespace CK.Env.NuGet
             Debug.Assert( _feed == null && url.Equals( Url, StringComparison.OrdinalIgnoreCase ) );
             if(creds.IsSecretKeyName)
             {
-                keyStore.DeclareSecretKey( creds.PasswordOrSecretKeyName, ( s ) => "PAT Used to authenticate CKli to the feeds, and retrieve informations about NuGet packages", true );
+                keyStore.DeclareSecretKey( creds.PasswordOrSecretKeyName, ( s ) => "PAT Used to authenticate CKli to the feeds, and retrieve informations about NuGet packages" );
             }
             return _feed = new ReadFeed( this, name, creds );
         }
