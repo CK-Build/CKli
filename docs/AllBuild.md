@@ -17,10 +17,10 @@ The 3 main steps of this command are:
 
 Before building a Solution, CKli displays the ordered list of Solutions with a star * in front of the one being processed: 
 ```log
-  - Info:  -- Rank 0
-|  |  |          *   0 - CodeCake.sln
-|  |  |              1 - CSemVer-Net.sln
-|  |  |           -- Rank 1
-|  |  |              2 - SGV-Net.sln
+-- Rank 0
+    0 - CodeCake.sln
+*   1 - CSemVer-Net.sln
+-- Rank 1
+    2 - SGV-Net.sln
 ```
 

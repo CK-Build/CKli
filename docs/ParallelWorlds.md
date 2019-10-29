@@ -6,6 +6,7 @@ You can create a Parallel World right now, by running `World/GenerateParallelWor
 
 :warning:This will create and push to remote a new branch on all repositories of a World.
 
-We currently use the Parallel World to manage LTS versions accross a stack.
+We currently use the Parallel World to manage [LTS](https://en.wikipedia.org/wiki/Long-term_support) versions accross a stack.
 
 This feature is WIP.
+

@@ -8,8 +8,8 @@ You can see below a Dependency Graph from the CK World, it show nicely the compl
 
 There is so much repositories that the graph itself is unreadable !
 
-Hopefully, CKli solve these issues with a command:  
-`World/AllBuild`   
+Hopefully, CKli solve these issues with a command: 
+`World/AllBuild` 
 Following the dependency order, it will commit the dependencies bumps, then execute the CI script.
 
 This command have two parameters: 
@@ -25,7 +25,7 @@ Running a CI build on all the stack can fail for a lot of reason, rebuilding eve
 
 If you set `rebuildAll` to false, CKli will flush the previous builds and rebuild everything from scratch.
 
-In depth information about the AllBuild is available here: [here](AllBuild.md).
+In depth information about the AllBuild is available [here](AllBuild.md).
 
 ## Publish
 When the AllBuild script ran, CKli gave arguments to the CI script, telling it to push the Generated Artifacts in a Folder called "LocalFeed"
