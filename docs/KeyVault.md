@@ -28,6 +28,8 @@ This KeyVault is stored at  `%LocalAppData%/CKli/CKLI-INVENIETIS.KeyVault.txt`.
 
 ## Shared KeyVault
 
-At this moment, there is only one Shared KeyVault, is the CI/CD KeyVault.
+At this moment, there is only one Shared KeyVault, its the CI/CD KeyVault.
 
- [Work In Progress]
+This KeyVault is stored in a Shared State, next to the World config file, and will be cloned in all the repositories of a World.
+
+[Work In Progress]
