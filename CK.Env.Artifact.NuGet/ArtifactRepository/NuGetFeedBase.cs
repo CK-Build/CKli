@@ -61,12 +61,6 @@ namespace CK.Env.NuGet
             }
         }
 
-        private protected NuGetFeedBase( NuGetClient c, PackageSource packageSource )
-        {
-            Client = c;
-            PackageSource = packageSource;
-        }
-
         bool _secretEnsured = false;
         void EnsureSecrets( IActivityMonitor m)
         {
@@ -93,7 +87,13 @@ namespace CK.Env.NuGet
         internal NuGetFeedBase( IActivityMonitor m, NuGetClient c, string url, string name, SimpleCredentials creds )
             : this( c, new PackageSource( url, name ) )
         {
-            HandleFeed( url, name, creds );
+            HandleFeed(c.SecretKeyStore, url, name, creds );
+        }
+
+        private protected NuGetFeedBase( NuGetClient c, PackageSource packageSource )
+        {
+            Client = c;
+            PackageSource = packageSource;
         }
 
         internal readonly PackageSource PackageSource;
@@ -104,9 +104,13 @@ namespace CK.Env.NuGet
 
         public string Name => PackageSource.Name;
 
-        internal INuGetFeed HandleFeed( string url, string name, SimpleCredentials creds )
+        internal INuGetFeed HandleFeed( SecretKeyStore keyStore, string url, string name, SimpleCredentials creds )
         {
             Debug.Assert( _feed == null && url.Equals( Url, StringComparison.OrdinalIgnoreCase ) );
+            if(creds.IsSecretKeyName)
+            {
+                keyStore.DeclareSecretKey( creds.PasswordOrSecretKeyName, ( s ) => "", true );
+            }
             return _feed = new ReadFeed( this, name, creds );
         }
 

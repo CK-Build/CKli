@@ -100,6 +100,10 @@ namespace CK.Env.NPM
             var npmFeeds = feeds.OfType<NPMFeed>();
             if( npmFeeds.Any( f => f.Scope == scope ) ) r.ThrowXmlException( $"NPM feed with the same scope '{scope}' is already defined." );
             if( npmFeeds.Any( f => StringComparer.OrdinalIgnoreCase.Equals( f.Url, url ) ) ) r.ThrowXmlException( $"NPM feed with the same url '{url}' is already defined." );
+            if(creds.IsSecretKeyName)
+            {
+                SecretKeyStore.DeclareSecretKey( creds.PasswordOrSecretKeyName, (a) => "", true );
+            }
             return new NPMFeed( scope, url, creds, () =>
             {
                 Registry registry =

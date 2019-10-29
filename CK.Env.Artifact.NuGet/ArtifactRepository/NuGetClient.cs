@@ -326,7 +326,7 @@ namespace CK.Env.NuGet
                 if( url.Equals( i.Url, StringComparison.OrdinalIgnoreCase ) )
                 {
                     if( i.Feed != null ) r.ThrowXmlException( $"NuGet feed defined by url '{url}' is already registered." );
-                    return i.HandleFeed( url, name, creds );
+                    return i.HandleFeed( SecretKeyStore, url, name, creds );
                 }
             }
             var feed = new PureFeed(m, this, url, name, creds );
