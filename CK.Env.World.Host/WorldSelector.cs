@@ -126,6 +126,7 @@ namespace CK.Env
                 var original = Store.ReadWorldDescription( m, w ).Root;
                 var expanded = XTypedFactory.PreProcess( m, original );
                 if( expanded.Errors.Count > 0 ) return false;
+                bool resetSecrets = true;
                 _root = _factory.CreateInstance<XTypedObject>( m, expanded.Result, baseProvider );
                 if( _root != null )
                 {
@@ -141,10 +142,12 @@ namespace CK.Env
                         {
                             var missing = _userKeyStore.Infos.Where( secret => secret.IsRequired && !secret.IsSecretAvailable ).Select( s => s.Name ).Concatenate();
                             m.Error( $"Missing one or more secrets. These are required to continue: {missing}." );
+                            resetSecrets = false;
                         }
                     }
                     else m.Error( "Missing expected World definition element." );
                 }
+                if( resetSecrets ) keySnapshot.RestoreTo( _userKeyStore );
                 Close();
                 return false;
             }
