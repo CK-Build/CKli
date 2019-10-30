@@ -70,18 +70,6 @@ namespace CodeCake
                 .WithCriteria( () => gitInfo.IsValid )
                 .Does( () =>
                 {
-                    // Cheat here for this build.cs to avoid changing the default
-                    //
-                    //      protected override IEnumerable<ArtifactFeed> GetRemoteFeeds()
-                    //      {
-                    //          yield return new SignatureVSTSFeed( this, "Signature-Code", "CKEnvTest3" );
-                    //      }
-                    //
-                    // that is targeted by the CK.Env.Plugin.NuGetCodeCakeBuilderFolder.AdaptBuildNugetRepositoryForPushFeeds
-                    // method.
-                    //
-
-
                     globalInfo.PushArtifacts();
                 } );
 
