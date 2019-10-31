@@ -9,7 +9,8 @@ namespace CK.Env.NPM
     class NPMFeed : INPMFeed
     {
         readonly Func<Registry> _registryFactory;
-        Registry _registry = null;
+        Registry _registry;
+
         internal NPMFeed(
             string scope,
             string url,
@@ -35,12 +36,11 @@ namespace CK.Env.NPM
 
         public ArtifactType ArtifactType => NPMClient.NPMType;
 
+        public bool CheckSecret( IActivityMonitor m, bool throwOnMissing = false ) => true;
+
         public async Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, string artifactName )
         {
-            if( _registry == null)
-            {
-                _registry = _registryFactory();
-            }
+            if( _registry == null ) _registry = _registryFactory();
             var v = new ArtifactAvailableInstances( this, artifactName );
 
             var result = await _registry.View( m, artifactName );
@@ -63,5 +63,6 @@ namespace CK.Env.NPM
             }
             return v;
         }
+
     }
 }

@@ -81,12 +81,6 @@ namespace CK.Env.NPM
         public override string ToString() => UniqueRepositoryName;
 
         /// <summary>
-        /// Gets whether the secret is available.
-        /// </summary>
-        public bool IsAvailable => String.IsNullOrEmpty( SecretKeyName )
-                                    || Client.SecretKeyStore.IsSecretKeyAvailable( SecretKeyName ) == true;
-
-        /// <summary>
         /// Ensures that the secret behind the <see cref="SecretKeyName"/> is available.
         /// This always returns null if <see cref="SecretKeyName"/> is null.
         /// </summary>

@@ -39,15 +39,9 @@ namespace CK.Env
         /// if two repositories share the same SecretKeyName, the resolved secret must be the same.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
+        /// <param name="throwOnEmpty">True to throw a <see cref="MissingRequiredSecretException"/> instead of returning a null or empty string.</param>
         /// <returns>The non empty secret or null.</returns>
         string ResolveSecret( IActivityMonitor m, bool throwOnEmpty = false );
-
-        /// <summary>
-        /// Gets whether this repository is ready to accept artifacts.
-        /// This must be false if a <see cref="SecretKeyName"/> is defined  but
-        /// can not be resolved.
-        /// </summary>
-        bool IsAvailable { get; }
 
         /// <summary>
         /// Checks whether this artifact repository handles the artifact type.
