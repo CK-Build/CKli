@@ -29,7 +29,7 @@ namespace CK.Env
         /// Initializes a new <see cref="SimpleCredentials"/> from its xml representation
         /// that must have a UserName attribute and Password or PasswordSecretKeyName (but not both). 
         /// </summary>
-        /// <param name="e">The xml element reader.</param>
+        /// <param name="r">The xml element reader.</param>
         public SimpleCredentials( XElementReader r )
         {
             UserName = r.HandleRequiredAttribute<string>( "UserName" );

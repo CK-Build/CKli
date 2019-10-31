@@ -20,14 +20,19 @@ namespace CK.Env
         /// </summary>
         public static CKTraitContext TagsContext = CKTraitContext.Create( "SecretCategory", '|' );
 
-        internal SecretKeyInfo( string name, Func<SecretKeyInfo, string> descriptionBuilder, bool isRequired )
-            : this( name, descriptionBuilder )
+        internal SecretKeyInfo( string name, Func<SecretKeyInfo, string> descriptionBuilder, bool isRequired, bool isTransient )
+            : this( name, descriptionBuilder, isTransient )
         {
             _isRequired = isRequired;
         }
 
-        internal SecretKeyInfo( string name, Func<SecretKeyInfo, string> descriptionBuilder, SecretKeyInfo subKey, IReadOnlyDictionary<string, SecretKeyInfo> keyInfos )
-            : this( name, descriptionBuilder )
+        internal SecretKeyInfo(
+            string name,
+            Func<SecretKeyInfo, string> descriptionBuilder,
+            SecretKeyInfo subKey,
+            IReadOnlyDictionary<string, SecretKeyInfo> keyInfos,
+            bool isTransient )
+            : this( name, descriptionBuilder, isTransient )
         {
             SubKey = subKey ?? throw new ArgumentNullException( nameof( subKey ) );
             if( subKey.SuperKey != null )
@@ -46,8 +51,11 @@ namespace CK.Env
         /// </summary>
         /// <param name="data">Data captured by <see cref="GetData"/>.</param>
         /// <param name="keyInfos">Current set of secrets being restored.</param>
-        internal SecretKeyInfo( (string name, string description, string secret, bool isRequired, string tags, string subKey) data, IReadOnlyDictionary<string, SecretKeyInfo> keyInfos )
+        internal SecretKeyInfo(
+            (string name, string description, string secret, bool isRequired, string tags, string subKey, bool isTransient) data,
+            IReadOnlyDictionary<string, SecretKeyInfo> keyInfos )
         {
+            IsTransient = data.isTransient;
             Name = data.name;
             _description = data.description;
             _secret = data.secret;
@@ -64,13 +72,14 @@ namespace CK.Env
         /// Exports data for "serialization".
         /// </summary>
         /// <returns>The raw data.</returns>
-        internal (string name, string description, string secret, bool isRequired, string tags, string subKey) GetData()
+        internal (string name, string description, string secret, bool isRequired, string tags, string subKey, bool isTransient) GetData()
         {
-            return (Name, _description, _secret, _isRequired, _tags.ToString(), SubKey?.Name );
+            return (Name, _description, _secret, _isRequired, _tags.ToString(), SubKey?.Name, IsTransient );
         }
 
-        SecretKeyInfo( string name, Func<SecretKeyInfo, string> descriptionBuilder )
+        SecretKeyInfo( string name, Func<SecretKeyInfo, string> descriptionBuilder, bool isTransient )
         {
+            IsTransient = isTransient;
             Name = name ?? throw new ArgumentNullException( nameof( name ) );
             SetDescription( descriptionBuilder );
             _tags = TagsContext.EmptyTrait;
@@ -107,6 +116,11 @@ namespace CK.Env
         /// Gets the name of this secret key.
         /// </summary>
         public string Name { get; }
+
+        /// <summary>
+        /// Gets whether this key is transient or not. If the key is transient, it will not be stored in a KeyVault.
+        /// </summary>
+        public bool IsTransient { get; }
 
         /// <summary>
         /// Gets the description.
@@ -160,6 +174,7 @@ namespace CK.Env
         public bool ImportSecret( IActivityMonitor m, string secret )
         {
             if( String.IsNullOrEmpty( secret ) ) throw new ArgumentNullException( nameof( secret ) );
+            if( IsTransient ) throw new InvalidOperationException( "This is transient, you cannot import a stored(non transient) secret." );
             if( IsSecretAvailable )
             {
                 if( SuperKey != null && SuperKey.IsSecretAvailable )
