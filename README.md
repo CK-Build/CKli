@@ -40,11 +40,11 @@ Type `run Home/EnsureStackDefinition` and press `enter`.
 You now need to fill the argument of this command: 
 
 ```powershell
-[required] - stackName:							  #The Name of the stack you are cloning
-[required] - url:								  #The Url of the stack you are cloning
-[required] - isPublic: false					  #true for public stack, false otherwise
+[required] - stackName:                              #The Name of the stack you are cloning
+[required] - url:                                  #The Url of the stack you are cloning
+[required] - isPublic: false                      #true for public stack, false otherwise
 [default value: <null>] - mappedPath: Enter path: #the path were the stack will be cloned
-[default value: master] - branchName:			  # you can keep this empty
+[default value: master] - branchName:              # you can keep this empty
 ```
 
 If you see any warning, read them carefully: you may have a secret missing.
@@ -102,6 +102,7 @@ You can notice that the filtering is <u>case insensitive</u>.
 `> run home*`
 
 Will output:
+
 ```
 > Warn: Pattern 'home*' matches require 4 different payloads.
 |  - Warn: (stackName, url, isPublic, mappedPath, branchName): Home/EnsureStackDefinition
@@ -125,8 +126,6 @@ A Stack is a default World, with zero or more [Parallel World](docs/ParallelWorl
      > 3 CK-Build[NetCore2] => /Dev/CK-Build[NetCore2] #A Parallel World
 ```
 
-
-
 The stacks are versioned in git repositories.
 
 You can list the worlds by simply pressing `enter` instead of typing a command.
@@ -139,13 +138,13 @@ To add a Stack, use the command `Home/EnsureStackDefinition`
 
 #### Stack Index
 
-| Stack Name | Repository URL                                               |            |
-| ---------- | ------------------------------------------------------------ | ---------- |
-| CK         | https://github.com/signature-opensource/CK-Stack             | **Public** |
-| CK-Build   | https://github.com/signature-opensource/CK-Stack             | **Public** |
+| Stack Name | Repository URL                                                      |            |
+| ---------- | ------------------------------------------------------------------- | ---------- |
+| CK         | https://github.com/signature-opensource/CK-Stack                    | **Public** |
+| CK-Build   | https://github.com/signature-opensource/CK-Stack                    | **Public** |
 | Engie      | https://invenietis@dev.azure.com/invenietis/Cofely/_git/Engie-Stack | Private    |
-| SC         | https://gitlab.com/signature-code/signature-code-stack.git   | Private    |
-| S-Mos      | https://gitlab.com/signature-mosaic/Signature-Mosaic-Stack   | Private    |
+| SC         | https://gitlab.com/signature-code/signature-code-stack.git          | Private    |
+| S-Mos      | https://gitlab.com/signature-mosaic/Signature-Mosaic-Stack          | Private    |
 
 #### Add an existing Stack
 
@@ -160,6 +159,7 @@ SC is a private stack, if you don't have access to https://gitlab.com/signature-
 Run `Home/EnsureStackDefinition`
 
 Fill the parameters of the command like below :
+
 ```bash
 > SC                                                        #stack's name
 > https://gitlab.com/signature-code/signature-code-stack.git#Git URL containing the stack
@@ -168,6 +168,7 @@ Fill the parameters of the command like below :
 >                                                           #leave empty
 > y                                                         #Confirm
 ```
+
 :information_source: The local mapping is the location where the Stack will be cloned on your PC.
 
 Signature-Code being a private stack, CKli will not be able to clone the repository automatically.
@@ -185,6 +186,7 @@ For Your Information, here are the URLs to create your PATs on other git service
 - GitHub: https://github.com/settings/tokens
 
 - Azure
+  
   - Invenietis: https://dev.azure.com/invenietis/_usersSettings/tokens
   - Signature-OpenSource: https://dev.azure.com/Signature-OpenSource/_usersSettings/tokens
   - Signature-Code: https://dev.azure.com/Signature-Code/_usersSettings/tokens
@@ -194,7 +196,8 @@ _____
 Run `secret set GITLAB_GIT_WRITE_PAT`
 
 Paste the previously obtained token
-``` bash
+
+```bash
 Enter 'GITLAB_GIT_WRITE_PAT' secret (empty to cancel): I2MjVkYzIxZWYwNWY2YWQ0ZGRmNDdjNWYy
 ```
 

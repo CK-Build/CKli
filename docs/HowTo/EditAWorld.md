@@ -2,8 +2,6 @@
 
 ## Config Location
 
-
-
 The worlds are versioned in a Git Repository, if you have ensured your repository, the repository is located in the folder where CKli store all its stuff.
 The CKli data path is OS specific:
 
@@ -37,6 +35,10 @@ For this example, we will edit the world CK, located in the directory signature-
 - **Ordering Matter**: Services have dependencies, dependencies must be declared before, like a lot of declarative languages.
 
 - **Scopes**: Some Services provides a scope, and services declared in it are not accessible from outside.
+
+## Elements documentation:
+
+Technical documentation is currently not automatically generated. You need to heads to the class declaration to know the arguments and dependencies of your element. You can easily spot the elements' classes, they all begin by a `X`.
 
 ## When your config is right
 

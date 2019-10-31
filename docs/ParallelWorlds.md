@@ -9,4 +9,3 @@ You can create a Parallel World right now, by running `World/GenerateParallelWor
 We currently use the Parallel World to manage [LTS](https://en.wikipedia.org/wiki/Long-term_support) versions accross a stack.
 
 This feature is WIP.
-

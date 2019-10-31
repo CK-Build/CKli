@@ -19,6 +19,11 @@ namespace CK.Env
             b.Append( "\"" )
                 .Append( name )
                 .Append( "\"" );
+
+        public static StringBuilder AppendDependency( this StringBuilder b, string dependent, string dependencies ) =>
+            b.AppendGraphName( dependencies )
+            .Append( " -> " )
+            .AppendGraphName( dependent );
     }
 
     /// <summary>
@@ -174,7 +179,7 @@ namespace CK.Env
                     {
                         b.Append( "rank=" )
                             .Append( slnGroupped.Key )
-                            .AppendLine(";");
+                            .AppendLine( ";" );
                         foreach( var sln in slnGroupped )
                         {
 
@@ -182,11 +187,16 @@ namespace CK.Env
                            .AppendLine( ";" );
                             foreach( var slnDep in sln.Solution.PublishedRequirements )
                             {
-                                b.AppendGraphName( sln.Solution.Solution.Name )
-                                    .Append( " -> " )
-                                    .AppendGraphName( slnDep.Solution.Name  )
+                                b.AppendDependency( sln.Solution.Solution.Name, slnDep.Solution.Name )
                                     .AppendLine( ";" );
                             }
+
+                            foreach( var slnBuildDep in sln.Solution.Requirements.Except( sln.Solution.PublishedRequirements ) )
+                            {
+                                b.AppendDependency( sln.Solution.Solution.Name, slnBuildDep.Solution.Name )
+                                    .AppendLine( @" [style=""dotted""];" );
+                            }
+
                         }
                     }
                 }
@@ -232,9 +242,7 @@ namespace CK.Env
                                     .AppendLine( ";" );
                             foreach( var projDep in proj.ProjectReferences.Where( p => p.Target.IsPublished ) )
                             {
-                                b.AppendGraphName( proj.Name )
-                                    .Append( " -> " )
-                                    .AppendGraphName( projDep.Target.Name )
+                                b.AppendDependency( proj.Name, projDep.Target.Name )
                                     .AppendLine( ";" );
                             }
                         }
@@ -245,9 +253,7 @@ namespace CK.Env
                 foreach( var dep in ctx.DependencyContext.PackageDependencies )
                 {
                     if( !dep.OriginProject.IsPublished ) continue;
-                    b.AppendGraphName( dep.OriginProject.Name )
-                        .Append( " -> " )
-                        .AppendGraphName( dep.TargetProject.Name )
+                    b.AppendDependency( dep.OriginProject.Name, dep.TargetProject.Name )
                         .AppendLine( ";" );
                 }
             }
