@@ -1,7 +1,7 @@
 namespace CK.Core
 {
     /// <summary>
-    /// Models the identitity of a packages' feed (packages are installable artifacts).
+    /// Models the identity of a packages' feed (packages are installable artifacts).
     /// </summary>
     public interface IArtifactFeedIdentity
     {

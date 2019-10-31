@@ -45,8 +45,9 @@ namespace CK.Env
             }
             foreach( var r in feeds )
             {
-                InstanciateFeed(m, r );
+                InstanciateFeed( m, r );
             }
+            foreach( var f in _feeds ) f.CheckSecret( m, true );
         }
 
         IArtifactRepository InstanciateRepository( in XElementReader r )

@@ -98,18 +98,26 @@ namespace CK.Env.NPM
                 }
             }
             var npmFeeds = feeds.OfType<NPMFeed>();
-            if( npmFeeds.Any( f => f.Scope == scope ) ) r.ThrowXmlException( $"NPM feed with the same scope '{scope}' is already defined." );
-            if( npmFeeds.Any( f => StringComparer.OrdinalIgnoreCase.Equals( f.Url, url ) ) ) r.ThrowXmlException( $"NPM feed with the same url '{url}' is already defined." );
-            if(creds.IsSecretKeyName)
+            if( npmFeeds.Any( f => f.Scope == scope ) )
             {
-                SecretKeyStore.DeclareSecretKey( creds.PasswordOrSecretKeyName, (a) => "PAT Used to authenticate CKli to the feeds, and retrieve informations about npm packages.");
+                r.ThrowXmlException( $"NPM feed with the same scope '{scope}' is already defined." );
             }
+            if( npmFeeds.Any( f => StringComparer.OrdinalIgnoreCase.Equals( f.Url, url ) ) )
+            {
+                r.ThrowXmlException( $"NPM feed with the same url '{url}' is already defined." );
+            }
+            if( creds.IsSecretKeyName )
+            {
+                SecretKeyStore.DeclareSecretKey( creds.PasswordOrSecretKeyName, ( a ) => "PAT Used to authenticate CKli to the feeds, and retrieve informations about npm packages." );
+            }
+
             return new NPMFeed( scope, url, creds, () =>
             {
                 Registry registry =
                     repositories.OfType<NPMAzureRepository>().FirstOrDefault( repo => repo.Scope == scope )?.GetRegistry( m )
                     ?? repositories.OfType<NPMStandardRepository>().FirstOrDefault( repo => repo.Url.Equals( url, StringComparison.OrdinalIgnoreCase ) )?.GetRegistry( m );
                 if( registry != null ) return registry;
+
                 string secret = creds.IsSecretKeyName ?
                       SecretKeyStore.GetSecretKey( m, creds.PasswordOrSecretKeyName, creds != null )
                     : creds.PasswordOrSecretKeyName;

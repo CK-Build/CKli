@@ -9,6 +9,14 @@ namespace CK.Env
     public interface IArtifactFeed : IArtifactFeedIdentity
     {
         /// <summary>
+        /// Ensures that any secret required to retrieve packages is available.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="throwOnMissing">True to throw a <see cref="MissingRequiredSecretException"/> instead of returning false.</param>
+        /// <returns>True on success, false if any required secret or configuration is missing.</returns>
+        bool CheckSecret( IActivityMonitor m, bool throwOnMissing = false );
+
+        /// <summary>
         /// Gets the best set of versions of an artifact in this feed.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
