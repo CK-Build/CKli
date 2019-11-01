@@ -23,7 +23,7 @@ namespace CK.Env.NuGet
     {
         /// <summary>
         /// Exposes the "NuGet" <see cref="ArtifactType"/>. This type of artifact is installable.
-        /// Savors are used to manage framework names.
+        /// <see cref="ArtifactType.ContextSavors"/> are used to manage framework names.
         /// The <see cref="CKTraitContext.Separator"/> is the ';' to match the one used by csproj (parsing and
         /// string representation becomes straightforward).
         /// </summary>
@@ -99,14 +99,20 @@ namespace CK.Env.NuGet
         static async Task<IEnumerable<ICredentialProvider>> GetCredentialProvidersAsync( ILogger logger )
         {
             var providers = new List<ICredentialProvider>();
-            var securePluginProviders = await new SecurePluginCredentialProviderBuilder( pluginManager: PluginManager.Instance, canShowDialog: false, logger: logger ).BuildAllAsync();
+            var securePluginProviders = await new SecurePluginCredentialProviderBuilder( pluginManager: PluginManager.Instance, canShowDialog: false, logger: logger )
+                                                    .BuildAllAsync();
             providers.AddRange( securePluginProviders );
             return providers;
         }
 
-        internal static bool Initalize( NuGetLoggerAdapter logger, out bool mustRefresh )
+
+        internal void Initialize( NuGetLoggerAdapter logger )
         {
-            mustRefresh = false;
+            throw new NotImplementedException();
+        }
+
+        internal static void Initalize( NuGetLoggerAdapter logger )
+        {
             lock( _secretKeysLock )
             {
                 if( !_initialized )
@@ -140,11 +146,10 @@ namespace CK.Env.NuGet
                             providers: credProviders,
                             nonInteractive: true,
                             handlesDefaultCredentials: true ) );
-                    mustRefresh = true;
                 }
             }
-            return _initialized;
         }
+
         #endregion
 
         class SourcePackageProvider : IPackageSourceProvider
@@ -304,36 +309,34 @@ namespace CK.Env.NuGet
             if( uri.Host == "pkgs.dev.azure.com" )
             {
                 bool privateFeed = uri.Segments[2] == "_packaging/";
-                if(privateFeed && (creds == null) )
+                if( privateFeed && (creds == null) )
                 {
                     r.ThrowXmlException( "Detected an azure private feed. Credentials are expected." );
                 }
-                if(!privateFeed && (creds!=null))
+                if( !privateFeed && (creds != null) )
                 {
                     r.ThrowXmlException( "Detected an azure public feed. There should be no credentials." );
                 }
             }
-            SecretKeyInfo secretKeyed = null;
-            if( creds?.IsSecretKeyName == true )
-            {
-                secretKeyed = SecretKeyStore.DeclareSecretKey( creds.PasswordOrSecretKeyName, current => current?.Description
-                                    ?? $"Required for NuGet.config file to retrieve packages from '{name}' feed." );
-            }
-
             var internals = repositories.OfType<NuGetFeedBase>().Concat( feeds.OfType<NuGetFeedBase>() );
             foreach( var i in internals )
             {
+                Debug.Assert( i is NuGetRepositoryBase, "We could have looked up for this more precise internal class." );
                 if( url.Equals( i.Url, StringComparison.OrdinalIgnoreCase ) )
                 {
-                    if( i.Feed != null ) r.ThrowXmlException( $"NuGet feed defined by url '{url}' is already registered." );
+                    if( i.Feed != null ) r.ThrowXmlException( $"NuGet feed defined by url '{url}' is already registered (by repository {i.Name})." );
                     return i.HandleFeed( SecretKeyStore, url, name, creds );
                 }
             }
-            var feed = new PureFeed(m, this, url, name, creds );
+            var feed = new PureFeed( m, this, url, name, creds );
             _sourcePackageProvider.SetPackageSources( internals.Append( feed ) );
             return feed.Feed;
         }
 
+        /// <summary>
+        /// This internal specialization is used for feeds when they don't share the same 
+        /// url as an existing Repository.
+        /// </summary>
         class PureFeed : NuGetFeedBase
         {
             public PureFeed( IActivityMonitor m, NuGetClient c, string url, string name, SimpleCredentials creds )
