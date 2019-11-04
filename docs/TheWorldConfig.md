@@ -226,7 +226,7 @@ This element allow to remove feeds from the nuget.config when CKli will auto con
 
 ### ArtifactSources
 
-This element drive the feeds used by a solution. On auto configuration, it will ensure that the feeds are targeted in the`nuget.config` for .NET solutions, and the `.npmrc` for the npm projects.
+This element drive the feeds used by a solution. On auto configuration, it will ensure that the feeds are targeted in the `nuget.config` for .NET solutions, and the `.npmrc` for the npm projects.
 
 ### ArtifactTargets
 
@@ -246,24 +246,31 @@ Solution settings holds other properties that are not visible in the above confi
 
 ## Folder
 
-You can declare `Folder` elements, it provide a scope and any element inside will
+You can declare `Folder` elements:
+
+```xml
+<Folder Name="toto">
+    <!-- Path of elements will be: "WorldMapping/toto"-->
+    <Folder Name="tata">
+        <!-- Path of elements will be: "WorldMapping/toto/tata"-->
+    </Folder>    
+</Folder>
+```
+
+Multiple Worlds can use the same mapping, and the same Folder names, it will result in  multiple repositories in the same folder, and can be usefull to organise your repositories.
 
 ## GitFolder
 
+The `GitFolder` element declare a repository.
+
 ### Branch
+
+The `Folder` element declare to CKli which branch it should checkout.
 
 #### SolutionSpec
 
-# Creating A Brand New World
+The `SolutionSpec` element, tell to CKli that the `GitFolder` contain a dotnet solution.
 
-## Creating a World
+The `SolutionSpec` element inherit from `SharedSolutionSpec` so you can specify the same options.
 
-A World is stored in a repository. You can use a existing repository that already host a world, or you can create an empty repository.
-
-## `develop` required
-
-Currently, git repositories are checked out on the `develop` branch instead of their default one. Checkout will fail if repositories don't have a `develop` branch.
-
-Please ensure all repositories in the various `*-World.xml` have a `develop` branch.
-
-
+# 

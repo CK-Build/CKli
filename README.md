@@ -40,10 +40,10 @@ Type `run Home/EnsureStackDefinition` and press `enter`.
 You now need to fill the argument of this command: 
 
 ```powershell
-[required] - stackName:                              #The Name of the stack you are cloning
+[required] - stackName:                            #The Name of the stack you are cloning
 [required] - url:                                  #The Url of the stack you are cloning
-[required] - isPublic: false                      #true for public stack, false otherwise
-[default value: <null>] - mappedPath: Enter path: #the path were the stack will be cloned
+[required] - isPublic: false                       #true for public stack, false otherwise
+[default value: <null>] - mappedPath: Enter path:  #the path were the stack will be cloned
 [default value: master] - branchName:              # you can keep this empty
 ```
 
