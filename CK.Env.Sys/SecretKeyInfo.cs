@@ -20,8 +20,8 @@ namespace CK.Env
         /// </summary>
         public static CKTraitContext TagsContext = CKTraitContext.Create( "SecretCategory", '|' );
 
-        internal SecretKeyInfo( string name, Func<SecretKeyInfo, string> descriptionBuilder, bool isRequired, bool isTransient )
-            : this( name, descriptionBuilder, isTransient )
+        internal SecretKeyInfo( string name, Func<SecretKeyInfo, string> descriptionBuilder, bool isRequired, string sourceProviderName )
+            : this( name, descriptionBuilder, sourceProviderName )
         {
             _isRequired = isRequired;
         }
@@ -31,8 +31,8 @@ namespace CK.Env
             Func<SecretKeyInfo, string> descriptionBuilder,
             SecretKeyInfo subKey,
             IReadOnlyDictionary<string, SecretKeyInfo> keyInfos,
-            bool isTransient )
-            : this( name, descriptionBuilder, isTransient )
+            string sourceProviderName )
+            : this( name, descriptionBuilder, sourceProviderName )
         {
             SubKey = subKey ?? throw new ArgumentNullException( nameof( subKey ) );
             if( subKey.SuperKey != null )
@@ -52,10 +52,10 @@ namespace CK.Env
         /// <param name="data">Data captured by <see cref="GetData"/>.</param>
         /// <param name="keyInfos">Current set of secrets being restored.</param>
         internal SecretKeyInfo(
-            (string name, string description, string secret, bool isRequired, string tags, string subKey, bool isTransient) data,
+            (string name, string description, string secret, bool isRequired, string tags, string subKey, string sourceProviderName) data,
             IReadOnlyDictionary<string, SecretKeyInfo> keyInfos )
         {
-            IsTransient = data.isTransient;
+            SourceProviderName = data.sourceProviderName;
             Name = data.name;
             _description = data.description;
             _secret = data.secret;
@@ -72,14 +72,14 @@ namespace CK.Env
         /// Exports data for "serialization".
         /// </summary>
         /// <returns>The raw data.</returns>
-        internal (string name, string description, string secret, bool isRequired, string tags, string subKey, bool isTransient) GetData()
+        internal (string name, string description, string secret, bool isRequired, string tags, string subKey, string sourceProviderName) GetData()
         {
-            return (Name, _description, _secret, _isRequired, _tags.ToString(), SubKey?.Name, IsTransient );
+            return (Name, _description, _secret, _isRequired, _tags.ToString(), SubKey?.Name, SourceProviderName );
         }
 
-        SecretKeyInfo( string name, Func<SecretKeyInfo, string> descriptionBuilder, bool isTransient )
+        SecretKeyInfo( string name, Func<SecretKeyInfo, string> descriptionBuilder, string sourceProviderName )
         {
-            IsTransient = isTransient;
+            SourceProviderName = sourceProviderName;
             Name = name ?? throw new ArgumentNullException( nameof( name ) );
             SetDescription( descriptionBuilder );
             _tags = TagsContext.EmptyTrait;
@@ -120,7 +120,7 @@ namespace CK.Env
         /// <summary>
         /// Gets whether this key is transient or not. If the key is transient, it will not be stored in a KeyVault.
         /// </summary>
-        public bool IsTransient { get; }
+        public string SourceProviderName { get; }
 
         /// <summary>
         /// Gets the description.
@@ -174,7 +174,7 @@ namespace CK.Env
         public bool ImportSecret( IActivityMonitor m, string secret )
         {
             if( String.IsNullOrEmpty( secret ) ) throw new ArgumentNullException( nameof( secret ) );
-            if( IsTransient ) throw new InvalidOperationException( "This is transient, you cannot import a stored(non transient) secret." );
+            if( !string.IsNullOrWhiteSpace( SourceProviderName) ) throw new InvalidOperationException( "This secret is provided you cannot import a non-stored secret." );
             if( IsSecretAvailable )
             {
                 if( SuperKey != null && SuperKey.IsSecretAvailable )

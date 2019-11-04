@@ -216,9 +216,15 @@ namespace CKli
 
         static void DumpSecrets( UserKeyVault v )
         {
-            string FirstPadding( bool missing )
+            string FirstPadding( int paddingSize, string sourceProviderName, bool missing )
             {
-                return missing ? "[Missing]" : "         ";
+                bool provided = !string.IsNullOrWhiteSpace( sourceProviderName );
+                if( missing && provided ) throw new InvalidOperationException( "Cannot be both missing and provided" );
+                if( missing ) sourceProviderName = "Missing";
+
+                return provided
+                    ? $"[{sourceProviderName}]" + new string( ' ', paddingSize - sourceProviderName.Length )
+                    : new string( ' ', paddingSize + 2 );
             }
 
             string PaddingByDepth( int depth ) => new string( ' ', depth * 5 );
@@ -237,16 +243,31 @@ namespace CKli
                 DoesThingWithGray( () => Console.Write( "└────┬> " ) );
             }
 
+            int sourceNameMaxLength = "Required".Length;
+
+            foreach( var k in v.KeyStore.Infos )
+            {
+                var sub = k;
+                while( sub != null )
+                {
+                    if( !string.IsNullOrWhiteSpace( sub.SourceProviderName ) && sub.SourceProviderName.Length > sourceNameMaxLength )
+                    {
+                        sourceNameMaxLength = sub.SourceProviderName.Length;
+                    }
+                    sub = sub.SubKey;
+                }
+            }
+
             foreach( var k in v.KeyStore.Infos )
             {
                 if( k.SuperKey != null ) continue;
-                Console.ForegroundColor = k.IsSecretAvailable ? ConsoleColor.Green : ConsoleColor.Red;
-                Console.Write( FirstPadding( !k.IsSecretAvailable ) );
+                Console.ForegroundColor = k.IsSecretAvailable ? (!string.IsNullOrWhiteSpace( k.SourceProviderName ) ? ConsoleColor.Blue : ConsoleColor.Green) : ConsoleColor.Red;
+                Console.Write( FirstPadding( sourceNameMaxLength, k.SourceProviderName, !k.IsSecretAvailable ) );
                 WhitePipe();
                 Console.WriteLine( k.Name );
                 Console.ForegroundColor = ConsoleColor.Gray;
                 StringBuilder b = new StringBuilder();
-                b.AppendMultiLine( FirstPadding( false ) + "│", k.Description, true, false );
+                b.AppendMultiLine( FirstPadding( sourceNameMaxLength, null, false ) + "│", k.Description, true, false );
                 b.AppendLine();
                 Console.Write( b );
                 var sub = k.SubKey;
@@ -256,26 +277,26 @@ namespace CKli
                 {
                     if( sub.IsSecretAvailable )
                     {
-                        Console.ForegroundColor = displayedAvailable ? ConsoleColor.DarkGreen : ConsoleColor.Green;
+                        Console.ForegroundColor = displayedAvailable ? (!string.IsNullOrWhiteSpace( sub.SourceProviderName ) ? ConsoleColor.Blue : ConsoleColor.DarkGreen) : ConsoleColor.Green;
                         displayedAvailable = true;
                     }
                     else
                     {
                         Console.ForegroundColor = ConsoleColor.Red;
                     }
-                    Console.Write( FirstPadding( !sub.IsSecretAvailable ) );
+                    Console.Write( FirstPadding( sourceNameMaxLength, sub.SourceProviderName, !sub.IsSecretAvailable ) );
                     Console.Write( PaddingByDepth( depth ) );
                     RightArrow();
                     Console.WriteLine( sub.Name );
                     Console.ForegroundColor = ConsoleColor.Gray;
                     depth++;
                     b.Clear();
-                    b.AppendMultiLine( FirstPadding( false ) + PaddingByDepth( depth ) + "│ ", sub.Description, true, false );
+                    b.AppendMultiLine( FirstPadding( sourceNameMaxLength, sub.SourceProviderName, false ) + PaddingByDepth( depth ) + "│ ", sub.Description, true, false );
                     b.AppendLine();
                     Console.Write( b.ToString() );
                     sub = sub.SubKey;
                 }
-                Console.WriteLine( FirstPadding( false ) );
+                Console.WriteLine( FirstPadding( sourceNameMaxLength, null, false ) );
             }
         }
 

@@ -88,6 +88,10 @@ For example:
 
 Will allow to use elements declared in the NPM plugin, such as `XNPMClient`.
 
+## World Secret
+
+This element allow you to declare secret defined in the World config. It's usefull to share readonly secrets with the worlds. 
+
 ## Artifacts
 
 This elements define the <u>TargetRepositories </u>and the <u>SourceFeeds</u>.

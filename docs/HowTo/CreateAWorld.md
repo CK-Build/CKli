@@ -25,5 +25,3 @@ Currently, CKli require:
   - located in a folder named "CodeCakeBuilder" at the root of the repository
   
   - Referenced in the Solution previously mentioned
-
-

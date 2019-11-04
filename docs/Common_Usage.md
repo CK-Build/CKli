@@ -23,16 +23,17 @@ This command have two parameters:
 
 Running a CI build on all the stack can fail for a lot of reason, rebuilding everything take a lot of time, so CKli does not rebuild the repositories that was successfully built.
 
-If you set `rebuildAll` to false, CKli will flush the previous builds and rebuild everything from scratch.
+If you set `rebuildAll` to true, CKli will flush the previous builds and rebuild everything from scratch.
 
 In depth information about the AllBuild is available [here](AllBuild.md).
 
 ## Publish
+
 When the AllBuild script ran, CKli gave arguments to the CI script, telling it to push the Generated Artifacts in a Folder called "LocalFeed"
 You can simply run `World/PublishCI` to publish these artifacts to their CI feeds (defined in the World.xml config file), and push the Repositories.
 
-
 ## Secrets
+
 Each time you do an operation that require you to be authenticated on a service, like cloning a private repository on GitHub, CKli require a secret to operate.   
 At any moment, you can list the secrets by running the command `secret`.
 
@@ -50,7 +51,7 @@ CKli can configure for you a lot of settings. There is a bunch of commands that 
 
 CKli got a command for Auto Configuring the following files (The link lead to the specific autoconfig doc) :  
 
--  [appveyor.yml](In_Depth/CIAutoConfig.md)
+- [appveyor.yml](In_Depth/CIAutoConfig.md)
 - [.gitlab-ci.yml]((In_Depth/CIAutoConfig.md))
 - CodeCakeBuilder
 - CodeCakeBuilderKeyVault
@@ -86,4 +87,3 @@ The commands names are case insensitive, and you can filter them with a widlcard
 Available Commands matching 'yodii*common*apply*':
      Yodii-Projects/Yodii-Script/branches/develop/Common/ApplySettings
 ```
-

@@ -18,11 +18,11 @@ namespace CK.Env
         /// </summary>
         public struct Snapshot
         {
-            readonly (string name, string description, string secret, bool isRequired, string tags, string subKey, bool isTransient)[] _data;
+            readonly (string name, string description, string secret, bool isRequired, string tags, string subKey, string sourceNameMaxLength)[] _data;
 
             internal Snapshot( SecretKeyStore store )
             {
-                _data = new (string name, string description, string secret, bool isRequired, string tags, string subKey, bool isTransient)[store._orderedInfos.Count];
+                _data = new (string name, string description, string secret, bool isRequired, string tags, string subKey, string sourceNameMaxLength)[store._orderedInfos.Count];
                 for( int i = 0; i < store._orderedInfos.Count; i++ )
                 {
                     _data[i] = store._orderedInfos[i].GetData();
@@ -103,13 +103,13 @@ namespace CK.Env
         /// <param name="descriptionBuilder">Description builder function.</param>
         /// <param name="isRequired">True if this key is required to initialize a World.</param>
         /// <returns>The secret key info.</returns>
-        public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo, string> descriptionBuilder, bool isRequired = false, bool isTransient = false )
+        public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo, string> descriptionBuilder, bool isRequired = false, string sourceNameMaxLength = null )
         {
             bool redeclaration = true;
             if( !_keyInfos.TryGetValue( name, out var info ) )
             {
                 redeclaration = false;
-                _keyInfos.Add( name, info = new SecretKeyInfo( name, descriptionBuilder, isRequired, isTransient ) );
+                _keyInfos.Add( name, info = new SecretKeyInfo( name, descriptionBuilder, isRequired, sourceNameMaxLength ) );
                 _orderedInfos.Add( info );
             }
             else
@@ -131,13 +131,13 @@ namespace CK.Env
         /// <param name="descriptionBuilder">Description builder function.</param>
         /// <param name="subKey">The sub key.</param>
         /// <returns>The secret key info.</returns>
-        public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo, string> descriptionBuilder, SecretKeyInfo subKey, bool isTransient = false )
+        public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo, string> descriptionBuilder, SecretKeyInfo subKey, string sourceNameMaxLength = null )
         {
             bool redeclaration = true;
             if( !_keyInfos.TryGetValue( name, out var info ) )
             {
                 redeclaration = false;
-                _keyInfos.Add( name, info = new SecretKeyInfo( name, descriptionBuilder, subKey, _keyInfos, isTransient ) );
+                _keyInfos.Add( name, info = new SecretKeyInfo( name, descriptionBuilder, subKey, _keyInfos, sourceNameMaxLength ) );
                 _orderedInfos.Insert( 0, info );
             }
             else
