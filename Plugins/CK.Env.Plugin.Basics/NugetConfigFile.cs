@@ -206,12 +206,12 @@ namespace CK.Env.Plugin
             entry.EnsureAddKeyValue( "ClearTextPassword", clearTextPassword );
         }
 
-        public void DeleteFeedCredentials( IActivityMonitor m, string feedName)
+        public void DeleteFeedCredentials( IActivityMonitor m, string feedName )
         {
             if( String.IsNullOrWhiteSpace( feedName ) ) throw new ArgumentNullException( nameof( feedName ) );
             var rootCred = EnsureDocument().Root.EnsureElement( "packageSourceCredentials" );
             var element = rootCred.Element( feedName );
-            if(element != null)
+            if( element != null )
             {
                 m.Info( $"Removing Credentials of feed {feedName}." );
                 element.Remove();

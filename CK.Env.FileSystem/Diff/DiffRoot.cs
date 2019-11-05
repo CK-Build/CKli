@@ -5,7 +5,7 @@ namespace CK.Env.Diff
 {
     public class DiffRoot : IDiffRoot
     {
-        public DiffRoot(string name, IEnumerable<NormalizedPath> paths)
+        public DiffRoot( string name, IEnumerable<NormalizedPath> paths )
         {
             Name = name;
             Paths = paths;
@@ -13,6 +13,6 @@ namespace CK.Env.Diff
 
         public string Name { get; }
 
-        public IEnumerable<NormalizedPath> Paths { get;  }
+        public IEnumerable<NormalizedPath> Paths { get; }
     }
 }

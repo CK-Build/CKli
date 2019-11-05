@@ -1,8 +1,8 @@
+using CK.Core;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using CK.Core;
 
 namespace CK.Env
 {
@@ -33,7 +33,7 @@ namespace CK.Env
 
             internal PluginCollection<IGitBranchPlugin> FindOrCreateWithoutInitialization( string branchName ) => DoFindOrCreate( false, branchName );
 
-            public IGitPluginCollection<IGitBranchPlugin> this[ string branchName ] => DoFindOrCreate( true, branchName );
+            public IGitPluginCollection<IGitBranchPlugin> this[string branchName] => DoFindOrCreate( true, branchName );
 
             public bool EnsurePlugins( IActivityMonitor m, string branchName ) => DoFindOrCreate( true, branchName, m ) != null;
 
@@ -150,7 +150,7 @@ namespace CK.Env
             {
                 if( _pluginCount != 0 ) Reset();
                 // Collects the settings.
-                var updatedMappings = new Dictionary<Type, object>( _mappings ); 
+                var updatedMappings = new Dictionary<Type, object>( _mappings );
                 _pluginCount = _manager.Registry.FillMappings(
                                                     updatedMappings,
                                                     ServiceContainer,
@@ -169,7 +169,7 @@ namespace CK.Env
                 foreach( var k in pluginKeys )
                 {
                     var p = _mappings[k];
-                    if( p is ICommandMethodsProvider commandProvider)
+                    if( p is ICommandMethodsProvider commandProvider )
                     {
                         _manager._commandRegister.Unregister( commandProvider );
                     }
@@ -208,7 +208,7 @@ namespace CK.Env
         /// <param name="defaultBranchName">The default branch name (typically "develop"). Must not be null or empty.</param>
         public GitPluginManager( GitPluginRegistry registry, ISimpleServiceContainer baseProvider, CommandRegister commandRegister, string defaultBranchName )
         {
-            if( String.IsNullOrWhiteSpace(defaultBranchName) ) throw new ArgumentNullException( nameof( defaultBranchName ) );
+            if( String.IsNullOrWhiteSpace( defaultBranchName ) ) throw new ArgumentNullException( nameof( defaultBranchName ) );
             ServiceContainer = new SimpleServiceContainer( baseProvider );
             _defaultBranchName = defaultBranchName;
             _commandRegister = commandRegister ?? throw new ArgumentNullException( nameof( commandRegister ) );

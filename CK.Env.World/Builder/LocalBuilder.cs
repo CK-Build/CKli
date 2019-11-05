@@ -1,8 +1,8 @@
-using System;
-using System.Collections.Generic;
 using CK.Core;
 using CK.Env.DependencyModel;
 using CSemVer;
+using System;
+using System.Collections.Generic;
 
 namespace CK.Env
 {
@@ -24,15 +24,15 @@ namespace CK.Env
             : base( zeroBuilder, BuildResultType.Local, artifacts, localFeedProvider, ctx )
         {
             _withUnitTest = withUnitTest;
-            _commitTimes = new DateTimeOffset[ ctx.Solutions.Count ];
+            _commitTimes = new DateTimeOffset[ctx.Solutions.Count];
         }
 
         protected override (SVersion Version, bool MustBuild) PrepareBuild( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades )
         {
-            if( !driver.UpdatePackageDependencies( m, upgrades ) ) return (null,false);
-            if( !driver.GitRepository.AmendCommit( m ) ) return (null,false);
+            if( !driver.UpdatePackageDependencies( m, upgrades ) ) return (null, false);
+            if( !driver.GitRepository.AmendCommit( m ) ) return (null, false);
             _commitTimes[s.Index] = driver.GitRepository.Head.CommitDate;
-            return (driver.GitRepository.GetCommitVersionInfo( m ).AssemblyBuildInfo.Version,true);
+            return (driver.GitRepository.GetCommitVersionInfo( m ).AssemblyBuildInfo.Version, true);
         }
 
         protected override BuildState Build( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade )

@@ -2,7 +2,7 @@ namespace CK.Env
 {
     public class CommitInfo
     {
-        public CommitInfo(string message, string sha)
+        public CommitInfo( string message, string sha )
         {
             Message = message;
             Sha = sha;

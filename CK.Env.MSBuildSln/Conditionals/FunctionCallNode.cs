@@ -1,7 +1,7 @@
+using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using CK.Text;
 
 namespace CK.Env.MSBuildSln
 {

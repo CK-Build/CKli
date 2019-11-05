@@ -1,14 +1,14 @@
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Xml.Linq;
 using CK.Core;
 using CK.Env.DependencyModel;
 using CK.Env.Diff;
 using CK.Env.MSBuildSln;
 using CK.Text;
 using CSemVer;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Xml.Linq;
 
 namespace CK.Env.Plugin
 {
@@ -49,7 +49,7 @@ namespace CK.Env.Plugin
             f.Reset += OnReset;
         }
 
-        private void OnReset(IActivityMonitor m)
+        private void OnReset( IActivityMonitor m )
         {
             SetSolutionDirty( m );
         }
@@ -313,7 +313,7 @@ namespace CK.Env.Plugin
                 toRemove.Remove( dep.Package.Artifact );
                 project.EnsurePackageReference(
                     dep.Package,
-                    dep.PrivateAsset.Equals("all", StringComparison.OrdinalIgnoreCase) ? ArtifactDependencyKind.Private : ArtifactDependencyKind.Transitive,
+                    dep.PrivateAsset.Equals( "all", StringComparison.OrdinalIgnoreCase ) ? ArtifactDependencyKind.Private : ArtifactDependencyKind.Transitive,
                     dep.Frameworks );
             }
             foreach( var noMore in toRemove ) project.RemovePackageReference( noMore );
@@ -601,7 +601,7 @@ namespace CK.Env.Plugin
             IEnvLocalFeed feed;
             if( PluginBranch == StandardGitStatus.Local )
             {
-                if( !v.WithBuildMetaData(null).NormalizedText.EndsWith( "-local" ) )
+                if( !v.WithBuildMetaData( null ).NormalizedText.EndsWith( "-local" ) )
                 {
                     monitor.Warn( $"Version {v} is not a -local version. It has already been built." );
                     return true;

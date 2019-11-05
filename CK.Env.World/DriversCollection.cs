@@ -103,7 +103,7 @@ namespace CK.Env
                     else
                     {
                         var da = DependencyAnalyzer.Create( m, solutions, final == LogFilter.Debug );
-                        if(da == null)
+                        if( da == null )
                         {
                             m.Error( "Error while creating the DependencyAnalyzer." );
                             return false;

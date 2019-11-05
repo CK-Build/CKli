@@ -28,7 +28,7 @@ namespace CK.Env
         /// <param name="packageId">The package identifier.</param>
         /// <param name="version">The package version.</param>
         public UpdatePackageInfo( IProject project, ArtifactType packageType, string packageId, SVersion version )
-            : this( project, new ArtifactInstance( packageType, packageId, version) )
+            : this( project, new ArtifactInstance( packageType, packageId, version ) )
         {
         }
 

@@ -1,7 +1,6 @@
 using CK.Core;
 using CK.Text;
 using CSemVer;
-using NuGet.Common;
 using NuGet.Configuration;
 using NuGet.Packaging.Core;
 using NuGet.Protocol.Core.Types;
@@ -61,7 +60,7 @@ namespace CK.Env.NuGet
         /// Gets the range of package quality that is accepted by this feed.
         /// </summary>
         public PackageQualityFilter QualityFilter { get; }
-        
+
         /// <summary>
         /// Must provide the secret key name.
         /// A null or empty SecretKeyName means that the repository does not require any protection.
@@ -85,7 +84,7 @@ namespace CK.Env.NuGet
                 if( !String.IsNullOrWhiteSpace( s ) )
                 {
                     _secret = Client.SecretKeyStore.GetSecretKey( m, s, throwOnEmpty );
-                    if( _secret != null ) OnSecretResolved( m, _secret ); 
+                    if( _secret != null ) OnSecretResolved( m, _secret );
                 }
             }
             return String.IsNullOrWhiteSpace( _secret ) ? null : _secret;

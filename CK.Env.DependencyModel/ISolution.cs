@@ -1,9 +1,9 @@
-using System.Collections.Generic;
 using CK.Text;
+using System.Collections.Generic;
 
 namespace CK.Env.DependencyModel
 {
-     /// <summary>
+    /// <summary>
     /// Generic solution: contains a list of <see cref="IProject"/> of any type.
     /// </summary>
     public interface ISolution : ITaggedObject
@@ -56,6 +56,6 @@ namespace CK.Env.DependencyModel
         /// Gets the artifact sources.
         /// </summary>
         IReadOnlyCollection<IArtifactFeed> ArtifactSources { get; }
-       
+
     }
 }

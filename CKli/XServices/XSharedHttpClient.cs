@@ -1,6 +1,6 @@
+using CK.Core;
 using CK.Env;
 using System;
-using CK.Core;
 using System.Net.Http;
 
 namespace CKli

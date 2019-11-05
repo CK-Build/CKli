@@ -59,7 +59,7 @@ namespace CK.Env
         }
 
         bool CheckValid( IActivityMonitor m )
-        { 
+        {
             if( !Git.Branches.Any( p => p.Commits.Any() ) )
             {
                 // Sometimes we fail while cloning the repo.
@@ -153,10 +153,10 @@ namespace CK.Env
                                                             : StandardGitStatus.Unknown);
         public IWorldName World => ProtoGitFolder.World;
 
-        [BackgroundCommand(false)]
-        [ParallelCommand(false)]
+        [BackgroundCommand( false )]
+        [ParallelCommand( false )]
         [CommandMethod]
-        public bool RunCommand(IActivityMonitor m, string commandToRun)
+        public bool RunCommand( IActivityMonitor m, string commandToRun )
         {
             if( Environment.OSVersion.Platform != PlatformID.Win32NT )
             {
@@ -344,7 +344,7 @@ namespace CK.Env
         /// Success is true on success, false on error (such as merge conflicts) and in case of success,
         /// the result states whether a reload should be required or if nothing changed.
         /// </returns>
-        public (bool Success, bool ReloadNeeded) Pull( IActivityMonitor m ) => Pull( m, MergeFileFavor.Theirs ); 
+        public (bool Success, bool ReloadNeeded) Pull( IActivityMonitor m ) => Pull( m, MergeFileFavor.Theirs );
 
         /// <summary>
         /// Resets the index to the tree recorded by the commit and updates the working directory to
@@ -357,7 +357,7 @@ namespace CK.Env
         {
             using( m.OpenInfo( $"Reset --hard changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
             {
-                Reset?.Invoke(m);
+                Reset?.Invoke( m );
                 try
                 {
                     Git.Reset( ResetMode.Hard );

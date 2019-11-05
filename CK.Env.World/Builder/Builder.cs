@@ -188,7 +188,7 @@ namespace CK.Env
                     var pr = PrepareBuild( m, s.Solution, s.Driver, upgrades );
                     ZeroBuilder.RegisterSHAlias( m );
                     if( pr.Version == null ) return false;
-                    m.CloseGroup( $"Target version: {pr.Version}{(pr.MustBuild ? "" :" (no build required)")}" );
+                    m.CloseGroup( $"Target version: {pr.Version}{(pr.MustBuild ? "" : " (no build required)")}" );
                     _targetVersions[i] = pr.MustBuild ? pr.Version : null;
                     _packagesVersion.AddRange( s.Solution.Solution.GeneratedArtifacts.Select( p => new KeyValuePair<Artifact, SVersion>( p.Artifact, pr.Version ) ) );
                 }
@@ -210,7 +210,7 @@ namespace CK.Env
         BuildState RunBuild( IActivityMonitor m )
         {
             BuildState finalState = BuildState.Succeed;
-            foreach( var (s,d) in DependentSolutionContext.Solutions )
+            foreach( var (s, d) in DependentSolutionContext.Solutions )
             {
                 DependentSolutionContext.DependencyContext.LogSolutions( m, s );
                 IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade = GetBuildProjectUpgrades( s );

@@ -21,7 +21,7 @@ namespace CK.Env.Plugin
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
-            CreateOrUpdate( m, _solutionSpec.GlobalJsonSdkVersion == null ? null : $"{{ \"sdk\": {{ \"version\": \"{_solutionSpec.GlobalJsonSdkVersion}\" }} }}" ); 
+            CreateOrUpdate( m, _solutionSpec.GlobalJsonSdkVersion == null ? null : $"{{ \"sdk\": {{ \"version\": \"{_solutionSpec.GlobalJsonSdkVersion}\" }} }}" );
         }
     }
 }

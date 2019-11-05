@@ -114,7 +114,7 @@ namespace CK.Env.NPM
 
         public async Task<bool> AddDistTag( IActivityMonitor m, string packageName, SVersion version, string tagName )
         {
-            if(RegistryUri.IsFile)
+            if( RegistryUri.IsFile )
             {
                 m.Warn( "Dist tags are not supported on a filesystem registry." );
                 return true;

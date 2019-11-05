@@ -10,7 +10,7 @@ namespace CK.SimpleKeyVault.Tests
         [Test]
         public void simple_crypt_test()
         {
-            var vals = new Dictionary<string,string> {
+            var vals = new Dictionary<string, string> {
                 { "A", "a1" },
                 { "Hello", "world" },
                 { "Hi", null },
@@ -55,7 +55,7 @@ namespace CK.SimpleKeyVault.Tests
         [TestCase( "x\ny" )]
         public void invalid_keys( string k )
         {
-            var vals = new Dictionary<string,string> {
+            var vals = new Dictionary<string, string> {
                 { "A", "a1" },
                 { k, "a2" }
             };

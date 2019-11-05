@@ -1,7 +1,7 @@
-using System;
-using System.Diagnostics;
 using CSemVer;
 using SimpleGitVersion;
+using System;
+using System.Diagnostics;
 
 namespace CK.Env
 {
@@ -44,5 +44,5 @@ namespace CK.Env
         public string AssemblyVersion { get; }
 
         public string FileVersion { get; }
-}
+    }
 }

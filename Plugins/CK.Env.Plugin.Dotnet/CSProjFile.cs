@@ -1,8 +1,8 @@
-using System.Linq;
 using CK.Core;
 using CK.Env.DependencyModel;
 using CK.Env.MSBuildSln;
 using CK.Text;
+using System.Linq;
 
 namespace CK.Env.Plugin
 {

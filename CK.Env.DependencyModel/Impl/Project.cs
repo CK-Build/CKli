@@ -1,5 +1,5 @@
-using CK.Text;
 using CK.Core;
+using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -139,7 +139,7 @@ namespace CK.Env.DependencyModel
         public bool IsPublished
         {
             get => _isPublished;
-            private set 
+            private set
             {
                 if( _isPublished != value )
                 {
@@ -273,7 +273,7 @@ namespace CK.Env.DependencyModel
         /// <param name="target">The referenced project.</param>
         /// <param name="kind">The dependency kind.</param>
         /// <param name="applicableSavors">Optional savors that, when defined, must be a subset of this <see cref="Savors"/>.</param>
-        public void EnsureProjectReference( Project target, ArtifactDependencyKind kind = ArtifactDependencyKind.Transitive , CKTrait applicableSavors = null)
+        public void EnsureProjectReference( Project target, ArtifactDependencyKind kind = ArtifactDependencyKind.Transitive, CKTrait applicableSavors = null )
         {
             CheckSolution();
             var savors = applicableSavors ?? Savors;

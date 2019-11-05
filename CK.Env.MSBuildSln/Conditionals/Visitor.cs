@@ -65,7 +65,7 @@ namespace CK.Env.MSBuildSln
                 var aV = Visit( a );
                 if( aV != a )
                 {
-                    if( vArgs == null ) vArgs = new List<BaseNode>( node.Arguments.Take(i) );
+                    if( vArgs == null ) vArgs = new List<BaseNode>( node.Arguments.Take( i ) );
                     if( aV != null ) vArgs.Add( aV );
                 }
             }

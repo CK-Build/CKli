@@ -41,7 +41,7 @@ namespace CK.Env.Plugin
             return new NPMDep( name, NPMVersionDependencyType.MinVersion, kind, ">=" + minVersion.ToNormalizedString(), minVersion );
         }
 
-        public static NPMDep CreateNPMDepLocalPath(NormalizedPath path, string name, ArtifactDependencyKind kind )
+        public static NPMDep CreateNPMDepLocalPath( NormalizedPath path, string name, ArtifactDependencyKind kind )
         {
             return new NPMDep( name, NPMVersionDependencyType.LocalPath, kind, $"file:{path.ToString()}", null );
         }
@@ -61,17 +61,17 @@ namespace CK.Env.Plugin
                 $"file:{ dirPath.AppendPart( fileName ).ToString()}",
                 version );
         }
-        public static NPMDep CreateNPMDepLocalFeedTarballFromRawDep(string rawDep, string name, ArtifactDependencyKind kind, SVersion version )
+        public static NPMDep CreateNPMDepLocalFeedTarballFromRawDep( string rawDep, string name, ArtifactDependencyKind kind, SVersion version )
         {
             return CreateNPMDepLocalFeedTarball(
-                Path.GetDirectoryName( rawDep.Remove(0, 5 ) ),
+                Path.GetDirectoryName( rawDep.Remove( 0, 5 ) ),
                 name,
                 kind,
                 version
                 );
         }
 
-        internal static SVersion GetVersionOutOfTarballPath(string path, string packageName)
+        internal static SVersion GetVersionOutOfTarballPath( string path, string packageName )
         {
             path = Path.GetFileNameWithoutExtension( path );
             path = path.Remove( packageName.Length + 1 ); //remove the package name

@@ -203,7 +203,8 @@ $@"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
             {
                 m.Error( $"SourceLink is not supported on {GitFolder} ({GitFolder.KnownGitProvider})." );
                 return false;
-            } else if(linkName == "FileSystem")
+            }
+            else if( linkName == "FileSystem" )
             {
                 m.Info( "We didn't implemented the sourcelink configuration on for a git hosted on the filesystem." );
                 return true;

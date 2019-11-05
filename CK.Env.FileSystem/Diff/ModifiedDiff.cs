@@ -5,7 +5,7 @@ namespace CK.Env.Diff
 {
     class ModifiedDiff : IDiff, IModifiedDiff
     {
-        public ModifiedDiff( NormalizedPath oldPath, NormalizedPath newPath)
+        public ModifiedDiff( NormalizedPath oldPath, NormalizedPath newPath )
         {
             OldPath = oldPath;
             NewPath = newPath;
@@ -23,7 +23,7 @@ namespace CK.Env.Diff
 
         public bool SendToBuilder( IActivityMonitor m, DiffRootResultBuilderBase diffRootResultBuilder )
         {
-            return diffRootResultBuilder.Accept(m, this );
+            return diffRootResultBuilder.Accept( m, this );
         }
     }
 }

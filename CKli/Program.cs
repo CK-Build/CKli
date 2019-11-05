@@ -1,13 +1,13 @@
 using CK.Core;
-using System;
-using System.Linq;
 using CK.Env;
-using System.Text.RegularExpressions;
-using System.Collections.Generic;
-using CK.Text;
 using CK.Monitoring;
-using System.Threading.Tasks;
+using CK.Text;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace CKli
 {

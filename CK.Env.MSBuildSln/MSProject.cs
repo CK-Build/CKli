@@ -1,11 +1,11 @@
+using CK.Core;
+using CK.Text;
+using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Xml.Linq;
-using CK.Core;
-using CK.Text;
-using CSemVer;
 
 namespace CK.Env.MSBuildSln
 {
@@ -452,7 +452,7 @@ namespace CK.Env.MSBuildSln
                              .Select( e => (Origin: e,
                                             PackageId: (string)e.Attribute( "Include" ),
                                             RawVersion: (string)e.Attribute( "Version" ) ?? (string)e.Element( "Version" ),
-                                            PrivateAssets: (string)e.Attribute( "PrivateAssets" ) ?? ( string)e.Element( "PrivateAssets" ) ?? ""
+                                            PrivateAssets: (string)e.Attribute( "PrivateAssets" ) ?? (string)e.Element( "PrivateAssets" ) ?? ""
                                             ) );
 
             var conditionEvaluator = new PartialEvaluator();

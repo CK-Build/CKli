@@ -1,12 +1,12 @@
+using CK.Core;
+using CK.Text;
+using CKSetup;
+using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
-using CK.Core;
-using CK.Text;
-using CKSetup;
-using CSemVer;
 
 namespace CK.Env.CKSetup
 {
@@ -27,7 +27,7 @@ namespace CK.Env.CKSetup
             Name = name;
             SecretKeyName = name != "Public"
                             ? $"CKSETUPREMOTESTORE_{name.ToUpperInvariant()}_PUSH_API_KEY"
-                            : "CKSETUPREMOTESTORE_PUSH_API_KEY"; 
+                            : "CKSETUPREMOTESTORE_PUSH_API_KEY";
             UniqueRepositoryName = CKSetupClient.CKSetupType.Name + ':' + name;
             _keyStore.DeclareSecretKey( SecretKeyName, current => current?.Description ?? $"Required to push to '{UniqueRepositoryName}'." );
         }

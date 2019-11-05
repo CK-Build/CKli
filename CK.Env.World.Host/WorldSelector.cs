@@ -1,9 +1,9 @@
+using CK.Core;
+using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using CK.Core;
-using CK.Text;
 
 namespace CK.Env
 {

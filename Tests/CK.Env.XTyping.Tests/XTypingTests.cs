@@ -47,7 +47,7 @@ namespace CK.Env.Tests
                 .Should().Be( "Thing1, Thing1, Thing2, Below, Thing1Override, Thing1, Thing2, Thing1, Thing2, Thing1Override, Thing1, Thing2, Thing1Override, Thing1, Thing2, Thing2Override, Thing1, Thing1, Thing2" );
 
             var rCDATA = new Regex( Regex.Escape( cdata ), RegexOptions.CultureInvariant );
-            rCDATA.Matches( original.ToString() ).Count.Should().Be( 1 );  
+            rCDATA.Matches( original.ToString() ).Count.Should().Be( 1 );
             rCDATA.Matches( p.ToString() ).Count.Should().Be( 8, "There is 8 Thing1 reuse!" );
         }
 

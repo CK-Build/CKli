@@ -29,7 +29,7 @@ namespace CK.Env.MSBuildSln.Tests
                 folders.Single( p => p.ProjectName == "Solution Items" ).Items
                     .Select( item => item.Path )
                     // Skips .xmlfiles since these are changing a lot currently (worlds).
-                    .Where( p => !p.EndsWith(".xml") )
+                    .Where( p => !p.EndsWith( ".xml" ) )
                     .Should().BeEquivalentTo(
                         ".editorconfig",
                         ".gitignore",

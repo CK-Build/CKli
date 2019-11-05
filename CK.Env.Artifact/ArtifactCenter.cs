@@ -1,8 +1,8 @@
+using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
-using CK.Core;
 
 namespace CK.Env
 {
@@ -86,11 +86,11 @@ namespace CK.Env
             return repo;
         }
 
-        IArtifactFeed InstanciateFeed(IActivityMonitor m, XElementReader r )
+        IArtifactFeed InstanciateFeed( IActivityMonitor m, XElementReader r )
         {
             foreach( var h in _typeHandlers )
             {
-                var f = h.CreateFeedFromXML(m, r, _repositories, _feeds );
+                var f = h.CreateFeedFromXML( m, r, _repositories, _feeds );
                 if( f != null )
                 {
                     if( _feeds.Any( feed => feed.TypedName == f.TypedName ) )

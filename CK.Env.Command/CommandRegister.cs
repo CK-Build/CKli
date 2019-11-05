@@ -25,7 +25,7 @@ namespace CK.Env
         public void Register( ICommandHandler h )
         {
             if( h.UniqueName.IsEmptyPath
-                || h.UniqueName.Path.IndexOfAny( new char[] { '*', '?' } ) >= 0 ) throw new ArgumentException( "Command name must not be empty nor contain '*' or '?'.", nameof(ICommandHandler.UniqueName) );
+                || h.UniqueName.Path.IndexOfAny( new char[] { '*', '?' } ) >= 0 ) throw new ArgumentException( "Command name must not be empty nor contain '*' or '?'.", nameof( ICommandHandler.UniqueName ) );
             _commands.Add( h.UniqueName, h );
         }
 
@@ -45,7 +45,7 @@ namespace CK.Env
             readonly Func<bool> _enabled;
             readonly ParameterInfo[] _parameters;
 
-            public MethodHandler( bool confirmationRequired,bool? parallelRun, bool? backgroundRun, NormalizedPath n, object instance, MethodInfo method, ParameterInfo[] parameters, Func<bool> enabled )
+            public MethodHandler( bool confirmationRequired, bool? parallelRun, bool? backgroundRun, NormalizedPath n, object instance, MethodInfo method, ParameterInfo[] parameters, Func<bool> enabled )
             {
                 ConfirmationRequired = confirmationRequired;
                 UniqueName = n;
@@ -54,7 +54,7 @@ namespace CK.Env
                 _parameters = parameters;
                 PayloadSignature = parameters.Length == 1
                               ? null
-                              : '(' + parameters.Skip(1).Select( p => p.Name ).Concatenate() + ')';
+                              : '(' + parameters.Skip( 1 ).Select( p => p.Name ).Concatenate() + ')';
                 _enabled = enabled;
                 ParallelRun = parallelRun;
                 BackgroundRun = backgroundRun;
@@ -147,7 +147,7 @@ namespace CK.Env
         public void Register( ICommandMethodsProvider provider )
         {
             var methods = provider?.GetType().GetMethods() ?? throw new ArgumentNullException( nameof( provider ) );
-            foreach( var m in methods ) 
+            foreach( var m in methods )
             {
                 var attr = m.GetCustomAttribute<CommandMethodAttribute>();
                 if( attr != null )
@@ -192,7 +192,7 @@ namespace CK.Env
         /// Unregisters all commands, optionally keeping some of them.
         /// </summary>
         /// <param name="keepFilter">Optional function that can return true to keep the handler registered.</param>
-        public void UnregisterAll( Func<ICommandHandler,bool> keepFilter = null )
+        public void UnregisterAll( Func<ICommandHandler, bool> keepFilter = null )
         {
             if( keepFilter == null ) _commands.Clear();
             else

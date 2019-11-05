@@ -21,7 +21,7 @@ namespace CK.Env.CKSetup
             initializer.Services.Add( this );
         }
 
-        public CKSetupClient Client { get; }       
+        public CKSetupClient Client { get; }
 
     }
 }

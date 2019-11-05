@@ -144,7 +144,7 @@ namespace CK.Env.NPM
                                     tarballPath: file.FullPath,
                                     isPublic: arePublicArtifacts,
                                     scope: file.PackageScope,
-                                    distTag:firstDistTag ) )
+                                    distTag: firstDistTag ) )
                             {
                                 pushed.Add( file );
                             }

@@ -1,14 +1,10 @@
-using NUnit.Framework;
-using FluentAssertions;
-
-using static CK.Testing.MonitorTestHelper;
 using CK.Env.Tests.LocalTestHelper;
+using FluentAssertions;
+using NUnit.Framework;
+using System;
 using System.IO;
 using System.Linq;
-using System;
-using CK.Text;
-using System.Collections.Generic;
-using System.Diagnostics;
+using static CK.Testing.MonitorTestHelper;
 
 namespace CK.Env.Tests
 {

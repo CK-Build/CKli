@@ -140,7 +140,7 @@ namespace CK.Env.Plugin
             YamlElement branches = firstMapping["branches"];
             if( branches == null )
             {
-                firstMapping["branches"] = SetSequence( new YamlMapping(), "only", new YamlValue( "master"), new YamlValue ("develop") );
+                firstMapping["branches"] = SetSequence( new YamlMapping(), "only", new YamlValue( "master" ), new YamlValue( "develop" ) );
             }
         }
     }

@@ -1,9 +1,9 @@
+using CK.Core;
+using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using CK.Core;
-using CK.Text;
 
 namespace CK.Env
 {
@@ -70,7 +70,7 @@ namespace CK.Env
             var feedNames = FeedNames.Select( n => Artifact.TryParseOrCreate( n, Key.Artifact.Type ) ).ToArray();
             if( feedNames.Any( f => !f.IsValid ) )
             {
-                return Error( $"Invalid feed names found in '{FeedNames.Concatenate("', '")}'." );
+                return Error( $"Invalid feed names found in '{FeedNames.Concatenate( "', '" )}'." );
             }
 
             // Checking dependencies.

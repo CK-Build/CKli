@@ -1,8 +1,8 @@
 
 using CK.Core;
 using CK.Env;
-using Microsoft.Extensions.FileProviders;
 using CK.Text;
+using Microsoft.Extensions.FileProviders;
 
 namespace CKli
 {

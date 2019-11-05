@@ -19,7 +19,7 @@ namespace CK.Env
             NoDotNetUnitTests = r.HandleOptionalAttribute( nameof( NoDotNetUnitTests ), false );
             NoStrongNameSigning = r.HandleOptionalAttribute( nameof( NoStrongNameSigning ), false );
             NoSharedPropsFile = r.HandleOptionalAttribute( nameof( NoSharedPropsFile ), false );
-            DisableSourceLink = r.HandleOptionalAttribute( nameof(DisableSourceLink), false );
+            DisableSourceLink = r.HandleOptionalAttribute( nameof( DisableSourceLink ), false );
             GlobalJsonSdkVersion = r.HandleOptionalAttribute<string>( nameof( GlobalJsonSdkVersion ), null );
 
             ArtifactTargets = r.HandleCollection(

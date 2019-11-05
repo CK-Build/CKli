@@ -139,7 +139,7 @@ namespace CK.Env.NuGet
                     _initialized = true;
                 }
                 if( HttpHandlerResourceV3.CredentialService == null )
-                { 
+                {
                     var credProviders = new AsyncLazy<IEnumerable<ICredentialProvider>>( async () => await GetCredentialProvidersAsync( logger ) );
                     HttpHandlerResourceV3.CredentialService = new Lazy<ICredentialService>(
                         () => new CredentialService(
@@ -350,7 +350,7 @@ namespace CK.Env.NuGet
                 if( String.IsNullOrWhiteSpace( secretOrName ) )
                 {
                     logger.Monitor.Trace( "NuGet request failed and there is no Credentials name or password defined. Rethrowing the exception." );
-                    return false;                   
+                    return false;
                 }
                 if( Feed.Credentials.IsSecretKeyName )
                 {

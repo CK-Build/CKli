@@ -145,7 +145,7 @@ namespace CK.Env
                 case BuildResultType.CI: _ciBuildResult.ReplaceElementByName( rXml ); break;
                 case BuildResultType.Release: _releaseBuildResult.ReplaceElementByName( rXml ); break;
             }
-            _buildResults[(int)r.Type - 1] = r; 
+            _buildResults[(int)r.Type - 1] = r;
         }
 
         /// <summary>
@@ -156,7 +156,7 @@ namespace CK.Env
         public BuildResult GetBuildResult( BuildResultType type )
         {
             if( type == BuildResultType.None ) return null;
-            if( _buildResults[(int)type - 1]  == null )
+            if( _buildResults[(int)type - 1] == null )
             {
                 XElement e = GetParentBuildResultElement( type );
                 e = e?.Elements().FirstOrDefault();
@@ -196,7 +196,7 @@ namespace CK.Env
         /// Gets the last build type.
         /// </summary>
         public BuildResultType LastBuildType { get; private set; }
-       
+
 
     }
 }

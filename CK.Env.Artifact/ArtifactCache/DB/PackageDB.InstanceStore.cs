@@ -88,7 +88,7 @@ namespace CK.Env
                         var cc = new Comparable( pInstance => dep.Target.Key.CompareTo( pInstance.Key ) );
                         // Lookup only from 0 to our index: our dependencies are before us.
                         Debug.Assert( _instances.AsSpan( 0, i ).BinarySearch( cc ) >= 0 );
-                        ctx.Writer.Write( _instances.AsSpan(0,i).BinarySearch( cc ) );
+                        ctx.Writer.Write( _instances.AsSpan( 0, i ).BinarySearch( cc ) );
                     }
                 }
             }
@@ -98,7 +98,7 @@ namespace CK.Env
                 _instances = new PackageInstance[ctx.Reader.ReadInt32()];
                 for( int i = 0; i < _instances.Length; ++i )
                 {
-                    _instances[i] = allInstances[ ctx.Reader.ReadInt32() ];
+                    _instances[i] = allInstances[ctx.Reader.ReadInt32()];
                 }
             }
 
@@ -124,7 +124,7 @@ namespace CK.Env
                 _instances = new PackageInstance[pLen + 1];
                 Array.Copy( prev, 0, _instances, 0, idxNewOne );
                 _instances[idxNewOne] = newOne;
-                Array.Copy( prev, idxNewOne, _instances, idxNewOne+1, pLen - idxNewOne );
+                Array.Copy( prev, idxNewOne, _instances, idxNewOne + 1, pLen - idxNewOne );
             }
 
             InstanceStore( PackageInstance[] prev, (int idx, PackageInstance p)[] indices )
@@ -188,7 +188,7 @@ namespace CK.Env
             {
                 readonly Func<PackageInstance, int> _comparer;
 
-                public Comparable( Func<PackageInstance,int> comparer )
+                public Comparable( Func<PackageInstance, int> comparer )
                 {
                     _comparer = comparer;
                 }
@@ -215,7 +215,7 @@ namespace CK.Env
 
             IEnumerator IEnumerable.GetEnumerator() => _instances.GetEnumerator();
 
-            ArraySegment<PackageInstance> Range( ArraySegment<PackageInstance> all, Func<PackageInstance,int> comparer )
+            ArraySegment<PackageInstance> Range( ArraySegment<PackageInstance> all, Func<PackageInstance, int> comparer )
             {
                 Func<PackageInstance, int> rStart = p =>
                 {

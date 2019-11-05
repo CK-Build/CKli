@@ -1,12 +1,12 @@
+using CK.Core;
+using CK.Text;
+using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
-using CK.Core;
-using CK.Text;
-using LibGit2Sharp;
 
 namespace CK.Env
 {
@@ -57,40 +57,40 @@ namespace CK.Env
                 m.Warn( $"File '{StacksFilePath}' not found." );
             }
             else using( m.OpenInfo( $"Reading '{StacksFilePath}'." ) )
-            {
-                foreach( var line in File.ReadAllLines( StacksFilePath ).Where( line => !String.IsNullOrWhiteSpace( line ) ) )
                 {
-                    Exception severe = null;
-                    try
+                    foreach( var line in File.ReadAllLines( StacksFilePath ).Where( line => !String.IsNullOrWhiteSpace( line ) ) )
                     {
-                        var l = line.Split( '>' );
-                        if( l.Length >= 3 )
+                        Exception severe = null;
+                        try
                         {
-                            var name = l[0].Trim();
-                            if( name.Length > 0 )
+                            var l = line.Split( '>' );
+                            if( l.Length >= 3 )
                             {
-                                var url = l[1].Trim();
-                                if( Uri.TryCreate( url, UriKind.Absolute, out var uri ) )
+                                var name = l[0].Trim();
+                                if( name.Length > 0 )
                                 {
-                                    var pubTxt = l[2].Trim();
-                                    bool isPublic = pubTxt.Equals( "Public", StringComparison.OrdinalIgnoreCase );
-                                    string branchName = l.Length >= 4 ? l[3].Trim() : null;
-                                    FindOrCreateStackDef( m, name, url, isPublic, branchName );
-                                    continue;
+                                    var url = l[1].Trim();
+                                    if( Uri.TryCreate( url, UriKind.Absolute, out var uri ) )
+                                    {
+                                        var pubTxt = l[2].Trim();
+                                        bool isPublic = pubTxt.Equals( "Public", StringComparison.OrdinalIgnoreCase );
+                                        string branchName = l.Length >= 4 ? l[3].Trim() : null;
+                                        FindOrCreateStackDef( m, name, url, isPublic, branchName );
+                                        continue;
+                                    }
+                                    else m.Error( $"Invalid repository url '{url}'." );
                                 }
-                                else m.Error( $"Invalid repository url '{url}'." );
+                                else m.Error( $"Missing stack name." );
                             }
-                            else m.Error( $"Missing stack name." );
+                            else m.Error( $"Invalid line format." );
                         }
-                        else m.Error( $"Invalid line format." );
+                        catch( Exception ex )
+                        {
+                            severe = ex;
+                        }
+                        m.Error( $"Unable to read line '{line}'.", severe );
                     }
-                    catch( Exception ex )
-                    {
-                        severe = ex;
-                    }
-                    m.Error( $"Unable to read line '{line}'.", severe );
                 }
-            }
             if( _stacks.Count == 0 )
             {
                 using( m.OpenInfo( "Since there is no Stack defined, we initialize CK and CK-Build mapped to '/Dev/CK' by default." ) )
@@ -180,9 +180,9 @@ namespace CK.Env
             string url,
             bool isPublic,
             NormalizedPath mappedPath = default,
-            string branchName = "master")
+            string branchName = "master" )
         {
-            if( String.IsNullOrWhiteSpace( stackName ) ) throw new ArgumentException( "Must not be empty.", nameof(stackName) );
+            if( String.IsNullOrWhiteSpace( stackName ) ) throw new ArgumentException( "Must not be empty.", nameof( stackName ) );
 
             bool change = WorldLocalMapping.SetMap( m, stackName, mappedPath );
             if( FindOrCreateStackDef( m, stackName, url, isPublic, branchName ) ) change = true;
@@ -262,13 +262,13 @@ namespace CK.Env
             StackDef[] _stacks;
             GitRepository _git;
 
-            
+
 
             public StackRepo( GitWorldStore store, Uri uri )
             {
                 _store = store;
                 OriginUrl = uri;
-                var cleanPath = CleanPathDirName(uri.AbsolutePath);
+                var cleanPath = CleanPathDirName( uri.AbsolutePath );
                 Root = store._rootPath.AppendPart( cleanPath );
             }
 
@@ -359,7 +359,7 @@ namespace CK.Env
                 else if( option == StackInitializeOption.OpenAndPullRepository ) Pull( m );
                 if( !IsOpen )
                 {
-                    m.Warn( $"Repository '{OriginUrl}' for stacks '{_stacks.Select( s => s.StackName ).Concatenate("', '")}' is not opened. Skipping Worlds reading from them." );
+                    m.Warn( $"Repository '{OriginUrl}' for stacks '{_stacks.Select( s => s.StackName ).Concatenate( "', '" )}' is not opened. Skipping Worlds reading from them." );
                     return;
                 }
                 var worldNames = Directory.GetFiles( Root, "*.World.xml" )
@@ -423,7 +423,7 @@ namespace CK.Env
                 if( !_repos[i].PostSynchronize( m ) )
                 {
                     _repos[i].Dispose();
-                    _repos.RemoveAt( i-- );                  
+                    _repos.RemoveAt( i-- );
                 }
             }
             SetWorlds( m, newWorlds );
@@ -515,7 +515,7 @@ namespace CK.Env
             newWorlds.Sort( ( w1, w2 ) =>
             {
                 int cmp = w1.Name.CompareTo( w2.Name );
-                return cmp != 0 ? cmp : string.Compare(w1.ParallelName, w2.ParallelName );
+                return cmp != 0 ? cmp : string.Compare( w1.ParallelName, w2.ParallelName );
             } );
             return newWorlds;
         }

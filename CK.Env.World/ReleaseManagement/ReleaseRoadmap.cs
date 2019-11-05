@@ -88,7 +88,7 @@ namespace CK.Env
         /// <returns>Solutions, Git path and <see cref="ReleaseInfo"/>.</returns>
         public static IEnumerable<(string SolutionName, NormalizedPath SubPath, ReleaseInfo Info)> Load( XElement e )
         {
-            return e.Elements().Select( s => ((string)s.AttributeRequired( "Name" ), new NormalizedPath( (string)s.AttributeRequired( "SubPath" ) ), new ReleaseInfo( s.Element( "ReleaseInfo" ) ) ) );
+            return e.Elements().Select( s => ((string)s.AttributeRequired( "Name" ), new NormalizedPath( (string)s.AttributeRequired( "SubPath" ) ), new ReleaseInfo( s.Element( "ReleaseInfo" ) )) );
         }
 
         /// <summary>
@@ -105,7 +105,7 @@ namespace CK.Env
         {
             if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
             ReleaseSolutionInfo[] infos = new ReleaseSolutionInfo[ctx.Solutions.Count];
-            foreach( var (s,d) in ctx.Solutions )
+            foreach( var (s, d) in ctx.Solutions )
             {
                 var v = d.GitRepository.GetCommitVersionInfo( m );
                 if( v == null )

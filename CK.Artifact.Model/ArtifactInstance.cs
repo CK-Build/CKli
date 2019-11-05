@@ -96,7 +96,7 @@ namespace CK.Core
             if( idx > 0
                 && idx < instanceName.Length - 3
                 && SVersion.TryParse( instanceName.Substring( idx + 1 ), out var version )
-                && Core.Artifact.TryParse( instanceName.Substring(0,idx), out var artifact ) )
+                && Core.Artifact.TryParse( instanceName.Substring( 0, idx ), out var artifact ) )
             {
                 return new ArtifactInstance( artifact, version );
             }

@@ -1,10 +1,10 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System;
-using CK.Text;
-using System.Collections.Generic;
 using CK.Core;
+using CK.Text;
+using System;
+using System.Collections.Generic;
 
 namespace CK.Env.MSBuildSln
 {
@@ -35,7 +35,7 @@ namespace CK.Env.MSBuildSln
             BaseNode node = Expr( t );
             if( t.CurrentToken.TokenType != TokenType.EndOfInput )
             {
-               m.SetError( "EndOfInput.", "Parser" );
+                m.SetError( "EndOfInput.", "Parser" );
             }
             return node;
         }

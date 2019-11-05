@@ -1,8 +1,6 @@
 using CK.Core;
 using CK.Env.MSBuildSln;
 using CK.Text;
-using CSemVer;
-using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
@@ -13,7 +11,7 @@ namespace CK.Env.Plugin
         readonly CodeCakeBuilderFolder _f;
         readonly SolutionDriver _solutionDriver;
 
-        public CodeCakeBuilderCSProjFile(CodeCakeBuilderFolder f, NormalizedPath branchPath, SolutionDriver solutionDriver)
+        public CodeCakeBuilderCSProjFile( CodeCakeBuilderFolder f, NormalizedPath branchPath, SolutionDriver solutionDriver )
             : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" ), Encoding.UTF8 )
         {
             _f = f;
@@ -28,7 +26,7 @@ namespace CK.Env.Plugin
         public void ApplySettings( IActivityMonitor m )
         {
             if( !_f.EnsureDirectory( m ) ) return;
-            var solution = _solutionDriver.GetSolution( m, allowInvalidSolution:true );
+            var solution = _solutionDriver.GetSolution( m, allowInvalidSolution: true );
             if( solution == null ) return;
 
             var slnFile = solution.Tag<SolutionFile>();

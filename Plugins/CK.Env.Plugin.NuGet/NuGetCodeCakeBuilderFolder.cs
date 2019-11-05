@@ -3,7 +3,6 @@ using CK.Env.DependencyModel;
 using CK.Env.NuGet;
 using CK.Text;
 using System;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -83,7 +82,7 @@ namespace CK.Env.Plugin
                     case INuGetAzureRepository a:
                         b.Append( "yield return new SignatureVSTSFeed( this, \"" )
                             .Append( a.Organization ).Append( "\"," )
-                            .Append( $"\"{a.FeedName}\"" ).Append(", ")
+                            .Append( $"\"{a.FeedName}\"" ).Append( ", " )
                             .Append( a.ProjectName != null ? $"\"{a.ProjectName}\"" : "null" )
                             .AppendLine( ");" );
                         break;

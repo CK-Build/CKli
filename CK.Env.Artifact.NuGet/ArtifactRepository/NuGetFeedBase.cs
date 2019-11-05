@@ -1,6 +1,5 @@
 using CK.Core;
 using CSemVer;
-using NuGet.Common;
 using NuGet.Configuration;
 using NuGet.Protocol.Core.Types;
 using System;
@@ -172,7 +171,7 @@ namespace CK.Env.NuGet
             {
                 _sourceRepository = new SourceRepository( PackageSource, NuGetClient.StaticProviders );
             }
-            again:
+        again:
             MetadataResource meta = null;
             try
             {

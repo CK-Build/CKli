@@ -152,7 +152,7 @@ namespace CK.Env.MSBuildSln
             if( project == null ) return null;
             if( project is T typed ) return typed;
             m.Error( lineNumber == 0
-                        ? $"Project '{guid}' must be a {typeof(T).GetType().Name}."
+                        ? $"Project '{guid}' must be a {typeof( T ).GetType().Name}."
                         : $"Guid '{guid}' defined on line #{lineNumber} references must be a {typeof( T ).GetType().Name}." );
             return null;
         }

@@ -453,7 +453,7 @@ namespace CK.Env.DependencyModel
                             {
                                 if( packages.TryGetValue( package.Artifact, out var alreadyPublished ) )
                                 {
-                                    m.Error( $"'{package.Project.Solution+"->"+package}' is already published by {alreadyPublished.Project.Solution+"->"+alreadyPublished.Project}." );
+                                    m.Error( $"'{package.Project.Solution + "->" + package}' is already published by {alreadyPublished.Project.Solution + "->" + alreadyPublished.Project}." );
                                     return null;
                                 }
                                 packages.Add( package.Artifact, new LocalPackageItem( package.Artifact, project ) );

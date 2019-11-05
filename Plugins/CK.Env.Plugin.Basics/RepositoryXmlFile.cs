@@ -97,7 +97,7 @@ namespace CK.Env.Plugin
             // If the <Debug > element exists, we set the IgnoreDirtyWorkingFolder attribute to false.
             EnsureDocument().Root.Element( xDebugName )?.SetAttributeValue( "IgnoreDirtyWorkingFolder", "false" );
             // Obsolete:
-            Document.Root.Elements( SVGNS+"PossibleVersionsMode" ).Remove();
+            Document.Root.Elements( SVGNS + "PossibleVersionsMode" ).Remove();
             Save( m );
         }
 
@@ -111,7 +111,7 @@ namespace CK.Env.Plugin
         /// Ensures that Branches element exists in the non null <see cref="XmlFilePluginBase.Document"/>.
         /// If the Document is null, this is null.
         /// </summary>
-        public XElement Branches => _branches ?? (_branches = Document?.Root.EnsureElement( xBranchesName ) );
+        public XElement Branches => _branches ?? (_branches = Document?.Root.EnsureElement( xBranchesName ));
 
         /// <summary>
         /// Ensures that document and the branches element exists.

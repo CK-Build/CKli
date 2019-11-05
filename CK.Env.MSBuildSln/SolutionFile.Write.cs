@@ -57,14 +57,14 @@ namespace CK.Env.MSBuildSln
             }
         }
 
-        void WriteGlobal(TextWriter w )
+        void WriteGlobal( TextWriter w )
         {
-            w.WriteLine("Global");
+            w.WriteLine( "Global" );
             foreach( var s in GlobalSections )
             {
                 WriteGlobalSection( w, s );
             }
-            w.WriteLine("EndGlobal");
+            w.WriteLine( "EndGlobal" );
         }
 
         void WriteGlobalSection( TextWriter w, Section s )

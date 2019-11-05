@@ -1,9 +1,9 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using CK.Text;
 using System;
 using System.Collections.Generic;
-using CK.Text;
 
 namespace CK.Env.MSBuildSln
 {
@@ -12,7 +12,7 @@ namespace CK.Env.MSBuildSln
         public StringNode( string value )
         {
             StringValue = value ?? throw new ArgumentNullException( nameof( value ) );
-            RequiresExpansion = value.IndexOf("$(", StringComparison.Ordinal ) >= 0;
+            RequiresExpansion = value.IndexOf( "$(", StringComparison.Ordinal ) >= 0;
         }
 
         public override string StringValue { get; }

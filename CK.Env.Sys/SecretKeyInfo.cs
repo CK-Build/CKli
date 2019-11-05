@@ -74,7 +74,7 @@ namespace CK.Env
         /// <returns>The raw data.</returns>
         internal (string name, string description, string secret, bool isRequired, string tags, string subKey, string sourceProviderName) GetData()
         {
-            return (Name, _description, _secret, _isRequired, _tags.ToString(), SubKey?.Name, SourceProviderName );
+            return (Name, _description, _secret, _isRequired, _tags.ToString(), SubKey?.Name, SourceProviderName);
         }
 
         SecretKeyInfo( string name, Func<SecretKeyInfo, string> descriptionBuilder, string sourceProviderName )
@@ -174,7 +174,7 @@ namespace CK.Env
         public bool ImportSecret( IActivityMonitor m, string secret )
         {
             if( String.IsNullOrEmpty( secret ) ) throw new ArgumentNullException( nameof( secret ) );
-            if( !string.IsNullOrWhiteSpace( SourceProviderName) ) throw new InvalidOperationException( "This secret is provided you cannot import a non-stored secret." );
+            if( !string.IsNullOrWhiteSpace( SourceProviderName ) ) throw new InvalidOperationException( "This secret is provided you cannot import a non-stored secret." );
             if( IsSecretAvailable )
             {
                 if( SuperKey != null && SuperKey.IsSecretAvailable )

@@ -23,7 +23,7 @@ namespace CK.Env
         /// <param name="withSelf">True to consider <paramref name="this"/> element. Defaults to consider only the element children.</param>
         public static IEnumerable<XElement> TopDescendants( this XElement @this, Func<XElement, bool> predicate, bool withSelf = false )
         {
-            if( predicate == null ) throw new ArgumentNullException( nameof(predicate) );
+            if( predicate == null ) throw new ArgumentNullException( nameof( predicate ) );
             if( @this == null ) yield break;
             if( withSelf && predicate( @this ) )
             {

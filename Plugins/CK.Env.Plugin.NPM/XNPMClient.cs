@@ -1,7 +1,7 @@
-using CK.Env;
 using CK.Core;
-using System.Net.Http;
+using CK.Env;
 using CK.Env.NPM;
+using System.Net.Http;
 
 namespace CKli
 {
@@ -15,7 +15,7 @@ namespace CKli
             ArtifactCenter artifact,
             IEnvLocalFeedProvider localFeedProvider,
             FileSystem fs,
-            Initializer initializer)
+            Initializer initializer )
             : base( initializer )
         {
             _npmClient = new NPMClient( sharedHttpClient, secretKeyStore );

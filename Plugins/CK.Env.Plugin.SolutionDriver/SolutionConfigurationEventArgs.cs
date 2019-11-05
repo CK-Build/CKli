@@ -77,7 +77,7 @@ namespace CK.Env.Plugin
         {
             FailureMessage += message != null
                 ? Environment.NewLine + message
-                : (String.IsNullOrWhiteSpace( message ) ? "(no message)" : message );
+                : (String.IsNullOrWhiteSpace( message ) ? "(no message)" : message);
         }
 
     }

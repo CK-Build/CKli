@@ -1,5 +1,5 @@
-using CK.Text;
 using CK.Core;
+using CK.Text;
 using SharpYaml.Model;
 
 namespace CK.Env.Plugin
@@ -49,8 +49,8 @@ namespace CK.Env.Plugin
                         new YamlValue(@"'**\Tests\**\TestResult*.xml'"),
                         new YamlValue(@"'**Tests\**\Logs\**\*'"),
                     },
-                    ["when"] = new YamlValue("always"),
-                    ["expire_in"] = new YamlValue("6 month")
+                    ["when"] = new YamlValue( "always" ),
+                    ["expire_in"] = new YamlValue( "6 month" )
                 }
             );
             CreateOrUpdate( m, YamlMappingToString( m ) );

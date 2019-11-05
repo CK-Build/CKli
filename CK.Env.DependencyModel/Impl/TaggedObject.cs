@@ -26,7 +26,7 @@ namespace CK.Env.DependencyModel
             {
                 if( newValue != null )
                 {
-                    _tag = newValue is object[] ? new object[] { newValue } : newValue;
+                    _tag = newValue is object[]? new object[] { newValue } : newValue;
                     return newValue;
                 }
             }

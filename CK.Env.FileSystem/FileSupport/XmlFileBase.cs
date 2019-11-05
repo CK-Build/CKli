@@ -22,7 +22,7 @@ namespace CK.Env
         {
             if( _doc == null && (_currentText = TextContent) != null )
             {
-                _doc = XDocument.Parse( _currentText, LoadOptions.PreserveWhitespace|LoadOptions.SetLineInfo );
+                _doc = XDocument.Parse( _currentText, LoadOptions.PreserveWhitespace | LoadOptions.SetLineInfo );
                 _doc.Changed += OnDocChanged;
             }
             return _doc;
@@ -46,7 +46,7 @@ namespace CK.Env
         {
             if( _currentText == null && GetDocument() != null )
             {
-                _currentText =  _doc.Beautify().ToString();
+                _currentText = _doc.Beautify().ToString();
             }
             return _currentText;
         }

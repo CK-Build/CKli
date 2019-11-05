@@ -13,7 +13,7 @@ namespace CK.Env.Plugin
         /// <returns>The section name.</returns>
         public static string ToPackageJsonKey( this ArtifactDependencyKind @this )
         {
-            switch( @this)
+            switch( @this )
             {
                 case ArtifactDependencyKind.Development: return "devDependencies";
                 case ArtifactDependencyKind.Transitive: return "peerDependencies";

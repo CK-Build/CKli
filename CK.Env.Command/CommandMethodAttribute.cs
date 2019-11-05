@@ -2,7 +2,7 @@ using System;
 
 namespace CK.Env
 {
-    [AttributeUsage(AttributeTargets.Method)]
+    [AttributeUsage( AttributeTargets.Method )]
     public class CommandMethodAttribute : Attribute
     {
         public CommandMethodAttribute( bool confirmationRequired = true )

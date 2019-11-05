@@ -5,7 +5,7 @@ namespace CK.Env.Diff
 {
     public class DiffResult : IDiffResult
     {
-        internal DiffResult(bool isValid, List<DiffRootResult> diffs, DiffRootResult others)
+        internal DiffResult( bool isValid, List<DiffRootResult> diffs, DiffRootResult others )
         {
             IsValid = isValid;
             Diffs = diffs;
@@ -28,7 +28,7 @@ namespace CK.Env.Diff
             {
                 sb.Append( diff.ToString() );
             }
-            sb.AppendLine(Others.ToString());
+            sb.AppendLine( Others.ToString() );
             return sb.ToString();
 
         }

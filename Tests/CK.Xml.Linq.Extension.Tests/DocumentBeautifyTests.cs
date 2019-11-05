@@ -7,10 +7,10 @@ namespace CK.Xml.Linq.Extension.Tests
 {
     public class DocumentBeautifyTests
     {
-        [TestCase("<A><B /></A>", "<A>¤  <B />¤</A>")]
-        [TestCase("<A><B> X </B></A>", "<A>¤  <B> X </B>¤</A>")]
-        [TestCase("<A><B> ¤ </B></A>", "<A>¤  <B></B>¤</A>" )]
-        [TestCase("<A><B> ¤ ¤ </B></A>", "<A>¤  <B></B>¤</A>" )]
+        [TestCase( "<A><B /></A>", "<A>¤  <B />¤</A>" )]
+        [TestCase( "<A><B> X </B></A>", "<A>¤  <B> X </B>¤</A>" )]
+        [TestCase( "<A><B> ¤ </B></A>", "<A>¤  <B></B>¤</A>" )]
+        [TestCase( "<A><B> ¤ ¤ </B></A>", "<A>¤  <B></B>¤</A>" )]
         public void beautify_on_elements( string input, string result )
         {
             input = input.Replace( "¤", Environment.NewLine );

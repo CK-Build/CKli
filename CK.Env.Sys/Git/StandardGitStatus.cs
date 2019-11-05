@@ -35,7 +35,7 @@ namespace CK.Env
         /// <summary>
         /// On develop or local branch.
         /// </summary>
-        DevelopOrLocal = Local|Develop,
+        DevelopOrLocal = Local | Develop,
 
         /// <summary>
         /// On master or develop branch.

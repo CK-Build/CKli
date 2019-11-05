@@ -14,7 +14,7 @@ namespace CK.Env.MSBuildSln
             XElement originElement,
             XElement finalDeclaration,
             CKTrait frameworks,
-            string privateAsset)
+            string privateAsset )
         {
             Owner = owner;
             Package = new ArtifactInstance( ArtifactType.Single( "NuGet" ), packageId, version );

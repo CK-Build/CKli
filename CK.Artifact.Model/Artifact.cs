@@ -1,5 +1,5 @@
-using System;
 using CSemVer;
+using System;
 
 namespace CK.Core
 {
@@ -42,7 +42,7 @@ namespace CK.Core
             if( type == null ) throw new ArgumentNullException( nameof( type ) );
             if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
             Type = type;
-            Name = name; 
+            Name = name;
         }
 
         /// <summary>
@@ -113,7 +113,7 @@ namespace CK.Core
         /// </summary>
         /// <param name="other">The other artifact.</param>
         /// <returns>True when equals, false otherwise.</returns>
-        public bool Equals( Artifact other ) => Type == other.Type &&  Name.Equals(other.Name, StringComparison.OrdinalIgnoreCase);
+        public bool Equals( Artifact other ) => Type == other.Type && Name.Equals( other.Name, StringComparison.OrdinalIgnoreCase );
 
         /// <summary>
         /// Overridden to call <see cref="Equals(Artifact)"/>.
@@ -126,7 +126,7 @@ namespace CK.Core
         /// Overrsidden to combine <see cref="Type"/> and <see cref="Name"/>.
         /// </summary>
         /// <returns>The hash code.</returns>
-        public override int GetHashCode() => Type.GetHashCode() ^ StringComparer.OrdinalIgnoreCase.GetHashCode(Name);
+        public override int GetHashCode() => Type.GetHashCode() ^ StringComparer.OrdinalIgnoreCase.GetHashCode( Name );
 
         /// <summary>
         /// Implements == operator.
@@ -159,7 +159,7 @@ namespace CK.Core
         {
             if( !IsValid )
             {
-                return other.IsValid ? -1 : 0; 
+                return other.IsValid ? -1 : 0;
             }
             if( !other.IsValid ) return 1;
             int cmp = Type.CompareTo( other.Type );

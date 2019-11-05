@@ -1,11 +1,11 @@
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using CK.Core;
 using CK.Env.DependencyModel;
 using CK.Text;
 using CSemVer;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 
 namespace CK.Env
 {
@@ -35,18 +35,18 @@ namespace CK.Env
             ISolutionDriver driver,
             IReadOnlyList<UpdatePackageInfo> upgrades )
         {
-            IReleaseSolutionInfo info = _roadmap.ReleaseInfos[ s.Index ];
+            IReleaseSolutionInfo info = _roadmap.ReleaseInfos[s.Index];
             var targetVersion = info.CurrentReleaseInfo.Version;
             if( upgrades.Count > 0 )
             {
-                if( !driver.UpdatePackageDependencies( m, upgrades ) ) return (null,false);
+                if( !driver.UpdatePackageDependencies( m, upgrades ) ) return (null, false);
                 var upText = upgrades.Select( u => u.PackageUpdate.ToString() ).Concatenate();
                 var msg = info.CurrentReleaseInfo.Level == ReleaseLevel.None
                             ? $"Not released (keeping version {targetVersion}). Upgrading release dependencies: {upText}."
                             : $"Releasing {targetVersion}. Upgrading release dependencies: {upText}." + Environment.NewLine
                               + Environment.NewLine
                               + info.ReleaseNote;
-                if( !driver.GitRepository.Commit( m, msg ) ) return (null,false);
+                if( !driver.GitRepository.Commit( m, msg ) ) return (null, false);
             }
             _commits[s.Index] = driver.GitRepository.Head.CommitSha;
             return (targetVersion, info.CurrentReleaseInfo.Level != ReleaseLevel.None);
@@ -54,7 +54,7 @@ namespace CK.Env
 
         protected override BuildResult CreateBuildResult( IActivityMonitor m )
         {
-            foreach( var (s,driver) in DependentSolutionContext.Solutions )
+            foreach( var (s, driver) in DependentSolutionContext.Solutions )
             {
                 var buildProjectUpgrades = GetBuildProjectUpgrades( s );
                 if( !driver.UpdatePackageDependencies( m, buildProjectUpgrades ) ) return null;

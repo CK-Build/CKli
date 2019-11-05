@@ -6,6 +6,6 @@ namespace CK.Env
     public interface IDiffRoot
     {
         string Name { get; }
-        IEnumerable<NormalizedPath> Paths { get;  }
+        IEnumerable<NormalizedPath> Paths { get; }
     }
 }

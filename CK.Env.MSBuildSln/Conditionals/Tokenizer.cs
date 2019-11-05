@@ -1,5 +1,5 @@
-using System;
 using CK.Text;
+using System;
 
 namespace CK.Env.MSBuildSln
 {
@@ -189,7 +189,7 @@ namespace CK.Env.MSBuildSln
                 {
                     _m.Forward( 1 );
                 }
-                while( !_m.IsEnd && (_m.Head == '_' || Char.IsLetter( _m.Head ) || Char.IsDigit( _m.Head ) ) );
+                while( !_m.IsEnd && (_m.Head == '_' || Char.IsLetter( _m.Head ) || Char.IsDigit( _m.Head )) );
                 int end = _m.StartIndex;
                 if( !_m.IsEnd )
                 {

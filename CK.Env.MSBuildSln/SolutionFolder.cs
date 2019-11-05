@@ -9,7 +9,7 @@ namespace CK.Env.MSBuildSln
     /// </summary>
     public class SolutionFolder : ProjectBase
     {
-        readonly List<NormalizedPath> _items;      
+        readonly List<NormalizedPath> _items;
 
         /// <summary>
         /// Initializes a new <see cref="SolutionFolder"/>.

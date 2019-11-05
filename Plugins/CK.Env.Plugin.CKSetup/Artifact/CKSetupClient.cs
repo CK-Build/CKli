@@ -1,10 +1,10 @@
+using CK.Core;
+using CKSetup;
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
-using CK.Core;
-using CKSetup;
 
 namespace CK.Env.CKSetup
 {

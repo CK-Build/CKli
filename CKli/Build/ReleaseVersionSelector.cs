@@ -70,7 +70,7 @@ namespace CKli
             var min = projExRefNotRelease.Any() ? projExRefNotRelease.Min( q => q.Key ) : PackageQuality.None;
             var worst = min != PackageQuality.None
                             ? projExRefNotRelease.SingleOrDefault( p => p.Key == min )
-                            : null; 
+                            : null;
             if( worst == null || worst.Key == PackageQuality.Release )
             {
                 Console.WriteLine( "Nothing prevent to choose the Release quality." );

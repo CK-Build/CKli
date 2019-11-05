@@ -42,14 +42,14 @@ namespace CK.SimpleKeyVault
         public static Dictionary<string, string> DecryptValues( string crypted, string passPhrase )
         {
             var keys = new HashSet<string>();
-            var result = new Dictionary<string,string>();
+            var result = new Dictionary<string, string>();
             if( String.IsNullOrWhiteSpace( crypted ) ) return result;
 
             string[] lines = crypted.Split( new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries );
             foreach( var l in lines )
             {
                 if( l.StartsWith( "--" ) ) continue;
-                if( l.StartsWith(" > " ) )
+                if( l.StartsWith( " > " ) )
                 {
                     byte[] bytes = Convert.FromBase64String( l.Substring( 3 ) );
                     using( var mem = new MemoryStream( bytes ) )
@@ -83,7 +83,7 @@ namespace CK.SimpleKeyVault
         /// No key must not be null, empty or contain \\r or \\n or space characters.</param>
         /// <param name="passPhrase">Secret to use. Must not be null, empty or white space.</param>
         /// <returns>The encrypted string.</returns>
-        public static string EncryptValuesToString( IDictionary<string,string> values, string passPhrase )
+        public static string EncryptValuesToString( IDictionary<string, string> values, string passPhrase )
         {
             if( values == null ) throw new ArgumentNullException( nameof( values ) );
             using( var mem = new MemoryStream() )
@@ -94,7 +94,7 @@ namespace CK.SimpleKeyVault
                 var b = new StringBuilder();
                 b.AppendLine( "-- Version: 1" );
                 b.AppendLine( "-- Keys below can be removed if needed." );
-                w.Write( values.Count ); 
+                w.Write( values.Count );
                 foreach( var kv in values )
                 {
                     if( String.IsNullOrEmpty( kv.Key )

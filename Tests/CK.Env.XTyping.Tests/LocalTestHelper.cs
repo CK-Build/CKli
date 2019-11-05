@@ -1,7 +1,7 @@
+using CK.Text;
 using System.IO;
 using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
-using CK.Text;
 
 namespace CK.Env.Tests
 {

@@ -59,7 +59,7 @@ namespace CK.Env.Plugin
             var passPhrase = _secretStore.GetSecretKey( m, SolutionDriver.CODECAKEBUILDER_SECRET_KEY, true );
 
             // Opens the actual current vault: if more secrets are defined we keep them.
-            Dictionary<string,string> current = KeyVault.DecryptValues( TextContent, passPhrase );
+            Dictionary<string, string> current = KeyVault.DecryptValues( TextContent, passPhrase );
             current.Clear();
 
             // The central CICDKeyVault is protected with the same CODECAKEBUILDER_SECRET_KEY secret.

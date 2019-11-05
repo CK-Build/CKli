@@ -1,7 +1,7 @@
-using CK.Env;
-using System;
 using CK.Core;
+using CK.Env;
 using CK.Env.NuGet;
+using System;
 using System.Net.Http;
 
 namespace CKli

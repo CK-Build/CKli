@@ -218,7 +218,7 @@ namespace CK.Env
         internal bool OnChildrenCreated( Initializer initializer, IReadOnlyList<XTypedObject> children )
         {
             XTypedObject sibling = null;
-            for( int i = children.Count-1; i >= 0; --i )
+            for( int i = children.Count - 1; i >= 0; --i )
             {
                 var c = children[i];
                 c.NextSibling = sibling;

@@ -17,7 +17,7 @@ namespace CK.Env.Diff
 
         public bool SendToBuilder( IActivityMonitor m, DiffRootResultBuilderBase diffRootResultBuilder )
         {
-            return diffRootResultBuilder.Accept(m, this );
+            return diffRootResultBuilder.Accept( m, this );
         }
     }
 }

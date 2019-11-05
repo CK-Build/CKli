@@ -69,7 +69,7 @@ namespace CK.Env
             IEnumerable<ArtifactInstance> packages,
             bool isNPM )
         {
-            string apiUrl = AzureDevOpsAPIHelper.GetUrl(projectName, organization, feedName, isNPM, "packagesBatch", "api-version=5.0-preview.1" );
+            string apiUrl = AzureDevOpsAPIHelper.GetUrl( projectName, organization, feedName, isNPM, "packagesBatch", "api-version=5.0-preview.1" );
             var basicAuth = Convert.ToBase64String( Encoding.ASCII.GetBytes( ":" + personalAccessToken ) );
             var byLabels = packages
                                 .SelectMany( p => p.Version.PackageQuality.GetLabels().Select( label => (label, p) ) )

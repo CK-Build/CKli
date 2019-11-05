@@ -1,7 +1,7 @@
+using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using CK.Core;
 
 namespace CK.Env
 {
@@ -40,7 +40,7 @@ namespace CK.Env
                 for( int i = 0; i <= max; i++ )
                 {
                     var s = new SecretKeyInfo( _data[max - i], store._keyInfos );
-                    store._orderedInfos.Insert(0, s );
+                    store._orderedInfos.Insert( 0, s );
                     store._keyInfos.Add( s.Name, s );
                 }
             }
@@ -182,7 +182,7 @@ namespace CK.Env
             return false;
         }
 
-        
+
 
         /// <summary>
         /// Gets whether a secret key has been declared (the returned is not null) and if whether the
@@ -252,7 +252,7 @@ namespace CK.Env
 
     public class MissingRequiredSecretException : Exception
     {
-        public MissingRequiredSecretException(string message) : base(message)
+        public MissingRequiredSecretException( string message ) : base( message )
         {
         }
     }

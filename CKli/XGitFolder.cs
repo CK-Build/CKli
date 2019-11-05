@@ -34,7 +34,7 @@ namespace CKli
         /// <summary>
         /// Gets all the branches that are defined.
         /// </summary>
-        public IReadOnlyList<XBranch> Branches => _branches; 
+        public IReadOnlyList<XBranch> Branches => _branches;
 
         internal void Register( XBranch b )
         {

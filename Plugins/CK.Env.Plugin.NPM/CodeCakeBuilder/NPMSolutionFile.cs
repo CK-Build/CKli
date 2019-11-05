@@ -9,7 +9,7 @@ namespace CK.Env.Plugin
     {
         readonly NPMCodeCakeBuilderFolder _f;
         readonly NPMProjectsDriver _driver;
-        
+
         public NPMSolutionFile(
             NPMCodeCakeBuilderFolder f,
             NPMProjectsDriver driver,
@@ -18,7 +18,7 @@ namespace CK.Env.Plugin
         {
             _f = f;
             _driver = driver;
-       }
+        }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 

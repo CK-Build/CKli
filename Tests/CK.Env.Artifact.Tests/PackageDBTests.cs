@@ -161,7 +161,7 @@ namespace CK.Env.Tests
         [Test]
         public void instance_lists_are_ordered_by_version_desc()
         {
-            var db = CreatePackageLevel0DB( true,  null );
+            var db = CreatePackageLevel0DB( true, null );
 
             foreach( var instances in PLevel0V1
                                         .Select( x => x.Key.Artifact ).Distinct()

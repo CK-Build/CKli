@@ -1,10 +1,10 @@
 using CK.Core;
+using CK.Env.CKSetup;
 using CK.Env.Plugin;
 using CKSetup;
 using System;
-using System.Linq;
 using System.Collections.Generic;
-using CK.Env.CKSetup;
+using System.Linq;
 
 namespace CK.Env
 {

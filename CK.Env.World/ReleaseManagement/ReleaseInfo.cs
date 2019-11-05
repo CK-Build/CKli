@@ -1,7 +1,7 @@
+using CK.Core;
 using CSemVer;
 using System;
 using System.Xml.Linq;
-using CK.Core;
 
 namespace CK.Env
 {
@@ -89,7 +89,7 @@ namespace CK.Env
         /// <returns>True if this ReleaseInfo can be used with this level and constraint.</returns>
         public bool IsCompatibleWith( ReleaseLevel l, ReleaseConstraint c )
         {
-            return Level >= l && (Constraint&c) == c;
+            return Level >= l && (Constraint & c) == c;
         }
 
         /// <summary>

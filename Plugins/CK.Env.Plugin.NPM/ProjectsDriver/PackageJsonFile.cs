@@ -181,7 +181,7 @@ namespace CK.Env.Plugin
                 {
                     path = value.Substring( 5 );
                     path = Path.GetFileNameWithoutExtension( path );
-                    path = path.Remove(0, name.Length ); //remove the package name
+                    path = path.Remove( 0, name.Length ); //remove the package name
                     SVersion version = SVersion.TryParse( path );
                     if( !version.IsValid )
                     {

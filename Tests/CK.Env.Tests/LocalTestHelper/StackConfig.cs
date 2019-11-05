@@ -10,14 +10,14 @@ namespace CK.Env.Tests.LocalTestHelper
 
         readonly NormalizedPath _configPath;
 
-        StackConfig(NormalizedPath path, XDocument config)
+        StackConfig( NormalizedPath path, XDocument config )
         {
             _configPath = path;
             Config = config;
             config.Changed += Config_Changed;
         }
 
-        public static StackConfig Create(NormalizedPath path)
+        public static StackConfig Create( NormalizedPath path )
         {
             var xml = XDocument.Load( path );
             return new StackConfig( path, xml );
@@ -55,7 +55,7 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <param name="configNode"></param>
         /// <param name="path"></param>
         /// <param name="replacePlaceHolder">When true, replace placeHolder with path, when false, replace the path with the placeholder.</param>
-        void PlaceHolderSwap(XElement configNode, string oldString, string newString )
+        void PlaceHolderSwap( XElement configNode, string oldString, string newString )
         {
             foreach( var attribute in configNode.Attributes().Where( p => p.Value.Contains( oldString ) ) )
             {

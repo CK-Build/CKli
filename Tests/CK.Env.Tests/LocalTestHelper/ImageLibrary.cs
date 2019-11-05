@@ -1,8 +1,6 @@
 using CK.Text;
 using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Text;
 
 using static CK.Testing.MonitorTestHelper;
 namespace CK.Env.Tests.LocalTestHelper
@@ -72,7 +70,7 @@ namespace CK.Env.Tests.LocalTestHelper
             } );
         }
 
-        public static NormalizedPath full_apply_settings(Action<TestUniverse> action, bool refreshCache)
+        public static NormalizedPath full_apply_settings( Action<TestUniverse> action, bool refreshCache )
         {
             return ImageBuilderHelper( action, refreshCache, another_minimal_solution_second_ci_build, ( universe ) =>
              {

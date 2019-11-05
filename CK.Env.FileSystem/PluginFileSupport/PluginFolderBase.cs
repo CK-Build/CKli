@@ -18,9 +18,9 @@ namespace CK.Env.Plugin
         readonly string _csResourcePrefixSlash;
         readonly Dictionary<string, string> _textResources = new Dictionary<string, string>();
 
-        string GetTextResourceFromPath(string path)
+        string GetTextResourceFromPath( string path )
         {
-            return _textResources[path.Replace( '/', '.' ).Replace('\\','.')];
+            return _textResources[path.Replace( '/', '.' ).Replace( '\\', '.' )];
         }
 
         /// <summary>
@@ -144,8 +144,8 @@ namespace CK.Env.Plugin
         protected bool SetTextResource( IActivityMonitor m, NormalizedPath path, Func<string, string> transformer = null )
         {
             var fs = GitFolder.FileSystem;
-            var target = FolderPath.Combine(path);
-            var text = GetTextResourceFromPath(path);
+            var target = FolderPath.Combine( path );
+            var text = GetTextResourceFromPath( path );
             var final = transformer != null ? transformer( text ) : text;
             if( final == null )
             {

@@ -80,7 +80,7 @@ namespace CK.Env.Plugin
         /// Gets a bag of objects that enables state sharing between participants and from <see cref="BuildStartEventArgs"/>
         /// to <see cref="BuildEndEventArgs"/>.
         /// </summary>
-        public IDictionary<object,object> Memory { get; }
+        public IDictionary<object, object> Memory { get; }
 
         internal BuildStartEventArgs(
             IActivityMonitor m,
@@ -92,7 +92,7 @@ namespace CK.Env.Plugin
             string codeCakeBuilderExecutableFile )
             : base( m )
         {
-            if( !buildRequired && (buildType&(BuildType.WithUnitTests|BuildType.WithPushToRemote)) == 0 ) throw new ArgumentException( "No build, tests or push." );
+            if( !buildRequired && (buildType & (BuildType.WithUnitTests | BuildType.WithPushToRemote)) == 0 ) throw new ArgumentException( "No build, tests or push." );
 
             BuildIsRequired = buildRequired;
             Solution = solution ?? throw new ArgumentNullException( nameof( solution ) );

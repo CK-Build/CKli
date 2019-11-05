@@ -16,7 +16,7 @@ namespace CK.Env.MSBuildSln
 
         internal Section( ISolutionItem container, string name, string step, Dictionary<string, PropertyLine> lines )
         {
-            Debug.Assert( lines != null );    
+            Debug.Assert( lines != null );
             _container = container;
             Name = name;
             Step = step;

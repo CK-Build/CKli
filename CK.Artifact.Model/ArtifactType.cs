@@ -46,7 +46,7 @@ namespace CK.Core
         /// </summary>
         /// <param name="name">Type name.</param>
         /// <returns>The single registered type.</returns>
-        public static ArtifactType Single( string name ) 
+        public static ArtifactType Single( string name )
         {
             if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
             var types = _types;

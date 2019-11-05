@@ -1,9 +1,9 @@
-using System;
 using CK.Core;
-using System.Collections.Generic;
-using System.Linq;
 using CK.Text;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 
 namespace CK.Env
 {
@@ -118,13 +118,13 @@ namespace CK.Env
                 else
                 {
                     var targets = init.info.Dependencies
-                                           .Select( d => ( d.Target,
+                                           .Select( d => (d.Target,
                                                            _instances.Find( d.Target )
                                                            ?? initialization
                                                                 .Take( i )
                                                                 .Select( t => t.p )
                                                                 .FirstOrDefault( p => p != null
-                                                                                 && p.Key == d.Target) ) )
+                                                                                 && p.Key == d.Target )) )
                                            .ToArray();
                     if( targets.Any( t => t.Item2 == null ) )
                     {
@@ -183,7 +183,7 @@ namespace CK.Env
         /// <returns></returns>
         public PackageDB WithLastUpdate( DateTime t )
         {
-            return  t != _lastUpdate ? new PackageDB( this, null, null, t ) : this;
+            return t != _lastUpdate ? new PackageDB( this, null, null, t ) : this;
         }
 
         /// <summary>

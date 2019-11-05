@@ -37,7 +37,7 @@ namespace CK.Env
         {
             ctx.Writer.WriteSharedString( _name.Type.Name );
             ctx.Writer.Write( _name.Name );
-            _instances.WriteIndices(ctx, allInstances);
+            _instances.WriteIndices( ctx, allInstances );
         }
 
         /// <summary>

@@ -159,7 +159,7 @@ namespace CK.Env
             var key = new EntryKey( type, branchName );
             if( !_descriptors.TryGetValue( key, out var desc ) )
             {
-                desc = new Descriptor(instance, key);
+                desc = new Descriptor( instance, key );
                 _descriptors.Add( key, desc );
             }
             else if( desc.Settings != null )

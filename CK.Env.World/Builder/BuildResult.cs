@@ -29,7 +29,7 @@ namespace CK.Env
             ArtifactCenter artifacts,
             IWorldSolutionContext ctx,
             IReadOnlyList<SVersion> versions,
-            IReadOnlyList<ReleaseNoteInfo> releaseNotes)
+            IReadOnlyList<ReleaseNoteInfo> releaseNotes )
         {
             var result = new List<(ArtifactInstance Artifact, string SolutionName, string TargetName)>();
             foreach( var row in ctx.DependentSolutions
@@ -63,7 +63,7 @@ namespace CK.Env
             {
                 throw new ArgumentException( $"Missing BuildResultType." );
             }
-            CreationDate = XmlConvert.ToDateTime( (string)e.Attribute( nameof(CreationDate) ), XmlDateTimeSerializationMode.Utc );
+            CreationDate = XmlConvert.ToDateTime( (string)e.Attribute( nameof( CreationDate ) ), XmlDateTimeSerializationMode.Utc );
             GeneratedArtifacts = e.Elements( XmlNames.xA )
                                   .Select( a => (
                                             new ArtifactInstance(
@@ -71,9 +71,9 @@ namespace CK.Env
                                                     (string)a.AttributeRequired( XmlNames.xName ),
                                                     SVersion.Parse( (string)a.AttributeRequired( XmlNames.xVersion ) ) ),
                                             (string)a.AttributeRequired( XmlNames.xSolution ),
-                                            (string)a.AttributeRequired( XmlNames.xTarget ) ) )
+                                            (string)a.AttributeRequired( XmlNames.xTarget )) )
                                   .ToList();
-            var r = e.Element( nameof(ReleaseNotes) );
+            var r = e.Element( nameof( ReleaseNotes ) );
             if( r != null )
             {
                 ReleaseNotes = r.Elements().Select( n => new ReleaseNoteInfo( n ) ).ToList();
@@ -113,12 +113,12 @@ namespace CK.Env
                                                                    new XAttribute( XmlNames.xSolution, a.SolutionName ),
                                                                    new XAttribute( XmlNames.xTarget, a.TargetName ) ) );
             var releaseNotes = ReleaseNotes != null
-                                ? new XElement( nameof(ReleaseNotes), ReleaseNotes.Select( r => r.ToXml() ) )
+                                ? new XElement( nameof( ReleaseNotes ), ReleaseNotes.Select( r => r.ToXml() ) )
                                 : null;
 
             return new XElement( XmlNames.xBuildResult,
                                     new XAttribute( XmlNames.xType, Type.ToString() ),
-                                    new XAttribute( nameof(CreationDate), CreationDate ),
+                                    new XAttribute( nameof( CreationDate ), CreationDate ),
                                     artifacts,
                                     releaseNotes );
         }

@@ -26,7 +26,7 @@ namespace System.Xml.Linq
             HashSet<XObject> handled )
         {
             _handled = handled ?? throw new ArgumentNullException( nameof( handled ) );
-            Monitor = monitor ?? throw new ArgumentNullException(nameof(monitor));
+            Monitor = monitor ?? throw new ArgumentNullException( nameof( monitor ) );
             Element = element ?? throw new ArgumentNullException( nameof( element ) );
         }
 
@@ -134,7 +134,7 @@ namespace System.Xml.Linq
         /// <param name="r">The reader. <see cref="IsValid"/> is false and should not be used if this methid returned false.</param>
         /// <returns>True if a child has been found, false otherwise.</returns>
         public bool WithOptionalChild( XName name, out XElementReader r )
-        {           
+        {
             var c = Element.Element( name );
             if( c == null )
             {

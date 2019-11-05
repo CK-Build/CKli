@@ -79,7 +79,7 @@ namespace CK.Env.Plugin
                 }
                 if( Specification.IsPrivate )
                 {
-                    if( !PackageJson.IsPrivate ) return Error(m, NPMProjectStatus.ErrorPackageMustBePrivate );
+                    if( !PackageJson.IsPrivate ) return Error( m, NPMProjectStatus.ErrorPackageMustBePrivate );
                 }
                 else
                 {

@@ -103,7 +103,7 @@ namespace CK.Env.Plugin
                         b.Append( "yield return new AzureNPMFeed( this, \"" )
                             .Append( a.Organization ).Append( "\", " )
                             .Append( $"\"{a.FeedName}\"" ).Append( ", " )
-                            .Append( a.ProjectName != null ? $"\"{a.ProjectName}\"" : "null")
+                            .Append( a.ProjectName != null ? $"\"{a.ProjectName}\"" : "null" )
                             .AppendLine( " );" );
                         break;
                     case INPMStandardRepository n:

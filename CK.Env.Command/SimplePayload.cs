@@ -6,7 +6,7 @@ using System.Reflection;
 
 namespace CK.Env
 {
-    public class SimplePayload 
+    public class SimplePayload
     {
         public class Field
         {
@@ -31,7 +31,7 @@ namespace CK.Env
             /// or <see cref="Type.Missing"/> if there is noi value set nor default.
             /// </summary>
             /// <returns>The value or the missing type marker.</returns>
-            public object GetValue() => IsValueSet  ? _value : Type.Missing;
+            public object GetValue() => IsValueSet ? _value : Type.Missing;
 
             public Field( string name, Type type, bool hasDefaultValue, object defaultValue, bool isPassword = false )
             {

@@ -4,12 +4,9 @@ using CKli;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using static CK.Testing.BasicTestHelper;
 
 namespace CK.Env.Tests.LocalTestHelper
 {

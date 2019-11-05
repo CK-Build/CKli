@@ -26,5 +26,5 @@ namespace CK.Core
         /// </summary>
         Transitive
     }
-    
+
 }

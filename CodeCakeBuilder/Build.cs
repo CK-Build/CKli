@@ -4,7 +4,6 @@ using Cake.Core.Diagnostics;
 using CodeCake.Abstractions;
 using SimpleGitVersion;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 
 namespace CodeCake

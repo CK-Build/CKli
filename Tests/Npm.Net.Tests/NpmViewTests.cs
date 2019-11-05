@@ -36,6 +36,6 @@ namespace Npm.Net.Tests
             json["name"].ToString().Should().Be( "@signature/json-graph-serializer" );
         }
 
-        
+
     }
 }

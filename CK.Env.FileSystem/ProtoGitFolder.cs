@@ -30,7 +30,7 @@ namespace CK.Env
             SecretKeyStore secretKeyStore,
             FileSystem fileSystem,
             CommandRegister commandRegister )
-            : base(secretKeyStore, url, isPublic)
+            : base( secretKeyStore, url, isPublic )
         {
             if( folderPath.IsEmptyPath ) throw new ArgumentException( "Empty path: FileSystem.Root path can not be a Git folder.", nameof( folderPath ) );
             if( folderPath.IsRooted ) throw new ArgumentException( "Must be relative to the FileSystem.Root.", nameof( folderPath ) );

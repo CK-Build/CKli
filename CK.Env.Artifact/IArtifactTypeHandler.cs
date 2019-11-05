@@ -29,7 +29,7 @@ namespace CK.Env
         /// <param name="repositories">The repositories already initialized.</param>
         /// <param name="feeds">The feeds already initialized.</param>
         /// <returns>The artifact feed or null.</returns>
-        IArtifactFeed CreateFeedFromXML(IActivityMonitor m, in XElementReader r, IReadOnlyList<IArtifactRepository> repositories, IReadOnlyList<IArtifactFeed> feeds );
+        IArtifactFeed CreateFeedFromXML( IActivityMonitor m, in XElementReader r, IReadOnlyList<IArtifactRepository> repositories, IReadOnlyList<IArtifactFeed> feeds );
 
     }
 }

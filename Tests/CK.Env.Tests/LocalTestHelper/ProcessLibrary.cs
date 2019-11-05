@@ -1,9 +1,7 @@
 using CK.Core;
-using CK.Env.Plugin;
 using CK.Text;
 using FluentAssertions;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -82,7 +80,7 @@ namespace CK.Env.Tests.LocalTestHelper
             string tempName = "temp";
             NormalizedPath tempZip = ImageManager.CacheUniverseFolder.AppendPart( tempName + ".zip" );
             File.Delete( tempZip );
-            universe.SnapshotState( tempName ).Should().Be(tempZip);
+            universe.SnapshotState( tempName ).Should().Be( tempZip );
             return ImageManager.InstantiateImage( m, tempZip );
         }
 
