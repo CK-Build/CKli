@@ -220,7 +220,11 @@ namespace CKli
             {
                 bool provided = !string.IsNullOrWhiteSpace( sourceProviderName );
                 if( missing && provided ) throw new InvalidOperationException( "Cannot be both missing and provided" );
-                if( missing ) sourceProviderName = "Missing";
+                if( missing )
+                {
+                    sourceProviderName = "Missing";
+                    provided = true;
+                }
 
                 return provided
                     ? $"[{sourceProviderName}]" + new string( ' ', paddingSize - sourceProviderName.Length )
@@ -261,7 +265,7 @@ namespace CKli
             foreach( var k in v.KeyStore.Infos )
             {
                 if( k.SuperKey != null ) continue;
-                Console.ForegroundColor = k.IsSecretAvailable ? (!string.IsNullOrWhiteSpace( k.SourceProviderName ) ? ConsoleColor.Blue : ConsoleColor.Green) : ConsoleColor.Red;
+                Console.ForegroundColor = k.IsSecretAvailable ? (!string.IsNullOrWhiteSpace( k.SourceProviderName ) ? ConsoleColor.Cyan : ConsoleColor.Green) : ConsoleColor.Red;
                 Console.Write( FirstPadding( sourceNameMaxLength, k.SourceProviderName, !k.IsSecretAvailable ) );
                 WhitePipe();
                 Console.WriteLine( k.Name );
@@ -277,7 +281,7 @@ namespace CKli
                 {
                     if( sub.IsSecretAvailable )
                     {
-                        Console.ForegroundColor = displayedAvailable ? (!string.IsNullOrWhiteSpace( sub.SourceProviderName ) ? ConsoleColor.Blue : ConsoleColor.DarkGreen) : ConsoleColor.Green;
+                        Console.ForegroundColor = displayedAvailable ? (!string.IsNullOrWhiteSpace( sub.SourceProviderName ) ? ConsoleColor.Cyan : ConsoleColor.DarkGreen) : ConsoleColor.Green;
                         displayedAvailable = true;
                     }
                     else

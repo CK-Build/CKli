@@ -29,12 +29,14 @@ namespace CK.Env.NPM
         /// </summary>
         public bool UsePassword { get; }
 
-        protected override Registry CreateRegistry( IActivityMonitor m )
+        protected override Registry CreateRegistry( IActivityMonitor m, bool throwOnError )
         {
             var u = new Uri( Url );
+            string secret = ResolveSecret( m, throwOnError );
+            if( secret == null ) return null;
             return UsePassword
-                    ? new Registry( Client.HttpClient, "CKli", ResolveSecret( m, true ), u )
-                    : new Registry( Client.HttpClient, ResolveSecret( m, true ), u );
+                    ? new Registry( Client.HttpClient, "CKli", secret, u )
+                    : new Registry( Client.HttpClient, secret, u );
         }
     }
 }

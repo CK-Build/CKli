@@ -63,16 +63,17 @@ namespace CK.Env.NPM
         public bool HandleArtifactType( in ArtifactType artifactType ) => artifactType == NPMClient.NPMType;
 
         /// <summary>
-        /// Resolves the target NPM registry. Never null.
+        /// Resolves the target NPM registry.
         /// </summary>
-        public Registry GetRegistry( IActivityMonitor m ) => _registry ?? (_registry = CreateRegistry( m ));
+        public Registry GetRegistry( IActivityMonitor m, bool throwOnError = true ) => _registry ?? (_registry = CreateRegistry( m, throwOnError ));
 
         /// <summary>
-        /// Creates the registry or throws on error.
+        /// Creates the registry.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
+        /// <param name="throwOnError">If true, throw when the <see cref="Registry"/> cannot be instantied.</param>
         /// <returns>The initialized registry.</returns>
-        protected abstract Registry CreateRegistry( IActivityMonitor m );
+        protected abstract Registry CreateRegistry( IActivityMonitor m, bool throwOnError );
 
         /// <summary>
         /// Overridden to return the <see cref="UniqueRepositoryName"/> string.
@@ -111,7 +112,7 @@ namespace CK.Env.NPM
         /// <returns>True if found, false otherwise.</returns>
         public virtual Task<bool> ExistsAsync( IActivityMonitor m, string packageId, SVersion version )
         {
-            return GetRegistry( m ).ExistAsync( m, packageId, version );
+            return GetRegistry( m, true ).ExistAsync( m, packageId, version );
         }
 
         /// <summary>
@@ -129,7 +130,7 @@ namespace CK.Env.NPM
                 var pushed = new List<LocalNPMPackageFile>();
                 foreach( LocalNPMPackageFile file in files )
                 {
-                    if( await GetRegistry( m ).ExistAsync( m, file.Instance.Artifact.Name, file.Instance.Version ) )
+                    if( await GetRegistry( m, true ).ExistAsync( m, file.Instance.Artifact.Name, file.Instance.Version ) )
                     {
                         m.Info( $"Package '{file.Instance}' already in '{ToString()}'. Push skipped." );
                         skipped.Add( file );
@@ -139,7 +140,7 @@ namespace CK.Env.NPM
                         string firstDistTag = file.Instance.Version.PackageQuality.GetLabels()[0].ToString();
                         using( FileStream fileStream = File.OpenRead( file.FullPath ) )
                         {
-                            if( GetRegistry( m ).Publish( m,
+                            if( GetRegistry( m, true ).Publish( m,
                                     tarballPath: file.FullPath,
                                     isPublic: arePublicArtifacts,
                                     scope: file.PackageScope,
@@ -160,7 +161,7 @@ namespace CK.Env.NPM
                     {
                         foreach( var label in file.Instance.Version.PackageQuality.GetLabels().Skip( 1 ) )
                         {
-                            success &= await GetRegistry( m ).AddDistTag( m, file.Instance.Artifact.Name, file.Instance.Version, label.ToString() );
+                            success &= await GetRegistry( m, true ).AddDistTag( m, file.Instance.Artifact.Name, file.Instance.Version, label.ToString() );
                         }
                     }
                     if( success )

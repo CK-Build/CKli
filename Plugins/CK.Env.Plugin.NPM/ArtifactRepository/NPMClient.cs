@@ -114,8 +114,8 @@ namespace CK.Env.NPM
             return new NPMFeed( scope, url, creds, () =>
             {
                 Registry registry =
-                    repositories.OfType<NPMAzureRepository>().FirstOrDefault( repo => repo.Scope == scope )?.GetRegistry( m )
-                    ?? repositories.OfType<NPMStandardRepository>().FirstOrDefault( repo => repo.Url.Equals( url, StringComparison.OrdinalIgnoreCase ) )?.GetRegistry( m );
+                    repositories.OfType<NPMAzureRepository>().FirstOrDefault( repo => repo.Scope == scope )?.GetRegistry( m, false )
+                    ?? repositories.OfType<NPMStandardRepository>().FirstOrDefault( repo => repo.Url.Equals( url, StringComparison.OrdinalIgnoreCase ) )?.GetRegistry( m, false );
                 if( registry != null ) return registry;
 
                 string secret = creds.IsSecretKeyName ?

@@ -58,9 +58,10 @@ namespace CK.Env.NPM
         /// </summary>
         public override string SecretKeyName => AzureDevOpsAPIHelper.GetSecretKeyName( Organization );
 
-        protected override Registry CreateRegistry( IActivityMonitor m )
+        protected override Registry CreateRegistry( IActivityMonitor m, bool throwOnError )
         {
-            string pat = ResolveSecret( m, true );
+            string pat = ResolveSecret( m, throwOnError );
+            if( string.IsNullOrWhiteSpace( pat ) ) return null;
             return new Registry( Client.HttpClient, "CKli", pat, new Uri( Url ) );
         }
 

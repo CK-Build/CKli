@@ -417,7 +417,7 @@ namespace CK.Env.NPM
                         }
                         else
                         {
-                            m.Error( "Unable to authenticate, need: " + string.Join( ",", auth ) );
+                            m.Error( "Unable to authenticate, need: " + string.Join( ", ", auth ) );
                         }
                     }
                     else
