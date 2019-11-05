@@ -19,7 +19,7 @@ namespace CK.Env
                     string description = b.HandleRequiredAttribute<string>( "Description" );
                     keyStore.DeclareSecretKey( name, desc => description, true, "World" );
                     keyStore.SetSecret( initializer.Monitor, name, password );
-                    return null;
+                    return name;
                 }
             );
             initializer.Reader.WarnUnhandled();
