@@ -336,8 +336,8 @@ namespace CK.Env.DependencyModel
             var options = new DependencySorterOptions();
             if( traceGraphDetails )
             {
-                options.HookInput = i => i.Trace( m );
-                options.HookOutput = i => i.Trace( m );
+                options.HookInput = i => i.Debug( m );
+                options.HookOutput = i => i.Debug( m );
             }
             IDependencySorterResult result = DependencySorter.OrderItems( m, sortables.Values, null, options );
             if( !result.IsComplete )
