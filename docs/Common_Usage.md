@@ -87,3 +87,20 @@ The commands names are case insensitive, and you can filter them with a widlcard
 Available Commands matching 'yodii*common*apply*':
      Yodii-Projects/Yodii-Script/branches/develop/Common/ApplySettings
 ```
+
+## Managing External Dependencies
+
+### Displaying External Dependencies
+
+You can display external dependencies with the command `World/ShowExternalDependencies`.
+
+The version in green with a left arrow are possible upgrade, version in white with a right arrow are version actually installed.
+If multiple versions of the same package is installed, the version are colored in yellow.
+
+### Upgrading External Dependencies
+
+You can upgrade the dependencies accross the stack simply, with the command `World/UpgradeDependency`.
+
+You just have to give the package name in the parameter, and optionally the package version. If the package version is not provided, the best version used in the stack will be used.
+
+
