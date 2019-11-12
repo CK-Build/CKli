@@ -107,8 +107,8 @@ namespace CK.Env.Plugin
             var s = _solutionDriver.GetSolution( m, allowInvalidSolution: true );
             if( s == null ) return;
 
-            var text = GitFolder.FileSystem.GetFileInfo( f ).AsTextFileInfo( ignoreExtension: true )?.TextContent ?? String.Empty;
-            var lines = _rLine.Matches( text )
+            string text = GitFolder.FileSystem.GetFileInfo( f ).AsTextFileInfo( ignoreExtension: true )?.TextContent ?? String.Empty;
+            List<Line> lines = _rLine.Matches( text )
                             .Cast<Match>()
                             .Select( l => l.Groups[2].Length > 0
                                             ? new Line( l.Groups[1].Value, l.Groups[2].Value )

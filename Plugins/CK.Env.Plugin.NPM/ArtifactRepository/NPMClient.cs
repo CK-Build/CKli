@@ -102,10 +102,6 @@ namespace CK.Env.NPM
             {
                 r.ThrowXmlException( $"NPM feed with the same scope '{scope}' is already defined." );
             }
-            if( npmFeeds.Any( f => StringComparer.OrdinalIgnoreCase.Equals( f.Url, url ) ) )
-            {
-                r.ThrowXmlException( $"NPM feed with the same url '{url}' is already defined." );
-            }
             if( creds.IsSecretKeyName )
             {
                 SecretKeyStore.DeclareSecretKey( creds.PasswordOrSecretKeyName, ( a ) => "PAT Used to authenticate CKli to the feeds, and retrieve informations about npm packages." );
