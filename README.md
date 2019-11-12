@@ -221,3 +221,7 @@ To open a World, you can type its number and press `enter`.
 On World the opening, CKli will automatically clone all the repositories of SC.
 
 :tada: You are now ready to operate on a World. To see what you can do, please head to the [Common Usages](docs/Common_Usage.md).
+
+## See Also
+- https://blog.7mind.io/role-based-repositories.html
+- https://github.com/7mind/sbtgen
