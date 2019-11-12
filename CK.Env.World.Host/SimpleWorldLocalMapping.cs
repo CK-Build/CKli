@@ -32,10 +32,11 @@ namespace CK.Env
             }
         }
 
-        void Save()
-        {
-            File.WriteAllLines( _filePath, _map.OrderBy( k => k.Key ).Select( k => k.Key + " > " + k.Value ) );
-        }
+        /// <summary>
+        /// Fires when <see cref="SetMap(IActivityMonitor, string, NormalizedPath)"/> changed a mapping
+        /// (and has persisted the change).
+        /// </summary>
+        public event EventHandler MappingChanged;
 
         /// <summary>
         /// Gets the root path for a World.
@@ -80,8 +81,14 @@ namespace CK.Env
             _map[worldFullName] = mappedPath;
             m.Info( $"Mapping updated: '{worldFullName}' -> '{mappedPath}'." );
             Save();
+            MappingChanged?.Invoke( this, EventArgs.Empty );
             return true;
         }
+        void Save()
+        {
+            File.WriteAllLines( _filePath, _map.OrderBy( k => k.Key ).Select( k => k.Key + " > " + k.Value ) );
+        }
+
     }
 
 }

@@ -44,18 +44,18 @@ namespace CK.Env
             {
                 // First initialization: the key vault is not opened.
                 _xTypedObjectfactory.AutoRegisterFromLoadedAssemblies( m );
-                _store.ReadStacksFromFile( m );
+                _store.ReadStacksFromLocalStacksFilePath( m );
             }
             else
             {
-                _store.PullAll( m );
+                _store.ReadWorlds( m, true );
             }
         }
 
         [CommandMethod]
         public void Refresh( IActivityMonitor m )
         {
-            _store.PullAll( m );
+            _store.ReadWorlds( m );
             if( WorldSelector.CanClose )
             {
                 var opened = WorldSelector.CurrentWorld.WorldName.FullName;

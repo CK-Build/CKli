@@ -26,20 +26,14 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public static TestUniverse SeedInitialSetup( this TestUniverse universe, IActivityMonitor m )
         {
-            universe.UserHost.WorldStore.EnsureStackDefinition(
-                m: m,
-                stackName: "CKTest-Build",
-                url: universe.StackBareGitPath,
-                isPublic: true,
-                mappedPath: universe.UserLocalDirectory
-            );
+            universe.UserHost.WorldStore.EnsureStackRepository( m, universe.StackBareGitPath, isPublic: true );
+
             TestUniverse.PlaceHolderSwapEverything(
                 m: m,
                 tempPath: universe.UniversePath,
                 oldString: TestUniverse.PlaceHolderString,
                 newString: universe.UniversePath
             );
-            universe.UserHost.WorldStore.PullAll( m ).Should().BeFalse();//The repo was previously cloned, pulling should do nothing.
             EnsureWorldOpened( universe, m, "CKTest-Build" );
             return universe;
         }

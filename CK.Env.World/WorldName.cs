@@ -5,7 +5,7 @@ namespace CK.Env
     /// <summary>
     /// Immutable implementation of <see cref="IWorldName"/>.
     /// </summary>
-    public class WorldName : IWorldName
+    public class WorldName : IWorldName, IEquatable<IWorldName>
     {
         /// <summary>
         /// Gets the base name of this world: this is the name of the "Stack".
@@ -69,5 +69,12 @@ namespace CK.Env
             }
             LocalBranchName = DevelopBranchName + "-local";
         }
+
+        public override bool Equals( object obj ) => obj is IWorldName n ? Equals( n ) : false;
+
+        public override int GetHashCode() => FullName.GetHashCode();
+
+        public bool Equals( IWorldName other ) => FullName.Equals( other.FullName, StringComparison.OrdinalIgnoreCase );
+
     }
 }

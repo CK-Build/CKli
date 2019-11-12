@@ -40,17 +40,12 @@ namespace CK.Env
         /// <summary>
         /// Tries to parse a xml World definition file name.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
         /// <param name="path">The file path.</param>
         /// <param name="localMap">The mapper to use.</param>
         /// <returns>The name or null on error.</returns>
-        public static LocalWorldName TryParse( IActivityMonitor m, NormalizedPath path, IWorldLocalMapping localMap )
+        public static LocalWorldName TryParse( NormalizedPath path, IWorldLocalMapping localMap )
         {
-            if( path.IsEmptyPath || !path.LastPart.EndsWith( ".World.xml", StringComparison.OrdinalIgnoreCase ) )
-            {
-                m.Error( $"Path must end with '.World.xml': '{path}'" );
-                return null;
-            }
+            if( path.IsEmptyPath || !path.LastPart.EndsWith( ".World.xml", StringComparison.OrdinalIgnoreCase ) ) return null;
             try
             {
                 var fName = path.LastPart;
@@ -64,11 +59,11 @@ namespace CK.Env
                 int paraLength = fName.IndexOf( ']' ) - idx - 1;
                 return new LocalWorldName( path, fName.Substring( 0, idx ), fName.Substring( idx + 1, paraLength ), localMap );
             }
-            catch( Exception ex )
+            catch
             {
-                m.Error( $"While parsing file path: {path}.", ex );
                 return null;
             }
         }
+
     }
 }
