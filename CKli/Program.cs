@@ -157,7 +157,7 @@ namespace CKli
                 if( rep == "exit" ) return;
                 if( !hasWorld && Int32.TryParse( rep, out var idx ) )
                 {
-                    host.WorldSelector.Open( monitor, idx.ToString() );
+                    host.WorldSelector.OpenWorld( monitor, idx.ToString() );
                     continue;
                 }
                 Console.WriteLine( "Unrecognized command." );
@@ -210,13 +210,14 @@ namespace CKli
                     Console.WriteLine( $"  - {w.Name}" );
                     name = w.Name;
                 }
+                ++idx;
                 if( w.Root.IsEmptyPath )
                 {
-                    Console.WriteLine( $"     > ... {w.FullName} => (No local mapping. 'run Home/SetWorldMapping' to set it.)" );
+                    Console.WriteLine( $"     > ... {w.FullName} => (No local mapping. 'run World/SetWorldMapping' to set it.)" );
                 }
                 else
                 {
-                    Console.WriteLine( $"     > {++idx} {w.FullName} => {(w.Root.IsEmptyPath ? "(No local mapping)" : w.Root.Path)}" );
+                    Console.WriteLine( $"     > {idx} {w.FullName} => {(w.Root.IsEmptyPath ? "(No local mapping)" : w.Root.Path)}" );
                 }
             }
         }

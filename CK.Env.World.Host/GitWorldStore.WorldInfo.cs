@@ -57,6 +57,23 @@ namespace CK.Env
             /// </summary>
             public bool HasDefinitionFile { get; internal set; }
 
+            /// <summary>
+            /// Gets whether this <see cref="WorldInfo"/> has been disposed.
+            /// </summary>
+            public bool IsDisposed => _name == null;
+
+            /// <summary>
+            /// Destroys this WorldInfo: this removes this object from the <see cref="StackRepo.Worlds"/>.
+            /// </summary>
+            public void Dispose()
+            {
+                if( _name != null )
+                {
+                    Repo.OnDispose( this );
+                    _name = null;
+                }
+            }
+
             internal void UpdateMapping( IWorldLocalMapping mapping )
             {
                 Debug.Assert( mapping != null );

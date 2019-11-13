@@ -1,10 +1,10 @@
+using CK.Text;
+using LibGit2Sharp;
 using System;
 using System.IO;
 using System.Linq;
-using LibGit2Sharp;
 using System.Runtime.CompilerServices;
 using static CK.Testing.MonitorTestHelper;
-using CK.Text;
 
 namespace CK.Env.Tests
 {

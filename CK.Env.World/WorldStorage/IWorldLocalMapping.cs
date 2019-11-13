@@ -1,4 +1,6 @@
+using CK.Core;
 using CK.Text;
+using System;
 
 namespace CK.Env
 {
@@ -15,5 +17,21 @@ namespace CK.Env
         /// <param name="w">The world name.</param>
         /// <returns>The path to the root directory or <see cref="NormalizedPath.IsEmptyPath"/> if it is not mapped.</returns>
         NormalizedPath GetRootPath( IWorldName w );
+
+        /// <summary>
+        /// Fires when <see cref="SetMap"/> changed a mapping (and has persisted the change).
+        /// </summary>
+        event EventHandler MappingChanged;
+
+        /// <summary>
+        /// Creates or updates a mapping between a <see cref="IWorldName.FullName"/> and a local path.
+        /// The change is immediately persisted.
+        /// </summary>
+        /// <param name="m"></param>
+        /// <param name="worldFullName">World's full name. Must not be null, empty or white space.</param>
+        /// <param name="mappedPath">Local path. Must be rooted.</param>
+        /// <returns>True if the path has been set, false if nothing changed.</returns>
+        bool SetMap( IActivityMonitor m, string worldFullName, in NormalizedPath mappedPath );
+
     }
 }

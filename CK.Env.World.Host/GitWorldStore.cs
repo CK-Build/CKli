@@ -11,7 +11,7 @@ using System.Xml.Linq;
 namespace CK.Env
 {
     /// <summary>
-    /// Encapsulates a whole context.
+    /// Implements a World store based on Git repositories.
     /// </summary>
     public sealed partial class GitWorldStore : WorldStore, ICommandMethodsProvider, IDisposable
     {
@@ -44,7 +44,7 @@ namespace CK.Env
             }
         }
 
-        NormalizedPath ICommandMethodsProvider.CommandProviderName => UserHost.HomeCommandPath;
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => UserHost.WorldCommandPath;
 
         new SimpleWorldLocalMapping WorldLocalMapping => (SimpleWorldLocalMapping)base.WorldLocalMapping;
 
@@ -93,7 +93,7 @@ namespace CK.Env
             {
                 using( m.OpenInfo( "Since there is no Stack defined, we initialize CK and CK-Build mapped to '/Dev/CK' by default." ) )
                 {
-                    m.Info( $"Use Home/{nameof( SetWorldMapping )} command to update the mapping." );
+                    m.Info( $"Use 'run World/{nameof( SetWorldMapping )}' command to update the mapping." );
                     _stackRepos.Add( new StackRepo( this, new Uri( "https://github.com/signature-opensource/CK-Stack.git" ), true ) );
                     WorldLocalMapping.SetMap( m, "CK-Build", "/Dev/CK" );
                     WorldLocalMapping.SetMap( m, "CK", "/Dev/CK" );
@@ -122,47 +122,24 @@ namespace CK.Env
                 }
             }
         }
-        
-        /// <summary>
-        /// Must be called after <see cref="ReadStacksFromLocalStacksFilePath(IActivityMonitor)"/>
-        /// and after beeing sure that all required secrets are available.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        public void Initialize( IActivityMonitor m )
-        {
-            foreach( var r in _stackRepos )
-            {
-                if( !r.Refresh( m, true ) )
-                {
-                    m.Warn( $"Unable to open repository '{r}'." );
-                }
-                else m.Trace( $"Repository '{r}' opened with {r.Worlds.Count} worlds." );
-            }
-        }
 
         /// <summary>
-        /// Gets or sets whether the commands related to repository or stacks management
+        /// Gets or sets whether the commands related to repositorystacks or world management
         /// must be disabled.
         /// </summary>
         public bool DisableRepositoryAndStacksCommands { get; set; }
 
         /// <summary>
-        /// Requires <see cref="DisableRepositoryAndStacksCommands"/> to be false.
-        /// </summary>
-        public bool CanEnsureStackRepository => !DisableRepositoryAndStacksCommands;
-
-        /// <summary>
-        /// Registers a new <see cref="StackRepo"/> or updates it <see cref="GitRepositoryKey.IsPublic"/> configuration.
+        /// Registers a new <see cref="StackRepo"/> or updates its <see cref="GitRepositoryKey.IsPublic"/> configuration.
+        /// This is exposed as a command by <see cref="UserHost.EnsureStackRepository"/> in order for Stack repository manipulations
+        /// (that are NOT world: it's meta) to appear in "Home/" command namespace instead of "World/".
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="url">The repository url. Must not be numm or empty.</param>
         /// <param name="isPublic">Whether this repository contains public (Open Source) worlds.</param>
-        [CommandMethod]
-        public void EnsureStackRepository(
-            IActivityMonitor m,
-            string url,
-            bool isPublic )
+        public void EnsureStackRepository( IActivityMonitor m, string url, bool isPublic )
         {
+            if( DisableRepositoryAndStacksCommands ) throw new InvalidOperationException( nameof( DisableRepositoryAndStacksCommands ) );
             if( String.IsNullOrWhiteSpace( url ) || !Uri.TryCreate( url, UriKind.Absolute, out var uri ) ) throw new ArgumentException( "Must be a valid url.", nameof( url ) );
             int idx = _stackRepos.IndexOf( r => r.OriginUrl.ToString().Equals( url, StringComparison.OrdinalIgnoreCase ) );
             if( idx < 0 )
@@ -187,17 +164,13 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Requires <see cref="DisableRepositoryAndStacksCommands"/> to be false.
-        /// </summary>
-        public bool CanDeleteStackRepository => !DisableRepositoryAndStacksCommands;
-
-        /// <summary>
         /// Removes a stack repository.
-        /// A warning is emitted if the stack is not found in the registered <see cref="Stacks"/>.
+        /// A warning is emitted if the repository is not registered.
+        /// This is exposed as a command by <see cref="UserHost.EnsureStackRepository"/> in order for Stack repository manipulations
+        /// (that are NOT world: it's meta) to appear in "Home/" command namespace instead of "World/".
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="stackName">The name of the stack to remove.</param>
-        [CommandMethod]
+        /// <param name="url">The url of the repository to remove.</param>
         public void DeleteStackRepository( IActivityMonitor m, string url )
         {
             if( String.IsNullOrWhiteSpace( url ) || !Uri.TryCreate( url, UriKind.Absolute, out var uri ) ) throw new ArgumentException( "Must be a valid url.", nameof( url ) );
@@ -205,10 +178,55 @@ namespace CK.Env
             if( idx < 0 ) m.Warn( $"Stack repository '{url}' not found." );
             else
             {
-                m.Info( $"Removing: '{_stackRepos[idx]}'." );
+                m.Info( $"Removing: '{_stackRepos[idx]}' with {_stackRepos[idx].Worlds.Count} world(s) in it." );
                 _stackRepos.RemoveAt( idx );
                 WriteStacksToLocalStacksFilePath( m );
             }
+        }
+
+        /// <summary>
+        /// Whether <see cref="DisableRepositoryAndStacksCommands"/> is false.
+        /// </summary>
+        public bool CanDeleteWorld => !DisableRepositoryAndStacksCommands;
+
+        /// <summary>
+        /// Deletes a stack or a world.
+        /// A warning is emitted if the world cannot be found.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="worldFullName">The world full name to remove.</param>
+        [CommandMethod]
+        public void DeleteWorld( IActivityMonitor m, string worldFullName )
+        {
+            if( !WorldName.TryParse( worldFullName, out var name ) )
+            {
+                m.Error( $"Invalid '{worldFullName}' world name." );
+                return;
+            }
+            List<WorldInfo> toRemove = null;
+            if( name.ParallelName == null )
+            {
+                toRemove = _stackRepos.SelectMany( r => r.Worlds ).Where( w => w.WorldName.Name == name.Name ).ToList();
+            }
+            else
+            {
+                toRemove = _stackRepos.SelectMany( r => r.Worlds ).Where( w => w.WorldName.FullName == name.FullName ).ToList();
+            }
+            if( toRemove.Count == 0 )
+            {
+                m.Warn( $"Unable to find '{worldFullName}' world." );
+                return;
+            }
+            if( toRemove.Count > 1 )
+            {
+                m.Info( $"Removing '{worldFullName}' Stack: removing '{toRemove.Select( w => w.WorldName.FullName ).Concatenate( "', '" )}' worlds." );
+            }
+            else 
+            {
+                m.Info( $"Removing '{worldFullName}' world." );
+            }
+            foreach( var w in toRemove ) w.Dispose();
+            WriteStacksToLocalStacksFilePath( m );
         }
 
         /// <summary>
@@ -218,7 +236,6 @@ namespace CK.Env
         /// <param name="worldFullName">The world full name that must exist.</param>
         /// <param name="mappedPath">The target mapped path.</param>
         /// <returns>True on success, false on error.</returns>
-        [CommandMethod]
         public bool SetWorldMapping( IActivityMonitor m, string worldFullName, NormalizedPath mappedPath )
         {
             var worlds = ReadWorlds( m );
@@ -239,10 +256,7 @@ namespace CK.Env
                 m.Error( $"Invalid '{mappedPath}'. It must be rooted." );
                 return false;
             }
-            if( !WorldLocalMapping.SetMap( m, w.FullName, mappedPath ) ) return true;
-            m.Info( $"World '{w.FullName}' is now mapped to '{mappedPath}'." );
-            ReadWorlds( m, false );
-            return true;
+            return WorldLocalMapping.SetMap( m, w.FullName, mappedPath );
         }
 
         /// <summary>
@@ -295,7 +309,7 @@ namespace CK.Env
             return true;
         }
 
-        protected override LocalWorldName DoCreateNewParrallel( IActivityMonitor m, IRootedWorldName source, string parallelName, XDocument content )
+        protected override LocalWorldName DoCreateNewParallel( IActivityMonitor m, IRootedWorldName source, string parallelName, XDocument content )
         {
             Debug.Assert( source != null );
             Debug.Assert( content != null );
@@ -305,7 +319,7 @@ namespace CK.Env
             if( source is LocalWorldName src
                 && (repo = _stackRepos.FirstOrDefault( r => src.XmlDescriptionFilePath.StartsWith( r.Root ))) == null )
             {
-                m.Error( $"Unable to find source world name." );
+                m.Error( $"Unable to find source World." );
                 return null;
             }
             string wName = source.Name + (parallelName != null ? '[' + parallelName + ']' : String.Empty);

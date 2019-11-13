@@ -107,16 +107,16 @@ namespace CK.Env.Tests.LocalTestHelper
             {
                 ReplaceInDirectoriesPaths(
                     ckliPath: ckliPath,
-                    oldString: GitWorldStore.CleanPathDirName( PlaceHolderString ),
-                    newString: GitWorldStore.CleanPathDirName( path )
+                    oldString: GitWorldStore.StackRepo.CleanPathDirName( PlaceHolderString ),
+                    newString: GitWorldStore.StackRepo.CleanPathDirName( path )
                 );
             }
             PlaceHolderSwapEverything( m, path, PlaceHolderString, path );
             var userHost = new UserHost( new FakeApplicationLifetime(), ckliPath );
             var output = new TestUniverse( m, path, userHost );
             userHost.Initialize( m );
-            userHost.WorldStore.DeleteStackDefinition( m, "CK" );
-            userHost.WorldStore.DeleteStackDefinition( m, "CK-Build" );
+            userHost.WorldStore.DeleteWorld( m, "CK" );
+            userHost.WorldStore.DeleteWorld( m, "CK-Build" );
             return output;
         }
 
@@ -183,7 +183,7 @@ namespace CK.Env.Tests.LocalTestHelper
             NormalizedPath tempPath = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
             FileHelper.DirectoryCopy( UniversePath, tempPath, true ); //Try to escape all handles.
             PlaceHolderSwapEverything( _m, tempPath, UniversePath, PlaceHolderString );
-            ReplaceInDirectoriesPaths( tempPath.AppendPart( _ckliMapping ), GitWorldStore.CleanPathDirName( UniversePath ), GitWorldStore.CleanPathDirName( PlaceHolderString ) );
+            ReplaceInDirectoriesPaths( tempPath.AppendPart( _ckliMapping ), GitWorldStore.StackRepo.CleanPathDirName( UniversePath ), GitWorldStore.StackRepo.CleanPathDirName( PlaceHolderString ) );
             NormalizedPath output = ImageManager.CacheUniverseFolder.AppendPart( imageName + ".zip" );
             File.Delete( output );
             ZipFile.CreateFromDirectory( tempPath, output );

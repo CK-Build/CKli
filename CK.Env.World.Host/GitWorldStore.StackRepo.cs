@@ -65,6 +65,11 @@ namespace CK.Env
             /// </summary>
             public string BranchName { get; }
 
+            internal void OnDispose( WorldInfo worldInfo )
+            {
+                _worlds.Remove( worldInfo );
+            }
+
             /// <summary>
             /// Commits and push changes to the remote.
             /// </summary>
@@ -73,8 +78,7 @@ namespace CK.Env
             internal bool PushChanges( IActivityMonitor m )
             {
                 Debug.Assert( IsOpen );
-                return _git.Commit( m, "Automatic synchronization commit." )
-                       && _git.Push( m );
+                return _git.Commit( m, "Automatic synchronization commit." ) && _git.Push( m );
             }
 
             /// <summary>
@@ -162,7 +166,12 @@ namespace CK.Env
                 }
             }
 
-            static string CleanPathDirName( string path ) =>
+            /// <summary>
+            /// This is public to be used by unit tests.
+            /// </summary>
+            /// <param name="path">The original path.</param>
+            /// <returns>The cleaned up path.</returns>
+            public static string CleanPathDirName( string path ) =>
                     path.Replace( ".git", "" )
                         .Replace( "_git", "" )
                         .Replace( '/', '_' )

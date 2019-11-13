@@ -28,7 +28,12 @@ namespace CK.Env
         /// <param name="factory">The factory for XTypedObjects.</param>
         /// <param name="userKeyStore">The user key store.</param>
         /// <param name="appLife">Simple application lifetime controller.</param>
-        public WorldSelector( WorldStore store, CommandRegister commandRegister, XTypedFactory factory, SecretKeyStore userKeyStore, IBasicApplicationLifetime appLife )
+        public WorldSelector(
+            WorldStore store,
+            CommandRegister commandRegister,
+            XTypedFactory factory,
+            SecretKeyStore userKeyStore,
+            IBasicApplicationLifetime appLife )
         {
             Store = store ?? throw new ArgumentNullException( nameof( store ) );
             _command = commandRegister ?? throw new ArgumentNullException( nameof( commandRegister ) );
@@ -50,21 +55,21 @@ namespace CK.Env
         /// </summary>
         public World CurrentWorld { get; private set; }
 
-        NormalizedPath ICommandMethodsProvider.CommandProviderName => UserHost.HomeCommandPath;
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => UserHost.WorldCommandPath;
 
         /// <summary>
         /// Closing current world: current world must not be null.
         /// </summary>
-        public bool CanClose => CurrentWorld != null;
+        public bool CanCloseWorld => CurrentWorld != null;
 
         /// <summary>
         /// Closes the current world.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         [CommandMethod( confirmationRequired: false )]
-        public void Close( IActivityMonitor m )
+        public void CloseWorld( IActivityMonitor m )
         {
-            if( !CanClose ) throw new InvalidOperationException();
+            if( !CanCloseWorld ) throw new InvalidOperationException();
             m.Info( $"Closing current world: {CurrentWorld.WorldName.FullName}." );
             Close();
         }
@@ -72,7 +77,7 @@ namespace CK.Env
         /// <summary>
         /// Opening a world requires the current world to be closed first.
         /// </summary>
-        public bool CanOpen => CurrentWorld == null;
+        public bool CanOpenWorld => CurrentWorld == null;
 
         /// <summary>
         /// Tries to open a world in <see cref="Store"/> by its full name (or its One based index).
@@ -80,10 +85,10 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="worldFullNameOr1BasedIndex">The name or the index in the store.</param>
         /// <returns>True on success, false on error.</returns>
-        [CommandMethod]
-        public bool Open( IActivityMonitor m, string worldFullNameOr1BasedIndex )
+        [CommandMethod( confirmationRequired: false )]
+        public bool OpenWorld( IActivityMonitor m, string worldFullNameOr1BasedIndex )
         {
-            if( !CanOpen ) throw new InvalidOperationException();
+            if( !CanOpenWorld ) throw new InvalidOperationException();
             using( m.OpenInfo( $"Opening world '{worldFullNameOr1BasedIndex}'." ) )
             {
                 var all = Store.ReadWorlds( m );

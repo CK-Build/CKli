@@ -17,9 +17,9 @@ namespace CK.Env.Tests.LocalTestHelper
             {
                 if( currentWorldName != null )
                 {
-                    universe.UserHost.WorldSelector.Close( m );
+                    universe.UserHost.WorldSelector.CloseWorld( m );
                 }
-                universe.UserHost.WorldSelector.Open( m, worldName ).Should().BeTrue();
+                universe.UserHost.WorldSelector.OpenWorld( m, worldName ).Should().BeTrue();
             }
             return universe;
         }

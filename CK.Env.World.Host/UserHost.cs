@@ -8,6 +8,7 @@ namespace CK.Env
     public sealed class UserHost : ICommandMethodsProvider, IDisposable
     {
         public static readonly NormalizedPath HomeCommandPath = "Home";
+        public static readonly NormalizedPath WorldCommandPath = "World";
 
         readonly XTypedFactory _xTypedObjectfactory;
         readonly SimpleWorldLocalMapping _worldMapping;
@@ -52,20 +53,50 @@ namespace CK.Env
             }
         }
 
+        //[CommandMethod]
+        //public void Refresh( IActivityMonitor m )
+        //{
+        //    _store.ReadWorlds( m );
+        //    if( WorldSelector.CanClose )
+        //    {
+        //        var opened = WorldSelector.CurrentWorld.WorldName.FullName;
+        //        if( opened != null )
+        //        {
+        //            WorldSelector.CloseWorld( m );
+        //            WorldSelector.OpenWorld( m, opened );
+        //        }
+        //    }
+        //}
+
+        /// <summary>
+        /// Requires <see cref="GitWorldStore.DisableRepositoryAndStacksCommands"/> to be false.
+        /// </summary>
+        public bool CanEnsureStackRepository => !_store.DisableRepositoryAndStacksCommands;
+
+        /// <summary>
+        /// Registers a new <see cref="StackRepo"/> or updates its <see cref="GitRepositoryKey.IsPublic"/> configuration.
+        /// This method is exposed as a command here in order to appear in the "Home/" command namespace (instead of the "World/").
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="url">The repository url. Must not be numm or empty.</param>
+        /// <param name="isPublic">Whether this repository contains public (Open Source) worlds.</param>
         [CommandMethod]
-        public void Refresh( IActivityMonitor m )
-        {
-            _store.ReadWorlds( m );
-            if( WorldSelector.CanClose )
-            {
-                var opened = WorldSelector.CurrentWorld.WorldName.FullName;
-                if( opened != null )
-                {
-                    WorldSelector.Close( m );
-                    WorldSelector.Open( m, opened );
-                }
-            }
-        }
+        public void EnsureStackRepository( IActivityMonitor m, string url, bool isPublic ) => _store.EnsureStackRepository( m, url, isPublic );
+
+        /// <summary>
+        /// Requires <see cref="GitWorldStore.DisableRepositoryAndStacksCommands"/> to be false.
+        /// </summary>
+        public bool CanDeleteStackRepository => !_store.DisableRepositoryAndStacksCommands;
+
+        /// <summary>
+        /// Removes a stack repository.
+        /// A warning is emitted if the repository is not registered.
+        /// This method is exposed as a command here in order to appear in the "Home/" command namespace (instead of the "World/").
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="url">The url of the repository to remove.</param>
+        [CommandMethod]
+        public void DeleteStackRepository( IActivityMonitor m, string url ) => _store.DeleteStackRepository( m, url );
 
         public void Dispose()
         {

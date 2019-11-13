@@ -33,8 +33,7 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Fires when <see cref="SetMap(IActivityMonitor, string, NormalizedPath)"/> changed a mapping
-        /// (and has persisted the change).
+        /// Fires when <see cref="SetMap"/> changed a mapping (and has persisted the change).
         /// </summary>
         public event EventHandler MappingChanged;
 
@@ -69,8 +68,17 @@ namespace CK.Env
 
         internal bool IsMapped( string worldFullName ) => _map.ContainsKey( worldFullName );
 
-        internal bool SetMap( IActivityMonitor m, string worldFullName, NormalizedPath mappedPath )
+        /// <summary>
+        /// Creates or updates a mapping between a <see cref="IWorldName.FullName"/> and a local path.
+        /// The change is immediately persisted.
+        /// </summary>
+        /// <param name="m"></param>
+        /// <param name="worldFullName">World's full name. Must not be null, empty or white space.</param>
+        /// <param name="mappedPath">Local path. Must be rooted.</param>
+        /// <returns>True if the path has been set, false if nothing changed.</returns>
+        public bool SetMap( IActivityMonitor m, string worldFullName, in NormalizedPath mappedPath )
         {
+            if( String.IsNullOrWhiteSpace( worldFullName ) ) throw new ArgumentNullException( nameof( worldFullName ) ); 
             if( _map.TryGetValue( worldFullName, out var exists )
                 && (exists == mappedPath || mappedPath.IsEmptyPath) )
             {
@@ -84,6 +92,7 @@ namespace CK.Env
             MappingChanged?.Invoke( this, EventArgs.Empty );
             return true;
         }
+
         void Save()
         {
             File.WriteAllLines( _filePath, _map.OrderBy( k => k.Key ).Select( k => k.Key + " > " + k.Value ) );

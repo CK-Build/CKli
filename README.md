@@ -2,13 +2,14 @@
 
 ## What is CKli ?
 
-CKli is a tool for <u>multi-repositories</u> stacks. It allow to automate actions, on <u>Worlds</u> (a group of repositories), and concentrate information in a single place.
+CKli is a tool for <u>multi-repositories</u> stacks.
+It allows to automate actions, on <u>Worlds</u> (a group of repositories), and concentrates information in a single place.
 
 ## Getting Started
 
 ### Prerequisites
 
-- [.NET Core Runtime 2.1.](https://dotnet.microsoft.com/)
+- [.NET SDK 2.1.](https://dotnet.microsoft.com/)
 
 ### Installation
 
@@ -29,7 +30,7 @@ If you installed CKli globally, you can run `ckli` in any command prompt to star
 
 Since there is no Stack defined yet, CKli initializes one Repository that contains the CK and CK-Build stacks.
 Both of them are mapped to '/Dev/CK' by default: their repositories will be cloned in this folder.
-(Note that you can 'run Home/SetWorldMapping' command to update this default mapping.)
+(Note that you can 'run World/SetWorldMapping' command to update this default mapping.)
 
 CK and CK-Build are public Stacks in a Public repository: they should be cloneable by anyone. This is not always the case: CKli can work with private
 stacks that require authorizations: some **secrets will be required** (and of course even CK and CK-Build require secrets in order to push code).
@@ -54,15 +55,15 @@ This lists the available Stacks and Worlds an to open (and clone if needed) a wh
 
 There is 5 <u>basic commands</u> available, that allow you to:
 
-- `run` one or more of commands
-- `list` and discover available commands
-- clear the screen, with `cls`
-- manage your `secret`
-- `exit`
+- `list` and discover available commands.
+- `run` one or more of commands.
+- clear the screen, with `cls`.
+- manage your `secret` keys.
+- `exit`.
 
 These <u>basic commands</u> are available everywhere but the actual commands are the one that you `run` and they depend on the context.
 
-`run` and `list` accepts a command name that can contain simple wildcards (* and ?).
+`run` and `list` first parameter is a command name or a pattern with simple wildcards (* and ?).
 
 For example, `list home*`  will return any command starting with `home` : 
 

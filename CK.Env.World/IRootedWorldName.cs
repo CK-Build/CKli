@@ -3,7 +3,8 @@ using CK.Text;
 namespace CK.Env
 {
     /// <summary>
-    /// Extends <see cref="IWorldName"/> with a <see cref="Root"/> path.
+    /// Extends <see cref="IWorldName"/> with a <see cref="Root"/> path where the World's GitFolder
+    /// are checked out.
     /// </summary>
     public interface IRootedWorldName : IWorldName
     {

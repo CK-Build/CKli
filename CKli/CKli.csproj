@@ -6,8 +6,13 @@
     <LangVersion>7.3</LangVersion>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <PackAsTool>True</PackAsTool>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath=""/>
+  </ItemGroup>  
+
   <ItemGroup>
     <ProjectReference Include="..\Plugins\CK.Env.Plugin.Appveyor\CK.Env.Plugin.Appveyor.csproj" />
     <ProjectReference Include="..\Plugins\CK.Env.Plugin.Basics\CK.Env.Plugin.Basics.csproj" />

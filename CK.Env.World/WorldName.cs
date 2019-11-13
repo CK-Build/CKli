@@ -70,6 +70,31 @@ namespace CK.Env
             LocalBranchName = DevelopBranchName + "-local";
         }
 
+        /// <summary>
+        /// Tries to parse a full name.
+        /// </summary>
+        /// <param name="fullName">The full name to parse.</param>
+        /// <param name="name">The world name on success.</param>
+        /// <returns>True on success, false otherwise.</returns>
+        public static bool TryParse( string fullName, out WorldName name )
+        {
+            name = null;
+            if( !String.IsNullOrWhiteSpace( fullName ) )
+            {
+                int idx = fullName.IndexOf( '[' );
+                if( idx < 0 )
+                {
+                    name = new WorldName( fullName, null );
+                }
+                else
+                {
+                    int paraLength = fullName.IndexOf( ']' ) - idx - 1;
+                    name = new WorldName( fullName.Substring( 0, idx ), fullName.Substring( idx + 1, paraLength ) );
+                }
+            }
+            return name != null;
+        }
+
         public override bool Equals( object obj ) => obj is IWorldName n ? Equals( n ) : false;
 
         public override int GetHashCode() => FullName.GetHashCode();

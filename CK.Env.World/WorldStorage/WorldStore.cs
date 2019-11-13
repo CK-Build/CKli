@@ -26,7 +26,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the mapper.
         /// </summary>
-        protected IWorldLocalMapping WorldLocalMapping { get; }
+        public IWorldLocalMapping WorldLocalMapping { get; }
 
         /// <summary>
         /// Returns all the available worlds with their potential local path (ordered by <see cref="IWorldName.FullName"/>).
@@ -49,7 +49,7 @@ namespace CK.Env
             if( source == null ) throw new ArgumentNullException( nameof( source ) );
             if( content == null ) throw new ArgumentNullException( nameof( content ) );
             if( String.IsNullOrWhiteSpace( parallelName ) ) throw new ArgumentNullException( nameof( parallelName ) );
-            return DoCreateNewParrallel( m, source, parallelName, content );
+            return DoCreateNewParallel( m, source, parallelName, content );
         }
 
         /// <summary>
@@ -60,7 +60,7 @@ namespace CK.Env
         /// <param name="parallelName">The parallel world name to create. See <see cref="IWorldName"/>.</param>
         /// <param name="content">The initial content.</param>
         /// <returns>The new world or null on error.</returns>
-        protected abstract LocalWorldName DoCreateNewParrallel( IActivityMonitor m, IRootedWorldName source, string parallelName, XDocument content );
+        protected abstract LocalWorldName DoCreateNewParallel( IActivityMonitor m, IRootedWorldName source, string parallelName, XDocument content );
 
         /// <summary>
         /// Gets the world description of one world.
