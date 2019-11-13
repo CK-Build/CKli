@@ -38,13 +38,13 @@ namespace CK.Env
             internal static StackRepo Parse( GitWorldStore store, XElement e )
             {
                 var uri = new Uri( (string)e.AttributeRequired( nameof( OriginUrl ) ) );
-                var pub = (bool?)e.Attribute( nameof(IsPublic) ) ?? false;
+                var pub = (bool?)e.Attribute( nameof( IsPublic ) ) ?? false;
                 var r = new StackRepo( store, uri, pub, null );
-                r._worlds.AddRange( e.Elements( "Worlds" ).Elements( nameof(WorldInfo) ).Select( eW => new WorldInfo( r, eW ) ) );
+                r._worlds.AddRange( e.Elements( "Worlds" ).Elements( nameof( WorldInfo ) ).Select( eW => new WorldInfo( r, eW ) ) );
                 return r;
             }
 
-            internal XElement ToXml() => new XElement( nameof(StackRepo),
+            internal XElement ToXml() => new XElement( nameof( StackRepo ),
                                 new XAttribute( nameof( OriginUrl ), OriginUrl ),
                                 new XAttribute( nameof( IsPublic ), IsPublic ),
                                 new XElement( "Worlds", _worlds.Select( w => w.ToXml() ) ) );
@@ -161,8 +161,9 @@ namespace CK.Env
                     _git = null;
                 }
             }
+        }
 
-            static string CleanPathDirName( string path ) =>
+        public static string CleanPathDirName( string path ) =>
                     path.Replace( ".git", "" )
                         .Replace( "_git", "" )
                         .Replace( '/', '_' )
@@ -171,7 +172,6 @@ namespace CK.Env
                         .Trim( '_' )
                         .ToLowerInvariant();
 
-        }
 
     }
 }

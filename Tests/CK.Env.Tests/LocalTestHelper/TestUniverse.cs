@@ -115,8 +115,7 @@ namespace CK.Env.Tests.LocalTestHelper
             var userHost = new UserHost( new FakeApplicationLifetime(), ckliPath );
             var output = new TestUniverse( m, path, userHost );
             userHost.Initialize( m );
-            userHost.WorldStore.DeleteStackDefinition( m, "CK" );
-            userHost.WorldStore.DeleteStackDefinition( m, "CK-Build" );
+            userHost.WorldStore.DeleteStackRepository( m, "https://github.com/signature-opensource/CK-Stack.git" );
             return output;
         }
 
