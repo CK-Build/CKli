@@ -42,7 +42,8 @@ namespace CKli
             catch( Exception ex )
             {
                 monitor.Fatal( ex );
-                Console.ReadLine();
+                Console.WriteLine( "Hit a key." );
+                Console.ReadKey();
             }
         }
 
@@ -64,7 +65,7 @@ namespace CKli
                     Console.WriteLine( $"> {textCommands}" );
                 }
                 Console.Write( "> " );
-                string rep = Console.ReadLine().Trim();
+                string rep = ReadLine.Read().Trim();
                 if( rep.Length == 0 )
                 {
                     if( hasWorld ) host.CommandRegister["World/DumpWorldState"].Execute( monitor, null );
@@ -542,7 +543,7 @@ namespace CKli
 
         static string ReadNullableString()
         {
-            string s = Console.ReadLine();
+            string s = ReadLine.Read();
             if( s.Length == 0 ) return null;
             if( IsEmptyString( s ) ) return String.Empty;
             return s;
