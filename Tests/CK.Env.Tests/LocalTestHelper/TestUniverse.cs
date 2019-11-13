@@ -115,8 +115,8 @@ namespace CK.Env.Tests.LocalTestHelper
             var userHost = new UserHost( new FakeApplicationLifetime(), ckliPath );
             var output = new TestUniverse( m, path, userHost );
             userHost.Initialize( m );
-            userHost.WorldStore.DeleteWorld( m, "CK" );
-            userHost.WorldStore.DeleteWorld( m, "CK-Build" );
+            userHost.WorldStore.DestroyWorld( m, "CK" );
+            userHost.WorldStore.DestroyWorld( m, "CK-Build" );
             return output;
         }
 

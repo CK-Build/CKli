@@ -22,12 +22,13 @@ namespace CK.Env
         {
             LocalWorldName _name;
 
-            internal WorldInfo( StackRepo repo, LocalWorldName name, bool hasDefinitionFile )
+            internal WorldInfo( StackRepo repo, LocalWorldName name, bool hasDefinitionFile, bool isHidden )
             {
                 Debug.Assert( repo != null && name != null );
                 Repo = repo;
                 _name = name;
                 HasDefinitionFile = hasDefinitionFile;
+                IsHidden = isHidden;
             }
 
             internal WorldInfo( StackRepo r, XElement e )
@@ -36,11 +37,13 @@ namespace CK.Env
                 var n = (string)e.AttributeRequired( nameof( WorldName.FullName ) );
                 _name = LocalWorldName.TryParse( r.Root.AppendPart( n + ".World.xml" ), r.Store.WorldLocalMapping );
                 HasDefinitionFile = (bool?)e.Attribute( nameof( HasDefinitionFile ) ) ?? false;
+                IsHidden = (bool?)e.Attribute( nameof( IsHidden ) ) ?? false;
             }
 
             internal XElement ToXml() => new XElement( nameof(WorldInfo),
                                             new XAttribute( nameof( WorldName.FullName ), _name.FullName ),
-                                            new XAttribute( nameof( HasDefinitionFile ), HasDefinitionFile ) );
+                                            new XAttribute( nameof( HasDefinitionFile ), HasDefinitionFile ),
+                                            new XAttribute( nameof( IsHidden ), IsHidden ) );
 
             /// <summary>
             /// Gets the repository.
@@ -58,20 +61,41 @@ namespace CK.Env
             public bool HasDefinitionFile { get; internal set; }
 
             /// <summary>
-            /// Gets whether this <see cref="WorldInfo"/> has been disposed.
+            /// Gets or sets whether this world is hidden.
             /// </summary>
-            public bool IsDisposed => _name == null;
+            public bool IsHidden { get; set; }
+
+            /// Gets whether this <see cref="WorldInfo"/> has been destroyed.
+            /// </summary>
+            public bool IsDestroyed => _name == null;
 
             /// <summary>
-            /// Destroys this WorldInfo: this removes this object from the <see cref="StackRepo.Worlds"/>.
+            /// Destroys this WorldInfo: this deletes the Local file state (in the <see cref="IRootedWorldName.Root"/>), the shared file state
+            /// and the definition file itself.
+            /// Once done we remove this object from the <see cref="StackRepo.Worlds"/>.
             /// </summary>
-            public void Dispose()
+            public bool Destroy( IActivityMonitor m )
             {
                 if( _name != null )
                 {
-                    Repo.OnDispose( this );
-                    _name = null;
+                    var p = Repo.Store.ToLocalStateFilePath( WorldName );
+                    try
+                    {
+                        File.Delete( p );
+                        p = Repo.Store.ToSharedStateFilePath( WorldName ).Item2;
+                        File.Delete( p );
+                        p = WorldName.XmlDescriptionFilePath;
+                        File.Delete( p );
+                        Repo.OnDestroy( this );
+                        _name = null;
+                    }
+                    catch( Exception ex )
+                    {
+                        m.Error( $"Unable to delete file '{p}'.", ex );
+                        return false;
+                    }
                 }
+                return true;
             }
 
             internal void UpdateMapping( IWorldLocalMapping mapping )

@@ -187,7 +187,7 @@ namespace CK.Env
         /// <summary>
         /// Whether <see cref="DisableRepositoryAndStacksCommands"/> is false.
         /// </summary>
-        public bool CanDeleteWorld => !DisableRepositoryAndStacksCommands;
+        public bool CanDestroyWorld => !DisableRepositoryAndStacksCommands;
 
         /// <summary>
         /// Deletes a stack or a world.
@@ -196,7 +196,7 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="worldFullName">The world full name to remove.</param>
         [CommandMethod]
-        public void DeleteWorld( IActivityMonitor m, string worldFullName )
+        public void DestroyWorld( IActivityMonitor m, string worldFullName )
         {
             if( !WorldName.TryParse( worldFullName, out var name ) )
             {
@@ -225,7 +225,14 @@ namespace CK.Env
             {
                 m.Info( $"Removing '{worldFullName}' world." );
             }
-            foreach( var w in toRemove ) w.Dispose();
+            foreach( var w in toRemove )
+            {
+                if( !w.Destroy( m ) )
+                {
+                    m.Error( $"Unable to destroy '{w.WorldName}'. Manual check required in folders '{RootPath}' and '{w.WorldName.Root}'." );
+                    break;
+                }
+            }
             WriteStacksToLocalStacksFilePath( m );
         }
 

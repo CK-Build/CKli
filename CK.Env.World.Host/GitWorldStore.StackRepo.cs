@@ -65,7 +65,7 @@ namespace CK.Env
             /// </summary>
             public string BranchName { get; }
 
-            internal void OnDispose( WorldInfo worldInfo )
+            internal void OnDestroy( WorldInfo worldInfo )
             {
                 _worlds.Remove( worldInfo );
             }
@@ -145,7 +145,7 @@ namespace CK.Env
                         foreach( var newWorld in worldNames.Values )
                         {
                             m.Info( $"Found a new World definition: creating '{newWorld.FullName}' entry." );
-                            _worlds.Add( new WorldInfo( this, newWorld, true ) );
+                            _worlds.Add( new WorldInfo( this, newWorld, true, force ) );
                         }
                     }
                 }
