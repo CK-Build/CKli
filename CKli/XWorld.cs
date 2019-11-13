@@ -22,7 +22,7 @@ namespace CKli
 
         public XWorld(
             FileSystem fileSystem,
-            IWorldName worldName,
+            IRootedWorldName worldName,
             WorldStore worldStore,
             IEnvLocalFeedProvider localFeeds,
             SecretKeyStore keyStore,

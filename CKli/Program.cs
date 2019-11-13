@@ -210,7 +210,14 @@ namespace CKli
                     Console.WriteLine( $"  - {w.Name}" );
                     name = w.Name;
                 }
-                Console.WriteLine( $"     > {++idx} {w.FullName} => {(w.Root.IsEmptyPath ? "(No local mapping)" : w.Root.Path)}" );
+                if( w.Root.IsEmptyPath )
+                {
+                    Console.WriteLine( $"     > ... {w.FullName} => (No local mapping. 'run Home/SetWorldMapping' to set it.)" );
+                }
+                else
+                {
+                    Console.WriteLine( $"     > {++idx} {w.FullName} => {(w.Root.IsEmptyPath ? "(No local mapping)" : w.Root.Path)}" );
+                }
             }
         }
 

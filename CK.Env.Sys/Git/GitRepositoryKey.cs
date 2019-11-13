@@ -54,8 +54,9 @@ namespace CK.Env
 
         /// <summary>
         /// Gets whether the Git repository is public.
+        /// Specialized classes may set this property.
         /// </summary>
-        public bool IsPublic { get; }
+        public bool IsPublic { get; protected set; }
 
         /// <summary>
         /// Gets the remote origin url.
@@ -107,6 +108,8 @@ namespace CK.Env
                     return KnownGitProvider.ToString().ToUpperInvariant() + "_GIT" + suffix;
             }
         }
+
+        public override string ToString() => $"{OriginUrl} ({(IsPublic ? "Public" : "Private" )})";
     }
 
 }

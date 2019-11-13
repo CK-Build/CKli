@@ -36,31 +36,31 @@ namespace CK.Env
         public abstract IReadOnlyList<IRootedWorldName> ReadWorlds( IActivityMonitor m );
 
         /// <summary>
-        /// Creates a new world in this store or returns null if the world already exists or if an error
-        /// prevents it to be created.
+        /// Creates a new world in this store from an existing source or returns null if the world
+        /// already exists or if an error prevents it to be created.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="name">The name of the world. See <see cref="IWorldName"/>.</param>
-        /// <param name="parallelName">The long-term support key. See <see cref="IWorldName"/>.</param>
+        /// <param name="source">The soure origin of the world. It must exist in the current worlds. See <see cref="IWorldName"/>.</param>
+        /// <param name="parallelName">The parallel world name to create. Must not be null or empty. See <see cref="IWorldName"/>.</param>
         /// <param name="content">The initial content. Must not be null.</param>
         /// <returns>The new world or null on error.</returns>
-        public IRootedWorldName CreateNew( IActivityMonitor m, string name, string parallelName, XDocument content )
+        public IRootedWorldName CreateNewParrallel( IActivityMonitor m, IRootedWorldName source, string parallelName, XDocument content )
         {
-            if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
+            if( source == null ) throw new ArgumentNullException( nameof( source ) );
             if( content == null ) throw new ArgumentNullException( nameof( content ) );
-            if( String.IsNullOrWhiteSpace( parallelName ) ) parallelName = null;
-            return DoCreateNew( m, name, parallelName, content );
+            if( String.IsNullOrWhiteSpace( parallelName ) ) throw new ArgumentNullException( nameof( parallelName ) );
+            return DoCreateNewParrallel( m, source, parallelName, content );
         }
 
         /// <summary>
         /// Must create a new world in this store or returns null if the world already exists.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="name">The name of the world. See <see cref="IWorldName"/>.</param>
-        /// <param name="parallelName">The long-term support key. See <see cref="IWorldName"/>.</param>
+        /// <param name="source">The soure origin of the world. It must exist in the current worlds. See <see cref="IWorldName"/>.</param>
+        /// <param name="parallelName">The parallel world name to create. See <see cref="IWorldName"/>.</param>
         /// <param name="content">The initial content.</param>
         /// <returns>The new world or null on error.</returns>
-        protected abstract LocalWorldName DoCreateNew( IActivityMonitor m, string name, string parallelName, XDocument content );
+        protected abstract LocalWorldName DoCreateNewParrallel( IActivityMonitor m, IRootedWorldName source, string parallelName, XDocument content );
 
         /// <summary>
         /// Gets the world description of one world.

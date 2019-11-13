@@ -27,33 +27,17 @@ If you installed CKli globally, you can run `ckli` in any command prompt to star
 
 ### First Run
 
-CKli will ask a password to secure your [KeyVault](docs/KeyVault.md), where all your secrets are stored. Every time you start CKli, your KeyVault password will be asked.
+Since there is no Stack defined yet, CKli initializes one Repository that contains the CK and CK-Build stacks.
+Both of them are mapped to '/Dev/CK' by default: their repositories will be cloned in this folder.
+(Note that you can 'run Home/SetWorldMapping' command to update this default mapping.)
 
-By default there is 2 stack available: CK and CK-Build.
+CK and CK-Build are public Stacks in a Public repository: they should be cloneable by anyone. This is not always the case: CKli can work with private
+stacks that require authorizations: some **secrets will be required** (and of course even CK and CK-Build require secrets in order to push code).
 
-### QuickStart: Cloning a World
+CKli manages a [KeyVault](docs/KeyVault.md) where all your secrets are stored. You must enter a password to secure this key vault, and every time you
+start CKli, you will be prompted for your KeyVault password. (If you trust your desktop security, this password doesn't need to be strong.)
 
-Gets the URL of the stack you want to clone from the [Stack Index](#Stack Index).
-
-Type `run Home/EnsureStackDefinition` and press `enter`.
-
-You now need to fill the argument of this command: 
-
-```powershell
-[required] - stackName:                            #The Name of the stack you are cloning
-[required] - url:                                  #The Url of the stack you are cloning
-[required] - isPublic: false                       #true for public stack, false otherwise
-[default value: <null>] - mappedPath: Enter path:  #the path were the stack will be cloned
-[default value: master] - branchName:              # you can keep this empty
-```
-
-If you see any warning, read them carefully: you may have a secret missing.
-
-Type `secret` to see all the secrets needed by CKli. You don't need to fill all of these, only those asked in the warning.
-
-To set a secret, type `secret set SECRET_NAME`.
-
-When you filled all the secrets, you can simply press `enter` and the stack you added will show up. 
+Once the required KeyVault password is entered, press `enter`: 
 
 ```
 --------- Worlds ---------
@@ -62,28 +46,23 @@ When you filled all the secrets, you can simply press `enter` and the stack you 
   - CK-Build
      > 2 CK-Build => /Dev/CK
      > 3 CK-Build[NetCore2] => /Dev/CK-Build[NetCore2]
-  - SC
-     > 4 SC => C:/dev/CK
 ```
 
-Upon opening a World, CKli will clone all the repositories.
-To open a world, type its number then press `enter`.
+This lists the available Stacks and Worlds an to open (and clone if needed) a whole World, type its number and press `enter`.
 
 ### Commands
 
 There is 5 <u>basic commands</u> available, that allow you to:
 
-- `run` a set of commands
-- `list` a set of commands
-- clear the prompt, with `cls`
+- `run` one or more of commands
+- `list` and discover available commands
+- clear the screen, with `cls`
 - manage your `secret`
 - `exit`
 
-These <u>basic commands</u> are available everywhere.
+These <u>basic commands</u> are available everywhere but the actual commands are the one that you `run` and they depend on the context.
 
-Different <u>commands</u> are available, depending on the context.
-
-The commands `run` and `list` works on a set of commands. You can <u>filter</u> those commands with wildcards and text.
+`run` and `list` accepts a command name that can contain simple wildcards (* and ?).
 
 For example, `list home*`  will return any command starting with `home` : 
 
@@ -111,6 +90,53 @@ Will output:
 |          <No payload>: Home/Close, Home/Refresh
 ```
 
+
+### QuickStart: Cloning a World
+
+Gets the URL of the stack you want to clone:
+
+| Stack Name | Repository URL                                                      |            |
+| ---------- | ------------------------------------------------------------------- | ---------- |
+| CK         | https://github.com/signature-opensource/CK-Stack                    | **Public** |
+| CK-Build   | https://github.com/signature-opensource/CK-Stack                    | **Public** |
+| Engie      | https://invenietis@dev.azure.com/invenietis/Cofely/_git/Engie-Stack | Private    |
+| SC         | https://gitlab.com/signature-code/signature-code-stack.git          | Private    |
+| S-Mos      | https://gitlab.com/signature-mosaic/Signature-Mosaic-Stack          | Private    |
+
+
+Type `run Home/EnsureStackRepository` (or `run *ensure*` since there is no other command with `Ensure` in its name) and press `enter`.
+
+You now need to fill the argument of this command that is the url and whether it is a Public or a Private stack: 
+
+```powershell
+[required] - url:                                  #The Url of the stack you are cloning
+[required] - isPublic:                             #true for public stack, false otherwise
+```
+
+If you see any warning, read them carefully: you may have a secret missing (and please note that the Public/Private flag is to handle
+the secrets requirements only: if you don't have the authorizations to access a repository, it is useless to try to make it Public!).
+
+Type `secret` to see all the secrets needed by CKli. You may not need to fill all of these, only those asked in the warning.
+
+To set a secret, type `secret set SECRET_NAME`.
+
+Once the required secrets entered, press `enter`: 
+
+```
+--------- Worlds ---------
+  - CK
+     > 1 CK => /Dev/CK
+  - CK-Build
+     > 2 CK-Build => /Dev/CK
+     > 3 CK-Build[NetCore2] => /Dev/CK-Build[NetCore2]
+  - SC
+     > 4 SC => C:/dev/CK
+```
+
+Upon opening a World, CKli will clone all the repositories.
+To open a world, type its number then press `enter`.
+
+
 ### Worlds And Stacks
 
 A World is a group of repositories.
@@ -135,16 +161,6 @@ To open a World, type its number then press `enter`.
 To close a world, run `Home/Close`.
 
 To add a Stack, use the command `Home/EnsureStackDefinition`  
-
-#### Stack Index
-
-| Stack Name | Repository URL                                                      |            |
-| ---------- | ------------------------------------------------------------------- | ---------- |
-| CK         | https://github.com/signature-opensource/CK-Stack                    | **Public** |
-| CK-Build   | https://github.com/signature-opensource/CK-Stack                    | **Public** |
-| Engie      | https://invenietis@dev.azure.com/invenietis/Cofely/_git/Engie-Stack | Private    |
-| SC         | https://gitlab.com/signature-code/signature-code-stack.git          | Private    |
-| S-Mos      | https://gitlab.com/signature-mosaic/Signature-Mosaic-Stack          | Private    |
 
 #### Add an existing Stack
 

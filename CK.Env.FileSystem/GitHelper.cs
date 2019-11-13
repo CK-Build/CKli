@@ -71,7 +71,7 @@ namespace CK.Env
         public NormalizedPath SubPath { get; }
 
         /// <summary>
-        /// Full physical path is the same as <see cref="RepositoryInformation.WorkingDirectory"/>.
+        /// Full physical path is the same as LibGit's <see cref="RepositoryInformation.WorkingDirectory"/>.
         /// </summary>
         public NormalizedPath FullPhysicalPath { get; }
 

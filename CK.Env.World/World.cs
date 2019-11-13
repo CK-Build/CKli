@@ -63,7 +63,7 @@ namespace CK.Env
             CommandRegister commandRegister,
             ArtifactCenter artifacts,
             WorldStore store,
-            IWorldName worldName,
+            IRootedWorldName worldName,
             bool isPublicWorld,
             IEnvLocalFeedProvider localFeedProvider,
             SecretKeyStore keyStore,
@@ -116,7 +116,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the world name.
         /// </summary>
-        public IWorldName WorldName { get; }
+        public IRootedWorldName WorldName { get; }
 
         /// <summary>
         /// Initializes this world state by loading the local and shared states.
@@ -1178,7 +1178,7 @@ namespace CK.Env
                     }
                 }
             }
-            if( _store.CreateNew( m, WorldName.Name, parallelName, worldData ) == null ) return false;
+            if( _store.CreateNewParrallel( m, WorldName, parallelName, worldData ) == null ) return false;
             bool error = false;
             using( m.OpenInfo( $"Pushing branches." ) )
             {

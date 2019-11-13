@@ -13,13 +13,10 @@ namespace CK.Env
     /// <summary>
     /// Encapsulates a whole context.
     /// </summary>
-    public sealed class GitWorldStore : WorldStore, ICommandMethodsProvider, IDisposable
+    public sealed partial class GitWorldStore : WorldStore, ICommandMethodsProvider, IDisposable
     {
         readonly NormalizedPath _rootPath;
-        readonly List<StackDef> _stacks;
-        readonly List<StackRepo> _repos;
-
-        int _syncCount;
+        readonly List<StackRepo> _stackRepos;
 
         public GitWorldStore(
             NormalizedPath userHostPath,
@@ -30,11 +27,21 @@ namespace CK.Env
         {
             _rootPath = userHostPath;
             SecretKeyStore = keyStore;
-            StacksFilePath = userHostPath.AppendPart( "Stacks.txt" );
-            _stacks = new List<StackDef>();
-            Stacks = _stacks;
-            _repos = new List<StackRepo>();
+            StacksFilePath = userHostPath.AppendPart( "Stacks.xml" );
+            _stackRepos = new List<StackRepo>();
+            mapping.MappingChanged += Mapping_MappingChanged;
             commandRegister.Register( this );
+        }
+
+        void Mapping_MappingChanged( object sender, EventArgs e )
+        {
+            foreach( var r in _stackRepos )
+            {
+                foreach( var w in r.Worlds )
+                {
+                    w.UpdateMapping( WorldLocalMapping );
+                }
+            }
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => UserHost.HomeCommandPath;
@@ -46,399 +53,163 @@ namespace CK.Env
         NormalizedPath StacksFilePath { get; }
 
         /// <summary>
-        /// Reads the Stacks.txt file and instanciates the <see cref="StackDef"/> objects:
-        /// this registers the required secrets in the key store.
+        /// Gets the stacks repositories.
+        /// </summary>
+        public IReadOnlyCollection<StackRepo> StackRepositories { get; }
+
+        /// <summary>
+        /// Gets the root path of thi store: it contains the <see cref="StackRepo"/>'s git working folder.
+        /// </summary>
+        public NormalizedPath RootPath => _rootPath;
+
+        /// <summary>
+        /// Reads the Stacks.xml file and instanciates the <see cref="StackRepo"/> objects and
+        /// their <see cref="WorldInfo"/>: creating the StackRepo registers the required secrets
+        /// in the key store.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        public void ReadStacksFromFile( IActivityMonitor m )
+        internal void ReadStacksFromLocalStacksFilePath( IActivityMonitor m )
         {
             if( !File.Exists( StacksFilePath ) )
             {
                 m.Warn( $"File '{StacksFilePath}' not found." );
             }
-            else using( m.OpenInfo( $"Reading '{StacksFilePath}'." ) )
+            else
+            {
+                using( m.OpenInfo( $"Reading '{StacksFilePath}'." ) )
                 {
-                    foreach( var line in File.ReadAllLines( StacksFilePath ).Where( line => !String.IsNullOrWhiteSpace( line ) ) )
+                    try
                     {
-                        Exception severe = null;
-                        try
-                        {
-                            var l = line.Split( '>' );
-                            if( l.Length >= 3 )
-                            {
-                                var name = l[0].Trim();
-                                if( name.Length > 0 )
-                                {
-                                    var url = l[1].Trim();
-                                    if( Uri.TryCreate( url, UriKind.Absolute, out var uri ) )
-                                    {
-                                        var pubTxt = l[2].Trim();
-                                        bool isPublic = pubTxt.Equals( "Public", StringComparison.OrdinalIgnoreCase );
-                                        string branchName = l.Length >= 4 ? l[3].Trim() : null;
-                                        FindOrCreateStackDef( m, name, url, isPublic, branchName );
-                                        continue;
-                                    }
-                                    else m.Error( $"Invalid repository url '{url}'." );
-                                }
-                                else m.Error( $"Missing stack name." );
-                            }
-                            else m.Error( $"Invalid line format." );
-                        }
-                        catch( Exception ex )
-                        {
-                            severe = ex;
-                        }
-                        m.Error( $"Unable to read line '{line}'.", severe );
+                        _stackRepos.Clear();
+                        _stackRepos.AddRange( XDocument.Load( StacksFilePath ).Root.Elements().Select( e => StackRepo.Parse( this, e ) ) );
+                    }
+                    catch( Exception ex )
+                    {
+                        m.Error( $"Unable to read '{StacksFilePath}' file.", ex );
                     }
                 }
-            if( _stacks.Count == 0 )
+            }
+            if( _stackRepos.Count == 0 )
             {
                 using( m.OpenInfo( "Since there is no Stack defined, we initialize CK and CK-Build mapped to '/Dev/CK' by default." ) )
                 {
                     m.Info( $"Use Home/{nameof( SetWorldMapping )} command to update the mapping." );
-                    EnsureStackDefinition( m, "CK-Build", "https://github.com/signature-opensource/CK-Stack.git", true, "/Dev/CK" );
-                    EnsureStackDefinition( m, "CK", "https://github.com/signature-opensource/CK-Stack.git", true, "/Dev/CK" );
+                    _stackRepos.Add( new StackRepo( this, new Uri( "https://github.com/signature-opensource/CK-Stack.git" ), true ) );
+                    WorldLocalMapping.SetMap( m, "CK-Build", "/Dev/CK" );
+                    WorldLocalMapping.SetMap( m, "CK", "/Dev/CK" );
                 }
             }
-            else UpdateReposFromDefinitions( m, StackInitializeOption.None );
         }
 
         /// <summary>
-        /// Must be called after <see cref="ReadStacksFromFile(IActivityMonitor)"/>
+        /// Updates the "Stacks.xml" file.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>True on success, false on error.</returns>
+        bool WriteStacksToLocalStacksFilePath( IActivityMonitor m )
+        {
+            using( m.OpenDebug( $"Saving {StacksFilePath}." ) )
+            {
+                try
+                {
+                    new XDocument( new XElement( "Stacks", _stackRepos.Select( r => r.ToXml() ) ) ).Save( StacksFilePath );
+                    return true;
+                }
+                catch( Exception ex )
+                {
+                    m.Error( ex );
+                    return false;
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Must be called after <see cref="ReadStacksFromLocalStacksFilePath(IActivityMonitor)"/>
         /// and after beeing sure that all required secrets are available.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         public void Initialize( IActivityMonitor m )
         {
-            UpdateReposFromDefinitions( m, StackInitializeOption.OpenAndPullRepository );
-        }
-
-        void WriteStacksToFile( IActivityMonitor m )
-        {
-            File.WriteAllLines( StacksFilePath, _stacks.Select( s => s.ToString() ) );
-        }
-
-        #region Stack Definition
-
-        /// <summary>
-        /// Exposes a stack definition: its name and repository (since this
-        /// specializes <see cref="GitRepositoryKey"/>).
-        /// </summary>
-        public class StackDef : GitRepositoryKey
-        {
-            internal StackDef( SecretKeyStore secretKeyStore, string stackName, Uri url, bool isPublic, string branchName = null )
-                : base( secretKeyStore, url, isPublic )
+            foreach( var r in _stackRepos )
             {
-                StackName = stackName;
-                BranchName = branchName ?? "master";
-            }
-
-            /// <summary>
-            /// Gets the stack name.
-            /// </summary>
-            public string StackName { get; }
-
-            /// <summary>
-            /// Gets the branch name: Should always be "master" but this may be changed.
-            /// </summary>
-            public string BranchName { get; }
-
-            /// <summary>
-            /// Overridden to return the one line format saved in the text file.
-            /// </summary>
-            /// <returns>This defintion on one line.</returns>
-            public override string ToString()
-            {
-                var m = $"{StackName} > {OriginUrl} > ";
-                m += IsPublic ? "Public" : "Private";
-                if( BranchName != "master" ) m += " > " + BranchName;
-                return m;
+                if( !r.Refresh( m, true ) )
+                {
+                    m.Warn( $"Unable to open repository '{r}'." );
+                }
+                else m.Trace( $"Repository '{r}' opened with {r.Worlds.Count} worlds." );
             }
         }
 
         /// <summary>
-        /// Gets the stacks definition.
+        /// Gets or sets whether the commands related to repository or stacks management
+        /// must be disabled.
         /// </summary>
-        public IReadOnlyCollection<StackDef> Stacks { get; }
+        public bool DisableRepositoryAndStacksCommands { get; set; }
 
         /// <summary>
-        /// Registers a new stack in <see cref="Stacks"/> or updates it.
+        /// Requires <see cref="DisableRepositoryAndStacksCommands"/> to be false.
+        /// </summary>
+        public bool CanEnsureStackRepository => !DisableRepositoryAndStacksCommands;
+
+        /// <summary>
+        /// Registers a new <see cref="StackRepo"/> or updates it <see cref="GitRepositoryKey.IsPublic"/> configuration.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="stackName">The name of the stack. This is the key.</param>
-        /// <param name="url">The remote repository url.</param>
-        /// <param name="isPublic">Whether this stack is public (Open Source). This will set whether the git repository hosting the stack is public or not</param>
-        /// <param name="mappedPath">
-        /// The mapped path used if no existing mapping already exists.
-        /// This is required if no mapping currently already exists, it must be a local rooted path.
-        /// </param>
-        /// <param name="branchName">Optional branch name. Should always be "master".</param>
+        /// <param name="url">The repository url. Must not be numm or empty.</param>
+        /// <param name="isPublic">Whether this repository contains public (Open Source) worlds.</param>
         [CommandMethod]
-        public void EnsureStackDefinition(
+        public void EnsureStackRepository(
             IActivityMonitor m,
-            string stackName,
             string url,
-            bool isPublic,
-            NormalizedPath mappedPath = default,
-            string branchName = "master" )
+            bool isPublic )
         {
-            if( String.IsNullOrWhiteSpace( stackName ) ) throw new ArgumentException( "Must not be empty.", nameof( stackName ) );
-
-            bool change = WorldLocalMapping.SetMap( m, stackName, mappedPath );
-            if( FindOrCreateStackDef( m, stackName, url, isPublic, branchName ) ) change = true;
-
-            if( change )
+            if( String.IsNullOrWhiteSpace( url ) || !Uri.TryCreate( url, UriKind.Absolute, out var uri ) ) throw new ArgumentException( "Must be a valid url.", nameof( url ) );
+            int idx = _stackRepos.IndexOf( r => r.OriginUrl.ToString().Equals( url, StringComparison.OrdinalIgnoreCase ) );
+            if( idx < 0 )
             {
-                UpdateReposFromDefinitions( m, StackInitializeOption.OpenAndPullRepository );
-                WriteStacksToFile( m );
-            }
-        }
-
-        /// <summary>
-        /// Returns true it the definition has been added or updated.
-        /// False if nothing changed.
-        /// </summary>
-        bool FindOrCreateStackDef(
-                        IActivityMonitor m,
-                        string stackName,
-                        string url,
-                        bool isPublic,
-                        string branchName )
-        {
-            var def = new StackDef( SecretKeyStore, stackName, new Uri( url ), isPublic, branchName );
-            int idx = _stacks.IndexOf( d => d.StackName.Equals( stackName, StringComparison.OrdinalIgnoreCase ) );
-            if( idx >= 0 )
-            {
-                if( _stacks[idx].ToString() == def.ToString() ) return false;
-                m.Info( $"Replaced existing Stack: '{_stacks[idx]}' with '{def}'." );
-                _stacks[idx] = def;
+                var r = new StackRepo( this, uri, isPublic );
+                if( r.Refresh( m ) )
+                {
+                    _stackRepos.Add( r );
+                    WriteStacksToLocalStacksFilePath( m );
+                }
             }
             else
             {
-                m.Info( $"Added Stack: '{def}'." );
-                _stacks.Add( def );
+                var r = _stackRepos[idx];
+                if( r.IsPublic != isPublic )
+                {
+                    r.IsPublic = isPublic;
+                    m.Info( $"Changing configuration for '{r.OriginUrl}' from {(isPublic ? "Private to Public" : "Public to Private" )}." );
+                    WriteStacksToLocalStacksFilePath( m );
+                }
             }
-            return true;
         }
 
         /// <summary>
-        /// Removes a stack.
+        /// Requires <see cref="DisableRepositoryAndStacksCommands"/> to be false.
+        /// </summary>
+        public bool CanDeleteStackRepository => !DisableRepositoryAndStacksCommands;
+
+        /// <summary>
+        /// Removes a stack repository.
         /// A warning is emitted if the stack is not found in the registered <see cref="Stacks"/>.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="stackName">The name of the stack to remove.</param>
         [CommandMethod]
-        public void DeleteStackDefinition( IActivityMonitor m, string stackName )
+        public void DeleteStackRepository( IActivityMonitor m, string url )
         {
-            int idx = _stacks.IndexOf( d => d.StackName.Equals( stackName, StringComparison.OrdinalIgnoreCase ) );
-            if( idx < 0 ) m.Warn( $"Stack named '{stackName}' not found." );
+            if( String.IsNullOrWhiteSpace( url ) || !Uri.TryCreate( url, UriKind.Absolute, out var uri ) ) throw new ArgumentException( "Must be a valid url.", nameof( url ) );
+            int idx = _stackRepos.IndexOf( r => r.OriginUrl.ToString().Equals( url, StringComparison.OrdinalIgnoreCase ) );
+            if( idx < 0 ) m.Warn( $"Stack repository '{url}' not found." );
             else
             {
-                m.Info( $"Removing: '{_stacks[idx]}'." );
-                _stacks.RemoveAt( idx );
-                UpdateReposFromDefinitions( m, StackInitializeOption.None );
+                m.Info( $"Removing: '{_stackRepos[idx]}'." );
+                _stackRepos.RemoveAt( idx );
+                WriteStacksToLocalStacksFilePath( m );
             }
         }
-
-        #endregion
-
-        #region Repository
-
-        public static string CleanPathDirName( string path ) =>
-                path.Replace( ".git", "" )
-                    .Replace( "_git", "" )
-                    .Replace( '/', '_' )
-                    .Replace( ':', '_' )
-                    .Replace( "__", "_" )
-                    .Trim( '_' )
-                    .ToLowerInvariant();
-
-        class StackRepo : IDisposable
-        {
-            public readonly Uri OriginUrl;
-            readonly GitWorldStore _store;
-            int _syncCount;
-
-            StackDef[] _stacks;
-            GitRepository _git;
-
-
-
-            public StackRepo( GitWorldStore store, Uri uri )
-            {
-                _store = store;
-                OriginUrl = uri;
-                var cleanPath = CleanPathDirName( uri.AbsolutePath );
-                Root = store._rootPath.AppendPart( cleanPath );
-            }
-
-            /// <summary>
-            /// Pulls the remote and returns true if the working folder has been updated.
-            /// </summary>
-            /// <param name="m">The monitor to use.</param>
-            /// <returns>True if the working folder has been updated.</returns>
-            internal bool Pull( IActivityMonitor m )
-            {
-                return EnsureOpen( m ) && _git.Pull( m, MergeFileFavor.Theirs ).ReloadNeeded;
-            }
-
-            /// <summary>
-            /// Commits and push changes to the remote.
-            /// </summary>
-            /// <param name="m">The monitor to use.</param>
-            /// <returns>True on success, false on error.</returns>
-            internal bool PushChanges( IActivityMonitor m )
-            {
-                Debug.Assert( IsOpen );
-                return _git.Commit( m, "Automatic synchronization commit." )
-                       && _git.Push( m );
-            }
-
-            /// <summary>
-            /// Return true if the Git Repository is open.
-            /// </summary>
-            public bool IsOpen => _git != null;
-
-            public NormalizedPath Root { get; }
-
-            /// <summary>
-            /// Ensure that the the Git Repository is Opened.
-            /// Return <see cref="IsOpen"/>.
-            /// </summary>
-            /// <param name="m">The monitor to use.</param>
-            /// <returns><see cref="IsOpen"/></returns>
-            internal bool EnsureOpen( IActivityMonitor m )
-            {
-                if( !IsOpen )
-                {
-                    var gitKey = _stacks[0];
-                    Debug.Assert( _stacks.All( d => d.OriginUrl == gitKey.OriginUrl && d.IsPublic == gitKey.IsPublic ) );
-                    Debug.Assert( _stacks.All( d => d.BranchName == gitKey.BranchName ) );
-                    _git = GitRepository.Create( m, gitKey, Root, Root.LastPart, false, gitKey.BranchName, true );
-                }
-                return IsOpen;
-            }
-
-            internal void Synchronize(
-                IActivityMonitor m,
-                IEnumerable<StackDef> expectedStacks,
-                StackInitializeOption option,
-                Action<LocalWorldName> addWorld )
-            {
-                Debug.Assert( expectedStacks.All( d => d.OriginUrl == OriginUrl ) );
-                _syncCount = _store._syncCount;
-                _stacks = expectedStacks.ToArray();
-                ReadWorlds( m, option, addWorld );
-            }
-
-            internal bool PostSynchronize( IActivityMonitor m )
-            {
-                if( _syncCount == _store._syncCount ) return true;
-                using( m.OpenInfo( $"Removing stack repository '{Root.LastPart}' => '{OriginUrl}'." ) )
-                {
-                    try
-                    {
-                        if( IsOpen )
-                        {
-                            _git.Dispose();
-                            _git = null;
-                        }
-                        FileHelper.RawDeleteLocalDirectory( m, Root );
-                    }
-                    catch( Exception ex )
-                    {
-                        m.Error( ex );
-                    }
-                }
-                return false;
-            }
-
-            internal void ReadWorlds( IActivityMonitor m, StackInitializeOption option, Action<LocalWorldName> addWorld )
-            {
-                if( option == StackInitializeOption.OpenRepository ) EnsureOpen( m );
-                else if( option == StackInitializeOption.OpenAndPullRepository ) Pull( m );
-                if( !IsOpen )
-                {
-                    m.Warn( $"Repository '{OriginUrl}' for stacks '{_stacks.Select( s => s.StackName ).Concatenate( "', '" )}' is not opened. Skipping Worlds reading from them." );
-                    return;
-                }
-                var worldNames = Directory.GetFiles( Root, "*.World.xml" )
-                                    .Select( p => LocalWorldName.TryParse( m, p, _store.WorldLocalMapping ) )
-                                    .Where( w => w != null )
-                                    .ToList();
-                var missing = _stacks
-                                .Where( s => !worldNames.Any( w => w.FullName.Equals( s.StackName, StringComparison.OrdinalIgnoreCase ) ) );
-                foreach( var s in missing )
-                {
-                    m.Warn( $"Unable to find xml file definition for '{s.StackName}'." );
-                }
-                for( int i = 0; i < worldNames.Count; ++i )
-                {
-                    var w = worldNames[i];
-                    if( w.ParallelName == null
-                        && !_stacks.Any( s => s.StackName.Equals( w.FullName, StringComparison.OrdinalIgnoreCase ) ) )
-                    {
-                        m.Warn( $"Unexpected '{w.FullName}' stack found. It is ignored." );
-                        worldNames.RemoveAt( i-- );
-                    }
-                    else
-                    {
-                        addWorld( w );
-                    }
-                }
-            }
-
-            public void Dispose()
-            {
-                if( IsOpen )
-                {
-                    _git.Dispose();
-                    _git = null;
-                }
-            }
-        }
-
-
-        void UpdateReposFromDefinitions( IActivityMonitor m, StackInitializeOption option )
-        {
-            var newWorlds = new List<LocalWorldName>();
-            ++_syncCount;
-            foreach( var gD in _stacks.GroupBy( d => d.OriginUrl ) )
-            {
-                if( gD.Any( d => d.IsPublic ) && gD.Any( d => !d.IsPublic ) )//Filter out repos with mixed public/private
-                {
-                    m.Error( $"Repository {gD.Key} contains a mix of public and private Stacks. All stacks in this repository are ignored." );
-                }
-                else if( gD.Select( d => d.BranchName ).Distinct().Count() > 1 )//Filter 
-                {
-                    m.Error( $"Repository {gD.Key} contains Stacks bound to different branches: it must be the same branch for all stacks. All stacks in this repository are ignored." );
-                }
-                else
-                {
-                    EnsureRepo( gD.Key ).Synchronize( m, gD, option, newWorlds.Add );
-                }
-            }
-            for( int i = 0; i < _repos.Count; ++i )
-            {
-                if( !_repos[i].PostSynchronize( m ) )
-                {
-                    _repos[i].Dispose();
-                    _repos.RemoveAt( i-- );
-                }
-            }
-            SetWorlds( m, newWorlds );
-
-            StackRepo EnsureRepo( Uri u )
-            {
-                int idx = _repos.IndexOf( r => r.OriginUrl == u );
-                if( idx >= 0 ) return _repos[idx];
-                var newOne = new StackRepo( this, u );
-                _repos.Add( newOne );
-                return newOne;
-            }
-        }
-
-        #endregion
 
         /// <summary>
         /// Sets a mapping for a world full name.
@@ -474,23 +245,6 @@ namespace CK.Env
             return true;
         }
 
-        StackRepo FindRepo( IActivityMonitor m, string stackName )
-        {
-            int idx = _stacks.IndexOf( d => d.StackName == stackName );
-            if( idx < 0 )
-            {
-                m.Error( $"Stack named '{stackName}' not found." );
-                return null;
-            }
-            var home = _repos.FirstOrDefault( r => r.OriginUrl == _stacks[idx].OriginUrl );
-            if( home == null )
-            {
-                m.Error( $"Repository initialization error for stack '{_stacks[idx]}'." );
-                return null;
-            }
-            return home;
-        }
-
         /// <summary>
         /// Gets the list of <see cref="ReadWorlds"/>, optionally pulling the repositories.
         /// </summary>
@@ -501,23 +255,22 @@ namespace CK.Env
         /// </param>
         public IReadOnlyList<IRootedWorldName> ReadWorlds( IActivityMonitor m, bool withPull )
         {
-            var newWorlds = new List<LocalWorldName>();
-            foreach( var r in _repos )
+            foreach( var r in _stackRepos )
             {
-                r.ReadWorlds( m, withPull ? StackInitializeOption.OpenAndPullRepository : StackInitializeOption.OpenRepository, newWorlds.Add );
+                if( !r.Refresh( m, withPull ) )
+                {
+                    m.Warn( $"Unable to open repository '{r}'." );
+                }
+                else m.Trace( $"Repository '{r}' opened with {r.Worlds.Count} worlds." );
             }
-            return SetWorlds( m, newWorlds );
-        }
-
-        IReadOnlyList<IRootedWorldName> SetWorlds( IActivityMonitor m, List<LocalWorldName> newWorlds )
-        {
+            var list = _stackRepos.SelectMany( r => r.Worlds.Select( w => w.WorldName ) ).ToList();
             Debug.Assert( '[' > 'A', "Unfortunately..." );
-            newWorlds.Sort( ( w1, w2 ) =>
+            list.Sort( ( w1, w2 ) =>
             {
                 int cmp = w1.Name.CompareTo( w2.Name );
                 return cmp != 0 ? cmp : string.Compare( w1.ParallelName, w2.ParallelName );
             } );
-            return newWorlds;
+            return list;
         }
 
         LocalWorldName ToLocal( IWorldName w )
@@ -542,31 +295,31 @@ namespace CK.Env
             return true;
         }
 
-        protected override LocalWorldName DoCreateNew( IActivityMonitor m, string name, string parallelName, XDocument content )
+        protected override LocalWorldName DoCreateNewParrallel( IActivityMonitor m, IRootedWorldName source, string parallelName, XDocument content )
         {
-            Debug.Assert( !String.IsNullOrWhiteSpace( name ) );
+            Debug.Assert( source != null );
             Debug.Assert( content != null );
-            Debug.Assert( parallelName == null || !String.IsNullOrWhiteSpace( parallelName ) );
+            Debug.Assert( !String.IsNullOrWhiteSpace( parallelName ) );
 
-            string wName = name + (parallelName != null ? '[' + parallelName + ']' : String.Empty);
-            if( ReadWorlds( m ).Any( w => w.FullName == wName ) )
+            StackRepo repo = null;
+            if( source is LocalWorldName src
+                && (repo = _stackRepos.FirstOrDefault( r => src.XmlDescriptionFilePath.StartsWith( r.Root ))) == null )
+            {
+                m.Error( $"Unable to find source world name." );
+                return null;
+            }
+            string wName = source.Name + (parallelName != null ? '[' + parallelName + ']' : String.Empty);
+            var world = _stackRepos.SelectMany( r => r.Worlds ).FirstOrDefault( w => w.WorldName.FullName == wName );
+            if( world != null )
             {
                 m.Error( $"World '{wName}' already exists." );
                 return null;
             }
-            int idx = _stacks.IndexOf( d => d.StackName == name );
-            if( idx < 0 )
-            {
-                m.Error( "A repository must be created first for a new Stack." );
-                return null;
-            }
-            var home = FindRepo( m, name );
-            if( home == null ) return null;
 
-            var path = home.Root.AppendPart( wName + ".World.xml" );
+            var path = repo.Root.AppendPart( wName + ".World.xml" );
             if( !File.Exists( path ) )
             {
-                var w = new LocalWorldName( path, name, parallelName, WorldLocalMapping );
+                var w = new LocalWorldName( path, source.Name, parallelName, WorldLocalMapping );
                 if( !WriteWorldDescription( m, w, content ) )
                 {
                     m.Error( $"Unable to create {wName} world." );
@@ -574,7 +327,7 @@ namespace CK.Env
                 }
                 return w;
             }
-            m.Error( $"World file {path} already exists." );
+            m.Error( $"World file '{path}' already exists." );
             return null;
         }
 
@@ -596,7 +349,7 @@ namespace CK.Env
 
         void OnWorkingFolderChanged( IActivityMonitor m, LocalWorldName local )
         {
-            var repo = _repos.FirstOrDefault( r => local.XmlDescriptionFilePath.StartsWith( r.Root ) );
+            var repo = _stackRepos.FirstOrDefault( r => local.XmlDescriptionFilePath.StartsWith( r.Root ) );
             if( repo == null )
             {
                 m.Warn( $"Unable to find the local repository for {local.FullName}." );
@@ -624,27 +377,13 @@ namespace CK.Env
             return (local, def.RemoveLastPart().AppendPart( def.LastPart.Substring( 0, def.LastPart.Length - 3 ) + "SharedState.xml" ));
         }
 
-        /// <summary>
-        /// Pulls all repositories and returns true if something changed.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <returns>True if something changed.</returns>
-        public bool PullAll( IActivityMonitor m )
-        {
-            bool changed = false;
-            foreach( var r in _repos )
-            {
-                changed |= r.Pull( m );
-            }
-            return changed;
-        }
-
         public void Dispose()
         {
-            foreach( var repo in _repos )
+            foreach( var repo in _stackRepos )
             {
                 repo.Dispose();
             }
+            _stackRepos.Clear();
         }
     }
 }

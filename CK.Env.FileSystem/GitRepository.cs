@@ -19,11 +19,15 @@ namespace CK.Env
         /// Checks out a working folder if needed or checks that an existing one is
         /// bound to the <see cref="GitRepositoryKey.OriginUrl"/> 'origin' remote, ensuring
         /// that the specified branch name exists (and optionally checked out).
+        /// <para>Returns the LibGit2Sharp repository object or null on error.</para>
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="git">The Git key.</param>
         /// <param name="workingFolder">The local working folder.</param>
-        /// <param name="subPath"></param>
+        /// <param name="subPath">
+        /// The short path to display, relative to a well known root. It must not be empty.
+        /// (this can be the <see cref="NormalizedPath.LastPart"/> of the <paramref name="workingFolder"/>.)
+        /// </param>
         /// <param name="ensureHooks">True to create the standard hooks.</param>
         /// <param name="branchName">
         /// The initial branch name if cloning is done and the branch that must be
