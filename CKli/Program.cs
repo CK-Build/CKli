@@ -91,8 +91,7 @@ namespace CKli
                         {
                             if( two[0].Equals( "save", StringComparison.OrdinalIgnoreCase ) )
                             {
-                                Console.Write( $"Enter new passphrase (empty to cancel): " );
-                                var s = ReadSecret();
+                                var s = ReadLine.ReadPassword( "Enter new passphrase (empty to cancel) [Hidden]: " );
                                 if( s != null ) host.UserKeyVault.SaveKeyVault( monitor, s );
                             }
                             else two = null;
@@ -105,8 +104,7 @@ namespace CKli
                             }
                             else if( two[0].Equals( "set", StringComparison.OrdinalIgnoreCase ) )
                             {
-                                Console.Write( $"Enter '{two[1]}' secret (empty to cancel): " );
-                                var s = ReadSecret();
+                                var s = ReadLine.ReadPassword( $"Enter '{two[1]}' secret (empty to cancel) [Hidden]: " );
                                 if( s != null ) host.UserKeyVault.UpdateSecret( monitor, two[1], s );
                             }
                             else two = null;
@@ -166,21 +164,20 @@ namespace CKli
 
         static void OpenKeyVault( IActivityMonitor monitor, UserHost host )
         {
+            Console.WriteLine();
             string prompt;
             if( host.UserKeyVault.KeyVaultFileExists )
             {
                 Console.WriteLine( "Your personal KeyVault should be opened." );
-                prompt = "Enter the passphrase to open it: ";
+                prompt = "Enter the passphrase to open it [Hidden]: ";
             }
             else
             {
                 Console.WriteLine( $"Personal KeyVault not found at: '{host.UserKeyVault.KeyVaultPath}'" );
                 Console.WriteLine( "It will contain encrypted secrets required by the different operations on all stacks." );
-                prompt = "It should be created. Enter its passphrase (and memorize it!): ";
+                prompt = "It should be created. Enter its passphrase (and memorize it!) [Hidden]: ";
             }
-
-            Console.Write( prompt );
-            var s = ReadSecret();
+            var s = ReadLine.ReadPassword( prompt );
             if( s != null ) host.UserKeyVault.OpenKeyVault( monitor, s );
             else Console.WriteLine( "KeyVault opening cancelled." );
 
@@ -196,6 +193,7 @@ namespace CKli
             Console.WriteLine( "Note:" );
             Console.WriteLine( " - You can always use 'secret set NAME' or 'secret clear NAME' commands at anytime to upsert or remove secrets." );
             Console.WriteLine( " - You can also change the KeyVault passphrase thanks to 'secret save'." );
+            Console.WriteLine();
         }
 
         static void DumpWorlds( IEnumerable<IRootedWorldName> worlds )
@@ -442,7 +440,7 @@ namespace CKli
                 Console.Write( $"{f.RequirementAndName}: " );
                 if( f.Type == typeof( String ) )
                 {
-                    f.SetValue( f.IsPassword ? ReadSecret() : ReadNullableString() );
+                    f.SetValue( f.IsPassword ? ReadLine.ReadPassword() : ReadNullableString() );
                 }
                 else if( f.Type == typeof( bool ) || f.Type == typeof( bool? ) )
                 {
@@ -547,18 +545,6 @@ namespace CKli
             string s = Console.ReadLine();
             if( s.Length == 0 ) return null;
             if( IsEmptyString( s ) ) return String.Empty;
-            return s;
-        }
-
-        static string ReadSecret()
-        {
-            ConsoleColor fore = Console.ForegroundColor;
-            ConsoleColor back = Console.BackgroundColor;
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.BackgroundColor = ConsoleColor.Red;
-            string s = ReadNullableString();
-            Console.ForegroundColor = fore;
-            Console.BackgroundColor = back;
             return s;
         }
 

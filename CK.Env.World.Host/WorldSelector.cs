@@ -29,7 +29,7 @@ namespace CK.Env
         /// <param name="userKeyStore">The user key store.</param>
         /// <param name="appLife">Simple application lifetime controller.</param>
         public WorldSelector(
-            WorldStore store,
+            GitWorldStore store,
             CommandRegister commandRegister,
             XTypedFactory factory,
             SecretKeyStore userKeyStore,
@@ -47,7 +47,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the store.
         /// </summary>
-        public WorldStore Store { get; }
+        public GitWorldStore Store { get; }
 
         /// <summary>
         /// Gets the current world.
@@ -142,7 +142,11 @@ namespace CK.Env
                         if( _userKeyStore.Infos.All( secret => !secret.IsRequired || secret.IsSecretAvailable ) )
                         {
                             CurrentWorld = xW.GetObject( m );
-                            if( CurrentWorld != null ) return true;
+                            if( CurrentWorld != null )
+                            {
+                                Store.DisableRepositoryAndStacksCommands = true;
+                                return true;
+                            }
                         }
                         else
                         {
@@ -179,6 +183,7 @@ namespace CK.Env
                 _fs.Dispose();
                 _fs = null;
             }
+            Store.DisableRepositoryAndStacksCommands = false;
         }
 
         public void Dispose() => Close();
