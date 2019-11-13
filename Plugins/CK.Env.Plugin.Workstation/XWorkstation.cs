@@ -70,7 +70,7 @@ namespace CKli
             _scripts = new List<object>();
             _fileSystem = fileSystem;
             var envVars = new HashSet<EnvVar>();
-            if( initializer.Reader.WithOptionalChild( "ApplySettings", out XElementReader rSettings ) )
+            if( initializer.Reader.WithOptionalChild( "Setup", out XElementReader rSettings ) )
             {
                 foreach( var r in rSettings.WithChildren() )
                 {
@@ -127,10 +127,10 @@ Invoke-Command -ScriptBlock $ScriptBlock";
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => _commandName;
 
-        public bool CanApplySettings => _scripts.Count > 0;
+        public bool CanSetup => _scripts.Count > 0;
 
         [CommandMethod]
-        public void ApplySettings( IActivityMonitor monitor )
+        public void Setup( IActivityMonitor monitor )
         {
             using( monitor.OpenInfo( $"Executing {_scripts.Count} script(s) on this Workstation." ) )
             using( var tempPS1 = new TemporaryFile( "ps1" ) )

@@ -1,4 +1,4 @@
-# Common usage
+# Common Usages
 
 ## Build
 
@@ -102,5 +102,3 @@ If multiple versions of the same package is installed, the version are colored i
 You can upgrade the dependencies accross the stack simply, with the command `World/UpgradeDependency`.
 
 You just have to give the package name in the parameter, and optionally the package version. If the package version is not provided, the best version used in the stack will be used.
-
-
