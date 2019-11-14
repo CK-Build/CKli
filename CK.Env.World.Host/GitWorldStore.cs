@@ -244,6 +244,7 @@ namespace CK.Env
         /// <param name="worldFullName">The world full name that must exist.</param>
         /// <param name="mappedPath">The target mapped path.</param>
         /// <returns>True on success, false on error.</returns>
+        [CommandMethod]
         public bool SetWorldMapping( IActivityMonitor m, string worldFullName, NormalizedPath mappedPath )
         {
             var worlds = ReadWorlds( m );

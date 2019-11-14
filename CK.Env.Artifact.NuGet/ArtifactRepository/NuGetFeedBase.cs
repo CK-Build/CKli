@@ -91,7 +91,7 @@ namespace CK.Env.NuGet
                     // There is no credential: let it be and hope it works.
                     m.Trace( $"Feed '{Name}' has no available secret. It must be a public feed." );
                 }
-                return _checkedSecret.Value;
+                return _checkedSecret ?? false;
             }
 
             public async Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, string artifactName )
