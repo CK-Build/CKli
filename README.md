@@ -9,7 +9,7 @@ It allows to automate actions, on <u>Worlds</u> (a group of repositories), and c
 
 ### Prerequisites
 
-- [.NET SDK 2.1.](https://dotnet.microsoft.com/)
+- [.NET Core SDK 2.1.](https://dotnet.microsoft.com/)
 
 ### Installation
 
@@ -91,7 +91,6 @@ Will output:
 |          <No payload>: Home/Close, Home/Refresh
 ```
 
-
 ### QuickStart: Cloning a World
 
 Gets the URL of the stack you want to clone:
@@ -103,7 +102,6 @@ Gets the URL of the stack you want to clone:
 | Engie      | https://invenietis@dev.azure.com/invenietis/Cofely/_git/Engie-Stack | Private    |
 | SC         | https://gitlab.com/signature-code/signature-code-stack.git          | Private    |
 | S-Mos      | https://gitlab.com/signature-mosaic/Signature-Mosaic-Stack          | Private    |
-
 
 Type `run Home/EnsureStackRepository` (or `run *ensure*` since there is no other command with `Ensure` in its name) and press `enter`.
 
@@ -136,7 +134,6 @@ Once the required secrets entered, press `enter`:
 
 Upon opening a World, CKli will clone all the repositories.
 To open a world, type its number then press `enter`.
-
 
 ### Worlds And Stacks
 
@@ -240,5 +237,6 @@ On World the opening, CKli will automatically clone all the repositories of SC.
 :tada: You are now ready to operate on a World. To see what you can do, please head to the [Common Usages](docs/Common_Usage.md).
 
 ## See Also
+
 - https://blog.7mind.io/role-based-repositories.html
 - https://github.com/7mind/sbtgen

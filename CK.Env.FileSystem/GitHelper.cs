@@ -31,7 +31,7 @@ namespace CK.Env
             NormalizedPath subPath )
         {
             RepositoryKey = repositoryKey ?? throw new ArgumentNullException( nameof( repositoryKey ) );
-            Git = libRepository ?? throw new ArgumentNullException( nameof( libRepository ) ); ;
+            Git = libRepository ?? throw new ArgumentNullException( nameof( libRepository ) );
             FullPhysicalPath = fullPath;
             SubPath = subPath;
 
