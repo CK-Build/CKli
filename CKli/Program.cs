@@ -15,6 +15,7 @@ namespace CKli
     {
         static void Main( string[] args )
         {
+            ReadLine.HistoryEnabled = true;
             NormalizedPath userHostPath = Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData );
             userHostPath = userHostPath.AppendPart( "CKli" );
 
