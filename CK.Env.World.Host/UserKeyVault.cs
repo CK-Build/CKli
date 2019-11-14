@@ -65,16 +65,17 @@ namespace CK.Env
 
         /// <summary>
         /// Updates or clears the secret of a declared key in the <see cref="KeyStore"/>.
+        /// Returns true if secret has been changed, false otherwise.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="key">The secret name to update.</param>
         /// <param name="secret">The secret to update. Null or empty clears the secret.</param>
         /// <param name="autoSave">False to not automatically saves the vault.</param>
-        public void UpdateSecret( IActivityMonitor m, string key, string secret, bool autoSave = true )
+        /// <returns>True if secret has been changed, false otherwise.</returns>
+        public bool UpdateSecret( IActivityMonitor m, string key, string secret, bool autoSave = true )
         {
-            if( _store.SetSecret( m, key, secret )
-                && autoSave
-                && IsKeyVaultOpened )
+            if( !_store.SetSecret( m, key, secret ) ) return false;
+            if( autoSave && IsKeyVaultOpened )
             {
                 if( string.IsNullOrEmpty( secret ) )
                 {
@@ -82,6 +83,7 @@ namespace CK.Env
                 }
                 DoSaveKeyVault( m );
             }
+            return true;
         }
 
         /// <summary>

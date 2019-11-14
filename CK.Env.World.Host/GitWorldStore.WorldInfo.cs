@@ -22,13 +22,11 @@ namespace CK.Env
         {
             LocalWorldName _name;
 
-            internal WorldInfo( StackRepo repo, LocalWorldName name, bool hasDefinitionFile, bool isHidden )
+            internal WorldInfo( StackRepo repo, LocalWorldName name )
             {
                 Debug.Assert( repo != null && name != null );
                 Repo = repo;
                 _name = name;
-                HasDefinitionFile = hasDefinitionFile;
-                IsHidden = isHidden;
             }
 
             internal WorldInfo( StackRepo r, XElement e )
@@ -36,14 +34,14 @@ namespace CK.Env
                 Repo = r;
                 var n = (string)e.AttributeRequired( nameof( WorldName.FullName ) );
                 _name = LocalWorldName.TryParse( r.Root.AppendPart( n + ".World.xml" ), r.Store.WorldLocalMapping );
-                HasDefinitionFile = (bool?)e.Attribute( nameof( HasDefinitionFile ) ) ?? false;
-                IsHidden = (bool?)e.Attribute( nameof( IsHidden ) ) ?? false;
+                _name.HasDefinitionFile = (bool?)e.Attribute( nameof( WorldName.HasDefinitionFile ) ) ?? false;
+                _name.IsHidden = (bool?)e.Attribute( nameof( WorldName.IsHidden ) ) ?? false;
             }
 
             internal XElement ToXml() => new XElement( nameof(WorldInfo),
                                             new XAttribute( nameof( WorldName.FullName ), _name.FullName ),
-                                            new XAttribute( nameof( HasDefinitionFile ), HasDefinitionFile ),
-                                            new XAttribute( nameof( IsHidden ), IsHidden ) );
+                                            new XAttribute( nameof( WorldName.HasDefinitionFile ), _name.HasDefinitionFile ),
+                                            new XAttribute( nameof( WorldName.IsHidden ), _name.IsHidden ) );
 
             /// <summary>
             /// Gets the repository.
@@ -54,16 +52,6 @@ namespace CK.Env
             /// Gets the local world name.
             /// </summary>
             public LocalWorldName WorldName => _name;
-
-            /// <summary>
-            /// Gets whether the xml definition file for this stack exists.
-            /// </summary>
-            public bool HasDefinitionFile { get; internal set; }
-
-            /// <summary>
-            /// Gets or sets whether this world is hidden.
-            /// </summary>
-            public bool IsHidden { get; set; }
 
             /// Gets whether this <see cref="WorldInfo"/> has been destroyed.
             /// </summary>
@@ -87,6 +75,7 @@ namespace CK.Env
                         p = WorldName.XmlDescriptionFilePath;
                         File.Delete( p );
                         Repo.OnDestroy( this );
+                        _name.HasDefinitionFile = false;
                         _name = null;
                     }
                     catch( Exception ex )
@@ -96,12 +85,6 @@ namespace CK.Env
                     }
                 }
                 return true;
-            }
-
-            internal void UpdateMapping( IWorldLocalMapping mapping )
-            {
-                Debug.Assert( mapping != null );
-                _name = new LocalWorldName( _name.XmlDescriptionFilePath, _name.Name, _name.ParallelName, mapping );
             }
 
             /// <summary>

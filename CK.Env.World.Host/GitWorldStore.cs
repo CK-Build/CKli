@@ -39,7 +39,7 @@ namespace CK.Env
             {
                 foreach( var w in r.Worlds )
                 {
-                    w.UpdateMapping( WorldLocalMapping );
+                    w.WorldName.UpdateRoot( WorldLocalMapping );
                 }
             }
         }

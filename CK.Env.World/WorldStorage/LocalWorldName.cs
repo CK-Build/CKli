@@ -2,12 +2,14 @@ using CK.Core;
 using CK.Text;
 using System;
 using System.Diagnostics;
+using System.Xml.Linq;
 
 namespace CK.Env
 {
     /// <summary>
     /// Local world name is a <see cref="IRootedWorldName"/> that also carries
-    /// its definition file path (<see cref="XmlDescriptionFilePath"/>).
+    /// its definition file path (<see cref="XmlDescriptionFilePath"/>), whether this file
+    /// is available or not and whether this World name should be hidden. 
     /// </summary>
     public class LocalWorldName : WorldName, IRootedWorldName
     {
@@ -35,10 +37,32 @@ namespace CK.Env
         /// Gets the local world root directory path.
         /// This is <see cref="NormalizedPath.IsEmptyPath"/> if the world is not mapped.
         /// </summary>
-        public NormalizedPath Root { get; }
+        public NormalizedPath Root { get; private set; }
 
         /// <summary>
-        /// Tries to parse a xml World definition file name.
+        /// Updates the world root.
+        /// It may becomes <see cref="NormalizedPath.IsEmptyPath"/> if this world is no mre mapped.
+        /// </summary>
+        /// <param name="localMap"></param>
+        public void UpdateRoot( IWorldLocalMapping localMap )
+        {
+            Root = localMap.GetRootPath( this );
+        }
+
+        /// <summary>
+        /// Gets or sets whether the xml definition file for this stack exists.
+        /// Defaults to false.
+        /// </summary>
+        public bool HasDefinitionFile { get; set; }
+
+        /// <summary>
+        /// Gets or sets whether this world name should be hidden.
+        /// Defauts to true.
+        /// </summary>
+        public bool IsHidden { get; set; }
+
+        /// <summary>
+        /// Tries to parse a xml World definition file name (must end with ".World.xml").
         /// </summary>
         /// <param name="path">The file path.</param>
         /// <param name="localMap">The mapper to use.</param>
