@@ -138,7 +138,7 @@ namespace CKli
                 while( !c.IsAnswered )
                 {
                     Console.Write( $"= (Enter the final release number and press enter)> " );
-                    string line = Console.ReadLine();
+                    string line = ReadLine.Read();
                     if( line == "X" )
                     {
                         c.Cancel();
