@@ -146,9 +146,9 @@ namespace CK.Env
             if( idx < 0 )
             {
                 var r = new StackRepo( this, uri, isPublic );
+                _stackRepos.Add( r );
                 if( r.Refresh( m ) )
                 {
-                    _stackRepos.Add( r );
                     WriteStacksToLocalStacksFilePath( m );
                 }
             }
@@ -158,7 +158,7 @@ namespace CK.Env
                 if( r.IsPublic != isPublic )
                 {
                     r.IsPublic = isPublic;
-                    m.Info( $"Changing configuration for '{r.OriginUrl}' from {(isPublic ? "Private to Public" : "Public to Private" )}." );
+                    m.Info( $"Changing configuration for '{r.OriginUrl}' from {(isPublic ? "Private to Public" : "Public to Private")}." );
                     WriteStacksToLocalStacksFilePath( m );
                 }
             }
@@ -222,7 +222,7 @@ namespace CK.Env
             {
                 m.Info( $"Removing '{worldFullName}' Stack: removing '{toRemove.Select( w => w.WorldName.FullName ).Concatenate( "', '" )}' worlds." );
             }
-            else 
+            else
             {
                 m.Info( $"Removing '{worldFullName}' world." );
             }
@@ -325,7 +325,7 @@ namespace CK.Env
 
             StackRepo repo = null;
             if( source is LocalWorldName src
-                && (repo = _stackRepos.FirstOrDefault( r => src.XmlDescriptionFilePath.StartsWith( r.Root ))) == null )
+                && (repo = _stackRepos.FirstOrDefault( r => src.XmlDescriptionFilePath.StartsWith( r.Root ) )) == null )
             {
                 m.Error( $"Unable to find source World." );
                 return null;
