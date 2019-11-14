@@ -152,6 +152,7 @@ namespace CK.Env
         /// <summary>
         /// Sets or clears a secret that must have been declared.
         /// Updates it when <paramref name="secret"/> is not null or empty, otherwise clears it.
+        /// Returns true if secret has been changed, false otherwise.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="name">The secret name.</param>

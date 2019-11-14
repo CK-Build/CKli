@@ -30,12 +30,12 @@ namespace CK.Env
             else if( url.Authority.Equals( "bitbucket.org", StringComparison.OrdinalIgnoreCase ) ) KnownGitProvider = KnownGitProvider.Bitbucket;
             else if( url.Scheme == Uri.UriSchemeFile ) KnownGitProvider = KnownGitProvider.FileSystem;
 
-            if( KnownGitProvider == KnownGitProvider.FileSystem ) return; //No credentials needed.
+            if( KnownGitProvider == KnownGitProvider.FileSystem ) return; // No credentials needed.
             if( KnownGitProvider != KnownGitProvider.Unknown )
             {
                 string GetReadPATDescription( SecretKeyInfo current )
                 {
-                    var d = current?.Description ?? $"Used to read/clone solutions hosted by '{KnownGitProvider}'.";
+                    var d = current?.Description ?? $"Used to read/clone private repositories hosted by '{KnownGitProvider}'.";
                     if( (current == null || !current.IsRequired) && !IsPublic )
                     {
                         d += $" This secret is required since at least '{url}' is not public.";

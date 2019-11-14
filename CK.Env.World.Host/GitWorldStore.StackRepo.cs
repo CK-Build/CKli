@@ -127,25 +127,26 @@ namespace CK.Env
                         {
                             if( !worldNames.Remove( exists.WorldName.FullName ) )
                             {
-                                if( exists.HasDefinitionFile )
+                                if( exists.WorldName.HasDefinitionFile )
                                 {
                                     m.Warn( $"Unable to find World definition file for '{exists.WorldName}'. File '{exists.WorldName.XmlDescriptionFilePath}' not found." );
-                                    exists.HasDefinitionFile = false;
+                                    exists.WorldName.HasDefinitionFile = false;
                                 }
                             }
                             else
                             {
-                                if( !exists.HasDefinitionFile )
+                                if( !exists.WorldName.HasDefinitionFile )
                                 {
                                     m.Trace( $"Found World definition file for '{exists.WorldName}'." );
-                                    exists.HasDefinitionFile = true;
+                                    exists.WorldName.HasDefinitionFile = true;
                                 }
                             }
                         }
                         foreach( var newWorld in worldNames.Values )
                         {
                             m.Info( $"Found a new World definition: creating '{newWorld.FullName}' entry." );
-                            _worlds.Add( new WorldInfo( this, newWorld, true, force ) );
+                            newWorld.HasDefinitionFile = true;
+                            _worlds.Add( new WorldInfo( this, newWorld ) );
                         }
                     }
                 }

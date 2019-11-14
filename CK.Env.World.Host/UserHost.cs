@@ -53,21 +53,6 @@ namespace CK.Env
             }
         }
 
-        //[CommandMethod]
-        //public void Refresh( IActivityMonitor m )
-        //{
-        //    _store.ReadWorlds( m );
-        //    if( WorldSelector.CanClose )
-        //    {
-        //        var opened = WorldSelector.CurrentWorld.WorldName.FullName;
-        //        if( opened != null )
-        //        {
-        //            WorldSelector.CloseWorld( m );
-        //            WorldSelector.OpenWorld( m, opened );
-        //        }
-        //    }
-        //}
-
         /// <summary>
         /// Requires <see cref="GitWorldStore.DisableRepositoryAndStacksCommands"/> to be false.
         /// </summary>

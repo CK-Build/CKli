@@ -85,6 +85,7 @@ namespace CKli
                         Console.WriteLine( "Your personal KeyVault is not opened." );
                         OpenKeyVault( monitor, host );
                     }
+                    bool changedVault = false;
                     rep = rep.Substring( 6 ).Trim();
                     if( rep.Length > 0 )
                     {
@@ -107,7 +108,10 @@ namespace CKli
                             else if( two[0].Equals( "set", StringComparison.OrdinalIgnoreCase ) )
                             {
                                 var s = ReadLine.ReadPassword( $"Enter '{two[1]}' secret (empty to cancel) [Hidden]: " );
-                                if( s != null ) host.UserKeyVault.UpdateSecret( monitor, two[1], s );
+                                if( s != null )
+                                {
+                                    changedVault = host.UserKeyVault.UpdateSecret( monitor, two[1], s );
+                                }
                             }
                             else two = null;
                         }
@@ -117,6 +121,7 @@ namespace CKli
                         }
                     }
                     DumpSecrets( host.UserKeyVault );
+                    if( changedVault ) host.WorldStore.ReadWorlds( monitor );
                     continue;
                 }
                 if( rep.StartsWith( "list" ) )
