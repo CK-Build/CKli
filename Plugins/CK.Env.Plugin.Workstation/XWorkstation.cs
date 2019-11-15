@@ -149,7 +149,8 @@ Invoke-Command -ScriptBlock $ScriptBlock";
                                 {
                                     monitor.Debug( $"With EnvironmentVariables: {currentVariables?.Select( v => v.ToString() ).Concatenate()}." );
                                     monitor.Debug( script.Script );
-                                    var variables = currentVariables?.Select( v => (v.Name, Environment.ExpandEnvironmentVariables( v.Value )) ).ToList();
+                                    var variables = currentVariables?.Select( v => (v.Name, Environment.ExpandEnvironmentVariables( v.Value )) ).ToList()
+                                        ?? new List<(string Name, string)>();
                                     variables.Add( ("CKLI_WORLD_MAPPING", _fileSystem.Root) );
 
                                     System.IO.File.WriteAllText( tempPS1.Path, script.Script );
@@ -159,7 +160,7 @@ Invoke-Command -ScriptBlock $ScriptBlock";
                                                 tempPS1.Path,
                                                 new[] { script.Arguments },
                                                 stdErrorLevel: LogLevel.Warn,
-                                                variables ) ) ;
+                                                variables ) )
                                     {
                                         hasError |= !script.ContinueOnNonZeroExitCode;
                                         if( !hasError ) monitor.Warn( "ContinueOnNonZeroExitCode is true: error is ignored." );
