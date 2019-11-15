@@ -149,6 +149,9 @@ Invoke-Command -ScriptBlock $ScriptBlock";
                                 {
                                     monitor.Debug( $"With EnvironmentVariables: {currentVariables?.Select( v => v.ToString() ).Concatenate()}." );
                                     monitor.Debug( script.Script );
+                                    var variables = currentVariables?.Select( v => (v.Name, Environment.ExpandEnvironmentVariables( v.Value )) ).ToList();
+                                    variables.Add( ("CKLI_WORLD_MAPPING", _fileSystem.Root) );
+
                                     System.IO.File.WriteAllText( tempPS1.Path, script.Script );
                                     if( !ProcessRunner.RunPowerShell(
                                                 monitor,
@@ -156,7 +159,7 @@ Invoke-Command -ScriptBlock $ScriptBlock";
                                                 tempPS1.Path,
                                                 new[] { script.Arguments },
                                                 stdErrorLevel: LogLevel.Warn,
-                                                currentVariables?.Select( v => (v.Name, Environment.ExpandEnvironmentVariables( v.Value )) ) ) )
+                                                variables ) ) ;
                                     {
                                         hasError |= !script.ContinueOnNonZeroExitCode;
                                         if( !hasError ) monitor.Warn( "ContinueOnNonZeroExitCode is true: error is ignored." );
