@@ -46,7 +46,6 @@ namespace CK.Env.Plugin
 
 
             // Root files
-            SetTextResource( m, "InstallCredentialProvider.ps1" );
             SetTextResource( m, "Program.cs" );
             SetTextResource( m, "StandardGlobalInfo.cs" );
             SetTextResource( m, "Build.CreateStandardGlobalInfo.cs" );

@@ -91,10 +91,7 @@ namespace CK.Env.Plugin
             {
                 firstMapping["services"] = new YamlValue( "mssql" + _solutionSpec.SqlServer.ToLowerInvariant() );
             }
-            var install = new YamlSequence
-            {
-                CreateKeyValue( "ps", "./CodeCakeBuilder/InstallCredentialProvider.ps1" )
-            };
+            var install = new YamlSequence();
             // Temporary: installs the 6.9.0 of npm.
             if( solution.GeneratedArtifacts.Any( g => g.Artifact.Type.Name == "NPM" ) )
             {
