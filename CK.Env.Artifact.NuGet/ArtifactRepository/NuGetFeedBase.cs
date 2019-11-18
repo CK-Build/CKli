@@ -166,7 +166,6 @@ namespace CK.Env.NuGet
         {
             bool retry = false;
             var logger = new NuGetLoggerAdapter( m );
-            NuGetClient.Initalize( logger );
             if( _sourceRepository == null )
             {
                 _sourceRepository = new SourceRepository( PackageSource, NuGetClient.StaticProviders );

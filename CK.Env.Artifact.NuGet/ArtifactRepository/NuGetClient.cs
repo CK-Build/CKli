@@ -12,8 +12,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
@@ -66,90 +68,31 @@ namespace CK.Env.NuGet
                         m.Info( $"Updating credential for '{url}' access." );
                         _secretAzureKeys[url] = secret;
                     }
-                    GenerateNuGetCredentialsEnvironmentVariable( m );
-                    // Clears the credential service.
-                    HttpHandlerResourceV3.CredentialService = null;
                 }
             }
         }
 
-        static void GenerateNuGetCredentialsEnvironmentVariable( IActivityMonitor m )
+        class Creds : ICredentialProvider
         {
-            // The VSS_NUGET_EXTERNAL_FEED_ENDPOINTS is used by Azure Credential Provider to handle authentication
-            // for the feed.
-            StringBuilder b = new StringBuilder( @"{""endpointCredentials"":[" );
-            bool already = false;
-            foreach( var kv in _secretAzureKeys )
-            {
-                if( already ) b.Append( ',' );
-                else already = true;
+            public string Id { get; }
 
-                b.Append( @"{""endpoint"":""" ).AppendJSONEscaped( kv.Key ).Append( @"""," )
-                    .Append( @"""username"":""Unused"",""password"":""" ).AppendJSONEscaped( kv.Value ).Append( @"""" )
-                    .Append( "}" );
-            }
-            b.Append( "]}" );
-            var json = b.ToString();
-            m.Info( $"Updated VSS_NUGET_EXTERNAL_FEED_ENDPOINTS with {_secretAzureKeys.Count} endpoints." );
-
-            Debug.Assert( Newtonsoft.Json.Linq.JObject.Parse( json )["endpointCredentials"] != null );
-            Environment.SetEnvironmentVariable( "VSS_NUGET_EXTERNAL_FEED_ENDPOINTS", json );
+            public Task<CredentialResponse> GetAsync(
+                Uri uri,
+                IWebProxy proxy,
+                CredentialRequestType type,
+                string message,
+                bool isRetry,
+                bool nonInteractive,
+                CancellationToken cancellationToken ) =>
+                Task.FromResult(
+                    new CredentialResponse(
+                        new NetworkCredential(
+                            "CKli",
+                                _secretAzureKeys.Single( p => new Uri( p.Key ).ToString() == uri.ToString() ).Value
+                        )
+                    )
+                );
         }
-
-        static async Task<IEnumerable<ICredentialProvider>> GetCredentialProvidersAsync( ILogger logger )
-        {
-            var providers = new List<ICredentialProvider>();
-            var securePluginProviders = await new SecurePluginCredentialProviderBuilder( pluginManager: PluginManager.Instance, canShowDialog: false, logger: logger )
-                                                    .BuildAllAsync();
-            providers.AddRange( securePluginProviders );
-            return providers;
-        }
-
-
-        internal void Initialize( NuGetLoggerAdapter logger )
-        {
-            throw new NotImplementedException();
-        }
-
-        internal static void Initalize( NuGetLoggerAdapter logger )
-        {
-            lock( _secretKeysLock )
-            {
-                if( !_initialized )
-                {
-                    using( logger.Monitor.OpenInfo( "Installing the Azure Artifact Credential provider (https://github.com/Microsoft/artifacts-credprovider)." ) )
-                    {
-                        var a = System.Reflection.Assembly.GetExecutingAssembly();
-                        using( var r = new StreamReader( a.GetManifestResourceStream( "CK.Env.Artifact.NuGet.Res.InstallCredentialProvider.ps1.txt" ) ) )
-                        {
-                            var tempPath = Path.GetTempPath();
-                            var installer = Guid.NewGuid().ToString() + ".ps1";
-                            var installerPath = Path.Combine( tempPath, installer );
-                            File.WriteAllText( installerPath, r.ReadToEnd() );
-                            ProcessRunner.RunPowerShell(
-                                logger.Monitor,
-                                tempPath,
-                                installer,
-                                new[] { "-AddNetfx" },
-                                Core.LogLevel.Error,
-                                new[] { ("PSExecutionPolicyPreference", "Bypass") } );
-                            File.Delete( installerPath );
-                        }
-                    }
-                    _initialized = true;
-                }
-                if( HttpHandlerResourceV3.CredentialService == null )
-                {
-                    var credProviders = new AsyncLazy<IEnumerable<ICredentialProvider>>( async () => await GetCredentialProvidersAsync( logger ) );
-                    HttpHandlerResourceV3.CredentialService = new Lazy<ICredentialService>(
-                        () => new CredentialService(
-                            providers: credProviders,
-                            nonInteractive: true,
-                            handlesDefaultCredentials: true ) );
-                }
-            }
-        }
-
         #endregion
 
         class SourcePackageProvider : IPackageSourceProvider
@@ -241,6 +184,15 @@ namespace CK.Env.NuGet
             StaticProviders.AddRange( Repository.Provider.GetCoreV3() );
             _secretKeysLock = new object();
             _secretAzureKeys = new Dictionary<string, string>();
+            HttpHandlerResourceV3.CredentialService = new Lazy<ICredentialService>(
+                            () => new CredentialService(
+                                providers: new AsyncLazy<IEnumerable<ICredentialProvider>>(
+                                    () => Task.FromResult<IEnumerable<ICredentialProvider>>(
+                                        new List<Creds> { new Creds() } )
+                                ),
+                                nonInteractive: true,
+                                handlesDefaultCredentials: true )
+                            );
         }
 
         public NuGetClient( HttpClient httpClient, SecretKeyStore keyStore )
