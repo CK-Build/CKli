@@ -145,19 +145,18 @@ namespace CK.Env
                     var xW = _root.Descendants<IXTypedObjectProvider<World>>().FirstOrDefault();
                     if( xW != null )
                     {
-                        if( _userKeyStore.Infos.All( secret => !secret.IsRequired || secret.IsSecretAvailable ) )
+
+                        CurrentWorld = xW.GetObject( m );//We try to load the world even if required secret are not present.
+                        if( CurrentWorld != null )
                         {
-                            CurrentWorld = xW.GetObject( m );
-                            if( CurrentWorld != null )
-                            {
-                                Store.DisableRepositoryAndStacksCommands = true;
-                                return true;
-                            }
+                            Store.DisableRepositoryAndStacksCommands = true;
+                            return true;
                         }
-                        else
+                        // The world couldn't be opened
+                        var missingSecrets = _userKeyStore.Infos.Where( secret => secret.IsRequired && !secret.IsSecretAvailable ).Select( s => s.Name );
+                        if(missingSecrets.Any())
                         {
-                            var missing = _userKeyStore.Infos.Where( secret => secret.IsRequired && !secret.IsSecretAvailable ).Select( s => s.Name ).Concatenate();
-                            m.Error( $"Missing one or more secrets. These are required to continue: {missing}." );
+                            m.Error( $"Missing one or more secrets. These are required to continue: {missingSecrets.Concatenate()}." );
                             resetSecrets = false;
                         }
                     }
