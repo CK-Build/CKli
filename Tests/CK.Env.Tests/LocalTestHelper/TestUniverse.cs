@@ -161,7 +161,7 @@ namespace CK.Env.Tests.LocalTestHelper
             }
             int cnt = SwapAllGitOriginPlaceholders( m, tempPath, oldString, newString );
             ReplacePlaceHolderInFile( ckliMapping.AppendPart( "WorldLocalMapping.txt" ), oldString, newString );
-            ReplacePlaceHolderInFile( ckliMapping.AppendPart( "Stacks.txt" ), oldString, newString );
+            ReplacePlaceHolderInFile( ckliMapping.AppendPart( "Stacks.xml" ), oldString, newString );
         }
 
         static void ReplacePlaceHolderInFile( string filePath, string oldString, string newString )
@@ -185,7 +185,8 @@ namespace CK.Env.Tests.LocalTestHelper
             PlaceHolderSwapEverything( _m, tempPath, UniversePath, PlaceHolderString );
             ReplaceInDirectoriesPaths( tempPath.AppendPart( _ckliMapping ), GitWorldStore.StackRepo.CleanPathDirName( UniversePath ), GitWorldStore.StackRepo.CleanPathDirName( PlaceHolderString ) );
             NormalizedPath output = ImageManager.CacheUniverseFolder.AppendPart( imageName + ".zip" );
-            File.Delete( output );
+            if( File.Exists( output ) ) File.Delete( output );
+            Directory.CreateDirectory( ImageManager.CacheUniverseFolder );
             ZipFile.CreateFromDirectory( tempPath, output );
             return output;
         }

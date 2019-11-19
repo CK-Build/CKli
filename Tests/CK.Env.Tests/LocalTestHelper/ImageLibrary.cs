@@ -38,44 +38,50 @@ namespace CK.Env.Tests.LocalTestHelper
             }
         }
 
-        public static NormalizedPath minimal_solution_first_ci_build( Action<TestUniverse> action, bool refreshCache )
+        public static NormalizedPath minimal_solution_open( Action<TestUniverse> action, bool refreshCache )
         {
             return ImageBuilderHelper( action, refreshCache, minimal_solution_setup, ( universe ) =>
              {
-                 universe.AllBuild( TestHelper.Monitor, "CKTest-Build" );
+                 universe.EnsureWorldOpened( TestHelper.Monitor, "CKTest-Build" );
              } );
         }
 
-        public static NormalizedPath minimal_solution_second_ci_build( Action<TestUniverse> action, bool refreshCache )
-        {
-            return ImageBuilderHelper( action, refreshCache, minimal_solution_first_ci_build, ( universe ) =>
+        public static NormalizedPath minimal_solution_add_ccb( Action<TestUniverse> action, bool refreshCache ) =>
+            ImageBuilderHelper( action, refreshCache, minimal_solution_open, ( universe ) =>
+            {
+                const string stackName = "CKTest-Build";
+                universe.ApplyWithFilter( TestHelper.Monitor, stackName, "*CodeCakeBuilder*Apply*" )
+                .CommitAll( TestHelper.Monitor, stackName );
+            } );
+
+        public static NormalizedPath minimal_solution_first_ci_build( Action<TestUniverse> action, bool refreshCache ) =>
+            ImageBuilderHelper( action, refreshCache, minimal_solution_add_ccb, ( universe ) =>
+             {
+                 universe.AllBuild( TestHelper.Monitor, "CKTest-Build" );
+             } );
+
+        public static NormalizedPath minimal_solution_second_ci_build( Action<TestUniverse> action, bool refreshCache ) =>
+            ImageBuilderHelper( action, refreshCache, minimal_solution_first_ci_build, ( universe ) =>
             {
                 universe.AllBuild( TestHelper.Monitor, "CKTest-Build" );
             } );
-        }
 
-        public static NormalizedPath another_minimal_solution_second_ci_build( Action<TestUniverse> action, bool refreshCache )
-        {
-            return ImageBuilderHelper( action, refreshCache, minimal_solution_first_ci_build, ( universe ) =>
+        public static NormalizedPath another_minimal_solution_second_ci_build( Action<TestUniverse> action, bool refreshCache ) =>
+            ImageBuilderHelper( action, refreshCache, minimal_solution_first_ci_build, ( universe ) =>
             {
                 universe.AllBuild( TestHelper.Monitor, "CKTest-Build" );
             } );
-        }
 
-        public static NormalizedPath full_apply_settings_randomly_applied( Action<TestUniverse> action, bool refreshCache, int seed )
-        {
-            return ImageBuilderHelper( action, refreshCache, another_minimal_solution_second_ci_build, ( universe ) =>
+        public static NormalizedPath full_apply_settings_randomly_applied( Action<TestUniverse> action, bool refreshCache, int seed ) =>
+            ImageBuilderHelper( action, refreshCache, another_minimal_solution_second_ci_build, ( universe ) =>
             {
                 universe.ApplyRandomly( TestHelper.Monitor, "CKTest-Build", seed );
             } );
-        }
 
-        public static NormalizedPath full_apply_settings( Action<TestUniverse> action, bool refreshCache )
-        {
-            return ImageBuilderHelper( action, refreshCache, another_minimal_solution_second_ci_build, ( universe ) =>
+        public static NormalizedPath full_apply_settings( Action<TestUniverse> action, bool refreshCache ) =>
+            ImageBuilderHelper( action, refreshCache, another_minimal_solution_second_ci_build, ( universe ) =>
              {
                  universe.ApplyAll( TestHelper.Monitor, "CKTest-Build" );
              } );
-        }
     }
 }

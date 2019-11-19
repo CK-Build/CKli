@@ -44,9 +44,9 @@ namespace CK.Env.Tests.LocalTestHelper
             Func<Action<TestUniverse>, bool, NormalizedPath> imageGenerator,
             bool refreshCache )
         {
-            NormalizedPath generatedBaseImagePath = CacheUniverseFolder.AppendPart( imageGenerator.Method.Name );
+            NormalizedPath generatedBaseImagePath = CacheUniverseFolder.AppendPart( imageGenerator.Method.Name + ".zip" );
             if( !refreshCache && File.Exists( generatedBaseImagePath ) ) return generatedBaseImagePath;
-            File.Delete( generatedBaseImagePath );
+            if( File.Exists( generatedBaseImagePath ) ) File.Delete( generatedBaseImagePath );
             return imageGenerator( null, refreshCache );
         }
 

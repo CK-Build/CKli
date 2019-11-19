@@ -19,6 +19,7 @@ namespace CK.Env.Tests.LocalTestHelper
                 {
                     universe.UserHost.WorldSelector.CloseWorld( m );
                 }
+                universe.UserHost.WorldStore.SetWorldMapping( m, worldName, universe.DevDirectory );
                 universe.UserHost.WorldSelector.OpenWorld( m, worldName ).Should().BeTrue();
             }
             return universe;
@@ -47,16 +48,38 @@ namespace CK.Env.Tests.LocalTestHelper
             return universe;
         }
 
-        public static TestUniverse ApplyAll( this TestUniverse universe, IActivityMonitor m, string worldName )
+        public static TestUniverse ApplyWithFilter( this TestUniverse universe, IActivityMonitor m, string worldName, string pattern )
         {
             EnsureWorldOpened( universe, m, worldName );
             var commandRegister = universe.UserHost.CommandRegister;
-            foreach( var command in commandRegister.GetCommands( "*applysettings*" ) )
+            foreach( var command in commandRegister.GetCommands( pattern ) )
             {
                 command.Execute( m, command.CreatePayload() );
             }
             return universe;
         }
+
+        public static TestUniverse CommitAll (this TestUniverse universe, IActivityMonitor m, string worldName)
+        {
+            EnsureWorldOpened( universe, m, worldName );
+            var commandRegister = universe.UserHost.CommandRegister;
+            foreach( var command in commandRegister.GetCommands( "*commit" ) )
+            {
+                var payload = command.CreatePayload();
+                if( !(payload is SimplePayload simple) )
+                {
+                    m.Error( "Unsupported payload type: " + payload.GetType() );
+                    throw new NotSupportedException();
+                }
+                simple.Fields[0].SetValue( "Tests automated commit. If you see this commit online, blame Kuinox." );
+                simple.Fields[1].SetValue( 0 );
+                command.Execute( m, payload );
+            }
+            return universe;
+        }
+
+        public static TestUniverse ApplyAll( this TestUniverse universe, IActivityMonitor m, string worldName )
+            => ApplyWithFilter( universe, m, worldName, "*applysettings*" );
 
         public static TestUniverse CommitAll( this TestUniverse universe, IActivityMonitor m, string commitMessage, string worldName )
         {
@@ -91,18 +114,18 @@ namespace CK.Env.Tests.LocalTestHelper
             m.Info( $"Running random actions with seed '{seed}'" );
             var rand = new Random( seed );
 
-            //for( int i = 0; i < actions.Length*2; i++ )
-            //{
-            //    int choosed = rand.Next( 0, actions.Length );
-            //    ranAction[choosed] = true;
-            //    actions[choosed]();
-            //}
+            for( int i = 0; i < actions.Length * 2; i++ )
+            {
+                int choosed = rand.Next( 0, actions.Length );
+                ranAction[choosed] = true;
+                actions[choosed]();
+            }
 
-            //IOrderedEnumerable<Action> shuffled = actions.Where( ( p, i ) => !ranAction[i] ).OrderBy( k => rand.Next() );
-            //foreach( var action in shuffled )
-            //{
-            //    //action();
-            //}
+            IOrderedEnumerable<Action> shuffled = actions.Where( ( p, i ) => !ranAction[i] ).OrderBy( k => rand.Next() );
+            foreach( var action in shuffled )
+            {
+                action();
+            }
             return universe;
         }
     }
