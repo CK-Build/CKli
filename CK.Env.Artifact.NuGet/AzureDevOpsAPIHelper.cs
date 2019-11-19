@@ -32,19 +32,20 @@ namespace CK.Env
         /// <summary>
         /// Gets the url api.
         /// </summary>
+        /// <param name="publicProjectName">Project name for Open Source (public) Azure Feed. Must be null for private feed.</param>
         /// <param name="organization">The organization name.</param>
         /// <param name="feedName">The name of the feed.</param>
         /// <param name="isNPM">True for NPM, false for NuGet.</param>
-        /// <param name="point">The API point (after the /npm/ or /nuget/).</param>
+        /// <param name="point">The API point (after the /npm/ or /nuget/). Can contain multiple/segments/if/needed.</param>
         /// <param name="version">The API version.</param>
         /// <returns>The url.</returns>
-        public static string GetUrl( string projectName, string organization, string feedName, bool isNPM, string point = "packagesBatch", string version = "api-version=5.0-preview.1" )
+        public static string GetUrl( string publicProjectName, string organization, string feedName, bool isNPM, string point = "packagesBatch", string version = "api-version=5.0-preview.1" )
         {
-            if( projectName == null )
+            if( publicProjectName == null )
             {
                 return $"https://pkgs.dev.azure.com/{organization}/_apis/packaging/feeds/{feedName}/{(isNPM ? "npm" : "nuget")}/{point}?{version}";
             }
-            return $"https://pkgs.dev.azure.com/{organization}/{projectName}/_apis/packaging/feeds/{feedName}/{(isNPM ? "npm" : "nuget")}/{point}?{version}";
+            return $"https://pkgs.dev.azure.com/{organization}/{publicProjectName}/_apis/packaging/feeds/{feedName}/{(isNPM ? "npm" : "nuget")}/{point}?{version}";
         }
 
 

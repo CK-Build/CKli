@@ -282,15 +282,17 @@ namespace CK.Env.NPM
             string basic = Convert.ToBase64String( Encoding.ASCII.GetBytes( $"{_username}:{_password}" ) );
             _authHeader = new AuthenticationHeaderValue( "Basic", basic );
             (string organization, string feedId) = GetAzureInfoFromUri();
-            string url = $"https://pkgs.dev.azure.com/" +
-                $"{organization}/_apis/packaging/feeds/{feedId}/npm/{packageName}/versions/{version}?api-version=5.0-preview.1";
+            string url = $"https://pkgs.dev.azure.com/{organization}/_apis/packaging/feeds/{feedId}/npm/{packageName}/versions/{version}?api-version=5.0-preview.1";
             using( HttpRequestMessage req = NpmRequestMessage( m, new Uri( url ), HttpMethod.Get ) )
             using( HttpResponseMessage res = await _httpClient.SendAsync( req ) )
             {
                 _authHeader = oldAuth;
                 string body = await res.Content.ReadAsStringAsync();
                 if( res.StatusCode == HttpStatusCode.NotFound ) return (body, false);
-                if( !res.IsSuccessStatusCode ) throw new Exception( "Status code not successfull and is not a 404" );
+                if( !res.IsSuccessStatusCode )
+                {
+                    throw new Exception( $"IsSuccessStatusCode: {res.StatusCode}. Body: {body}." );
+                }
                 return (body, true);
             }
         }
