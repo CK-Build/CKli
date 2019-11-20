@@ -21,7 +21,7 @@ namespace CKli
 
             LogFile.RootLogPath = userHostPath.AppendPart( "Logs" );
             var logConfig = new GrandOutputConfiguration().AddHandler(
-                                new CK.Monitoring.Handlers.TextFileConfiguration() { Path = "Text" } );
+                                new CK.Monitoring.Handlers.TextFileConfiguration() { Path = "Text", MaxCountPerFile = 200_000} );
             GrandOutput.EnsureActiveDefault( logConfig );
 
             var monitor = new ActivityMonitor();
