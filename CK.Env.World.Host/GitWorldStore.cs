@@ -95,6 +95,7 @@ namespace CK.Env
                 {
                     m.Info( $"Use 'run World/{nameof( SetWorldMapping )}' command to update the mapping." );
                     _stackRepos.Add( new StackRepo( this, new Uri( "https://github.com/signature-opensource/CK-Stack.git" ), true ) );
+                    _stackRepos.Add( new StackRepo( this, new Uri( "https://github.com/signature-opensource/CK-Stack.git" ), true ) );
                     WorldLocalMapping.SetMap( m, "CK-Build", "/Dev/CK" );
                     WorldLocalMapping.SetMap( m, "CK", "/Dev/CK" );
                     WriteStacksToLocalStacksFilePath( m );
