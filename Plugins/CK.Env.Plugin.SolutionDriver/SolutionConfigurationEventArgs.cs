@@ -31,6 +31,7 @@ namespace CK.Env.Plugin
             Solution = solution ?? throw new ArgumentNullException( nameof( solution ) );
             SolutionSpec = spec ?? throw new ArgumentNullException( nameof( spec ) );
             BuildRequiredSecrets = buildSecrets ?? throw new ArgumentNullException( nameof( SolutionSpec ) );
+            IsNewSolution = isNew;
         }
 
         /// <summary>
