@@ -39,7 +39,9 @@ namespace CK.Env.Plugin
             YamlMapping codeCakeJob = FindOrCreateYamlElement( m, firstMapping, "codecakebuilder" );
             SetSequence( codeCakeJob, "tags", new YamlValue( "windows" ) );
             SetSequence( codeCakeJob, "script",
-                new YamlValue( "dotnet run --project CodeCakeBuilder -nointeraction" ),
+                new YamlValue( "dotnet run --project CodeCakeBuilder -nointeraction" )
+            );
+            codeCakeJob["artifacts"] =
                 new YamlMapping()
                 {
                     ["paths"] = new YamlSequence()
@@ -51,8 +53,7 @@ namespace CK.Env.Plugin
                     },
                     ["when"] = new YamlValue( "always" ),
                     ["expire_in"] = new YamlValue( "6 month" )
-                }
-            );
+                };
             CreateOrUpdate( m, YamlMappingToString( m ) );
         }
 
