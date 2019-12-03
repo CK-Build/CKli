@@ -2,7 +2,10 @@ using CK.Core;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Management.Automation;
+using System.Management.Automation.Runspaces;
 using System.Text;
+using Microsoft.PowerShell;
 
 namespace CK.Env
 {
@@ -33,12 +36,19 @@ namespace CK.Env
             {
                 scriptFileName = "./" + scriptFileName;
             }
-            var a = '"' + scriptFileName + '"';
+            var fileName = '"' + scriptFileName + '"';
             foreach( var arg in arguments )
             {
-                a += " " + arg;
+                fileName += " " + arg;
             }
-            return Run( m, workingDir, "Powershell.exe", a, stdErrorLevel, environmentVariables );
+
+            var state = InitialSessionState.Create();
+            state.ExecutionPolicy = ExecutionPolicy.Bypass;
+            using( var ps = PowerShell.Create( state ) )
+            {
+                ps.Invoke( fileName );
+            }
+            return Run( m, workingDir, "Powershell.exe", fileName, stdErrorLevel, environmentVariables );
         }
 
         /// <summary>
