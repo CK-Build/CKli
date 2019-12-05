@@ -64,7 +64,13 @@ namespace CK.Env.NPM
             {
                 if( !String.IsNullOrEmpty( result.SecretKeyName ) )
                 {
-                    SecretKeyStore.DeclareSecretKey( result.SecretKeyName, desc => $"Required to push NPM packages to repository '{result.UniqueRepositoryName}'." );
+                    string DescriptionBuilder( SecretKeyInfo key )
+                    {
+                        string desc = key?.Description;
+                        string ourDesc = $"Required to push NPM packages to repository '{result.UniqueRepositoryName}'.";
+                        return desc != null ? $"{desc}\n{ourDesc}" : ourDesc;
+                    }
+                    SecretKeyStore.DeclareSecretKey( result.SecretKeyName, DescriptionBuilder );
                 }
             }
             return result;

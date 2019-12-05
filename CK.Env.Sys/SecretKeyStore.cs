@@ -100,7 +100,8 @@ namespace CK.Env
         /// compose the final description and the <paramref name="isRequired"/> is or'ed.
         /// </summary>
         /// <param name="name">The name of the secret key.</param>
-        /// <param name="descriptionBuilder">Description builder function.</param>
+        /// <param name="descriptionBuilder">Description builder function. Allow to manipulate the description.
+        /// Other components may have already put some description.</param>
         /// <param name="isRequired">True if this key is required to initialize a World.</param>
         /// <returns>The secret key info.</returns>
         public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo, string> descriptionBuilder, bool isRequired = false, string sourceNameMaxLength = null )
