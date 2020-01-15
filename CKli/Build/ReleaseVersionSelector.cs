@@ -113,7 +113,7 @@ namespace CKli
             char a;
             do
             {
-                while( "0123AX".IndexOf( (a = Console.ReadKey().KeyChar) ) < 0 ) Console.Write( '\b' );
+                while( (c.CanUsePreviouslyResolvedInfo ? "0123AX": "0123X").IndexOf( (a = Console.ReadKey().KeyChar) ) < 0 ) Console.Write( '\b' );
                 if( a == 'X' ) c.Cancel();
                 if( a == 'A' )
                 {
