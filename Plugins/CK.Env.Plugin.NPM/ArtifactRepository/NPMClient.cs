@@ -108,7 +108,7 @@ namespace CK.Env.NPM
             {
                 r.ThrowXmlException( $"NPM feed with the same scope '{scope}' is already defined." );
             }
-            if( creds.IsSecretKeyName )
+            if( creds?.IsSecretKeyName ?? false )
             {
                 SecretKeyStore.DeclareSecretKey( creds.PasswordOrSecretKeyName, ( a ) => "PAT Used to authenticate CKli to the feeds, and retrieve informations about npm packages." );
             }
