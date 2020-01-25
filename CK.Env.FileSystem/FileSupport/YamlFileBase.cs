@@ -75,12 +75,6 @@ namespace CK.Env
             return kv;
         }
 
-        protected static YamlSequence EnsureSequenceContent( YamlSequence s )
-        {
-            //s.Add(new YamlElement() )
-            return s;
-        }
-
         protected static YamlMapping EnsureSequence( YamlMapping m, string key )
         {
             if( m[key] == null )

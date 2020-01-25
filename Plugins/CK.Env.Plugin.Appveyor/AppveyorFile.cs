@@ -132,12 +132,13 @@ namespace CK.Env.Plugin
             CreateOrUpdate( m, YamlMappingToString( m ) );
         }
 
-        static void EnsureDefaultBranches( YamlMapping firstMapping )
+        void EnsureDefaultBranches( YamlMapping firstMapping )
         {
             YamlElement branches = firstMapping["branches"];
-            if( branches == null )
+            if( branches == null ) firstMapping["branches"] = branches = new YamlMapping();
+            if( branches is YamlMapping m )
             {
-                firstMapping["branches"] = SetSequence( new YamlMapping(), "only", new YamlValue( "master" ), new YamlValue( "develop" ) );
+                SetSequence( m, "only", new YamlValue( GitFolder.World.MasterBranchName ), new YamlValue( GitFolder.World.DevelopBranchName ) );
             }
         }
     }
