@@ -6,7 +6,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using static CK.Testing.MonitorTestHelper;
 
-namespace CK.Env.Tests
+namespace CK.Env.FS.Tests
 {
     public static class LocalTestHelper
     {

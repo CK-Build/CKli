@@ -51,13 +51,14 @@ namespace CK.Env.Tests
         public void a_simple_project_can_be_build_once()
         {
             EnsureCallbackIsCalled(
-                ( Action<TestUniverse> action, object[] parameters ) => ImageLibrary.minimal_solution_first_ci_build( action, (bool)parameters[0] ),
-                ( universe ) =>
-                {
-                    var files = Directory.EnumerateFiles( universe.DevDirectory.Combine( "LocalFeed/CI" ) );
-                    files.Should().HaveCount( 1 );
-                    Path.GetFileName( files.Single() ).Should().Be( "CKTest.Code.Cake.0.1.1--0007-develop.nupkg" );
-                },
+                ( Action<(TestUniverse, World)> action, object[] parameters ) =>
+                ImageLibrary.minimal_solution_first_ci_build( ( universe, world ) => action( (universe, world) ), (bool)parameters[0] ),
+                ( arg ) =>
+                    {
+                        var files = Directory.EnumerateFiles( arg.Item1.DevDirectory.Combine( "LocalFeed/CI" ) );
+                        files.Should().HaveCount( 1 );
+                        Path.GetFileName( files.Single() ).Should().Be( "CKTest.Code.Cake.0.1.1--0007-develop.nupkg" );
+                    },
                 TestHelper.IsExplicitAllowed
             );
         }
@@ -66,7 +67,7 @@ namespace CK.Env.Tests
         public void a_simple_project_can_be_build_a_second_time()
         {
             ImageLibrary.minimal_solution_second_ci_build(
-            ( universe ) =>
+            ( universe, world ) =>
             {
                 var files = Directory.EnumerateFiles( universe.DevDirectory.Combine( "LocalFeed/CI" ) );
                 files.Should().HaveCount( 1 ); //We didn't made any modification: the version should not change.
@@ -77,7 +78,7 @@ namespace CK.Env.Tests
         [Test]
         public void dll_should_not_change_after_rebuild()
         {
-            ImageLibrary.minimal_solution_second_ci_build( universe => { }, TestHelper.IsExplicitAllowed );//We are now sure this image, and it's base exist.
+            ImageLibrary.minimal_solution_second_ci_build( (universe, world) => { }, TestHelper.IsExplicitAllowed );//We are now sure this image, and it's base exist.
             using( var compare = ImageManager.CompareBuildedImages(
                 nameof( ImageLibrary.minimal_solution_first_ci_build ),
                 nameof( ImageLibrary.minimal_solution_second_ci_build ) ) )

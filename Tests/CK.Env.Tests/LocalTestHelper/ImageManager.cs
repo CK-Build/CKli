@@ -40,19 +40,19 @@ namespace CK.Env.Tests.LocalTestHelper
             return TestUniverse.Create( m, tempPath );
         }
 
-        public static NormalizedPath EnsureImage(
-            Func<Action<TestUniverse>, bool, NormalizedPath> imageGenerator,
+        public static NormalizedPath EnsureImage<T>(
+            Func<T, bool, NormalizedPath> imageGenerator,
             bool refreshCache )
         {
             NormalizedPath generatedBaseImagePath = CacheUniverseFolder.AppendPart( imageGenerator.Method.Name + ".zip" );
             if( !refreshCache && File.Exists( generatedBaseImagePath ) ) return generatedBaseImagePath;
             if( File.Exists( generatedBaseImagePath ) ) File.Delete( generatedBaseImagePath );
-            return imageGenerator( null, refreshCache );
+            return imageGenerator( default, refreshCache );
         }
 
-        public static TestUniverse InstantiateImage(
+        public static TestUniverse InstantiateImage<T>(
             IActivityMonitor m,
-            Func<Action<TestUniverse>, bool, NormalizedPath> parentImageGenerator,
+            Func<T, bool, NormalizedPath> parentImageGenerator,
             bool refreshCache )
         {
             if( parentImageGenerator == null ) throw new ArgumentNullException();
@@ -103,6 +103,11 @@ namespace CK.Env.Tests.LocalTestHelper
                 CacheUniverseFolder.AppendPart( imageAName + ".zip" ),
                 CacheUniverseFolder.AppendPart( imageBName + ".zip" )
             );
+
+        internal static TestUniverse InstantiateImage( object monitor, NormalizedPath tempZip )
+        {
+            throw new NotImplementedException();
+        }
 
         public static ZipComparer CompareBuildedImages( NormalizedPath imageA, NormalizedPath imageB ) =>
             new ZipComparer(

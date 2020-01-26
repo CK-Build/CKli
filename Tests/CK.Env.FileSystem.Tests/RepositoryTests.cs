@@ -7,7 +7,7 @@ using System.IO;
 using System.Linq;
 using static CK.Testing.MonitorTestHelper;
 
-namespace CK.Env.Tests
+namespace CK.Env.FS.Tests
 {
     [TestFixture]
     public class RepositoryTests

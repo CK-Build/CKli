@@ -4,25 +4,26 @@ using FluentAssertions;
 using System;
 using System.IO;
 using System.Linq;
+using static CK.Testing.MonitorTestHelper;
 
 namespace CK.Env.Tests.LocalTestHelper
 {
     public static class ProcessLibrary
     {
 
-        public static TestUniverse EnsureWorldOpened( this TestUniverse universe, IActivityMonitor m, string worldName )
+        public static World EnsureWorldOpened( this TestUniverse universe, string worldName )
         {
             var currentWorldName = universe.UserHost.WorldSelector.CurrentWorld?.WorldName?.FullName;
             if( currentWorldName != worldName )
             {
                 if( currentWorldName != null )
                 {
-                    universe.UserHost.WorldSelector.CloseWorld( m );
+                    universe.UserHost.WorldSelector.CloseWorld( TestHelper.Monitor );
                 }
-                universe.UserHost.WorldStore.SetWorldMapping( m, worldName, universe.DevDirectory );
-                universe.UserHost.WorldSelector.OpenWorld( m, worldName ).Should().BeTrue();
+                universe.UserHost.WorldStore.SetWorldMapping( TestHelper.Monitor, worldName, universe.DevDirectory );
+                universe.UserHost.WorldSelector.OpenWorld( TestHelper.Monitor, worldName ).Should().BeTrue();
             }
-            return universe;
+            return universe.UserHost.WorldSelector.CurrentWorld;
         }
 
         public static TestUniverse SeedInitialSetup( this TestUniverse universe, IActivityMonitor m )
@@ -35,22 +36,13 @@ namespace CK.Env.Tests.LocalTestHelper
                 oldString: TestUniverse.PlaceHolderString,
                 newString: universe.UniversePath
             );
-            EnsureWorldOpened( universe, m, "CKTest-Build" );
-            return universe;
-        }
-
-        public static TestUniverse AllBuild( this TestUniverse universe, IActivityMonitor m, string worldName )
-        {
-            EnsureWorldOpened( universe, m, worldName );
-            var w = universe.UserHost.WorldSelector.CurrentWorld;
-            w.Should().NotBeNull();
-            w.AllBuild( m, true ).Should().BeTrue();
+            EnsureWorldOpened( universe, "CKTest-Build" );
             return universe;
         }
 
         public static TestUniverse ApplyWithFilter( this TestUniverse universe, IActivityMonitor m, string worldName, string pattern )
         {
-            EnsureWorldOpened( universe, m, worldName );
+            EnsureWorldOpened( universe, worldName );
             var commandRegister = universe.UserHost.CommandRegister;
             foreach( var command in commandRegister.GetCommands( pattern ) )
             {
@@ -61,7 +53,7 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public static TestUniverse CommitAll (this TestUniverse universe, IActivityMonitor m, string worldName)
         {
-            EnsureWorldOpened( universe, m, worldName );
+            EnsureWorldOpened( universe, worldName );
             var commandRegister = universe.UserHost.CommandRegister;
             foreach( var command in commandRegister.GetCommands( "*commit" ) )
             {
@@ -83,7 +75,7 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public static TestUniverse CommitAll( this TestUniverse universe, IActivityMonitor m, string commitMessage, string worldName )
         {
-            EnsureWorldOpened( universe, m, worldName );
+            EnsureWorldOpened( universe, worldName );
             var currentWorld = universe.UserHost.WorldSelector.CurrentWorld;
             foreach( var gitFolder in currentWorld.SolutionDrivers.GetDriverOnCurrentBranch().Select( s => s.GitRepository ) )
             {
@@ -92,29 +84,37 @@ namespace CK.Env.Tests.LocalTestHelper
             return universe;
         }
 
-        public static TestUniverse RestartCKli( this TestUniverse universe, IActivityMonitor m )
+        public static TestUniverse RestartCKli( this TestUniverse universe)
         {
             string tempName = "temp";
             NormalizedPath tempZip = ImageManager.CacheUniverseFolder.AppendPart( tempName + ".zip" );
             File.Delete( tempZip );
             universe.SnapshotState( tempName ).Should().Be( tempZip );
-            return ImageManager.InstantiateImage( m, tempZip );
+            return ImageManager.InstantiateImage( TestHelper.Monitor, tempZip );
         }
 
+        /// <summary>
+        /// Run all apply settings in a random fashion.
+        /// </summary>
+        /// <param name="universe"></param>
+        /// <param name="m"></param>
+        /// <param name="worldName"></param>
+        /// <param name="seed"></param>
+        /// <returns></returns>
         public static TestUniverse ApplyRandomly( this TestUniverse universe, IActivityMonitor m, string worldName, int seed )
         {
-            EnsureWorldOpened( universe, m, worldName );
+            EnsureWorldOpened( universe, worldName );
             var commandRegister = universe.UserHost.CommandRegister;
             var commands = commandRegister.GetCommands( "*applysettings*" );
             Action[] actions = commands.Select( s => new Action( () => { s.Execute( m, s.CreatePayload() ); } ) )
                 .Append( () => { CommitAll( universe, m, "Applied some settings.", worldName ); } )
-                .Append( () => { universe = RestartCKli( universe, m ); } ).ToArray();
+                .Append( () => { universe = universe.RestartCKli(); } ).ToArray();
 
             bool[] ranAction = new bool[actions.Length];
             m.Info( $"Running random actions with seed '{seed}'" );
             var rand = new Random( seed );
 
-            for( int i = 0; i < actions.Length * 2; i++ )
+            for( int i = 0; i < actions.Length * 2; i++ )//TODO: we can add better checks.
             {
                 int choosed = rand.Next( 0, actions.Length );
                 ranAction[choosed] = true;
