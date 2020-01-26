@@ -223,7 +223,7 @@ $@"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
 </PropertyGroup>" ),
                 XElement.Parse(
 $@"<ItemGroup Condition="" '$(CakeBuild)' == 'true' "">
-   <PackageReference Include=""Microsoft.SourceLink.{linkName}"" Version=""1.0.0-beta2-19367-01"" PrivateAssets=""All""/>
+   <PackageReference Include=""Microsoft.SourceLink.{linkName}"" Version=""1.0.0"" PrivateAssets=""All""/>
 </ItemGroup>" )
                 );
             return true;
