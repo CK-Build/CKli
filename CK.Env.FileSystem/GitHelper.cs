@@ -55,6 +55,8 @@ namespace CK.Env
         /// </summary>
         protected readonly Repository Git;
 
+        public IQueryableCommitLog Commits => Git.Commits; // you wont like it but i needed it.
+
         /// <summary>
         /// Gets whether the Git repository is public or private.
         /// </summary>
@@ -636,52 +638,62 @@ namespace CK.Env
                 try
                 {
                     var gitFolderPath = Path.Combine( workingFolder, ".git" );
-                    if( !Directory.Exists( gitFolderPath ) )
+                    bool repoCreated = false;
+                    using( m.OpenTrace( "Ensuring the git repository." ) )
                     {
-                        using( m.OpenInfo( $"Cloning '{workingFolder}' from '{git.OriginUrl}' on {branchName}." ) )
+                        if( !Directory.Exists( gitFolderPath ) )
                         {
-                            try
+                            m.Trace( $"The folder '{gitFolderPath}' does not exist." );
+                            using( m.OpenInfo( $"Cloning '{workingFolder}' from '{git.OriginUrl}' on {branchName}." ) )
                             {
-                                Repository.Clone( git.OriginUrl.ToString(), workingFolder, new CloneOptions()
+                                try
                                 {
-                                    CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, git ),
-                                    Checkout = true
-                                } );
-                            }
-                            catch( Exception ex )
-                            {
-                                m.Error( "Git clone failed. Deleting the repository.", ex );
-                                FileHelper.RawDeleteLocalDirectory( m, workingFolder );
-                                return null;
+                                    Repository.Clone( git.OriginUrl.ToString(), workingFolder, new CloneOptions()
+                                    {
+                                        CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, git ),
+                                        Checkout = true
+                                    } );
+                                    repoCreated = true;
+                                }
+                                catch( Exception ex )
+                                {
+                                    m.Error( "Git clone failed. Deleting the repository.", ex );
+                                    FileHelper.RawDeleteLocalDirectory( m, workingFolder );
+                                    return null;
+                                }
                             }
                         }
                     }
-                    else if( !Repository.IsValid( gitFolderPath ) )
+                    Repository r;
+                    using( m.OpenTrace( "Checking the validity of the git repository." ) )
                     {
-                        m.Fatal( $"Git folder '{gitFolderPath}' exists but is not a valid Repository." );
-                        return null;
-                    }
-                    Repository r = new Repository( workingFolder );
-                    var remote = r.Network.Remotes.FirstOrDefault( rem => rem.Url.Equals( git.OriginUrl.ToString(), StringComparison.OrdinalIgnoreCase ) );
-                    if( remote == null || remote.Name != "origin" )
-                    {
+                        if( !Repository.IsValid( gitFolderPath ) )
+                        {
+                            m.Fatal( $"Git folder '{gitFolderPath}' exists but is not a valid Repository." );
+                            return null;
+                        }
+                        r = new Repository( workingFolder );
+                        var remote = r.Network.Remotes.FirstOrDefault( rem => rem.Url.Equals( git.OriginUrl.ToString(), StringComparison.OrdinalIgnoreCase ) );
+                        if( remote == null || remote.Name != "origin" )
+                        {
 
-                        m.Fatal( $"Existing '{workingFolder}' must have its 'origin' remote set to '{git.OriginUrl}'. This must be fixed manually." );
-                        r.Dispose();
-                        return null;
-                    }
-                    if( !r.Commits.Any() )
-                    {
-                        m.Info( $"Unitialized repository: automatically creating an initial commit." );
-                        var date = DateTimeOffset.Now;
-                        Signature author = r.Config.BuildSignature( date );
-                        var committer = new Signature( "CKli", "none", date );
-                        r.Commit( "Initial commit automatically created.", author, committer, new CommitOptions { AllowEmptyCommit = true } );
+                            m.Fatal( $"Existing '{workingFolder}' must have its 'origin' remote set to '{git.OriginUrl}'. This must be fixed manually." );
+                            r.Dispose();
+                            return null;
+                        }
+                        if( !r.Commits.Any() )
+                        {
+                            m.Info( $"Unitialized repository: automatically creating an initial commit." );
+                            var date = DateTimeOffset.Now;
+                            Signature author = r.Config.BuildSignature( date );
+                            var committer = new Signature( "CKli", "none", date );
+                            r.Commit( "Initial commit automatically created.", author, committer, new CommitOptions { AllowEmptyCommit = true } );
+                        }
                     }
                     if( r.Head?.FriendlyName != branchName && branchName != null )
                     {
                         Branch branch = DoEnsureBranch( m, r, branchName, false, workingFolder );
-                        Commands.Checkout( r, branch );
+                        if( repoCreated ) Commands.Checkout( r, branch );
                     }
                     if( ensureHooks ) EnsureHooks( m, workingFolder );
                     m.CloseGroup( "Repository is checked out." );

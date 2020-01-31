@@ -10,8 +10,12 @@ namespace CK.Env.Tests
 {
     public class NonRegressionsTests
     {
+        /// <summary>
+        /// When switching to local, CKli did checkout on develop but we were on a local branch.
+        /// It should had keep the local branch checkout.
+        /// </summary>
         [Test]
-        public void ckli_save_branch_state_on_restart() //When switching to local, CKli forgot the state and was 
+        public void ckli_save_branch_state_on_restart() 
         {
             ImageLibrary.minimal_solution_switched_to_local( ( universe, world ) =>
             {
