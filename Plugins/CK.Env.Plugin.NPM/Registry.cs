@@ -264,50 +264,11 @@ namespace CK.Env.NPM
             return (v?.ToString() ?? "", v != null);
         }
 
-        (string organization, string feedId) GetAzureInfoFromUri()
-        {
-            var match = new Regex(
-                @"(?:https:\/\/pkgs\.dev\.azure\.com\/)([^\/]*)\/_packaging\/([^\/]*)\/npm\/registry" )
-                    .Match( RegistryUri.ToString() );
-            return (match.Groups[1].Value, match.Groups[2].Value);
-        }
-
-        bool IsAzureRepository => RegistryUri.Host == "pkgs.dev.azure.com";
-
-
-        async Task<(string body, bool found)> AzureSpecialVersionRequest( IActivityMonitor m, string packageName, string version )
-        {
-            if( string.IsNullOrEmpty( _username ) ) throw new InvalidOperationException( "Azure username must not be empty." );
-            var oldAuth = _authHeader;
-            string basic = Convert.ToBase64String( Encoding.ASCII.GetBytes( $"{_username}:{_password}" ) );
-            _authHeader = new AuthenticationHeaderValue( "Basic", basic );
-            (string organization, string feedId) = GetAzureInfoFromUri();
-            string url = $"https://pkgs.dev.azure.com/{organization}/_apis/packaging/feeds/{feedId}/npm/{packageName}/versions/{version}?api-version=5.0-preview.1";
-            using( HttpRequestMessage req = NpmRequestMessage( m, new Uri( url ), HttpMethod.Get ) )
-            using( HttpResponseMessage res = await _httpClient.SendAsync( req ) )
-            {
-                _authHeader = oldAuth;
-                string body = await res.Content.ReadAsStringAsync();
-                if( res.StatusCode == HttpStatusCode.NotFound ) return (body, false);
-                if( !res.IsSuccessStatusCode )
-                {
-                    throw new Exception( $"IsSuccessStatusCode: {res.StatusCode}. Body: {body}." );
-                }
-                return (body, true);
-            }
-        }
-
         public async Task<bool> ExistAsync( IActivityMonitor m, string packageName, SVersion version )
         {
             if( RegistryUri.IsFile )
             {
                 return File.Exists( Path.Combine( RegistryUri.AbsolutePath, +'-' + version.ToNormalizedString() + ".tgz" ) );
-            }
-
-            if( IsAzureRepository )
-            {
-                (_, bool found) = await AzureSpecialVersionRequest( m, packageName, version.ToNormalizedString() );
-                return found;
             }
             (_, bool exist) = await View( m, packageName, version );
             return exist;
