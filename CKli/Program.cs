@@ -5,6 +5,7 @@ using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -15,6 +16,21 @@ namespace CKli
     {
         static void Main( string[] args )
         {
+            static string GetHeaderVersion()
+            {
+                var a = (AssemblyInformationalVersionAttribute)Attribute.GetCustomAttribute( Assembly.GetExecutingAssembly(), typeof( AssemblyInformationalVersionAttribute ) );
+                var thisFramework = Assembly.GetExecutingAssembly().CustomAttributes
+                   .Where( x => x.AttributeType.FullName == "System.Runtime.Versioning.TargetFrameworkAttribute" )
+                   .Select( x => x.ConstructorArguments )
+                   .Where( p => p.Count > 0 )
+                   .Select( p => p[0].Value as string )
+                   .FirstOrDefault();
+                return "CKli " + (thisFramework ?? "<no TargetFrameworkAttribute>") + " - " + (a != null ? a.InformationalVersion : "<no version>");
+            }
+
+            Console.WriteLine( GetHeaderVersion() );
+            Console.WriteLine();
+
             ReadLine.HistoryEnabled = true;
             NormalizedPath userHostPath = Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData );
             userHostPath = userHostPath.AppendPart( "CKli" );
@@ -316,8 +332,6 @@ namespace CKli
                 Console.WriteLine( FirstPadding( sourceNameMaxLength, null, false ) );
             }
         }
-
-
 
         static void RunCommand( IActivityMonitor m, UserHost host, string rep )
         {
