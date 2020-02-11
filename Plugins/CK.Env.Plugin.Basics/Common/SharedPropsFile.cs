@@ -127,7 +127,7 @@ namespace CK.Env.Plugin
   <IsTestProject Condition=""$(MSBuildProjectName.EndsWith('.Tests'))"">true</IsTestProject>
   <IsInTestsFolder Condition=""$(MSBuildProjectDirectoryNoRoot.Contains('\Tests\'))"">true</IsInTestsFolder>
   <!-- SolutionDir is defined by Visual Studio, we unify the behavior here. -->
-  <SolutionDir Condition="" $(SolutionDir) != '' "">$([System.IO.Path]::GetDirectoryName($([System.IO.Path]::GetDirectoryName($(MSBuildThisFileDirectory)))))\</SolutionDir>
+  <SolutionDir Condition="" $(SolutionDir) == '' "">$([System.IO.Path]::GetDirectoryName($([System.IO.Path]::GetDirectoryName($(MSBuildThisFileDirectory)))))\</SolutionDir>
 </PropertyGroup>" ) );
         }
 
@@ -136,6 +136,7 @@ namespace CK.Env.Plugin
             const string sectionName = "ReproducibleBuilds";
             // This may be temporary: see https://github.com/dotnet/sourcelink/issues/91
             // For the moment, when SourceLink is disabled, we also disable the reproducible builds.
+            // Path mapping is not an easy beast. See https://github.com/tonerdo/coverlet/issues/363.
             if( _solutionSpec.DisableSourceLink )
             {
                 XCommentSection.FindOrCreate( Document.Root, sectionName, false )?.Remove();
@@ -157,7 +158,6 @@ namespace CK.Env.Plugin
 $@"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
   <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
   <Deterministic>true</Deterministic>
-  <PathMap>'$(SolutionDir)'=C:\CKli-World\{GitFolder.SubPath.Path.Replace( '/', '\\' )}</PathMap>
 </PropertyGroup>" ) );
             }
         }
@@ -228,8 +228,6 @@ $@"<ItemGroup Condition="" '$(CakeBuild)' == 'true' "">
                 );
             return true;
         }
-
-
 
     }
 }
