@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
@@ -11,7 +11,14 @@
   
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath=""/>
-  </ItemGroup>  
+  </ItemGroup>
+
+  <PropertyGroup Condition=" '$(CakeBuild)' != 'true' ">
+    <Version>0.0.0-0</Version>
+    <AssemblyVersion>0.0.0</AssemblyVersion>
+    <FileVersion>0.0.0.0</FileVersion>
+    <InformationalVersion>0.0.0-0/0000000000000000000000000000000000000000/0001-01-01 00:00:00Z</InformationalVersion>
+  </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Plugins\CK.Env.Plugin.Appveyor\CK.Env.Plugin.Appveyor.csproj" />
