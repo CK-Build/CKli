@@ -36,11 +36,15 @@ namespace CK.Env.Plugin
             CKSetupStore store = e.SolutionSpec.UseCKSetup
                                     ? e.Solution.ArtifactTargets.OfType<CKSetupStore>().SingleOrDefault()
                                     : null;
-            if( store != null && e.Secrets.TryGetValue( store.SecretKeyName, out var apiKey ) )
+            if( store != null )
             {
-                // The actual key contains both the url and the secret.
-                e.Secrets["CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL"] = apiKey + '|' + store.Url;
-                e.Secrets.Remove( store.SecretKeyName );
+                if( e.Secrets.TryGetValue( store.SecretKeyName, out var apiKey ) )
+                {
+                    // The actual key contains both the url and the secret.
+                    e.Secrets["CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL"] = apiKey + '|' + store.Url;
+                    e.Secrets.Remove( store.SecretKeyName );
+                }
+                else e.Monitor.Warn( $"Missing '{store.SecretKeyName}' secret. Unable to configure 'CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL' in 'CodeCakeBuilderKeyVault.txt' file." );
             }
         }
 
