@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Env.DependencyModel;
 using CK.Text;
 using System.Linq;
 using System.Xml.Linq;
@@ -8,12 +9,14 @@ namespace CK.Env.Plugin
     public class SharedPropsFile : XmlFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly CommonFolder _commonFolder;
+        readonly SolutionDriver _driver;
         readonly SolutionSpec _solutionSpec;
 
-        public SharedPropsFile( CommonFolder f, SolutionSpec solutionSpec, NormalizedPath branchPath )
+        public SharedPropsFile( CommonFolder f, SolutionDriver driver, SolutionSpec solutionSpec, NormalizedPath branchPath )
             : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "Shared.props" ), null )
         {
             _commonFolder = f;
+            _driver = driver;
             _solutionSpec = solutionSpec;
         }
 
@@ -30,17 +33,22 @@ namespace CK.Env.Plugin
                 return;
             }
             if( !_commonFolder.EnsureDirectory( m ) ) return;
+            var s = _driver.GetSolution( m, false );
+            if( s == null ) return;
+            bool useCentralPackage = s.Projects.Select( p => p.Tag<MSBuildSln.MSProject>() )
+                                               .Where( p => p != null )
+                                               .Any( p => p.UseMicrosoftBuildCentralPackageVersions );
 
-            // If Shared.props exists, we make sure ther is no xml namespace defined.
+            // If Shared.props exists, we make sure there is no xml namespace defined.
             if( Document == null ) Document = new XDocument( new XElement( "Project" ) );
             else Document.Root.RemoveAllNamespaces();
 
-            HandleBasicDefinitions( m );
+            HandleBasicDefinitions( m, useCentralPackage );
             HandleStandardProperties( m );
             HandleReproducibleBuilds( m );
             HandleZeroVersion( m );
             HandleGenerateDocumentation( m );
-            HandleSourceLink( m );
+            HandleSourceLink( m, useCentralPackage );
 
             Document.Root.Elements( "PropertyGroup" )
                          .Where( e => !e.HasElements )
@@ -103,7 +111,7 @@ namespace CK.Env.Plugin
 </PropertyGroup>" ) );
         }
 
-        void HandleBasicDefinitions( IActivityMonitor m )
+        void HandleBasicDefinitions( IActivityMonitor m, bool useCentralPackages )
         {
             const string sectionName = "BasicDefinitions";
             var section = XCommentSection.FindOrCreate( Document.Root, sectionName, false );
@@ -121,14 +129,20 @@ namespace CK.Env.Plugin
             }
 
             section.StartComment = ": It is useful to knwow whether we are in the Tests/ folder and/or if the current project is a Test.";
-            section.SetContent(
-                XElement.Parse(
+            var content = XElement.Parse(
 @"<PropertyGroup>
   <IsTestProject Condition=""$(MSBuildProjectName.EndsWith('.Tests'))"">true</IsTestProject>
   <IsInTestsFolder Condition=""$(MSBuildProjectDirectoryNoRoot.Contains('\Tests\'))"">true</IsInTestsFolder>
   <!-- SolutionDir is defined by Visual Studio, we unify the behavior here. -->
   <SolutionDir Condition="" $(SolutionDir) == '' "">$([System.IO.Path]::GetDirectoryName($([System.IO.Path]::GetDirectoryName($(MSBuildThisFileDirectory)))))\</SolutionDir>
-</PropertyGroup>" ) );
+</PropertyGroup>" );
+            if( useCentralPackages )
+            {
+                content.Add(
+                    new XComment( " Using Microsoft.Build.CentralPackageVersions: this avoids the Packages.props at the root of the repository. " ),
+                    new XElement( "CentralPackagesFile", "$(MSBuildThisFileDirectory)CentralPackages.props" ) );
+            }
+            section.SetContent( content );
         }
 
         void HandleReproducibleBuilds( IActivityMonitor m )
@@ -182,7 +196,7 @@ $@"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
 
         }
 
-        void HandleSourceLink( IActivityMonitor m )
+        void HandleSourceLink( IActivityMonitor m, bool useCentralPackages )
         {
             if( _solutionSpec.DisableSourceLink )
             {
@@ -190,11 +204,11 @@ $@"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
             }
             else
             {
-                EnsureSourceLink( m );
+                EnsureSourceLink( m, useCentralPackages );
             }
         }
 
-        bool EnsureSourceLink( IActivityMonitor m )
+        bool EnsureSourceLink( IActivityMonitor m, bool useCentralPackages )
         {
             var linkNames = new string[] { null, "GitHub", "GitLab", "Vsts.Git", "Bitbucket.Git", "FileSystem" };
 
@@ -206,9 +220,13 @@ $@"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
             }
             else if( linkName == "FileSystem" )
             {
-                m.Info( "We didn't implemented the sourcelink configuration on for a git hosted on the filesystem." );
+                m.Info( "Sourcelink for a local git repository is not supported." );
                 return true;
             }
+
+            string packageName = $"Microsoft.SourceLink.{linkName}";
+            const string currentVersion = "1.0.0";
+
             var section = XCommentSection.FindOrCreate( Document.Root, "SourceLink", true );
             section.StartComment = ": is enabled only for Cake build. ";
             section.SetContent(
@@ -221,11 +239,43 @@ $@"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
   <PublishRepositoryUrl>true</PublishRepositoryUrl>
   <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
 </PropertyGroup>" ),
-                XElement.Parse(
-$@"<ItemGroup Condition="" '$(CakeBuild)' == 'true' "">
-   <PackageReference Include=""Microsoft.SourceLink.{linkName}"" Version=""1.0.0"" PrivateAssets=""All""/>
-</ItemGroup>" )
+                new XElement( "ItemGroup", new XAttribute( "Condition", " '$(CakeBuild)' == 'true' " ),
+                        new XElement( "PackageReference",
+                                new XAttribute( "Include", packageName ),
+                                useCentralPackages ? null : new XAttribute( "Version", currentVersion ),
+                                new XAttribute( "PrivateAssets", "All" ) ) )
                 );
+            // Quick and dirty: impacts the Common/CentralPackages.props here.
+            if( useCentralPackages )
+            {
+                var fName = _commonFolder.FolderPath.AppendPart( "CentralPackages.props" );
+                var f = FileSystem.GetFileInfo( fName ).AsTextFileInfo( ignoreExtension: true );
+                if( f != null )
+                {
+                    var d = XDocument.Parse( f.ReadAsText() );
+                    bool hasChanged = d.Root.RemoveAllNamespaces();
+
+                    var link = d.Root.Elements( "ItemGroup" )
+                                        .Elements( "PackageReference" ).FirstOrDefault( e => (string)e.Attribute( "Update" ) == packageName );
+                    if( link == null )
+                    {
+                        hasChanged = true;
+                        link = new XElement( "PackageReference",
+                                    new XAttribute( "Update", packageName ),
+                                    new XAttribute( "Version", currentVersion ) );
+                        d.Root.EnsureElement( "ItemGroup" ).Add( link );
+                    }
+                    else if( (hasChanged = (string)link.Attribute( "Version" ) != currentVersion) )
+                    {
+                        link.SetAttributeValue( "Version", currentVersion );
+                    }
+                    if( hasChanged )
+                    {
+                        m.Info( $"Updating '{fName}' for {packageName}/{currentVersion}." );
+                        FileSystem.CopyTo( m, d.ToString(), fName );
+                    }
+                }
+            }
             return true;
         }
 

@@ -11,7 +11,6 @@ namespace CK.Env.MSBuildSln
 {
     public class MSProject : Project
     {
-
         /// <summary>
         /// Traits are used to manage framework names.
         /// The <see cref="CKTraitContext.Separator"/> is the ';' to match the one used by csproj (parsing and
@@ -80,7 +79,11 @@ namespace CK.Env.MSBuildSln
 
         }
 
-        MSProjFile _file;
+        MSProjFile _primaryFile;
+        // Packages.props or Common/CentralPackages.props or whatever has been
+        // successfully read from <CentralPackagesFile> property.
+        // See https://github.com/microsoft/MSBuildSdks/tree/master/src/CentralPackageVersions#extensibility
+        MSProjFile _centralPackagesFile;
         Dependencies _dependencies;
 
         internal MSProject(
@@ -98,7 +101,7 @@ namespace CK.Env.MSBuildSln
         /// Gets the project file. This is loaded when the <see cref="Solution"/>
         /// is created. This is null if an error occurred while loading.
         /// </summary>
-        public MSProjFile ProjectFile => _file;
+        public MSProjFile ProjectFile => _primaryFile;
 
         internal override bool Initialize(
             FileSystem fs,
@@ -111,10 +114,10 @@ namespace CK.Env.MSBuildSln
 
         MSProjFile ReloadProjectFile( FileSystem fs, IActivityMonitor m, Dictionary<NormalizedPath, MSProjFile> cache )
         {
-            _file = MSProjFile.FindOrLoadProjectFile( fs, m, Path, cache );
-            if( _file != null )
+            _primaryFile = MSProjFile.FindOrLoadProjectFile( fs, m, Path, cache );
+            if( _primaryFile != null )
             {
-                XElement f = _file.Document.Root
+                XElement f = _primaryFile.Document.Root
                                 .Elements( "PropertyGroup" )
                                 .Elements()
                                 .Where( x => x.Name.LocalName == "TargetFramework" || x.Name.LocalName == "TargetFrameworks" )
@@ -122,24 +125,52 @@ namespace CK.Env.MSBuildSln
                 if( f == null )
                 {
                     m.Error( $"There must be one and only one TargetFramework or TargetFrameworks element in {Path}." );
-                    _file = null;
+                    _primaryFile = null;
                 }
                 else
                 {
                     TargetFrameworks = Savors.FindOrCreate( f.Value );
 
-                    LangVersion = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "LangVersion" ).LastOrDefault()?.Value;
-                    OutputType = _file.Document.Root.Elements( "PropertyGroup" ).Elements( "OutputType" ).LastOrDefault()?.Value;
-                    IsPackable = (bool?)_file.Document.Root.Elements( "PropertyGroup" ).Elements( "IsPackable" ).LastOrDefault();
+                    LangVersion = _primaryFile.Document.Root.Elements( "PropertyGroup" ).Elements( "LangVersion" ).LastOrDefault()?.Value;
+                    OutputType = _primaryFile.Document.Root.Elements( "PropertyGroup" ).Elements( "OutputType" ).LastOrDefault()?.Value;
+                    IsPackable = (bool?)_primaryFile.Document.Root.Elements( "PropertyGroup" ).Elements( "IsPackable" ).LastOrDefault();
+
+                    bool useMicrosoftBuildCentralPackageVersions = _primaryFile.Document.Root.Elements( "Sdk" )
+                                                                                    .Attributes( "Name" )
+                                                                                    .Any( a => a.Value == "Microsoft.Build.CentralPackageVersions" );
+                    if( useMicrosoftBuildCentralPackageVersions )
+                    {
+                        NormalizedPath packageFile;
+                        var definer = _primaryFile.AllFiles.Select( file => file.Document.Root )
+                                             .SelectMany( root => root.Elements( "PropertyGroup" ) )
+                                             .Elements()
+                                             .FirstOrDefault( e => e.Name.LocalName == "CentralPackagesFile" );
+                        if( definer != null )
+                        {
+                            m.Info( $"Found Property '{definer}' that defines CentralPackagesFile." );
+                            var fileDefiner = _primaryFile.AllFiles.Single( file => file.Document == definer.Document );
+                            packageFile = definer.Value.Replace( "$(MSBuildThisFileDirectory)", fileDefiner.Path.RemoveLastPart() + '/' );
+                        }
+                        else
+                        {
+                            packageFile = Solution.SolutionFolderPath.AppendPart( "Packages.props" );
+                        }
+                        _centralPackagesFile = MSProjFile.FindOrLoadProjectFile( fs, m, packageFile, cache );
+                        if( _centralPackagesFile == null )
+                        {
+                            // Emits an error: reading the missing Version attribute will fail.
+                            m.Error( $"Failed to read '{packageFile}' central package file." );
+                        }
+                    }
                     DoInitializeDependencies( m );
-                    if( !_dependencies.IsInitialized ) _file = null;
+                    if( !_dependencies.IsInitialized ) _primaryFile = null;
                 }
             }
-            if( _file == null )
+            if( _primaryFile == null )
             {
                 TargetFrameworks = Savors.EmptyTrait;
             }
-            return _file;
+            return _primaryFile;
         }
 
         public bool? IsPackable { get; private set; }
@@ -163,6 +194,12 @@ namespace CK.Env.MSBuildSln
         public CKTrait TargetFrameworks { get; private set; }
 
         /// <summary>
+        /// Gets whether Microsoft.Build.CentralPackageVersions is used thanks to:
+        ///         &lt;Sdk Name="Microsoft.Build.CentralPackageVersions" Version="..." /&gt;
+        /// </summary>
+        public bool UseMicrosoftBuildCentralPackageVersions => _centralPackagesFile != null;
+
+        /// <summary>
         /// Gets the dependencies.
         /// </summary>
         public Dependencies Deps => _dependencies;
@@ -180,7 +217,7 @@ namespace CK.Env.MSBuildSln
         public bool Save( IActivityMonitor m )
         {
             if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
-            return _file.Save( m, Solution.FileSystem );
+            return _primaryFile.Save( m, Solution.FileSystem );
         }
 
         /// <summary>
@@ -194,9 +231,9 @@ namespace CK.Env.MSBuildSln
         {
             if( frameworks?.IsEmpty ?? true ) throw new ArgumentException( "Must not be null or empty.", nameof( frameworks ) );
             if( frameworks.Context != Savors ) throw new ArgumentException( "Must be from MSProject.Traits context.", nameof( frameworks ) );
-            if( _file == null ) throw new InvalidOperationException( "Invalid project file." );
+            if( _primaryFile == null ) throw new InvalidOperationException( "Invalid project file." );
             if( TargetFrameworks == frameworks ) return false;
-            XElement f = _file.Document.Root
+            XElement f = _primaryFile.Document.Root
                             .Elements( "PropertyGroup" )
                             .Elements()
                             .Where( x => x.Name.LocalName == "TargetFramework" || x.Name.LocalName == "TargetFrameworks" )
@@ -256,10 +293,19 @@ namespace CK.Env.MSBuildSln
                 {
                     if( !preserveExisting )
                     {
-                        var e = p.PropertyVersionElement;
+                        var e = p.FinalVersionElement;
                         if( e != null )
                         {
-                            e.Value = sV;
+                            // <PackageReference Update="CK.Core" Version="13.0.1" /> centrally managed
+                            // package or <CKCoreVersion>13.0.1</CKCoreVersion>.
+                            if( e.Name == "PackageReference" )
+                            {
+                                e.SetAttributeValue( "Version", sV );
+                            }
+                            else
+                            {
+                                e.Value = sV;
+                            }
                         }
                         else
                         {
@@ -307,12 +353,12 @@ namespace CK.Env.MSBuildSln
 
         void DoSetSimpleProperty( IActivityMonitor m, string elementName, string value )
         {
-            _file.Document.Root
+            _primaryFile.Document.Root
                     .Elements( "PropertyGroup" )
                     .Elements( elementName ).Remove();
             if( value != null )
             {
-                _file.Document.Root
+                _primaryFile.Document.Root
                         .EnsureElement( "PropertyGroup" )
                         .SetElementValue( elementName, value );
             }
@@ -444,7 +490,7 @@ namespace CK.Env.MSBuildSln
 
         void DoInitializeDependencies( IActivityMonitor m )
         {
-            var packageRefs = _file.AllFiles.Select( f => f.Document.Root )
+            var packageRefs = _primaryFile.AllFiles.Select( f => f.Document.Root )
                              .SelectMany( root => root.Elements( "ItemGroup" )
                                                         .Elements()
                                                         .Where( e => e.Name.LocalName == "PackageReference"
@@ -470,35 +516,73 @@ namespace CK.Env.MSBuildSln
                     }
                     else
                     {
-                        bool isPropVersion;
-                        bool versionLocked = false;
-                        SVersion version = null;
-                        if( string.IsNullOrWhiteSpace( p.PackageId )
-                            || string.IsNullOrWhiteSpace( p.RawVersion )
-                            || (
-                                 !(isPropVersion = p.RawVersion.StartsWith( "$(" ))
-                                 && !((versionLocked, version) = SVersionRange.TryParseSimpleRange( m, p.RawVersion )).version.IsValid
-                               ) )
+                        if( string.IsNullOrWhiteSpace( p.PackageId ) )
                         {
-                            if( version != null )
-                            {
-                                m.Error( $"Unable to parse Version attribute on element {p.Origin}: {version.ErrorMessage}" );
-                            }
-                            else
-                            {
-                                m.Error( $"Invalid Include or Version attribute on element {p.Origin}." );
-                            }
+                            m.Error( $"Invalid Include attribute on element {p.Origin}." );
                             return;
                         }
 
+                        XElement propertyDef = null;
+                        bool versionLocked = false;
+                        SVersion version = null;
+
+                        if( p.RawVersion == null )
+                        {
+                            // No Version attribute nor element: we must use Central packages!
+                            if( _centralPackagesFile == null )
+                            {
+                                m.Error( $"Missing version attribute on element {p.Origin} (and Microsoft.Build.CentralPackageVersions is not used)." );
+                                return;
+                            }
+                            propertyDef = _centralPackagesFile.Document.Root.Elements().Where( e => e.Name.LocalName == "ItemGroup" )
+                                                                                .Elements().Where( e => e.Name.LocalName == "PackageReference" )
+                                                                                .FirstOrDefault( e => (string)e.Attribute( "Update" ) == p.PackageId );
+                            if( propertyDef == null )
+                            {
+                                propertyDef = _centralPackagesFile.Document.Root.Elements().Where( e => e.Name.LocalName == "ItemGroup" )
+                                                                                    .Elements().Where( e => e.Name.LocalName == "PackageReference" )
+                                                                                    .FirstOrDefault( e => p.PackageId.Equals( (string)e.Attribute( "Update" ), StringComparison.OrdinalIgnoreCase ) );
+                                if( propertyDef == null )
+                                {
+                                    m.Error( $"Unable to find a version for '{p.PackageId}' in central package file '{_centralPackagesFile.Path}'." );
+                                    return;
+                                }
+                                m.Warn( $"Found a package version for '{p.PackageId}' in central package file '{_centralPackagesFile.Path}': '{propertyDef.Attribute( "Update" )}' case differ." );
+                            }
+                            if( !((versionLocked, version) = SVersionRange.TryParseSimpleRange( m, (string)propertyDef.Attribute( "Version" ) )).version.IsValid )
+                            {
+                                m.Error( $"Unable to parse Version attribute on element {propertyDef} in central package file '{_centralPackagesFile.Path}': {version.ErrorMessage}" );
+                            }
+                        }
+                        else
+                        {
+                            bool isPropVersion;
+                            if( string.IsNullOrWhiteSpace( p.RawVersion )
+                                || (
+                                     !(isPropVersion = p.RawVersion.StartsWith( "$(" ))
+                                     && !((versionLocked, version) = SVersionRange.TryParseSimpleRange( m, p.RawVersion )).version.IsValid
+                                   ) )
+                            {
+                                if( version != null )
+                                {
+                                    m.Error( $"Unable to parse Version attribute on element {p.Origin}: {version.ErrorMessage}" );
+                                }
+                                else
+                                {
+                                    m.Error( $"Invalid Version attribute on element {p.Origin}." );
+                                }
+                                return;
+                            }
+                            if( isPropVersion )
+                            {
+                                propertyDef = FollowRefPropertyVersion( m, p, ref versionLocked, ref version );
+                                if( propertyDef == null ) return;
+                            }
+                        }
+
+
                         string[] defaultValues = new string[] { "compile", "runtime", "contentFiles", "build", "analyzers", "native" };
 
-                        XElement propertyDef = null;
-                        if( isPropVersion )
-                        {
-                            propertyDef = FollowRefPropertyVersion( m, p, ref versionLocked, ref version );
-                            if( propertyDef == null ) return;
-                        }
                         CKTrait frameworks = ComputeFrameworks( m, p.Origin, conditionEvaluator );
                         if( frameworks == null ) return;
                         if( frameworks.IsEmpty )
@@ -512,7 +596,7 @@ namespace CK.Env.MSBuildSln
                 }
                 else
                 {
-                    //This is a ProjectReference.
+                    // This is a ProjectReference.
                     string projectName = new NormalizedPath( p.PackageId ).LastPart;
                     if( !projectName.EndsWith( ".csproj" ) )
                     {
@@ -575,12 +659,12 @@ namespace CK.Env.MSBuildSln
         {
             if( !p.RawVersion.EndsWith( "Version)" ) )
             {
-                m.Error( $"Invalid $(PropertyVersion) on element {p.Origin}. Its name must end with Version." );
+                m.Error( $"Invalid $(PropertyVersion) on element {p.Origin}. Its name must end with 'Version'." );
                 return null;
             }
             // Lookup for the property.
             string propName = p.RawVersion.Substring( 2, p.RawVersion.Length - 3 );
-            var candidates = _file.AllFiles.Select( f => f.Document.Root )
+            var candidates = _primaryFile.AllFiles.Select( f => f.Document.Root )
                                  .SelectMany( root => root.Elements( "PropertyGroup" ) )
                                  .Elements()
                                  .Where( e => e.Name.LocalName == propName ).ToList();

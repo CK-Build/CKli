@@ -12,14 +12,14 @@ namespace CK.Env.MSBuildSln
             bool versionLocked,
             SVersion version,
             XElement originElement,
-            XElement finalDeclaration,
+            XElement finalVersionElement,
             CKTrait frameworks,
             string privateAsset )
         {
             Owner = owner;
             Package = new ArtifactInstance( ArtifactType.Single( "NuGet" ), packageId, version );
             OriginElement = originElement;
-            PropertyVersionElement = finalDeclaration;
+            FinalVersionElement = finalVersionElement;
             Frameworks = frameworks;
             VersionLocked = versionLocked;
             PrivateAsset = privateAsset;
@@ -63,14 +63,12 @@ namespace CK.Env.MSBuildSln
         public XElement OriginElement { get; }
 
         /// <summary>
-        /// Gets the element that defines the $(Version) if a property version is used. Null otherwise.
+        /// Gets the element that defines the $(Version) if a property version is used (The element is like &lt;CKCoreVersion&gt;13.0.1&lt;/CKCoreVersion&gt;)
+        /// or is the &lt;PackageReference Update="PackageName" Version="..." /&lt; centrally managed package
+        /// (see https://github.com/microsoft/MSBuildSdks/tree/master/src/CentralPackageVersions).
+        /// Null otherwise.
         /// </summary>
-        public XElement PropertyVersionElement { get; }
-
-        /// <summary>
-        /// Gets whether the version use a $(Version) property.
-        /// </summary>
-        public bool UsePropertyVersion => PropertyVersionElement != null;
+        public XElement FinalVersionElement { get; }
 
         /// <summary>
         /// Overridden to return the <see cref="Owner"/> => <see cref="PackageId"/>/<see cref="Version"/> (<see cref="Frameworks"/>).

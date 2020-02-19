@@ -182,14 +182,26 @@ namespace System.Xml.Linq
         /// set to their respective <see cref="XName.LocalName"/>.
         /// </summary>
         /// <param name="this">This element.</param>
-        public static void RemoveAllNamespaces( this XElement @this )
+        /// <returns>True if this element (or any of its child elements) has been changed, false otherwise.</returns>
+        public static bool RemoveAllNamespaces( this XElement @this )
         {
-            @this.Name = @this.Name.LocalName;
-
+            bool hasChanged = false;
+            XName n = @this.Name;
+            if( n.Namespace != XNamespace.None )
+            {
+                hasChanged = true;
+                @this.Name = n.LocalName;
+            }
+            if( @this.Attributes().Any( a => a.IsNamespaceDeclaration ) )
+            {
+                hasChanged = true;
+                @this.Attributes().Where( a => a.IsNamespaceDeclaration ).Remove();
+            }
             foreach( var c in @this.Elements() )
             {
-                RemoveAllNamespaces( c );
+                hasChanged |= RemoveAllNamespaces( c );
             }
+            return hasChanged;
         }
 
         /// <summary>

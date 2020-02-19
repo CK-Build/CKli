@@ -40,8 +40,6 @@ namespace CK.Env.NuGet
 
         private static readonly object _secretKeysLock;
         private static readonly Dictionary<string, string> _secretAzureKeys;
-        private static bool _initialized;
-
 
         /// <summary>
         /// Method to call to set the credentials of nuget.
