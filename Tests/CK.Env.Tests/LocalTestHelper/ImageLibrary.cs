@@ -56,7 +56,7 @@ namespace CK.Env.Tests.LocalTestHelper
             Action<TestUniverse> buildAction,
             [CallerMemberName] string newImageName = null ) =>
                 ImageBuilderHelper(
-                    ( universe ) => testCallback( universe, universe.EnsureWorldOpened( worldName ) ),
+                    ( universe ) => testCallback?.Invoke( universe, universe.EnsureWorldOpened( worldName ) ),
                     refreshCache,
                     parentBuilder,
                     buildAction,
