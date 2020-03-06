@@ -310,7 +310,7 @@ namespace CK.Env.MSBuildSln
                         else
                         {
                             e = p.OriginElement;
-                            e.Attribute( "Version" ).SetValue( sV );
+                            e.Attribute( p.IsVersionOverride ? "VersionOverride" : "Version" ).SetValue( sV );
                         }
                         ++changeCount;
                         m.Trace( $"Update in {ToString()}: {packageId} from {currentVersion} to {sV}." );
@@ -511,7 +511,7 @@ namespace CK.Env.MSBuildSln
                 {
                     if( p.Origin.Attribute( "Include" ) == null )
                     {
-                        m.Warn( "PackageReference that are not Include are not supported and ignored." );
+                        m.Warn( $"Element {p.Origin} misses Include attribute. It is ignored." );
                         continue;
                     }
                     else
@@ -523,6 +523,7 @@ namespace CK.Env.MSBuildSln
                         }
 
                         XElement propertyDef = null;
+                        bool isVersionOverride = false;
                         bool versionLocked = false;
                         SVersion version = null;
 
@@ -531,27 +532,48 @@ namespace CK.Env.MSBuildSln
                             // No Version attribute nor element: we must use Central packages!
                             if( _centralPackagesFile == null )
                             {
-                                m.Error( $"Missing version attribute on element {p.Origin} (and Microsoft.Build.CentralPackageVersions is not used)." );
-                                return;
+                                m.Warn( $"Missing Version attribute (or child element) on element {p.Origin} (and Microsoft.Build.CentralPackageVersions is not used). This is ignored." );
+                                continue;
                             }
-                            propertyDef = _centralPackagesFile.Document.Root.Elements().Where( e => e.Name.LocalName == "ItemGroup" )
-                                                                                .Elements().Where( e => e.Name.LocalName == "PackageReference" )
-                                                                                .FirstOrDefault( e => (string)e.Attribute( "Update" ) == p.PackageId );
-                            if( propertyDef == null )
+                            else
                             {
-                                propertyDef = _centralPackagesFile.Document.Root.Elements().Where( e => e.Name.LocalName == "ItemGroup" )
-                                                                                    .Elements().Where( e => e.Name.LocalName == "PackageReference" )
-                                                                                    .FirstOrDefault( e => p.PackageId.Equals( (string)e.Attribute( "Update" ), StringComparison.OrdinalIgnoreCase ) );
-                                if( propertyDef == null )
+                                // We are using CentralPackageVersions: VersionOverride may be used!
+                                var vO = (string)p.Origin.Attribute( "VersionOverride" );
+                                if( vO == null )
                                 {
-                                    m.Error( $"Unable to find a version for '{p.PackageId}' in central package file '{_centralPackagesFile.Path}'." );
+                                    m.Warn( $"Missing Version attribute (or VersionOverride attribute since Microsoft.Build.CentralPackageVersions is used) on element {p.Origin}. This is ignored." );
+                                    continue;
+                                }
+                                isVersionOverride = true;
+                                if( !((versionLocked, version) = SVersionRange.TryParseSimpleRange( m, vO )).version.IsValid )
+                                {
+                                    m.Error( $"Unable to parse VersionOverride attribute on element {p.Origin}: {version.ErrorMessage}" );
                                     return;
                                 }
-                                m.Warn( $"Found a package version for '{p.PackageId}' in central package file '{_centralPackagesFile.Path}': '{propertyDef.Attribute( "Update" )}' case differ." );
+                                m.Warn( $"VersionOverride is used for package {p.PackageId}: {vO}." );
                             }
-                            if( !((versionLocked, version) = SVersionRange.TryParseSimpleRange( m, (string)propertyDef.Attribute( "Version" ) )).version.IsValid )
+                            if( !isVersionOverride )
                             {
-                                m.Error( $"Unable to parse Version attribute on element {propertyDef} in central package file '{_centralPackagesFile.Path}': {version.ErrorMessage}" );
+                                // We must find the <Package Update= ... version.
+                                propertyDef = _centralPackagesFile.Document.Root.Elements().Where( e => e.Name.LocalName == "ItemGroup" )
+                                                                                .Elements().Where( e => e.Name.LocalName == "PackageReference" )
+                                                                                .FirstOrDefault( e => (string)e.Attribute( "Update" ) == p.PackageId );
+                                if( propertyDef == null )
+                                {
+                                    propertyDef = _centralPackagesFile.Document.Root.Elements().Where( e => e.Name.LocalName == "ItemGroup" )
+                                                                                        .Elements().Where( e => e.Name.LocalName == "PackageReference" )
+                                                                                        .FirstOrDefault( e => p.PackageId.Equals( (string)e.Attribute( "Update" ), StringComparison.OrdinalIgnoreCase ) );
+                                    if( propertyDef == null )
+                                    {
+                                        m.Error( $"Unable to find a version for '{p.PackageId}' in central package file '{_centralPackagesFile.Path}'." );
+                                        return;
+                                    }
+                                    m.Warn( $"Found a package version for '{p.PackageId}' in central package file '{_centralPackagesFile.Path}': '{propertyDef.Attribute( "Update" )}' case differ." );
+                                }
+                                if( !((versionLocked, version) = SVersionRange.TryParseSimpleRange( m, (string)propertyDef.Attribute( "Version" ) )).version.IsValid )
+                                {
+                                    m.Error( $"Unable to parse Version attribute on element {propertyDef} in central package file '{_centralPackagesFile.Path}': {version.ErrorMessage}" );
+                                }
                             }
                         }
                         else
@@ -591,7 +613,7 @@ namespace CK.Env.MSBuildSln
                             uselessDeps.Add( p.Origin );
                             continue;
                         }
-                        deps.Add( new DeclaredPackageDependency( this, p.PackageId, versionLocked, version, p.Origin, propertyDef, frameworks, p.PrivateAssets ) );
+                        deps.Add( new DeclaredPackageDependency( this, p.PackageId, versionLocked, version, p.Origin, propertyDef, frameworks, p.PrivateAssets, isVersionOverride ) );
                     }
                 }
                 else

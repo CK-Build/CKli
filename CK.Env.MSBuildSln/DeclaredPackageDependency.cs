@@ -14,7 +14,8 @@ namespace CK.Env.MSBuildSln
             XElement originElement,
             XElement finalVersionElement,
             CKTrait frameworks,
-            string privateAsset )
+            string privateAsset,
+            bool isVersionOverride )
         {
             Owner = owner;
             Package = new ArtifactInstance( ArtifactType.Single( "NuGet" ), packageId, version );
@@ -23,9 +24,8 @@ namespace CK.Env.MSBuildSln
             Frameworks = frameworks;
             VersionLocked = versionLocked;
             PrivateAsset = privateAsset;
+            IsVersionOverride = isVersionOverride;
         }
-
-        public string PrivateAsset { get; }
 
         /// <summary>
         /// Gets the project that owns this dependency.
@@ -66,9 +66,21 @@ namespace CK.Env.MSBuildSln
         /// Gets the element that defines the $(Version) if a property version is used (The element is like &lt;CKCoreVersion&gt;13.0.1&lt;/CKCoreVersion&gt;)
         /// or is the &lt;PackageReference Update="PackageName" Version="..." /&lt; centrally managed package
         /// (see https://github.com/microsoft/MSBuildSdks/tree/master/src/CentralPackageVersions).
-        /// Null otherwise.
+        /// When null, the <see cref="OriginElement"/> must be used (and the version is either in Version or OverrideVersion attribute).
         /// </summary>
         public XElement FinalVersionElement { get; }
+
+        /// <summary>
+        /// Gets whether VersionOverride is used locally in the Project file whereas packages
+        /// are centrally managed: https://github.com/microsoft/MSBuildSdks/tree/master/src/CentralPackageVersions.
+        /// </summary>
+        public bool IsVersionOverride { get; }
+
+        /// <summary>
+        /// Gets the "PrivateAsset" value: when "all", the PackageReference model Kind is set to ArtifactDependencyKind.Private
+        /// instead of Transitive.
+        /// </summary>
+        public string PrivateAsset { get; }
 
         /// <summary>
         /// Overridden to return the <see cref="Owner"/> => <see cref="PackageId"/>/<see cref="Version"/> (<see cref="Frameworks"/>).

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace CK.SimpleKeyVault
 {
@@ -11,10 +13,16 @@ namespace CK.SimpleKeyVault
     /// </summary>
     public static class KeyVault
     {
+        private static readonly byte[] MagicHeader = new byte[] { 0, 148, 41, 0, 247, 87, 1, 2 }; 
         /// <summary>
         /// This salt must be the same as the one of CodeCake.
         /// </summary>
         private static readonly string Salt = "{E4E66F59-CAF2-4C39-A7F8-46097B1C461B}";
+
+        /// <summary>
+        /// The current version is 2.
+        /// </summary>
+        private static readonly int CurrentVersion = 2;
 
         /// <summary>
         /// Creates a new <see cref="SymmetricAlgorithm"/>.
@@ -35,6 +43,8 @@ namespace CK.SimpleKeyVault
 
         /// <summary>
         /// Decrypts a list of key value pairs previously encrypted by <see cref="EncryptValuesToString"/>.
+        /// Throws <see cref="InvalidOperationException"/> on error (bad password or invalid format).
+        /// A missing first line with the "-- Version: " will be considered the <see cref="CurrentVersion"/>. 
         /// </summary>
         /// <param name="crypted">The crypted string. Can be null or empty.</param>
         /// <param name="passPhrase">Secret to use. Must not be null, empty or white space.</param>
@@ -44,11 +54,32 @@ namespace CK.SimpleKeyVault
             var keys = new HashSet<string>();
             var result = new Dictionary<string, string>();
             if( String.IsNullOrWhiteSpace( crypted ) ) return result;
+            if( String.IsNullOrWhiteSpace( passPhrase ) ) throw new ArgumentException( "Pass phrase must not be empty.", nameof( passPhrase ) );
 
+            int version = CurrentVersion;
+            Match mVersion = null;
             string[] lines = crypted.Split( new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries );
             foreach( var l in lines )
             {
-                if( l.StartsWith( "--" ) ) continue;
+                if( l.StartsWith( "--" ) )
+                {
+                    if( mVersion == null )
+                    {
+                        mVersion = Regex.Match( l, @"--\s*Version\s*:\s*(\d+)", RegexOptions.CultureInvariant );
+                        if( mVersion.Success )
+                        {
+                            if( !int.TryParse( mVersion.Groups[1].Value, out version ) )
+                            {
+                                throw new InvalidDataException( "Unable to read version from file header: " + l );
+                            }
+                            if( version < 1 || version > CurrentVersion )
+                            {
+                                throw new InvalidDataException( $"Invalid or unhandled version {version}. Must be between 1 and {CurrentVersion}." );
+                            }
+                        }
+                    }
+                    continue;
+                }
                 if( l.StartsWith( " > " ) )
                 {
                     byte[] bytes = Convert.FromBase64String( l.Substring( 3 ) );
@@ -57,17 +88,31 @@ namespace CK.SimpleKeyVault
                     using( var read = new CryptoStream( mem, algo.CreateDecryptor(), CryptoStreamMode.Read ) )
                     using( var r = new BinaryReader( read ) )
                     {
-                        int count = r.ReadInt32();
-                        for( int i = 0; i < count; ++i )
+                        if( version > 1 )
                         {
-                            var k = r.ReadString();
-                            var v = r.ReadBoolean() ? r.ReadString() : null;
-                            if( keys.Contains( k ) )
+                            if( !r.ReadBytes( MagicHeader.Length ).SequenceEqual( MagicHeader ) )
                             {
-                                result[k] = v;
+                                throw new InvalidDataException( $"Invalid crypted content." );
                             }
                         }
-                        return result;
+                        try
+                        {
+                            int count = r.ReadInt32();
+                            for( int i = 0; i < count; ++i )
+                            {
+                                var k = r.ReadString();
+                                var v = r.ReadBoolean() ? r.ReadString() : null;
+                                if( keys.Contains( k ) )
+                                {
+                                    result[k] = v;
+                                }
+                            }
+                            return result;
+                        }
+                        catch( Exception ex )
+                        {
+                            throw new InvalidDataException( $"Invalid crypted content.", ex );
+                        }
                     }
                 }
                 keys.Add( l );
@@ -92,8 +137,9 @@ namespace CK.SimpleKeyVault
             using( var w = new BinaryWriter( output ) )
             {
                 var b = new StringBuilder();
-                b.AppendLine( "-- Version: 1" );
+                b.Append( "-- Version: " ).Append( CurrentVersion ).AppendLine();
                 b.AppendLine( "-- Keys below can be removed if needed." );
+                w.Write( MagicHeader );
                 w.Write( values.Count );
                 foreach( var kv in values )
                 {
