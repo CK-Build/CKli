@@ -1,6 +1,8 @@
 using CK.Core;
 using CK.Env.MSBuildSln;
 using CK.Text;
+using CSemVer;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
@@ -36,11 +38,36 @@ namespace CK.Env.Plugin
                 m.Error( $"Missing CodeCakeBuilder project in '{slnFile.FilePath}'." );
                 return;
             }
-            var currentFramework = MSProject.Savors.FindOrCreate( "netcoreapp3.1" );
-            if( ccbProject.TargetFrameworks != currentFramework )
+            // This is the baseline of CCB.
+            // This should be modeled in the world xml.
+            var framework = MSProject.Savors.FindOrCreate( "netcoreapp3.1" );
+            var dependencies = new[] {
+                ("NuGet.Protocol", "5.4.0", false),
+                ("NuGet.Credentials", "5.4.0", false),
+                ("CK.Text", "9.0.0", false),
+                ("SimpleGitVersion.Cake", "2.1.0", false),
+                ("CKSetup.Cake", "11.1.2", false),
+                ("Newtonsoft.Json", "12.0.3", false)
+            };
+
+            void EnsurePackageReference( string packageId, string v, bool required = false )
             {
-                ccbProject.SetTargetFrameworks( m, currentFramework );
+                var version = SVersion.Parse( v );
+                var current = ccbProject.Deps.Packages.Where( p => p.PackageId == packageId ).Max( p => p.Version );
+                if( current == null )
+                {
+                    if( required ) ccbProject.SetPackageReferenceVersion( m, framework, packageId, version, addIfNotExists: true );
+                }
+                else if( current < version )
+                {
+                    ccbProject.SetPackageReferenceVersion( m, framework, packageId, version );
+                }
             }
+
+            // Applying CCB Dependency baseline.
+            if( ccbProject.TargetFrameworks != framework ) ccbProject.SetTargetFrameworks( m, framework );
+            foreach( var b in dependencies ) EnsurePackageReference( b.Item1, b.Item2, b.Item3 );
+
             slnFile.Save( m );
         }
     }

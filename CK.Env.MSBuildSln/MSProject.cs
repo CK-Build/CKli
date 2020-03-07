@@ -173,6 +173,10 @@ namespace CK.Env.MSBuildSln
             return _primaryFile;
         }
 
+        /// <summary>
+        /// Gets the &lt;IsPackable&gt; element value.
+        /// Null if the project can not be read or if IsPackable is not defined.
+        /// </summary>
         public bool? IsPackable { get; private set; }
 
         /// <summary>
