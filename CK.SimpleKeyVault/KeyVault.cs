@@ -13,7 +13,8 @@ namespace CK.SimpleKeyVault
     /// </summary>
     public static class KeyVault
     {
-        private static readonly byte[] MagicHeader = new byte[] { 0, 148, 41, 0, 247, 87, 1, 2 }; 
+        private static readonly byte[] MagicHeader = new byte[] { 0, 148, 41, 0, 247, 87, 1, 2 };
+
         /// <summary>
         /// This salt must be the same as the one of CodeCake.
         /// </summary>

@@ -8,7 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="CSemVer" Version="7.0.2" />
-    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="13.0.0-a00-00-0008-develop" />
+    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="13.1.0" />
   </ItemGroup>
 
 </Project>

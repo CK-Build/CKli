@@ -188,7 +188,7 @@ namespace CK.Env.MSBuildSln
         public string OutputType { get; private set; }
 
         /// <summary>
-        /// Gets the target frameforks from the primary project file.
+        /// Gets the target frameforks (from the <see cref="Savors"/> context).
         /// Null if the project can not be read.
         /// </summary>
         public CKTrait TargetFrameworks { get; private set; }

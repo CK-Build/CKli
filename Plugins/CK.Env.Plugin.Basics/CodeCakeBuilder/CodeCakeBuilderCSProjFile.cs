@@ -36,7 +36,12 @@ namespace CK.Env.Plugin
                 m.Error( $"Missing CodeCakeBuilder project in '{slnFile.FilePath}'." );
                 return;
             }
-            //slnFile.Save( m );//TODO
+            var currentFramework = MSProject.Savors.FindOrCreate( "netcoreapp3.1" );
+            if( ccbProject.TargetFrameworks != currentFramework )
+            {
+                ccbProject.SetTargetFrameworks( m, currentFramework );
+            }
+            slnFile.Save( m );
         }
     }
 }
