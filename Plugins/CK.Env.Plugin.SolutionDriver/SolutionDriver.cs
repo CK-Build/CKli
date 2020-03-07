@@ -205,12 +205,12 @@ namespace CK.Env.Plugin
                     }
                     else
                     {
-                        m.Info( $"Project {p.ProjectName} will be published." );
+                        m.Trace( $"Project {p.ProjectName} will be published." );
                     }
                 }
                 else
                 {
-                    m.Info( $"Project {p.ProjectName} is set to not be packed: this project won't be published." );
+                    m.Trace( $"Project {p.ProjectName} is set to not be packed: this project won't be published." );
                 }
                 var (project, isNewProject) = _solution.AddOrFindProject( p.SolutionRelativeFolderPath, ".Net", p.ProjectName, p.TargetFrameworks );
                 project.Tag( p );
