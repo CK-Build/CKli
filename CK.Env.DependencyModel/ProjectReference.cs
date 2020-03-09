@@ -47,12 +47,23 @@ namespace CK.Env.DependencyModel
         }
 
         /// <summary>
-        /// Dumps "Owner -> Target (Kind)" string (with [applicable savors] suffix if <see cref="IsSavored"/>).
+        /// Return "Target (Kind)" string (with [applicable savors] suffix if <see cref="IsSavored"/>).
         /// </summary>
         /// <returns>A readable string.</returns>
-        public override string ToString() => IsSavored
-                                                ? $"{Owner} -> {Target} ({Kind}) [{ApplicableSavors}]"
-                                                : $"{Owner} -> {Target} ({Kind})";
+        public string ToStringTarget() => IsSavored
+                                                ? Kind != ArtifactDependencyKind.Transitive
+                                                    ? $"{Target} (RefKind:{Kind}) [{ApplicableSavors}]"
+                                                    : $"{Target} [{ApplicableSavors}]"
+                                                : (Kind != ArtifactDependencyKind.Transitive
+                                                    ? $"{Target} (RefKind:{Kind})"
+                                                    : Target.ToString());
+
+
+        /// <summary>
+        /// Returns "Owner -> Target (Kind)" string (with [applicable savors] suffix if <see cref="IsSavored"/>).
+        /// </summary>
+        /// <returns>A readable string.</returns>
+        public override string ToString() => Owner.ToString() + " -> " + ToStringTarget();
 
     }
 }

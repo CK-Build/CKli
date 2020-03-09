@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Text;
 using System.Xml.Linq;
 
 namespace CK.Env.Plugin
@@ -380,19 +381,70 @@ namespace CK.Env.Plugin
         }
 
         [CommandMethod]
-        public void ShowSolutionExternalDependencies( IActivityMonitor m )
+        public void ShowDetail( IActivityMonitor monitor )
         {
-            var packages = _solutionContext.GetDependencyAnalyser( m, m.ActualFilter == LogFilter.Debug ).ExternalReferences;
-            if( packages.Count == 0 )
+            var solution = GetSolution( monitor, allowInvalidSolution: false );
+            if( solution == null ) return;
+            var depSolution = _solutionContext.GetDependencyAnalyser( monitor, false ).DefaultDependencyContext[solution];
+
+            StringBuilder b = new StringBuilder();
+
+            b.Append( depSolution.Index ).Append( " - [Rank:" ).Append( depSolution.Rank ).Append("] ").Append( solution.FullPath ).AppendLine();
+            b.Append( "| ArtifactTargets: " ).AppendJoin( ", ", solution.ArtifactTargets.Select( t => $"{t.UniqueRepositoryName} (Filter: {t.QualityFilter})" ) ).AppendLine();
+            b.Append( "| ArtifactSources: " ).AppendJoin( ", ", solution.ArtifactSources.Select( t => t.TypedName ) ).AppendLine();
+            var publishedProjects = solution.Projects.Where( p => p.IsPublished );
+            if( publishedProjects.Any() )
             {
-                Console.WriteLine( "This Solution don't have any external references." );
+                b.Append( "| Published: " ).AppendLine();
+                foreach( var p in publishedProjects )
+                {
+                    DumpProject( b, p, true );
+                }
+            }
+            var localProjects = solution.Projects.Where( p => !p.IsPublished && !p.IsBuildProject );
+            if( localProjects.Any() )
+            {
+                b.Append( "| Local: " ).AppendLine();
+                foreach( var p in localProjects )
+                {
+                    DumpProject( b, p, true );
+                }
+            }
+            if( solution.BuildProject != null )
+            {
+                b.Append( "| BuildProject: " ).Append( solution.BuildProject.SimpleProjectName ).AppendLine();
+                DumpProject( b, solution.BuildProject, false );
+            }
+            var min = depSolution.MinimalRequirements;
+            var req = depSolution.Requirements;
+            b.Append( "| MinimalRequirements: " ).AppendJoin( ", ", min.OrderBy( s => s.Index ).Select( s => s.Solution.Name ) ).AppendLine();
+            if( req.Count != min.Count )
+            {
+                b.Append( "|        Requirements: " ).AppendJoin( ", ", req.OrderBy( s => s.Index ).Select( s => s.Solution.Name ) ).AppendLine();
+            }
+            var iMin = depSolution.MinimalImpacts;
+            var iReq = depSolution.Impacts;
+            b.Append( "| MinimalImpacts: " ).AppendJoin( ", ", iMin.OrderBy( s => s.Index ).Select( s => s.Solution.Name ) ).AppendLine();
+            if( iReq.Count != iMin.Count )
+            {
+                b.Append( "|        Impacts: " ).AppendJoin( ", ", iReq.OrderBy( s => s.Index ).Select( s => s.Solution.Name ) ).AppendLine();
             }
 
-            Console.WriteLine( $"External dependency of the Solution {GetSolution( m, allowInvalidSolution: true ).Name}:" );
-            foreach( PackageReference externalRef in packages )
+            Console.Write( b.ToString() );
+        }
+
+        static void DumpProject( StringBuilder b, IProject p, bool withHeader )
+        {
+            if( withHeader )
             {
-                Console.WriteLine( "====|" + externalRef.ToString() );
+                b.Append( "|   " ).Append( p.SimpleProjectName ).Append( " [" ).Append( p.Type ).Append( "] " );
+                if( p.IsTestProject ) b.Append( "[Test]" );
+                if( p.Savors != null ) b.Append( " [" ).Append( p.Savors ).Append( "]" );
+                b.AppendLine();
             }
+            if( p.GeneratedArtifacts.Any() ) b.Append( "|     => " ).AppendJoin( ", ", p.GeneratedArtifacts ).AppendLine();
+            b.Append( "|     PackageReferences: " ).AppendJoin( ", ", p.PackageReferences.Select( p => p.ToStringTarget() ) ).AppendLine();
+            b.Append( "|     ProjectReferences: " ).AppendJoin( ", ", p.ProjectReferences.Select( p => p.ToStringTarget() ) ).AppendLine();
         }
 
         /// <summary>
