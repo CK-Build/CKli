@@ -63,6 +63,8 @@ namespace CK.Env.Plugin
                 EnsureStorePath( e.Monitor, targetStore );
             }
             e.EnvironmentVariables.Add( ("CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL", targetStore) );
+            e.EnvironmentVariables.Add( ("CKSETUP_STORE", targetStore) );
+            e.EnvironmentVariables.Add( ("CKSETUP_REMOTE", targetStore) );
         }
 
         void OnEndBuild( object sender, EventMonitoredArgs e )
