@@ -58,7 +58,7 @@ namespace CK.Env.DependencyModel
         /// </para>
         /// <para>
         /// <see cref="PackageReference.ApplicableSavors"/> and <see cref="ProjectReference.ApplicableSavors"/> share
-        /// the same context and are either equal to these savors or are a subset of them (and cannot be empty either).
+        /// the same context and are either equal to these savors or are a nn-empty subset of them.
         /// </para>
         /// </summary>
         CKTrait Savors { get; }

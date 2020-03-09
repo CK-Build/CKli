@@ -152,7 +152,8 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets the packages produced by this solution that are consumed by other solutions.
         /// Only packages that are used by another solution in the current context are in this set.
-        /// To get the set of packages produced, use <see cref="GeneratedPackages"/>.
+        /// To get the set of packages produced, use <see cref="ISolution.GeneratedArtifacts"/> (where
+        /// <see cref="ArtifactType.IsInstallable"/> is true).
         /// </summary>
         public IReadOnlyCollection<ExportedLocalPackage> ExportedLocalPackages { get; private set; }
 

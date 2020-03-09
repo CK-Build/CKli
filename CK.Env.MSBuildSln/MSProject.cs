@@ -543,18 +543,16 @@ namespace CK.Env.MSBuildSln
                             {
                                 // We are using CentralPackageVersions: VersionOverride may be used!
                                 var vO = (string)p.Origin.Attribute( "VersionOverride" );
-                                if( vO == null )
+                                if( vO != null )
                                 {
-                                    m.Warn( $"Missing Version attribute (or VersionOverride attribute since Microsoft.Build.CentralPackageVersions is used) on element {p.Origin}. This is ignored." );
-                                    continue;
+                                    isVersionOverride = true;
+                                    if( !((versionLocked, version) = SVersionRange.TryParseSimpleRange( m, vO )).version.IsValid )
+                                    {
+                                        m.Error( $"Unable to parse VersionOverride attribute on element {p.Origin}: {version.ErrorMessage}" );
+                                        return;
+                                    }
+                                    m.Warn( $"VersionOverride is used for package {p.PackageId}: {vO}." );
                                 }
-                                isVersionOverride = true;
-                                if( !((versionLocked, version) = SVersionRange.TryParseSimpleRange( m, vO )).version.IsValid )
-                                {
-                                    m.Error( $"Unable to parse VersionOverride attribute on element {p.Origin}: {version.ErrorMessage}" );
-                                    return;
-                                }
-                                m.Warn( $"VersionOverride is used for package {p.PackageId}: {vO}." );
                             }
                             if( !isVersionOverride )
                             {
