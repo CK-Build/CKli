@@ -99,11 +99,6 @@ namespace CK.Env
                     if( idx >= 1 && idx <= all.Count )
                     {
                         w = all[idx - 1];
-                        if( w.Root.IsEmptyPath )
-                        {
-                            m.Error( $"World '{w.FullName}' is not mapped. Use 'World/{nameof( Store.SetWorldMapping )}' command." );
-                            return false;
-                        }
                         m.Info( $"World '{worldFullNameOr1BasedIndex}' is world {w.FullName}." );
                     }
                     else
@@ -120,6 +115,11 @@ namespace CK.Env
                         m.Error( $"Unable to find World {worldFullNameOr1BasedIndex} among {all.Select( x => x.FullName ).Concatenate()}." );
                         return false;
                     }
+                }
+                if( w.Root.IsEmptyPath )
+                {
+                    m.Error( $"World '{w.FullName}' is not mapped. Use 'World/{nameof( Store.SetWorldMapping )}' command." );
+                    return false;
                 }
                 Debug.Assert( w != null );
                 Close();
