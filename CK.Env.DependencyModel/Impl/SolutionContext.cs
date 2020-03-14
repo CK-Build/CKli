@@ -47,7 +47,15 @@ namespace CK.Env.DependencyModel
         internal Project OnProjectAdding( Project newOne )
         {
             int idx = _allProjects.BinarySearch( newOne, ProjectNameComparer.Comparer );
-            if( idx >= 0 ) return _allProjects[idx];
+            if( idx >= 0 )
+            {
+                // Those are the comparison keys.
+                Debug.Assert( _allProjects[idx].SimpleProjectName == newOne.SimpleProjectName );
+                Debug.Assert( _allProjects[idx].Type == newOne.Type );
+                Debug.Assert( _allProjects[idx].SolutionRelativeFolderPath == newOne.SolutionRelativeFolderPath );
+                Debug.Assert( newOne.Name == null, "Name (unambiguous) has not been computed." );
+                return _allProjects[idx];
+            }
             idx = ~idx;
             _allProjects.Insert( idx, newOne );
             HandleHomonymsAround( newOne.SimpleProjectName, idx, false );
@@ -150,6 +158,11 @@ namespace CK.Env.DependencyModel
         internal void OnBuildProjectChanged( Solution solution )
         {
             ++_version;
+        }
+
+        internal void OnProjectSavorsTransformed( Project project )
+        {
+            _version++;
         }
 
         internal void OnIsTestProjectChanged( Project project )

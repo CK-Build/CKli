@@ -110,22 +110,23 @@ namespace CK.Env.NPM
             }
             if( creds?.IsSecretKeyName ?? false )
             {
-                SecretKeyStore.DeclareSecretKey( creds.PasswordOrSecretKeyName, ( a ) => "PAT Used to authenticate CKli to the feeds, and retrieve informations about npm packages." );
+                SecretKeyStore.DeclareSecretKey( creds.PasswordOrSecretKeyName, a => "PAT Used to authenticate CKli to the feeds, and retrieve informations about npm packages." );
             }
 
             return new NPMFeed( scope, url, creds, () =>
             {
-                Registry registry =
-                    repositories.OfType<NPMAzureRepository>().FirstOrDefault( repo => repo.Scope == scope )?.GetRegistry( m, false )
-                    ?? repositories.OfType<NPMStandardRepository>().FirstOrDefault( repo => repo.Url.Equals( url, StringComparison.OrdinalIgnoreCase ) )?.GetRegistry( m, false );
+                Registry registry = repositories.OfType<NPMAzureRepository>().FirstOrDefault( repo => repo.Scope == scope )?.GetRegistry( m, false )
+                                    ?? repositories.OfType<NPMStandardRepository>()
+                                                    .FirstOrDefault( repo => repo.Url.Equals( url, StringComparison.OrdinalIgnoreCase ) )?.GetRegistry( m, false );
                 if( registry != null ) return registry;
 
-                string secret = creds.IsSecretKeyName ?
-                      SecretKeyStore.GetSecretKey( m, creds.PasswordOrSecretKeyName, creds != null )
-                    : creds.PasswordOrSecretKeyName;
-                return usePassword ?
-                      new Registry( HttpClient, creds.UserName, secret, uri )
-                    : new Registry( HttpClient, secret, uri );
+                string secret = creds.IsSecretKeyName
+                                ? SecretKeyStore.GetSecretKey( m, creds.PasswordOrSecretKeyName, creds != null )
+                                : creds.PasswordOrSecretKeyName;
+
+                return usePassword
+                            ? new Registry( HttpClient, creds.UserName, secret, uri )
+                            : new Registry( HttpClient, secret, uri );
                 ;
             } );
         }

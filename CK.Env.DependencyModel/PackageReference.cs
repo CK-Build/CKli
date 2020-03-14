@@ -1,4 +1,5 @@
 using CK.Core;
+using System;
 using System.Diagnostics;
 
 namespace CK.Env.DependencyModel
@@ -45,6 +46,14 @@ namespace CK.Env.DependencyModel
             Target = t;
             Kind = kind;
             ApplicableSavors = applicableSavors;
+        }
+
+        internal PackageReference( in PackageReference o, Func<CKTrait, CKTrait> f )
+        {
+            Owner = o.Owner;
+            Target = o.Target;
+            Kind = o.Kind;
+            ApplicableSavors = f( o.ApplicableSavors );
         }
 
         /// <summary>

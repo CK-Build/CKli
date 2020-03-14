@@ -22,18 +22,15 @@ namespace CK.Env.MSBuildSln.Tests
                    "(Not (([Numeric]54 GreaterOrEqualTo '0x87AB')) Or (('$(prop)'* EqualTo '$(prop)'*) And ('$(T)'* EqualTo 'net461')))" )]
         public void parsing_valid_simple_conditions( string c, string d )
         {
-            using( TestHelper.TemporaryEnsureConsoleMonitor() )
+            MSBuildConditionParser.TryParse( TestHelper.Monitor, c, out BaseNode node ).Should().BeTrue();
+            if( d != null )
             {
-                MSBuildConditionParser.TryParse( TestHelper.Monitor, c, out BaseNode node ).Should().BeTrue();
-                if( d != null )
-                {
-                    node.Should().NotBeNull();
-                    node.ToString().Should().Be( d );
-                }
-                else
-                {
-                    node.Should().BeNull();
-                }
+                node.Should().NotBeNull();
+                node.ToString().Should().Be( d );
+            }
+            else
+            {
+                node.Should().BeNull();
             }
         }
 

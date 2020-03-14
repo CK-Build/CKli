@@ -1,7 +1,9 @@
 using CK.Core;
+using CK.Text;
 using FluentAssertions;
 using NUnit.Framework;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using static CK.Testing.MonitorTestHelper;
 
@@ -16,34 +18,44 @@ namespace CK.Env.MSBuildSln.Tests
         [Test]
         public void reading_this_solution_works()
         {
-            Assume.That( TestHelper.IsExplicitAllowed );
             using( var fs = new FileSystem( TestHelper.SolutionFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
                 var s = SolutionFile.Read( fs, TestHelper.Monitor, "CK-Env.sln", true );
 
-                s.Children.Should().HaveCount( 34, "There must be 34 projects!" );
                 var folders = s.Children.OfType<SolutionFolder>();
-
-                folders.Select( p => p.ProjectName ).Should().BeEquivalentTo( "Solution Items", "Tests" );
-
-                folders.Single( p => p.ProjectName == "Solution Items" ).Items
-                    .Select( item => item.Path )
-                    // Skips .xmlfiles since these are changing a lot currently (worlds).
-                    .Where( p => !p.EndsWith( ".xml" ) )
+                folders.Select( p => p.ProjectName ).Should().BeEquivalentTo( "Solution Items", "Tests", "Plugins" );
+                folders.Single( p => p.ProjectName == "Solution Items" ).Items.Select( item => item.Path )
                     .Should().BeEquivalentTo(
                         ".editorconfig",
                         ".gitignore",
-                        "LocalWorldRootPathMapping.txt",
                         "nuget.config",
+                        "README.md",
                         "Common/SharedKey.snk" );
-
-                using( var w = new System.IO.StringWriter() )
-                {
-                    s.Write( w );
-                    Console.WriteLine( w.ToString() );
-                }
             }
         }
 
+
+        [Test]
+        public void changing_TargetFrameworks()
+        {
+            var cache = new Dictionary<NormalizedPath, MSProjFile>();
+
+            using( var fs = new FileSystem( TestHelper.TestProjectFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
+            {
+                var s = SolutionFile.Read( fs, TestHelper.Monitor, "Samples/SampleSolution.sln", true );
+                s.IsDirty.Should().BeFalse();
+                var p1 = s.MSProjects.Single( p => p.ProjectName == "P1" );
+                p1.TargetFrameworks.Should().BeSameAs( MSProject.Savors.FindOrCreate( "netcoreapp2.1" ) );
+
+                p1.SetTargetFrameworks( TestHelper.Monitor, MSProject.Savors.FindOrCreate( "netcoreapp3.1" ) );
+                s.IsDirty.Should().BeTrue();
+                s.Save( TestHelper.Monitor ).Should().BeTrue();
+                s.IsDirty.Should().BeFalse();
+
+                p1.SetTargetFrameworks( TestHelper.Monitor, MSProject.Savors.FindOrCreate( "netcoreapp2.1" ) );
+                s.IsDirty.Should().BeTrue();
+                s.Save( TestHelper.Monitor ).Should().BeTrue();
+            }
+        }
     }
 }

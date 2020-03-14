@@ -54,7 +54,6 @@ namespace CK.Env.Plugin
             }
             else
             {
-                m.Info( "Removing build files related to NPM handling." );
                 DeleteFile( m, "CakeExtensions/NpmDistTagRunner.cs" );
                 DeleteFile( m, "CakeExtensions/NpmView.cs" );
                 DeleteFile( m, "CakeExtensions/NpmGetNpmVersion.cs" );

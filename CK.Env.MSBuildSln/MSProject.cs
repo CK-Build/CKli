@@ -225,7 +225,7 @@ namespace CK.Env.MSBuildSln
         }
 
         /// <summary>
-        /// Sets the TargetFramework(s) element in the project file.
+        /// Sets the TargetFramework(s) element in the project file (from <see cref="MSProject.Savors"/> context).
         /// The dependencies are analysed and new <see cref="Dependencies.UselessDependencies"/> may appear.
         /// </summary>
         /// <param name="m">The activity monitor to use.</param>
@@ -234,7 +234,7 @@ namespace CK.Env.MSBuildSln
         public bool SetTargetFrameworks( IActivityMonitor m, CKTrait frameworks )
         {
             if( frameworks?.IsEmpty ?? true ) throw new ArgumentException( "Must not be null or empty.", nameof( frameworks ) );
-            if( frameworks.Context != Savors ) throw new ArgumentException( "Must be from MSProject.Traits context.", nameof( frameworks ) );
+            if( frameworks.Context != Savors ) throw new ArgumentException( "Must be from MSProject.Savors context.", nameof( frameworks ) );
             if( _primaryFile == null ) throw new InvalidOperationException( "Invalid project file." );
             if( TargetFrameworks == frameworks ) return false;
             XElement f = _primaryFile.Document.Root

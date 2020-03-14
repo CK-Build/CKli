@@ -20,6 +20,7 @@ namespace CK.Env.DependencyModel
         readonly List<NormalizedPath> _projectSources;
         Solution _solution;
         string _name;
+        CKTrait _savors;
         bool _isPublished;
         bool _isTestProject;
 
@@ -37,7 +38,7 @@ namespace CK.Env.DependencyModel
             SolutionRelativeFolderPath = primarySolutionRelativeFolderPath;
             FullFolderPath = fullFolderPath;
             SimpleProjectName = simpleProjecName;
-            Savors = savors;
+            _savors = savors;
             _generatedArtifacts = new List<GeneratedArtifact>();
             _projectReferences = new List<ProjectReference>();
             _packageReferences = new List<PackageReference>();
@@ -189,7 +190,26 @@ namespace CK.Env.DependencyModel
         /// the <see cref="ArtifactType.ContextSavors"/> of the "primary" artifact produced by this project).
         /// </para>
         /// </summary>
-        public CKTrait Savors { get; }
+        public CKTrait Savors => _savors;
+
+        /// <summary>
+        /// Applies a transformation to all the savors in this project: this <see cref="Savors"/>
+        /// first and then all <see cref="PackageReference.ApplicableSavors"/> and <see cref="ProjectReference.ApplicableSavors"/>.
+        /// </summary>
+        /// <param name="f"></param>
+        public void TransformSavors( Func<CKTrait,CKTrait> f )
+        {
+            _savors = f( _savors );
+            for( int i = 0; i < _packageReferences.Count; ++i )
+            {
+                _packageReferences[i] = new PackageReference( _packageReferences[i], f );
+            }
+            for( int i = 0; i < _projectReferences.Count; ++i )
+            {
+                _projectReferences[i] = new ProjectReference( _projectReferences[i], f );
+            }
+            Solution.OnProjectSavorsTransformed( this );
+        }
 
         /// <summary>
         /// Gets all artifacts that this project generates. 
@@ -244,8 +264,6 @@ namespace CK.Env.DependencyModel
         /// in <see cref="GeneratedArtifacts"/>.
         /// </summary>
         public IReadOnlyCollection<NormalizedPath> ProjectSources => _projectSources;
-
-
 
         /// <summary>
         /// Gets the references to local projects.

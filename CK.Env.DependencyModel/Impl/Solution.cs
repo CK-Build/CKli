@@ -142,24 +142,17 @@ namespace CK.Env.DependencyModel
         /// </param>
         /// <param name="type">The project type.</param>
         /// <param name="simpleProjecName">The project name.</param>
-        /// <param name="savors">
-        /// Optional savors for this project. When not null, the <see cref="CKTrait.Context"/> can be any
-        /// context (typically the <see cref="ArtifactType.ContextSavors"/> of the "primary" artifact produced
-        /// by this project).
-        /// </param>
         /// <returns>The project and whether it has been created or not.</returns>
         public (Project Project, bool Created) AddOrFindProject(
             NormalizedPath solutionRelativeFolderPath,
             string type,
-            string simpleProjecName,
-            CKTrait savors = null )
+            string simpleProjecName )
         {
             if( string.IsNullOrWhiteSpace( type ) ) throw new ArgumentNullException( nameof( type ) );
             if( string.IsNullOrWhiteSpace( simpleProjecName ) ) throw new ArgumentNullException( nameof( simpleProjecName ) );
-            if( savors != null && savors.IsEmpty ) throw new ArgumentException( "Savors can not be empty.", nameof( savors ) ); ;
 
             var fullFolderPath = FullPath.Combine( solutionRelativeFolderPath );
-            var newOne = new Project( this, solutionRelativeFolderPath, fullFolderPath, type, simpleProjecName, savors );
+            var newOne = new Project( this, solutionRelativeFolderPath, fullFolderPath, type, simpleProjecName, null );
             Debug.Assert( newOne.Name == null );
             var added = _ctx.OnProjectAdding( newOne );
             if( added != newOne ) return (added, false);
@@ -272,6 +265,12 @@ namespace CK.Env.DependencyModel
         {
             _version++;
             _ctx.OnBuildProjectChanged( this );
+        }
+
+        internal void OnProjectSavorsTransformed( Project project )
+        {
+            _version++;
+            _ctx.OnProjectSavorsTransformed( project );
         }
 
         internal void OnIsTestProjectChanged( Project project )

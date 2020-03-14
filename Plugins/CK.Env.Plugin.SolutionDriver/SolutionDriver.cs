@@ -213,11 +213,33 @@ namespace CK.Env.Plugin
                 {
                     m.Trace( $"Project {p.ProjectName} is set to not be packed: this project won't be published." );
                 }
-                var (project, isNewProject) = _solution.AddOrFindProject( p.SolutionRelativeFolderPath, ".Net", p.ProjectName, p.TargetFrameworks );
+                var (project, isNewProject) = _solution.AddOrFindProject( p.SolutionRelativeFolderPath, ".Net", p.ProjectName );
                 project.Tag( p );
                 if( isNewProject )
                 {
+                    project.TransformSavors( _ => p.TargetFrameworks );
                     ConfigureFromSpec( m, project, _solutionSpec );
+                }
+                else
+                {
+                    var previous = project.Savors;
+                    if( previous != p.TargetFrameworks )
+                    {
+                        var removed = previous.Except( p.TargetFrameworks );
+                        m.Trace( $"TargetFramework changed from {previous} to {p.TargetFrameworks}." );
+                        project.TransformSavors( t =>
+                        {
+                            var c = t.Except( previous );
+                            if( c.AtomicTraits.Count == t.AtomicTraits.Count - previous.AtomicTraits.Count )
+                            {
+                                // The trait contained all the previous ones: we replace all of them with the new one.
+                                return c.Union( p.TargetFrameworks );
+                            }
+                            // The trait doesn't contain all the previous ones: we must not blindly add the new project's trait,
+                            // we only remove the ones that have been removed.
+                            return t.Except( removed );
+                        } );
+                    }
                 }
                 SynchronizePackageReferences( m, project );
                 projectsToRemove.Remove( project );
