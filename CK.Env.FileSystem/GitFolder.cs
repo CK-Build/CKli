@@ -156,13 +156,9 @@ namespace CK.Env
         [BackgroundCommand( false )]
         [ParallelCommand( false )]
         [CommandMethod]
-        public bool RunCommand( IActivityMonitor m, string commandToRun )
+        public bool RunProcess( IActivityMonitor m, string fileName, string arguments )
         {
-            if( Environment.OSVersion.Platform != PlatformID.Win32NT )
-            {
-                throw new PlatformNotSupportedException( "Linux not supported yet." );
-            }
-            return ProcessRunner.Run( m, FullPhysicalPath, "cmd", "/c " + commandToRun );
+            return ProcessRunner.Run( m, FullPhysicalPath, fileName, arguments);
         }
 
         /// <summary>
