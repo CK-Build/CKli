@@ -12,7 +12,7 @@ namespace CodeCake
 
         AngularWorkspace(
             NPMProject workspaceProject,
-            IReadOnlyList<NPMProject> projects)
+            IReadOnlyList<NPMProject> projects )
             : base()
         {
             WorkspaceProject = workspaceProject;
@@ -35,8 +35,8 @@ namespace CodeCake
             foreach( var project in jsonProject.Properties() )
             {
                 string projectName = project.Name;
-                var projectPath = project["root"].ToString();
-                var outputPath = project["architect"]?["build"]?["options"]?["outputPath"].Value<string>()
+                var projectPath = project.Value["root"].ToString();
+                var outputPath = project.Value["architect"]?["build"]?["options"]?["outputPath"].Value<string>()
                     ?? projectPath;
                 projects.Add(
                     NPMPublishedProject.Create(
