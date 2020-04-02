@@ -57,17 +57,12 @@ namespace CodeCake
     /// </summary>
     public partial class NPMSolution : NPMProjectContainer, ICIWorkflow
     {
-        readonly StandardGlobalInfo _globalInfo;
-
         /// <summary>
         /// Initiaizes a new <see cref="NPMSolution" />.
         /// </summary>
         /// <param name="projects">Set of projects.</param>
-        NPMSolution(
-            StandardGlobalInfo globalInfo )
-            : base()
+        NPMSolution() : base()
         {
-            _globalInfo = globalInfo;
         }
 
         public IEnumerable<AngularWorkspace> AngularWorkspaces => Containers.OfType<AngularWorkspace>();
@@ -169,7 +164,7 @@ namespace CodeCake
         public static NPMSolution ReadFromNPMSolutionFile( StandardGlobalInfo globalInfo )
         {
             var document = XDocument.Load( "CodeCakeBuilder/NPMSolution.xml" ).Root;
-            var solution = new NPMSolution( globalInfo );
+            var solution = new NPMSolution();
 
             foreach( var item in document.Elements( "AngularWorkspace" ) )
             {

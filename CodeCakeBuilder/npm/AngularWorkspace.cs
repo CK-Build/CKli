@@ -29,14 +29,12 @@ namespace CodeCake
             JObject packageJson = JObject.Parse( File.ReadAllText( packageJsonPath ) );
             JObject angularJson = JObject.Parse( File.ReadAllText( angularJsonPath ) );
             if( !(packageJson["private"]?.ToObject<bool>() ?? false) ) throw new InvalidDataException( "A workspace project should be private." );
-            string solutionName = packageJson["name"].ToString();
             List<NPMProject> projects = new List<NPMProject>();
             var jsonProject = angularJson["projects"].ToObject<JObject>();
             foreach( var project in jsonProject.Properties() )
             {
-                string projectName = project.Name;
                 var projectPath = project.Value["root"].ToString();
-                var outputPath = project.Value["architect"]?["build"]?["options"]?["outputPath"].Value<string>()
+                var outputPath = project.Value["architect"]?["build"]?["options"]?["outputPath"]?.Value<string>()
                     ?? projectPath;
                 projects.Add(
                     NPMPublishedProject.Create(
@@ -47,7 +45,7 @@ namespace CodeCake
                     )
                 );
             }
-            return new AngularWorkspace( projects.Single( p => p.DirectoryPath == path ), projects );
+            return new AngularWorkspace( NPMPublishedProject.Create( globalInfo, npmSolution, path, path ), projects );
         }
     }
 }
