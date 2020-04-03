@@ -69,6 +69,20 @@ namespace CK.Env
                  LogLevel stdErrorLevel = LogLevel.Warn,
                  IEnumerable<(string, string)> environmentVariables = null )
         {
+            ProcessStartInfo cmdStartInfo = ConfigureProcessInfo( workingDir, fileName, arguments, environmentVariables );
+            return Run( m, cmdStartInfo, stdErrorLevel );
+        }
+
+        /// <summary>
+        /// Configures a <see cref="ProcessStartInfo"/>.
+        /// </summary>
+        /// <param name="workingDir">The working directory.</param>
+        /// <param name="fileName">The file name to run.</param>
+        /// <param name="arguments">Command arguments.</param>
+        /// <param name="environmentVariables">Optional environment variables for the child process.</param>
+        /// <returns>A configured start info.</returns>
+        public static ProcessStartInfo ConfigureProcessInfo( string workingDir, string fileName, string arguments, IEnumerable<(string, string)> environmentVariables = null )
+        {
             ProcessStartInfo cmdStartInfo = new ProcessStartInfo
             {
                 WorkingDirectory = workingDir,
@@ -87,11 +101,23 @@ namespace CK.Env
                 }
             }
             cmdStartInfo.Arguments = arguments;
-            using( m.OpenTrace( $"{fileName} {cmdStartInfo.Arguments}" ) )
+            return cmdStartInfo;
+        }
+
+        /// <summary>
+        /// Simple process run.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="startInfo">Process start info.</param>
+        /// <param name="stdErrorLevel">Trace level of Standard Error stream.</param>
+        /// <returns>True on success (<see cref="Process.ExitCode"/> is equal to 0), false otherwise.</returns>
+        public static bool Run( IActivityMonitor m, ProcessStartInfo startInfo, LogLevel stdErrorLevel = LogLevel.Warn )
+        {
+            using( m.OpenTrace( $"{startInfo.FileName} {startInfo.Arguments}" ) )
             using( Process cmdProcess = new Process() )
             {
                 StringBuilder errorCapture = new StringBuilder();
-                cmdProcess.StartInfo = cmdStartInfo;
+                cmdProcess.StartInfo = startInfo;
                 cmdProcess.ErrorDataReceived += ( o, e ) => { if( !string.IsNullOrEmpty( e.Data ) ) errorCapture.AppendLine( e.Data ); };
                 cmdProcess.OutputDataReceived += ( o, e ) => { if( e.Data != null ) m.Info( "<StdOut> " + e.Data ); };
                 cmdProcess.Start();

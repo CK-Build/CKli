@@ -48,6 +48,18 @@ namespace CK.Env.Plugin
             _solutionSpec = spec;
             _localFeedProvider = localFeedProvider;
             f.Reset += OnReset;
+            f.RunProcessStarting += OnRunProcessStarting;
+        }
+
+        void OnRunProcessStarting( object sender, RunCommandEventArgs e )
+        {
+            e.StartInfo.EnvironmentVariables.Add( "CKLI_CURRENT_WORLD_FULLNAME", GitFolder.World.FullName );
+            e.StartInfo.EnvironmentVariables.Add( "CKLI_CURRENT_WORLD_NAME", GitFolder.World.Name );
+            ISolution s = GetSolution( e.Monitor, true );
+            if( s != null )
+            {
+                e.StartInfo.EnvironmentVariables.Add( "CKLI_CURRENT_SOLUTION_NAME", s.FullPath.LastPart );
+            }
         }
 
         private void OnReset( IActivityMonitor m )
@@ -90,7 +102,6 @@ namespace CK.Env.Plugin
         /// plugins can participate to its configuration.
         /// </summary>
         public event EventHandler<SolutionConfigurationEventArgs> OnSolutionConfiguration;
-
 
         /// <summary>
         /// Gets whether the solution has been correctly read and configured.

@@ -153,12 +153,25 @@ namespace CK.Env
                                                             : StandardGitStatus.Unknown);
         public IWorldName World => ProtoGitFolder.World;
 
-        [BackgroundCommand( false )]
-        [ParallelCommand( false )]
+        /// <summary>
+        /// Event raised when <see cref="RunProcess(IActivityMonitor, string, string)"/> is called.
+        /// </summary>
+        public event EventHandler<RunCommandEventArgs> RunProcessStarting;
+
+        /// <summary>
+        /// Runs a command at the root of this repository.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="fileName">The filename to execute.</param>
+        /// <param name="arguments">the raw string of arguments.</param>
+        /// <returns>True on success. False on error.</returns>
         [CommandMethod]
         public bool RunProcess( IActivityMonitor m, string fileName, string arguments )
         {
-            return ProcessRunner.Run( m, FullPhysicalPath, fileName, arguments);
+            ProcessStartInfo info = ProcessRunner.ConfigureProcessInfo( FullPhysicalPath, fileName, arguments );
+            RunCommandEventArgs arg = new RunCommandEventArgs( m, info );
+            RunProcessStarting?.Invoke( this, arg );
+            return ProcessRunner.Run( m, arg.StartInfo, arg.StdErrorLevel );
         }
 
         /// <summary>
