@@ -169,7 +169,7 @@ namespace CodeCake
         public static NPMSolution ReadFromNPMSolutionFile( StandardGlobalInfo globalInfo )
         {
             var document = XDocument.Load( "CodeCakeBuilder/NPMSolution.xml" ).Root;
-            var solution = new NPMSolution();
+            var solution = new NPMSolution(globalInfo);
 
             foreach( var item in document.Elements( "AngularWorkspace" ) )
             {
