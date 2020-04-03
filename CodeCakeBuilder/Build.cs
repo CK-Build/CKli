@@ -19,12 +19,6 @@ namespace CodeCake
             StandardGlobalInfo globalInfo = CreateStandardGlobalInfo( gitInfo )
                                                 .AddDotnet()
                                                 .SetCIBuildTag();
-
-            var nuGetType = globalInfo.ArtifactTypes.OfType<NuGetArtifactType>().Single();
-            //Because this CCB is our reference for the ApplySettings, we must not modify Build.NuGetArtifactType.GetRemoteFeeds
-            //So here we modify the feed.
-            IList<ArtifactFeed> feeds = nuGetType.GetTargetFeeds();
-
             Task( "Check-Repository" )
                 .Does( () =>
                 {

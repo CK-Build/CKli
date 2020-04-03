@@ -57,39 +57,33 @@ namespace CodeCake
     /// </summary>
     public partial class NPMSolution : NPMProjectContainer, ICIWorkflow
     {
-        readonly StandardGlobalInfo _globalInfo;
-
         /// <summary>
         /// Initiaizes a new <see cref="NPMSolution" />.
         /// </summary>
         /// <param name="projects">Set of projects.</param>
-        NPMSolution(
-            StandardGlobalInfo globalInfo )
-            : base()
+        NPMSolution() : base()
         {
-            _globalInfo = globalInfo;
         }
 
         public IEnumerable<AngularWorkspace> AngularWorkspaces => Containers.OfType<AngularWorkspace>();
 
 
-        /// <summary>
-        /// Runs "npm ci" on all <see cref="SimpleProjects"/>.
-        /// </summary>
         public void RunNpmCI()
         {
-            foreach( var p in AllProjects )
+            foreach( var p in SimpleProjects )
             {
                 p.RunNpmCi();
+            }
+
+            foreach( var p in AngularWorkspaces )
+            {
+                p.WorkspaceProject.RunNpmCi();
             }
         }
 
         public void Clean()
         {
-            foreach( var p in AllProjects )
-            {
-                p.RunNpmCi();
-            }
+            RunNpmCI();
 
             foreach( var p in SimpleProjects )
             {
@@ -170,14 +164,13 @@ namespace CodeCake
         public static NPMSolution ReadFromNPMSolutionFile( StandardGlobalInfo globalInfo )
         {
             var document = XDocument.Load( "CodeCakeBuilder/NPMSolution.xml" ).Root;
-            var solution = new NPMSolution( globalInfo );
+            var solution = new NPMSolution();
 
             foreach( var item in document.Elements( "AngularWorkspace" ) )
             {
                 solution.Add( AngularWorkspace.Create( globalInfo,
                          solution,
-                         (string)item.Attribute( "Path" ),
-                         (string)item.Attribute( "OutputFolder" ) ) );
+                         (string)item.Attribute( "Path" ) ) );
             }
             foreach( var item in document.Elements( "Project" ) )
             {
