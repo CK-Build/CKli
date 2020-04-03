@@ -45,7 +45,7 @@ namespace CK.Env.Plugin
 
             HandleBasicDefinitions( m, useCentralPackage );
             HandleStandardProperties( m );
-            HandleReproducibleBuilds( m );
+            XCommentSection.FindOrCreate( Document.Root, "ReproducibleBuilds", false )?.Remove();
             HandleZeroVersion( m );
             HandleGenerateDocumentation( m );
             HandleSourceLink( m, useCentralPackage );
@@ -56,6 +56,55 @@ namespace CK.Env.Plugin
                          .Remove();
 
             Save( m );
+        }
+
+        void HandleBasicDefinitions( IActivityMonitor m, bool useCentralPackages )
+        {
+            const string sectionName = "BasicDefinitions";
+            var section = XCommentSection.FindOrCreate( Document.Root, sectionName, false );
+            if( section == null )
+            {
+                // Removes previously non sectioned property group.
+                Document.Root.Elements( "PropertyGroup" )
+                        .Where( e => e.Element( "IsTestProject" ) != null
+                                        || e.Element( "SharedDir" ) != null
+                                        || e.Element( "SolutionDir" ) != null
+                                        || e.Element( "IsInTestsFolder" ) != null )
+                        .Select( e => e.ClearCommentsBeforeAndNewLineAfter() )
+                        .Remove();
+                section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
+            }
+
+            section.StartComment = ": It is useful to knwow whether we are in the Tests/ folder and/or if the current project is a Test.";
+            var content = XElement.Parse(
+@"<PropertyGroup>
+  <IsTestProject Condition=""$(MSBuildProjectName.EndsWith('.Tests'))"">true</IsTestProject>
+  <IsInTestsFolder Condition=""$(MSBuildProjectDirectoryNoRoot.Contains('\Tests\'))"">true</IsInTestsFolder>
+  <!-- SolutionDir is defined by Visual Studio, we unify the behavior here. -->
+  <SolutionDir Condition="" $(SolutionDir) == '' "">$([System.IO.Path]::GetDirectoryName($([System.IO.Path]::GetDirectoryName($(MSBuildThisFileDirectory)))))\</SolutionDir>
+
+  <!-- CakeBuild is obsolete: the new standard ContinuousIntegrationBuild should be used. -->
+  <ContinuousIntegrationBuild Condition="" '$(CakeBuild)' == 'true' "">true</ContinuousIntegrationBuild>
+
+  <!-- Always enable Deterministic build. -->
+  <Deterministic>true</Deterministic>
+  <!-- Always allow the repository url to appear in the nuget package. -->
+  <PublishRepositoryUrl>true</PublishRepositoryUrl>
+  <!-- InformationalVersion is either the Zero version or provided by the CodeCakeBuilder when in CI build). -->
+  <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  <!-- Always embedds the .pdb in the nuget package.
+       When using SourceLink, we should follow the guidelines here: https://github.com/dotnet/sourcelink#using-source-link-in-net-projects
+       (for packages that are ultimately uploaded to nuget.org). -->
+  <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+
+</PropertyGroup>" );
+            if( useCentralPackages )
+            {
+                content.Add(
+                    new XComment( " Using Microsoft.Build.CentralPackageVersions: this avoids the Packages.props at the root of the repository. " ),
+                    new XElement( "CentralPackagesFile", "$(MSBuildThisFileDirectory)CentralPackages.props" ) );
+            }
+            section.SetContent( content );
         }
 
         void HandleStandardProperties( IActivityMonitor m )
@@ -106,74 +155,9 @@ namespace CK.Env.Plugin
             section.StartComment = ": Default is in Release or during Cake builds (except for projects below Tests/). Each project can override GenerateDocumentationFile property.";
             section.SetContent(
                 XElement.Parse(
-@"<PropertyGroup Condition="" '$(IsInTestsFolder)' != 'true' And ('$(CakeBuild)' == 'true' Or '$(Configuration)' == 'Release') "">
+@"<PropertyGroup Condition="" '$(IsInTestsFolder)' != 'true' And ('$(ContinuousIntegrationBuild)' == 'true' Or '$(Configuration)' == 'Release') "">
   <GenerateDocumentationFile>true</GenerateDocumentationFile>
 </PropertyGroup>" ) );
-        }
-
-        void HandleBasicDefinitions( IActivityMonitor m, bool useCentralPackages )
-        {
-            const string sectionName = "BasicDefinitions";
-            var section = XCommentSection.FindOrCreate( Document.Root, sectionName, false );
-            if( section == null )
-            {
-                // Removes previously non sectioned property group.
-                Document.Root.Elements( "PropertyGroup" )
-                        .Where( e => e.Element( "IsTestProject" ) != null
-                                        || e.Element( "SharedDir" ) != null
-                                        || e.Element( "SolutionDir" ) != null
-                                        || e.Element( "IsInTestsFolder" ) != null )
-                        .Select( e => e.ClearCommentsBeforeAndNewLineAfter() )
-                        .Remove();
-                section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
-            }
-
-            section.StartComment = ": It is useful to knwow whether we are in the Tests/ folder and/or if the current project is a Test.";
-            var content = XElement.Parse(
-@"<PropertyGroup>
-  <IsTestProject Condition=""$(MSBuildProjectName.EndsWith('.Tests'))"">true</IsTestProject>
-  <IsInTestsFolder Condition=""$(MSBuildProjectDirectoryNoRoot.Contains('\Tests\'))"">true</IsInTestsFolder>
-  <!-- SolutionDir is defined by Visual Studio, we unify the behavior here. -->
-  <SolutionDir Condition="" $(SolutionDir) == '' "">$([System.IO.Path]::GetDirectoryName($([System.IO.Path]::GetDirectoryName($(MSBuildThisFileDirectory)))))\</SolutionDir>
-</PropertyGroup>" );
-            if( useCentralPackages )
-            {
-                content.Add(
-                    new XComment( " Using Microsoft.Build.CentralPackageVersions: this avoids the Packages.props at the root of the repository. " ),
-                    new XElement( "CentralPackagesFile", "$(MSBuildThisFileDirectory)CentralPackages.props" ) );
-            }
-            section.SetContent( content );
-        }
-
-        void HandleReproducibleBuilds( IActivityMonitor m )
-        {
-            const string sectionName = "ReproducibleBuilds";
-            // This may be temporary: see https://github.com/dotnet/sourcelink/issues/91
-            // For the moment, when SourceLink is disabled, we also disable the reproducible builds.
-            // Path mapping is not an easy beast. See https://github.com/tonerdo/coverlet/issues/363.
-            if( _solutionSpec.DisableSourceLink )
-            {
-                XCommentSection.FindOrCreate( Document.Root, sectionName, false )?.Remove();
-            }
-            else
-            {
-                var section = XCommentSection.FindOrCreate( Document.Root, sectionName, false );
-                if( section == null )
-                {
-                    // Removes previously non sectioned property group.
-                    Document.Root.Elements( "PropertyGroup" ).Where( e => e.Element( "CKliWorldPath" ) != null )
-                        .Select( e => e.ClearCommentsBeforeAndNewLineAfter() )
-                        .Remove();
-                    section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
-                }
-                section.StartComment = ": See http://blog.paranoidcoding.com/2016/04/05/deterministic-builds-in-roslyn.html.";
-                section.SetContent(
-                    XElement.Parse(
-$@"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
-  <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-  <Deterministic>true</Deterministic>
-</PropertyGroup>" ) );
-            }
         }
 
         void HandleZeroVersion( IActivityMonitor m )
@@ -187,7 +171,7 @@ $@"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
             section.StartComment = ": When not building from the CI, assemblies always use the ZeroVersion (see CSemVer.InformationalVersion).";
             section.SetContent(
                 XElement.Parse(
-@"<PropertyGroup Condition="" '$(CakeBuild)' != 'true' "">
+@"<PropertyGroup Condition="" '$(ContinuousIntegrationBuild)' != 'true' "">
   <Version>0.0.0-0</Version>
   <AssemblyVersion>0.0.0</AssemblyVersion>
   <FileVersion>0.0.0.0</FileVersion>
@@ -228,18 +212,9 @@ $@"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
             const string currentVersion = "1.0.0";
 
             var section = XCommentSection.FindOrCreate( Document.Root, "SourceLink", true );
-            section.StartComment = ": is enabled only for Cake build. ";
+            section.StartComment = ": is enabled only for ContinuousIntegrationBuild build. ";
             section.SetContent(
-                XElement.Parse(
-@"<PropertyGroup>
-  <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-</PropertyGroup>" ),
-                XElement.Parse(
-@"<PropertyGroup Condition="" '$(CakeBuild)' == 'true' "">
-  <PublishRepositoryUrl>true</PublishRepositoryUrl>
-  <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
-</PropertyGroup>" ),
-                new XElement( "ItemGroup", new XAttribute( "Condition", " '$(CakeBuild)' == 'true' " ),
+                new XElement( "ItemGroup", new XAttribute( "Condition", " '$(ContinuousIntegrationBuild)' == 'true' " ),
                         new XElement( "PackageReference",
                                 new XAttribute( "Include", packageName ),
                                 useCentralPackages ? null : new XAttribute( "Version", currentVersion ),
