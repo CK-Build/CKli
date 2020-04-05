@@ -9,7 +9,7 @@ namespace CK.Env.DependencyModel
 {
     /// <summary>
     /// Encapsulates the result of the dependencies analysis at the solution level.
-    /// This is produced by <see cref="DependencyAnalyzer.CreateDependencyContext(IActivityMonitor, Func{IProject, bool})"/>.
+    /// This is produced by <see cref="DependencyAnalyzer.CreateDependencyContext(IActivityMonitor, bool, Func{IProject, bool})"/>.
     /// This object doesn't hold the potential project filter that has been used to built it.
     /// When <see cref="IsObsolete"/> is true, it must be fully rebuilt from a new <see cref="DependencyAnalyzer"/>.
     /// </summary>

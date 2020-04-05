@@ -222,7 +222,7 @@ namespace CK.Env.Plugin
                 }
                 else
                 {
-                    m.Trace( $"Project {p.ProjectName} is set to not be packed: this project won't be published." );
+                    m.Trace( $"Project {p.ProjectName} is set to not be packaged: this project won't be published." );
                 }
                 var (project, isNewProject) = _solution.AddOrFindProject( p.SolutionRelativeFolderPath, ".Net", p.ProjectName );
                 project.Tag( p );
@@ -256,6 +256,9 @@ namespace CK.Env.Plugin
                 projectsToRemove.Remove( project );
                 orderedProjects[i++] = project;
             }
+
+            SynchronizeSolutionPackageReferences( _sln, _solution );
+
             foreach( var project in _solution.Projects.Where( p => p.Tag<MSProject>() != null ) )
             {
                 SynchronizeProjectReferences( m, project, msProj => orderedProjects[msProj.MSProjIndex] );
@@ -351,6 +354,17 @@ namespace CK.Env.Plugin
                     dep.Frameworks );
             }
             foreach( var noMore in toRemove ) project.RemovePackageReference( noMore );
+        }
+
+        static void SynchronizeSolutionPackageReferences( SolutionFile sln, Solution solutionModel )
+        {
+            HashSet<Artifact> solutionRefs = new HashSet<Artifact>( solutionModel.SolutionPackageReferences.Select( p => p.Target.Artifact ) );
+            foreach( var p in sln.StandardDotnetToolConfigFile.Tools )
+            {
+                solutionRefs.Remove( p.Artifact );
+                solutionModel.EnsureSolutionPackageReference( p );
+            }
+            foreach( var p in solutionRefs ) solutionModel.RemoveSolutionPackageReference( p );
         }
 
         static void SynchronizeProjectReferences( IActivityMonitor m, DependencyModel.Project project, Func<MSProject, DependencyModel.Project> depsFinder )
@@ -505,6 +519,7 @@ namespace CK.Env.Plugin
                     int changes = p.SetPackageReferenceVersion( monitor, p.TargetFrameworks, update.PackageUpdate.Artifact.Name, update.PackageUpdate.Version );
                     mustSave |= changes != 0;
                 }
+                mustSave |= _sln.StandardDotnetToolConfigFile.SetPackageReferenceVersion( monitor, update.PackageUpdate );
             }
             bool error = false;
             using( monitor.OnError( () => error = true ) )

@@ -13,6 +13,12 @@ namespace CK.Env
         ITextFileInfo _file;
         readonly Encoding _encoding;
 
+        /// <summary>
+        /// Initializes a new <see cref="TextFileBase"/>.
+        /// </summary>
+        /// <param name="fs">The file system.</param>
+        /// <param name="filePath">The path to the file relative to the file system root.</param>
+        /// <param name="encoding">The encoding that defaults to UTF-8.</param>
         protected TextFileBase( FileSystem fs, NormalizedPath filePath, Encoding encoding = null )
         {
             FileSystem = fs;

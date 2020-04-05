@@ -78,7 +78,7 @@ namespace CK.Env.Plugin
         public IReadOnlyList<NPMDep> Dependencies => _deps;
 
         /// <summary>
-        /// Sets a minimum version for a dependency that must exist, regardless of it current status.
+        /// Sets a minimum version for a dependency that must exist, regardless of its current status.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="name">The dependency name that must appear in <see cref="Dependencies"/>.</param>
@@ -101,7 +101,7 @@ namespace CK.Env.Plugin
                     d = NPMDep.CreateNPMDepMinVersion( dOrig.Name, dOrig.Kind, v );
                 }
                 Root[d.Kind.ToPackageJsonKey()][d.Name] = d.RawDep;
-                m.Info( $"Updated {dOrig.ToString()} to version {d.RawDep}." );
+                m.Info( $"Updated {dOrig} to version {d.RawDep}." );
                 _unsavedDeps.Add( d );
                 _deps[idx] = d;
                 return true;

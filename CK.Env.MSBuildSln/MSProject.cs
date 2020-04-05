@@ -12,11 +12,18 @@ namespace CK.Env.MSBuildSln
     public class MSProject : Project
     {
         /// <summary>
-        /// Traits are used to manage framework names.
+        /// Definition of NuGet artifact type: its name is "NuGet", it is installable and its savors
+        /// use ';' as a seprator to match the one used by csproj.
+        /// <see cref="Savors"/> exposes them directly.
+        /// </summary>
+        public static readonly ArtifactType NuGetArtifactType = ArtifactType.Register( "NuGet", true, ';' );
+
+        /// <summary>
+        /// Traits are used to manage framework names: these are the savors of <see cref="NuGetArtifactType"/>.
         /// The <see cref="CKTraitContext.Separator"/> is the ';' to match the one used by csproj (parsing and
         /// string representation becomes straightforward).
         /// </summary>
-        public static readonly CKTraitContext Savors = ArtifactType.Register( "NuGet", true, ';' ).ContextSavors;
+        public static readonly CKTraitContext Savors = NuGetArtifactType.ContextSavors;
 
         /// <summary>
         /// Captures <see cref="DeclaredPackageDependency"/> and <see cref="ProjectToProjectDependency"/>.
@@ -91,7 +98,7 @@ namespace CK.Env.MSBuildSln
                     KnownProjectType type,
                     string projectGuid,
                     string projectName,
-                    string relativePath )
+                    NormalizedPath relativePath )
             : base( solution, projectGuid, type.ToGuid(), projectName, relativePath )
         {
             Debug.Assert( KnownType.IsVSProject() );

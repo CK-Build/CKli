@@ -329,7 +329,9 @@ namespace CK.Env.DependencyModel
             var sortables = new Dictionary<ISolution, SolutionItem>();
             foreach( var s in _solutions )
             {
-                var sItem = new SolutionItem( s, s.Projects.Where( p => projectFilter( p ) ).Select( p => _projects[p] ) );
+                // The Solution contains its Projects.
+                var children = s.Projects.Where( p => projectFilter( p ) ).Select( p => _projects[p] );
+                var sItem = new SolutionItem( s, children );
                 sortables.Add( s, sItem );
             }
 
@@ -466,7 +468,7 @@ namespace CK.Env.DependencyModel
             }
 
             // 3 - Create the requirements between each project and Packages that are bound to a
-            //     Published project (the LocalPackageItem previuosly created).
+            //     Published project (the LocalPackageItem previously created).
             //     When PackageReferences references external Packages, we add it to the ExternalRefs.
             foreach( var project in projectItems.AllProjectItems )
             {
@@ -499,6 +501,7 @@ namespace CK.Env.DependencyModel
                     }
                 }
             }
+
             return new DependencyAnalyzer(
                         m,
                         solutions,

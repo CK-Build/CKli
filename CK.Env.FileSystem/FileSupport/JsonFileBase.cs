@@ -13,6 +13,11 @@ namespace CK.Env
         JObject _root;
         string _currentText;
 
+        /// <summary>
+        /// Initializes a new <see cref="JsonFileBase"/>.
+        /// </summary>
+        /// <param name="fs">The file system.</param>
+        /// <param name="filePath">The path to the file relative to the file system root.</param>
         public JsonFileBase( FileSystem fs, NormalizedPath filePath )
             : base( fs, filePath )
         {
@@ -37,7 +42,7 @@ namespace CK.Env
 
         string GetCurrentText()
         {
-            _currentText = GetRoot().ToString( Newtonsoft.Json.Formatting.Indented );
+            _currentText = GetRoot()?.ToString( Newtonsoft.Json.Formatting.Indented );
             return _currentText;
         }
 

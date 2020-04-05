@@ -16,6 +16,7 @@ namespace CK.Env.DependencyModel
         readonly List<Project> _projects;
         readonly List<IArtifactRepository> _artifactTargets;
         readonly List<IArtifactFeed> _artifactSources;
+        readonly List<SolutionPackageReference> _solutionPackageReferences;
         readonly SolutionContext _ctx;
         Project _buildProject;
         int _version;
@@ -28,6 +29,7 @@ namespace CK.Env.DependencyModel
             _projects = new List<Project>();
             _artifactTargets = new List<IArtifactRepository>();
             _artifactSources = new List<IArtifactFeed>();
+            _solutionPackageReferences = new List<SolutionPackageReference>();
         }
 
         /// <summary>
@@ -237,7 +239,41 @@ namespace CK.Env.DependencyModel
             OnArtifactSourceRemoved( artifactSource );
         }
 
+        /// <summary>
+        /// Gets a set of projectless dependencies.
+        /// </summary>
+        public IReadOnlyCollection<SolutionPackageReference> SolutionPackageReferences => _solutionPackageReferences;
 
+        /// <summary>
+        /// Ensures that a direct dependency to this solution is in <see cref="SolutionPackageReferences"/>.
+        /// </summary>
+        /// <param name="target">Referenced package.</param>
+        public void EnsureSolutionPackageReference( ArtifactInstance target )
+        {
+            if( target == null ) throw new ArgumentNullException( nameof( target ) );
+
+            int idx = _solutionPackageReferences.IndexOf( p => p.Target.Artifact == target.Artifact );
+            if( idx >= 0 && _solutionPackageReferences[idx].Target.Version == target.Version ) return;
+
+            var newOne = new SolutionPackageReference( this, target );
+            if( idx >= 0 ) _solutionPackageReferences[idx] = newOne;
+            else _solutionPackageReferences.Add( newOne );
+            OnSolutionPackageReferenceChanged();
+        }
+
+        /// <summary>
+        /// Removes a direct dependency (that must belong to <see cref="SolutionPackageReferences"/> otherwise an
+        /// InvalidOperationException is thrown).
+        /// </summary>
+        /// <param name="target">The artifact to remove.</param>
+        public void RemoveSolutionPackageReference( Artifact target )
+        {
+            int idx = _solutionPackageReferences.IndexOf( p => p.Target.Artifact == target );
+            if( idx < 0 ) throw new InvalidOperationException( $"Package '{target}' is not referenced by '{ToString()}'." );
+            var oldOne = _solutionPackageReferences[idx];
+            _solutionPackageReferences.RemoveAt( idx );
+            OnSolutionPackageReferenceChanged();
+        }
 
         string IDependentItemRef.FullName => Name;
 
@@ -342,6 +378,12 @@ namespace CK.Env.DependencyModel
         {
             _version++;
             _ctx.OnArtifactSourceRemoved( this, artifactSource );
+        }
+
+        void OnSolutionPackageReferenceChanged()
+        {
+            _version++;
+            _ctx.OnSolutionPackageReferenceChanged();
         }
 
     }

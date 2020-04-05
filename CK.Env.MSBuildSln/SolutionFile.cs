@@ -27,6 +27,7 @@ namespace CK.Env.MSBuildSln
             _projectBaseList = new List<ProjectBase>();
             _projectMSList = new List<MSProject>();
             _sections = new Dictionary<string, Section>( StringComparer.OrdinalIgnoreCase );
+            StandardDotnetToolConfigFile = new DotnetToolConfigFile( this, ".config/dotnet-tools.json" );
         }
 
         /// <summary>
@@ -117,6 +118,13 @@ namespace CK.Env.MSBuildSln
         public Section FindGlobalSection( string name ) => _sections.GetValueWithDefault( name, null );
 
         /// <summary>
+        /// Gets the <see cref="DotnetToolConfigFile"/> that is the ".config/dotnet-tools.json" file
+        /// relatively to this solution file.
+        /// It may not exist.
+        /// </summary>
+        public DotnetToolConfigFile StandardDotnetToolConfigFile { get; }
+
+        /// <summary>
         /// Gets the projects that directly belongs to this solution (no intermediate
         /// <see cref="KnownProjectType.SolutionFolder"/>).
         /// </summary>
@@ -158,15 +166,10 @@ namespace CK.Env.MSBuildSln
         }
 
         /// <summary>
-        /// Gets whether any of the the projects this solution contains need to be saved
+        /// Gets whether any of the the projects this solution contains need to be saved or the <see cref="StandardDotnetToolConfigFile"/>
         /// or the solution itself needs to be saved.
         /// </summary>
-        public bool IsDirty => _isDirtyProjectFiles || _isDirtyStructure;
-
-        /// <summary>
-        /// Raised whenever <see cref="IsDirty"/> has changed.
-        /// </summary>
-        public event EventHandler IsDirtyChanged;
+        public bool IsDirty => _isDirtyProjectFiles || _isDirtyStructure || StandardDotnetToolConfigFile.IsDirty;
 
         /// <summary>
         /// Raised whenever a <see cref="Save"/> has actually been made
@@ -176,25 +179,15 @@ namespace CK.Env.MSBuildSln
 
         internal void CheckDirtyProjectFiles( bool shouldBeDirty )
         {
-            DebounceDirtyChanged( () =>
+            if( _isDirtyProjectFiles != shouldBeDirty )
             {
-                if( _isDirtyProjectFiles != shouldBeDirty )
-                {
-                    _isDirtyProjectFiles = MSProjects.Any( p => p.ProjectFile.IsDirty );
-                }
-            } );
+                _isDirtyProjectFiles = MSProjects.Any( p => p.ProjectFile.IsDirty );
+            }
         }
 
         internal void SetDirtyStructure( bool dirty )
         {
-            DebounceDirtyChanged( () => _isDirtyStructure = dirty );
-        }
-
-        void DebounceDirtyChanged( Action a )
-        {
-            bool d = IsDirty;
-            a();
-            if( d != IsDirty ) IsDirtyChanged?.Invoke( this, EventArgs.Empty );
+            _isDirtyStructure = dirty;
         }
 
         /// <summary>
@@ -221,6 +214,11 @@ namespace CK.Env.MSBuildSln
                     Write( w );
                     FileSystem.CopyTo( m, w.ToString(), FilePath );
                 }
+                saved = true;
+            }
+            if( StandardDotnetToolConfigFile.IsDirty )
+            {
+                StandardDotnetToolConfigFile.Save( m );
                 saved = true;
             }
             if( saved ) Saved?.Invoke( this, new EventMonitoredArgs( m ) );

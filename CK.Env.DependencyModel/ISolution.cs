@@ -57,5 +57,10 @@ namespace CK.Env.DependencyModel
         /// </summary>
         IReadOnlyCollection<IArtifactFeed> ArtifactSources { get; }
 
+        /// <summary>
+        /// Gets a set of projectless dependencies.
+        /// </summary>
+        IReadOnlyCollection<SolutionPackageReference> SolutionPackageReferences { get; }
+
     }
 }

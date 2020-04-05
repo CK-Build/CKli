@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Text;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -120,7 +121,7 @@ namespace CK.Env.DependencyModel
         public IEnumerator<Solution> GetEnumerator() => _list.GetEnumerator();
 
         /// <summary>
-        /// Gets a <see cref="DependencyAnalyzer"/> that is up to date (based on the <see cref="Version"/>).
+        /// Gets a <see cref="DependencyAnalyzer"/> that is up to date (based on the <see cref="SolutionContext.Version"/>).
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="traceGraphDetails">True to trace the details of the input and output (sorted) graphs.</param>
@@ -221,6 +222,11 @@ namespace CK.Env.DependencyModel
         }
 
         internal void OnArtifactSourceRemoved( Solution solution, IArtifactFeed artifactSource )
+        {
+            ++_version;
+        }
+
+        internal void OnSolutionPackageReferenceChanged()
         {
             ++_version;
         }
