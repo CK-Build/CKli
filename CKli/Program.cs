@@ -356,38 +356,28 @@ namespace CKli
                 return;
             }
             var firstHandler = handlers[0];
-            bool? parallelRun = firstHandler.ParallelRun;
-            bool? globalConfirm = firstHandler.ConfirmationRequired;
-            bool? backgroundRun = firstHandler.BackgroundRun;
+            bool globalConfirm = firstHandler.ConfirmationRequired;
+            ParallelCommandMode parallelMode = firstHandler.ParallelMode;
 
-            if( handlers.Any( h => h.ConfirmationRequired != globalConfirm.Value ) )
+            if( handlers.Any( h => h.ConfirmationRequired != globalConfirm ) )
             {
                 m.Error( "Different ConfirmationRequired found among commands. All commands must have the same ConfirmationRequired " );
                 return;
             }
-            if( handlers.Any( h => h.BackgroundRun != backgroundRun ) )
+            if( handlers.Any( h => h.ParallelMode != parallelMode ) )
             {
-                m.Error( "Different BackgroundCommandAttribute found among commands. All commands must have the same attributes and identically configured attribute." );
-                return;
-            }
-            if( handlers.Any( h => h.ParallelRun != parallelRun ) )
-            {
-                m.Error( "Different ParallelCommandAttribute found among commands. All commands must have the same attributes and identically configured attribute." );
+                m.Error( "Different ParallelMode found among commands. All commands must have the same ParallelMode." );
                 return;
             }
             var payload = firstHandler.CreatePayload();
             if( !ReadPayload( m, payload ) ) return;
 
-            if( parallelRun == null )
+            if( handlers.Count > 0 && parallelMode == ParallelCommandMode.UserChoice )
             {
-                Console.WriteLine( "The selected command(s) can run in parallel. Do you want to run in parallel?" );
-                parallelRun = YesOrNo();
-            }
-
-            if( backgroundRun == null )
-            {
-                Console.WriteLine( "The selected command(s) can run in background. Do you want to run in background?" );
-                backgroundRun = YesOrNo();
+                bool? a = YesNoCancel( "The selected commands can run in parallel. Do you want to run them in parallel?" );
+                if( a == null ) return;
+                parallelMode = a.Value ? ParallelCommandMode.Parallel : ParallelCommandMode.Sequential;
+                globalConfirm = false;
             }
 
             if( globalConfirm == true )
@@ -400,12 +390,7 @@ namespace CKli
                 DumpPayLoad( payload );
                 if( !YesOrNo() ) return;
             }
-            if( backgroundRun.Value )
-            {
-                throw new NotImplementedException();
-            }
-
-            if( !parallelRun.Value )
+            if( parallelMode == ParallelCommandMode.Sequential )
             {
                 foreach( var h in handlers )
                 {
@@ -422,7 +407,6 @@ namespace CKli
                 } ) ).ToArray();
                 Task.WaitAll( tasks );
             }
-
         }
 
         static bool YesOrNo()
@@ -430,6 +414,16 @@ namespace CKli
             char c;
             Console.WriteLine( "Y/N?" );
             while( "YNyn".IndexOf( (c = Console.ReadKey().KeyChar) ) < 0 ) Console.Write( '\b' );
+            return c == 'Y' || c == 'y';
+        }
+
+        static bool? YesNoCancel( string message )
+        {
+            char c;
+            Console.WriteLine( message );
+            Console.WriteLine( "Yes, No or Cancel? (Y/N/C)" );
+            while( "YNCync".IndexOf( (c = Console.ReadKey().KeyChar) ) < 0 ) Console.Write( '\b' );
+            if( c == 'C' || c == 'c' ) return null;
             return c == 'Y' || c == 'y';
         }
 

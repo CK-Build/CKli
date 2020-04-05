@@ -11,5 +11,11 @@ namespace CK.Env
         }
 
         public bool ConfirmationRequired { get; }
+
+        /// <summary>
+        /// Gets or sets the <see cref="ParallelCommandMode"/> for this command.
+        /// Defaults to <see cref="ParallelCommandMode.Sequential"/>.
+        /// </summary>
+        public ParallelCommandMode ParallelMode { get; set; }
     }
 }

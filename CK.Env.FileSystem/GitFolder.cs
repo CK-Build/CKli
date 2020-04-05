@@ -165,7 +165,7 @@ namespace CK.Env
         /// <param name="fileName">The filename to execute.</param>
         /// <param name="arguments">the raw string of arguments.</param>
         /// <returns>True on success. False on error.</returns>
-        [CommandMethod]
+        [CommandMethod( ParallelMode = ParallelCommandMode.UserChoice )]
         public bool RunProcess( IActivityMonitor m, string fileName, string arguments )
         {
             ProcessStartInfo info = ProcessRunner.ConfigureProcessInfo( FullPhysicalPath, fileName, arguments );

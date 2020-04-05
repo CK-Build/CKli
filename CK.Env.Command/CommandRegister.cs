@@ -45,7 +45,7 @@ namespace CK.Env
             readonly Func<bool> _enabled;
             readonly ParameterInfo[] _parameters;
 
-            public MethodHandler( bool confirmationRequired, bool? parallelRun, bool? backgroundRun, NormalizedPath n, object instance, MethodInfo method, ParameterInfo[] parameters, Func<bool> enabled )
+            public MethodHandler( bool confirmationRequired, NormalizedPath n, object instance, MethodInfo method, ParallelCommandMode parallelMode, ParameterInfo[] parameters, Func<bool> enabled )
             {
                 ConfirmationRequired = confirmationRequired;
                 UniqueName = n;
@@ -56,8 +56,7 @@ namespace CK.Env
                               ? null
                               : '(' + parameters.Skip( 1 ).Select( p => p.Name ).Concatenate() + ')';
                 _enabled = enabled;
-                ParallelRun = parallelRun;
-                BackgroundRun = backgroundRun;
+                ParallelMode = parallelMode;
             }
 
             public bool ConfirmationRequired { get; }
@@ -68,9 +67,7 @@ namespace CK.Env
 
             public string PayloadSignature { get; }
 
-            public bool? ParallelRun { get; }
-
-            public bool? BackgroundRun { get; }
+            public ParallelCommandMode ParallelMode { get; }
 
             public object CreatePayload()
             {
@@ -118,9 +115,10 @@ namespace CK.Env
         /// <param name="uniqueName">The unique command name.</param>
         /// <param name="o">The object instance that holds the method.</param>
         /// <param name="method">The method.</param>
-        /// <param name="enabled">A companion function that knows how to compte whether the command is enabled or not.</param>
+        /// <param name="parallelMode">Parallel command mode.</param>
+        /// <param name="enabled">A companion function that knows how to compute whether the command is enabled or not.</param>
         /// <returns>The registered command handler.</returns>
-        public ICommandHandler Register( bool confirmationRequired, NormalizedPath uniqueName, object o, MethodInfo method, Func<bool> enabled = null )
+        public ICommandHandler Register( bool confirmationRequired, NormalizedPath uniqueName, object o, MethodInfo method, ParallelCommandMode parallelMode, Func<bool> enabled = null )
         {
             if( _commands.ContainsKey( uniqueName ) )
             {
@@ -131,11 +129,7 @@ namespace CK.Env
             {
                 throw new ArgumentException( $"Method {method} for command '{uniqueName}' must have a first IActivityMonitor parameter.", nameof( method ) );
             }
-            var parallelAttribute = method.GetCustomAttribute<ParallelCommandAttribute>();
-            var backgroundAttribute = method.GetCustomAttribute<BackgroundCommandAttribute>();
-            bool? runParallel = parallelAttribute == null ? false : parallelAttribute.AlwaysRunInParallel ? true : (bool?)null;
-            bool? runBackground = backgroundAttribute == null ? false : backgroundAttribute.AlwaysRunInBackground ? true : (bool?)null;
-            var h = new MethodHandler( confirmationRequired, runParallel, runBackground, uniqueName, o, method, parameters, enabled );
+            var h = new MethodHandler( confirmationRequired, uniqueName, o, method, parallelMode, parameters, enabled );
             _commands.Add( uniqueName, h );
             return h;
         }
@@ -153,7 +147,7 @@ namespace CK.Env
                 if( attr != null )
                 {
                     var enabled = GetEnabledMethod( provider, methods, m.Name );
-                    Register( attr.ConfirmationRequired, provider.CommandProviderName.AppendPart( m.Name ), provider, m, enabled );
+                    Register( attr.ConfirmationRequired, provider.CommandProviderName.AppendPart( m.Name ), provider, m, attr.ParallelMode, enabled );
                 }
             }
         }
