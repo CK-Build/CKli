@@ -280,7 +280,7 @@ namespace CK.Env.MSBuildSln
             {
                 throw new ArgumentException( $"Package {packageId} is already a ProjectReference.", nameof( packageId ) );
             }
-            var sV = version.ToNormalizedString();
+            var sV = version.ToString();
             int changeCount = 0;
             CKTrait pFrameworks = null;
             foreach( var p in _dependencies.Packages.Where( p => p.PackageId == packageId

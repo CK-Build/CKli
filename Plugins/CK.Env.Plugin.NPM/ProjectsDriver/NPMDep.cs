@@ -38,12 +38,12 @@ namespace CK.Env.Plugin
 
         public static NPMDep CreateNPMDepMinVersion( string name, ArtifactDependencyKind kind, SVersion minVersion )
         {
-            return new NPMDep( name, NPMVersionDependencyType.MinVersion, kind, ">=" + minVersion.ToNormalizedString(), minVersion );
+            return new NPMDep( name, NPMVersionDependencyType.MinVersion, kind, ">=" + minVersion.ToString(), minVersion );
         }
 
         public static NPMDep CreateNPMDepLocalPath( NormalizedPath path, string name, ArtifactDependencyKind kind )
         {
-            return new NPMDep( name, NPMVersionDependencyType.LocalPath, kind, $"file:{path.ToString()}", null );
+            return new NPMDep( name, NPMVersionDependencyType.LocalPath, kind, $"file:{path}", null );
         }
         /// <summary>
         /// 

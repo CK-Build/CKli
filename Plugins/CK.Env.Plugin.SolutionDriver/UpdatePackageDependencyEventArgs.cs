@@ -9,7 +9,7 @@ namespace CK.Env.Plugin
     public class UpdatePackageDependencyEventArgs : EventMonitoredArgs
     {
         /// <summary>
-        /// Initializes a new <see cref="SolutionConfigurationEventArgs"/>.
+        /// Initializes a new <see cref="UpdatePackageDependencyEventArgs"/>.
         /// </summary>
         /// <param name="m">The monitor.</param>
         /// <param name="updateInfo">The update info to apply.</param>

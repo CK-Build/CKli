@@ -380,13 +380,13 @@ namespace CKli
 
             if( parallelRun == null )
             {
-                Console.WriteLine( "The selected command(s) can run in parallel. Do you want to run in parallel ?" );
+                Console.WriteLine( "The selected command(s) can run in parallel. Do you want to run in parallel?" );
                 parallelRun = YesOrNo();
             }
 
             if( backgroundRun == null )
             {
-                Console.WriteLine( "The selected command(s) can run in background. Do you want to run in background ?" );
+                Console.WriteLine( "The selected command(s) can run in background. Do you want to run in background?" );
                 backgroundRun = YesOrNo();
             }
 
