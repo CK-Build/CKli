@@ -75,13 +75,12 @@ namespace CK.Env.Plugin
                 section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
             }
 
-            section.StartComment = ": It is useful to knwow whether we are in the Tests/ folder and/or if the current project is a Test.";
-            var content = XElement.Parse(
+            section.StartComment = ": provides simple and useful definitions.";
+            var propertyGroup = XElement.Parse(
 @"<PropertyGroup>
-  <IsTestProject Condition=""$(MSBuildProjectName.EndsWith('.Tests'))"">true</IsTestProject>
-  <IsInTestsFolder Condition=""$(MSBuildProjectDirectoryNoRoot.Contains('\Tests\'))"">true</IsInTestsFolder>
+
   <!-- SolutionDir is defined by Visual Studio, we unify the behavior here. -->
-  <SolutionDir Condition="" $(SolutionDir) == '' "">$([System.IO.Path]::GetDirectoryName($([System.IO.Path]::GetDirectoryName($(MSBuildThisFileDirectory)))))\</SolutionDir>
+  <SolutionDir Condition="" $(SolutionDir) == '' "">$([System.IO.Path]::GetDirectoryName($([System.IO.Path]::GetDirectoryName($(MSBuildThisFileDirectory)))))/</SolutionDir>
 
   <!-- CakeBuild is obsolete: the new standard ContinuousIntegrationBuild should be used. -->
   <ContinuousIntegrationBuild Condition="" '$(CakeBuild)' == 'true' "">true</ContinuousIntegrationBuild>
@@ -90,21 +89,28 @@ namespace CK.Env.Plugin
   <Deterministic>true</Deterministic>
   <!-- Always allow the repository url to appear in the nuget package. -->
   <PublishRepositoryUrl>true</PublishRepositoryUrl>
+
   <!-- InformationalVersion is either the Zero version or provided by the CodeCakeBuilder when in CI build). -->
   <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   <!-- Always embedds the .pdb in the nuget package.
-       When using SourceLink, we should follow the guidelines here: https://github.com/dotnet/sourcelink#using-source-link-in-net-projects
-       (for packages that are ultimately uploaded to nuget.org). -->
+       TODO: When using SourceLink, we should follow the guidelines here: https://github.com/dotnet/sourcelink#using-source-link-in-net-projects
+             (only for packages that are ultimately uploaded to nuget.org). -->
   <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
 
 </PropertyGroup>" );
             if( useCentralPackages )
             {
-                content.Add(
+                propertyGroup.Add(
                     new XComment( " Using Microsoft.Build.CentralPackageVersions: this avoids the Packages.props at the root of the repository. " ),
                     new XElement( "CentralPackagesFile", "$(MSBuildThisFileDirectory)CentralPackages.props" ) );
             }
-            section.SetContent( content );
+
+            var itemGroup = XElement.Parse(
+@"<!-- This is always good to define the SourceRoot, even if DeterministicSourcePaths is off. -->
+<ItemGroup>
+  <SourceRoot Include=""$(SolutionDir)"" />
+</ItemGroup>" );
+            section.SetContent( propertyGroup, itemGroup );
         }
 
         void HandleStandardProperties( IActivityMonitor m )
