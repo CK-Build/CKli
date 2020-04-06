@@ -221,6 +221,11 @@ namespace CK.Env.MSBuildSln
         public int MSProjIndex => Solution.MSProjects.IndexOf( x => x == this );
 
         /// <summary>
+        /// Gets whether this csproj file or one of its depdendencies have changed.
+        /// </summary>
+        public bool IsDirty => _primaryFile.IsDirty || (_centralPackagesFile?.IsDirty ?? false);
+
+        /// <summary>
         /// Saves all files that have been modified.
         /// </summary>
         /// <param name="m">The monitor.</param>
@@ -228,7 +233,8 @@ namespace CK.Env.MSBuildSln
         public bool Save( IActivityMonitor m )
         {
             if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
-            return _primaryFile.Save( m, Solution.FileSystem );
+            return _primaryFile.Save( m, Solution.FileSystem )
+                   && (_centralPackagesFile?.Save( m, Solution.FileSystem ) ?? true);
         }
 
         /// <summary>

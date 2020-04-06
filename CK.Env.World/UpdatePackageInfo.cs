@@ -42,5 +42,11 @@ namespace CK.Env
         /// </summary>
         public ArtifactInstance PackageUpdate { get; }
 
+        /// <summary>
+        /// Overridden to return $"{Project.Name} <= {PackageUpdate}".
+        /// </summary>
+        /// <returns>A readable string.</returns>
+        public override string ToString() => $"{Project.Name} <= {PackageUpdate}";
+
     }
 }

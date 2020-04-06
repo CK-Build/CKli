@@ -11,7 +11,7 @@ namespace CK.Env
     /// <summary>
     /// BUilder for CI in develop.
     /// Versions are based on the number of commits from head to the last actual release.
-    /// Builds may be rtried whenever an update of the build chain is required and the commit
+    /// Builds may be retried whenever an update of the build chain is required and the commit
     /// cannot be amended (fresh checkout or right after a push).
     /// This is a edge case that does'nt happen often.
     /// </summary>

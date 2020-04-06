@@ -181,7 +181,7 @@ namespace CK.Env.MSBuildSln
         {
             if( _isDirtyProjectFiles != shouldBeDirty )
             {
-                _isDirtyProjectFiles = MSProjects.Any( p => p.ProjectFile.IsDirty );
+                _isDirtyProjectFiles = MSProjects.Any( p => p.IsDirty );
             }
         }
 
@@ -202,7 +202,7 @@ namespace CK.Env.MSBuildSln
             {
                 foreach( var p in MSProjects )
                 {
-                    if( !p.ProjectFile.Save( m, FileSystem ) ) return false;
+                    if( !p.Save( m ) ) return false;
                 }
                 CheckDirtyProjectFiles( false );
                 saved = true;
