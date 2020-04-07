@@ -112,7 +112,7 @@ namespace CK.Env.Tests.LocalTestHelper
         public static NormalizedPath minimal_solution_add_ccb( Action<TestUniverse> action, bool refreshCache ) =>
             ImageBuilderHelper<Action<TestUniverse>>( action, refreshCache, minimal_solution_open, ( universe ) =>
             {
-                universe.ApplyWithFilter( TestHelper.Monitor, _cktestBuildStackName, "*CodeCakeBuilder*Apply*" );
+                universe.RunCommands( TestHelper.Monitor, _cktestBuildStackName, "*CodeCakeBuilder*Apply*" );
                 universe.CommitAll( TestHelper.Monitor, _cktestBuildStackName );
             } );
 

@@ -15,7 +15,7 @@ namespace CK.Env.Tests
         /// It should had keep the local branch checkout.
         /// </summary>
         [Test]
-        public void ckli_save_branch_state_on_restart() 
+        public void ckli_save_branch_state_on_restart()
         {
             ImageLibrary.minimal_solution_switched_to_local( ( universe, world ) =>
             {
@@ -23,6 +23,23 @@ namespace CK.Env.Tests
                 universe.UserHost.WorldSelector.CloseWorld( TestHelper.Monitor );
                 var reopenedWorld = universe.EnsureWorldOpened( world.WorldName.Name );
                 reopenedWorld.CheckGlobalGitStatus( TestHelper.Monitor, StandardGitStatus.Local ).Should().BeTrue();
+            }, TestHelper.IsExplicitAllowed );
+        }
+
+        /// <summary>
+        /// https://github.com/CK-Build/CKli/issues/20
+        /// </summary>
+        [Test]
+        public void issue_20()
+        {
+            ImageLibrary.minimal_solution_first_ci_build( ( universe, world ) =>
+            {
+                universe
+                    .RunCommands( TestHelper.Monitor, world.WorldName.Name, "*pull*" )
+                    .RunCommands( TestHelper.Monitor, world.WorldName.Name, "*command*", "git checkout master" )
+                    .RunCommands( TestHelper.Monitor, world.WorldName.Name, "*command*", "git pull" );
+
+                world.DumpWorldState( TestHelper.Monitor ).Should().BeTrue();
             }, TestHelper.IsExplicitAllowed );
         }
     }
