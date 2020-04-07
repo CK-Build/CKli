@@ -644,7 +644,7 @@ namespace CK.Env
             if( worldCtx == null ) return;
             SVersion version;
             var externalReferences = worldCtx.DependencyContext.Analyzer.ExternalReferences;
-            List<PackageReference> artifactUses = externalReferences
+            List<ProjectPackageReference> artifactUses = externalReferences
                     .Where( p =>
                         p.Target.Artifact.TypedName.Equals( packageName, StringComparison.OrdinalIgnoreCase )
                         || p.Target.Artifact.Name.Equals( packageName, StringComparison.OrdinalIgnoreCase ) )
@@ -734,6 +734,7 @@ namespace CK.Env
         {
             if( !CanAllBuild ) throw new InvalidOperationException( nameof( CanAllBuild ) );
             if( !CheckGlobalGitStatusLocalXorDevelop( monitor ) ) return false;
+            monitor.MinimalFilter = LogFilter.Trace;
             return RunSafe( monitor, $"Local build.", ( m, error ) =>
             {
                 var ctx = GetWorldSolutionContext( m );

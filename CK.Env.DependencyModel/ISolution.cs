@@ -6,7 +6,7 @@ namespace CK.Env.DependencyModel
     /// <summary>
     /// Generic solution: contains a list of <see cref="IProject"/> of any type.
     /// </summary>
-    public interface ISolution : ITaggedObject
+    public interface ISolution : IPackageReferer, ITaggedObject
     {
         /// <summary>
         /// Gets the solution context.
@@ -22,7 +22,7 @@ namespace CK.Env.DependencyModel
         /// Gets the solution name that must uniquely identify a solution among multiple solutions.
         /// This is not necessarily the last part of its <see cref="FullPath"/>.
         /// </summary>
-        string Name { get; }
+        new string Name { get; }
 
         /// <summary>
         /// Gets the current version. This changes each time
@@ -61,6 +61,12 @@ namespace CK.Env.DependencyModel
         /// Gets a set of projectless dependencies.
         /// </summary>
         IReadOnlyCollection<SolutionPackageReference> SolutionPackageReferences { get; }
+
+        /// <summary>
+        /// Gets the <see cref="SolutionPackageReferences"/> concatenated to all <see cref="IProject.PackageReferences"/>.
+        /// This is the whole set of references from this solution.
+        /// </summary>
+        IEnumerable<PackageReference> AllPackageReferences { get; }
 
     }
 }

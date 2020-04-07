@@ -50,7 +50,7 @@ namespace CKli
                 .Where( p => p.IsPublished && p.PackageReferences.Any( q => q.Kind == ArtifactDependencyKind.Transitive ) )
                 .Select( p =>
                 {
-                    List<PackageReference> pcks = p.PackageReferences
+                    List<ProjectPackageReference> pcks = p.PackageReferences
                     .Where( q => q.Kind == ArtifactDependencyKind.Transitive )
                     .Where(
                         q => !c.Solution.ImportedLocalPackages
@@ -63,7 +63,7 @@ namespace CKli
                         return (p, pcks.Where( q => q.Target.Version.PackageQuality == worstQuality ));
                     }
                     p = null;
-                    return (p, Array.Empty<PackageReference>());
+                    return (p, Array.Empty<ProjectPackageReference>());
                 } )//There should be at least one package reference
                 .Where( x => x.p != null )
                 .GroupBy( p => p.Item2.First().Target.Version.PackageQuality ).ToList(); //ugliest LINQ i ever wrote, should take 3 lines.

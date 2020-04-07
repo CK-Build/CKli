@@ -5,73 +5,46 @@ using System.Diagnostics;
 namespace CK.Env.DependencyModel
 {
     /// <summary>
-    /// Defines a dependency to a package.
+    /// Defines a dependency to a package from a generic <see cref="IPackageReferer"/>.
     /// </summary>
     public readonly struct PackageReference
     {
         /// <summary>
-        /// Gets the project that owns the reference.
+        /// Gets the referer of this <see cref="Target"/>.
+        /// This is never null and is either a <see cref="ISolution"/> or a <see cref="IProject"/>.
         /// </summary>
-        public IProject Owner { get; }
+        public IPackageReferer Referer { get; }
 
         /// <summary>
         /// Gets the referenced artifact instance.
-        /// It is an installable type (see <see cref="ArtifactType.IsInstallable"/>).
+        /// It is an installable type (see <see cref="ArtifactType.IsInstallable"/>) and <see cref="ArtifactInstance.IsValid"/>
+        /// is necessarily true.
         /// </summary>
         public ArtifactInstance Target { get; }
 
         /// <summary>
-        /// Gets this reference kind.
+        /// Initializes a new <see cref="PackageReference"/> with a non null referer and valid target.
         /// </summary>
-        public ArtifactDependencyKind Kind { get; }
-
-        /// <summary>
-        /// Gets the savors that, when not null, is a subset of the <see cref="IProject.Savors"/> (or all the
-        /// project's savors) and cannot be empty.
-        /// </summary>
-        public CKTrait ApplicableSavors { get; }
-
-        /// <summary>
-        /// Gets whether this dependency is applicable only to a subset of the <see cref="IProject.Savors"/>.
-        /// </summary>
-        public bool IsSavored => ApplicableSavors != null && ApplicableSavors.AtomicTraits.Count < Owner.Savors.AtomicTraits.Count;
-
-        internal PackageReference( IProject o, ArtifactInstance t, ArtifactDependencyKind kind, CKTrait applicableSavors )
+        /// <param name="referer">The referer.</param>
+        /// <param name="target">Valid target.</param>
+        public PackageReference( IPackageReferer referer, ArtifactInstance target )
         {
-            Debug.Assert( o.Savors == null && applicableSavors == null
-                            || (o.Savors.Context == applicableSavors.Context
-                                && !applicableSavors.IsEmpty
-                                && o.Savors.IsSupersetOf( applicableSavors )) );
-            Owner = o;
-            Target = t;
-            Kind = kind;
-            ApplicableSavors = applicableSavors;
-        }
-
-        internal PackageReference( in PackageReference o, Func<CKTrait, CKTrait> f )
-        {
-            Owner = o.Owner;
-            Target = o.Target;
-            Kind = o.Kind;
-            ApplicableSavors = f( o.ApplicableSavors );
+            Referer = referer ?? throw new ArgumentNullException(nameof(referer));
+            if( !target.IsValid ) throw new ArgumentException( nameof( target ) );
+            Target = target;
         }
 
         /// <summary>
-        /// Return "Target (Kind)" string (with [applicable savors] suffix if <see cref="IsSavored"/>).
+        /// Returns "Referer {link} Target" string.
         /// </summary>
+        /// <param name="link">Link between referer and target.</param>
         /// <returns>A readable string.</returns>
-        public string ToStringTarget() => IsSavored
-                                                ? Kind != ArtifactDependencyKind.Transitive
-                                                    ? $"{Target} (RefKind:{Kind}) [{ApplicableSavors}]"
-                                                    : $"{Target} [{ApplicableSavors}]"
-                                                : (Kind != ArtifactDependencyKind.Transitive
-                                                    ? $"{Target} (RefKind:{Kind})"
-                                                    : Target.ToString());
+        public string ToString( string link ) => Referer.Name + link + Target.ToString();
 
         /// <summary>
-        /// Returns "Owner -> Target (Kind)" string (with [applicable savors] suffix if <see cref="IsSavored"/>).
+        /// Returns "Referer -> Target" string.
         /// </summary>
         /// <returns>A readable string.</returns>
-        public override string ToString() => Owner.ToString() + " -> " + ToStringTarget();
+        public override string ToString() => ToString( " -> " );
     }
 }

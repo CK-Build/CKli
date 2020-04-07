@@ -9,13 +9,13 @@ namespace CK.Env.DependencyModel
     /// <see cref="ProjectReferences"/> and whether it is a <see cref="IsTestProject"/>, <see cref="IsPublished"/> or whether it is
     /// the <see cref="Solution.BuildProject"/> or not.
     /// </summary>
-    public interface IProject : ITaggedObject
+    public interface IProject : IPackageReferer, ITaggedObject
     {
         /// <summary>
         /// Gets the solution to which this project belongs.
         /// This is null if this project has been removed from its Solution.
         /// </summary>
-        ISolution Solution { get; }
+        new ISolution Solution { get; }
 
         /// <summary>
         /// Gets the full path to this project folder that starts with the <see cref="Solution.FullPath"/>.
@@ -57,7 +57,7 @@ namespace CK.Env.DependencyModel
         /// the <see cref="ArtifactType.ContextSavors"/> of the "primary" artifact produced by this project).
         /// </para>
         /// <para>
-        /// <see cref="PackageReference.ApplicableSavors"/> and <see cref="ProjectReference.ApplicableSavors"/> share
+        /// <see cref="ProjectPackageReference.ApplicableSavors"/> and <see cref="ProjectReference.ApplicableSavors"/> share
         /// the same context and are either equal to these savors or are a nn-empty subset of them.
         /// </para>
         /// </summary>
@@ -95,12 +95,12 @@ namespace CK.Env.DependencyModel
         /// Given that the solution name is unique by design and that only one project of a given type can
         /// be defined in a folder, this name is eventually always unique. 
         /// </summary>
-        string Name { get; }
+        new string Name { get; }
 
         /// <summary>
         /// Gets the package references.
         /// </summary>
-        IReadOnlyList<PackageReference> PackageReferences { get; }
+        IReadOnlyList<ProjectPackageReference> PackageReferences { get; }
 
         /// <summary>
         /// Gets the references to local projects.

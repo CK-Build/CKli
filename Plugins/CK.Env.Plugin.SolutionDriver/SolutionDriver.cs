@@ -623,7 +623,7 @@ namespace CK.Env.Plugin
                         .SelectMany( p => p.PackageReferences )
                         .Select( dep => (Dep: dep, LocalVersion: feed.GetBestNuGetVersion( monitor, dep.Target.Artifact.Name )) )
                         .Where( pv => pv.LocalVersion != null )
-                        .Select( pv => new UpdatePackageInfo( pv.Dep.Owner, NuGetType, pv.Dep.Target.Artifact.Name, pv.LocalVersion ) )
+                        .Select( pv => new UpdatePackageInfo( pv.Dep.Owner, new ArtifactInstance( NuGetType, pv.Dep.Target.Artifact.Name, pv.LocalVersion ) ) )
                         .ToList();
 
             if( !UpdatePackageDependencies( monitor, toUpgrade ) ) return false;

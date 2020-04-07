@@ -161,9 +161,7 @@ namespace CK.Env
                                          .SelectMany( z => z.UpgradePackages
                                                .Select( a => new UpdatePackageInfo(
                                                    z.Project,
-                                                   a.Type,
-                                                   a.Name,
-                                                   _packagesVersion[a] ) ) )
+                                                   new ArtifactInstance( a.Type, a.Name, _packagesVersion[a] ) ) ) )
                                          .ToList();
         }
 
@@ -178,9 +176,7 @@ namespace CK.Env
                 var upgrades = s.Solution.ImportedLocalPackages
                                 .Select( p => new UpdatePackageInfo(
                                                     p.Project,
-                                                    p.Package.Artifact.Type,
-                                                    p.Package.Artifact.Name,
-                                                    _packagesVersion[p.Package.Artifact] ) )
+                                                    new ArtifactInstance( p.Package.Artifact.Type, p.Package.Artifact.Name, _packagesVersion[p.Package.Artifact] ) ) )
                                 .ToList();
                 _upgrades[i] = upgrades;
                 using( m.OpenInfo( $"Preparing {s} build." ) )

@@ -19,7 +19,7 @@ namespace CK.Env.DependencyModel
         /// </summary>
         readonly ISolutionContext _solutionContext;
         readonly ProjectItem.Cache _projects;
-        readonly IReadOnlyList<PackageReference> _externalRefs;
+        readonly IReadOnlyList<ProjectPackageReference> _externalRefs;
         readonly int _version;
         readonly SolutionDependencyContext _defaultDependencyContext;
 
@@ -174,7 +174,7 @@ namespace CK.Env.DependencyModel
             IReadOnlyCollection<ISolution> solutions,
             ISolutionContext solutionCtx,
             ProjectItem.Cache projects,
-            List<PackageReference> externalRefs,
+            List<ProjectPackageReference> externalRefs,
             bool traceGraphDetails )
         {
             _solutions = solutions;
@@ -194,7 +194,7 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets all the external package references.
         /// </summary>
-        public IReadOnlyList<PackageReference> ExternalReferences => _externalRefs;
+        public IReadOnlyList<ProjectPackageReference> ExternalReferences => _externalRefs;
 
         /// <summary>
         /// Gets the information about build projects (see <see cref="Solution.BuildProject"/>)
@@ -424,7 +424,7 @@ namespace CK.Env.DependencyModel
         {
             var packages = new Dictionary<Artifact, LocalPackageItem>();
             var projectItems = new ProjectItem.Cache();
-            var externalRefs = new List<PackageReference>();
+            var externalRefs = new List<ProjectPackageReference>();
 
             // Note: Project to project references are translated into Requirements directly
             //       in the ProjectItem constructor.

@@ -16,7 +16,7 @@ namespace CK.Env.DependencyModel
     {
         readonly List<GeneratedArtifact> _generatedArtifacts;
         readonly List<ProjectReference> _projectReferences;
-        readonly List<PackageReference> _packageReferences;
+        readonly List<ProjectPackageReference> _packageReferences;
         readonly List<NormalizedPath> _projectSources;
         Solution _solution;
         string _name;
@@ -41,7 +41,7 @@ namespace CK.Env.DependencyModel
             _savors = savors;
             _generatedArtifacts = new List<GeneratedArtifact>();
             _projectReferences = new List<ProjectReference>();
-            _packageReferences = new List<PackageReference>();
+            _packageReferences = new List<ProjectPackageReference>();
             _projectSources = new List<NormalizedPath>();
 
             _projectSources.Add( SolutionRelativeFolderPath );
@@ -106,6 +106,7 @@ namespace CK.Env.DependencyModel
         public Solution Solution => _solution;
 
         ISolution IProject.Solution => _solution;
+        ISolution IPackageReferer.Solution => _solution;
 
         /// <summary>
         /// Gets the path to this project relative to the <see cref="Solution"/>.
@@ -194,7 +195,7 @@ namespace CK.Env.DependencyModel
 
         /// <summary>
         /// Applies a transformation to all the savors in this project: this <see cref="Savors"/>
-        /// first and then all <see cref="PackageReference.ApplicableSavors"/> and <see cref="ProjectReference.ApplicableSavors"/>.
+        /// first and then all <see cref="ProjectPackageReference.ApplicableSavors"/> and <see cref="ProjectReference.ApplicableSavors"/>.
         /// </summary>
         /// <param name="f"></param>
         public void TransformSavors( Func<CKTrait,CKTrait> f )
@@ -202,7 +203,7 @@ namespace CK.Env.DependencyModel
             _savors = f( _savors );
             for( int i = 0; i < _packageReferences.Count; ++i )
             {
-                _packageReferences[i] = new PackageReference( _packageReferences[i], f );
+                _packageReferences[i] = new ProjectPackageReference( _packageReferences[i], f );
             }
             for( int i = 0; i < _projectReferences.Count; ++i )
             {
@@ -339,10 +340,10 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets the package references.
         /// </summary>
-        public IReadOnlyList<PackageReference> PackageReferences => _packageReferences;
+        public IReadOnlyList<ProjectPackageReference> PackageReferences => _packageReferences;
 
         /// <summary>
-        /// Adds a new <see cref="PackageReference"/> to this project.
+        /// Adds a new <see cref="ProjectPackageReference"/> to this project.
         /// </summary>
         /// <param name="target">The referenced package.</param>
         /// <param name="kind">The dependency kind.</param>
@@ -355,7 +356,7 @@ namespace CK.Env.DependencyModel
         }
 
         /// <summary>
-        /// Ensures that a new <see cref="PackageReference"/> with the exact same target and kind exists.
+        /// Ensures that a new <see cref="ProjectPackageReference"/> with the exact same target and kind exists.
         /// </summary>
         /// <param name="target">The referenced package.</param>
         /// <param name="kind">The dependency kind.</param>
@@ -391,7 +392,7 @@ namespace CK.Env.DependencyModel
 
         void DoAddPackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait applicableSavors )
         {
-            var r = new PackageReference( this, target, kind, CheckSavors( applicableSavors ) );
+            var r = new ProjectPackageReference( this, target, kind, CheckSavors( applicableSavors ) );
             _packageReferences.Add( r );
             _solution.OnPackageReferenceAdded( r );
         }

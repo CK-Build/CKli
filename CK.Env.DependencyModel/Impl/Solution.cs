@@ -38,6 +38,7 @@ namespace CK.Env.DependencyModel
         public SolutionContext Solutions => _ctx;
 
         ISolutionContext ISolution.Solutions => _ctx;
+        ISolution IPackageReferer.Solution => this;
 
         /// <summary>
         /// Gets the current version. This changes each time
@@ -275,6 +276,13 @@ namespace CK.Env.DependencyModel
             OnSolutionPackageReferenceChanged();
         }
 
+        /// <summary>
+        /// Gets the <see cref="SolutionPackageReferences"/> concatenated to all <see cref="IProject.PackageReferences"/>.
+        /// This is the whole set of references from this solution.
+        /// </summary>
+        public IEnumerable<PackageReference> AllPackageReferences => _solutionPackageReferences.Select( p => new PackageReference( p.Owner, p.Target ) )
+                                                                        .Concat( _projects.SelectMany( p => p.PackageReferences.Select( pr => new PackageReference( pr.Owner, pr.Target ) ) ) );
+
         string IDependentItemRef.FullName => Name;
 
         bool IDependentItemRef.Optional => false;
@@ -333,13 +341,13 @@ namespace CK.Env.DependencyModel
             _ctx.OnArtifactRemoved( a, project );
         }
 
-        internal void OnPackageReferenceRemoved( PackageReference r )
+        internal void OnPackageReferenceRemoved( ProjectPackageReference r )
         {
             _version++;
             _ctx.OnPackageReferenceRemoved( r );
         }
 
-        internal void OnPackageReferenceAdded( PackageReference r )
+        internal void OnPackageReferenceAdded( ProjectPackageReference r )
         {
             _version++;
             _ctx.OnPackageReferenceAdded( r );
