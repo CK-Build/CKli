@@ -13,53 +13,46 @@ namespace CK.Env.DependencyModel
     {
         /// <summary>
         /// Expanded data that captures for each solution, all referenced projects (<see cref="Target"/>) to
-        /// other solutions from its own projects (<see cref="Origin)"/>.
+        /// other solutions from its own project or solution (<see cref="Origin)"/>.
         /// </summary>
-        public class Row
+        public readonly struct Row
         {
             /// <summary>
-            /// Gets the solution of the <see cref="Origin"/> project.
+            /// Gets the origin project or solution.
+            /// It references the package produced by the <see cref="Target"/> project.
+            /// Target is null if this origin is a ISolution without any dependency to other solutions.
             /// </summary>
-            public ISolution Solution { get; }
-
-            /// <summary>
-            /// Gets the project that references the package produced by the <see cref="Target"/> project.
-            /// Null if <see cref="Solution"/> does not require any other solution.
-            /// </summary>
-            public IProject Origin { get; }
+            public IPackageReferer Origin { get; }
 
             /// <summary>
             /// Gets the targeted project by <see cref="Origin"/>.
-            /// Null if <see cref="Solution"/> does not require any other solution.
+            /// Null if <see cref="Origin"/> is a solution that does not require any other solution.
             /// </summary>
             public IProject Target { get; }
 
             /// <summary>
             /// Gets the actual package references from <see cref="Origin"/> to <see cref="Target"/>.
-            /// Null if <see cref="Solution"/> does not require any other solution.
+            /// Null if <see cref="Origin"/> is a Solution does not require any other solution.
             /// </summary>
-            public IEnumerable<ArtifactInstance> GetReferences() => Origin != null
-                                                                    ? Origin.PackageReferences
-                                                                        .Where( d => Target.GeneratedArtifacts
-                                                                                           .Select( g => g.Artifact )
-                                                                                           .Contains( d.Target.Artifact ) )
-                                                                        .Select( d => d.Target )
-                                                                    : null;
-
-            internal Row( ISolution s, IProject o, IProject t )
+            public IEnumerable<ArtifactInstance> GetReferences()
             {
-                Debug.Assert( (o == null) == (t == null) );
-                Solution = s;
+                var capture = Target;
+                return capture != null
+                        ? Origin.Solution.AllPackageReferences
+                                .Where( d => capture.GeneratedArtifacts
+                                .Select( g => g.Artifact )
+                                .Contains( d.Target.Artifact ) )
+                                .Select( d => d.Target )
+                        : null;
+            }
+
+            internal Row( IPackageReferer o, IProject t )
+            {
                 Origin = o;
                 Target = t;
             }
 
-            public override string ToString()
-            {
-                return Origin == null
-                        ? Solution.Name
-                        : $"{Origin.Name}=>{Target.Name}";
-            }
+            public override string ToString() => $"{Origin.Name} => {Target?.Name ?? "<no depdendeny>"}";
         }
 
         internal DependentSolution(
@@ -68,7 +61,7 @@ namespace CK.Env.DependencyModel
             Func<ISolution, DependentSolution> others )
         {
             Solution = s;
-            Requirements = dependencyTable.Where( r => r.Solution == s && r.Target != null )
+            Requirements = dependencyTable.Where( r => r.Origin.Solution == s && r.Target != null )
                             .Select( r => r.Target.Solution )
                             .Distinct()
                             .Select( others )
@@ -78,9 +71,10 @@ namespace CK.Env.DependencyModel
             Rank = MinimalRequirements.Count == 0 ? 0 : MinimalRequirements.Max( r => r.Rank ) + 1;
             TransitiveRequirements = Requirements.SelectMany( r => r.TransitiveRequirements ).Distinct().ToList();
 
-            PublishedRequirements = dependencyTable.Where( r => r.Solution == s
+            PublishedRequirements = dependencyTable.Where( r => r.Origin.Solution == s
                                               && r.Target != null
-                                              && r.Origin.IsPublished )
+                                              && r.Origin is IProject oP
+                                              && oP.IsPublished )
                             .Select( r => r.Target.Solution )
                             .Distinct()
                             .Select( others )
@@ -166,7 +160,7 @@ namespace CK.Env.DependencyModel
         {
             Solutions = solutions;
             Impacts = solutions.DependencyTable.Where( r => r.Target != null && r.Target.Solution == Solution )
-                                            .Select( r => r.Solution )
+                                            .Select( r => r.Origin.Solution )
                                             .Distinct()
                                             .Select( i => solutions.Solutions.First( d => d.Solution == i ) )
                                             .ToList();

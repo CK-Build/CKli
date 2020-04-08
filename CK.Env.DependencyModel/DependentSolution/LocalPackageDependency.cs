@@ -26,9 +26,9 @@ namespace CK.Env.DependencyModel
         public DependentSolution Origin { get; }
 
         /// <summary>
-        /// Gets the project that references the <see cref="TargetProject"/>'s artifact.
+        /// Gets the project that references the <see cref="TargetProject"/>'s artifact or null if this is a Solution dependency.
         /// </summary>
-        public IProject OriginProject => _row.Origin;
+        public IProject OriginProject => _row.Origin as IProject;
 
         /// <summary>
         /// Gets the dependent solution that produces the artifact.

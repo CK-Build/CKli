@@ -613,7 +613,7 @@ namespace CK.Env
                         {
                             foreach( var v in byVersion )
                             {
-                                Console.WriteLine( $"    |      => {v.Key} ({v.GroupBy( p => p.Owner.Solution ).Select( s => $"{s.Key.Name}" ).Concatenate()})" );
+                                Console.WriteLine( $"    |      => {v.Key} ({v.GroupBy( p => p.Referer.Solution ).Select( s => $"{s.Key.Name}" ).Concatenate()})" );
                             }
                         }
                         else
@@ -621,12 +621,12 @@ namespace CK.Env
                             foreach( var versionGrouped in byVersion )
                             {
                                 Console.WriteLine( "    |    |" + versionGrouped.Key );
-                                foreach( var solutionGrouped in versionGrouped.GroupBy( q => q.Owner.Solution ) )
+                                foreach( var solutionGrouped in versionGrouped.GroupBy( q => q.Referer.Solution ) )
                                 {
                                     Console.WriteLine( "    |    |    |" + solutionGrouped.Key.Name + ":" );
                                     foreach( var project in solutionGrouped )
                                     {
-                                        Console.WriteLine( "    |    |    |    |" + project.Owner.Name );
+                                        Console.WriteLine( "    |    |    |    |" + project.Referer.Name );
                                     }
                                 }
                             }
@@ -644,7 +644,7 @@ namespace CK.Env
             if( worldCtx == null ) return;
             SVersion version;
             var externalReferences = worldCtx.DependencyContext.Analyzer.ExternalReferences;
-            List<ProjectPackageReference> artifactUses = externalReferences
+            List<PackageReference> artifactUses = externalReferences
                     .Where( p =>
                         p.Target.Artifact.TypedName.Equals( packageName, StringComparison.OrdinalIgnoreCase )
                         || p.Target.Artifact.Name.Equals( packageName, StringComparison.OrdinalIgnoreCase ) )
@@ -682,12 +682,12 @@ namespace CK.Env
             }
             using( m.OpenInfo( $"{artifactToUpgrade.Count} packages to upgrade (out of {artifactUses.Count} package references)." ) )
             {
-                foreach( var slnGroupedPackage in artifactToUpgrade.GroupBy( s => s.Owner.Solution ) )
+                foreach( var slnGroupedPackage in artifactToUpgrade.GroupBy( s => s.Referer.Solution ) )
                 {
                     var sln = worldCtx.Solutions.First( s => s.Solution.Solution == slnGroupedPackage.Key );
                     sln.Driver.UpdatePackageDependencies( m,
                         slnGroupedPackage.Select(
-                            p => new UpdatePackageInfo( p.Owner, new ArtifactInstance( p.Target.Artifact, version ) )
+                            p => new UpdatePackageInfo( p.Referer, new ArtifactInstance( p.Target.Artifact, version ) )
                         ).ToList()
                     );
                 }

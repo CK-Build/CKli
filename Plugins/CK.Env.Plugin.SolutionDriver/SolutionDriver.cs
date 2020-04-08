@@ -442,7 +442,8 @@ namespace CK.Env.Plugin
             var publishedProjects = solution.Projects.Where( p => p.IsPublished );
             if( publishedProjects.Any() )
             {
-                b.Append( "| Published: " ).AppendLine();
+                int count = publishedProjects.Count();
+                b.Append( count > 1 ? $"|-> {count} published projects: " : $"|-> 1 published project:" ).AppendLine();
                 foreach( var p in publishedProjects )
                 {
                     DumpProject( b, p, true );
@@ -451,7 +452,8 @@ namespace CK.Env.Plugin
             var localProjects = solution.Projects.Where( p => !p.IsPublished && !p.IsBuildProject );
             if( localProjects.Any() )
             {
-                b.Append( "| Local: " ).AppendLine();
+                int count = localProjects.Count();
+                b.Append( count > 1 ? $"|-> {count} local projects: " : $"|-> 1 local project:" ).AppendLine();
                 foreach( var p in localProjects )
                 {
                     DumpProject( b, p, true );
@@ -459,8 +461,13 @@ namespace CK.Env.Plugin
             }
             if( solution.BuildProject != null )
             {
-                b.Append( "| BuildProject: " ).Append( solution.BuildProject.SimpleProjectName ).AppendLine();
+                b.Append( "|-> BuildProject: " ).Append( solution.BuildProject.SimpleProjectName ).AppendLine();
                 DumpProject( b, solution.BuildProject, false );
+            }
+            b.Append( "|-> Solution dependencies: " ).AppendLine();
+            if( solution.SolutionPackageReferences.Count > 0 )
+            {
+                b.Append( "| Packages: " ).AppendJoin( ", ", solution.SolutionPackageReferences.Select( p => p.Target.ToString() ) ).AppendLine();
             }
             var min = depSolution.MinimalRequirements;
             var req = depSolution.Requirements;

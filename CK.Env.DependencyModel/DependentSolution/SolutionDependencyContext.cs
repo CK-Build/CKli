@@ -52,7 +52,7 @@ namespace CK.Env.DependencyModel
             BuildProjectsInfo = buildProjectsInfo;
             DependencyTable = t;
             Solutions = solutions;
-            PackageDependencies = t.Where( row => row.Origin != null )
+            PackageDependencies = t.Where( row => row.Target != null )
                                    .SelectMany( row => row.GetReferences().Select( pR => new LocalPackageDependency( row, pR, _index ) ) )
                                    .ToArray();
             for( int i = solutions.Count - 1; i >= 0; --i ) solutions[i].Initialize( this );
@@ -80,7 +80,7 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets the package dependencies between solutions.
         /// This is somehow like the <see cref="DependencyTable"/> except that <see cref="DependentSolution"/>
-        /// are referenced (instead of <see cref="Solution"/>), that there is no row row for a solution that has
+        /// are referenced (instead of <see cref="Solution"/>), that there is no row for a solution that has
         /// no dependency and that each package reference (<see cref="LocalPackageDependency.Reference"/>) appears instead
         /// of the potential multiple <see cref="DependentSolution.Row.GetReferences()"/>.
         /// </summary>

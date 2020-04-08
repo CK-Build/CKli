@@ -19,7 +19,8 @@ namespace CK.Env.DependencyModel
         /// </summary>
         readonly ISolutionContext _solutionContext;
         readonly ProjectItem.Cache _projects;
-        readonly IReadOnlyList<ProjectPackageReference> _externalRefs;
+        readonly List<(ISolution Solution, LocalPackageItem LocalPackage)> _solutionDependencies;
+        readonly IReadOnlyList<PackageReference> _externalRefs;
         readonly int _version;
         readonly SolutionDependencyContext _defaultDependencyContext;
 
@@ -140,6 +141,8 @@ namespace CK.Env.DependencyModel
 
             internal void AddRequires( IDependentItemRef p ) => _requires.Add( p );
 
+            // In normal mode, the Solution is its own reference (it implements its own FullName that is enough
+            // to reference the container.
             IDependentItemContainerRef IDependentItem.Container => _cache.PureProjectsMode
                                                                     ? null
                                                                     : (IDependentItemContainerRef)_p.Solution;
@@ -173,12 +176,14 @@ namespace CK.Env.DependencyModel
             IActivityMonitor m,
             IReadOnlyCollection<ISolution> solutions,
             ISolutionContext solutionCtx,
+            List<(ISolution, LocalPackageItem)> solutionDependencies,
             ProjectItem.Cache projects,
-            List<ProjectPackageReference> externalRefs,
+            List<PackageReference> externalRefs,
             bool traceGraphDetails )
         {
             _solutions = solutions;
             _solutionContext = solutionCtx;
+            _solutionDependencies = solutionDependencies;
             _version = _solutionContext?.Version ?? 0;
             _projects = projects;
             _externalRefs = externalRefs;
@@ -194,7 +199,7 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets all the external package references.
         /// </summary>
-        public IReadOnlyList<ProjectPackageReference> ExternalReferences => _externalRefs;
+        public IReadOnlyList<PackageReference> ExternalReferences => _externalRefs;
 
         /// <summary>
         /// Gets the information about build projects (see <see cref="Solution.BuildProject"/>)
@@ -276,11 +281,13 @@ namespace CK.Env.DependencyModel
         {
             readonly ISolution _solution;
             readonly IEnumerable<IDependentItemRef> _projects;
+            readonly IEnumerable<LocalPackageItem> _requires;
 
-            internal SolutionItem( ISolution f, IEnumerable<IDependentItemRef> projects )
+            internal SolutionItem( ISolution f, IEnumerable<IDependentItemRef> projects, IEnumerable<LocalPackageItem> requires )
             {
                 _solution = f;
                 _projects = projects;
+                _requires = requires;
             }
 
             public ISolution Solution => _solution;
@@ -293,7 +300,7 @@ namespace CK.Env.DependencyModel
 
             IDependentItemRef IDependentItem.Generalization => null;
 
-            IEnumerable<IDependentItemRef> IDependentItem.Requires => null;
+            IEnumerable<IDependentItemRef> IDependentItem.Requires => _requires;
 
             IEnumerable<IDependentItemRef> IDependentItem.RequiredBy => null;
 
@@ -331,7 +338,7 @@ namespace CK.Env.DependencyModel
             {
                 // The Solution contains its Projects.
                 var children = s.Projects.Where( p => projectFilter( p ) ).Select( p => _projects[p] );
-                var sItem = new SolutionItem( s, children );
+                var sItem = new SolutionItem( s, children, _solutionDependencies.Where( deps => deps.Solution == s ).Select( deps => deps.LocalPackage ) );
                 sortables.Add( s, sItem );
             }
 
@@ -347,7 +354,7 @@ namespace CK.Env.DependencyModel
                 result.LogError( m );
                 return new SolutionDependencyContext( this, result, GetBuildProjectInfo( m ) );
             }
-            // Building the list of SolutionDependencyContext.DependencyRow.
+            // Building the list of DependentSolution.Row.
             var table = result.SortedItems
                           // 1 - Selects solutions along with their ordered index.
                           .Where( sorted => sorted.GroupForHead == null && sorted.Item is SolutionItem )
@@ -363,17 +370,13 @@ namespace CK.Env.DependencyModel
                                                             .SelectMany( c => c.SProject.DirectRequires
                                                                             .Select( r => r.Item )
                                                                             .OfType<LocalPackageItem>()
-                                                                            .Select( package => (Origin: c.Project, Target: package) )
+                                                                            .Select( package => (Origin: (IPackageReferer)c.Project, Target: package) )
+                                                        .Concat( sorted.DirectRequires.Select( r => (Origin:(IPackageReferer)sorted.StartValue, Target:(LocalPackageItem)r.Item ) ) )
                                         )) )
                            // 3 - Second Map: Expands the LocalRefs.
                            .SelectMany( s => s.LocalRefs.Any()
-                                                ? s.LocalRefs.Select( r => new DependentSolution.Row
-                                                                (
-                                                                    s.Solution,
-                                                                    r.Origin,
-                                                                    r.Target.Project
-                                                                ) )
-                                                : new[] { new DependentSolution.Row( s.Solution, null, null ) }
+                                                ? s.LocalRefs.Select( r => new DependentSolution.Row( r.Origin, r.Target.Project ) )
+                                                : new[] { new DependentSolution.Row( s.Solution, null ) }
                                       )
                             .ToList();
 
@@ -387,9 +390,9 @@ namespace CK.Env.DependencyModel
             int idx = 0;
             foreach( var r in table )
             {
-                if( current != r.Solution )
+                if( current != r.Origin.Solution )
                 {
-                    current = r.Solution;
+                    current = r.Origin.Solution;
                     var newDependent = new DependentSolution( current, table, s => index[s] );
                     depSolutions[idx++] = newDependent;
                     index.Add( current.Name, newDependent );
@@ -424,7 +427,7 @@ namespace CK.Env.DependencyModel
         {
             var packages = new Dictionary<Artifact, LocalPackageItem>();
             var projectItems = new ProjectItem.Cache();
-            var externalRefs = new List<ProjectPackageReference>();
+            var externalRefs = new List<PackageReference>();
 
             // Note: Project to project references are translated into Requirements directly
             //       in the ProjectItem constructor.
@@ -461,7 +464,6 @@ namespace CK.Env.DependencyModel
                                 packages.Add( package.Artifact, new LocalPackageItem( package.Artifact, project ) );
                                 m.Debug( $"Package '{package}' created." );
                             }
-
                         }
                     }
                 }
@@ -475,6 +477,7 @@ namespace CK.Env.DependencyModel
                 // Consider package references (Project to Project references are handled by ProjectItem constructors).
                 foreach( var dep in project.Project.PackageReferences )
                 {
+                    Debug.Assert( project.Project == dep.Owner );
                     if( packages.TryGetValue( dep.Target.Artifact, out LocalPackageItem target ) )
                     {
                         if( target.Project.Solution != project.Project.Solution )
@@ -491,14 +494,43 @@ namespace CK.Env.DependencyModel
                             //
                             // We transform the package reference into a project reference so that this edge
                             // case does not create cycles.
+                            m.Warn( $"Project '{dep.Owner.Name}' references the package '{dep.Target.Artifact}' from the same Solution. We consider it as a project reference to '{target.Project.Name}'." );
                             project.AddRequires( projectItems[target.Project] );
                         }
                     }
                     else
                     {
                         // Dependency to an external Package.
-                        externalRefs.Add( dep );
+                        externalRefs.Add( new PackageReference( dep.Owner, dep.Target ) );
                     }
+                }
+            }
+
+            var solutionDependencies = new List<(ISolution, LocalPackageItem)>();
+            // 4 - Consider the Solution references (like local dotnet tools) that are NOT locally 
+            //     produced to add them to the external references list.
+            //     When the Solution reference is produced locally, it will have to be mapped as
+            //     a required setup item during DependencyContext creation.
+            foreach( var p in solutions.SelectMany( s => s.SolutionPackageReferences ) )
+            {
+                if( packages.TryGetValue( p.Target.Artifact, out LocalPackageItem target ) )
+                {
+                    if( target.Project.Solution != p.Owner )
+                    {
+                        solutionDependencies.Add( (p.Owner,  target) );
+                    }
+                    else
+                    {
+                        // A Solution is referencing a Package that it generates...
+                        // This would always use the "previous" package version, that would be stupid. 
+                        // We simply totally skip this.
+                        m.Warn( $"Solution '{p.Owner}' has its own project '{target.Project.Name}' as a Solution dependency ('{p.Target.Artifact}'). We ignore this (silly) reference." );
+                    }
+                }
+                else
+                {
+                    // Solution dependency to an external Package.
+                    externalRefs.Add( new PackageReference( p.Owner, p.Target ) );
                 }
             }
 
@@ -506,6 +538,7 @@ namespace CK.Env.DependencyModel
                         m,
                         solutions,
                         solutionCtx,
+                        solutionDependencies,
                         projectItems,
                         externalRefs,
                         traceGraphDetails );
