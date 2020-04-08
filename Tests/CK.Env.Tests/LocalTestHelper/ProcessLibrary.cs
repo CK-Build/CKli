@@ -40,18 +40,23 @@ namespace CK.Env.Tests.LocalTestHelper
             return universe;
         }
 
-        public static TestUniverse ApplyWithFilter( this TestUniverse universe, IActivityMonitor m, string worldName, string pattern )
+        public static TestUniverse RunCommands( this TestUniverse universe, IActivityMonitor m, string worldName, string commandFilter, params object[] args )
         {
             EnsureWorldOpened( universe, worldName );
             var commandRegister = universe.UserHost.CommandRegister;
-            foreach( var command in commandRegister.GetCommands( pattern ) )
+            foreach( var command in commandRegister.GetCommands( commandFilter ) )
             {
-                command.Execute( m, command.CreatePayload() );
+                var payload = (SimplePayload)command.CreatePayload();
+                for( int i = 0; i < args.Length; i++ )
+                {
+                    payload.Fields[i].SetValue( args[i] );
+                }
+                command.Execute( m, payload );
             }
             return universe;
         }
 
-        public static TestUniverse CommitAll (this TestUniverse universe, IActivityMonitor m, string worldName)
+        public static TestUniverse CommitAll( this TestUniverse universe, IActivityMonitor m, string worldName )
         {
             EnsureWorldOpened( universe, worldName );
             var commandRegister = universe.UserHost.CommandRegister;
@@ -71,7 +76,7 @@ namespace CK.Env.Tests.LocalTestHelper
         }
 
         public static TestUniverse ApplyAll( this TestUniverse universe, IActivityMonitor m, string worldName )
-            => ApplyWithFilter( universe, m, worldName, "*applysettings*" );
+            => RunCommands( universe, m, worldName, "*applysettings*" );
 
         public static TestUniverse CommitAll( this TestUniverse universe, IActivityMonitor m, string commitMessage, string worldName )
         {
@@ -84,7 +89,7 @@ namespace CK.Env.Tests.LocalTestHelper
             return universe;
         }
 
-        public static TestUniverse RestartCKli( this TestUniverse universe)
+        public static TestUniverse RestartCKli( this TestUniverse universe )
         {
             string tempName = "temp";
             NormalizedPath tempZip = ImageManager.CacheUniverseFolder.AppendPart( tempName + ".zip" );
