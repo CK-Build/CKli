@@ -175,7 +175,7 @@ namespace CK.Env
                 var s = solutionAndDrivers[i];
                 var upgrades = s.Solution.ImportedLocalPackages
                                 .Select( p => new UpdatePackageInfo(
-                                                    p.Project,
+                                                    p.Importer,
                                                     new ArtifactInstance( p.Package.Artifact.Type, p.Package.Artifact.Name, _packagesVersion[p.Package.Artifact] ) ) )
                                 .ToList();
                 _upgrades[i] = upgrades;

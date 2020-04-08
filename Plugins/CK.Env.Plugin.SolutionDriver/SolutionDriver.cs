@@ -516,17 +516,23 @@ namespace CK.Env.Plugin
         {
             var solution = GetSolution( monitor, allowInvalidSolution: false );
             if( solution == null ) return false;
-            Debug.Assert( packageInfos.All( p => p.Project.Solution == solution ) );
+            Debug.Assert( packageInfos.All( p => p.Referer.Solution == solution ) );
             bool mustSave = false;
             foreach( var update in packageInfos )
             {
-                var p = update.Project.Tag<MSProject>();
-                if( p != null )
+                if( update.Referer is IProject project )
                 {
-                    int changes = p.SetPackageReferenceVersion( monitor, p.TargetFrameworks, update.PackageUpdate.Artifact.Name, update.PackageUpdate.Version );
-                    mustSave |= changes != 0;
+                    var p = project.Tag<MSProject>();
+                    if( p != null )
+                    {
+                        int changes = p.SetPackageReferenceVersion( monitor, p.TargetFrameworks, update.PackageUpdate.Artifact.Name, update.PackageUpdate.Version );
+                        mustSave |= changes != 0;
+                    }
                 }
-                mustSave |= _sln.StandardDotnetToolConfigFile.SetPackageReferenceVersion( monitor, update.PackageUpdate );
+                else
+                {
+                    mustSave |= _sln.StandardDotnetToolConfigFile.SetPackageReferenceVersion( monitor, update.PackageUpdate );
+                }
             }
             bool error = false;
             using( monitor.OnError( () => error = true ) )

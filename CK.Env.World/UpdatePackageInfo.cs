@@ -6,8 +6,8 @@ using System;
 namespace CK.Env
 {
     /// <summary>
-    /// Captures basic information that describes a package update for a project.
-    /// This is simply a <see cref="PackageReference"/> that has been renamed/repackaged in order to be more explicit.
+    /// Captures basic information that describes a package update for a project or a solution.
+    /// This is simply a <see cref="PackageReference"/> that has been renamed/reshaped in order to be more explicit.
     /// </summary>
     public readonly struct UpdatePackageInfo
     {
@@ -33,16 +33,9 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the project that must be updated.
-        /// This can be null if package must be updated in <see cref="ISolution.SolutionPackageReferences"/>.
+        /// Gets the project or solution that must be updated.
         /// </summary>
-        public IProject Project => _ref.Referer as IProject;
-
-        /// <summary>
-        /// Either the <see cref="IProject.Solution"/>, when <see cref="Project"/> is null,
-        /// the solution which <see cref="ISolution.SolutionPackageReferences"/> must be updated.
-        /// </summary>
-        public ISolution Solution => _ref.Referer.Solution;
+        public IPackageReferer Referer => _ref.Referer;
 
         /// <summary>
         /// Gets the package to update and its target version.

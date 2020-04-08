@@ -252,8 +252,8 @@ namespace CK.Env
 
                 foreach( var dep in ctx.DependencyContext.PackageDependencies )
                 {
-                    if( !dep.OriginProject.IsPublished ) continue;
-                    b.AppendDependency( dep.OriginProject.Name, dep.TargetProject.Name )
+                    if( !dep.OriginIsPublishedProject ) continue;
+                    b.AppendDependency( dep.RefererOrigin.Name, dep.TargetProject.Name )
                         .AppendLine( ";" );
                 }
             }

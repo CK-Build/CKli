@@ -22,19 +22,19 @@ namespace CK.Env.DependencyModel
         }
 
         /// <summary>
-        /// Gets the primary solution that consumes this package.
+        /// Gets the solution that consumes this package.
         /// </summary>
-        public DependentSolution Target => _dep.Origin;
+        public DependentSolution Solution => _dep.Origin;
 
         /// <summary>
-        /// Gets the project that references this package.
+        /// Gets the project or solution that generates this package.
         /// </summary>
-        public IProject TargetProject => _dep.OriginProject;
+        public IPackageReferer Exporter => _dep.TargetProject;
 
         /// <summary>
-        /// Gets the type of the dependency involved (ie. "NuGet", "NPM", etc.).
+        /// Gets the package name and version.
         /// </summary>
-        public ArtifactInstance Reference => _dep.Reference;
+        public ArtifactInstance Package => _dep.Reference;
 
     }
 }

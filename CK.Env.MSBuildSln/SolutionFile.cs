@@ -27,7 +27,7 @@ namespace CK.Env.MSBuildSln
             _projectBaseList = new List<ProjectBase>();
             _projectMSList = new List<MSProject>();
             _sections = new Dictionary<string, Section>( StringComparer.OrdinalIgnoreCase );
-            StandardDotnetToolConfigFile = new DotnetToolConfigFile( this, ".config/dotnet-tools.json" );
+            StandardDotnetToolConfigFile = new DotnetToolConfigFile( this, SolutionFolderPath.AppendPart( ".config" ).AppendPart( "dotnet-tools.json" ) );
         }
 
         /// <summary>

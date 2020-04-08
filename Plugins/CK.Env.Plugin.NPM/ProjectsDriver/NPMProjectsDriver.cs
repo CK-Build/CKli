@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Env.DependencyModel;
 using CK.Env.NPM;
 using CK.Text;
 using System;
@@ -132,11 +133,14 @@ namespace CK.Env.Plugin
             bool mustSave = false;
             foreach( var update in e.UpdateInfo )
             {
-                var p = update.Project.Tag<NPMProject>();
-                if( p != null )
+                if( update.Referer is IProject project )
                 {
-                    Debug.Assert( _npmProjects.Contains( p ) );
-                    mustSave |= p.PackageJson.SetDependencyMinVersion( e.Monitor, update.PackageUpdate.Artifact.Name, update.PackageUpdate.Version );
+                    var p = project.Tag<NPMProject>();
+                    if( p != null )
+                    {
+                        Debug.Assert( _npmProjects.Contains( p ) );
+                        mustSave |= p.PackageJson.SetDependencyMinVersion( e.Monitor, update.PackageUpdate.Artifact.Name, update.PackageUpdate.Version );
+                    }
                 }
             }
             if( mustSave )

@@ -29,7 +29,7 @@ namespace CK.Env.MSBuildSln
         /// Gets the package references. Empty if this file does not exist (or is empty).
         /// </summary>
         public IEnumerable<ArtifactInstance> Tools => Root != null && Root["tools"] is JObject t
-                                                        ? t.Properties().Select( p => (p.Name, Version: CSemVer.SVersion.TryParse(p["version"]?.Value<string>() )) )
+                                                        ? t.Properties().Select( p => (p.Name, Version: CSemVer.SVersion.TryParse(p.Value["version"]?.Value<string>() )) )
                                                                         .Where( p => p.Version.IsValid )
                                                                         .Select( p => new ArtifactInstance( MSProject.NuGetArtifactType, p.Name, p.Version ) )
                                                         : Array.Empty<ArtifactInstance>();

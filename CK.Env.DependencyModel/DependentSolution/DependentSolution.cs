@@ -37,13 +37,16 @@ namespace CK.Env.DependencyModel
             public IEnumerable<ArtifactInstance> GetReferences()
             {
                 var capture = Target;
-                return capture != null
-                        ? Origin.Solution.AllPackageReferences
-                                .Where( d => capture.GeneratedArtifacts
-                                .Select( g => g.Artifact )
-                                .Contains( d.Target.Artifact ) )
-                                .Select( d => d.Target )
-                        : null;
+                if( capture == null ) return null;
+                if( Origin is IProject p )
+                {
+                    return p.PackageReferences
+                                    .Where( d => capture.GeneratedArtifacts.Select( g => g.Artifact ).Contains( d.Target.Artifact ) )
+                                    .Select( d => d.Target );
+                }
+                return Origin.Solution.SolutionPackageReferences
+                        .Where( d => capture.GeneratedArtifacts.Select( g => g.Artifact ).Contains( d.Target.Artifact ) )
+                        .Select( d => d.Target );
             }
 
             internal Row( IPackageReferer o, IProject t )
@@ -52,7 +55,7 @@ namespace CK.Env.DependencyModel
                 Target = t;
             }
 
-            public override string ToString() => $"{Origin.Name} => {Target?.Name ?? "<no depdendeny>"}";
+            public override string ToString() => $"{Origin.Name} => {Target?.Name ?? "<no dependency>"}";
         }
 
         internal DependentSolution(

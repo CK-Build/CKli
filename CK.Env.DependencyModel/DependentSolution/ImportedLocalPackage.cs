@@ -21,14 +21,14 @@ namespace CK.Env.DependencyModel
         }
 
         /// <summary>
-        /// Gets the primary solution that produces this package.
+        /// Gets the solution that produces this package.
         /// </summary>
         public DependentSolution Solution => _dep.Target;
 
         /// <summary>
-        /// Gets the project name that references the <see cref="Package"/>.
+        /// Gets the project or solution that imports this package.
         /// </summary>
-        public IProject Project => _dep.OriginProject;
+        public IPackageReferer Importer => _dep.RefererOrigin;
 
         /// <summary>
         /// Gets the package name and version.
