@@ -211,7 +211,7 @@ namespace CK.Env.NPM
                     {
                         throw new PlatformNotSupportedException( "Linux not supported yet." );
                     }
-                    return ProcessRunner.Run( m, tempDirectory, "cmd.exe", $"/C npm publish \"{tarPath}\" --access {access} {distTagArg}", LogLevel.Info );
+                    return ProcessRunner.Run( m, tempDirectory, "npm", $"publish \"{tarPath}\" --access {access} {distTagArg}", LogLevel.Info );
                 }
                 catch( Exception ex )
                 {

@@ -128,8 +128,8 @@ namespace CK.Env.Plugin
         bool NpmInstall( IActivityMonitor m, NPMDep[] packages )
         {
             return ProcessRunner.Run(
-                m, FileSystem.GetFileInfo( FilePath.RemoveLastPart() ).PhysicalPath, "cmd.exe",
-                "/C npm install " + string.Join( ' ', packages.Select( p => p.RawDep ).ToArray() ) );
+                m, FileSystem.GetFileInfo( FilePath.RemoveLastPart() ).PhysicalPath, "npm",
+                "install " + string.Join( ' ', packages.Select( p => p.RawDep ).ToArray() ) );
         }
 
         /// <summary>
