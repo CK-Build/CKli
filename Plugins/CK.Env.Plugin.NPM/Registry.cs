@@ -207,10 +207,6 @@ namespace CK.Env.NPM
                     string tarPath = Path.GetFullPath( tarballPath );
                     string distTagArg = distTag != null ? $"--tag {distTag.ToLowerInvariant()}" : "";
                     string access = isPublic ? "public" : "private";
-                    if( Environment.OSVersion.Platform != PlatformID.Win32NT )
-                    {
-                        throw new PlatformNotSupportedException( "Linux not supported yet." );
-                    }
                     return ProcessRunner.Run( m, tempDirectory, "cmd.exe", $"/C npm publish \"{tarPath}\" --access {access} {distTagArg}", LogLevel.Info );
                 }
                 catch( Exception ex )
