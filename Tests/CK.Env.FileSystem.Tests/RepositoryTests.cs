@@ -48,7 +48,7 @@ namespace CK.Env.FS.Tests
                 CheckRoot( fs.GetFileInfo( "TestGitRepository\\" ) );
                 CheckRoot( fs.GetFileInfo( "\\TestGitRepository\\" ) );
 
-                void CheckRoot( IFileInfo r )
+                static void CheckRoot( IFileInfo r )
                 {
                     r.IsDirectory.Should().BeTrue();
                     r.Name.Should().Be( "TestGitRepository" );
@@ -74,7 +74,7 @@ namespace CK.Env.FS.Tests
                 CheckRootContent( fs.GetDirectoryContents( "TestGitRepository\\" ) );
                 CheckRootContent( fs.GetDirectoryContents( "\\TestGitRepository\\" ) );
 
-                void CheckRootContent( IDirectoryContents c )
+                static void CheckRootContent( IDirectoryContents c )
                 {
                     c.Exists.Should().BeTrue();
                     c.Select( f => $"{f.Name} - {f.IsDirectory}" )
@@ -101,7 +101,7 @@ namespace CK.Env.FS.Tests
                 CheckHead( fs.GetFileInfo( "TestGitRepository\\head\\" ) );
                 CheckHead( fs.GetFileInfo( "\\TestGitRepository\\head\\" ) );
 
-                void CheckHead( IFileInfo r )
+                static void CheckHead( IFileInfo r )
                 {
                     r.IsDirectory.Should().BeTrue();
                     r.Name.Should().Be( "head" );
@@ -116,7 +116,7 @@ namespace CK.Env.FS.Tests
                 CheckHeadContent( fs.GetDirectoryContents( "TestGitRepository\\head\\" ) );
                 CheckHeadContent( fs.GetDirectoryContents( "\\TestGitRepository\\head\\" ) );
 
-                void CheckHeadContent( IDirectoryContents c )
+                static void CheckHeadContent( IDirectoryContents c )
                 {
                     c.Exists.Should().BeTrue();
                     c.Select( f => $"{f.Name} - {f.IsDirectory}" )

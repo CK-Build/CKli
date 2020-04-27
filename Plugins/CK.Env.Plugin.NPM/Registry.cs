@@ -24,7 +24,7 @@ namespace CK.Env.NPM
         public static readonly Uri NPMJSOrgUri = new Uri( "https://registry.npmjs.org/" );
 
         readonly HttpClient _httpClient;
-        AuthenticationHeaderValue _authHeader;
+        readonly AuthenticationHeaderValue _authHeader;
         readonly string _session = GenerateSessionId();
 
         readonly string _password;
@@ -200,8 +200,8 @@ namespace CK.Env.NPM
 
                         if( !string.IsNullOrWhiteSpace( scope ) )
                         {
-                            w.WriteLine( scope + $":registry={RegistryUri.ToString()}" );
-                            m.Debug( scope + $":registry={RegistryUri.ToString()}" );
+                            w.WriteLine( scope + $":registry={RegistryUri}" );
+                            m.Debug( scope + $":registry={RegistryUri}" );
                         }
                     }
                     string tarPath = Path.GetFullPath( tarballPath );
@@ -323,7 +323,7 @@ namespace CK.Env.NPM
                 RequestUri = fullUri,
                 Method = method
             };
-            m.Info( $"Request URI: {req.Method.ToString()}:'{req.RequestUri}'." );
+            m.Info( $"Request URI: {req.Method}:'{req.RequestUri}'." );
             AddNpmHeaders( m, req.Headers );
             return req;
         }
@@ -425,24 +425,25 @@ namespace CK.Env.NPM
                         m.Error( "Incorrect warning header format." );
                         continue;
                     }
-                    string host = match.Groups[2].Value;
+                    // Useless:
+                    // string host = match.Groups[2].Value;
+                    // DateTime date = JsonConvert.DeserializeObject<DateTime>( match.Groups[4].Value );
                     string message = match.Groups[3].Value;
-                    DateTime date = JsonConvert.DeserializeObject<DateTime>( match.Groups[4].Value );
                     if( code == 199 )
                     {
                         if( message.Contains( "ENOTFOUND" ) )
                         {
-                            m.Warn( $"registry: Using stale data from {RegistryUri.ToString()} because the host is inaccessible -- are you offline?" );
+                            m.Warn( $"registry: Using stale data from {RegistryUri} because the host is inaccessible -- are you offline?" );
                             m.Error( "Npm.Net is not using any caches, so you should not see the previous warning." );
                         }
                         else
                         {
-                            m.Warn( $"Unexpected warning for {RegistryUri.ToString()}: {message}" );
+                            m.Warn( $"Unexpected warning for {RegistryUri}: {message}" );
                         }
                     }
                     else if( code == 111 )
                     {
-                        m.Warn( $"Using stale data from {RegistryUri.ToString()} due to a request error during revalidation." );
+                        m.Warn( $"Using stale data from {RegistryUri} due to a request error during revalidation." );
                     }
                 }
             }

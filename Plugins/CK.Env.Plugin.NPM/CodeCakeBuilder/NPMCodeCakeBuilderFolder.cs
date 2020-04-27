@@ -132,13 +132,5 @@ namespace CK.Env.Plugin
             return text;
         }
 
-        string AdaptBuild( string text )
-        {
-            var name = GitFolder.SubPath.LastPart;
-            Regex r = new Regex(
-                  "(?<1>const\\s+string\\s+solutionName\\s*=\\s*\").*?(?<2>\";\\s*//\\s*!Transformable)",
-                  RegexOptions.ExplicitCapture | RegexOptions.CultureInvariant );
-            return r.Replace( text, "$1" + name + "$2" );
-        }
     }
 }
