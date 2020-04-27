@@ -256,3 +256,4 @@ Tests/**/TestResult*.xml
 /Tests/**/Logs/
 /Tests/CK.Env.Tests/UniverseZips/
 /CodeCakeBuilder/MemoryKey.*.txt
+/Tests/CK.Env.Tests/SeedZips/minimal_project_scratch.zip

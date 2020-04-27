@@ -2,6 +2,7 @@ using CK.Core;
 using CK.Text;
 using FluentAssertions;
 using System;
+using System.IO;
 using System.Runtime.CompilerServices;
 
 using static CK.Testing.MonitorTestHelper;
@@ -140,5 +141,45 @@ namespace CK.Env.Tests.LocalTestHelper
         public static NormalizedPath full_apply_settings( Action<TestUniverse> action, bool refreshCache ) =>
             ImageBuilderHelper<Action<TestUniverse, World>>( action, refreshCache, another_minimal_solution_second_ci_build,
                 ( universe ) => universe.ApplyAll( TestHelper.Monitor, _cktestBuildStackName ) );
+
+        public static NormalizedPath init_seed_scratch( Action<TestUniverse> action, bool useless )
+        {
+            var fullPath = ImageManager.InitImageFromScratch( TestHelper.Monitor );
+            using( TestUniverse universe = ImageManager.InstantiateImage
+            (
+                m: TestHelper.Monitor,
+                imagePath: fullPath )
+            )
+            {
+                //universe.SeedInitialSetup( TestHelper.Monitor );
+                var snapshotPath = universe.SnapshotState( nameof( init_seed_scratch ) );
+                action?.Invoke( universe );
+                return snapshotPath;
+            }
+        }
+        public static NormalizedPath setup_seed_scratch( Action<TestUniverse> action, bool refreshCache )
+        {
+            using( TestUniverse universe = ImageManager.InstantiateImage
+            (
+                m: TestHelper.Monitor,
+                imagePath: ImageManager.CacheUniverseFolder.AppendPart( nameof( init_seed_scratch ) + ".zip" ) )
+            )
+            {
+                universe.InitWorldConfig( TestHelper.Monitor, $"{_cktestBuildStackName}.World.xml" );
+                //no config
+                universe.RestartCKli();
+                universe.SeedInitialSetup( TestHelper.Monitor );
+                var snapshotPath = universe.SnapshotState( nameof( setup_seed_scratch ) );
+                action?.Invoke( universe );
+                return snapshotPath;
+            }
+        }
+
+        public static NormalizedPath create_npm_project_from_setup_seed_scratch( Action<TestUniverse, World> action, bool refreshCache )
+        {
+            ImageBuilderHelper<Action<TestUniverse>>( _cktestBuildStackName, action, refreshCache, setup_seed_scratch,
+               ( universe ) => universe.CreateAndAddNpmProject( TestHelper.Monitor, "name" ) );
+            return null;
+        }
     }
 }

@@ -133,5 +133,24 @@ namespace CK.Env.Tests.LocalTestHelper
             }
             return universe;
         }
+
+        public static TestUniverse InitWorldConfig( this TestUniverse universe, IActivityMonitor m, string fileName )
+        {
+            var xDocument = universe.CreateWorldXml( m );
+            NormalizedPath tempPath = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
+            Directory.CreateDirectory( tempPath );
+            xDocument.Save( tempPath.AppendPart( fileName ) );
+            //File.WriteAllText( tempPath, xDocument.ToString() );
+            var p = new ProcessHelper();
+            p.CreateGitRepository( tempPath, universe.StackBareGitPath );
+
+            return universe;
+        }
+
+        public static TestUniverse CreateAndAddNpmProject(this TestUniverse univers, IActivityMonitor m, string projectName)
+        {
+            throw new NotImplementedException();
+        }
     }
+
 }

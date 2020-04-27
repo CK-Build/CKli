@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Xml.Linq;
 
 namespace CK.Env.Tests.LocalTestHelper
 {
@@ -32,6 +33,7 @@ namespace CK.Env.Tests.LocalTestHelper
         const string _ckliMapping = "CKli";
 
         const string _userLocalDirectoryName = "dev";
+
 
         public const string PlaceHolderString = "PLACEHOLDER_CKLI_TESTS";
 
@@ -190,6 +192,80 @@ namespace CK.Env.Tests.LocalTestHelper
             ZipFile.CreateFromDirectory( tempPath, output );
             return output;
         }
+
+        public XDocument CreateWorldXml( IActivityMonitor monitor )
+        {
+            XElement root = new XElement( "CKTest-Build-World" );
+            XDocument xDocument = new XDocument( new XDeclaration( "1.0", "utf-8", "" ), root );
+
+            root.Add
+            (
+                new XElement( "LoadLibrary", new XAttribute( "Name", "CK.Env.Plugin.Basics" ) ),
+                new XElement( "LoadLibrary", new XAttribute( "Name", "CK.Env.Plugin.SolutionDriver" ) ),
+                new XElement( "LoadLibrary", new XAttribute( "Name", "CK.Env.Plugin.Appveyor" ) ),
+                new XElement( "LoadLibrary", new XAttribute( "Name", "CK.Env.Plugin.GitLab" ) ),
+                new XElement( "LoadLibrary", new XAttribute( "Name", "CK.Env.Plugin.NPM" ) ),
+                new XElement( "LoadLibrary", new XAttribute( "Name", "CK.Env.Plugin.CKSetup" ) ),
+                new XElement( "LoadLibrary", new XAttribute( "Name", "CK.Env.Plugin.NuGet" ) ),
+                new XElement( "LoadLibrary", new XAttribute( "Name", "CK.Env.Plugin.Dotnet" ) ),
+
+                new XElement( "SharedHttpClient" ),
+                new XElement( "ArtifactCenter" ),
+                new XElement( "LocalFeedProvider" ),
+                new XElement( "NuGetClient" ),
+                new XElement( "NPMClient" ),
+                new XElement( "CKSetupClient" ),
+                new XElement( "World", new XAttribute( "IsPublic", "True" ) ),
+
+                new XElement( "Artifacts",
+
+                    new XElement( "SourceFeeds",
+                        new XElement( "Feed",
+                            new XAttribute( "Type", "NuGet" ),
+                            new XAttribute( "Name", "NuGet" ),
+                            new XAttribute( "Url", "https://api.nuget.org/v3/index.json" ) ),
+                        new XElement( "Feed",
+                            new XAttribute( "Type", "NuGet" ),
+                            new XAttribute( "Name", "Local" ),
+                            new XAttribute( "Url", "file://PLACEHOLDER_CKLI_TESTS/FakeRemoteFeed" ) )
+                        ),
+
+
+                new XElement( "TargetRepositories",
+                    new XElement( "Repository",
+                        new XAttribute( "Type", "NuGetStandard" ),
+                        new XAttribute( "Name", "local" ),
+                        new XAttribute( "Url", "file://PLACEHOLDER_CKLI_TESTS/FakeRemoteFeed" ),
+                        new XAttribute( "CheckName", "NuGet:local" ),
+                        new XAttribute( "SecretKeyName", string.Empty ) )
+                    )
+                ),
+
+                new XElement( "SharedSolutionSpec",
+                    new XElement( "ArtifactSources",
+                        new XElement( "add", new XAttribute( "Name", "NuGet:NuGet" ) ),
+                        new XElement( "add", new XAttribute( "Name", "NuGet:Local" ) )
+                    ),
+                    new XElement( "ArtifactTargets",
+                        new XElement( "add", new XAttribute( "Name", "NuGet:Local" ) )
+                    ),
+                    new XElement( "ExcludedPlugins",
+                        new XElement( "add",
+                            new XAttribute( "Type", "CK.Env.Plugin.CodeCakeBuilderCSProjFile, CK.Env.Plugin.Basics" ) )
+                    )
+                ),
+
+                new XElement( "Folder", new XAttribute( "Name", "CKTest-Build" ) )
+
+             );
+
+            //xDocument.Add( root );
+            //Store the file in a temp dir and commit it and push it into StackGitPath. Where to store local ? Don't store it imo.
+            //File.WriteAllText( universe.StackGitPath.AppendPart(""), xDocument.ToString() );
+
+            return xDocument;
+        }
+
 
         public void Dispose()
         {

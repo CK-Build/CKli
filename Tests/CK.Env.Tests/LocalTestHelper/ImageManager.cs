@@ -25,6 +25,36 @@ namespace CK.Env.Tests.LocalTestHelper
         public static NormalizedPath SeedUniverseFolder => TestHelper.TestProjectFolder.AppendPart( "SeedZips" );
 
         /// <summary>
+        /// Create a zip file
+        /// </summary>
+        /// <param name="monitor"></param>
+        /// <returns>Zip file full path</returns>
+        public static NormalizedPath InitImageFromScratch( IActivityMonitor monitor )
+        {
+            string imageName = $"minimal_project_scratch.zip";
+            string imageFullPath = Path.Combine( SeedUniverseFolder, imageName );
+
+            var directories = new List<string>()
+            {
+                "CKTest-Stack",
+                "dev",
+                "FakeRemoteFeed",
+                "Worlds"
+            };
+
+            NormalizedPath tempPath = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
+
+            DirectoryInfo directoryInfo = new DirectoryInfo( tempPath );
+            foreach( var directory in directories )
+                directoryInfo.CreateSubdirectory( directory );
+
+            if( File.Exists( imageFullPath ) ) File.Delete( imageFullPath );
+            ZipFile.CreateFromDirectory( tempPath, imageFullPath );
+
+            return imageFullPath;
+        }
+
+        /// <summary>
         /// Instantiate a <see cref="TestUniverse"/> from the given path.
         /// </summary>
         /// <param name="m"></param>
@@ -59,6 +89,20 @@ namespace CK.Env.Tests.LocalTestHelper
             NormalizedPath generatedBaseImagePath = EnsureImage( parentImageGenerator, refreshCache );
             return InstantiateImage( m, generatedBaseImagePath );
         }
+
+        //public static TestUniverse AddSolutionToImage
+        //(
+        //    IActivityMonitor m,
+        //   NormalizedPath imagePath,
+        //    string solutionName
+        //)
+        //{
+        //    TestUniverse universe = InstantiateImage( m, imagePath );
+
+        //    ZipFile.ExtractToDirectory( Path.Combine( BareReposFolder, solutionName, ".zip" ), universe.StackBareGitPath );
+
+        //    return universe;
+        //}
 
         public class ZipComparer : IDisposable
         {

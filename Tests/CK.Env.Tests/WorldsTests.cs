@@ -78,7 +78,7 @@ namespace CK.Env.Tests
         [Test]
         public void dll_should_not_change_after_rebuild()
         {
-            ImageLibrary.minimal_solution_second_ci_build( (universe, world) => { }, TestHelper.IsExplicitAllowed );//We are now sure this image, and it's base exist.
+            ImageLibrary.minimal_solution_second_ci_build( ( universe, world ) => { }, TestHelper.IsExplicitAllowed );//We are now sure this image, and it's base exist.
             using( var compare = ImageManager.CompareBuildedImages(
                 nameof( ImageLibrary.minimal_solution_first_ci_build ),
                 nameof( ImageLibrary.minimal_solution_second_ci_build ) ) )
@@ -131,6 +131,25 @@ namespace CK.Env.Tests
             {
                 compare.AExceptB.Where( p => p.FullName.EndsWith( ".git" ) );
             }
+        }
+
+
+        [Test]
+        public void create_seed_universe_from_scratch_as_image_does_not_throw()
+        {
+            ImageLibrary.init_seed_scratch( universe => { }, TestHelper.IsExplicitAllowed );
+        }
+
+        [Test]
+        public void setup_seed_universe_from_scratch_does_not_throw()
+        {
+            ImageLibrary.setup_seed_scratch( universe => { }, TestHelper.IsExplicitAllowed );
+        }
+
+        [Test]
+        public void add_npm_project_to_universe_setup_from_scratch_does_not_throw()
+        {
+            ImageLibrary.create_npm_project_from_setup_seed_scratch( (universe, world) => { }, TestHelper.IsExplicitAllowed );
         }
     }
 }
