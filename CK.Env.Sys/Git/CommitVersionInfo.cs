@@ -6,7 +6,7 @@ namespace CK.Env
 {
     /// <summary>
     /// Immutable encapsulation of all we need to know in terms of versions in a Git
-    /// repository to reason on new versions ot to generate a build thanks to <see cref="AssemblyBuildInfo"/>.
+    /// repository to reason on new versions or to generate a build thanks to <see cref="FinalBuildInfo"/>.
     /// </summary>
     public class CommitVersionInfo
     {
@@ -14,12 +14,12 @@ namespace CK.Env
         /// Initializes a new valid <see cref="CommitVersionInfo"/>.
         /// </summary>
         /// <param name="commitSHA1">The commit SHA1. Must not be null.</param>
-        /// <param name="releaseVersion">See <see cref="ReleaseVersion"/>.</param>
-        /// <param name="releaseContentVersion">See <see cref="ReleaseContentVersion"/>.</param>
-        /// <param name="previousVersion">See <see cref="PreviousVersion"/>.</param>
+        /// <param name="releaseVersion">See <see cref="ValidReleaseTag"/>.</param>
+        /// <param name="releaseContentVersion">See <see cref="BetterExistingVersion"/>.</param>
+        /// <param name="previousVersion">See <see cref="BestCommitBelow"/>.</param>
         /// <param name="nextPossibleVersions">See <see cref="NextPossibleVersions"/>.</param>
         /// <param name="possibleVersions">See <see cref="PossibleVersions"/>.Must not be null.</param>
-        /// <param name="assemblyBuildInfo">See <see cref="AssemblyBuildInfo"/>. Must not be null.</param>
+        /// <param name="assemblyBuildInfo">See <see cref="FinalBuildInfo"/>. Must not be null.</param>
         public CommitVersionInfo(
             string commitSha,
             CSVersion releaseVersion,
@@ -28,11 +28,11 @@ namespace CK.Env
             string previousVersionCommitSha,
             IReadOnlyList<CSVersion> nextPossibleVersions,
             IReadOnlyList<CSVersion> possibleVersions,
-            ICommitAssemblyBuildInfo assemblyBuildInfo )
+            ICommitBuildInfo assemblyBuildInfo )
         {
             CommitSha = commitSha ?? throw new ArgumentNullException( nameof( commitSha ) );
-            ReleaseVersion = releaseVersion;
-            ReleaseContentVersion = releaseContentVersion;
+            ValidReleaseTag = releaseVersion;
+            BetterExistingVersion = releaseContentVersion;
             if( (previousVersion == null) != (previousVersionCommitSha == null) )
             {
                 if( previousVersion == null )
@@ -41,20 +41,20 @@ namespace CK.Env
                 }
                 throw new ArgumentNullException( nameof( previousVersionCommitSha ) );
             }
-            PreviousVersion = previousVersion;
-            PreviousVersionCommitSha = previousVersionCommitSha;
+            BestCommitBelow = previousVersion;
+            BestCommitBelowSha = previousVersionCommitSha;
             NextPossibleVersions = nextPossibleVersions ?? throw new ArgumentNullException( nameof( nextPossibleVersions ) );
             PossibleVersions = possibleVersions ?? throw new ArgumentNullException( nameof( possibleVersions ) );
-            AssemblyBuildInfo = assemblyBuildInfo ?? throw new ArgumentNullException( nameof( assemblyBuildInfo ) );
+            FinalBuildInfo = assemblyBuildInfo ?? throw new ArgumentNullException( nameof( assemblyBuildInfo ) );
         }
 
         /// <summary>
         /// Initilalizes a new invalid CommitVersionInfo.
-        /// <see cref="AssemblyBuildInfo"/> is the <see cref="CommitAssemblyBuildInfo.ZeroBuildInfo"/>.
+        /// <see cref="FinalBuildInfo"/> is the <see cref="CommitAssemblyBuildInfo.ZeroBuildInfo"/>.
         /// </summary>
         public CommitVersionInfo()
         {
-            AssemblyBuildInfo = CommitAssemblyBuildInfo.ZeroBuildInfo;
+            FinalBuildInfo = CommitAssemblyBuildInfo.ZeroBuildInfo;
         }
 
         /// <summary>
@@ -73,27 +73,27 @@ namespace CK.Env
         /// This is null if there is actually no release tag on the current commit or if <see cref="IsValid"/> is false.
         /// (This is the RepositoryInfo.ValidReleaseTag from SimpleGitVersion.RepositoryInfo.)
         /// </summary>
-        public CSVersion ReleaseVersion { get; }
+        public CSVersion ValidReleaseTag { get; }
 
         /// <summary>
         /// Gets the version associated to the commit content.
         /// (This is the RepositoryInfo.BetterExistingVersion.ThisTag from SimpleGitVersion.RepositoryInfo.)
         /// </summary>
-        public CSVersion ReleaseContentVersion { get; }
+        public CSVersion BetterExistingVersion { get; }
 
         /// <summary>
         /// Gets the previous version, associated to a commit below the current one.
         /// This is null if no previous version has been found.
         /// (This is the RepositoryInfo.CommitInfo.BasicInfo?.BestCommitBelow.ThisTag from SimpleGitVersion.RepositoryInfo.)
         /// </summary>
-        public CSVersion PreviousVersion { get; }
+        public CSVersion BestCommitBelow { get; }
 
         /// <summary>
         /// Gets the previous version commit Sha, associated to a commit below the current one.
         /// This is null if no previous version has been found.
         /// (This is the RepositoryInfo.CommitInfo.BasicInfo?.BestCommitBelow.CommitSha from SimpleGitVersion.RepositoryInfo.)
         /// </summary>
-        public string PreviousVersionCommitSha { get; }
+        public string BestCommitBelowSha { get; }
 
         /// <summary>
         /// Get the versions that may be available to any commit above the current one.
@@ -111,9 +111,9 @@ namespace CK.Env
         public IReadOnlyList<CSVersion> PossibleVersions { get; }
 
         /// <summary>
-        /// Gets the <see cref="ICommitAssemblyBuildInfo"/> for this commit point.
-        /// Never null, defaults to <see cref="ZeroCommitAssemblyBuildInfo"/>.
+        /// Gets the <see cref="ICommitBuildInfo"/> for this commit point.
+        /// Never null, defaults to <see cref="CommitAssemblyBuildInfo.ZeroBuildInfo"/>.
         /// </summary>
-        public ICommitAssemblyBuildInfo AssemblyBuildInfo { get; }
+        public ICommitBuildInfo FinalBuildInfo { get; }
     }
 }

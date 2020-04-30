@@ -5,10 +5,9 @@ namespace CK.Env
 {
     /// <summary>
     /// Exposes all information version required to build a project.
-    /// Implementation should default to Zero Version if anything prevents computation
-    /// and 
+    /// Implementation should default to Zero Version if anything prevents computation.
     /// </summary>
-    public interface ICommitAssemblyBuildInfo
+    public interface ICommitBuildInfo
     {
         /// <summary>
         /// Gets "Debug" for ci build or prerelease below "rc" and "Release" for "rc" and official releases.

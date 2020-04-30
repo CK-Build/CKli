@@ -593,7 +593,7 @@ namespace CK.Env.Plugin
             }
             if( !msP.Solution.Save( monitor ) ) return false;
 
-            ICommitAssemblyBuildInfo b = CommitAssemblyBuildInfo.ZeroBuildInfo;
+            ICommitBuildInfo b = CommitAssemblyBuildInfo.ZeroBuildInfo;
             string commonArgs = $@" --no-dependencies";
             string versionArgs = $@" --configuration {b.BuildConfiguration} /p:Version=""{b.Version}"" /p:AssemblyVersion=""{b.AssemblyVersion}"" /p:FileVersion=""{b.FileVersion}"" /p:InformationalVersion=""{b.InformationalVersion}"" ";
             var args = info.MustPack

@@ -225,12 +225,12 @@ namespace CK.Env
                     m.Error( $"Missing required {pathOpt} file." );
                     return null;
                 }
-                var opt = RepositoryInfoOptions.Read( fOpt.ReadAsXDocument().Root );
+                var opt = new RepositoryInfoOptions( fOpt.ReadAsXDocument().Root );
                 opt.StartingBranchName = branchName;
                 var result = new RepositoryInfo( Git, opt );
-                if( result.RepositoryError != null )
+                if( result.StartingCommitInfo.Error != null )
                 {
-                    m.Error( $"Unable to read RepositoryInfo. RepositoryError: {result.RepositoryError}." );
+                    m.Error( $"Unable to read RepositoryInfo. RepositoryError: {result.StartingCommitInfo.Error}." );
                     return null;
                 }
                 if( result.Error != null )

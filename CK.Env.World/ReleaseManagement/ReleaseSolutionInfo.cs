@@ -60,7 +60,7 @@ namespace CK.Env
         /// Gets the previous version, associated to a commit below the current one.
         /// This is null if no previous version has been found.
         /// </summary>
-        public CSVersion PreviousVersion => _commitVersionInfo.PreviousVersion;
+        public CSVersion PreviousVersion => _commitVersionInfo.BestCommitBelow;
 
         /// <summary>
         /// Gets or sets the release note.
@@ -164,7 +164,7 @@ namespace CK.Env
             {
                 _info = info;
                 Requirements = requirements;
-                _possible = new PossibleVersions( requirements, info._commitVersionInfo.PreviousVersion, possibles );
+                _possible = new PossibleVersions( requirements, info._commitVersionInfo.BestCommitBelow, possibles );
                 CanUsePreviouslyResolvedInfo = info._previouslyResolvedInfo.IsValid
                                                && info._previouslyResolvedInfo.IsCompatibleWith( requirements.Level, requirements.Constraint )
                                                && _possible.AllPossibleVersions.Contains( info._previouslyResolvedInfo.Version );
@@ -182,9 +182,9 @@ namespace CK.Env
 
             public ReleaseInfo Requirements { get; }
 
-            public CSVersion PreviousVersion => _info._commitVersionInfo.PreviousVersion;
+            public CSVersion PreviousVersion => _info._commitVersionInfo.BestCommitBelow;
 
-            public string PreviousVersionCommitSha => _info._commitVersionInfo.PreviousVersionCommitSha;
+            public string PreviousVersionCommitSha => _info._commitVersionInfo.BestCommitBelowSha;
 
             public string ReleaseNote { get => _info.ReleaseNote; set => _info.ReleaseNote = value; }
 
@@ -270,24 +270,24 @@ namespace CK.Env
                 // In both cases, we must keep the ReleaseLevel.None, however, the requirements may
                 // not be None if we are processing an existing roadmap and updates have been
                 // already applied to the files.
-                if( _commitVersionInfo.ReleaseVersion != null )
+                if( _commitVersionInfo.ValidReleaseTag != null )
                 {
-                    m.Warn( $"This commit has already a version tag: {_commitVersionInfo.ReleaseVersion}." );
-                    if( !versionSelector.OnAlreadyReleased( m, Solution, _commitVersionInfo.ReleaseVersion, false ) )
+                    m.Warn( $"This commit has already a version tag: {_commitVersionInfo.ValidReleaseTag}." );
+                    if( !versionSelector.OnAlreadyReleased( m, Solution, _commitVersionInfo.ValidReleaseTag, false ) )
                     {
                         return new ReleaseInfo();
                     }
-                    return new ReleaseInfo().WithVersion( _commitVersionInfo.ReleaseVersion );
+                    return new ReleaseInfo().WithVersion( _commitVersionInfo.ValidReleaseTag );
                 }
-                if( _commitVersionInfo.ReleaseContentVersion != null )
+                if( _commitVersionInfo.BetterExistingVersion != null )
                 {
                     // TODO: ensure that this is the tag of the commit point merged into master branch.
-                    m.Info( $"This commit has a content version tag: {_commitVersionInfo.ReleaseContentVersion}. We use it." );
-                    if( !versionSelector.OnAlreadyReleased( m, Solution, _commitVersionInfo.ReleaseContentVersion, true ) )
+                    m.Info( $"This commit has a content version tag: {_commitVersionInfo.BetterExistingVersion}. We use it." );
+                    if( !versionSelector.OnAlreadyReleased( m, Solution, _commitVersionInfo.BetterExistingVersion, true ) )
                     {
                         return new ReleaseInfo();
                     }
-                    return new ReleaseInfo().WithVersion( _commitVersionInfo.ReleaseContentVersion );
+                    return new ReleaseInfo().WithVersion( _commitVersionInfo.BetterExistingVersion );
                 }
                 possibleVersions = _commitVersionInfo.PossibleVersions;
             }
@@ -297,7 +297,7 @@ namespace CK.Env
                     ? new ReleaseInfo()
                     : (ctx.HasChoice
                         ? requirements.WithLevel( ctx.FinalLevel ).WithVersion( ctx.FinalVersion )
-                        : throw new InvalidOperationException( "At least Canel or SetChoice must have been called." ));
+                        : throw new InvalidOperationException( "At least Cancel or SetChoice must have been called." ));
         }
 
         /// <summary>

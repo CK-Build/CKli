@@ -5,7 +5,7 @@ using System.Diagnostics;
 
 namespace CK.Env
 {
-    class CommitAssemblyBuildInfoFromRepo : ICommitAssemblyBuildInfo
+    class CommitAssemblyBuildInfoFromRepo : ICommitBuildInfo
     {
         readonly RepositoryInfo _info;
 
@@ -19,7 +19,15 @@ namespace CK.Env
             AssemblyVersion = $"{info.FinalVersion.Major}.{info.FinalVersion.Minor}";
             if( info.CIRelease != null )
             {
-                FileVersion = info.CIRelease.BaseTag.ToStringFileVersion( true );
+                if( info.CIRelease.IsZeroTimed )
+                {
+                    FileVersion = CSemVer.InformationalVersion.ZeroFileVersion;
+                }
+                else
+                {
+                    Debug.Assert( info.CIRelease.BaseTag.AsCSVersion != null, "In LastReleaseBased mode, there is a valid CSVersion base tag." );
+                    FileVersion = info.CIRelease.BaseTag.AsCSVersion.ToStringFileVersion( true );
+                }
             }
             else if( info.ValidReleaseTag != null )
             {

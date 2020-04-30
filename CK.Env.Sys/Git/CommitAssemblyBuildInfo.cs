@@ -4,11 +4,11 @@ using System;
 namespace CK.Env
 {
     /// <summary>
-    /// Implements <see cref="ICommitAssemblyBuildInfo"/>.
+    /// Implements <see cref="ICommitBuildInfo"/> from a valid <see cref="CSVersion"/>.
     /// </summary>
-    public class CommitAssemblyBuildInfo : ICommitAssemblyBuildInfo
+    public class CommitAssemblyBuildInfo : ICommitBuildInfo
     {
-        class ZeroBuild : ICommitAssemblyBuildInfo
+        class ZeroBuild : ICommitBuildInfo
         {
             public string BuildConfiguration => "Debug";
 
@@ -26,9 +26,9 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// A Zero Version <see cref="ICommitAssemblyBuildInfo"/>.
+        /// A Zero Version <see cref="ICommitBuildInfo"/>.
         /// </summary>
-        public static readonly ICommitAssemblyBuildInfo ZeroBuildInfo = new ZeroBuild();
+        public static readonly ICommitBuildInfo ZeroBuildInfo = new ZeroBuild();
 
         /// <summary>
         /// Initializes a new <see cref="CommitAssemblyBuildInfo"/> for a release version.
