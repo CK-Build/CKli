@@ -36,7 +36,7 @@ namespace CK.Env
                 string scriptFileName,
                 IEnumerable<string> arguments,
                 LogLevel stdErrorLevel = LogLevel.Warn,
-                IEnumerable<(string, string)> environmentVariables = null )
+                IEnumerable<(string, string)>? environmentVariables = null )
         {
             if( !Path.IsPathRooted( scriptFileName ) && scriptFileName[0] != '.' )
             {
@@ -73,7 +73,7 @@ namespace CK.Env
                  string fileName,
                  string arguments,
                  LogLevel stdErrorLevel = LogLevel.Warn,
-                 IEnumerable<(string, string)> environmentVariables = null )
+                 IEnumerable<(string, string)>? environmentVariables = null )
         {
             ProcessStartInfo cmdStartInfo = ConfigureProcessInfo( workingDir, fileName, arguments, environmentVariables );
             return Run( m, cmdStartInfo, stdErrorLevel );
@@ -87,7 +87,7 @@ namespace CK.Env
         /// <param name="arguments">Command arguments.</param>
         /// <param name="environmentVariables">Optional environment variables for the child process.</param>
         /// <returns>A configured start info.</returns>
-        public static ProcessStartInfo ConfigureProcessInfo( string workingDir, string fileName, string arguments, IEnumerable<(string, string)> environmentVariables = null )
+        public static ProcessStartInfo ConfigureProcessInfo( string workingDir, string fileName, string arguments, IEnumerable<(string, string)>? environmentVariables = null )
         {
             ProcessStartInfo cmdStartInfo = new ProcessStartInfo
             {

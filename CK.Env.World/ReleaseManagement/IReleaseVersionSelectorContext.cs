@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Env.DependencyModel;
 using CSemVer;
+using SimpleGitVersion;
 using System.Collections.Generic;
 
 namespace CK.Env
@@ -31,13 +32,7 @@ namespace CK.Env
         /// Gets the previous released version of this solution.
         /// Null if there is no previous release.
         /// </summary>
-        CSVersion PreviousVersion { get; }
-
-        /// <summary>
-        /// Gets the Sha of the commit that is the <see cref="PreviousVersion"/>.
-        /// Null if there is no previous release.
-        /// </summary>
-        string PreviousVersionCommitSha { get; }
+        ITagCommit? PreviousVersion { get; }
 
         /// <summary>
         /// Gets or sets the release note.

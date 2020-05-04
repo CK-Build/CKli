@@ -48,7 +48,7 @@ namespace CK.Env.Tests
         }
 
         [Test]
-        public void a_simple_project_can_be_build_once()
+        public void a_simple_project_can_be_built_once()
         {
             EnsureCallbackIsCalled(
                 ( Action<(TestUniverse, World)> action, object[] parameters ) =>
@@ -64,7 +64,7 @@ namespace CK.Env.Tests
         }
 
         [Test]
-        public void a_simple_project_can_be_build_a_second_time()
+        public void a_simple_project_can_be_built_a_second_time()
         {
             ImageLibrary.minimal_solution_second_ci_build(
             ( universe, world ) =>

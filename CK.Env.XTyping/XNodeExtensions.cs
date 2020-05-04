@@ -33,7 +33,7 @@ namespace CK.Env
             var current = @this.FirstChild<XElement>();
             while( current != null )
             {
-                XElement next = null;
+                XElement? next = null;
                 if( predicate( current ) )
                 {
                     yield return current;
@@ -66,7 +66,7 @@ namespace CK.Env
         /// <typeparam name="TNode">Type of the node.</typeparam>
         /// <param name="this">This node.</param>
         /// <returns>The first <typeparamref name="TNode"/> child or null if none.</returns>
-        public static TNode FirstChild<TNode>( this XNode @this ) where TNode : XNode
+        public static TNode? FirstChild<TNode>( this XNode @this ) where TNode : XNode
         {
             var container = @this as XContainer;
             return container?.FirstNode as TNode;
@@ -78,13 +78,13 @@ namespace CK.Env
         /// <typeparam name="TNode">Type of the node.</typeparam>
         /// <param name="this">This node.</param>
         /// <returns>The next <typeparamref name="TNode"/> sibling or null if none.</returns>
-        public static TNode NextSibling<TNode>( this XNode @this ) where TNode : XNode
+        public static TNode? NextSibling<TNode>( this XNode @this ) where TNode : XNode
         {
-            @this = @this?.NextNode;
-            while( @this != null )
+            var next = @this?.NextNode;
+            while( next != null )
             {
-                if( @this is TNode n ) return n;
-                @this = @this.NextNode;
+                if( next is TNode n ) return n;
+                next = next.NextNode;
             }
             return null;
         }

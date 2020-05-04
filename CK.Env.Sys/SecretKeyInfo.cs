@@ -10,7 +10,7 @@ namespace CK.Env
     /// </summary>
     public class SecretKeyInfo
     {
-        string _secret;
+        string? _secret;
         string _description;
         CKTrait _tags;
         bool _isRequired;
@@ -20,7 +20,7 @@ namespace CK.Env
         /// </summary>
         public static CKTraitContext TagsContext = CKTraitContext.Create( "SecretCategory", '|' );
 
-        internal SecretKeyInfo( string name, Func<SecretKeyInfo, string> descriptionBuilder, bool isRequired, string sourceProviderName )
+        internal SecretKeyInfo( string name, Func<SecretKeyInfo?, string> descriptionBuilder, bool isRequired, string? sourceProviderName )
             : this( name, descriptionBuilder, sourceProviderName )
         {
             _isRequired = isRequired;
@@ -28,10 +28,10 @@ namespace CK.Env
 
         internal SecretKeyInfo(
             string name,
-            Func<SecretKeyInfo, string> descriptionBuilder,
+            Func<SecretKeyInfo?, string> descriptionBuilder,
             SecretKeyInfo subKey,
             IReadOnlyDictionary<string, SecretKeyInfo> keyInfos,
-            string sourceProviderName )
+            string? sourceProviderName )
             : this( name, descriptionBuilder, sourceProviderName )
         {
             SubKey = subKey ?? throw new ArgumentNullException( nameof( subKey ) );
@@ -52,7 +52,7 @@ namespace CK.Env
         /// <param name="data">Data captured by <see cref="GetData"/>.</param>
         /// <param name="keyInfos">Current set of secrets being restored.</param>
         internal SecretKeyInfo(
-            (string name, string description, string secret, bool isRequired, string tags, string subKey, string sourceProviderName) data,
+            (string name, string description, string? secret, bool isRequired, string tags, string? subKey, string? sourceProviderName) data,
             IReadOnlyDictionary<string, SecretKeyInfo> keyInfos )
         {
             SourceProviderName = data.sourceProviderName;
@@ -72,27 +72,28 @@ namespace CK.Env
         /// Exports data for "serialization".
         /// </summary>
         /// <returns>The raw data.</returns>
-        internal (string name, string description, string secret, bool isRequired, string tags, string subKey, string sourceProviderName) GetData()
+        internal (string name, string description, string? secret, bool isRequired, string tags, string? subKey, string? sourceProviderName) GetData()
         {
             return (Name, _description, _secret, _isRequired, _tags.ToString(), SubKey?.Name, SourceProviderName);
         }
 
-        SecretKeyInfo( string name, Func<SecretKeyInfo, string> descriptionBuilder, string sourceProviderName )
+        SecretKeyInfo( string name, Func<SecretKeyInfo?, string> descriptionBuilder, string? sourceProviderName )
         {
             SourceProviderName = sourceProviderName;
             Name = name ?? throw new ArgumentNullException( nameof( name ) );
+            _description = String.Empty;
             SetDescription( descriptionBuilder );
             _tags = TagsContext.EmptyTrait;
         }
 
-        internal void Reconfigure( Func<SecretKeyInfo, string> descriptionBuilder, bool isRequired )
+        internal void Reconfigure( Func<SecretKeyInfo?, string> descriptionBuilder, bool isRequired )
         {
             SetDescription( descriptionBuilder );
             _isRequired |= isRequired;
             CheckSecretPropagation();
         }
 
-        internal void Reconfigure( Func<SecretKeyInfo, string> descriptionBuilder, SecretKeyInfo subKey )
+        internal void Reconfigure( Func<SecretKeyInfo?, string> descriptionBuilder, SecretKeyInfo subKey )
         {
             SetDescription( descriptionBuilder );
             if( subKey != SubKey )
@@ -102,10 +103,10 @@ namespace CK.Env
             CheckSecretPropagation();
         }
 
-        void SetDescription( Func<SecretKeyInfo, string> descriptionBuilder )
+        void SetDescription( Func<SecretKeyInfo?, string> descriptionBuilder )
         {
             if( descriptionBuilder == null ) throw new ArgumentNullException( nameof( descriptionBuilder ) );
-            _description = descriptionBuilder( _description != null ? this : null );
+            _description = descriptionBuilder( String.IsNullOrWhiteSpace( _description ) ? null : this );
             if( String.IsNullOrWhiteSpace( _description ) )
             {
                 throw new InvalidOperationException( $"Description must not be null or empty." );
@@ -118,12 +119,13 @@ namespace CK.Env
         public string Name { get; }
 
         /// <summary>
-        /// Gets whether this key is transient or not. If the key is transient, it will not be stored in a KeyVault.
+        /// Gets the source provider: when a secret is provided by a source, the key is transient and
+        /// will not be stored in a KeyVault.
         /// </summary>
-        public string SourceProviderName { get; }
+        public string? SourceProviderName { get; }
 
         /// <summary>
-        /// Gets the description.
+        /// Gets the description. Defaults to <see cref="String.Empty"/>.
         /// </summary>
         public string Description => _description;
 
@@ -163,7 +165,7 @@ namespace CK.Env
         /// Gets the secret or null if <see cref="IsSecretAvailable"/> is false).
         /// (Note that this secret may be defined by the <see cref="SuperKey"/>.)
         /// </summary>
-        public string Secret => _secret;
+        public string? Secret => _secret;
 
         /// <summary>
         /// Imports a secret, typically stored in an external safe place.
@@ -202,13 +204,13 @@ namespace CK.Env
         /// </summary>
         /// <param name="secret">The secret to set. Can be null to clear it.</param>
         /// <returns>True if a secret has been updated, false if nothing has changed.</returns>
-        public bool SetSecret( string secret )
+        public bool SetSecret( string? secret )
         {
             CheckSecretPropagation();
             if( SuperKey != null && SuperKey.IsSecretAvailable ) throw new InvalidOperationException( $"Secret is defined by the SuperKey '{SuperKey.Name}'." );
             if( String.IsNullOrEmpty( secret ) ) secret = null;
             bool changed = false;
-            SecretKeyInfo k = this;
+            SecretKeyInfo? k = this;
             do
             {
                 changed |= k._secret != secret;
@@ -238,13 +240,13 @@ namespace CK.Env
         /// Gets the secret key that is more powerful than this one or null if no such key exists.
         /// This super key if it exists and if its <see cref="IsSecretAvailable"/> is true, overrides the secret at this level.
         /// </summary>
-        public SecretKeyInfo SuperKey { get; private set; }
+        public SecretKeyInfo? SuperKey { get; private set; }
 
         /// <summary>
         /// Gets the secret key that is covered by this one or null if no such key exists.
         /// This subordinated key's secret is replaced by this one if it is set.
         /// </summary>
-        public SecretKeyInfo SubKey { get; }
+        public SecretKeyInfo? SubKey { get; }
 
         /// <summary>
         /// Gets the <see cref="Name"/>, <see cref="Description"/>, <see cref="IsRequired"/> and <see cref="IsSecretAvailable"/> status.

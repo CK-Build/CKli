@@ -593,9 +593,8 @@ namespace CK.Env.Plugin
             }
             if( !msP.Solution.Save( monitor ) ) return false;
 
-            ICommitBuildInfo b = CommitAssemblyBuildInfo.ZeroBuildInfo;
             string commonArgs = $@" --no-dependencies";
-            string versionArgs = $@" --configuration {b.BuildConfiguration} /p:Version=""{b.Version}"" /p:AssemblyVersion=""{b.AssemblyVersion}"" /p:FileVersion=""{b.FileVersion}"" /p:InformationalVersion=""{b.InformationalVersion}"" ";
+            string versionArgs = $@" --configuration Release /p:Version=""{SVersion.ZeroVersion}"" /p:AssemblyVersion=""{InformationalVersion.ZeroAssemblyVersion}"" /p:FileVersion=""{InformationalVersion.ZeroFileVersion}"" /p:InformationalVersion=""{InformationalVersion.ZeroInformationalVersion}"" ";
             var args = info.MustPack
                         ? $@"pack --output ""{_localFeedProvider.ZeroBuild.PhysicalPath}"""
                         : $@"publish --output ""{_localFeedProvider.GetZeroVersionCodeCakeBuilderExecutablePath( solution.Name ).RemoveLastPart()}""";
@@ -706,7 +705,7 @@ namespace CK.Env.Plugin
             if( solution == null ) return false;
 
             // Version is always provided by the current commit point.
-            var v = GitFolder.ReadRepositoryVersionInfo( monitor )?.FinalVersion;
+            var v = GitFolder.ReadVersionInfo( monitor )?.FinalBuildInfo.Version;
             if( v == null ) return false;
 
             BuildType buildType;

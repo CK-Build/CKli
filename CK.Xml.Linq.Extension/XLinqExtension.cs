@@ -205,7 +205,7 @@ namespace System.Xml.Linq
         }
 
         /// <summary>
-        /// Ensures that at least one named chiled element exist and returns it.
+        /// Ensures that at least one named child element exists and returns it.
         /// </summary>
         /// <param name="this">This parent element.</param>
         /// <param name="name">The name of the element to find or create.</param>

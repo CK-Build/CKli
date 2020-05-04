@@ -18,11 +18,9 @@ namespace CK.Env
         /// <param name="isPublic">Whether this repository is public.</param>
         public GitRepositoryKey( SecretKeyStore secretKeyStore, Uri url, bool isPublic )
         {
-            if( url == null ) throw new ArgumentNullException( nameof( url ) );
-            if( secretKeyStore == null ) throw new ArgumentNullException( nameof( secretKeyStore ) );
+            OriginUrl = url ?? throw new ArgumentNullException( nameof( url ) );
+            SecretKeyStore = secretKeyStore ?? throw new ArgumentNullException( nameof( secretKeyStore ) );
             IsPublic = isPublic;
-            OriginUrl = url;
-            SecretKeyStore = secretKeyStore;
 
             if( url.Authority.Equals( "github.com", StringComparison.OrdinalIgnoreCase ) ) KnownGitProvider = KnownGitProvider.GitHub;
             else if( url.Authority.Equals( "gitlab.com", StringComparison.OrdinalIgnoreCase ) ) KnownGitProvider = KnownGitProvider.GitLab;
@@ -33,7 +31,7 @@ namespace CK.Env
             if( KnownGitProvider == KnownGitProvider.FileSystem ) return; // No credentials needed.
             if( KnownGitProvider != KnownGitProvider.Unknown )
             {
-                string GetReadPATDescription( SecretKeyInfo current )
+                string GetReadPATDescription( SecretKeyInfo? current )
                 {
                     var d = current?.Description ?? $"Used to read/clone private repositories hosted by '{KnownGitProvider}'.";
                     if( (current == null || !current.IsRequired) && !IsPublic )
@@ -78,16 +76,17 @@ namespace CK.Env
         /// Note that if <see cref="IsPublic"/> is true, this PAT should be useless: anyone should be able to
         /// read/clone the repository.
         /// </summary>
-        public string ReadPATKeyName { get; }
+        public string? ReadPATKeyName { get; }
 
         /// <summary>
         /// Gets the write PAT key name for this repository.
         /// This PAT must allow pushes to the repository.
         /// </summary>
-        public string WritePATKeyName { get; }
+        public string? WritePATKeyName { get; }
 
         /// <summary>
         /// Helper that formats the PAT name based on the kind of provider.
+        /// <see cref="KnownGitProvider"/> must not be Unknown.
         /// </summary>
         /// <param name="suffix">Suffix to use.</param>
         /// <returns>The PAT name or null if <see cref="KnownGitProvider"/> is Unknown.</returns>
@@ -95,7 +94,7 @@ namespace CK.Env
         {
             switch( KnownGitProvider )
             {
-                case KnownGitProvider.Unknown: return null;
+                case KnownGitProvider.Unknown: throw new InvalidOperationException( "Unknown GitProvider." );
                 case KnownGitProvider.AzureDevOps:
                     var regex = Regex.Match( OriginUrl.PathAndQuery, @"/([^\/]*)" );
                     string organization = regex.Groups[1].Value;

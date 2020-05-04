@@ -72,11 +72,6 @@ namespace CKli
         public NormalizedPath FullPath { get; }
 
         /// <summary>
-        /// Gets whether this item is a folder.
-        /// </summary>
-        public bool IsFolder => Kind == FileSystemItemKind.Directory;
-
-        /// <summary>
         /// Gets this item kind (<see cref="FileSystemItemKind.File"/> or <see cref="FileSystemItemKind.Directory"/>).
         /// </summary>
         public FileSystemItemKind Kind { get; }

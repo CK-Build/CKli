@@ -32,7 +32,7 @@ namespace CK.Env
             _withUnitTest = withUnitTest;
         }
 
-        protected override (SVersion Version, bool MustBuild) PrepareBuild( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades )
+        protected override (SVersion? Version, bool MustBuild) PrepareBuild( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades )
         {
             if( !driver.UpdatePackageDependencies( m, upgrades ) ) return (null, false);
 
@@ -42,7 +42,7 @@ namespace CK.Env
             var msg = $"CI build: Upgrading dependencies:{Environment.NewLine}{Environment.NewLine}{upText}.";
             if( !driver.GitRepository.Commit( m, msg ) ) return (null, false);
             _commits[s.Index] = driver.GitRepository.Head.CommitSha;
-            return (driver.GitRepository.GetCommitVersionInfo( m ).FinalBuildInfo.Version, true);
+            return (driver.GitRepository.ReadVersionInfo( m ).FinalBuildInfo.Version, true);
         }
 
         protected override BuildState Build( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade )

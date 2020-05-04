@@ -23,6 +23,8 @@ namespace CK.Env.Plugin
             bool needDotNetBuild = s.Projects.Any( p => p.Type == ".Net" && p != s.BuildProject );
 
             // Clean old CodeCakeBuilders files
+            DeleteFile( m, "RepositoryInfo.xsd" );
+
             DeleteFile( m, "Build.NuGetHelper.cs" );
             DeleteFile( m, "Build.StandardCheckRepository.cs" );
             DeleteFile( m, "Build.StandardCreateNuGetPackages.cs" );
@@ -34,9 +36,14 @@ namespace CK.Env.Plugin
             DeleteFile( m, "Build.SetCIVersionOnRunner.cs" );
             DeleteFile( m, "npm/Build.NpmHelper.cs" );
             DeleteFile( m, "Abstractions/ArtifactRepository.cs" );
+
             DeleteFile( m, "dotnet/Build.NugetRepository.cs" );
+            DeleteFile( m, "dotnet/Build.StandardUnitTests.cs" );
             DeleteFile( m, "dotnet/Build.StandardCheckRepository.cs" );
+            DeleteFile( m, "dotnet/Build.StandardSolutionBuild.cs" );
+            DeleteFile( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
             DeleteFile( m, "dotnet/Build.StandardPushNuGetPackages.cs" );
+
             DeleteFile( m, "CakeExtensions/NpmGet.cs" );
             DeleteFile( m, "npm/Build.NpmRepository.cs" );
             DeleteFile( m, "npm/Build.StandardNpmBuild.cs" );

@@ -2,6 +2,7 @@ using CK.Core;
 using CK.Env.DependencyModel;
 using CK.Env.Diff;
 using CSemVer;
+using SimpleGitVersion;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -14,7 +15,7 @@ namespace CK.Env
     class ReleaseSolutionInfo : IReleaseSolutionInfo
     {
         readonly IGitRepository _repository;
-        readonly CommitVersionInfo _commitVersionInfo;
+        readonly ICommitInfo _commitVersionInfo;
         ReleaseRoadmap _releaser;
         ReleaseInfo _previouslyResolvedInfo;
         ReleaseInfo _releaseInfo;
@@ -22,7 +23,7 @@ namespace CK.Env
         internal ReleaseSolutionInfo(
             IGitRepository repository,
             DependentSolution solution,
-            CommitVersionInfo versionInfo,
+            ICommitInfo versionInfo,
             XElement previous = null )
         {
             Debug.Assert( repository != null && solution != null && versionInfo != null );
@@ -60,7 +61,7 @@ namespace CK.Env
         /// Gets the previous version, associated to a commit below the current one.
         /// This is null if no previous version has been found.
         /// </summary>
-        public CSVersion PreviousVersion => _commitVersionInfo.BestCommitBelow;
+        public CSVersion PreviousVersion => _commitVersionInfo.BestCommitBelow?.ThisTag;
 
         /// <summary>
         /// Gets or sets the release note.
@@ -164,7 +165,7 @@ namespace CK.Env
             {
                 _info = info;
                 Requirements = requirements;
-                _possible = new PossibleVersions( requirements, info._commitVersionInfo.BestCommitBelow, possibles );
+                _possible = new PossibleVersions( requirements, info._commitVersionInfo.BestCommitBelow?.ThisTag, possibles );
                 CanUsePreviouslyResolvedInfo = info._previouslyResolvedInfo.IsValid
                                                && info._previouslyResolvedInfo.IsCompatibleWith( requirements.Level, requirements.Constraint )
                                                && _possible.AllPossibleVersions.Contains( info._previouslyResolvedInfo.Version );
@@ -182,9 +183,7 @@ namespace CK.Env
 
             public ReleaseInfo Requirements { get; }
 
-            public CSVersion PreviousVersion => _info._commitVersionInfo.BestCommitBelow;
-
-            public string PreviousVersionCommitSha => _info._commitVersionInfo.BestCommitBelowSha;
+            public ITagCommit? PreviousVersion => _info._commitVersionInfo.BestCommitBelow;
 
             public string ReleaseNote { get => _info.ReleaseNote; set => _info.ReleaseNote = value; }
 
@@ -195,7 +194,7 @@ namespace CK.Env
                     m.Debug( $"Computing diff for {Solution.Solution.Name}." );
                     _diffsComputed = true;
                     var diffRoots = Solution.Solution.GeneratedArtifacts.Select( g => new DiffRoot( g.Artifact.TypedName, g.Project.ProjectSources ) );
-                    _diffResult = _info._repository.GetDiff( m, PreviousVersionCommitSha, diffRoots );
+                    _diffResult = _info._repository.GetDiff( m, PreviousVersion?.CommitSha, diffRoots );
                 }
                 return _diffResult;
             }
@@ -270,24 +269,24 @@ namespace CK.Env
                 // In both cases, we must keep the ReleaseLevel.None, however, the requirements may
                 // not be None if we are processing an existing roadmap and updates have been
                 // already applied to the files.
-                if( _commitVersionInfo.ValidReleaseTag != null )
+                if( _commitVersionInfo.ReleaseTag != null )
                 {
-                    m.Warn( $"This commit has already a version tag: {_commitVersionInfo.ValidReleaseTag}." );
-                    if( !versionSelector.OnAlreadyReleased( m, Solution, _commitVersionInfo.ValidReleaseTag, false ) )
+                    m.Warn( $"This commit has already a version tag: {_commitVersionInfo.ReleaseTag}." );
+                    if( !versionSelector.OnAlreadyReleased( m, Solution, _commitVersionInfo.ReleaseTag, false ) )
                     {
                         return new ReleaseInfo();
                     }
-                    return new ReleaseInfo().WithVersion( _commitVersionInfo.ValidReleaseTag );
+                    return new ReleaseInfo().WithVersion( _commitVersionInfo.ReleaseTag );
                 }
-                if( _commitVersionInfo.BetterExistingVersion != null )
+                if( _commitVersionInfo.AlreadyExistingVersion != null )
                 {
                     // TODO: ensure that this is the tag of the commit point merged into master branch.
-                    m.Info( $"This commit has a content version tag: {_commitVersionInfo.BetterExistingVersion}. We use it." );
-                    if( !versionSelector.OnAlreadyReleased( m, Solution, _commitVersionInfo.BetterExistingVersion, true ) )
+                    m.Info( $"This commit has a content version tag: {_commitVersionInfo.AlreadyExistingVersion.ThisTag}. We use it." );
+                    if( !versionSelector.OnAlreadyReleased( m, Solution, _commitVersionInfo.AlreadyExistingVersion.ThisTag, true ) )
                     {
                         return new ReleaseInfo();
                     }
-                    return new ReleaseInfo().WithVersion( _commitVersionInfo.BetterExistingVersion );
+                    return new ReleaseInfo().WithVersion( _commitVersionInfo.AlreadyExistingVersion.ThisTag );
                 }
                 possibleVersions = _commitVersionInfo.PossibleVersions;
             }
@@ -339,7 +338,7 @@ namespace CK.Env
             return new XElement( XmlNames.xS,
                         new XAttribute( XmlNames.xName, Solution.Solution.Name ),
                         new XAttribute( XmlNames.xSubPath, Solution.Solution.FullPath ),
-                        new XAttribute( XmlNames.xCommitSha, _commitVersionInfo.CommitSha ),
+                        new XAttribute( XmlNames.xCommitSha, _commitVersionInfo.FinalBuildInfo.CommitSha ),
                         _releaseInfo.ToXml(),
                         new XElement( XmlNames.xReleaseNote, new XCData( ReleaseNote ?? String.Empty ) ) );
         }

@@ -18,7 +18,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="path">The object's path. When empty, it is the SHA of the Tree (the "content SHA")) that is retrieved.</param>
         /// <returns>The SHA or null if not found.</returns>
-        string GetSha( string path = null );
+        string GetSha( string? path = null );
 
         /// <summary>
         /// Gets the current commit's message.

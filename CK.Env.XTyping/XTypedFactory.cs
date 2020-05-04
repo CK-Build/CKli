@@ -11,10 +11,10 @@ namespace CK.Env
 {
     public class XTypedFactory
     {
-        readonly XTypedFactory _base;
+        readonly XTypedFactory? _base;
         readonly Dictionary<XName, Type> _typeRegister;
 
-        public XTypedFactory( XTypedFactory baseFactory = null )
+        public XTypedFactory( XTypedFactory? baseFactory = null )
         {
             _base = baseFactory;
             _typeRegister = new Dictionary<XName, Type>();
@@ -106,7 +106,7 @@ namespace CK.Env
             return true;
         }
 
-        public Type GetNameMappping( XName n )
+        public Type? GetNameMappping( XName n )
         {
             if( !_typeRegister.TryGetValue( n, out var t ) && _base != null )
             {
@@ -115,7 +115,7 @@ namespace CK.Env
             return t;
         }
 
-        public Type GetMappping( XElementReader r )
+        public Type? GetMappping( XElementReader r )
         {
             var t = GetNameMappping( r.Element.Name );
             if( t == null ) r.WarnUnhandledElements();
@@ -123,12 +123,12 @@ namespace CK.Env
             return t;
         }
 
-        public T CreateInstance<T>( IActivityMonitor monitor, XElement e, IServiceProvider baseProvider = null ) where T : XTypedObject
+        public T? CreateInstance<T>( IActivityMonitor monitor, XElement e, IServiceProvider? baseProvider = null ) where T : XTypedObject
         {
-            return (T)CreateInstance( monitor, e, baseProvider, typeof( T ) );
+            return (T?)CreateInstance( monitor, e, baseProvider, typeof( T ) );
         }
 
-        public XTypedObject CreateInstance( IActivityMonitor monitor, XElement e, IServiceProvider baseProvider = null, Type type = null )
+        public XTypedObject? CreateInstance( IActivityMonitor monitor, XElement e, IServiceProvider? baseProvider = null, Type? type = null )
         {
             using( monitor.OpenDebug( $"Creating XTypedObject from root {e.ToStringPath()}." ) )
             {
@@ -139,25 +139,29 @@ namespace CK.Env
                 e.Changing += PreventAnyChangesToXElement;
                 var eReader = new XElementReader( monitor, e, new HashSet<XObject>() );
 
+                XTypedObject? result = null;
                 if( type == null ) type = GetMappping( eReader );
-                var rootConfig = new XTypedObject.Initializer( this, eReader, baseProvider );
-                var root = (XTypedObject)baseProvider.SimpleObjectCreate( monitor, type, rootConfig );
-                var result = root != null && CreateChildren( root, rootConfig ) ? root : null;
-                if( result != null ) eReader.WarnUnhandledAttributes();
+                if( type != null )
+                {
+                    var rootConfig = new XTypedObject.Initializer( this, eReader, baseProvider );
+                    var root = (XTypedObject?)baseProvider?.SimpleObjectCreate( monitor, type, rootConfig );
+                    result = root != null && CreateChildren( root, rootConfig ) ? root : null;
+                    if( result != null ) eReader.WarnUnhandledAttributes();
+                }
                 return result;
             }
         }
 
-        static void PreventAnyChangesToXElement( object sender, XObjectChangeEventArgs e )
+        static void PreventAnyChangesToXElement( object? sender, XObjectChangeEventArgs e )
         {
             throw new InvalidOperationException( "An XElement that is bound to a TypedObject must not be changed." );
         }
 
         static bool CreateChildren( XTypedObject parent, XTypedObject.Initializer parentConfig )
         {
-            SimpleServiceContainer cChild = null;
-            List<XTypedObject> created = null;
-            XTypedFactory typeFactory = null;
+            SimpleServiceContainer? cChild = null;
+            List<XTypedObject>? created = null;
+            XTypedFactory? typeFactory = null;
             var eParent = parent.XElement;
             foreach( var child in eParent.Elements() )
             {
@@ -175,7 +179,7 @@ namespace CK.Env
                     rChild.WarnUnhandledAttributes();
                 }
             }
-            return parent.OnChildrenCreated( parentConfig, (IReadOnlyList<XTypedObject>)created ?? Array.Empty<XTypedObject>() );
+            return parent.OnChildrenCreated( parentConfig, (IReadOnlyList<XTypedObject>?)created ?? Array.Empty<XTypedObject>() );
         }
 
         /// <summary>
@@ -183,7 +187,7 @@ namespace CK.Env
         /// </summary>
         public struct PreProcessResult
         {
-            internal PreProcessResult( IReadOnlyList<ActivityMonitorSimpleCollector.Entry> errors, XElement result )
+            internal PreProcessResult( IReadOnlyList<ActivityMonitorSimpleCollector.Entry>? errors, XElement result )
             {
                 Errors = errors ?? Array.Empty<ActivityMonitorSimpleCollector.Entry>();
                 Result = errors != null ? null : result;
@@ -193,7 +197,7 @@ namespace CK.Env
             /// Gets the preprocessed result.
             /// This can be available even if there are errors.
             /// </summary>
-            public XElement Result { get; }
+            public XElement? Result { get; }
 
             /// <summary>
             /// Gets the potential errors or warnings.
@@ -203,7 +207,7 @@ namespace CK.Env
 
         public static PreProcessResult PreProcess( IActivityMonitor monitor, XElement e )
         {
-            IReadOnlyList<ActivityMonitorSimpleCollector.Entry> errors = null;
+            IReadOnlyList<ActivityMonitorSimpleCollector.Entry>? errors = null;
             XElement result;
             using( monitor.CollectEntries( err => errors = err ) )
             {
@@ -214,7 +218,7 @@ namespace CK.Env
 
         class Reusables
         {
-            Dictionary<string, List<XNode>> _map;
+            Dictionary<string, List<XNode>>? _map;
 
             public Reusables( IActivityMonitor monitor, XElement root )
             {
@@ -226,14 +230,11 @@ namespace CK.Env
             {
                 Element = e;
                 Monitor = directParent.Monitor;
-                while( directParent.Element.Name == "Region" )
-                {
-                    directParent = directParent.Parent;
-                }
                 Parent = directParent;
+                while( Parent?.Element.Name == "Region" ) Parent = Parent.Parent;
             }
 
-            public Reusables Parent;
+            public Reusables? Parent;
 
             public readonly XElement Element;
 
@@ -276,7 +277,7 @@ namespace CK.Env
                             return Array.Empty<XElement>();
                         }
                         string reusableName = (string)e.AttributeRequired( "Name" );
-                        IEnumerable<XNode> reusable = Find( reusableName, clone: true );
+                        IEnumerable<XNode>? reusable = Find( reusableName, clone: true );
                         if( reusable == null )
                         {
                             Monitor.Error( $"Unable to find reusable named '{reusableName}' from {e.ToStringPath()}." );
@@ -309,9 +310,9 @@ namespace CK.Env
                 }
             }
 
-            IReadOnlyList<XNode> Find( string name, bool clone )
+            IReadOnlyList<XNode>? Find( string name, bool clone )
             {
-                var c = this;
+                Reusables? c = this;
                 do
                 {
                     if( c._map != null && c._map.TryGetValue( name, out var reusable ) )
