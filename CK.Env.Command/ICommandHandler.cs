@@ -45,7 +45,7 @@ namespace CK.Env
 
         /// <summary>
         /// Executes this command with its (optional) payload object.
-        /// Exception should be thrown by this metho, including <see cref="ArgumentException"/> if payload is not valid.
+        /// Exception should be thrown by this method, including <see cref="ArgumentException"/> if payload is not valid.
         /// The extension <see cref="CommandHandlerExtension.Execute(ICommandHandler, IActivityMonitor, object?)"/> handles any error.
         /// </summary>
         /// <param name="m">The monitor to use.</param>

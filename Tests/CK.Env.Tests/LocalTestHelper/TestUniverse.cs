@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-
+using static CK.Testing.MonitorTestHelper;
 namespace CK.Env.Tests.LocalTestHelper
 {
     public class TestUniverse : IDisposable
@@ -103,15 +103,14 @@ namespace CK.Env.Tests.LocalTestHelper
         {
             m.Info( $"Creating TestUniverse from {path}." );
             NormalizedPath ckliPath = path.AppendPart( _ckliMapping );
-            if( Directory.Exists( ckliPath ) )
-            {
-                ReplaceInDirectoriesPaths(
-                    ckliPath: ckliPath,
-                    oldString: GitWorldStore.StackRepo.CleanPathDirName( PlaceHolderString ),
-                    newString: GitWorldStore.StackRepo.CleanPathDirName( path )
-                );
-            }
-            PlaceHolderSwapEverything( m, path, PlaceHolderString, path );
+            //if( Directory.Exists( ckliPath ) )
+            //{
+            //    RenameDirectories(
+            //        dirPath: ckliPath,
+            //        oldString: GitWorldStore.StackRepo.CleanPathDirName( PlaceHolderString ),
+            //        newString: GitWorldStore.StackRepo.CleanPathDirName( path )
+            //    );
+            //}
             var userHost = new UserHost( new FakeApplicationLifetime(), ckliPath );
             var output = new TestUniverse( m, path, userHost );
             userHost.Initialize( m );
@@ -152,42 +151,79 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public static void PlaceHolderSwapEverything( IActivityMonitor m, NormalizedPath tempPath, string oldString, string newString )
         {
-            var ckliMapping = tempPath.AppendPart( _ckliMapping );
-            var c = LoadConfig( ckliMapping );
-            foreach( StackConfig config in c.Select( p => p.Value ) )
-            {
-                config.PlaceHolderSwap( oldString, newString );
-                config.Save();
-            }
-            int cnt = SwapAllGitOriginPlaceholders( m, tempPath, oldString, newString );
-            ReplacePlaceHolderInFile( ckliMapping.AppendPart( "WorldLocalMapping.txt" ), oldString, newString );
-            ReplacePlaceHolderInFile( ckliMapping.AppendPart( "Stacks.xml" ), oldString, newString );
+            ChangeStringInAllSubPathAndFileContent( m, tempPath, oldString, newString );
+            //var ckliMapping = tempPath.AppendPart( _ckliMapping );
+            //var c = LoadConfig( ckliMapping );
+            //foreach( StackConfig config in c.Select( p => p.Value ) )
+            //{
+            //    config.PlaceHolderSwap( oldString, newString );
+            //    config.Save();
+            //}
+            //int cnt = SwapAllGitOriginPlaceholders( m, tempPath, oldString, newString );
+            //ReplacePlaceHolderInFile( ckliMapping.AppendPart( "WorldLocalMapping.txt" ), oldString, newString );
+            //ReplacePlaceHolderInFile( ckliMapping.AppendPart( "Stacks.xml" ), oldString, newString );
         }
 
-        static void ReplacePlaceHolderInFile( string filePath, string oldString, string newString )
+        static void ReplacePlaceHolderInFile( IActivityMonitor m, string filePath, string oldString, string newString )
         {
-            if( !File.Exists( filePath ) ) return;
-            File.WriteAllText( filePath, File.ReadAllText( filePath ).Replace( oldString, newString ) );
+            string fileContent = File.ReadAllText( filePath );
+            if( !fileContent.Contains( oldString ) ) return;
+            m.Info( $"Corrected '{oldString}' to '{newString}' in '{filePath}'.'" );
+            File.WriteAllText( filePath, fileContent.Replace( oldString, newString ) );
         }
 
-        static void ReplaceInDirectoriesPaths( NormalizedPath ckliPath, string oldString, string newString )
+        static void RenameFile( IActivityMonitor m, NormalizedPath filePath, string oldString, string newString )
         {
-            foreach( var path in Directory.EnumerateDirectories( ckliPath, "*.*" ).Where( s => s.Contains( oldString ) ) )
+            if( !filePath.LastPart.Contains( oldString ) ) return;
+            NormalizedPath newPath = filePath.RemoveLastPart().AppendPart( filePath.LastPart.Replace( oldString, newString ) );
+            m.Info( $"'{filePath}' is now '{newPath}'" );
+            File.Move( filePath, newPath );
+        }
+
+        static void RenameFolder( IActivityMonitor m, NormalizedPath dirPath, string oldString, string newString )
+        {
+            oldString = GitWorldStore.StackRepo.CleanPathDirName( oldString );
+            newString = GitWorldStore.StackRepo.CleanPathDirName( newString );
+            if( !dirPath.LastPart.Contains( oldString ) ) return;
+            NormalizedPath newPath = dirPath.RemoveLastPart().AppendPart( dirPath.LastPart.Replace( oldString, newString ) );
+            m.Info( $"'{dirPath}' is now '{newPath}'" );
+            Directory.Move( dirPath, newPath );
+        }
+
+        static void ChangeStringInAllSubPathAndFileContent( IActivityMonitor m, NormalizedPath dirPath, string oldString, string newString )
+        {
+            //The Ministry of Truth Function
+            string[] dirs = Directory.GetDirectories( dirPath );
+            for( int i = 0; i < dirs.Length; i++ )
             {
-                Directory.Move( path, path.Replace( oldString, newString ) );
+                ChangeStringInAllSubPathAndFileContent( m, dirs[i], oldString, newString );
+                RenameFolder( m, dirs[i], oldString, newString );
+            }
+            string[] files = Directory.GetFiles( dirPath );
+            for( int i = 0; i < files.Length; i++ )
+            {
+                RenameFile( m, files[i], oldString, newString );
+                ReplacePlaceHolderInFile( m, files[i], oldString, newString );
             }
         }
+
+        //static void RenameDirectories( NormalizedPath dirPath, string oldString, string newString )
+        //{
+        //    foreach( var path in Directory.EnumerateDirectories( dirPath, "*.*" ).Where( s => s.Contains( oldString ) ) )
+        //    {
+        //        Directory.Move( path, path.Replace( oldString, newString ) );
+        //    }
+        //}
 
         public NormalizedPath SnapshotState( string imageName )
         {
             NormalizedPath tempPath = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
-            FileHelper.DirectoryCopy( UniversePath, tempPath, true ); //Try to escape all handles.
-            PlaceHolderSwapEverything( _m, tempPath, UniversePath, PlaceHolderString );
-            ReplaceInDirectoriesPaths( tempPath.AppendPart( _ckliMapping ), GitWorldStore.StackRepo.CleanPathDirName( UniversePath ), GitWorldStore.StackRepo.CleanPathDirName( PlaceHolderString ) );
+            FileHelper.DirectoryCopy( UniversePath, tempPath, true ); //Try to escape all write handles.
             NormalizedPath output = ImageManager.CacheUniverseFolder.AppendPart( imageName + ".zip" );
             if( File.Exists( output ) ) File.Delete( output );
             Directory.CreateDirectory( ImageManager.CacheUniverseFolder );
             ZipFile.CreateFromDirectory( tempPath, output );
+            FileHelper.RawDeleteLocalDirectory( TestHelper.Monitor, tempPath );
             return output;
         }
 
