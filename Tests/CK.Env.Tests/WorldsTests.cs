@@ -1,3 +1,4 @@
+using CK.Core;
 using CK.Env.Tests.LocalTestHelper;
 using FluentAssertions;
 using NUnit.Framework;
@@ -38,36 +39,55 @@ namespace CK.Env.Tests
         [Test]
         public void a_simple_project_can_be_opened()
         {
-            ImageLibrary.minimal_solution_open( ( universe ) => { }, TestHelper.IsExplicitAllowed );
+            ImageLibrary.minimal_solution_open( _ => { }, TestHelper.IsExplicitAllowed );
         }
 
         [Test]
-        public void a_simple_project_can_be_ccb_apply_settings()
+        public void Exceptions_raised_by_Commands_stop_the_test_on_error()
         {
-            ImageLibrary.minimal_solution_add_ccb( ( universe ) => { }, TestHelper.IsExplicitAllowed );
+            ImageLibrary.minimal_solution_open( universe =>
+            {
+                var world = universe.EnsureWorldOpened( "CKTest-Build" );
+                GitPluginSampleMock.ThrowOnExecuteSomething = true;
+                try
+                {
+                    universe.Invoking( u => u.RunCommands( TestHelper.Monitor, world.WorldName.FullName, "**MockPlugin/ExecuteSomething" ) )
+                                .Should().Throw<Exception>().WithMessage( "Mock.ExecuteSomething" );
+                }
+                finally
+                {
+                    GitPluginSampleMock.ThrowOnExecuteSomething = false;
+                }
+            }, TestHelper.IsExplicitAllowed );
+        }
+
+        [Test]
+        public void a_simple_project_can_apply_settings()
+        {
+            ImageLibrary.minimal_solution_apply_settings( ( universe ) => { }, TestHelper.IsExplicitAllowed );
         }
 
         [Test]
         public void a_simple_project_can_be_built_once()
         {
-            EnsureCallbackIsCalled(
-                ( Action<(TestUniverse, World)> action, object[] parameters ) =>
-                ImageLibrary.minimal_solution_first_ci_build( ( universe, world ) => action( (universe, world) ), (bool)parameters[0] ),
-                ( arg ) =>
+            EnsureCallbackIsCalled( (Action<(TestUniverse, World)> action, object[] parameters) =>
+                ImageLibrary.minimal_solution_first_ci_build(
+                    ( universe, world ) => action( (universe, world) ),
+                    (bool)parameters[0] ),
+                    arg =>
                     {
                         var files = Directory.EnumerateFiles( arg.Item1.DevDirectory.Combine( "LocalFeed/CI" ) );
                         files.Should().HaveCount( 1 );
                         Path.GetFileName( files.Single() ).Should().Be( "CKTest.Code.Cake.0.1.1--0007-develop.nupkg" );
                     },
-                TestHelper.IsExplicitAllowed
-            );
+                    TestHelper.IsExplicitAllowed
+                );
         }
 
         [Test]
         public void a_simple_project_can_be_built_a_second_time()
         {
-            ImageLibrary.minimal_solution_second_ci_build(
-            ( universe, world ) =>
+            ImageLibrary.minimal_solution_second_ci_build( ( universe, world ) =>
             {
                 var files = Directory.EnumerateFiles( universe.DevDirectory.Combine( "LocalFeed/CI" ) );
                 files.Should().HaveCount( 1 ); //We didn't made any modification: the version should not change.
@@ -78,7 +98,7 @@ namespace CK.Env.Tests
         [Test]
         public void dll_should_not_change_after_rebuild()
         {
-            ImageLibrary.minimal_solution_second_ci_build( (universe, world) => { }, TestHelper.IsExplicitAllowed );//We are now sure this image, and it's base exist.
+            ImageLibrary.minimal_solution_second_ci_build( (universe, world) => { }, TestHelper.IsExplicitAllowed ); //We are now sure this image, and it's base exist.
             using( var compare = ImageManager.CompareBuildedImages(
                 nameof( ImageLibrary.minimal_solution_first_ci_build ),
                 nameof( ImageLibrary.minimal_solution_second_ci_build ) ) )
@@ -93,7 +113,7 @@ namespace CK.Env.Tests
             bool isExplicit = TestHelper.IsExplicitAllowed;
             var imageA = ImageLibrary.minimal_solution_second_ci_build( null, isExplicit );
             var imageB = ImageLibrary.another_minimal_solution_second_ci_build( null, isExplicit );
-            using( var compare = ImageManager.CompareBuildedImages( imageA, imageB ) )
+            using( var compare = ImageManager.CompareBuiltImages( imageA, imageB ) )
             {
                 compare.AExceptB.Where( p => IsFileThatShouldBeDeterministic( p.FullName ) ).Should().BeEmpty();
             }

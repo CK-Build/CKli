@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text.RegularExpressions;
 
@@ -8,25 +9,24 @@ namespace System.Xml.Linq
     {
         static readonly Regex _startRegex = new Regex( "^<(?<1>[a-zA-Z]\\w*)>", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture );
         readonly string _startMarker;
-        readonly string _endMarker;
         readonly XComment _start;
         readonly XComment _end;
 
-        XCommentSection( string name, string startMarker, string endMarker, XComment start, XComment end )
+        XCommentSection( string name, string startMarker, XComment start, XComment end )
         {
             Name = name;
             _startMarker = startMarker;
-            _endMarker = endMarker;
             _start = start;
             _end = end;
         }
 
-        public static XCommentSection FindOrCreate( XElement parent, string name, bool createIfNotExists = false )
+        public static XCommentSection? FindOrCreate( XElement parent, string name, bool createIfNotExists = false )
         {
             var startMarker = "<" + name + ">";
             var endMarker = "</" + name + ">";
-            var start = parent.DescendantNodes().OfType<XComment>().Where( n => n.Value.StartsWith( startMarker ) ).SingleOrDefault();
-            XComment end = null;
+            var start = parent.DescendantNodes().OfType<XComment>().Where( n => n.Value.StartsWith( startMarker ) ).FirstOrDefault();
+            if( start == null && !createIfNotExists ) return null;
+            XComment? end = null;
             if( start != null )
             {
                 end = start.NodesAfterSelf().OfType<XComment>().FirstOrDefault( n => n.Value.StartsWith( endMarker ) );
@@ -44,13 +44,14 @@ namespace System.Xml.Linq
                     }
                 }
             }
-            else if( createIfNotExists )
+            else 
             {
+                Debug.Assert( createIfNotExists );
                 start = new XComment( startMarker );
                 end = new XComment( endMarker );
                 parent.Add( new XText( Environment.NewLine ), start, end, new XText( Environment.NewLine ) );
             }
-            return start != null ? new XCommentSection( name, startMarker, endMarker, start, end ) : null;
+            return new XCommentSection( name, startMarker, start, end );
         }
 
         public string Name { get; }

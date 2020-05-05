@@ -2,6 +2,7 @@ using CK.Core;
 using CK.Text;
 using FluentAssertions;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using static CK.Testing.MonitorTestHelper;
@@ -42,16 +43,20 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public static TestUniverse RunCommands( this TestUniverse universe, IActivityMonitor m, string worldName, string commandFilter, params object[] args )
         {
+            return RunCommands( universe, m, worldName, universe.UserHost.CommandRegister.GetCommands( commandFilter ), args );
+        }
+
+        public static TestUniverse RunCommands( this TestUniverse universe, IActivityMonitor m, string worldName, IEnumerable<ICommandHandler> commands, params object[] args )
+        {
             EnsureWorldOpened( universe, worldName );
-            var commandRegister = universe.UserHost.CommandRegister;
-            foreach( var command in commandRegister.GetCommands( commandFilter ) )
+            foreach( var command in commands )
             {
                 var payload = (SimplePayload)command.CreatePayload();
                 for( int i = 0; i < args.Length; i++ )
                 {
                     payload.Fields[i].SetValue( args[i] );
                 }
-                command.Execute( m, payload );
+                command.UnsafeExecute( m, payload );
             }
             return universe;
         }
@@ -70,7 +75,7 @@ namespace CK.Env.Tests.LocalTestHelper
                 }
                 simple.Fields[0].SetValue( "Tests automated commit. If you see this commit online, blame Kuinox." );
                 simple.Fields[1].SetValue( 0 );
-                command.Execute( m, payload );
+                command.UnsafeExecute( m, payload );
             }
             return universe;
         }

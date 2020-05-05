@@ -2,9 +2,13 @@ using CK.Core;
 using CK.Text;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Text.RegularExpressions;
+
+#nullable enable
 
 namespace CK.Env
 {
@@ -42,11 +46,12 @@ namespace CK.Env
         {
             readonly object _instance;
             readonly MethodInfo _method;
-            readonly Func<bool> _enabled;
+            readonly Func<bool>? _enabled;
             readonly ParameterInfo[] _parameters;
 
-            public MethodHandler( bool confirmationRequired, NormalizedPath n, object instance, MethodInfo method, ParallelCommandMode parallelMode, ParameterInfo[] parameters, Func<bool> enabled )
+            public MethodHandler( bool confirmationRequired, NormalizedPath n, object instance, MethodInfo method, ParallelCommandMode parallelMode, ParameterInfo[] parameters, Func<bool>? enabled )
             {
+                if( !IsValidCommandName( n ) ) throw new ArgumentException( $"Invalid characters in command name: {n}." );
                 ConfirmationRequired = confirmationRequired;
                 UniqueName = n;
                 _instance = instance;
@@ -59,51 +64,53 @@ namespace CK.Env
                 ParallelMode = parallelMode;
             }
 
+            static readonly char[] _invalidCommandNameChar = Path.GetInvalidPathChars().Concat( new char[] { '*', '?', '|', '<', '>' } ).Distinct().ToArray();
+ 
+            static public bool IsValidCommandName( NormalizedPath name )
+            {
+                return name.Path.IndexOfAny( _invalidCommandNameChar ) < 0;
+            }
+
             public bool ConfirmationRequired { get; }
 
             public NormalizedPath UniqueName { get; }
 
             public bool GetEnabled() => _enabled != null ? _enabled() : true;
 
-            public string PayloadSignature { get; }
+            public string? PayloadSignature { get; }
 
             public ParallelCommandMode ParallelMode { get; }
 
-            public object CreatePayload()
+            public object? CreatePayload()
             {
                 return PayloadSignature != null ? new SimplePayload( _parameters.Skip( 1 ) ) : null;
             }
 
-            public void Execute( IActivityMonitor m, object payload )
+            public void UnsafeExecute( IActivityMonitor m, object? payload )
             {
-                using( m.OpenTrace( $"Executing {UniqueName}." ) )
+                object[] p;
+                if( PayloadSignature != null )
                 {
-                    try
+                    if( !(payload is SimplePayload simple)
+                        || simple.Fields.Count != _parameters.Length - 1 )
                     {
-                        if( PayloadSignature != null )
-                        {
-                            if( !(payload is SimplePayload simple)
-                                || simple.Fields.Count != _parameters.Length - 1 )
-                            {
-                                throw new ArgumentException( nameof( payload ) );
-                            }
-                            var p = new object[_parameters.Length];
-                            p[0] = m;
-                            for( int i = 0; i < simple.Fields.Count; ++i )
-                            {
-                                p[i + 1] = simple.Fields[i].GetValue();
-                            }
-                            _method.Invoke( _instance, p );
-                        }
-                        else
-                        {
-                            _method.Invoke( _instance, new[] { m } );
-                        }
+                        throw new ArgumentException( nameof( payload ) );
                     }
-                    catch( Exception ex )
+                    p = new object[_parameters.Length];
+                    p[0] = m;
+                    for( int i = 0; i < simple.Fields.Count; ++i )
                     {
-                        m.Error( ex );
+                        p[i + 1] = simple.Fields[i].GetValue();
                     }
+                }
+                else p = new[] { m };
+                try
+                {
+                    _method.Invoke( _instance, p );
+                }
+                catch( TargetInvocationException ex )
+                {
+                    ExceptionDispatchInfo.Capture( ex.InnerException ?? ex ).Throw();
                 }
             }
         }
@@ -118,7 +125,7 @@ namespace CK.Env
         /// <param name="parallelMode">Parallel command mode.</param>
         /// <param name="enabled">A companion function that knows how to compute whether the command is enabled or not.</param>
         /// <returns>The registered command handler.</returns>
-        public ICommandHandler Register( bool confirmationRequired, NormalizedPath uniqueName, object o, MethodInfo method, ParallelCommandMode parallelMode, Func<bool> enabled = null )
+        public ICommandHandler Register( bool confirmationRequired, NormalizedPath uniqueName, object o, MethodInfo method, ParallelCommandMode parallelMode, Func<bool>? enabled = null )
         {
             if( _commands.ContainsKey( uniqueName ) )
             {
@@ -152,7 +159,7 @@ namespace CK.Env
             }
         }
 
-        Func<bool> GetEnabledMethod( object instance, MethodInfo[] methods, string commandMethodName )
+        Func<bool>? GetEnabledMethod( object instance, MethodInfo[] methods, string commandMethodName )
         {
             var isEnabledName = $"Is{commandMethodName}Enabled";
             var canName = $"Can{commandMethodName}";
@@ -186,7 +193,7 @@ namespace CK.Env
         /// Unregisters all commands, optionally keeping some of them.
         /// </summary>
         /// <param name="keepFilter">Optional function that can return true to keep the handler registered.</param>
-        public void UnregisterAll( Func<ICommandHandler, bool> keepFilter = null )
+        public void UnregisterAll( Func<ICommandHandler, bool>? keepFilter = null )
         {
             if( keepFilter == null ) _commands.Clear();
             else
@@ -211,7 +218,7 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the registered commands that match a pattern with wildcards ('*' and '?').
+        /// Gets the registered commands that match a pattern with wildcards ('*' and '?') or multiple patterns separated by '|'.
         /// </summary>
         /// <param name="pattern">The pattern. Must not be null or empty.</param>
         /// <param name="checkEnabled">False to also return currently disabled commands.</param>
@@ -219,13 +226,24 @@ namespace CK.Env
         public IEnumerable<ICommandHandler> GetCommands( string pattern, bool checkEnabled = true )
         {
             if( String.IsNullOrWhiteSpace( pattern ) ) throw new ArgumentNullException( nameof( pattern ) );
-            // Escaping is not required (ther cannot be * or ? in name, this is tested in registration): the pattern is simple.
+
+            // Escaping is not required (there cannot be * or ? in name, this is tested in registration): the pattern is simple.
             // Nevertheless, we must check for stupid patterns (or so-to-speak smart people trying to DoS us...):
-            string cleaned;
-            while( (cleaned = pattern.Replace( "**", "*" ).Replace( "*?", "*" ).Replace( "?*", "*" )) != pattern ) pattern = cleaned;
-            pattern = '^' + Regex.Escape( cleaned ).Replace( "\\*", ".*" ).Replace( "\\?", "." ) + '$';
+            if( pattern.IndexOf( '|' ) >= 0 )
+            {
+                pattern = String.Join( "|", pattern.Split( new[] { '|' }, StringSplitOptions.RemoveEmptyEntries  ).Select( p => NormalizePattern( p ) ) );
+            }
+            else pattern = NormalizePattern( pattern );
+
             return _commands.Values.Where( c => Regex.IsMatch( c.UniqueName, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant )
                                                 && (!checkEnabled || c.GetEnabled()) );
+
+            static string NormalizePattern( string p )
+            {
+                string cleaned;
+                while( (cleaned = p.Replace( "**", "*" ).Replace( "*?", "*" ).Replace( "?*", "*" )) != p ) p = cleaned;
+                return '^' + Regex.Escape( cleaned ).Replace( "\\*", ".*" ).Replace( "\\?", "." ) + '$';
+            }
         }
 
         /// <summary>
@@ -233,6 +251,6 @@ namespace CK.Env
         /// </summary>
         /// <param name="path">Path of the command.</param>
         /// <returns>The command handler or null.</returns>
-        public ICommandHandler this[NormalizedPath path] => _commands.GetValueWithDefault( path, null );
+        public ICommandHandler? this[NormalizedPath path] => _commands.GetValueOrDefault( path );
     }
 }

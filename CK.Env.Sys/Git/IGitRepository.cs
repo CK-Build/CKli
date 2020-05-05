@@ -43,7 +43,7 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">Defaults to <see cref="CurrentBranchName"/>.</param>
         /// <returns>The RepositoryInfo or null if it it cannot be obtained.</returns>
-        ICommitInfo ReadVersionInfo( IActivityMonitor m, string? branchName = null );
+        ICommitInfo? ReadVersionInfo( IActivityMonitor m, string? branchName = null );
 
         /// <summary>
         /// Gets the sha of the given branch tip or null if the branch doesnt' exist.

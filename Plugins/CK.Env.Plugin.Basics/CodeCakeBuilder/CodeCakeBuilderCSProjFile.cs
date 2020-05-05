@@ -8,13 +8,17 @@ using System.Text;
 
 namespace CK.Env.Plugin
 {
+    /// <summary>
+    /// Implements the CodeCakeBuilder/CodeCakeBuilder.csproj file. Even if this is a <see cref="XmlFilePluginBase"/>, we don't
+    /// use this <see cref="XmlFileBase.Document"/> but the <see cref="MSProject"/> model.
+    /// </summary>
     public class CodeCakeBuilderCSProjFile : XmlFilePluginBase, ICommandMethodsProvider
     {
         readonly CodeCakeBuilderFolder _f;
         readonly SolutionDriver _solutionDriver;
 
         public CodeCakeBuilderCSProjFile( CodeCakeBuilderFolder f, NormalizedPath branchPath, SolutionDriver solutionDriver )
-            : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" ), Encoding.UTF8 )
+            : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" ), System.Xml.Linq.XNamespace.None + "Project", Encoding.UTF8 )
         {
             _f = f;
             _solutionDriver = solutionDriver;

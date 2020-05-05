@@ -39,7 +39,7 @@ namespace CK.Env.Tests.LocalTestHelper
         private readonly IActivityMonitor _m;
 
         /// <summary>
-        /// Instantiate a new <see cref="TestUniverse"/>.
+        /// Instanciates a new <see cref="TestUniverse"/>.
         /// </summary>
         /// <param name="tempPath">Path of the TestHost.</param>
         /// <param name="userHost">The UserHost instantied with this path.</param>

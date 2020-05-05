@@ -115,17 +115,11 @@ namespace CK.Env
             {
                 return PluginManager.BranchPlugins.EnsurePlugins( m, CurrentBranchName );
             }
-            m.Error( $"No plugins since '{ToString()}' is not on a branch." );
+            m.Error( $"No plugins since '{this}' is not on a branch." );
             return false;
         }
 
         protected override void OnNewCurrentBranch( IActivityMonitor m ) => EnsureCurrentBranchPlugins( m );
-
-        void CheckoutWithPlugins( IActivityMonitor m, Branch branch )
-        {
-            Commands.Checkout( Git, branch );
-            EnsureCurrentBranchPlugins( m );
-        }
 
         /// <summary>
         /// Fires whenever we switched to the local branch.
@@ -212,8 +206,7 @@ namespace CK.Env
                     m.Error( $"Missing required {pathOpt} file." );
                     return null;
                 }
-                var opt = new RepositoryInfoOptions( fOpt.ReadAsXDocument().Root );
-                opt.HeadBranchName = branchName;
+                var opt = new RepositoryInfoOptions( fOpt.ReadAsXDocument().Root ) { HeadBranchName = branchName };
                 var result = new CommitInfo( Git, opt );
                 result.Explain( new AdaptedLogger( m ) );
                 return result.Error == null ? result : null;
@@ -525,7 +518,7 @@ namespace CK.Env
         bool RaiseEnteredLocalBranch( IActivityMonitor m, bool enter )
         {
             PluginManager.BranchPlugins.EnsurePlugins( m, World.LocalBranchName );
-            using( m.OpenTrace( $"{ToString()}: Raising {(enter ? "OnLocalBranchEntered" : "OnLocalBranchLeaving")} event." ) )
+            using( m.OpenTrace( $"{this}: Raising {(enter ? "OnLocalBranchEntered" : "OnLocalBranchLeaving")} event." ) )
             {
                 try
                 {

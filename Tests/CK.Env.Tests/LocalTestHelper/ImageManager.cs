@@ -99,7 +99,7 @@ namespace CK.Env.Tests.LocalTestHelper
 
 
         public static ZipComparer CompareBuildedImages( string imageAName, string imageBName ) =>
-            CompareBuildedImages(
+            CompareBuiltImages(
                 CacheUniverseFolder.AppendPart( imageAName + ".zip" ),
                 CacheUniverseFolder.AppendPart( imageBName + ".zip" )
             );
@@ -109,7 +109,7 @@ namespace CK.Env.Tests.LocalTestHelper
             throw new NotImplementedException();
         }
 
-        public static ZipComparer CompareBuildedImages( NormalizedPath imageA, NormalizedPath imageB ) =>
+        public static ZipComparer CompareBuiltImages( NormalizedPath imageA, NormalizedPath imageB ) =>
             new ZipComparer(
                 ZipFile.OpenRead( imageA ),
                 ZipFile.OpenRead( imageB )

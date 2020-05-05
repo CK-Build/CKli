@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Text;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace System.Xml.Linq
@@ -179,6 +180,7 @@ namespace System.Xml.Linq
         /// Throws a xml exception with line/column information if possible.
         /// </summary>
         /// <param name="message">The exception message. Must not be null or empty.</param>
+        [DoesNotReturn]
         public void ThrowXmlException( string message )
         {
             if( String.IsNullOrWhiteSpace( message ) ) throw new ArgumentException( nameof( message ) );
@@ -360,6 +362,7 @@ namespace System.Xml.Linq
             return set;
         }
 
+        [DoesNotReturn]
         void Throw( XObject culprit, string message )
         {
             var p = culprit.GetLineColumnInfo();

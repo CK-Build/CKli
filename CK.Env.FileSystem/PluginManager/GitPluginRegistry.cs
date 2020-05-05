@@ -48,7 +48,12 @@ namespace CK.Env
             public Descriptor( EntryKey k )
             {
                 Key = k;
-                Ctor = k.Type.GetConstructors().Single();
+                var ctors = k.Type.GetConstructors();
+                if( ctors.Length != 1 )
+                {
+                    throw new ArgumentException( $"Git plugin '{k.Type.Name}' must have one and only one public constructor." );
+                }
+                Ctor = ctors[0];
                 BranchParameterIdx = -1;
                 Parameters = Ctor.GetParameters();
                 for( int i = 0; i < Parameters.Length; ++i )
@@ -58,21 +63,21 @@ namespace CK.Env
                     {
                         if( k.BranchName == null && IsGitFolderBranchPlugin( p.ParameterType ) )
                         {
-                            throw new ArgumentException( $"Invalid plugin dependency: {k.Type.FullName} depends on {p.ParameterType.FullName} that is Branch dependent.", nameof( EntryKey ) );
+                            throw new ArgumentException( $"Invalid plugin dependency: {k.Type.Name} depends on {p.ParameterType.Name} that is Branch dependent.", nameof( EntryKey ) );
                         }
                     }
                     else if( p.Name == "branchPath" && p.ParameterType == typeof( NormalizedPath ) )
                     {
                         if( k.BranchName == null )
                         {
-                            throw new ArgumentException( $"Invalid plugin: {k.Type.FullName} is not a IGitBranchPlugin: it can not have a 'NormalizedPath branchPath' parameter.", nameof( EntryKey ) );
+                            throw new ArgumentException( $"Invalid plugin: {k.Type.Name} is not a IGitBranchPlugin: it can not have a 'NormalizedPath branchPath' parameter.", nameof( EntryKey ) );
                         }
                         BranchParameterIdx = i;
                     }
                 }
                 if( BranchParameterIdx < 0 && k.BranchName != null )
                 {
-                    throw new ArgumentException( $"Constructor of {k.Type.FullName} must have a 'NormalizedPath branchPath' parameter.", nameof( EntryKey ) );
+                    throw new ArgumentException( $"Constructor of {k.Type.Name} must have a 'NormalizedPath branchPath' parameter.", nameof( EntryKey ) );
                 }
             }
 

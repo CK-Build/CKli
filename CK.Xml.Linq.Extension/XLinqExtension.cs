@@ -1,6 +1,7 @@
 using CK.Core;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
 
@@ -25,9 +26,9 @@ namespace System.Xml.Linq
         /// that can be changed: the function must return true if the content of the StringBuilder must be considered.
         /// </param>
         /// <returns>This document.</returns>
-        public static XDocument Beautify( this XDocument @this, Func<string, StringBuilder, bool> actualTextProcessor = null )
+        public static XDocument Beautify( this XDocument @this, Func<string, StringBuilder, bool>? actualTextProcessor = null )
         {
-            bool? GetPreserve( XElement e )
+            static bool? GetPreserve( XElement e )
             {
                 var p = (string)e.Attribute( _xmlSpace );
                 return p == null ? (bool?)null : p == "preserve";
@@ -94,7 +95,7 @@ namespace System.Xml.Linq
         }
 
         static void HandleCollectedXText(
-            Func<string, StringBuilder, bool> actualTextProcessor,
+            Func<string, StringBuilder, bool>? actualTextProcessor,
             string startLine,
             List<XText> currentXText,
             StringBuilder currentText,
@@ -116,7 +117,7 @@ namespace System.Xml.Linq
                     break;
                 }
             }
-            XText replacement = null;
+            XText? replacement = null;
             if( !hasActualText )
             {
                 if( !removeDefaultStartLine )
@@ -158,9 +159,10 @@ namespace System.Xml.Linq
         /// <param name="this">This XObject to clone.</param>
         /// <param name="setLineColumnInfo">False to not propagate any associated <see cref="IXmlLineInfo"/> to the cloned object.</param>
         /// <returns>A clone of this object.</returns>
-        public static T Clone<T>( this T @this, bool setLineColumnInfo = true ) where T : XObject
+        [return: NotNullIfNotNull( "this" )]
+        public static T? Clone<T>( this T? @this, bool setLineColumnInfo = true ) where T : XObject
         {
-            XObject o = null;
+            XObject? o = null;
             switch( @this )
             {
                 case null: return null;
@@ -179,7 +181,8 @@ namespace System.Xml.Linq
 
         /// <summary>
         /// Very simple process that removes any namespace: all <see cref="XElement.Name"/> are
-        /// set to their respective <see cref="XName.LocalName"/>.
+        /// set to their respective <see cref="XName.LocalName"/> and attributes that are <see cref="XAttribute.IsNamespaceDeclaration"/>
+        /// are removed.
         /// </summary>
         /// <param name="this">This element.</param>
         /// <returns>True if this element (or any of its child elements) has been changed, false otherwise.</returns>
@@ -279,7 +282,7 @@ namespace System.Xml.Linq
         {
             var textElements = @this.NodesAfterSelf().TakeWhile( n => n is XText ).Cast<XText>().ToList();
             if( textElements.Count == 0 ) return @this;
-            string text = null;
+            string? text = null;
             bool found = false;
             foreach( var x in textElements )
             {
@@ -287,6 +290,7 @@ namespace System.Xml.Linq
                 if( found ) x.Remove();
                 else found = true;
             }
+            Debug.Assert( text != null, "There is at least one text element." );
             found = false;
             int i = 0;
             while( i < text.Length )
@@ -413,7 +417,7 @@ namespace System.Xml.Linq
         internal static HashSet<T> ApplyAddRemoveClear<T>(
             this IEnumerable<XElement> @this,
             Func<XElement, T> builder,
-            IEqualityComparer<T> comparer = null )
+            IEqualityComparer<T>? comparer = null )
         {
             return ApplyAddRemoveClear( @this, new HashSet<T>( comparer ), builder );
         }

@@ -172,10 +172,10 @@ namespace CK.Env
                 {
                     if( cChild == null ) cChild = new SimpleServiceContainer( parentConfig.ChildServices );
                     var config = new XTypedObject.Initializer( parent, rChild, cChild );
-                    var o = (XTypedObject)cChild.SimpleObjectCreate( rChild.Monitor, tChild, config );
+                    var o = (XTypedObject?)cChild.SimpleObjectCreate( rChild.Monitor, tChild, config );
                     if( created == null ) created = new List<XTypedObject>();
-                    created.Add( o );
                     if( o == null || !CreateChildren( o, config ) ) return false;
+                    created.Add( o );
                     rChild.WarnUnhandledAttributes();
                 }
             }

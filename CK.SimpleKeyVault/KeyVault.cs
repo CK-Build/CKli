@@ -87,7 +87,7 @@ namespace CK.SimpleKeyVault
                 {
                     byte[] bytes = Convert.FromBase64String( l.Substring( 3 ) );
                     using( var mem = new MemoryStream( bytes ) )
-                    using( var algo = CreateCryptoAlgorithm( passPhrase ) )
+                    using( var algo = CreateCryptoAlgorithm( passPhrase, salt ) )
                     using( var read = new CryptoStream( mem, algo.CreateDecryptor(), CryptoStreamMode.Read ) )
                     using( var r = new BinaryReader( read ) )
                     {
@@ -136,7 +136,7 @@ namespace CK.SimpleKeyVault
         {
             if( values == null ) throw new ArgumentNullException( nameof( values ) );
             using( var mem = new MemoryStream() )
-            using( var algo = CreateCryptoAlgorithm( passPhrase ) )
+            using( var algo = CreateCryptoAlgorithm( passPhrase, salt ) )
             using( var output = new CryptoStream( mem, algo.CreateEncryptor(), CryptoStreamMode.Write ) )
             using( var w = new BinaryWriter( output ) )
             {
@@ -185,7 +185,7 @@ namespace CK.SimpleKeyVault
             if( fileName == null ) throw new ArgumentNullException( nameof( fileName ) );
             if( outFileName == null ) throw new ArgumentNullException( nameof( outFileName ) );
 
-            using( var algo = CreateCryptoAlgorithm( passPhrase ) )
+            using( var algo = CreateCryptoAlgorithm( passPhrase, salt ) )
             using( var inStream = File.OpenRead( fileName ) )
             {
                 using( var outStream = File.Create( outFileName ) )
@@ -210,7 +210,7 @@ namespace CK.SimpleKeyVault
             if( fileName == null ) throw new ArgumentNullException( nameof( fileName ) );
             if( outFileName == null ) throw new ArgumentNullException( nameof( outFileName ) );
 
-            using( var algo = CreateCryptoAlgorithm( passPhrase ) )
+            using( var algo = CreateCryptoAlgorithm( passPhrase, salt ) )
             using( var inStream = File.OpenRead( fileName ) )
             {
                 using( var outStream = File.Create( outFileName ) )
