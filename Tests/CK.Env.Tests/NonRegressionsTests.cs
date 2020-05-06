@@ -3,6 +3,7 @@ using FluentAssertions;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using static CK.Testing.MonitorTestHelper;
 
@@ -21,7 +22,7 @@ namespace CK.Env.Tests
             {
                 world.CheckGlobalGitStatus( TestHelper.Monitor, StandardGitStatus.Local ).Should().BeTrue();
                 universe.UserHost.WorldSelector.CloseWorld( TestHelper.Monitor );
-                var reopenedWorld = universe.EnsureWorldOpened( world.WorldName.Name );
+                var reopenedWorld = universe.EnsureWorldOpened( TestHelper.Monitor, world.WorldName.Name );
                 reopenedWorld.CheckGlobalGitStatus( TestHelper.Monitor, StandardGitStatus.Local ).Should().BeTrue();
             }, TestHelper.IsExplicitAllowed );
         }
@@ -34,12 +35,17 @@ namespace CK.Env.Tests
         {
             ImageLibrary.minimal_solution_first_ci_build( ( universe, world ) =>
             {
-                universe
-                    .RunCommands( TestHelper.Monitor, world.WorldName.Name, "*pull*" )
-                    .RunCommands( TestHelper.Monitor, world.WorldName.Name, "*command*", "git checkout master" )
-                    .RunCommands( TestHelper.Monitor, world.WorldName.Name, "*command*", "git pull" );
+                var monitor = TestHelper.Monitor;
 
-                world.DumpWorldState( TestHelper.Monitor ).Should().BeTrue();
+                world.GitRepositories.All( g => g.CheckCleanCommit( monitor ) ).Should().BeTrue( "All repositories should be cleaned." );
+
+                universe
+                    .RunCommands( monitor, world.WorldName.Name, "*pull*" )
+                    .RunCommands( monitor, world.WorldName.Name, "*command*", "git checkout master" )
+                    .RunCommands( monitor, world.WorldName.Name, "*command*", "git pull" );
+
+                world.DumpWorldState( TestHelper.Monitor ).Should().BeTrue( "All repositories should be cleaned after the pull/checkout mster/pull." );
+
             }, TestHelper.IsExplicitAllowed );
         }
     }

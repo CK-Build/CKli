@@ -283,6 +283,13 @@ namespace CK.Env
         public DriversCollection SolutionDrivers => _solutionDrivers;
 
         /// <summary>
+        /// Gets the set of <see cref="IGitRepository"/> that has been discovered
+        /// (thanks to the registration of at one <see cref="ISolutionDriver"/> on a branch).
+        /// </summary>
+        public IReadOnlyCollection<IGitRepository> GitRepositories => _gitRepositories;
+
+
+        /// <summary>
         /// Secure the execution of the lambda in a try/catch.
         /// </summary>
         /// <param name="m"></param>

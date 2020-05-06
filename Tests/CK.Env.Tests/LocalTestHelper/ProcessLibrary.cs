@@ -12,17 +12,20 @@ namespace CK.Env.Tests.LocalTestHelper
     public static class ProcessLibrary
     {
 
-        public static World EnsureWorldOpened( this TestUniverse universe, string worldName )
+        public static World EnsureWorldOpened( this TestUniverse universe, IActivityMonitor m, string worldName )
         {
             var currentWorldName = universe.UserHost.WorldSelector.CurrentWorld?.WorldName?.FullName;
             if( currentWorldName != worldName )
             {
-                if( currentWorldName != null )
+                using( m.OpenInfo( $"Running TestUniverse.EnsureWorldOpened( '{worldName}' ) - Previous Opened World was '{currentWorldName}'." ) )
                 {
-                    universe.UserHost.WorldSelector.CloseWorld( TestHelper.Monitor );
+                    if( currentWorldName != null )
+                    {
+                        universe.UserHost.WorldSelector.CloseWorld( m );
+                    }
+                    universe.UserHost.WorldStore.SetWorldMapping( m, worldName, universe.DevDirectory );
+                    universe.UserHost.WorldSelector.OpenWorld( m, worldName ).Should().BeTrue();
                 }
-                universe.UserHost.WorldStore.SetWorldMapping( TestHelper.Monitor, worldName, universe.DevDirectory );
-                universe.UserHost.WorldSelector.OpenWorld( TestHelper.Monitor, worldName ).Should().BeTrue();
             }
             return universe.UserHost.WorldSelector.CurrentWorld;
         }
@@ -31,13 +34,10 @@ namespace CK.Env.Tests.LocalTestHelper
         {
             universe.UserHost.WorldStore.EnsureStackRepository( m, universe.StackBareGitPath, isPublic: true );
 
-            TestUniverse.PlaceHolderSwapEverything(
-                m: m,
-                tempPath: universe.UniversePath,
-                oldString: TestUniverse.PlaceHolderString,
-                newString: universe.UniversePath
-            );
-            EnsureWorldOpened( universe, "CKTest-Build" );
+            TestUniverse.ChangeStringInAllSubPathAndFileContent( m, folder: universe.UniversePath,
+                                                                    oldString: TestUniverse.PlaceHolderString,
+                                                                    newString: universe.UniversePath );
+            EnsureWorldOpened( universe, m, "CKTest-Build" );
             return universe;
         }
 
@@ -48,7 +48,7 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public static TestUniverse RunCommands( this TestUniverse universe, IActivityMonitor m, string worldName, IEnumerable<ICommandHandler> commands, params object[] args )
         {
-            EnsureWorldOpened( universe, worldName );
+            EnsureWorldOpened( universe, m, worldName );
             foreach( var command in commands )
             {
                 var payload = (SimplePayload)command.CreatePayload();
@@ -61,35 +61,18 @@ namespace CK.Env.Tests.LocalTestHelper
             return universe;
         }
 
-        public static TestUniverse CommitAll( this TestUniverse universe, IActivityMonitor m, string worldName )
-        {
-            EnsureWorldOpened( universe, worldName );
-            var commandRegister = universe.UserHost.CommandRegister;
-            foreach( var command in commandRegister.GetCommands( "*commit" ) )
-            {
-                var payload = command.CreatePayload();
-                if( !(payload is SimplePayload simple) )
-                {
-                    m.Error( "Unsupported payload type: " + payload.GetType() );
-                    throw new NotSupportedException();
-                }
-                simple.Fields[0].SetValue( "Tests automated commit. If you see this commit online, blame Kuinox." );
-                simple.Fields[1].SetValue( 0 );
-                command.UnsafeExecute( m, payload );
-            }
-            return universe;
-        }
-
-        public static TestUniverse ApplyAll( this TestUniverse universe, IActivityMonitor m, string worldName )
-            => RunCommands( universe, m, worldName, "*applysettings*" );
+        public static TestUniverse ApplySettings( this TestUniverse universe, IActivityMonitor m, string worldName ) => RunCommands( universe, m, worldName, "*/ApplySettings" );
 
         public static TestUniverse CommitAll( this TestUniverse universe, IActivityMonitor m, string commitMessage, string worldName )
         {
-            EnsureWorldOpened( universe, worldName );
-            var currentWorld = universe.UserHost.WorldSelector.CurrentWorld;
-            foreach( var gitFolder in currentWorld.SolutionDrivers.GetDriverOnCurrentBranch().Select( s => s.GitRepository ) )
+            using( m.OpenInfo( $"Running TestUniverse.CommitAll( '{worldName}' )" ) )
             {
-                gitFolder.Commit( m, commitMessage );
+                EnsureWorldOpened( universe, m, worldName );
+                var currentWorld = universe.UserHost.WorldSelector.CurrentWorld;
+                foreach( var gitFolder in currentWorld.GitRepositories )
+                {
+                    gitFolder.Commit( m, commitMessage );
+                }
             }
             return universe;
         }
@@ -113,10 +96,10 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <returns></returns>
         public static TestUniverse ApplyRandomly( this TestUniverse universe, IActivityMonitor m, string worldName, int seed )
         {
-            EnsureWorldOpened( universe, worldName );
+            EnsureWorldOpened( universe, m, worldName );
             var commandRegister = universe.UserHost.CommandRegister;
-            var commands = commandRegister.GetCommands( "*applysettings*" );
-            Action[] actions = commands.Select( s => new Action( () => { s.Execute( m, s.CreatePayload() ); } ) )
+            var commands = commandRegister.GetCommands( "*ApplySettings" );
+            Action[] actions = commands.Select( s => new Action( () => { s.UnsafeExecute( m, s.CreatePayload() ); } ) )
                 .Append( () => { CommitAll( universe, m, "Applied some settings.", worldName ); } )
                 .Append( () => { universe = universe.RestartCKli(); } ).ToArray();
 
@@ -124,7 +107,7 @@ namespace CK.Env.Tests.LocalTestHelper
             m.Info( $"Running random actions with seed '{seed}'" );
             var rand = new Random( seed );
 
-            for( int i = 0; i < actions.Length * 2; i++ )//TODO: we can add better checks.
+            for( int i = 0; i < actions.Length * 2; i++ )
             {
                 int choosed = rand.Next( 0, actions.Length );
                 ranAction[choosed] = true;

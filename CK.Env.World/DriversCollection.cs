@@ -166,23 +166,36 @@ namespace CK.Env
         /// <returns>The context or null on error.</returns>
         public IWorldSolutionContext GetSolutionDependencyContextOnCurrentBranches( IActivityMonitor monitor, bool reloadSolutions = false )
         {
-            var currentDrivers = GetDriverOnCurrentBranch();
+            var currentDrivers = GetDriversOnCurrentBranch();
             var c = new WorldBranchContext( currentDrivers );
             return c.Refresh( monitor, reloadSolutions ) ? c : null;
         }
 
-        public IEnumerable<ISolutionDriver> AllDrivers => _solutionDrivers;
+        /// <summary>
+        /// Gets all the drivers, through all the Git folder branches, that have been registered so far.
+        /// </summary>
+        public IReadOnlyCollection<ISolutionDriver> AllDrivers => _solutionDrivers;
 
-        public IEnumerable<ISolutionDriver> GetDriverOnCurrentBranch() =>
-            _perBranchContext
-                .SelectMany(
-                    p => p.Value.Drivers.Select( d => d.GetCurrentBranchDriver() )
-                ).Distinct();
+        /// <summary>
+        /// Gets the solution drivers for the currently checked out branches.
+        /// </summary>
+        /// <returns>The set of drivers.</returns>
+        public IEnumerable<ISolutionDriver> GetDriversOnCurrentBranch() => _solutionDrivers.Select( d => d.GetCurrentBranchDriver() ).Distinct();
 
+        /// <summary>
+        /// Gets all the drivers for all repositories in one specific branch.
+        /// </summary>
+        /// <param name="branchName">The branch name to filter.</param>
+        /// <returns>The set of drivers for the branch.</returns>
         public IEnumerable<ISolutionDriver> GetDriversOnBranch( string branchName ) => _solutionDrivers.Where( p => p.BranchName == branchName );
 
-        public int Count => _solutionDrivers.Count;
-
+        /// <summary>
+        /// Enslist a new driver in the root HashSet, ensures that a <see cref="WorldBranchContext"/> exists
+        /// for the <see cref="ISolutionDriver.BranchName"/> and returns it.
+        /// The driver is not registered in the WorldBranchContext at this level.
+        /// </summary>
+        /// <param name="driver">The driver to register.</param>
+        /// <returns>The WorldBranchContext into which the driver must be registered.</returns>
         internal WorldBranchContext Register( ISolutionDriver driver )
         {
             if( !_perBranchContext.TryGetValue( driver.BranchName, out var c ) )
@@ -194,26 +207,14 @@ namespace CK.Env
             return c;
         }
 
-        public void Clear()
-        {
-            _solutionDrivers.Clear();
-        }
-
-        public bool Contains( ISolutionDriver item )
-        {
-            return _solutionDrivers.Contains( item );
-        }
-
-        public void CopyTo( ISolutionDriver[] array, int arrayIndex )
-        {
-            _solutionDrivers.CopyTo( array, arrayIndex );
-        }
-
-        public void Unregister( ISolutionDriver driver )
+        /// <summary>
+        /// Removes a driver that must exist (otherwise an exception is thrown).
+        /// </summary>
+        /// <param name="driver">The driver to remove.</param>
+        internal void Unregister( ISolutionDriver driver )
         {
             if( !_solutionDrivers.Remove( driver ) ) throw new InvalidOperationException( "Not registered." );
             _perBranchContext[driver.BranchName].OnUnregisterDriver( driver );
-            _solutionDrivers.Remove( driver );
         }
     }
 }

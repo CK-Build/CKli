@@ -47,7 +47,7 @@ namespace CK.Env.Tests
         {
             ImageLibrary.minimal_solution_open( universe =>
             {
-                var world = universe.EnsureWorldOpened( "CKTest-Build" );
+                var world = universe.EnsureWorldOpened( TestHelper.Monitor, "CKTest-Build" );
                 GitPluginSampleMock.ThrowOnExecuteSomething = true;
                 try
                 {
@@ -78,7 +78,7 @@ namespace CK.Env.Tests
                     {
                         var files = Directory.EnumerateFiles( arg.Item1.DevDirectory.Combine( "LocalFeed/CI" ) );
                         files.Should().HaveCount( 1 );
-                        Path.GetFileName( files.Single() ).Should().Be( "CKTest.Code.Cake.0.1.1--0007-develop.nupkg" );
+                        Path.GetFileName( files.Single() ).Should().Be( "CKTest.Code.Cake.0.1.1--0008-develop.nupkg" );
                     },
                     TestHelper.IsExplicitAllowed
                 );
@@ -91,7 +91,7 @@ namespace CK.Env.Tests
             {
                 var files = Directory.EnumerateFiles( universe.DevDirectory.Combine( "LocalFeed/CI" ) );
                 files.Should().HaveCount( 1 ); //We didn't made any modification: the version should not change.
-                Path.GetFileName( files.Single() ).Should().Be( "CKTest.Code.Cake.0.1.1--0007-develop.nupkg" );
+                Path.GetFileName( files.Single() ).Should().Be( "CKTest.Code.Cake.0.1.1--0008-develop.nupkg" );
             }, TestHelper.IsExplicitAllowed );
         }
 
