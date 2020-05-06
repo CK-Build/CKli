@@ -24,7 +24,25 @@ namespace CK.Env.Plugin
             _driver = driver;
             _driver.OnStartBuild += OnStartBuild;
             _driver.OnEndBuild += OnEndBuild;
-            _options = new ChildObject<RepositoryInfoOptions>( this, XNamespace.None + "SimpleGitVersion", e => new RepositoryInfoOptions( e ), o => o.ToXml() );
+
+
+            _options = new ChildObject<RepositoryInfoOptions>( this, XNamespace.None + "SimpleGitVersion", LoadWithLegacy, o => o.ToXml() );
+
+            // We use e.Parent so that detection of the old schema can be done (root of the document).
+            // Once migrated, replace this with: e => new RepositoryInfoOptions( e )
+            RepositoryInfoOptions LoadWithLegacy( XElement e )
+            {
+                var o = new RepositoryInfoOptions( e.Parent );
+                if( o.XmlMigrationRequired )
+                {
+                    Document.Root.RemoveAllNamespaces();
+                    Document.Root.Elements( SGVSchema.Branches ).Remove();
+                    Document.Root.Elements( SGVSchema.IgnoreModifiedFiles ).Remove();
+                    Document.Root.Elements( SGVSchema.Debug ).Remove();
+                    e.ReplaceWith( o.ToXml() );
+                }
+                return o;
+            }
         }
 
         void OnStartBuild( object sender, BuildStartEventArgs e )
@@ -76,14 +94,8 @@ namespace CK.Env.Plugin
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
+
             var o = _options.EnsureObject();
-            if( o.XmlMigrationRequired )
-            {
-                Document.Root.RemoveAllNamespaces();
-                Document.Root.Elements( SGVSchema.Branches ).Remove();
-                Document.Root.Elements( SGVSchema.IgnoreModifiedFiles ).Remove();
-                Document.Root.Elements( SGVSchema.Debug ).Remove();
-            }
             o.IgnoreDirtyWorkingFolder = false;
             EnsureBranchMapping( m, GitFolder.World.DevelopBranchName, CIBranchVersionMode.LastReleaseBased, "develop" );
             if( PluginBranch == StandardGitStatus.Local )
