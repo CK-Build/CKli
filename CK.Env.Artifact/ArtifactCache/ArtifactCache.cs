@@ -65,7 +65,7 @@ namespace CK.Env
         /// False to log an error and return null if info is already registered.
         /// </param>
         /// <returns>The new database or null on error.</returns>
-        public PackageDB Add( IActivityMonitor m, PackageInfo info, bool skipExisting = true ) => Add( m, new[] { info }, skipExisting );
+        public PackageDB? Add( IActivityMonitor m, PackageInfo info, bool skipExisting = true ) => Add( m, new[] { info }, skipExisting );
 
         /// <summary>
         /// Registers multiple packages at once. Any <see cref="PackageInfo.Dependencies"/> must
@@ -78,7 +78,7 @@ namespace CK.Env
         /// By default, exisiting packages are silently ignored.
         /// </param>
         /// <returns>The new database or null on error.</returns>
-        public PackageDB Add( IActivityMonitor m, IEnumerable<PackageInfo> infos, bool skipExisting = true )
+        public PackageDB? Add( IActivityMonitor m, IEnumerable<PackageInfo> infos, bool skipExisting = true )
         {
             var newDb = _db.Add( m, infos, skipExisting );
             return newDb != null ? (_db = newDb) : null;

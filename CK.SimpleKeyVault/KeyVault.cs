@@ -13,12 +13,12 @@ namespace CK.SimpleKeyVault
     /// </summary>
     public static class KeyVault
     {
-        private static readonly byte[] MagicHeader = new byte[] { 0, 148, 41, 0, 247, 87, 1, 2 };
+        private static readonly byte[] _magicHeader = new byte[] { 0, 148, 41, 0, 247, 87, 1, 2 };
 
         /// <summary>
         /// This salt must be the same as the one of CodeCake.
         /// </summary>
-        const string Salt = "{E4E66F59-CAF2-4C39-A7F8-46097B1C461B}";
+        const string _salt = "{E4E66F59-CAF2-4C39-A7F8-46097B1C461B}";
 
         /// <summary>
         /// The current version is 2.
@@ -31,7 +31,7 @@ namespace CK.SimpleKeyVault
         /// <param name="passPhrase">Secret to use. Must not be null, empty or white space.</param>
         /// <param name="salt">Specific salt to use (this default value comes from https://github.com/appveyor/secure-file implementation).</param>
         /// <returns>The symmetric algorithm.</returns>
-        public static SymmetricAlgorithm CreateCryptoAlgorithm( string passPhrase, string salt = Salt )
+        public static SymmetricAlgorithm CreateCryptoAlgorithm( string passPhrase, string salt = _salt )
         {
             if( String.IsNullOrWhiteSpace( passPhrase ) ) throw new ArgumentNullException( nameof( passPhrase ) );
             using( var pbkdf2 = new Rfc2898DeriveBytes( passPhrase, Encoding.UTF8.GetBytes( salt ), 10000 ) )
@@ -52,7 +52,7 @@ namespace CK.SimpleKeyVault
         /// <param name="passPhrase">Secret to use. Must not be null, empty or white space.</param>
         /// <param name="salt">Specific salt to use (this default value comes from https://github.com/appveyor/secure-file implementation).</param>
         /// <returns>The list of key value pairs.</returns>
-        public static Dictionary<string, string?> DecryptValues( string crypted, string passPhrase, string salt = Salt )
+        public static Dictionary<string, string?> DecryptValues( string crypted, string passPhrase, string salt = _salt )
         {
             var keys = new HashSet<string>();
             var result = new Dictionary<string, string?>();
@@ -93,7 +93,7 @@ namespace CK.SimpleKeyVault
                     {
                         if( version > 1 )
                         {
-                            if( !r.ReadBytes( MagicHeader.Length ).SequenceEqual( MagicHeader ) )
+                            if( !r.ReadBytes( _magicHeader.Length ).SequenceEqual( _magicHeader ) )
                             {
                                 throw new InvalidDataException( $"Invalid crypted content." );
                             }
@@ -132,7 +132,7 @@ namespace CK.SimpleKeyVault
         /// <param name="passPhrase">Secret to use. Must not be null, empty or white space.</param>
         /// <param name="salt">Specific salt to use (this default value comes from https://github.com/appveyor/secure-file implementation).</param>
         /// <returns>The encrypted string.</returns>
-        public static string EncryptValuesToString( IDictionary<string, string?> values, string passPhrase, string salt = Salt )
+        public static string EncryptValuesToString( IDictionary<string, string?> values, string passPhrase, string salt = _salt )
         {
             if( values == null ) throw new ArgumentNullException( nameof( values ) );
             using( var mem = new MemoryStream() )
@@ -143,7 +143,7 @@ namespace CK.SimpleKeyVault
                 var b = new StringBuilder();
                 b.Append( "-- Version: " ).Append( CurrentVersion ).AppendLine();
                 b.AppendLine( "-- Keys below can be removed if needed." );
-                w.Write( MagicHeader );
+                w.Write( _magicHeader );
                 w.Write( values.Count );
                 foreach( var kv in values )
                 {
@@ -180,7 +180,7 @@ namespace CK.SimpleKeyVault
         /// <param name="outFileName">Target file that will be encrypted. Must not exist.</param>
         /// <param name="passPhrase">Secret to use. Must not be null, empty or white space.</param>
         /// <param name="salt">Specific salt to use (this default value comes from https://github.com/appveyor/secure-file implementation).</param>
-        public static void Encrypt( string fileName, string outFileName, string passPhrase, string salt = Salt )
+        public static void Encrypt( string fileName, string outFileName, string passPhrase, string salt = _salt )
         {
             if( fileName == null ) throw new ArgumentNullException( nameof( fileName ) );
             if( outFileName == null ) throw new ArgumentNullException( nameof( outFileName ) );
@@ -205,7 +205,7 @@ namespace CK.SimpleKeyVault
         /// <param name="outFileName">Target file that will be decrypted.</param>
         /// <param name="passPhrase">Secret to use. Must not be null, empty or white space.</param>
         /// <param name="salt">Specific salt to use (this default value comes from https://github.com/appveyor/secure-file implementation).</param>
-        public static void Decrypt( string fileName, string outFileName, string passPhrase, string salt = Salt )
+        public static void Decrypt( string fileName, string outFileName, string passPhrase, string salt = _salt )
         {
             if( fileName == null ) throw new ArgumentNullException( nameof( fileName ) );
             if( outFileName == null ) throw new ArgumentNullException( nameof( outFileName ) );

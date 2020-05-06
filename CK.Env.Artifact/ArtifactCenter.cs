@@ -52,19 +52,19 @@ namespace CK.Env
 
         IArtifactRepository InstanciateRepository( in XElementReader r )
         {
-            IArtifactRepository repo = null;
+            IArtifactRepository? repo = null;
             foreach( var f in _typeHandlers )
             {
                 repo = f.CreateRepository( r );
                 if( repo != null )
                 {
                     // First, check naming coherency.
-                    var checkName = r.HandleOptionalAttribute<string>( "CheckName", null );
+                    var checkName = r.HandleOptionalAttribute<string?>( "CheckName", null );
                     if( checkName != null && checkName != repo.UniqueRepositoryName )
                     {
                         r.ThrowXmlException( $"Invalid check for name: CheckName is '{checkName}' but the actual repository name is '{repo.UniqueRepositoryName}'." );
                     }
-                    var checkSecretKeyName = r.HandleOptionalAttribute<string>( "CheckSecretKeyName", null );
+                    var checkSecretKeyName = r.HandleOptionalAttribute<string?>( "CheckSecretKeyName", null );
                     if( checkSecretKeyName != null && checkSecretKeyName != repo.SecretKeyName )
                     {
                         r.ThrowXmlException( $"Invalid check for secret key name: CheckSecretKeyName is '{checkSecretKeyName}' but the actual repository secret key name is '{repo.SecretKeyName}'." );
@@ -133,15 +133,12 @@ namespace CK.Env
         /// The list of resolved secrets: a null secret means that the secret has not been successfully obtained
         /// for the corresponding <see cref="IArtifactRepositoryInfo.SecretKeyName"/>.
         /// </returns>
-        public List<(string SecretKeyName, string Secret)> ResolveSecrets(
-            IActivityMonitor m,
-            IEnumerable<IArtifactRepository> repositories,
-            bool allMustBeResolved )
+        public List<(string SecretKeyName, string? Secret)>? ResolveSecrets( IActivityMonitor m, IEnumerable<IArtifactRepository> repositories, bool allMustBeResolved )
         {
-            var r = repositories.Where( feed => !String.IsNullOrWhiteSpace( feed.SecretKeyName ) )
-                               .GroupBy( feed => feed.SecretKeyName )
-                               .Select( g => (g.Key, Secret: g.First().ResolveSecret( m )) )
-                               .ToList();
+            List<(string Key, string? Secret)>? r = repositories.Where( feed => !String.IsNullOrWhiteSpace( feed.SecretKeyName ) )
+                                                               .GroupBy( feed => feed.SecretKeyName )
+                                                               .Select( g => (g.Key, Secret: g.First().ResolveSecret( m )) )
+                                                               .ToList();
             if( allMustBeResolved )
             {
                 bool missing = false;

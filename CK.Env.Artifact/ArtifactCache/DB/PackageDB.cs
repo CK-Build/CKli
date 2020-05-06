@@ -58,7 +58,7 @@ namespace CK.Env
             ctx.Writer.Write( _lastUpdate );
         }
 
-        PackageDB( PackageDB origin, InstanceStore store, Dictionary<string, PackageFeed> newFeeds, DateTime lastUpdate )
+        PackageDB( PackageDB origin, InstanceStore? store, Dictionary<string, PackageFeed>? newFeeds, DateTime lastUpdate )
         {
             _version = origin._version + 1;
             _feeds = newFeeds ?? origin._feeds;
@@ -76,7 +76,7 @@ namespace CK.Env
         /// False to log an error and return null if info is already registered.
         /// </param>
         /// <returns>The new database or null on error.</returns>
-        public PackageDB Add( IActivityMonitor m, PackageInfo info, bool skipExisting = true )
+        public PackageDB? Add( IActivityMonitor m, PackageInfo info, bool skipExisting = true )
         {
             return Add( m, new[] { info }, skipExisting );
         }
@@ -92,15 +92,15 @@ namespace CK.Env
         /// By default, exisiting packages are silently ignored.
         /// </param>
         /// <returns>The new database or null on error.</returns>
-        public PackageDB Add( IActivityMonitor m, IEnumerable<PackageInfo> infos, bool skipExisting = true )
+        public PackageDB? Add( IActivityMonitor m, IEnumerable<PackageInfo> infos, bool skipExisting = true )
         {
             DateTime regDate = DateTime.UtcNow;
-            (PackageInfo info, Artifact[] feedNames, int idx, PackageInstance p)[] initialization;
-            initialization = infos.Select( i => (i, i.CheckValidAndParseFeedNames( m ), ~_instances.IndexOf( i.Key ), (PackageInstance)null) )
+            (PackageInfo info, Artifact[]? feedNames, int idx, PackageInstance? p)[] initialization;
+            initialization = infos.Select( i => (i, i.CheckValidAndParseFeedNames( m ), ~_instances.IndexOf( i.Key ), (PackageInstance?)null) )
                                   .ToArray();
             int newCount = 0;
-            Dictionary<string, PackageFeed> newFeeds = null;
-            List<(PackageFeed feed, List<PackageInstance> newPackages)> feedPackages = null;
+            Dictionary<string, PackageFeed>? newFeeds = null;
+            List<(PackageFeed feed, List<PackageInstance> newPackages)>? feedPackages = null;
             for( int i = 0; i < initialization.Length; ++i )
             {
                 var init = initialization[i];
@@ -131,7 +131,7 @@ namespace CK.Env
                         m.Error( $"Dependency Target(s) of {init.info.Key} not registered: {targets.Where( t => t.Item2 == null ).Select( t => t.Target.ToString() ).Concatenate()}" );
                         return null;
                     }
-                    var deps = init.info.Dependencies.Zip( targets, ( d, t ) => new PackageInstance.Reference( t.Item2, d.Kind, d.Savors ) )
+                    var deps = init.info.Dependencies.Zip( targets, ( d, t ) => new PackageInstance.Reference( t.Item2!, d.Kind, d.Savors ) )
                                    .ToArray();
                     var newOne = new PackageInstance( init.info.Key, init.info.Savors, deps, regDate );
                     initialization[i].p = newOne;
@@ -162,12 +162,12 @@ namespace CK.Env
             if( feedPackages != null )
             {
                 Debug.Assert( newFeeds != null );
-                foreach( var newPackage in feedPackages )
+                foreach( var (feed, newPackages) in feedPackages )
                 {
-                    newFeeds[newPackage.feed.TypedName] = new PackageFeed( newPackage.feed, newPackage.newPackages );
+                    newFeeds[feed.TypedName] = new PackageFeed( feed, newPackages );
                 }
             }
-            var indices = initialization.Where( x => x.p != null ).Select( x => (x.idx, x.p) ).ToArray();
+            var indices = initialization.Where( x => x.p != null ).Select( x => (x.idx, x.p!) ).ToArray();
             return new PackageDB( this, _instances.Add( indices ), newFeeds, regDate );
         }
 
@@ -202,7 +202,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="typedName">The type name.</param>
         /// <returns>The feed or null.</returns>
-        public PackageFeed FindFeed( string typedName ) => _feeds.GetValueOrDefault( typedName );
+        public PackageFeed? FindFeed( string typedName ) => _feeds.GetValueOrDefault( typedName );
 
         /// <summary>
         /// Gets the whole list of known packages.
@@ -214,7 +214,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="key">The package identifier.</param>
         /// <returns>The instance or null if not found.</returns>
-        public PackageInstance Find( in ArtifactInstance key ) => _instances.Find( key );
+        public PackageInstance? Find( in ArtifactInstance key ) => _instances.Find( key );
 
 
         /// <summary>

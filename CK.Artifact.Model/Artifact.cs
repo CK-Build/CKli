@@ -39,9 +39,8 @@ namespace CK.Core
         /// <param name="name">Artifact name. Must not be empty.</param>
         public Artifact( in ArtifactType type, string name )
         {
-            if( type == null ) throw new ArgumentNullException( nameof( type ) );
             if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
-            Type = type;
+            Type = type ?? throw new ArgumentNullException( nameof( type ) );
             Name = name;
         }
 
@@ -90,7 +89,7 @@ namespace CK.Core
         /// <param name="nameOrTypedName">The valid typed name or the future name of the artifact.</param>
         /// <param name="fallbackType">The fallback type. When null and try parse failed, an invalid artifact is returned.</param>
         /// <returns>The resulting artifact that may be invalid.</returns>
-        public static Artifact TryParseOrCreate( string nameOrTypedName, ArtifactType fallbackType )
+        public static Artifact TryParseOrCreate( string? nameOrTypedName, ArtifactType? fallbackType )
         {
             if( !String.IsNullOrWhiteSpace( nameOrTypedName ) )
             {

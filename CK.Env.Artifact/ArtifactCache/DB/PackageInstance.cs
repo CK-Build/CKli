@@ -28,9 +28,9 @@ namespace CK.Env
             /// Gets the savors that, when not null, is a subset of the <see cref="Savors"/> (or all the
             /// owner's savors) and cannot be empty.
             /// </summary>
-            public CKTrait ApplicableSavors { get; }
+            public CKTrait? ApplicableSavors { get; }
 
-            internal Reference( PackageInstance target, ArtifactDependencyKind kind, CKTrait applicableSavors )
+            internal Reference( PackageInstance target, ArtifactDependencyKind kind, CKTrait? applicableSavors )
             {
                 Target = target;
                 DependencyKind = kind;
@@ -40,7 +40,7 @@ namespace CK.Env
 
         internal PackageInstance(
             in ArtifactInstance instance,
-            CKTrait savors,
+            CKTrait? savors,
             IReadOnlyList<Reference> deps,
             DateTime registrationDate )
         {
@@ -69,7 +69,7 @@ namespace CK.Env
         /// equal to these savors or are a subset of them (and cannot be empty either).
         /// </para>
         /// </summary>
-        public CKTrait Savors { get; }
+        public CKTrait? Savors { get; }
 
         /// <summary>
         /// Gets the list of the dependencies.
@@ -101,7 +101,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="obj">The other object to compare to.</param>
         /// <returns>True if equal, fals otherwise.</returns>
-        public override bool Equals( object obj ) => obj is PackageInstance p ? Equals( p ) : false;
+        public override bool Equals( object? obj ) => obj is PackageInstance p ? Equals( p ) : false;
 
         /// <summary>
         /// Gets the <see cref="Key"/>'s hash code.

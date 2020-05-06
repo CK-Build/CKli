@@ -3,11 +3,12 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <IsPackable>False</IsPackable>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CSemVer" Version="8.0.0" />
-    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="13.2.0" />
+    <PackageReference Include="CSemVer" Version="8.0.1" />
+    <PackageReference Include="CK.Core" Version="13.1.0" />
   </ItemGroup>
 
 </Project>

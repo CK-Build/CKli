@@ -41,7 +41,7 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="throwOnEmpty">True to throw a <see cref="MissingRequiredSecretException"/> instead of returning a null or empty string.</param>
         /// <returns>The non empty secret or null.</returns>
-        string ResolveSecret( IActivityMonitor m, bool throwOnEmpty = false );
+        string? ResolveSecret( IActivityMonitor m, bool throwOnEmpty = false );
 
         /// <summary>
         /// Checks whether this artifact repository handles the artifact type.

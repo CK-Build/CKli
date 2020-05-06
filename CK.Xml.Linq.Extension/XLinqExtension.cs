@@ -154,6 +154,20 @@ namespace System.Xml.Linq
         #endregion
 
         /// <summary>
+        /// Throws a <see cref="XmlException"/> with the provided <paramref name="message"/> this the line and column
+        /// information if it exists.
+        /// </summary>
+        /// <param name="culprit">This XObject.</param>
+        /// <param name="message">The message.</param>
+        [DoesNotReturn]
+        public static void Throw( this XObject culprit, string message )
+        {
+            var p = culprit.GetLineColumnInfo();
+            if( p.HasLineInfo() ) throw new XmlException( message + culprit.GetLineColumnString(), null, p.LineNumber, p.LinePosition );
+            throw new XmlException( message );
+        }
+
+        /// <summary>
         /// Clones any XObject into another one.
         /// </summary>
         /// <param name="this">This XObject to clone.</param>

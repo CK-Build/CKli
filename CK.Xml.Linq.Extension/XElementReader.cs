@@ -353,21 +353,13 @@ namespace System.Xml.Linq
                     case "add":
                         {
                             var item = builder( WithElement( e, true ) );
-                            if( !set.Add( item ) ) Throw( e, $"Item '{item}' already exists. There must be a <remove> first." );
+                            if( !set.Add( item ) ) e.Throw( $"Item '{item}' already exists. There must be a <remove> first." );
                             break;
                         }
-                    default: Throw( e, $"Expected only <add>, <remove> or <clear/> element in '{Element.Name}'." ); break;
+                    default: e.Throw( $"Expected only <add>, <remove> or <clear/> element in '{Element.Name}'." ); break;
                 }
             }
             return set;
-        }
-
-        [DoesNotReturn]
-        void Throw( XObject culprit, string message )
-        {
-            var p = culprit.GetLineColumnInfo();
-            if( p.HasLineInfo() ) throw new XmlException( message + culprit.GetLineColumnString(), null, p.LineNumber, p.LinePosition );
-            throw new XmlException( message );
         }
 
     }
