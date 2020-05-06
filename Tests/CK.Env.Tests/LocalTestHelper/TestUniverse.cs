@@ -164,7 +164,6 @@ namespace CK.Env.Tests.LocalTestHelper
         public void Dispose()
         {
             UserHost.Dispose();
-            FileHelper.RawDeleteLocalDirectory( _m, UniversePath );
         }
     }
 }
