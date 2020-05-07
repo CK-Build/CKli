@@ -190,7 +190,7 @@ namespace CK.Env.Plugin
         {
             if( _solutionSpec.DisableSourceLink )
             {
-                XCommentSection.FindOrCreate( Document.Root, "SourceLink", false )?.Remove();
+                DisableSourceLink( m, useCentralPackages );
             }
             else
             {
@@ -211,6 +211,7 @@ namespace CK.Env.Plugin
             else if( linkName == "FileSystem" )
             {
                 m.Info( "Sourcelink for a local git repository is not supported." );
+                DisableSourceLink( m, useCentralPackages );
                 return true;
             }
 
@@ -258,6 +259,12 @@ namespace CK.Env.Plugin
                 }
             }
             return true;
+        }
+
+        void DisableSourceLink( IActivityMonitor m, bool useCentralPackages )
+        {
+            XCommentSection.FindOrCreate( Document.Root, "SourceLink", false )?.Remove();
+            // Currently, we let the reference (if it exists) in the CentralPackages.props.
         }
 
     }

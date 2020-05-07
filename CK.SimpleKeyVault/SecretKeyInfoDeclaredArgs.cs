@@ -1,6 +1,6 @@
 using System;
 
-namespace CK.Env
+namespace CK.SimpleKeyVault
 {
     /// <summary>
     /// Raised by <see cref="SecretKeyStore.SecretDeclared"/>.

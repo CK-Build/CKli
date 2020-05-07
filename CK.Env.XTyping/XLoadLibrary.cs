@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.IO;
 using System.Reflection;
 
 namespace CK.Env
@@ -10,6 +11,7 @@ namespace CK.Env
             : base( initializer )
         {
             Load( initializer.Services.GetService<XTypedFactory>( true ), initializer.Monitor );
+            Name = initializer.Reader.HandleRequiredAttribute<string>( nameof(Name) );
         }
 
         public string Name { get; set; }
@@ -18,7 +20,7 @@ namespace CK.Env
 
         void Load( XTypedFactory factory, IActivityMonitor m )
         {
-            using( m.OpenInfo( Optional ? $"Loading library '{Name}'." : $"Loading optional library '{Name}'." ) )
+            using( m.OpenInfo( Optional ? $"Loading optional library '{Name}'." : $"Loading library '{Name}'." ) )
             {
                 try
                 {

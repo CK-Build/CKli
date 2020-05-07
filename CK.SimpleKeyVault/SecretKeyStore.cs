@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace CK.Env
+namespace CK.SimpleKeyVault
 {
     /// <summary>
     /// Implements a simple <see cref="SecretKeyInfo"/> store.
@@ -18,11 +18,11 @@ namespace CK.Env
         /// </summary>
         public struct Snapshot
         {
-            readonly (string name, string description, string secret, bool isRequired, string tags, string subKey, string sourceNameMaxLength)[] _data;
+            readonly (string name, string description, string? secret, bool isRequired, string tags, string? subKey, string? sourceProviderName)[] _data;
 
             internal Snapshot( SecretKeyStore store )
             {
-                _data = new (string name, string description, string secret, bool isRequired, string tags, string subKey, string sourceNameMaxLength)[store._orderedInfos.Count];
+                _data = new (string name, string description, string? secret, bool isRequired, string tags, string? subKey, string? sourceProviderName)[store._orderedInfos.Count];
                 for( int i = 0; i < store._orderedInfos.Count; i++ )
                 {
                     _data[i] = store._orderedInfos[i].GetData();
@@ -58,7 +58,7 @@ namespace CK.Env
         /// <summary>
         /// Raised each time a secret is declared.
         /// </summary>
-        public event EventHandler<SecretKeyInfoDeclaredArgs> SecretDeclared;
+        public event EventHandler<SecretKeyInfoDeclaredArgs>? SecretDeclared;
 
         /// <summary>
         /// Gets the list of <see cref="SecretKeyInfo"/> that have been declared with the
@@ -73,11 +73,11 @@ namespace CK.Env
         public IEnumerable<SecretKeyInfo> OptimalAvailableInfos => _orderedInfos.Where( i => i.IsSecretAvailable && (i.SuperKey == null || !i.SuperKey.IsSecretAvailable) );
 
         /// <summary>
-        /// Gets the secret key info or null if it deosn't exist.
+        /// Gets the secret key info or null if it doesn't exist.
         /// </summary>
         /// <param name="name">The name of the key.</param>
         /// <returns>The info or null.</returns>
-        public SecretKeyInfo Find( string name ) => _keyInfos.GetValueWithDefault( name, null );
+        public SecretKeyInfo? Find( string name ) => _keyInfos.GetValueOrDefault( name );
 
         /// <summary>
         /// Creates a new <see cref="Snapshot"/>.
@@ -104,13 +104,13 @@ namespace CK.Env
         /// Other components may have already put some description.</param>
         /// <param name="isRequired">True if this key is required to initialize a World.</param>
         /// <returns>The secret key info.</returns>
-        public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo, string> descriptionBuilder, bool isRequired = false, string sourceNameMaxLength = null )
+        public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo?, string> descriptionBuilder, bool isRequired = false, string? sourceProviderName = null )
         {
             bool redeclaration = true;
             if( !_keyInfos.TryGetValue( name, out var info ) )
             {
                 redeclaration = false;
-                _keyInfos.Add( name, info = new SecretKeyInfo( name, descriptionBuilder, isRequired, sourceNameMaxLength ) );
+                _keyInfos.Add( name, info = new SecretKeyInfo( name, descriptionBuilder, isRequired, sourceProviderName ) );
                 _orderedInfos.Add( info );
             }
             else
@@ -132,7 +132,7 @@ namespace CK.Env
         /// <param name="descriptionBuilder">Description builder function.</param>
         /// <param name="subKey">The sub key.</param>
         /// <returns>The secret key info.</returns>
-        public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo, string> descriptionBuilder, SecretKeyInfo subKey, string sourceNameMaxLength = null )
+        public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo?, string> descriptionBuilder, SecretKeyInfo subKey, string? sourceNameMaxLength = null )
         {
             bool redeclaration = true;
             if( !_keyInfos.TryGetValue( name, out var info ) )
@@ -159,7 +159,7 @@ namespace CK.Env
         /// <param name="name">The secret name.</param>
         /// <param name="secret">The secret value. Null or empty clears the secret.</param>
         /// <returns>True if secret has been changed, false otherwise.</returns>
-        public bool SetSecret( IActivityMonitor m, string name, string secret )
+        public bool SetSecret( IActivityMonitor m, string name, string? secret )
         {
             if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
             bool clear = String.IsNullOrEmpty( secret );
@@ -205,14 +205,17 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="secrets">The secrets to import.</param>
-        public void ImportSecretKeys( IActivityMonitor m, IReadOnlyDictionary<string, string> secrets )
+        public void ImportSecretKeys( IActivityMonitor m, IReadOnlyDictionary<string, string?> secrets )
         {
             if( secrets == null ) throw new ArgumentException( nameof( secrets ) );
             foreach( var info in Infos )
             {
                 if( secrets.TryGetValue( info.Name, out var secret ) )
                 {
-                    info.ImportSecret( m, secret );
+                    if( !String.IsNullOrEmpty( secret ) )
+                    {
+                        info.ImportSecret( m, secret );
+                    }
                 }
             }
         }
@@ -225,10 +228,10 @@ namespace CK.Env
         /// <param name="name">The secret name.</param>
         /// <param name="throwOnUnavailable">True to throw an exception if the secret cannot be obtained.</param>
         /// <returns>The secret or null if it's not available (and <paramref name="throwOnUnavailable"/> is false).</returns>
-        public string GetSecretKey( IActivityMonitor m, string name, bool throwOnUnavailable )
+        public string? GetSecretKey( IActivityMonitor m, string name, bool throwOnUnavailable )
         {
             if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentException( nameof( name ) );
-            if( !_keyInfos.TryGetValue( name, out SecretKeyInfo keyInfo ) )
+            if( !_keyInfos.TryGetValue( name, out SecretKeyInfo? keyInfo ) )
             {
                 throw new InvalidOperationException( $"Secret '{name}' must be declared before any use of it." );
             }
@@ -237,7 +240,7 @@ namespace CK.Env
                 string exceptionInfo = keyInfo.ToString();
                 if( keyInfo.SuperKey != null )
                 {
-                    var k = keyInfo.SuperKey;
+                    SecretKeyInfo? k = keyInfo.SuperKey;
                     do
                     {
                         exceptionInfo += "\nOr better: " + k.ToString();

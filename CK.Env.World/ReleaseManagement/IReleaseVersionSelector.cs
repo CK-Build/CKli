@@ -14,7 +14,8 @@ namespace CK.Env
         void ChooseFinalVersion( IActivityMonitor m, IReleaseVersionSelectorContext context );
 
         /// <summary>
-        /// Called whenever the final version is already set by a version tag on the commit point.
+        /// Called whenever the final version is already set by a version tag on the commit point or that another
+        /// commit with the exact same content has a release tag.
         /// We consider this version to be already released.
         /// </summary>
         /// <param name="m">The monitor to use.</param>

@@ -20,9 +20,9 @@ namespace CKli
         {
             Console.WriteLine( "=========" );
             Console.Write( $"======== {c.Solution.Solution.Name} " );
-            if( c.PreviousVersionCommitSha != null )
+            if( c.PreviousVersion != null )
             {
-                Console.Write( $" last release: {c.PreviousVersion}" );
+                Console.Write( $" last release: {c.PreviousVersion.ThisTag}" );
                 var diffResult = c.GetProjectsDiff( m );
                 if( diffResult == null )
                 {

@@ -47,8 +47,7 @@ namespace CK.Env
         /// <returns>The path to the root directory or null if it is not mapped.</returns>
         public NormalizedPath GetRootPath( IWorldName w )
         {
-            NormalizedPath p;
-            if( !_map.TryGetValue( w.FullName, out p ) )
+            if( !_map.TryGetValue( w.FullName, out NormalizedPath p ) )
             {
                 // If Name is not the same as FullName, we are on a parallel
                 // world that is not mapped: if the Stack name is mapped (the default world),

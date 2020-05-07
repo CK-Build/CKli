@@ -16,6 +16,6 @@ namespace CK.Core
         /// <param name="services">Available services to inject.</param>
         /// <param name="requiredParameters">Optional required parameters.</param>
         /// <returns>The object instance or null on error.</returns>
-        object Create( IActivityMonitor monitor, Type t, IServiceProvider services, IEnumerable<object> requiredParameters = null );
+        object? Create( IActivityMonitor monitor, Type t, IServiceProvider services, IEnumerable<object>? requiredParameters = null );
     }
 }

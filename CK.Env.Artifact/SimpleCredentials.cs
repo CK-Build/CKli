@@ -33,8 +33,8 @@ namespace CK.Env
         public SimpleCredentials( XElementReader r )
         {
             UserName = r.HandleRequiredAttribute<string>( "UserName" );
-            var p = r.HandleOptionalAttribute<string>( "Password", null );
-            var k = r.HandleOptionalAttribute<string>( "PasswordSecretKeyName", null );
+            var p = r.HandleOptionalAttribute<string?>( "Password", null );
+            var k = r.HandleOptionalAttribute<string?>( "PasswordSecretKeyName", null );
             bool hasP = !String.IsNullOrEmpty( p );
             bool hasK = !String.IsNullOrEmpty( k );
             if( hasP && hasK ) throw new ArgumentException( $"Credential element '{r.Element}' can not specify both Password and PasswordSecretKeyName attributes." );
@@ -64,7 +64,7 @@ namespace CK.Env
         /// The password or its name (the key to resolve it).
         /// May be null if no password at all is provided.
         /// </summary>
-        public string PasswordOrSecretKeyName { get; }
+        public string? PasswordOrSecretKeyName { get; }
 
         /// <summary>
         /// Whether <see cref="PasswordOrSecretKeyName"/> is actually the name of the password and

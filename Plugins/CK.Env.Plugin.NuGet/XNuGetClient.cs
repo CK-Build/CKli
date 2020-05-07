@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Env;
 using CK.Env.NuGet;
+using CK.SimpleKeyVault;
 using System;
 using System.Net.Http;
 

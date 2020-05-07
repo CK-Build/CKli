@@ -2,7 +2,7 @@ using CK.Core;
 using CSemVer;
 using System.Collections.Generic;
 
-namespace CK.Env
+namespace CK.Core
 {
     /// <summary>
     /// Models a source of packages (packages are installable artifacts).
@@ -59,7 +59,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the list of all the packages that this feed contains.
         /// </summary>
-        public IReadOnlyList<PackageInstance> Instances { get; }
+        public IReadOnlyList<PackageInstance> Instances => _instances;
 
         /// <summary>
         /// Gets all the instances of a given <see cref="ArtifactType"/>.
@@ -90,7 +90,7 @@ namespace CK.Env
         /// <returns>The available instances. <see cref="ArtifactAvailableInstances.IsValid"/> is false if the artifact is not found.</returns>
         public ArtifactAvailableInstances GetAvailableInstances( string artifactName )
         {
-            SVersion ci = null, exp = null, pre = null, lat = null, sta = null;
+            SVersion? ci = null, exp = null, pre = null, lat = null, sta = null;
             foreach( var p in GetInstances( artifactName ) )
             {
                 PackageQualityVersions.Apply( p.Key.Version, ref ci, ref exp, ref pre, ref lat, ref sta );

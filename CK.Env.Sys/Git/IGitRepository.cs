@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Text;
 using CSemVer;
+using SimpleGitVersion;
 using System;
 using System.Collections.Generic;
 
@@ -34,6 +35,15 @@ namespace CK.Env
         /// Gets the head information.
         /// </summary>
         IGitHeadInfo Head { get; }
+
+        /// <summary>
+        /// Gets the simple git version <see cref="ICommitInfo"/> from a branch.
+        /// Returns null if an error occurred or if RepositoryInfo.xml has not been successfully read.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="branchName">Defaults to <see cref="CurrentBranchName"/>.</param>
+        /// <returns>The RepositoryInfo or null if it it cannot be obtained.</returns>
+        ICommitInfo? ReadVersionInfo( IActivityMonitor m, string? branchName = null );
 
         /// <summary>
         /// Gets the sha of the given branch tip or null if the branch doesnt' exist.
@@ -88,15 +98,7 @@ namespace CK.Env
         /// False will force the amend to be done if the date or message changed even if the working folder is clean.
         /// </param>
         /// <returns>True on success, false on error.</returns>
-        bool AmendCommit( IActivityMonitor m, Func<string, string> editMessage = null, Func<DateTimeOffset, DateTimeOffset?> editDate = null, bool skipIfNothingToCommit = true );
-
-        /// <summary>
-        /// Gets the version information from a branch.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="branchName">Defaults to <see cref="CurrentBranchName"/>.</param>
-        /// <returns>The commit version info or null if it it cannot be obtained.</returns>
-        CommitVersionInfo GetCommitVersionInfo( IActivityMonitor m, string branchName = null );
+        bool AmendCommit( IActivityMonitor m, Func<string, string>? editMessage = null, Func<DateTimeOffset, DateTimeOffset?>? editDate = null, bool skipIfNothingToCommit = true );
 
         /// <summary>
         /// Gets the current branch name (name of the repository's HEAD).
@@ -146,7 +148,7 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">Local branch name. When null, the <see cref="CurrentBranchName"/> is used.</param>
         /// <returns>True on success, false on error.</returns>
-        bool Push( IActivityMonitor m, string branchName = null );
+        bool Push( IActivityMonitor m, string? branchName = null );
 
         /// <summary>
         /// Resets a branch to a previous commit or deletes the branch when <paramref name="commitSha"/> is null or empty.

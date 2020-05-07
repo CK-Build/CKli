@@ -6,7 +6,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
-namespace CK.Env
+namespace CK.Core
 {
     public partial class PackageDB
     {
@@ -28,8 +28,8 @@ namespace CK.Env
             {
                 int len = ctx.Reader.ReadInt32();
                 _instances = new PackageInstance[len];
-                ArtifactType type = null;
-                string name = null;
+                ArtifactType? type = null;
+                string? name = null;
                 for( int i = 0; i < _instances.Length; ++i )
                 {
                     switch( ctx.Reader.ReadByte() )
@@ -39,6 +39,7 @@ namespace CK.Env
                         case 1:
                             name = ctx.Reader.ReadString(); break;
                     }
+                    Debug.Assert( type != null && name != null );
                     ArtifactInstance instance = new ArtifactInstance( type, name, CSemVer.SVersion.Parse( ctx.Reader.ReadString() ) );
                     var regDate = ctx.Reader.ReadDateTime();
                     var savors = ctx.ReadCKTrait();
@@ -59,8 +60,8 @@ namespace CK.Env
             public void Write( in SerializerContext ctx )
             {
                 ctx.Writer.Write( _instances.Length );
-                string type = null;
-                string name = null;
+                string? type = null;
+                string? name = null;
                 for( int i = 0; i < _instances.Length; ++i )
                 {
                     var p = _instances[i];
@@ -83,7 +84,11 @@ namespace CK.Env
                     ctx.Writer.WriteNonNegativeSmallInt32( p.Dependencies.Count );
                     foreach( var dep in p.Dependencies )
                     {
-                        if( p.Savors != null ) ctx.WriteExistingTrait( dep.ApplicableSavors );
+                        if( p.Savors != null )
+                        {
+                            Debug.Assert( dep.ApplicableSavors != null );
+                            ctx.WriteExistingTrait( dep.ApplicableSavors );
+                        }
                         ctx.Writer.Write( (byte)dep.DependencyKind );
                         var cc = new Comparable( pInstance => dep.Target.Key.CompareTo( pInstance.Key ) );
                         // Lookup only from 0 to our index: our dependencies are before us.
@@ -134,13 +139,13 @@ namespace CK.Env
                 _instances = new PackageInstance[prev.Length + indices.Length];
                 int prevIdx = 0;
                 int originOffset = 0, targetOffset = 0;
-                foreach( var i in indices )
+                foreach( var (idx, p) in indices )
                 {
-                    var len = i.idx - prevIdx;
-                    prevIdx = i.idx;
+                    var len = idx - prevIdx;
+                    prevIdx = idx;
                     Array.Copy( prev, originOffset, _instances, targetOffset, len );
                     targetOffset += len;
-                    _instances[targetOffset++] = i.p;
+                    _instances[targetOffset++] = p;
                     originOffset += len;
                 }
                 Array.Copy( prev, originOffset, _instances, targetOffset, _instances.Length - targetOffset );
@@ -148,7 +153,7 @@ namespace CK.Env
 
             static int CompareIndex( (int idx, PackageInstance p) i1, (int idx, PackageInstance p) i2 )
             {
-                int cmp = i1.Item1 - i2.Item1;
+                int cmp = i1.idx - i2.idx;
                 return cmp != 0 ? cmp : i1.p.CompareTo( i2.p );
             }
 
@@ -197,7 +202,7 @@ namespace CK.Env
                 public int CompareTo( PackageInstance other ) => _comparer( other );
             }
 
-            public PackageInstance Find( in ArtifactInstance instance )
+            public PackageInstance? Find( in ArtifactInstance instance )
             {
                 int idx = IndexOf( instance );
                 return idx < 0 ? null : _instances[idx];
@@ -217,19 +222,19 @@ namespace CK.Env
 
             ArraySegment<PackageInstance> Range( ArraySegment<PackageInstance> all, Func<PackageInstance, int> comparer )
             {
-                Func<PackageInstance, int> rStart = p =>
+                int rStart( PackageInstance p )
                 {
                     int cmp = comparer( p );
                     return cmp == 0 ? -1 : cmp;
-                };
+                }
                 int start = ~_instances.AsSpan().BinarySearch( new Comparable( rStart ) );
                 Debug.Assert( start >= 0 );
                 if( start == all.Count || comparer( all[start] ) != 0 ) return all.Slice( 0, 0 );
-                Func<PackageInstance, int> rEnd = p =>
+                int rEnd( PackageInstance p )
                 {
                     int cmp = comparer( p );
                     return cmp == 0 ? 1 : cmp;
-                };
+                }
                 int end = ~_instances.AsSpan().BinarySearch( new Comparable( rEnd ) );
                 return all.Slice( start, end - start );
             }
