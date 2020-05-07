@@ -1,3 +1,4 @@
+using CK.SimpleKeyVault;
 using System.Collections.Generic;
 
 namespace CK.Env

@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Env;
+using CK.SimpleKeyVault;
 using CK.Text;
 using SimpleGitVersion;
 using System;
