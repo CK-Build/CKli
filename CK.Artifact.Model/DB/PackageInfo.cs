@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 
-namespace CK.Env
+namespace CK.Core
 {
     /// <summary>
     /// Basic POCO used to describe a new package in a <see cref="PackageDB"/>.

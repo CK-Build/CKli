@@ -2,7 +2,7 @@ using CK.Core;
 using System;
 using System.Collections.Generic;
 
-namespace CK.Env
+namespace CK.Core
 {
     /// <summary>
     /// Immutable model of a package (packages are installable artifacts).

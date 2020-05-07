@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Env.NPM;
+using CK.SimpleKeyVault;
 using CK.Text;
 using System;
 using System.Collections.Generic;

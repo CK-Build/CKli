@@ -1,10 +1,10 @@
 using CK.Core;
 using System.Diagnostics;
 
-namespace CK.Env
+namespace CK.Core
 {
     /// <summary>
-    /// Internal struct. The ref is just for fun (a simple readonly would be enough).
+    /// Internal struct.
     /// </summary>
     readonly ref struct SerializerContext
     {

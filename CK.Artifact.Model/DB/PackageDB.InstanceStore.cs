@@ -6,7 +6,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
-namespace CK.Env
+namespace CK.Core
 {
     public partial class PackageDB
     {

@@ -1,3 +1,4 @@
+using CK.SimpleKeyVault;
 using System;
 using System.Text.RegularExpressions;
 

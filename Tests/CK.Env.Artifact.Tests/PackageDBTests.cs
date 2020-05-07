@@ -34,7 +34,8 @@ namespace CK.Env.Tests
             PLevel0V3 = Create( SVersion.Parse( "3.0.0" ) );
             PLevel0V4 = Create( SVersion.Parse( "4.0.0" ) );
             PLevel0 = new PackageInfo[][] { PLevel0V1, PLevel0V2, PLevel0V3, PLevel0V4 };
-            PackageInfo[] Create( SVersion v )
+
+            static PackageInfo[] Create( SVersion v )
             {
                 var result = new PackageInfo[60];
                 for( int i = 0; i < result.Length; ++i )
@@ -44,9 +45,11 @@ namespace CK.Env.Tests
                                 : i < (2 * result.Length / 3)
                                     ? T1
                                     : T2;
-                    var p = new PackageInfo();
-                    p.Key = new ArtifactInstance( type, $"P{i}", v );
-                    p.FeedNames.Add( $"F{i / (result.Length / 10)}" );
+                    var p = new PackageInfo
+                    {
+                        Key = new ArtifactInstance( type, $"P{i}", v ),
+                        FeedNames = { $"F{i / (result.Length / 10)}" }
+                    };
                     result[i] = p;
                 }
                 return result;

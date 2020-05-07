@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Env;
 using CK.Env.NPM;
+using CK.SimpleKeyVault;
 using System.Net.Http;
 
 namespace CKli

@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace CK.Env
+namespace CK.SimpleKeyVault
 {
     /// <summary>
     /// Implements a simple <see cref="SecretKeyInfo"/> store.
@@ -159,7 +159,7 @@ namespace CK.Env
         /// <param name="name">The secret name.</param>
         /// <param name="secret">The secret value. Null or empty clears the secret.</param>
         /// <returns>True if secret has been changed, false otherwise.</returns>
-        public bool SetSecret( IActivityMonitor m, string name, string secret )
+        public bool SetSecret( IActivityMonitor m, string name, string? secret )
         {
             if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
             bool clear = String.IsNullOrEmpty( secret );
@@ -205,14 +205,17 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="secrets">The secrets to import.</param>
-        public void ImportSecretKeys( IActivityMonitor m, IReadOnlyDictionary<string, string> secrets )
+        public void ImportSecretKeys( IActivityMonitor m, IReadOnlyDictionary<string, string?> secrets )
         {
             if( secrets == null ) throw new ArgumentException( nameof( secrets ) );
             foreach( var info in Infos )
             {
                 if( secrets.TryGetValue( info.Name, out var secret ) )
                 {
-                    info.ImportSecret( m, secret );
+                    if( !String.IsNullOrEmpty( secret ) )
+                    {
+                        info.ImportSecret( m, secret );
+                    }
                 }
             }
         }

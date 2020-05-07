@@ -2,7 +2,7 @@ using CK.Core;
 using CSemVer;
 using System.Collections.Generic;
 
-namespace CK.Env
+namespace CK.Core
 {
     /// <summary>
     /// Models a source of packages (packages are installable artifacts).

@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace CK.Env
+namespace CK.SimpleKeyVault
 {
     /// <summary>
     /// Defines a key that can be associated to a secret.

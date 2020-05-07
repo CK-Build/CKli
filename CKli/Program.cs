@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Env;
 using CK.Monitoring;
+using CK.SimpleKeyVault;
 using CK.Text;
 using NuGet.Protocol.Plugins;
 using System;

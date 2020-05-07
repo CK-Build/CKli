@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 
-namespace CK.Env
+namespace CK.Core
 {
     public partial class PackageDB
     {
