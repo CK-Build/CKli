@@ -11,7 +11,7 @@ namespace CK.Env.Plugin
         readonly SolutionSpec _solutionSpec;
 
         public GitIgnoreFile( GitFolder f, SolutionSpec solutionSpec, NormalizedPath branchPath )
-            : base( f, branchPath, branchPath.AppendPart( ".gitignore" ) )
+            : base( f, branchPath, branchPath.AppendPart( ".gitignore" ), UTF8EncodingNoBOM )
         {
             _solutionSpec = solutionSpec;
         }

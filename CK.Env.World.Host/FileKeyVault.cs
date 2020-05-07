@@ -8,24 +8,26 @@ using System.Linq;
 
 namespace CK.Env
 {
-    public sealed class UserKeyVault : IDisposable
+    /// <summary>
+    /// Simple file based key vault that handles a <see cref="KeyStore"/>: keys are automatically
+    /// loaded and saved in this file.
+    /// </summary>
+    public sealed class FileKeyVault : IDisposable
     {
         readonly SecretKeyStore _store;
         readonly Dictionary<string, string> _vaultContent;
         string _passPhrase;
 
-        public UserKeyVault( NormalizedPath userHostPath )
+        /// <summary>
+        /// Initializes a new vault based on a file path (that may exist or not).
+        /// </summary>
+        /// <param name="keyVaultPath">The vault file path.</param>
+        public FileKeyVault( NormalizedPath keyVaultPath )
         {
             _store = new SecretKeyStore();
             _store.SecretDeclared += OnSecretDeclared;
             _vaultContent = new Dictionary<string, string>();
-            KeyVaultKeyName = "CKLI-" + Environment.UserDomainName
-                                         .Replace( '-', '_' )
-                                         .Replace( '/', '_' )
-                                         .Replace( '\\', '_' )
-                                         .Replace( '.', '_' )
-                                         .ToUpperInvariant();
-            KeyVaultPath = userHostPath.AppendPart( KeyVaultKeyName + ".KeyVault.txt" );
+            KeyVaultPath = keyVaultPath;
         }
 
         void OnSecretDeclared( object sender, SecretKeyInfoDeclaredArgs e )
@@ -47,19 +49,12 @@ namespace CK.Env
         public string KeyVaultPath { get; }
 
         /// <summary>
-        /// Gets the name of the primary secret required to open the key vault.
-        /// This is: "CKLI_" + <see cref="Environment.UserDomainName"/> in upper
-        /// case where '\', '/', '.' and '-' are replaced with '_'.
-        /// </summary>
-        public string KeyVaultKeyName { get; }
-
-        /// <summary>
         /// Gets whether there is a file for this vault. When no file exists it must be created.
         /// </summary>
         public bool KeyVaultFileExists => File.Exists( KeyVaultPath );
 
         /// <summary>
-        /// Gets whether the key vault bound to the current <see cref="IWorldName"/> is opened.
+        /// Gets whether this key vault is opened.
         /// </summary>
         public bool IsKeyVaultOpened => _passPhrase != null;
 

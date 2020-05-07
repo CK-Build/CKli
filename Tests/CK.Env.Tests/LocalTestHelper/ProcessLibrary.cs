@@ -63,7 +63,7 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public static TestUniverse ApplySettings( this TestUniverse universe, IActivityMonitor m, string worldName ) => RunCommands( universe, m, worldName, "*/ApplySettings" );
 
-        public static TestUniverse CommitAll( this TestUniverse universe, IActivityMonitor m, string commitMessage, string worldName )
+        public static void CommitAll( this TestUniverse universe, IActivityMonitor m, string commitMessage, string worldName )
         {
             using( m.OpenInfo( $"Running TestUniverse.CommitAll( '{worldName}' )" ) )
             {
@@ -71,37 +71,40 @@ namespace CK.Env.Tests.LocalTestHelper
                 var currentWorld = universe.UserHost.WorldSelector.CurrentWorld;
                 foreach( var gitFolder in currentWorld.GitRepositories )
                 {
-                    gitFolder.Commit( m, commitMessage );
+                    gitFolder.Commit( m, commitMessage ).Should().BeTrue( "There must be no error when Committing a repository." );
                 }
             }
-            return universe;
         }
 
-        public static TestUniverse RestartCKli( this TestUniverse universe )
+        public static TestUniverse RestartCKli( this TestUniverse universe, IActivityMonitor m )
         {
-            string tempName = "temp";
-            NormalizedPath tempZip = ImageManager.CacheUniverseFolder.AppendPart( tempName + ".zip" );
-            File.Delete( tempZip );
-            universe.SnapshotState( tempName ).Should().Be( tempZip );
-            return ImageManager.InstantiateImage( TestHelper.Monitor, tempZip );
+            using( m.OpenInfo( "Restarting" ) )
+            {
+                string tempName = "temp";
+                NormalizedPath tempZip = ImageManager.CacheUniverseFolder.AppendPart( tempName + ".zip" );
+                File.Delete( tempZip );
+                universe.SnapshotState( tempName ).Should().Be( tempZip );
+                universe.Dispose();
+                return ImageManager.InstantiateImage( TestHelper.Monitor, tempZip );
+            }
         }
 
         /// <summary>
-        /// Run all apply settings in a random fashion.
+        /// Run all apply settings and comitting all in a random fashion.
         /// </summary>
         /// <param name="universe"></param>
         /// <param name="m"></param>
         /// <param name="worldName"></param>
         /// <param name="seed"></param>
         /// <returns></returns>
-        public static TestUniverse ApplyRandomly( this TestUniverse universe, IActivityMonitor m, string worldName, int seed )
+        public static void ApplySettingsAndCommitRandomly( this TestUniverse universe, IActivityMonitor m, string worldName, int seed )
         {
             EnsureWorldOpened( universe, m, worldName );
             var commandRegister = universe.UserHost.CommandRegister;
             var commands = commandRegister.GetCommands( "*ApplySettings" );
             Action[] actions = commands.Select( s => new Action( () => { s.UnsafeExecute( m, s.CreatePayload() ); } ) )
                 .Append( () => { CommitAll( universe, m, "Applied some settings.", worldName ); } )
-                .Append( () => { universe = universe.RestartCKli(); } ).ToArray();
+                .ToArray();
 
             bool[] ranAction = new bool[actions.Length];
             m.Info( $"Running random actions with seed '{seed}'" );
@@ -119,7 +122,6 @@ namespace CK.Env.Tests.LocalTestHelper
             {
                 action();
             }
-            return universe;
         }
     }
 }

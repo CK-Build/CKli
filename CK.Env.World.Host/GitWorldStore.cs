@@ -11,7 +11,7 @@ using System.Xml.Linq;
 namespace CK.Env
 {
     /// <summary>
-    /// Implements a World store based on Git repositories.
+    /// Implements a World store based on Git repositories: the <see cref="Worlds"/>
     /// </summary>
     public sealed partial class GitWorldStore : WorldStore, ICommandMethodsProvider, IDisposable
     {
@@ -44,6 +44,12 @@ namespace CK.Env
             }
         }
 
+        /// <summary>
+        /// Gets the root path of thi store: it contains the <see cref="StackRepo"/>'s git working folder.
+        /// </summary>
+        public NormalizedPath RootPath => _rootPath;
+
+
         NormalizedPath ICommandMethodsProvider.CommandProviderName => UserHost.WorldCommandPath;
 
         new SimpleWorldLocalMapping WorldLocalMapping => (SimpleWorldLocalMapping)base.WorldLocalMapping;
@@ -57,10 +63,6 @@ namespace CK.Env
         /// </summary>
         public IReadOnlyCollection<StackRepo> StackRepositories { get; }
 
-        /// <summary>
-        /// Gets the root path of thi store: it contains the <see cref="StackRepo"/>'s git working folder.
-        /// </summary>
-        public NormalizedPath RootPath => _rootPath;
 
         /// <summary>
         /// Reads the Stacks.xml file and instanciates the <see cref="StackRepo"/> objects and
@@ -93,7 +95,7 @@ namespace CK.Env
             {
                 using( m.OpenInfo( "Since there is no Stack defined, we initialize CK and CK-Build mapped to '/Dev/CK' by default." ) )
                 {
-                    m.Info( $"Use 'run World/{nameof( SetWorldMapping )}' command to update the mapping." );
+                    m.Info( $"Use 'run World/{nameof( SetWorldMapping )}' command to change this default mapping if you want." );
                     _stackRepos.Add( new StackRepo( this, new Uri( "https://github.com/signature-opensource/CK-Stack.git" ), true ) );
                     _stackRepos.Add( new StackRepo( this, new Uri( "https://github.com/CK-Build/CK-Build-Stack.git" ), true ) );
                     WorldLocalMapping.SetMap( m, "CK-Build", "/Dev/CK" );
@@ -126,7 +128,7 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets or sets whether the commands related to repositorystacks or world management
+        /// Gets or sets whether the commands related to RepositoryStacks or world management
         /// must be disabled.
         /// </summary>
         public bool DisableRepositoryAndStacksCommands { get; set; }
@@ -175,6 +177,7 @@ namespace CK.Env
         /// <param name="url">The url of the repository to remove.</param>
         public void DeleteStackRepository( IActivityMonitor m, string url )
         {
+            if( DisableRepositoryAndStacksCommands ) throw new InvalidOperationException( nameof( DisableRepositoryAndStacksCommands ) );
             if( String.IsNullOrWhiteSpace( url ) || !Uri.TryCreate( url, UriKind.Absolute, out var uri ) ) throw new ArgumentException( "Must be a valid url.", nameof( url ) );
             int idx = _stackRepos.IndexOf( r => r.OriginUrl.ToString().Equals( url, StringComparison.OrdinalIgnoreCase ) );
             if( idx < 0 ) m.Warn( $"Stack repository '{url}' not found." );
@@ -200,6 +203,7 @@ namespace CK.Env
         [CommandMethod]
         public void DestroyWorld( IActivityMonitor m, string worldFullName )
         {
+            if( !CanDestroyWorld ) throw new InvalidOperationException( nameof( CanDestroyWorld ) );
             if( !WorldName.TryParse( worldFullName, out var name ) )
             {
                 m.Error( $"Invalid '{worldFullName}' world name." );

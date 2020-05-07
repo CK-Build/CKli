@@ -9,10 +9,7 @@ using System.Linq;
 using System.Xml.Linq;
 
 namespace CK.Env
-{
-    /// <summary>
-    /// Encapsulates a whole context.
-    /// </summary>
+{ 
     public sealed partial class GitWorldStore
     {
         /// <summary>

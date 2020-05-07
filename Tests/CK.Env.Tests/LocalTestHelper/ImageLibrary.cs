@@ -141,7 +141,7 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public static NormalizedPath full_apply_settings_randomly_applied( Action<TestUniverse> action, bool refreshCache, int seed ) =>
             ImageBuilderHelper<Action<TestUniverse, World>>( action, refreshCache, another_minimal_solution_second_ci_build,
-                ( universe ) => universe.ApplyRandomly( TestHelper.Monitor, CKTestBuildStackName, seed ) );
+                ( universe ) => universe.ApplySettingsAndCommitRandomly( TestHelper.Monitor, CKTestBuildStackName, seed ) );
 
         public static NormalizedPath full_apply_settings( Action<TestUniverse> action, bool refreshCache ) =>
             ImageBuilderHelper<Action<TestUniverse, World>>( action, refreshCache, another_minimal_solution_second_ci_build,

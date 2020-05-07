@@ -35,17 +35,13 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public const string PlaceHolderString = "PLACEHOLDER_CKLI_TESTS";
 
-
-        private readonly IActivityMonitor _m;
-
         /// <summary>
         /// Instanciates a new <see cref="TestUniverse"/>.
         /// </summary>
         /// <param name="tempPath">Path of the TestHost.</param>
         /// <param name="userHost">The UserHost instantied with this path.</param>
-        TestUniverse( IActivityMonitor m, NormalizedPath tempPath, UserHost userHost )
+        TestUniverse( NormalizedPath tempPath, UserHost userHost )
         {
-            _m = m;
             UniversePath = tempPath;
             UserHost = userHost;
         }
@@ -54,8 +50,6 @@ namespace CK.Env.Tests.LocalTestHelper
         /// The <see cref="UserHost"/> used to run tests on.
         /// </summary>
         public UserHost UserHost { get; }
-
-        public Dictionary<string, StackConfig> Configs { get; }
 
         /// <summary>
         /// Temp path of the TestHost.
@@ -97,13 +91,13 @@ namespace CK.Env.Tests.LocalTestHelper
         {
             m.Info( $"Creating TestUniverse from {path}." );
             NormalizedPath ckliPath = path.AppendPart( _ckliMapping );
-            var userHost = new UserHost( new FakeApplicationLifetime(), ckliPath );
-            var output = new TestUniverse( m, path, userHost );
-            userHost.Initialize( m );
+            var userHost = UserHost.Create( m, new FakeApplicationLifetime(), ckliPath );
+            var output = new TestUniverse( path, userHost );
             userHost.WorldStore.DestroyWorld( m, "CK" );
             userHost.WorldStore.DestroyWorld( m, "CK-Build" );
             return output;
         }
+
 
         public static void ChangeStringInAllSubPathAndFileContent( IActivityMonitor m, NormalizedPath folder, string oldString, string newString )
         {

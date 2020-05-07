@@ -17,19 +17,7 @@ namespace CKli
     {
         static void Main( string[] args )
         {
-            static string GetHeaderVersion()
-            {
-                var a = (AssemblyInformationalVersionAttribute)Attribute.GetCustomAttribute( Assembly.GetExecutingAssembly(), typeof( AssemblyInformationalVersionAttribute ) );
-                var thisFramework = Assembly.GetExecutingAssembly().CustomAttributes
-                   .Where( x => x.AttributeType.FullName == "System.Runtime.Versioning.TargetFrameworkAttribute" )
-                   .Select( x => x.ConstructorArguments )
-                   .Where( p => p.Count > 0 )
-                   .Select( p => p[0].Value as string )
-                   .FirstOrDefault();
-                return "CKli " + (thisFramework ?? "<no TargetFrameworkAttribute>") + " - " + (a != null ? a.InformationalVersion : "<no version>");
-            }
-
-            Console.WriteLine( GetHeaderVersion() );
+            Console.WriteLine( "CKli " + CSemVer.InformationalVersion.ReadFromAssembly( Assembly.GetExecutingAssembly() ).ToString() );
             Console.WriteLine();
 
             ReadLine.HistoryEnabled = true;
@@ -48,11 +36,10 @@ namespace CKli
             IBasicApplicationLifetime appLife = new FakeApplicationLifetime();
             try
             {
-                using( var host = new UserHost( appLife, userHostPath ) )
+                using( var host = UserHost.Create( monitor, appLife, userHostPath ) )
                 {
-                    host.Initialize( monitor );
                     OpenKeyVault( monitor, host );
-                    if( host.UserKeyVault.IsKeyVaultOpened ) host.Initialize( monitor );
+                    if( host.UserKeyVault.IsKeyVaultOpened ) host.WorldStore.ReadWorlds( monitor, true );
                     DumpWorlds( host.WorldStore.ReadWorlds( monitor ) );
                     InteractiveRun( monitor, host );
                 }
@@ -244,7 +231,7 @@ namespace CKli
             }
         }
 
-        static void DumpSecrets( UserKeyVault v )
+        static void DumpSecrets( FileKeyVault v )
         {
             static string FirstPadding( int paddingSize, string sourceProviderName, bool missing )
             {

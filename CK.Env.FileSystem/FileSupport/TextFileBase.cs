@@ -16,7 +16,13 @@ namespace CK.Env
         readonly Encoding _encoding;
 
         /// <summary>
+        /// Gets the UTF-8 encoding without BOM.
+        /// </summary>
+        public readonly static Encoding UTF8EncodingNoBOM = new UTF8Encoding( false );
+
+        /// <summary>
         /// Initializes a new <see cref="TextFileBase"/>.
+        /// You can use <see cref="UTF8EncodingNoBOM"/> to specify that no BOM should be emitted.
         /// </summary>
         /// <param name="fs">The file system.</param>
         /// <param name="filePath">The path to the file relative to the file system root.</param>

@@ -48,4 +48,8 @@ dotnet_diagnostic.CA1031.severity = none
 # IDE0057: Use range operator. Use it if you want but this is not a suggestion.
 csharp_style_prefer_range_operator = false:suggestion
 
+# IDE0060: Remove unused parameter
+dotnet_code_quality_unused_parameters = all:silent
+
 # /Signature-Code .editorconfig
+
