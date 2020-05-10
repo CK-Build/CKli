@@ -81,15 +81,14 @@ namespace CK.Env
 
         /// <summary>
         /// Ensures that the Git working folder actually exists and creates a
-        /// GitFolder instance where the checked out  or returns null on error.
+        /// GitFolder instance where the checked out or returns null on error.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The GitFolder instance or null on error.</returns>
         public GitFolder CreateGitFolder( IActivityMonitor m )
         {
             var r = GitHelper.EnsureWorkingFolder( m, this, FullPhysicalPath, true, World.DevelopBranchName );
-            if( r == null ) return null;
-            return GitFolder.Create( m, r, this );
+            return r != null ? new GitFolder( r, this ) : null;
         }
 
         /// <summary>

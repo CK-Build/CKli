@@ -79,8 +79,12 @@ namespace CK.Env.Plugin
             var propertyGroup = XElement.Parse(
 @"<PropertyGroup>
 
+  <!-- Simple IsTestProject and IsInTestsFolder variables. -->
+  <IsTestProject Condition="" '$(IsTestProject)' == '' And $(MSBuildProjectName.EndsWith('.Tests'))"">true</IsTestProject>
+  <IsInTestsFolder Condition=""$(MSBuildProjectDirectory.Contains('\Tests\')) Or $(MSBuildProjectDirectory.Contains('/Tests/'))"">true</IsInTestsFolder>
+
   <!-- SolutionDir is defined by Visual Studio, we unify the behavior here. -->
-  <SolutionDir Condition="" $(SolutionDir) == '' "">$([System.IO.Path]::GetDirectoryName($([System.IO.Path]::GetDirectoryName($(MSBuildThisFileDirectory)))))/</SolutionDir>
+  <SolutionDir Condition="" '$(SolutionDir)' == '' "">$([System.IO.Path]::GetDirectoryName($([System.IO.Path]::GetDirectoryName($(MSBuildThisFileDirectory)))))/</SolutionDir>
 
   <!-- CakeBuild is obsolete: the new standard ContinuousIntegrationBuild should be used. -->
   <ContinuousIntegrationBuild Condition="" '$(CakeBuild)' == 'true' "">true</ContinuousIntegrationBuild>
@@ -158,12 +162,12 @@ namespace CK.Env.Plugin
                         .Remove();
                 section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
             }
-            section.StartComment = ": Default is in Release or during Cake builds (except for projects below Tests/). Each project can override GenerateDocumentationFile property.";
+            section.StartComment = ": When in IsInTestsFolder and in Release or during ContinuousIntegrationBuild builds. Each project can override GenerateDocumentationFile property. ";
             section.SetContent(
                 XElement.Parse(
-@"<PropertyGroup Condition="" '$(IsInTestsFolder)' != 'true' And ('$(ContinuousIntegrationBuild)' == 'true' Or '$(Configuration)' == 'Release') "">
-  <GenerateDocumentationFile>true</GenerateDocumentationFile>
-</PropertyGroup>" ) );
+@"<PropertyGroup Condition="" '$(GenerateDocumentationFile)' == '' And '$(IsInTestsFolder)' != 'true' And ('$(ContinuousIntegrationBuild)' == 'true' Or '$(Configuration)' == 'Release') "">
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>" ) );
         }
 
         void HandleZeroVersion( IActivityMonitor m )

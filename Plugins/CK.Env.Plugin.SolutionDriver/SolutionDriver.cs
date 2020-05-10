@@ -854,7 +854,6 @@ namespace CK.Env.Plugin
                                 ? ev.CodeCakeBuilderExecutableFile + " SolutionDirectoryIsCurrentDirectory"
                                 : "run --project CodeCakeBuilder";
                     args += " -autointeraction";
-                    args += " -PublishDirtyRepo=" + (ev.IsUsingDirtyFolder ? 'Y' : 'N');
                     args += " -PushToRemote=" + (ev.WithPushToRemote ? 'Y' : 'N');
                     if( !ev.BuildIsRequired ) args += " -target=\"Unit-Testing\" -exclusiveOptional -IgnoreNoArtifactsToProduce=Y";
                     if( !ev.WithUnitTest ) args += " -RunUnitTests=N";

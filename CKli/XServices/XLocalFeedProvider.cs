@@ -82,20 +82,23 @@ namespace CKli
                 using( m.OpenInfo( $"Removing '{PhysicalPath}' content." ) )
                 {
                     bool success = true;
-                    foreach( var d in Directory.EnumerateDirectories( PhysicalPath ) )
+                    if( Directory.Exists( PhysicalPath ) )
                     {
-                        FileHelper.RawDeleteLocalDirectory( m, d );
-                    }
-                    foreach( var f in Directory.EnumerateFiles( PhysicalPath ) )
-                    {
-                        try
+                        foreach( var d in Directory.EnumerateDirectories( PhysicalPath ) )
                         {
-                            File.Delete( f );
+                            FileHelper.RawDeleteLocalDirectory( m, d );
                         }
-                        catch( Exception ex )
+                        foreach( var f in Directory.EnumerateFiles( PhysicalPath ) )
                         {
-                            m.Error( $"While deleting file {f}.", ex );
-                            success = false;
+                            try
+                            {
+                                File.Delete( f );
+                            }
+                            catch( Exception ex )
+                            {
+                                m.Error( $"While deleting file {f}.", ex );
+                                success = false;
+                            }
                         }
                     }
                     return success;

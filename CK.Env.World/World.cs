@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Xml.Linq;
 
@@ -566,12 +567,8 @@ namespace CK.Env
             } );
         }
 
-        [CommandMethod]
-        public void ShowExternalDependencies( IActivityMonitor m, bool compact = true, bool onlyMultipleVersions = false )
+        IReadOnlyList<PackageReference> GetExternalPackageReferences( IActivityMonitor m, IWorldSolutionContext ctx )
         {
-            var ctx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
-            if( ctx == null ) return;
-
             var externals = ctx.DependencyContext.Analyzer.ExternalReferences;
             if( externals.Count == 0 )
             {
@@ -587,6 +584,15 @@ namespace CK.Env
                     }
                 }
             }
+            return externals;
+        }
+
+        [CommandMethod]
+        public void ShowExternalDependencies( IActivityMonitor m, bool compact = true, bool onlyMultipleVersions = false, PackageQuality quality = PackageQuality.None )
+        {
+            var ctx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
+            if( ctx == null ) return;
+            var externals = GetExternalPackageReferences( m, ctx );
             ConsoleColor stdForeColor = Console.ForegroundColor;
             ConsoleColor stdBackColor = Console.BackgroundColor;
             foreach( var byType in externals.GroupBy( g => g.Target.Artifact.Type ).OrderBy( g => g.Key.Name ) )
@@ -603,7 +609,7 @@ namespace CK.Env
                     {
                         var maxVersion = byVersion.Select( v => v.Key ).Max();
                         var externalVersionDisplay = _artifacts.GetExternalVersions( m, byName.Key )
-                                                               .SelectMany( a => a.Versions.Where( v => v > maxVersion ).Select( v => (v, a.FeedName) ) )
+                                                               .SelectMany( a => a.Versions.Where( v => v.PackageQuality >= quality && v > maxVersion ).Select( v => (v, a.FeedName) ) )
                                                                .GroupBy( v => v.v )
                                                                .OrderByDescending( v => v.Key )
                                                                .Select( g => $"{g.Key} ({g.Select( vn => vn.FeedName ).Concatenate()})" )

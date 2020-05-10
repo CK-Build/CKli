@@ -83,14 +83,14 @@ namespace CK.Env.Plugin
                     b.Append( "if( " );
                     if( r.QualityFilter.HasMin )
                     {
-                        b.Append( "GlobalInfo.Version.PackageQuality >= CSemVer.PackageQuality." )
+                        b.Append( "GlobalInfo.BuildInfo.Version.PackageQuality >= CSemVer.PackageQuality." )
                          .Append( r.QualityFilter.Min.ToString() )
                          .Append( ' ' );
                     }
                     if( r.QualityFilter.HasMax )
                     {
                         if( r.QualityFilter.HasMin ) b.Append( "&& " );
-                        b.Append( "GlobalInfo.Version.PackageQuality <= CSemVer.PackageQuality." )
+                        b.Append( "GlobalInfo.BuildInfo.Version.PackageQuality <= CSemVer.PackageQuality." )
                          .Append( r.QualityFilter.Max.ToString() )
                          .Append( ' ' );
                     }

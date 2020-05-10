@@ -27,10 +27,24 @@ namespace CK.Core
         /// <summary>
         /// Initializes a database from its serialized binary data.
         /// </summary>
-        /// <param name="r">The reader to use.</param>
-        public PackageDB( ICKBinaryReader r )
+        /// <param name="reader">The reader to use.</param>
+        public PackageDB( ICKBinaryReader reader )
+            : this( new DeserializerContext( reader ) )
         {
-            var ctx = new DeserializerContext( r );
+        }
+
+        /// <summary>
+        /// Writes this database into a binary stream.
+        /// </summary>
+        /// <param name="ctx">The binary writer to use.</param>
+        public void Write( ICKBinaryWriter writer ) => Write( new SerializerContext( writer ) );
+
+        /// <summary>
+        /// Initializes a database from its serialized binary data.
+        /// </summary>
+        /// <param name="ctx">The deserialization context to use.</param>
+        internal PackageDB( DeserializerContext ctx )
+        {
             _instances = new InstanceStore( ctx );
             int nbFeeds = ctx.Reader.ReadNonNegativeSmallInt32();
             _feeds = new Dictionary<string, PackageFeed>( nbFeeds );
@@ -45,10 +59,9 @@ namespace CK.Core
         /// <summary>
         /// Writes this database into a binary stream.
         /// </summary>
-        /// <param name="w">The writer to use.</param>
-        public void Write( ICKBinaryWriter w )
+        /// <param name="ctx">The serialization context to use.</param>
+        internal void Write( SerializerContext ctx )
         {
-            var ctx = new SerializerContext( w, 0 );
             _instances.Write( ctx );
             ctx.Writer.WriteNonNegativeSmallInt32( _feeds.Count );
             foreach( var kv in _feeds )
@@ -67,7 +80,7 @@ namespace CK.Core
         }
 
         /// <summary>
-        /// Registers one package. Any <see cref="PackageInfo.Dependencies"/> must
+        /// Registers one package. Any <see cref="FullPackageInfo.Dependencies"/> must
         /// be already registered.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -76,26 +89,26 @@ namespace CK.Core
         /// False to log an error and return null if info is already registered.
         /// </param>
         /// <returns>The new database or null on error.</returns>
-        public PackageDB? Add( IActivityMonitor m, PackageInfo info, bool skipExisting = true )
+        public PackageDB? Add( IActivityMonitor m, FullPackageInfo info, bool skipExisting = true )
         {
             return Add( m, new[] { info }, skipExisting );
         }
 
         /// <summary>
-        /// Registers multiple packages at once. Any <see cref="PackageInfo.Dependencies"/> must
+        /// Registers multiple packages at once. Any <see cref="FullPackageInfo.Dependencies"/> must
         /// be already registered or appear before the dependent package.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="infos">The package informations.</param>
         /// <param name="skipExisting">
         /// False to log an error and return null if infos contains already registered packages.
-        /// By default, exisiting packages are silently ignored.
+        /// By default, existing packages are silently ignored.
         /// </param>
-        /// <returns>The new database or null on error.</returns>
-        public PackageDB? Add( IActivityMonitor m, IEnumerable<PackageInfo> infos, bool skipExisting = true )
+        /// <returns>The new database (or this one if nothing changed), or null on error.</returns>
+        public PackageDB? Add( IActivityMonitor m, IEnumerable<FullPackageInfo> infos, bool skipExisting = true )
         {
             DateTime regDate = DateTime.UtcNow;
-            (PackageInfo info, Artifact[]? feedNames, int idx, PackageInstance? p)[] initialization;
+            (FullPackageInfo info, Artifact[]? feedNames, int idx, PackageInstance? p)[] initialization;
             initialization = infos.Select( i => (i, i.CheckValidAndParseFeedNames( m ), ~_instances.IndexOf( i.Key ), (PackageInstance?)null) )
                                   .ToArray();
             int newCount = 0;
@@ -188,7 +201,7 @@ namespace CK.Core
 
         /// <summary>
         /// Gets the version number.
-        /// It is an always increasing number (that may roll to negative... is years).
+        /// It is an always increasing number (that may roll to negative... in years).
         /// </summary>
         public int Version => _version;
 

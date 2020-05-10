@@ -8,9 +8,9 @@ using System.Linq;
 namespace CK.Core
 {
     /// <summary>
-    /// Basic POCO used to describe a new package in a <see cref="PackageDB"/>.
+    /// Simple mutable implementation of <see cref="IPackageInfo"/>.
     /// </summary>
-    public class PackageInfo
+    public class PackageInfo : IPackageInfo
     {
         CKTrait? _savors;
 
@@ -18,11 +18,6 @@ namespace CK.Core
         /// Gets or sets the key of this package.
         /// </summary>
         public ArtifactInstance Key { get; set; }
-
-        /// <summary>
-        /// Gets the name of the feeds that are known to contain this package.
-        /// </summary>
-        public List<string> FeedNames { get; } = new List<string>();
 
         /// <summary>
         /// Gets or sets the savors if any.
@@ -43,75 +38,7 @@ namespace CK.Core
         /// </summary>
         public List<(ArtifactInstance Target, ArtifactDependencyKind Kind, CKTrait? Savors)> Dependencies { get; } = new List<(ArtifactInstance, ArtifactDependencyKind, CKTrait?)>();
 
-        /// <summary>
-        /// Checks that this information is valid (in terms of naming, savors, dependencies and feed names) and
-        /// returns the array of necessarily valid <see cref="Artifact"/> names of feeds (that can be empty if
-        /// no feed name is provided).
-        /// If something is invalid, either logs an error and returns null if <paramref name="m"/> is available
-        /// or throws an <see cref="ArgumentException"/>.
-        /// </summary>
-        /// <param name="m">Monitor to use instead of throwing an exception.</param>
-        /// <returns>Not null valid feed names when valid, null when invalid and a monitor is provided.</returns>
-        public Artifact[]? CheckValidAndParseFeedNames( IActivityMonitor? m = null )
-        {
-            static Artifact[]? Error( string message, IActivityMonitor? m )
-            {
-                if( m == null ) throw new ArgumentException( message, nameof( PackageInfo ) );
-                m.Error( message );
-                return null;
-            }
+        IEnumerable<(ArtifactInstance Target, ArtifactDependencyKind Kind, CKTrait? Savors)> IPackageInfo.Dependencies => Dependencies;
 
-            // Cheking name.
-            if( !Key.IsValid )
-            {
-                return Error( $"Invalid ArtifactInstance.", m );
-            }
-
-            // Checking FeedNames.
-            var feedNames = FeedNames.Select( n => Artifact.TryParseOrCreate( n, Key.Artifact.Type ) ).ToArray();
-            if( feedNames.Any( f => !f.IsValid ) )
-            {
-                return Error( $"Invalid feed names found in '{FeedNames.Concatenate( "', '" )}'.", m );
-            }
-
-            // Checking dependencies.
-            if( Dependencies.Any( d => d.Kind == ArtifactDependencyKind.None ) )
-            {
-                return Error( $"Dependencies cannot have ArtifactDependencyKind.None kind.", m );
-            }
-            if( Dependencies.Any( d => !d.Target.IsValid ) )
-            {
-                return Error( $"Dependencies contain an invalid Target.", m );
-            }
-            // Checking Savors.
-            if( Savors == null )
-            {
-                if( Dependencies.Any( d => d.Savors != null ) )
-                {
-                    return Error( $"PackageInfo has no Savors defined: dependencies cannot specify savors.", m );
-                }
-            }
-            else
-            {
-                Debug.Assert( !Savors.IsEmpty );
-                var aliens = Dependencies.Where( d => d.Savors != null && d.Savors.Context != Savors.Context ).Select( d => d.Savors!.Context.Name );
-                if( aliens.Any() )
-                {
-                    return Error( $"PackageInfo defines {Savors} in '{Savors.Context.Name}' context but dependencies are defined in '{aliens.Concatenate( "', '" )}' context(s).", m );
-                }
-                else
-                {
-                    var undefined = Dependencies.Where( d => d.Savors != null )
-                                             .SelectMany( d => d.Savors!.Except( Savors ).AtomicTraits )
-                                             .Distinct()
-                                             .Select( t => t.ToString() );
-                    if( undefined.Any() )
-                    {
-                        return Error( $"PackageInfo defines {Savors} but dependencies have {undefined.Concatenate( Savors.Context.Separator.ToString() )} undefined savors.", m );
-                    }
-                }
-            }
-            return feedNames;
-        }
     }
 }

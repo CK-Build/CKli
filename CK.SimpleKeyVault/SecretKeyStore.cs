@@ -254,11 +254,4 @@ namespace CK.SimpleKeyVault
 
 
     }
-
-    public class MissingRequiredSecretException : Exception
-    {
-        public MissingRequiredSecretException( string message ) : base( message )
-        {
-        }
-    }
 }

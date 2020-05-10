@@ -4,7 +4,6 @@ using Cake.Core.Diagnostics;
 
 namespace CodeCake
 {
-    [AddPath( "%UserProfile%/.nuget/packages/**/tools*" )]
     public partial class Build : CodeCakeHost
     {
         public Build()

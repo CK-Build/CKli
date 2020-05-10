@@ -1,5 +1,6 @@
 using CK.Core;
 using System.Diagnostics;
+using System.Diagnostics.Contracts;
 
 namespace CK.Core
 {
@@ -8,13 +9,15 @@ namespace CK.Core
     /// </summary>
     readonly ref struct SerializerContext
     {
+        public const int Version = 0;
+
         public readonly ICKBinaryWriter Writer;
         public readonly CKBinaryWriter.ObjectPool<CKTraitContext> TraitContextPool;
         public readonly CKBinaryWriter.ObjectPool<CKTrait?> TraitPool;
 
-        public SerializerContext( ICKBinaryWriter writer, int version )
+        public SerializerContext( ICKBinaryWriter writer )
         {
-            (Writer = writer).WriteNonNegativeSmallInt32( version );
+            (Writer = writer).WriteNonNegativeSmallInt32( Version );
             TraitContextPool = new CKBinaryWriter.ObjectPool<CKTraitContext>( Writer, PureObjectRefEqualityComparer<CKTraitContext>.Default );
             TraitPool = new CKBinaryWriter.ObjectPool<CKTrait?>( Writer, PureObjectRefEqualityComparer<CKTrait?>.Default );
         }

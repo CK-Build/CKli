@@ -41,6 +41,9 @@ namespace CK.Env.Plugin
                     Document.Root.Elements( SGVSchema.Debug ).Remove();
                     e.ReplaceWith( o.ToXml() );
                 }
+                // Fogot these 2 ones.
+                Document.Root.Elements( "StartingVersionForCSemVer" ).Remove();
+                Document.Root.Nodes().OfType<XComment>().Where( c => c.Value.Contains( "Debug IgnoreDirtyWorkingFolder=" ) ).Remove();
                 return o;
             }
         }
@@ -58,11 +61,16 @@ namespace CK.Env.Plugin
 
         void OnEndBuild( object sender, BuildEndEventArgs e )
         {
-            if( !e.BuildStartArgs.IsUsingDirtyFolder
-                && e.BuildStartArgs.Memory.ContainsKey( this ) )
+            // We must always reset the in-memory option if we have changed it.
+            if( e.BuildStartArgs.Memory.ContainsKey( this ) )
             {
                 _options.EnsureObject().IgnoreDirtyWorkingFolder = false;
-                _options.UpdateXml( e.Monitor, true );
+                // If the build is protected by a Git reset, no need to update the file.
+                if( !e.BuildStartArgs.IsUsingDirtyFolder )
+                {
+                    _options.UpdateXml( e.Monitor, true );
+
+                }
             }
         }
 

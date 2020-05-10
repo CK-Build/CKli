@@ -1,12 +1,14 @@
 using CK.Core;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace CK.Core
 {
     /// <summary>
     /// Small wrapper around the immutable <see cref="PackageDB"/> object.
+    /// This exposes a centralized 
     /// </summary>
     public class ArtifactCache
     {
@@ -31,7 +33,8 @@ namespace CK.Core
             if( reader == null ) throw new ArgumentNullException( nameof( reader ) );
             try
             {
-                _db = new PackageDB( reader );
+                DeserializerContext ctx = new DeserializerContext( reader );
+                _db = new PackageDB( ctx );
                 return true;
             }
             catch( Exception ex )
@@ -47,7 +50,8 @@ namespace CK.Core
         /// <param name="w">The writer to use.</param>
         public void Write( CKBinaryWriter w )
         {
-            _db.Write( w );
+            SerializerContext ctx = new SerializerContext( w );
+            _db.Write( ctx );
         }
 
         /// <summary>
@@ -56,7 +60,12 @@ namespace CK.Core
         public PackageDB DB => _db;
 
         /// <summary>
-        /// Registers one package. Any <see cref="PackageInfo.Dependencies"/> must
+        /// Fires whenever <see cref="DB"/> has changed.
+        /// </summary>
+        public event EventHandler? DBChanged;
+
+        /// <summary>
+        /// Registers one package. Any <see cref="FullPackageInfo.Dependencies"/> must
         /// be already registered.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -65,23 +74,29 @@ namespace CK.Core
         /// False to log an error and return null if info is already registered.
         /// </param>
         /// <returns>The new database or null on error.</returns>
-        public PackageDB? Add( IActivityMonitor m, PackageInfo info, bool skipExisting = true ) => Add( m, new[] { info }, skipExisting );
+        public PackageDB? Add( IActivityMonitor m, FullPackageInfo info, bool skipExisting = true ) => Add( m, new[] { info }, skipExisting );
 
         /// <summary>
-        /// Registers multiple packages at once. Any <see cref="PackageInfo.Dependencies"/> must
+        /// Registers multiple packages at once. Any <see cref="FullPackageInfo.Dependencies"/> must
         /// be already registered or appear before the dependent package in the <paramref name="infos"/> enumerable.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="infos">The package informations.</param>
         /// <param name="skipExisting">
         /// False to log an error and return null if infos contains already registered packages.
-        /// By default, exisiting packages are silently ignored.
+        /// By default, existing packages are silently ignored.
         /// </param>
         /// <returns>The new database or null on error.</returns>
-        public PackageDB? Add( IActivityMonitor m, IEnumerable<PackageInfo> infos, bool skipExisting = true )
+        public PackageDB? Add( IActivityMonitor m, IEnumerable<FullPackageInfo> infos, bool skipExisting = true )
         {
             var newDb = _db.Add( m, infos, skipExisting );
-            return newDb != null ? (_db = newDb) : null;
+            if( newDb == null ) return null;
+            if( newDb != _db )
+            {
+                _db = newDb;
+                DBChanged?.Invoke( this, EventArgs.Empty );
+            }
+            return _db;
         }
 
         /// <summary>

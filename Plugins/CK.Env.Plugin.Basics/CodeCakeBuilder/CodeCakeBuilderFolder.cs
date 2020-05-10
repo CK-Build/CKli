@@ -1,7 +1,9 @@
 using CK.Core;
 using CK.Env.DependencyModel;
 using CK.Text;
+using System;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace CK.Env.Plugin
 {
@@ -89,11 +91,19 @@ namespace CK.Env.Plugin
 
         string AdaptBuild( IActivityMonitor m, ISolution s, string text )
         {
-            if( !s.Projects.Any( p => p.Type == "js" ) )
+            string jsSupport = "using Cake.Npm;" + Environment.NewLine + "using Cake.Npm.RunScript;" + Environment.NewLine;
+
+            text = text.Replace( jsSupport, String.Empty );
+            if( s.Projects.Any( p => p.Type == "js" ) )
             {
-                text = text.Replace( "using Cake.Npm;", "" );
-                text = text.Replace( "using Cake.Npm.Install;", "" );
-                text = text.Replace( "using Cake.Npm.RunScript;", "" );
+                text = jsSupport + text;
+            }
+            var mOld = Regex.Match( text, @"SimpleRepositoryInfo\s+gitInfo\s+=\s+Cake\.GetSimpleRepositoryInfo\(\);\s*", RegexOptions.Singleline );
+            if( mOld.Success )
+            {
+                m.Info( $"Auto upgrading Build.cs file." );
+                text = text.Remove( mOld.Index, mOld.Length ).Replace( "gitInfo.IsValid", "globalInfo.IsValid" );
+                text = Regex.Replace( text, @"CreateStandardGlobalInfo\(\s*gitInfo\s*\)", "CreateStandardGlobalInfo()" );
             }
             return text;
         }

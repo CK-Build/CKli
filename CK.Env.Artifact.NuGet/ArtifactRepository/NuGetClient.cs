@@ -302,7 +302,7 @@ namespace CK.Env.NuGet
             {
             }
 
-            private protected override bool CanRetry( MetadataResource meta, NuGetLoggerAdapter logger, Exception ex )
+            private protected override bool CanRetry( INuGetResource meta, NuGetLoggerAdapter logger, Exception ex )
             {
                 var secretOrName = Feed.Credentials?.PasswordOrSecretKeyName;
                 if( String.IsNullOrWhiteSpace( secretOrName ) )
