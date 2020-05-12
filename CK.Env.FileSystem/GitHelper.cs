@@ -227,7 +227,7 @@ namespace CK.Env
                 }
                 catch( Exception ex )
                 {
-                    using( m.OpenFatal( "This error need manual fix : " ) )
+                    using( m.OpenFatal( "The following error need manual fix:" ) )
                     {
                         m.Fatal( ex );
                     }
@@ -280,15 +280,16 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor.</param>
         /// <param name="branchName">The local name of the branch.</param>
+        /// <param name="skipFetchBranches">True to not call <see cref="FetchBranches(IActivityMonitor, bool)"/>.</param>
         /// <returns>
         /// Success is true on success, false on error (such as merge conflicts) and in case of success,
         /// the result states whether a reload should be required or if nothing changed.
         /// </returns>
-        public (bool Success, bool ReloadNeeded) Checkout( IActivityMonitor m, string branchName )
+        public (bool Success, bool ReloadNeeded) Checkout( IActivityMonitor m, string branchName, bool skipFetchBranches = false )
         {
             using( m.OpenInfo( $"Checking out branch '{branchName}' in '{SubPath}'." ) )
             {
-                if( !FetchBranches( m ) ) return (false, false);
+                if( !skipFetchBranches && !FetchBranches( m ) ) return (false, false);
                 try
                 {
                     bool reloadNeeded = false;

@@ -864,8 +864,7 @@ namespace CK.Env
         public bool EditRoadmap( IActivityMonitor monitor, bool pull = true )
         {
             if( !CanEditRoadmap ) throw new InvalidOperationException( nameof( CanEditRoadmap ) );
-            if( !CheckGlobalGitStatus( monitor, StandardGitStatus.Develop ) ) return false;
-            if( !CheckAndPullReposAndReloadIfNeeded( monitor, pull ) ) return false;
+            if( !CheckBeforeReleaseBuildOrEdit( monitor, pull ) ) return false;
             return DoEditRoadmap( monitor, false ) != null;
         }
 
@@ -888,17 +887,23 @@ namespace CK.Env
                                   && WorkStatus == GlobalWorkStatus.Idle
                                   && CachedGlobalGitStatus == StandardGitStatus.Develop;
 
-        bool CheckAndPullReposAndReloadIfNeeded( IActivityMonitor m, bool pull )
+        bool CheckBeforeReleaseBuildOrEdit( IActivityMonitor m, bool pull )
         {
+            if( !CheckGlobalGitStatus( m, StandardGitStatus.Develop ) ) return false;
             bool reloadNeeded = false;
             foreach( var g in _gitRepositories )
             {
                 if( !g.CheckCleanCommit( m ) ) return false;
                 if( pull )
                 {
-                    var (Success, ReloadNeeded) = g.Pull( m );
+                    // We first Checkout and pulls the Master branch
+                    // Ensuring a successful CheckOut of Master is a welcome security.
+                    if( !g.Checkout( m, WorldName.MasterBranchName ).Success ) return false;
+                    // Checking out the Develop branch back.
+                    var (Success, ReloadNeeded) = g.Checkout( m, WorldName.DevelopBranchName, skipFetchBranches: true );
                     if( !Success ) return false;
                     reloadNeeded |= ReloadNeeded;
+
                 }
             }
             if( reloadNeeded && GetWorldSolutionContext( m, true ) == null ) return false;
@@ -916,9 +921,7 @@ namespace CK.Env
         public bool Release( IActivityMonitor monitor, bool pull = true, bool resetRoadmap = false )
         {
             if( !CanRelease ) throw new InvalidOperationException( nameof( CanRelease ) );
-            if( !CheckGlobalGitStatus( monitor, StandardGitStatus.Develop ) ) return false;
-
-            if( !CheckAndPullReposAndReloadIfNeeded( monitor, pull ) ) return false;
+            if( !CheckBeforeReleaseBuildOrEdit( monitor, pull ) ) return false;
 
             var roadmap = DoEditRoadmap( monitor, resetRoadmap );
             if( roadmap == null ) return false;

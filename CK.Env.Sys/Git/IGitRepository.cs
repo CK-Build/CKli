@@ -177,14 +177,15 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor.</param>
         /// <param name="branchName">The local name of the branch.</param>
+        /// <param name="skipFetchBranches">True to not call <see cref="FetchBranches"/>.</param>
         /// <returns>
         /// Success is true on success, false on error (such as merge conflicts) and in case of success,
         /// the result states whether a reload should be required or if nothing changed.
         /// </returns>
-        (bool Success, bool ReloadNeeded) Checkout( IActivityMonitor m, string branchName );
+        (bool Success, bool ReloadNeeded) Checkout( IActivityMonitor m, string branchName, bool skipFetchBranches = false );
 
         /// <summary>
-        /// Pulls current branch by merging changes from remote 'orgin' branch into this repository.
+        /// Pulls current branch by merging changes from remote 'origin' branch into this repository.
         /// The current head must be clean.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
