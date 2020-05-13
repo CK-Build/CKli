@@ -1,8 +1,11 @@
 using CK.Env.Tests.LocalTestHelper;
+using CK.Text;
 using FluentAssertions;
+using LibGit2Sharp;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using static CK.Testing.MonitorTestHelper;
@@ -47,6 +50,41 @@ namespace CK.Env.Tests
                 world.DumpWorldState( TestHelper.Monitor ).Should().BeTrue( "All repositories should be cleaned after the pull/checkout mster/pull." );
 
             }, TestHelper.IsExplicitAllowed );
+        }
+
+        [Test]
+        public void CheckBeforeReleaseBuildOrEdit_pull_master()
+        {
+            ImageLibrary.minimal_solution_first_ci_build(
+                ( universe, world ) =>
+                {
+                    string cktestCodeCake = "CKTest-CodeCake";
+                    NormalizedPath tempDir = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
+                    Repository.Clone(
+                        "file:///" + Path.GetFullPath( universe.WorldsFolder.AppendPart( world.WorldName.Name ).AppendPart( cktestCodeCake ) ).Replace( "\\", "/" ),
+                        tempDir );
+                    Repository concurrentUser = new Repository( tempDir );
+                    Branch master = concurrentUser.Branches["master"];
+                    Commands.Checkout( concurrentUser, master );
+                    string testFileName = "testFile";
+                    NormalizedPath testFile = tempDir.AppendPart( testFileName );
+                    File.AppendAllText( testFile, "test" );
+                    Commands.Stage( concurrentUser, testFile );
+                    Signature testSignature = new Signature( "CKlitest", "nobody@test.com", DateTimeOffset.Now );
+                    concurrentUser.Commit( "Test commit.", testSignature, testSignature );
+                    concurrentUser.Network.Push( master );
+                    world.CheckBeforeReleaseBuildOrEdit( TestHelper.Monitor, true );
+                    foreach( IGitRepository repository in world.GitRepositories )
+                    {
+                        (bool Success, bool ReloadNeeded) = repository.Pull( TestHelper.Monitor );
+                        Success.Should().BeTrue();
+                    }
+                    NormalizedPath repoPath = universe.DevDirectory.AppendPart( "CKTest-Build" ).AppendPart( cktestCodeCake );
+                    Repository repo = new Repository( repoPath );
+                    Commands.Checkout( repo, repo.Branches["master"] );
+                    File.Exists( Path.GetFullPath( repoPath.AppendPart( testFileName ) ) ).Should().BeTrue();
+
+                }, TestHelper.IsExplicitAllowed );
         }
     }
 }

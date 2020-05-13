@@ -887,7 +887,7 @@ namespace CK.Env
                                   && WorkStatus == GlobalWorkStatus.Idle
                                   && CachedGlobalGitStatus == StandardGitStatus.Develop;
 
-        bool CheckBeforeReleaseBuildOrEdit( IActivityMonitor m, bool pull )
+        public bool CheckBeforeReleaseBuildOrEdit( IActivityMonitor m, bool pull )
         {
             if( !CheckGlobalGitStatus( m, StandardGitStatus.Develop ) ) return false;
             bool reloadNeeded = false;
