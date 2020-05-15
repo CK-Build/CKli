@@ -1,7 +1,7 @@
 using CSemVer;
 using System;
 
-namespace CK.Core
+namespace CK.Build
 {
     /// <summary>
     /// An artifact is produced by a solution and can be of any type.
@@ -51,11 +51,11 @@ namespace CK.Core
         /// </summary>
         /// <param name="typedName">The string to parse.</param>
         /// <returns>The resulting artifact that may be invalid.</returns>
-        public static Artifact TryParse( string typedName )
+        public static Artifact TryParse( string? typedName )
         {
-            if( typedName != null )
+            if( !String.IsNullOrWhiteSpace( typedName ) )
             {
-                var idx = typedName.IndexOf( ',' );
+                var idx = typedName.IndexOf( ':' );
                 if( idx > 0 && idx < typedName.Length - 1 )
                 {
                     var type = ArtifactType.SingleOrDefault( typedName.Substring( 0, idx ) );

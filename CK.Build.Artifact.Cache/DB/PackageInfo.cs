@@ -1,11 +1,8 @@
 using CK.Core;
-using CK.Text;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 
-namespace CK.Core
+namespace CK.Build
 {
     /// <summary>
     /// Simple mutable implementation of <see cref="IPackageInfo"/>.

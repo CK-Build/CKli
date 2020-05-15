@@ -1,10 +1,11 @@
+using CK.Core;
 using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 
-namespace CK.Core
+namespace CK.Build
 {
     /// <summary>
     /// Pure readonly interface used to describe a new package in a <see cref="PackageDB"/>.
@@ -12,7 +13,14 @@ namespace CK.Core
     public interface IFullPackageInfo : IPackageInfo
     {
         /// <summary>
+        /// Gets or sets whether the <see cref="FeedNames"/> are all the feeds that contain this package.
+        /// When false, feed names are only a subset of the feeds that contain this package.
+        /// </summary>
+        bool AllFeedNamesAreKnown { get; set; }
+
+        /// <summary>
         /// Gets the name of the feeds that are known to contain this package.
+        /// This can be empty: a package can exist in a <see cref="PackageDB"/> without being in any <see cref="PackageFeed"/>.
         /// </summary>
         IEnumerable<string> FeedNames { get; }
     }

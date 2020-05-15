@@ -3,9 +3,21 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 
-namespace CK.Core
+namespace CK.Build
 {
+
+    public class PackageDBChangedArgs : EventArgs
+    {
+        public PackageDBChangedArgs( PackageDB db )
+        {
+            PackageDB = db;
+        }
+
+        public PackageDB PackageDB { get; }
+    }
+
     /// <summary>
     /// Small wrapper around the immutable <see cref="PackageDB"/> object.
     /// This exposes a centralized 
@@ -62,7 +74,7 @@ namespace CK.Core
         /// <summary>
         /// Fires whenever <see cref="DB"/> has changed.
         /// </summary>
-        public event EventHandler? DBChanged;
+        public event EventHandler<PackageDBChangedArgs>? DBChanged;
 
         /// <summary>
         /// Registers one package. Any <see cref="FullPackageInfo.Dependencies"/> must
@@ -89,14 +101,15 @@ namespace CK.Core
         /// <returns>The new database or null on error.</returns>
         public PackageDB? Add( IActivityMonitor m, IEnumerable<FullPackageInfo> infos, bool skipExisting = true )
         {
-            var newDb = _db.Add( m, infos, skipExisting );
-            if( newDb == null ) return null;
-            if( newDb != _db )
+            bool success = false;
+            var newDb = Util.InterlockedSet( ref _db, origin =>
             {
-                _db = newDb;
-                DBChanged?.Invoke( this, EventArgs.Empty );
-            }
-            return _db;
+                var newOne = origin.Add( m, infos, skipExisting );
+                return (success = (newOne != null)) ? newOne! : origin;
+            } );
+            if( !success ) return null;
+            DBChanged?.Invoke( this, new PackageDBChangedArgs( newDb ) );
+            return newDb;
         }
 
         /// <summary>

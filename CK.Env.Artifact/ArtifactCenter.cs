@@ -1,5 +1,5 @@
 using CK.Core;
-using CSemVer;
+using CK.Build;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,15 +24,9 @@ namespace CK.Env
             _typeHandlers = new List<IArtifactTypeHandler>();
             _feeds = new List<IArtifactFeed>();
             _repositories = new List<IArtifactRepository>();
-            ArtifactCache = new ArtifactCache();
 
             _cachedArtifacts = new Dictionary<Artifact, IReadOnlyCollection<ArtifactAvailableInstances>>();
         }
-
-        /// <summary>
-        /// Gets the artifact cache.
-        /// </summary>
-        public ArtifactCache ArtifactCache { get; } 
 
         /// <summary>
         /// Registers a new <see cref="IArtifactTypeHandler"/>.

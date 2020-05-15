@@ -2,7 +2,7 @@ using CK.Core;
 using System.Diagnostics;
 using System.Diagnostics.Contracts;
 
-namespace CK.Core
+namespace CK.Build
 {
     /// <summary>
     /// Internal struct.

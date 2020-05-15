@@ -1,7 +1,7 @@
 using CSemVer;
 using System;
 
-namespace CK.Core
+namespace CK.Build
 {
     /// <summary>
     /// Defines the instance of an <see cref="Artifact"/>: its <see cref="Version"/> is known.
@@ -96,7 +96,7 @@ namespace CK.Core
             if( idx > 0
                 && idx < instanceName.Length - 3
                 && SVersion.TryParse( instanceName.Substring( idx + 1 ), out var version )
-                && Core.Artifact.TryParse( instanceName.Substring( 0, idx ), out var artifact ) )
+                && Artifact.TryParse( instanceName.Substring( 0, idx ), out var artifact ) )
             {
                 return new ArtifactInstance( artifact, version );
             }

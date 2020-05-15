@@ -1,6 +1,7 @@
+using CK.Core;
 using System;
 
-namespace CK.Core
+namespace CK.Build
 {
     /// <summary>
     /// Immutable description of artifacts type that can be registered

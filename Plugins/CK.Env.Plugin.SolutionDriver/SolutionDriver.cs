@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Build;
 using CK.Env.DependencyModel;
 using CK.Env.Diff;
 using CK.Env.MSBuildSln;

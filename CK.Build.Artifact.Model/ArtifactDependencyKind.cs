@@ -1,4 +1,4 @@
-namespace CK.Core
+namespace CK.Build
 {
     /// <summary>
     /// Defines how a project, package, any artifact references another project, package or any artifact.

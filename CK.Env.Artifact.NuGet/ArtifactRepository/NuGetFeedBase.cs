@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Build;
 using CK.SimpleKeyVault;
 using CSemVer;
 using NuGet.Configuration;

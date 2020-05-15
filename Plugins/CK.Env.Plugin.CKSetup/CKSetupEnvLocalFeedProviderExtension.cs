@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Build;
 using CK.Env.CKSetup;
 using CK.Env.Plugin;
 using CKSetup;

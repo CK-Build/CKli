@@ -6,7 +6,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
-namespace CK.Core
+namespace CK.Build
 {
     public partial class PackageDB
     {
@@ -132,30 +132,52 @@ namespace CK.Core
                 Array.Copy( prev, idxNewOne, _instances, idxNewOne + 1, pLen - idxNewOne );
             }
 
-            InstanceStore( PackageInstance[] prev, (int idx, PackageInstance p)[] indices )
+            InstanceStore( PackageInstance[] prev, (int idx, PackageInstance? p)[] indices, int nbToRemove )
             {
-                Debug.Assert( indices.All( x => x.p != null ) );
+                Debug.Assert( indices.Count( x => x.p == null ) == nbToRemove );
+
+                static int CompareIndex( (int idx, PackageInstance? p) i1, (int idx, PackageInstance? p) i2 )
+                {
+                    int cmp = i1.idx - i2.idx;
+                    return cmp != 0
+                            ? cmp
+                            : (i1.p == null
+                                ? -1
+                                : (i2.p == null
+                                    ? 1
+                                    : i1.p.CompareTo( i2.p )));
+                }
                 Array.Sort( indices, CompareIndex );
-                _instances = new PackageInstance[prev.Length + indices.Length];
+                var instances = new PackageInstance[prev.Length + indices.Length - 2 * nbToRemove];
                 int prevIdx = 0;
                 int originOffset = 0, targetOffset = 0;
                 foreach( var (idx, p) in indices )
                 {
                     var len = idx - prevIdx;
                     prevIdx = idx;
-                    Array.Copy( prev, originOffset, _instances, targetOffset, len );
-                    targetOffset += len;
-                    _instances[targetOffset++] = p;
-                    originOffset += len;
+                    if( len < 0 )
+                    {
+                        Debug.Assert( len == -1 && p != null, "Setting a removed slot." );
+                        instances[targetOffset++] = p;
+                    }
+                    else
+                    {
+                        Array.Copy( prev, originOffset, instances, targetOffset, len );
+                        targetOffset += len;
+                        originOffset += len;
+                        if( p == null )
+                        {
+                            prevIdx++;
+                            originOffset++;
+                        }
+                        else instances[targetOffset++] = p;
+                    }
                 }
-                Array.Copy( prev, originOffset, _instances, targetOffset, _instances.Length - targetOffset );
+                Array.Copy( prev, originOffset, instances, targetOffset, instances.Length - targetOffset );
+                _instances = instances;
             }
 
-            static int CompareIndex( (int idx, PackageInstance p) i1, (int idx, PackageInstance p) i2 )
-            {
-                int cmp = i1.idx - i2.idx;
-                return cmp != 0 ? cmp : i1.p.CompareTo( i2.p );
-            }
+
 
             public InstanceStore Add( PackageInstance newOne )
             {
@@ -172,10 +194,20 @@ namespace CK.Core
                 return Add( indices );
             }
 
-            public InstanceStore Add( (int idx, PackageInstance p)[] indices )
+            public InstanceStore Add( List<(int idx, PackageInstance p)>? newPackages, List<int>? oldPackages )
             {
-                return new InstanceStore( _instances, indices );
+                Debug.Assert( (newPackages != null && newPackages.Count > 0) || (oldPackages != null && oldPackages.Count > 0) );
+                if( oldPackages == null ) return Add( newPackages!.ToArray() );
+
+                IEnumerable<(int idx, PackageInstance? p)>? indices = oldPackages.Select( idx => (idx, (PackageInstance?)null ) );
+                if( newPackages != null ) indices = indices.Concat( newPackages.Select( p => (p.idx, (PackageInstance?)p.p) ) );
+                return Add( indices.ToArray(), oldPackages.Count );
             }
+
+            public InstanceStore Add( (int idx, PackageInstance? p)[] indices, int nbToRemove ) => new InstanceStore( _instances, indices, nbToRemove );
+#pragma warning disable CS8620 // Argument cannot be used for parameter due to differences in the nullability of reference types.
+            public InstanceStore Add( (int idx, PackageInstance p)[] indices ) => new InstanceStore( _instances, indices, 0 );
+#pragma warning restore CS8620 // Argument cannot be used for parameter due to differences in the nullability of reference types.
 
             public ArraySegment<PackageInstance> GetInstances( ArtifactType type )
             {

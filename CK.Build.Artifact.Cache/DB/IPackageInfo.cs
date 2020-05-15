@@ -1,6 +1,7 @@
+using CK.Core;
 using System.Collections.Generic;
 
-namespace CK.Core
+namespace CK.Build
 {
     /// <summary>
     /// Pure readonly interface that describes the basic information of a package handled by the <see cref="PackageDB"/>

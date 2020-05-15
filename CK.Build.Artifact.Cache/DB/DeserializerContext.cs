@@ -1,6 +1,6 @@
 using CK.Core;
 
-namespace CK.Core
+namespace CK.Build
 {
     /// <summary>
     /// Internal struct.

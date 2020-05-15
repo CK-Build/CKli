@@ -1,7 +1,7 @@
 using CSemVer;
 using System;
 
-namespace CK.Core
+namespace CK.Build
 {
     /// <summary>
     /// Immutable that defines an Artifact associated to a set of available versions (a <see cref="PackageQualityVersions"/>)

@@ -1,11 +1,13 @@
 using CK.Core;
 using CSemVer;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 
-namespace CK.Core
+namespace CK.Build
 {
     /// <summary>
-    /// Models a source of packages (packages are installable artifacts).
+    /// Models a source of packages (packages are installable artifacts) inside a <see cref="PackageDB"/>.
     /// </summary>
     public class PackageFeed : IArtifactFeedIdentity
     {
@@ -13,24 +15,74 @@ namespace CK.Core
         readonly Artifact _name;
         readonly PackageDB.InstanceStore _instances;
 
+        internal class Diff
+        {
+            List<(int idx, PackageInstance p)>? _new;
+            List<int>? _old;
+
+            internal Diff( PackageFeed f, (int idx, PackageInstance p) newOne )
+            {
+                Feed = f;
+                _new = new List<(int idx, PackageInstance p)>() { newOne };
+            }
+
+            internal Diff( PackageFeed f, int oldIdx )
+            {
+                Feed = f;
+                _old = new List<int>() { oldIdx };
+            }
+
+            public readonly PackageFeed Feed;
+
+            public void AddNew( int idx, PackageInstance p )
+            {
+                Debug.Assert( _new != null && _new.Count > 0, "We have already allocated it (with its very first package)." );
+                Debug.Assert( _old == null, "All AddNew must be called before AddOld." );
+                Debug.Assert( idx >= 0 );
+                _new.Add( (idx, p) );
+            }
+
+            public void AddOld( int oldIdx )
+            {
+                if( _old == null ) _old = new List<int>();
+                _old.Add( oldIdx );
+            }
+
+            public PackageFeed Create()
+            {
+                Debug.Assert( _old != null || _new != null );
+                return new PackageFeed( Feed, _new, _old );
+            }
+        }
+
         internal PackageFeed( in Artifact name, PackageDB.InstanceStore instances )
         {
             _name = name;
             _instances = instances;
+            Debug.Assert( _instances.All( p => p.Key.Artifact.Type == _name.Type ) );
         }
 
         internal PackageFeed( PackageFeed other, List<PackageInstance> newPackages )
         {
             _name = other._name;
             _instances = other._instances.Add( newPackages );
+            Debug.Assert( _instances.All( p => p.Key.Artifact.Type == _name.Type ) );
+        }
+
+        internal PackageFeed( PackageFeed other, List<(int idx, PackageInstance p)>? newPackages, List<int>? oldPackages )
+        {
+            _name = other._name;
+            _instances = other._instances.Add( newPackages, oldPackages );
+            Debug.Assert( _instances.All( p => p.Key.Artifact.Type == _name.Type ) );
         }
 
         internal PackageFeed( PackageDB.InstanceStore allInstances, DeserializerContext ctx )
         {
-            var type = Core.ArtifactType.Single( ctx.Reader.ReadSharedString() );
+            var type = ArtifactType.Single( ctx.Reader.ReadSharedString() );
             var name = ctx.Reader.ReadString();
             _name = new Artifact( type, name );
             _instances = new PackageDB.InstanceStore( ctx, allInstances );
+            Debug.Assert( _instances.All( p => p.Key.Artifact.Type == _name.Type ) );
         }
 
         internal void Write( PackageDB.InstanceStore allInstances, SerializerContext ctx )
@@ -62,16 +114,6 @@ namespace CK.Core
         public IReadOnlyList<PackageInstance> Instances => _instances;
 
         /// <summary>
-        /// Gets all the instances of a given <see cref="ArtifactType"/>.
-        /// </summary>
-        /// <param name="type">The package's type.</param>
-        /// <returns>The list of the known instances.</returns>
-        public IReadOnlyList<PackageInstance> GetInstances( ArtifactType type )
-        {
-            return _instances.GetInstances( type );
-        }
-
-        /// <summary>
         /// Gets all the instances of a given package (of type <see cref="ArtifactType"/>).
         /// </summary>
         /// <param name="name">The package's name.</param>
@@ -83,20 +125,29 @@ namespace CK.Core
         }
 
         /// <summary>
+        /// Gets the instance or null if not found.
+        /// </summary>
+        /// <param name="key">The package identifier.</param>
+        /// <returns>The instance or null if not found.</returns>
+        public PackageInstance? Find( in ArtifactInstance key ) => _instances.Find( key );
+
+        internal int IndexOf( in ArtifactInstance key ) => _instances.IndexOf( key );
+
+        /// <summary>
         /// Gets the available instances in this feed.
         /// </summary>
         /// <param name="this">This feed.</param>
-        /// <param name="artifactName">The artifact name.</param>
+        /// <param name="name">The package's name.</param>
         /// <returns>The available instances. <see cref="ArtifactAvailableInstances.IsValid"/> is false if the artifact is not found.</returns>
-        public ArtifactAvailableInstances GetAvailableInstances( string artifactName )
+        public ArtifactAvailableInstances GetAvailableInstances( string name )
         {
             SVersion? ci = null, exp = null, pre = null, lat = null, sta = null;
-            foreach( var p in GetInstances( artifactName ) )
+            foreach( var p in GetInstances( name ) )
             {
                 PackageQualityVersions.Apply( p.Key.Version, ref ci, ref exp, ref pre, ref lat, ref sta );
             }
             var versions = new PackageQualityVersions( ci, exp, pre, lat, sta );
-            return new ArtifactAvailableInstances( this, artifactName, versions );
+            return new ArtifactAvailableInstances( this, name, versions );
         }
 
     }
