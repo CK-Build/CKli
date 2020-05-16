@@ -8,19 +8,8 @@ using System.Threading;
 namespace CK.Build
 {
 
-    public class PackageDBChangedArgs : EventArgs
-    {
-        public PackageDBChangedArgs( PackageDB db )
-        {
-            PackageDB = db;
-        }
-
-        public PackageDB PackageDB { get; }
-    }
-
     /// <summary>
-    /// Small wrapper around the immutable <see cref="PackageDB"/> object.
-    /// This exposes a centralized 
+    /// Wraps the immutable <see cref="PackageDB"/> object.
     /// </summary>
     public class ArtifactCache
     {
