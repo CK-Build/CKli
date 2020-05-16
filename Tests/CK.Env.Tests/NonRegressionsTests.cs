@@ -63,16 +63,19 @@ namespace CK.Env.Tests
                     Repository.Clone(
                         "file:///" + Path.GetFullPath( universe.WorldsFolder.AppendPart( world.WorldName.Name ).AppendPart( cktestCodeCake ) ).Replace( "\\", "/" ),
                         tempDir );
-                    Repository concurrentUser = new Repository( tempDir );
-                    Branch master = concurrentUser.Branches["master"];
-                    Commands.Checkout( concurrentUser, master );
                     string testFileName = "testFile";
-                    NormalizedPath testFile = tempDir.AppendPart( testFileName );
-                    File.AppendAllText( testFile, "test" );
-                    Commands.Stage( concurrentUser, testFile );
-                    Signature testSignature = new Signature( "CKlitest", "nobody@test.com", DateTimeOffset.Now );
-                    concurrentUser.Commit( "Test commit.", testSignature, testSignature );
-                    concurrentUser.Network.Push( master );
+                    using( Repository concurrentUser = new Repository( tempDir ) )
+                    {
+                        Branch master = concurrentUser.Branches["master"];
+                        Commands.Checkout( concurrentUser, master );
+                        NormalizedPath testFile = tempDir.AppendPart( testFileName );
+                        File.AppendAllText( testFile, "test" );
+                        Commands.Stage( concurrentUser, testFile );
+                        Signature testSignature = new Signature( "CKlitest", "nobody@test.com", DateTimeOffset.Now );
+                        concurrentUser.Commit( "Test commit.", testSignature, testSignature );
+                        concurrentUser.Network.Push( master );
+                    }
+
                     world.CheckBeforeReleaseBuildOrEdit( TestHelper.Monitor, true );
                     foreach( IGitRepository repository in world.GitRepositories )
                     {
@@ -80,8 +83,10 @@ namespace CK.Env.Tests
                         Success.Should().BeTrue();
                     }
                     NormalizedPath repoPath = universe.DevDirectory.AppendPart( "CKTest-Build" ).AppendPart( cktestCodeCake );
-                    Repository repo = new Repository( repoPath );
-                    Commands.Checkout( repo, repo.Branches["master"] );
+                    using( Repository repo = new Repository( repoPath ) )
+                    {
+                        Commands.Checkout( repo, repo.Branches["master"] );
+                    }
                     File.Exists( Path.GetFullPath( repoPath.AppendPart( testFileName ) ) ).Should().BeTrue();
 
                 }, TestHelper.IsExplicitAllowed );
