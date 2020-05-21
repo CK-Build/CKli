@@ -48,13 +48,8 @@ namespace CK.Env
                 fileName += " " + arg;
             }
 
-            var state = InitialSessionState.Create();
-            state.ExecutionPolicy = ExecutionPolicy.Bypass;
-            using( var ps = PowerShell.Create( state ) )
-            {
-                ps.Invoke( fileName );
-            }
-            return Run( m, workingDir, IsRunningOnUnix ? "pwsh" : "Powershell.exe", fileName, stdErrorLevel, environmentVariables );
+            return
+                Run( m, workingDir, IsRunningOnUnix ? "pwsh" : "Powershell.exe", "-executionpolicy unrestricted "+ fileName, stdErrorLevel, environmentVariables );
         }
 
         /// <summary>
