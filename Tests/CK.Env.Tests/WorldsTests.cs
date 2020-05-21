@@ -51,7 +51,7 @@ namespace CK.Env.Tests
                 GitPluginSampleMock.ThrowOnExecuteSomething = true;
                 try
                 {
-                    universe.Invoking( u => u.RunCommands( TestHelper.Monitor, world.WorldName.FullName, "**MockPlugin/ExecuteSomething" ) )
+                    universe.Invoking( u => u.RunCommands( TestHelper.Monitor, world.WorldName.FullName, "**MockPlugin/ExecuteSomething", true ) )
                                 .Should().Throw<Exception>().WithMessage( "Mock.ExecuteSomething" );
                 }
                 finally

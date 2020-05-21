@@ -6,6 +6,8 @@ using System.Runtime.CompilerServices;
 using System.Linq;
 
 using static CK.Testing.MonitorTestHelper;
+using NUnit.Framework.Internal;
+
 namespace CK.Env.Tests.LocalTestHelper
 {
     public static class ImageLibrary
@@ -26,18 +28,18 @@ namespace CK.Env.Tests.LocalTestHelper
             Action<TestUniverse> testCallback,
             bool refreshCache,
             Func<T, bool, NormalizedPath> parentBuilder,
-            Action<TestUniverse> buildAction,
+            Func<TestUniverse, TestUniverse> buildAction,
             [CallerMemberName] string newImageName = null )
         {
-            using( TestUniverse universe = ImageManager.InstantiateImage( TestHelper.Monitor, parentBuilder, refreshCache ) )
+            TestUniverse universe;
+            using( universe = ImageManager.InstantiateImage( TestHelper.Monitor, parentBuilder, refreshCache ) )
             {
-                buildAction( universe );
+                universe = buildAction( universe );
                 var snapshotPath = universe.SnapshotState( newImageName );
                 testCallback?.Invoke( universe );
                 return snapshotPath;
             }
         }
-
 
         /// <summary>
         /// Helper to build an image, save it, then run test against it.
@@ -50,18 +52,18 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <param name="newImageName">The name of the new image.</param>
         /// <returns>The path of the new image.</returns>
         static NormalizedPath ImageBuilderHelper<T>(
-            string worldName,
-            Action<TestUniverse, World> testCallback,
-            bool refreshCache,
-            Func<T, bool, NormalizedPath> parentBuilder,
-            Action<TestUniverse> buildAction,
-            [CallerMemberName] string newImageName = null ) =>
-                ImageBuilderHelper(
-                    ( universe ) => testCallback?.Invoke( universe, universe.EnsureWorldOpened( TestHelper.Monitor, worldName ) ),
-                    refreshCache,
-                    parentBuilder,
-                    buildAction,
-                    newImageName );
+        string worldName,
+        Action<TestUniverse, World> testCallback,
+        bool refreshCache,
+        Func<T, bool, NormalizedPath> parentBuilder,
+        Func<TestUniverse, TestUniverse> buildAction,
+        [CallerMemberName] string newImageName = null ) =>
+            ImageBuilderHelper(
+                ( universe ) => testCallback?.Invoke( universe, universe.EnsureWorldOpened( TestHelper.Monitor, worldName ) ),
+                refreshCache,
+                parentBuilder,
+                buildAction,
+                newImageName );
 
         /// <summary>
         /// Helper to build an image, save it, then run test against it.
@@ -78,7 +80,7 @@ namespace CK.Env.Tests.LocalTestHelper
             Action<TestUniverse, World> testCallback,
             bool refreshCache,
             Func<T, bool, NormalizedPath> parentBuilder,
-            Action<TestUniverse, World> buildAction,
+            Func<TestUniverse, World, TestUniverse> buildAction,
             [CallerMemberName] string newImageName = null ) =>
                 ImageBuilderHelper( worldName, testCallback,
                     refreshCache,
@@ -88,11 +90,11 @@ namespace CK.Env.Tests.LocalTestHelper
                         universe.EnsureWorldOpened( TestHelper.Monitor, worldName );
                         var w = universe.UserHost.WorldSelector.CurrentWorld;
                         w.Should().NotBeNull();
-                        buildAction( universe, w );
+                        return buildAction( universe, w );
                     },
                     newImageName );
 
-        public static NormalizedPath minimal_solution_setup( Action<TestUniverse> action, bool useless )
+        public static NormalizedPath minimal_solution_setup( Action<TestUniverse> testCallback, bool useless )
         {
             using( TestUniverse universe = ImageManager.InstantiateImage(
                 m: TestHelper.Monitor,
@@ -101,21 +103,23 @@ namespace CK.Env.Tests.LocalTestHelper
             {
                 universe.SeedInitialSetup( TestHelper.Monitor );
                 var snapshotPath = universe.SnapshotState( nameof( minimal_solution_setup ) );
-                action?.Invoke( universe );
+                testCallback?.Invoke( universe );
                 return snapshotPath;
             }
         }
 
-        public static NormalizedPath minimal_solution_open( Action<TestUniverse> action, bool refreshCache ) =>
-            ImageBuilderHelper<Action<TestUniverse>>( action, refreshCache, minimal_solution_setup,
-                universe => universe.EnsureWorldOpened( TestHelper.Monitor, CKTestBuildStackName ) );
+        public static NormalizedPath minimal_solution_open( Action<TestUniverse> testCallback, bool refreshCache ) =>
+            ImageBuilderHelper<Action<TestUniverse>>( testCallback, refreshCache, minimal_solution_setup,
+                universe =>
+                {
+                    universe.EnsureWorldOpened( TestHelper.Monitor, CKTestBuildStackName );
+                    return universe;
+                } );
 
-        public static NormalizedPath minimal_solution_apply_settings( Action<TestUniverse> action, bool refreshCache ) =>
-            ImageBuilderHelper<Action<TestUniverse>>( action, refreshCache, minimal_solution_open, universe =>
-            {
-                universe.RunCommands( TestHelper.Monitor, CKTestBuildStackName, "**ApplySettings" );
-                universe.CommitAll( TestHelper.Monitor, "Applied all settings.",  CKTestBuildStackName );
-            } );
+        public static NormalizedPath minimal_solution_apply_settings( Action<TestUniverse> testCallback, bool refreshCache ) =>
+            ImageBuilderHelper<Action<TestUniverse>>( testCallback, refreshCache, minimal_solution_open, universe =>
+                universe.RunCommands( TestHelper.Monitor, CKTestBuildStackName, "**ApplySettings", true )
+                    .CommitAll( TestHelper.Monitor, "Applied all settings.", CKTestBuildStackName ) );
 
         public static NormalizedPath minimal_solution_first_ci_build( Action<TestUniverse, World> testCallback, bool refreshCache ) =>
             ImageBuilderHelper<Action<TestUniverse>>( CKTestBuildStackName, testCallback, refreshCache, minimal_solution_apply_settings,
@@ -124,27 +128,49 @@ namespace CK.Env.Tests.LocalTestHelper
                     world.GitRepositories.All( g => g.CheckCleanCommit( TestHelper.Monitor ) ).Should().BeTrue( "All repositories should be clean before AllBuild." );
                     world.AllBuild( TestHelper.Monitor ).Should().BeTrue( "AllBuild must be successful." );
                     world.GitRepositories.All( g => g.CheckCleanCommit( TestHelper.Monitor ) ).Should().BeTrue( "All repositories should be clean after AllBuild." );
+                    return universe;
                 } );
 
         public static NormalizedPath minimal_solution_switched_to_local( Action<TestUniverse, World> testCallback, bool refreshCache ) =>
             ImageBuilderHelper<Action<TestUniverse, World>>( CKTestBuildStackName, testCallback, refreshCache, minimal_solution_first_ci_build,
-                ( universe, world ) => world.SwitchToLocal( TestHelper.Monitor ) );
+                ( universe, world ) =>
+                {
+                    world.SwitchToLocal( TestHelper.Monitor );
+                    return universe;
+                } );
 
 
-        public static NormalizedPath minimal_solution_second_ci_build( Action<TestUniverse, World> action, bool refreshCache ) =>
-            ImageBuilderHelper<Action<TestUniverse, World>>( CKTestBuildStackName, action, refreshCache, minimal_solution_first_ci_build,
-                ( universe, world ) => world.AllBuild( TestHelper.Monitor ) );
+        public static NormalizedPath minimal_solution_second_ci_build( Action<TestUniverse, World> testCallback, bool refreshCache ) =>
+            ImageBuilderHelper<Action<TestUniverse, World>>( CKTestBuildStackName, testCallback, refreshCache, minimal_solution_first_ci_build,
+                ( universe, world ) =>
+                {
+                    world.AllBuild( TestHelper.Monitor );
+                    return universe;
+                } );
 
-        public static NormalizedPath another_minimal_solution_second_ci_build( Action<TestUniverse, World> action, bool refreshCache ) =>
-            ImageBuilderHelper<Action<TestUniverse, World>>( CKTestBuildStackName, action, refreshCache, minimal_solution_first_ci_build,
-                ( universe, world ) => world.AllBuild( TestHelper.Monitor ) );
+        public static NormalizedPath another_minimal_solution_second_ci_build( Action<TestUniverse, World> testCallback, bool refreshCache ) =>
+            ImageBuilderHelper<Action<TestUniverse, World>>( CKTestBuildStackName, testCallback, refreshCache, minimal_solution_first_ci_build,
+                ( universe, world ) =>
+                {
+                     world.AllBuild( TestHelper.Monitor );
+                    return universe;
+                } );
 
-        public static NormalizedPath full_apply_settings_randomly_applied( Action<TestUniverse> action, bool refreshCache, int seed ) =>
-            ImageBuilderHelper<Action<TestUniverse, World>>( action, refreshCache, another_minimal_solution_second_ci_build,
+        public static NormalizedPath full_apply_settings_randomly_applied( Action<TestUniverse> testCallback, bool refreshCache, int seed ) =>
+            ImageBuilderHelper<Action<TestUniverse, World>>( testCallback, refreshCache, another_minimal_solution_second_ci_build,
                 ( universe ) => universe.ApplySettingsAndCommitRandomly( TestHelper.Monitor, CKTestBuildStackName, seed ) );
 
-        public static NormalizedPath full_apply_settings( Action<TestUniverse> action, bool refreshCache ) =>
-            ImageBuilderHelper<Action<TestUniverse, World>>( action, refreshCache, another_minimal_solution_second_ci_build,
+        public static NormalizedPath full_apply_settings( Action<TestUniverse, World> testCallback, bool refreshCache ) =>
+            ImageBuilderHelper<Action<TestUniverse, World>>( CKTestBuildStackName, testCallback, refreshCache, another_minimal_solution_second_ci_build,
                 ( universe ) => universe.ApplySettings( TestHelper.Monitor, CKTestBuildStackName ) );
+
+        public static NormalizedPath workstation_setup_helloworld_script_added( Action<TestUniverse, World> action, bool refreshCache ) =>
+            ImageBuilderHelper<Action<TestUniverse, World>>( CKTestBuildStackName, action, refreshCache, full_apply_settings,
+                       ( universe ) =>
+                       {
+                           var path = universe.GetWorldByName( CKTestBuildStackName ).Repo.Root.AppendPart( "workstation_setup_ran" );
+                           universe.AddSetupScriptInStack( CKTestBuildStackName, $"Write-Host \"Hello World\";\nNew-Item {path};" );
+                           return universe.RestartCKli( TestHelper.Monitor );
+                       } );
     }
 }

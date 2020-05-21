@@ -165,11 +165,11 @@ namespace CK.Env
             }
 
             /// <summary>
-            /// This is public to be used by unit tests.
+            /// This is public to be used by integrations tests.
             /// </summary>
             /// <param name="path">The original path.</param>
             /// <returns>The cleaned up path.</returns>
-            public static string CleanPathDirName( string path ) =>
+            public static string CleanPathDirName( string path ) =>//TODO: find a better home for this function.
                     path.Replace( ".git", "" )
                         .Replace( "_git", "" )
                         .Replace( '/', '_' )

@@ -43,9 +43,9 @@ namespace CK.Env.Tests
                 world.GitRepositories.All( g => g.CheckCleanCommit( monitor ) ).Should().BeTrue( "All repositories should be cleaned." );
 
                 universe
-                    .RunCommands( monitor, world.WorldName.Name, "*pull*" )
-                    .RunCommands( monitor, world.WorldName.Name, "*command*", "git checkout master" )
-                    .RunCommands( monitor, world.WorldName.Name, "*command*", "git pull" );
+                    .RunCommands( monitor, world.WorldName.Name, "*pull*", true)
+                    .RunCommands( monitor, world.WorldName.Name, "*command*", true, "git checkout master" )
+                    .RunCommands( monitor, world.WorldName.Name, "*command*", true, "git pull" );
 
                 world.DumpWorldState( TestHelper.Monitor ).Should().BeTrue( "All repositories should be cleaned after the pull/checkout mster/pull." );
 
@@ -90,6 +90,19 @@ namespace CK.Env.Tests
                     File.Exists( Path.GetFullPath( repoPath.AppendPart( testFileName ) ) ).Should().BeTrue();
 
                 }, TestHelper.IsExplicitAllowed );
+        }
+
+        [Test]
+        public void Workstation_script_is_called()
+        {
+            ImageLibrary.workstation_setup_helloworld_script_added( ( universe, world ) =>
+            {
+                string proofOfExecution = "workstation_setup_ran";
+                GitWorldStore.WorldInfo worldInfo = universe.GetWorldByName( universe.UserHost.WorldSelector.CurrentWorld.WorldName.FullName );
+                File.Exists( worldInfo.Repo.Root.AppendPart( proofOfExecution ) ).Should().BeFalse();
+                universe.RunCommands( TestHelper.Monitor, worldInfo.WorldName.Name, "*Workstation*setup*", true );
+                File.Exists( worldInfo.Repo.Root.AppendPart( proofOfExecution ) ).Should().BeTrue();
+            }, TestHelper.IsExplicitAllowed );
         }
     }
 }

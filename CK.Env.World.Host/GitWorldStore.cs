@@ -46,7 +46,7 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the root path of thi store: it contains the <see cref="StackRepo"/>'s git working folder.
+        /// Gets the root path of the store: it contains the <see cref="StackRepo"/>'s git working folder.
         /// </summary>
         public NormalizedPath RootPath => _rootPath;
 
@@ -62,7 +62,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the stacks repositories.
         /// </summary>
-        public IReadOnlyCollection<StackRepo> StackRepositories { get; }
+        public IReadOnlyCollection<StackRepo> StackRepositories => _stackRepos;
 
 
         /// <summary>
