@@ -36,17 +36,16 @@ namespace CK.Env.Tests
         [Test]
         public void issue_20()
         {
-            Assume.That( false, "Need FIX!" );
             ImageLibrary.minimal_solution_first_ci_build( ( universe, world ) =>
             {
                 var monitor = TestHelper.Monitor;
 
                 world.GitRepositories.All( g => g.CheckCleanCommit( monitor ) ).Should().BeTrue( "All repositories should be cleaned." );
-
+                string runCommand = $"*{nameof(GitFolder.RunProcess)}*";
                 universe
-                    .RunCommands( monitor, world.WorldName.Name, "/Pull", true)
-                    .RunCommands( monitor, world.WorldName.Name, "*command*", true, "git checkout master" )
-                    .RunCommands( monitor, world.WorldName.Name, "*command*", true, "git pull" );
+                    .RunCommands( monitor, world.WorldName.Name, "*pull*", true)
+                    .RunCommands( monitor, world.WorldName.Name, runCommand, true, "git", "checkout master" )
+                    .RunCommands( monitor, world.WorldName.Name, runCommand, true, "git", "pull" );
 
                 world.DumpWorldState( TestHelper.Monitor ).Should().BeTrue( "All repositories should be cleaned after the pull/checkout master/pull." );
 
