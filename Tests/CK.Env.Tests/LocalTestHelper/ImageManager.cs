@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Threading;
 using static CK.Testing.MonitorTestHelper;
 
 namespace CK.Env.Tests.LocalTestHelper
@@ -39,6 +40,10 @@ namespace CK.Env.Tests.LocalTestHelper
             if( Directory.Exists( WorkFolder ) )
             {
                 m.Info( $"Deleting '{WorkFolder} content.'" );
+                FileHelper.RawDeleteLocalDirectory( TestHelper.Monitor, WorkFolder );
+                Thread.Sleep( 500 );
+                FileHelper.RawDeleteLocalDirectory( TestHelper.Monitor, WorkFolder );
+                Thread.Sleep( 500 );
                 FileHelper.RawDeleteLocalDirectory( TestHelper.Monitor, WorkFolder );
             }
             Directory.CreateDirectory( WorkFolder );
