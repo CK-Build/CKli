@@ -41,6 +41,19 @@ namespace CK.Env.Tests.LocalTestHelper
             return universe.UserHost.WorldSelector.CurrentWorld;
         }
 
+        public static TestUniverse CommitPushStack( this TestUniverse universe, IActivityMonitor m )
+        {
+            var path = universe.GetStackRepoByUri( new Uri( universe.StackBareGitPath ) ).Root;
+            using( Repository repo = new Repository( path ) )
+            {
+                Commands.Stage( repo, "*" );
+                Signature testSignature = new Signature( "CKlitestProcess", "nobody@test.com", DateTimeOffset.Now );
+                repo.Commit( "Placeholder swap.", testSignature, testSignature );
+                repo.Network.Push( repo.Branches["master"] );
+            }
+            return universe;
+        }
+
         /// <summary>
         /// Used to bootstrap the seed zip.
         /// </summary>
@@ -54,7 +67,9 @@ namespace CK.Env.Tests.LocalTestHelper
             TestUniverse.ChangeStringInAllSubPathAndFileContent( m, folder: universe.UniversePath,
                                                                     oldString: TestUniverse.PlaceHolderString,
                                                                     newString: universe.UniversePath );
-            EnsureWorldOpened( universe, m, "CKTest-Build" );
+            universe
+                .CommitPushStack( m ).
+                EnsureWorldOpened( m, "CKTest-Build" );
             return universe;
         }
 
@@ -69,8 +84,9 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <returns></returns>
         public static TestUniverse RunCommands( this TestUniverse universe, IActivityMonitor m, string worldName, string commandFilter, bool throwIfNoCommand, params object[] args )
         {
+            universe.EnsureWorldOpened( m, worldName );
             List<ICommandHandler> commands = universe.UserHost.CommandRegister.GetCommands( commandFilter ).ToList(); ;
-            if( commands.Count == 0 ) throw new KeyNotFoundException();
+            if( throwIfNoCommand && commands.Count == 0 ) throw new KeyNotFoundException();
             return RunCommands( universe, m, worldName, commands, args );
         }
 
@@ -148,9 +164,12 @@ namespace CK.Env.Tests.LocalTestHelper
             return universe;
         }
 
+        public static GitWorldStore.StackRepo GetStackRepoByUri( this TestUniverse universe, Uri uri )
+            => universe.UserHost.WorldStore.StackRepositories.Single( s => s.OriginUrl == uri );
+
         public static GitWorldStore.WorldInfo GetWorldByName( this TestUniverse universe, string worldName )
         {
-            var stack = universe.UserHost.WorldStore.StackRepositories.Single( s => s.Worlds.Any( s => s.WorldName.FullName == worldName ) );
+            GitWorldStore.StackRepo stack = universe.UserHost.WorldStore.StackRepositories.Single( s => s.Worlds.Any( s => s.WorldName.FullName == worldName ) );
             return stack.Worlds.Single( s => s.WorldName.FullName == worldName );
         }
 
@@ -177,7 +196,7 @@ namespace CK.Env.Tests.LocalTestHelper
             EnsureElement( EnsureElement( root, "Workstation" ), "Setup" ).Add( new XElement( "Script", script ) );
             string workstationPlugin = "CK.Env.Plugin.Workstation";
             var libs = root.Elements( "LoadLibrary" );
-            if(!libs.Any(s=>s.Attribute("Name").Value == workstationPlugin ) )
+            if( !libs.Any( s => s.Attribute( "Name" ).Value == workstationPlugin ) )
             {
                 var plugin = new XElement( "LoadLibrary" );
                 plugin.SetAttributeValue( "Name", workstationPlugin );
