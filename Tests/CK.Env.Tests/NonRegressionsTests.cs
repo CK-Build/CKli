@@ -43,11 +43,11 @@ namespace CK.Env.Tests
                 world.GitRepositories.All( g => g.CheckCleanCommit( monitor ) ).Should().BeTrue( "All repositories should be cleaned." );
 
                 universe
-                    .RunCommands( monitor, world.WorldName.Name, "*pull*", true)
+                    .RunCommands( monitor, world.WorldName.Name, "/Pull", true)
                     .RunCommands( monitor, world.WorldName.Name, "*command*", true, "git checkout master" )
                     .RunCommands( monitor, world.WorldName.Name, "*command*", true, "git pull" );
 
-                world.DumpWorldState( TestHelper.Monitor ).Should().BeTrue( "All repositories should be cleaned after the pull/checkout mster/pull." );
+                world.DumpWorldState( TestHelper.Monitor ).Should().BeTrue( "All repositories should be cleaned after the pull/checkout master/pull." );
 
             }, TestHelper.IsExplicitAllowed );
         }

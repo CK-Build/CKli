@@ -266,7 +266,7 @@ namespace CK.Env
         public FileSystem FileSystem => ProtoGitFolder.FileSystem;
 
         /// <summary>
-        /// Pulls current branch by merging changes from remote 'orgin' branch into this repository.
+        /// Pulls current branch by merging changes from remote 'origin' branch into this repository.
         /// The current head must be clean.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
