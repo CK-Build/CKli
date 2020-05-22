@@ -41,10 +41,6 @@ namespace CK.Env.Tests.LocalTestHelper
             {
                 m.Info( $"Deleting '{WorkFolder} content.'" );
                 FileHelper.RawDeleteLocalDirectory( TestHelper.Monitor, WorkFolder );
-                Thread.Sleep( 500 );
-                FileHelper.RawDeleteLocalDirectory( TestHelper.Monitor, WorkFolder );
-                Thread.Sleep( 500 );
-                FileHelper.RawDeleteLocalDirectory( TestHelper.Monitor, WorkFolder );
             }
             Directory.CreateDirectory( WorkFolder );
             ZipFile.ExtractToDirectory( imagePath, WorkFolder );
