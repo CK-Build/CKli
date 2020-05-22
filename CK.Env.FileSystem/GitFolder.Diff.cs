@@ -34,7 +34,7 @@ namespace CK.Env
                 Git,
                 roots.Select(
                     r => new DiffRootResultBuilder( r ) ).ToList(),
-                    new DiffRootResultBuilderOther( new DiffRoot( "Others", new List<NormalizedPath>() ) )
+                    new DiffRootResultBuilderOther( new DiffRoot( "Others", Array.Empty<NormalizedPath>() ) )
             );
             return builder.BuildDiffResult( m, commits );
         }

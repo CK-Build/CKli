@@ -29,10 +29,36 @@ namespace CK.Env
         bool CanUsePreviouslyResolvedInfo { get; }
 
         /// <summary>
-        /// Gets the previous released version of this solution.
-        /// Null if there is no previous release.
+        /// Gets the current released version of this solution.
+        /// Null if there is no current release.
+        /// </summary>
+        ITagCommit? CurrentReleasedVersion { get; }
+
+        /// <summary>
+        /// Gets the previous version of this solution if there has been a previous version:
+        /// when this is not null, <see cref="GetProjectsDiff(IActivityMonitor)"/> can be called.
         /// </summary>
         ITagCommit? PreviousVersion { get; }
+
+        /// <summary>
+        /// Gets the set of <see cref="DirectoryDiff"/> for the project folders between the current head
+        /// and <see cref="PreviousVersion"/> that must be not null.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <returns>The set of diff or null on error.</returns>
+        IDiffResult GetProjectsDiff( IActivityMonitor m );
+
+        /// <summary>
+        /// Gets the list of the packages that must be updated in non published projects (typically in Tests projects).
+        /// Empty if none.
+        /// </summary>
+        IReadOnlyList<(ImportedLocalPackage LocalRef, SVersion NewVersion)> PublishedUpdates { get; }
+
+        /// <summary>
+        /// Gets the list of the packages that must be updated in the published projects.
+        /// Empty if none.
+        /// </summary>
+        IReadOnlyList<(ImportedLocalPackage LocalRef, SVersion NewVersion)> NonPublishedUpdates { get; }
 
         /// <summary>
         /// Gets or sets the release note.
@@ -53,13 +79,6 @@ namespace CK.Env
         /// Gets all the distinct possible versions.
         /// </summary>
         IReadOnlyCollection<CSVersion> AllPossibleVersions { get; }
-
-        /// <summary>
-        /// Gets the set of <see cref="DirectoryDiff"/> for the project folders.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <returns>The set of diff or null on error.</returns>
-        IDiffResult GetProjectsDiff( IActivityMonitor m );
 
         /// <summary>
         /// Cancels the current session. It can be restarted later.

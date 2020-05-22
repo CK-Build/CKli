@@ -69,8 +69,8 @@ namespace CK.Env.Diff
                     }
                 }
             }
-            //all the commits are now cached.
-            return new DiffResult( true, _diffRootResultBuilders.Select( p => p.Result ).ToList(), _others.Result );
+            // all the commits are now cached.
+            return new DiffResult( _diffRootResultBuilders.Select( p => p.Result ).ToList(), _others.Result );
         }
     }
 }
