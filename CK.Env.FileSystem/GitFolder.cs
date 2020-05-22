@@ -679,11 +679,11 @@ namespace CK.Env
             }
         }
 
-        internal void Dispose()
+        public override void Dispose()
         {
             ProtoGitFolder.CommandRegister.Unregister( this );
             ((IDisposable)PluginManager).Dispose();
-            Git.Dispose();
+            base.Dispose();
         }
 
         public override string ToString() => $"{FullPhysicalPath} ({CurrentBranchName ?? "<no branch>" }).";

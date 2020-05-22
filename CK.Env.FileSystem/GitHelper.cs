@@ -15,7 +15,7 @@ namespace CK.Env
     /// This is abstract since this base doesn't impose IDisposable support, it is up to
     /// specialized classes to handle disposing.
     /// </summary>
-    public abstract class GitHelper : IGitHeadInfo
+    public abstract class GitHelper : IGitHeadInfo, IDisposable
     {
         /// <summary>
         /// Initializes a new <see cref="GitHelper"/>.
@@ -54,6 +54,11 @@ namespace CK.Env
         /// The LibGit2Sharp repository itself.
         /// </summary>
         protected readonly Repository Git;
+
+        public virtual void Dispose()
+        {
+            Git.Dispose();
+        }
 
         public IQueryableCommitLog Commits => Git.Commits; // you wont like it but i needed it.
 

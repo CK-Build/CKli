@@ -9,7 +9,7 @@ using System.Linq;
 using System.Xml.Linq;
 
 namespace CK.Env
-{ 
+{
     public sealed partial class GitWorldStore
     {
         /// <summary>
@@ -35,13 +35,13 @@ namespace CK.Env
             internal static StackRepo Parse( GitWorldStore store, XElement e )
             {
                 var uri = new Uri( (string)e.AttributeRequired( nameof( OriginUrl ) ) );
-                var pub = (bool?)e.Attribute( nameof(IsPublic) ) ?? false;
+                var pub = (bool?)e.Attribute( nameof( IsPublic ) ) ?? false;
                 var r = new StackRepo( store, uri, pub, null );
-                r._worlds.AddRange( e.Elements( "Worlds" ).Elements( nameof(WorldInfo) ).Select( eW => new WorldInfo( r, eW ) ) );
+                r._worlds.AddRange( e.Elements( "Worlds" ).Elements( nameof( WorldInfo ) ).Select( eW => new WorldInfo( r, eW ) ) );
                 return r;
             }
 
-            internal XElement ToXml() => new XElement( nameof(StackRepo),
+            internal XElement ToXml() => new XElement( nameof( StackRepo ),
                                 new XAttribute( nameof( OriginUrl ), OriginUrl ),
                                 new XAttribute( nameof( IsPublic ), IsPublic ),
                                 new XElement( "Worlds", _worlds.Select( w => w.ToXml() ) ) );
@@ -99,7 +99,7 @@ namespace CK.Env
             internal bool Refresh( IActivityMonitor m, bool force = true )
             {
                 bool isOpened = false;
-                if( !IsOpen )
+                if( _git == null )
                 {
                     _git = GitRepository.Create( m, this, Root, Root.LastPart, false, BranchName, checkOutBranchName: true );
                     if( _git == null ) return false;
@@ -157,7 +157,7 @@ namespace CK.Env
 
             public void Dispose()
             {
-                if( IsOpen )
+                if( _git != null )
                 {
                     _git.Dispose();
                     _git = null;

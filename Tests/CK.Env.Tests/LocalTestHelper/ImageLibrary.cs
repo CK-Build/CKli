@@ -31,13 +31,17 @@ namespace CK.Env.Tests.LocalTestHelper
             Func<TestUniverse, TestUniverse> buildAction,
             [CallerMemberName] string newImageName = null )
         {
-            TestUniverse universe;
-            using( universe = ImageManager.InstantiateImage( TestHelper.Monitor, parentBuilder, refreshCache ) )
+            TestUniverse universe = ImageManager.InstantiateImage( TestHelper.Monitor, parentBuilder, refreshCache );
+            try
             {
                 universe = buildAction( universe );
                 var snapshotPath = universe.SnapshotState( newImageName );
                 testCallback?.Invoke( universe );
                 return snapshotPath;
+            }
+            finally
+            {
+                universe.Dispose();
             }
         }
 
@@ -152,7 +156,7 @@ namespace CK.Env.Tests.LocalTestHelper
             ImageBuilderHelper<Action<TestUniverse, World>>( CKTestBuildStackName, testCallback, refreshCache, minimal_solution_first_ci_build,
                 ( universe, world ) =>
                 {
-                     world.AllBuild( TestHelper.Monitor );
+                    world.AllBuild( TestHelper.Monitor );
                     return universe;
                 } );
 
