@@ -16,7 +16,7 @@ namespace CK.Env.Plugin
         public RepositoryXmlFile( GitFolder f, NormalizedPath branchPath, SolutionDriver driver )
             : base( f, branchPath, branchPath.AppendPart( "RepositoryInfo.xml" ), XNamespace.None + "RepositoryInfo" )
         {
-            if( PluginBranch == StandardGitStatus.Local )
+            if( StandardPluginBranch == StandardGitStatus.Local )
             {
                 f.OnLocalBranchEntered += OnLocalBranchEntered;
                 f.OnLocalBranchLeaving += OnLocalBranchLeaving;
@@ -106,7 +106,7 @@ namespace CK.Env.Plugin
             var o = _options.EnsureObject();
             o.IgnoreDirtyWorkingFolder = false;
             EnsureBranchMapping( m, GitFolder.World.DevelopBranchName, CIBranchVersionMode.LastReleaseBased, "develop" );
-            if( PluginBranch == StandardGitStatus.Local )
+            if( StandardPluginBranch == StandardGitStatus.Local )
             {
                 EnsureLocalBranch( m );
             }

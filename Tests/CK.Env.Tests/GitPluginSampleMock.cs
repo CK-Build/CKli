@@ -28,7 +28,7 @@ namespace CK.Env.Tests
             ++NewedCount;
         }
 
-        public NormalizedPath CommandProviderName => "MockPlugin";
+        public NormalizedPath CommandProviderName => BranchPath.AppendPart( "MockPlugin" );
 
         public void Dispose()
         {

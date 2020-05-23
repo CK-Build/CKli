@@ -180,7 +180,16 @@ namespace CK.Env
         /// Gets the solution drivers for the currently checked out branches.
         /// </summary>
         /// <returns>The set of drivers.</returns>
-        public IEnumerable<ISolutionDriver> GetDriversOnCurrentBranch() => _solutionDrivers.Select( d => d.GetCurrentBranchDriver() ).Distinct();
+        public IEnumerable<ISolutionDriver> GetDriversOnCurrentBranch()
+        {
+            var dedup = new HashSet<ISolutionDriver>();
+            var drivers = _solutionDrivers.ToArray();
+            foreach( var d in drivers )
+            {
+                dedup.Add( d.GetCurrentBranchDriver() );
+            }
+            return dedup;
+        }
 
         /// <summary>
         /// Gets all the drivers for all repositories in one specific branch.

@@ -59,7 +59,7 @@ namespace CK.Env.Plugin
             ISolution s = GetSolution( e.Monitor, true );
             if( s != null )
             {
-                e.StartInfo.EnvironmentVariables.Add( "CKLI_CURRENT_SOLUTION_NAME", s.FullPath.LastPart );
+                e.StartInfo.EnvironmentVariables.Add( "CKLI_CURRENT_SOLUTION_NAME", s.Name );
             }
         }
 
@@ -82,10 +82,10 @@ namespace CK.Env.Plugin
         /// <summary>
         /// Gets whether this plugin is able to work.
         /// It provides services only on local or develop and if the <see cref="GitFolder.StandardGitStatus"/>
-        /// is the same as <see cref="GitBranchPluginBase.PluginBranch"/>.
+        /// is the same as <see cref="GitBranchPluginBase.StandardPluginBranch"/>.
         /// </summary>
-        bool IsActive => GitFolder.StandardGitStatus == PluginBranch
-                         && (PluginBranch == StandardGitStatus.Local || PluginBranch == StandardGitStatus.Develop);
+        bool IsActive => GitFolder.StandardGitStatus == StandardPluginBranch
+                         && (StandardPluginBranch == StandardGitStatus.Local || StandardPluginBranch == StandardGitStatus.Develop);
 
         /// <summary>
         /// Gets the solution driver of the <see cref="IGitRepository.CurrentBranchName"/>.
@@ -93,7 +93,7 @@ namespace CK.Env.Plugin
         /// <returns>This solution driver or the one of the current branch.</returns>
         public ISolutionDriver GetCurrentBranchDriver()
         {
-            return GitFolder.StandardGitStatus == PluginBranch
+            return GitFolder.StandardGitStatus == StandardPluginBranch
                 ? this
                 : GitFolder.PluginManager.BranchPlugins[GitFolder.CurrentBranchName].GetPlugin<SolutionDriver>();
         }
@@ -627,7 +627,7 @@ namespace CK.Env.Plugin
             var solution = GetSolution( monitor, allowInvalidSolution: false );
             if( solution == null ) return false;
 
-            var feed = PluginBranch == StandardGitStatus.Local
+            var feed = StandardPluginBranch == StandardGitStatus.Local
                         ? _localFeedProvider.Local
                         : _localFeedProvider.CI;
 
@@ -646,7 +646,7 @@ namespace CK.Env.Plugin
         bool LocalCommit( IActivityMonitor m )
         {
             Debug.Assert( IsActive );
-            bool amend = PluginBranch == StandardGitStatus.Local || GitFolder.Head.Message == "Local build auto commit.";
+            bool amend = StandardPluginBranch == StandardGitStatus.Local || GitFolder.Head.Message == "Local build auto commit.";
             return GitFolder.Commit( m, "Local build auto commit.", amend ? CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage : CommitBehavior.CreateNewCommit );
         }
 
@@ -712,7 +712,7 @@ namespace CK.Env.Plugin
             BuildType buildType;
 
             IEnvLocalFeed feed;
-            if( PluginBranch == StandardGitStatus.Local )
+            if( StandardPluginBranch == StandardGitStatus.Local )
             {
                 if( !v.WithBuildMetaData( null ).NormalizedText.EndsWith( "-local" ) )
                 {
