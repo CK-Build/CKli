@@ -1,11 +1,11 @@
 # The KeyVault
 
-The KeyVault is a text file storing <u>secrets</u>, encrypted with a password.
+The KeyVault is a text file storing <u>secrets</u>, encrypted with a passphrase.
 
 Example of a KeyVault:
 
 ```
--- Version: 1
+-- Version: 2
 -- Keys below can be removed if needed.
 NUGET_ORG_PUSH_API_KEY
 AZURE_FEED_SIGNATURE_OPENSOURCE_PAT
@@ -20,16 +20,16 @@ You can read 2 secrets names, as the comment point out, if you remove them, the 
 
 Your personal KeyVault is where your secrets are stored.
 
-On the first run, CKli will ask for a password and will use this to encrypt your secrets.
+On the first run, CKli will ask for a passphrase and will use this to encrypt your secrets.
 
-Every time your start CKli, this password will be asked, to load all your secrets.
+Every time your start CKli, this passphrase will be asked, to load all your secrets.
 
-This KeyVault is stored at  `%LocalAppData%/CKli/CKLI-INVENIETIS.KeyVault.txt`.
+This KeyVault is stored at  `%LocalAppData%/CKli/Personal.KeyVault.txt`.
 
 ## Shared KeyVault
 
-At this moment, there is only one Shared KeyVault, its the CI/CD KeyVault.
-
-This KeyVault is stored in a Shared State, next to the World config file, and will be cloned in all the repositories of a World.
+At this moment, there is only one Shared KeyVault: the CI/CD KeyVault.
+This KeyVault is stored in the Shared State, next to the World config file: it belongs the the stack Git repository
+and is shared by all the "users" of a World.
 
 [Work In Progress]

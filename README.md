@@ -9,7 +9,7 @@ It allows to automate actions, on <u>Worlds</u> (a group of repositories), and c
 
 ### Prerequisites
 
-- [.NET Core SDK 2.1.](https://dotnet.microsoft.com/)
+- [.NET Core SDK 3.1.](https://dotnet.microsoft.com/download)
 
 ### Installation
 
@@ -217,7 +217,7 @@ Enter 'GITLAB_GIT_WRITE_PAT' secret (empty to cancel): I2MjVkYzIxZWYwNWY2YWQ0ZGR
 
 Then press enter, and you secret is now stored in your [KeyVault](docs/KeyVault.md).
 
-The stack you added will now be displayed.
+The new stack will now be displayed:
 
 ```
 --------- Worlds ---------
@@ -230,9 +230,9 @@ The stack you added will now be displayed.
      > 4 SC => C:/dev/CK
 ```
 
-To open a World, you can type its number and press `enter`.
-
-On World the opening, CKli will automatically clone all the repositories of SC.
+To open a World, you can type its number and press `enter`: CKli will automatically clone all
+the repositories of SC. Press `enter` again and (since you are _inside_ the SC stack) the SC's
+repositories with their respective statuses are listed.
 
 :tada: You are now ready to operate on a World. To see what you can do, please head to the [Common Usages](docs/Common_Usage.md).
 
