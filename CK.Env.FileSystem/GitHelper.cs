@@ -12,8 +12,6 @@ namespace CK.Env
 {
     /// <summary>
     /// Abstract base that adds useful methods to LibGit2Sharp <see cref="Repository"/>.
-    /// This is abstract since this base doesn't impose IDisposable support, it is up to
-    /// specialized classes to handle disposing.
     /// </summary>
     public abstract class GitHelper : IGitHeadInfo, IDisposable
     {
@@ -55,12 +53,13 @@ namespace CK.Env
         /// </summary>
         protected readonly Repository Git;
 
+        /// <summary>
+        /// Disposes the <see cref="Git"/> member.
+        /// </summary>
         public virtual void Dispose()
         {
             Git.Dispose();
         }
-
-        public IQueryableCommitLog Commits => Git.Commits; // you wont like it but i needed it.
 
         /// <summary>
         /// Gets whether the Git repository is public or private.
@@ -679,7 +678,7 @@ namespace CK.Env
                             return null;
                         }
                         r = new Repository( workingFolder );
-                        var remote = r.Network.Remotes.FirstOrDefault( rem => rem.Url.Equals( git.OriginUrl.ToString(), StringComparison.OrdinalIgnoreCase ) );
+                        var remote = r.Network.Remotes.FirstOrDefault( rem => GitRepositoryKey.CheckAndNormalizeRepositoryUrl( new Uri( rem.Url, UriKind.Absolute ) ).Equals( git.OriginUrl ) );
                         if( remote == null || remote.Name != "origin" )
                         {
 

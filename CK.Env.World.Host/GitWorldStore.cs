@@ -97,8 +97,8 @@ namespace CK.Env
                 using( m.OpenInfo( "Since there is no Stack defined, we initialize CK and CK-Build mapped to '/Dev/CK' by default." ) )
                 {
                     m.Info( $"Use 'run World/{nameof( SetWorldMapping )}' command to change this default mapping if you want." );
-                    _stackRepos.Add( new StackRepo( this, new Uri( "https://github.com/signature-opensource/CK-Stack.git" ), true ) );
-                    _stackRepos.Add( new StackRepo( this, new Uri( "https://github.com/CK-Build/CK-Build-Stack.git" ), true ) );
+                    _stackRepos.Add( new StackRepo( this, new Uri( "https://github.com/signature-opensource/CK-Stack" ), true ) );
+                    _stackRepos.Add( new StackRepo( this, new Uri( "https://github.com/CK-Build/CK-Build-Stack" ), true ) );
                     WorldLocalMapping.SetMap( m, "CK-Build", "/Dev/CK" );
                     WorldLocalMapping.SetMap( m, "CK", "/Dev/CK" );
                     WriteStacksToLocalStacksFilePath( m );
@@ -145,15 +145,20 @@ namespace CK.Env
         public void EnsureStackRepository( IActivityMonitor m, string url, bool isPublic )
         {
             if( DisableRepositoryAndStacksCommands ) throw new InvalidOperationException( nameof( DisableRepositoryAndStacksCommands ) );
-            if( String.IsNullOrWhiteSpace( url ) || !Uri.TryCreate( url, UriKind.Absolute, out var uri ) ) throw new ArgumentException( "Must be a valid url.", nameof( url ) );
-            int idx = _stackRepos.IndexOf( r => r.OriginUrl.ToString().Equals( url, StringComparison.OrdinalIgnoreCase ) );
+            if( String.IsNullOrWhiteSpace( url ) || !Uri.TryCreate( url, UriKind.Absolute, out var uri ) ) throw new ArgumentException( $"Must be a valid, absolute, url: {url}", nameof( url ) );
+            uri = ProtoGitFolder.CheckAndNormalizeRepositoryUrl( uri );
+            int idx = _stackRepos.IndexOf( r => r.OriginUrl.Equals( uri ) );
             if( idx < 0 )
             {
                 var r = new StackRepo( this, uri, isPublic );
-                _stackRepos.Add( r );
-                if( r.Refresh( m ) )
+                if( r.Refresh( m ) && r.Worlds.Count > 0 )
                 {
+                    _stackRepos.Add( r );
                     WriteStacksToLocalStacksFilePath( m );
+                }
+                else
+                {
+                    m.Warn( $"EnsureStackRepository( '{url}', {isPublic} ): no stack added." );
                 }
             }
             else

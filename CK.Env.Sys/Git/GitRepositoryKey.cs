@@ -19,7 +19,7 @@ namespace CK.Env
         /// <param name="isPublic">Whether this repository is public.</param>
         public GitRepositoryKey( SecretKeyStore secretKeyStore, Uri url, bool isPublic )
         {
-            OriginUrl = url ?? throw new ArgumentNullException( nameof( url ) );
+            OriginUrl = CheckAndNormalizeRepositoryUrl( url );
             SecretKeyStore = secretKeyStore ?? throw new ArgumentNullException( nameof( secretKeyStore ) );
             IsPublic = isPublic;
 
@@ -52,6 +52,28 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Normalizes a valid, absolute, url. If the path ends with ".git" (case insensitive), this suffix is removed.
+        /// </summary>
+        /// <param name="url">The valid, absolut, url.</param>
+        /// <returns>The normalized url.</returns>
+        public static Uri CheckAndNormalizeRepositoryUrl( Uri url )
+        {
+            if( url == null ) throw new ArgumentNullException( nameof( url ) );
+            if( !url.IsAbsoluteUri ) throw new ArgumentException( $"Invalid Url. It must be absolute: {url}", nameof( url ) );
+            if( url.Query.Length == 0 )
+            {
+                // Security: since execution paths may differ before reaching the constructor, multiple suffix may be handled or not.
+                // Here we ensure that all suffixes are removed.
+                while( url.AbsolutePath.EndsWith( ".git", StringComparison.OrdinalIgnoreCase ) )
+                {
+                    var s = url.AbsoluteUri;
+                    url = new Uri( s.Remove( s.Length - 4 ) );
+                }
+            }
+            return url;
+        }
+
+        /// <summary>
         /// Gets whether the Git repository is public.
         /// Specialized classes may set this property.
         /// </summary>
@@ -59,6 +81,9 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the remote origin url.
+        /// This is checked in the constructor as an absolute url and if the url has no query part 
+        /// and the path ends with ".git", the trailing .git is removed.
+        /// See https://stackoverflow.com/a/11069413/. 
         /// </summary>
         public Uri OriginUrl { get; }
 

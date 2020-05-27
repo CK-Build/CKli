@@ -70,8 +70,8 @@ For example, `list home*`  will return any command starting with `home` :
 ```
 Available Commands matching 'home*':
      Home/Close
-     Home/DeleteStackDefinition
-     Home/EnsureStackDefinition
+     Home/DeleteStackRepository
+     Home/EnsureStackRepository
      Home/SetWorldMapping
 ```
 
@@ -85,8 +85,8 @@ Will output:
 
 ```
 > Warn: Pattern 'home*' matches require 4 different payloads.
-|  - Warn: (stackName, url, isPublic, mappedPath, branchName): Home/EnsureStackDefinition
-|          (stackName): Home/DeleteStackDefinition
+|  - Warn: (stackName, url, isPublic, mappedPath, branchName): Home/EnsureStackRepository
+|          (stackName): Home/EnsureStackRepository
 |          (worldFullName, mappedPath): Home/SetWorldMapping
 |          <No payload>: Home/Close, Home/Refresh
 ```
@@ -98,9 +98,9 @@ Gets the URL of the stack you want to clone:
 | Stack Name | Repository URL                                                      |            |
 | ---------- | ------------------------------------------------------------------- | ---------- |
 | CK         | https://github.com/signature-opensource/CK-Stack                    | **Public** |
-| CK-Build   | https://github.com/signature-opensource/CK-Stack                    | **Public** |
+| CK-Build   | https://github.com/CK-Build/CK-Build-Stack                          | **Public** |
 | Engie      | https://invenietis@dev.azure.com/invenietis/Cofely/_git/Engie-Stack | Private    |
-| SC         | https://gitlab.com/signature-code/signature-code-stack.git          | Private    |
+| SC         | https://gitlab.com/signature-code/signature-code-stack              | Private    |
 | S-Mos      | https://gitlab.com/signature-mosaic/Signature-Mosaic-Stack          | Private    |
 
 Type `run Home/EnsureStackRepository` (or `run *ensure*` since there is no other command with `Ensure` in its name) and press `enter`.
@@ -137,20 +137,18 @@ To open a world, type its number then press `enter`.
 
 ### Worlds And Stacks
 
-A World is a group of repositories.
+A World is a set of repositories.
 
-A Stack is a default World, with zero or more [Parallel World](docs/ParallelWorlds.md).
+A Stack has a default World and zero or more [Parallel World](docs/ParallelWorlds.md).
 
 ```bash
 --------- Worlds ---------
   - CK #A Stack
-     > 1 CK => /Dev/CK #A World
-  - CK-Build #Another Stack
-     > 2 CK-Build => /Dev/CK #A World
-     > 3 CK-Build[NetCore2] => /Dev/CK-Build[NetCore2] #A Parallel World
+     > 1 CK => /Dev/CK #A World (the default one of the CK stack).
+  - CK-Build #Another Stack...
+     > 2 CK-Build => /Dev/CK-Build #...and its default World...
+     > 3 CK-Build[NetCore2] => /Dev/CK-Build[NetCore2] #...and a Parallel World.
 ```
-
-The stacks are versioned in git repositories.
 
 You can list the worlds by simply pressing `enter` instead of typing a command.
 
@@ -158,25 +156,31 @@ To open a World, type its number then press `enter`.
 
 To close a world, run `Home/Close`.
 
-To add a Stack, use the command `Home/EnsureStackDefinition`  
+To add a Stack, use the command `Home/EnsureStackRepository`
+
+**Note:** Stack definitions, mappings to local directories, world states, etc. are simple xml or text files.
+It is not recommended to interact with them directly, but having a look at them helps understand CKli.
+
+ - On Windows: explore `%LocalAppData%/CKli` folder.
+ - On Unix: `cd $HOME/.local/share/CKli`.
 
 #### Add an existing Stack
 
 CKli does not know where your stack are defined.  
 
-##### Ensure Stack Definition
+##### Ensure Stack Repository
 
 In this example, we will add the stack SC (Signature-Code).
 
-SC is a private stack, if you don't have access to https://gitlab.com/signature-code/signature-code-stack.git, you can not reproduce this example.
+SC is a private stack, if you don't have access to https://gitlab.com/signature-code/signature-code-stack, you can not reproduce this example.
 
-Run `Home/EnsureStackDefinition`
+Run `Home/EnsureStackRepository`
 
 Fill the parameters of the command like below :
 
 ```bash
 > SC                                                        #stack's name
-> https://gitlab.com/signature-code/signature-code-stack.git#Git URL containing the stack
+> https://gitlab.com/signature-code/signature-code-stack    #Git URL containing the stack
 > false                                                     #Whether the stack is public
 > C:/dev/CK                                                 #local mapping
 >                                                           #leave empty

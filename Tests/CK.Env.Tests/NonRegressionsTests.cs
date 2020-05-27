@@ -41,9 +41,9 @@ namespace CK.Env.Tests
                 var monitor = TestHelper.Monitor;
 
                 world.GitRepositories.All( g => g.CheckCleanCommit( monitor ) ).Should().BeTrue( "All repositories should be cleaned." );
-                string runCommand = $"*{nameof(GitFolder.RunProcess)}*";
+                string runCommand = $"*{nameof( GitFolder.RunProcess )}*";
                 universe
-                    .RunCommands( monitor, world.WorldName.Name, "*pull*", true)
+                    .RunCommands( monitor, world.WorldName.Name, "*pull*", true )
                     .RunCommands( monitor, world.WorldName.Name, runCommand, true, "git", "checkout master" )
                     .RunCommands( monitor, world.WorldName.Name, runCommand, true, "git", "pull" );
 

@@ -46,7 +46,6 @@ namespace CK.Env
                                 new XAttribute( nameof( IsPublic ), IsPublic ),
                                 new XElement( "Worlds", _worlds.Select( w => w.ToXml() ) ) );
 
-
             /// <summary>
             /// Gets the root store.
             /// </summary>
@@ -55,7 +54,11 @@ namespace CK.Env
             /// <summary>
             /// Gets or whether the Git repository is public.
             /// </summary>
-            public new bool IsPublic { get; set; }
+            /// <remarks>
+            /// This non virtual (masked) implementation works around the impossibility for an overridden
+            /// property to change the setter from public to protected.
+            /// </remarks>
+            public new bool IsPublic { get => base.IsPublic; set => base.IsPublic = value; }
 
             /// <summary>
             /// Gets the branch name: Should always be "master" but this may be changed.
@@ -120,10 +123,12 @@ namespace CK.Env
                             m.Warn( $"Invalid Parallel World '{orphan.FullName}': unable to find the default stack definition '{orphan.Name}' in the repository. It is ignored." );
                             worldNames.Remove( orphan.FullName );
                         }
+                        // Cleanup the worldNames built from the definition files with all the worlds that are already known.
                         foreach( var exists in _worlds )
                         {
                             if( !worldNames.Remove( exists.WorldName.FullName ) )
                             {
+                                // The definition file has disappeared.
                                 if( exists.WorldName.HasDefinitionFile )
                                 {
                                     m.Warn( $"Unable to find World definition file for '{exists.WorldName}'. File '{exists.WorldName.XmlDescriptionFilePath}' not found." );
@@ -132,6 +137,7 @@ namespace CK.Env
                             }
                             else
                             {
+                                // The definition file exists.
                                 if( !exists.WorldName.HasDefinitionFile )
                                 {
                                     m.Trace( $"Found World definition file for '{exists.WorldName}'." );
@@ -139,11 +145,20 @@ namespace CK.Env
                                 }
                             }
                         }
-                        foreach( var newWorld in worldNames.Values )
+                        // Process the remaining world definitions: these are necessarily new worlds in this stack...
+                        foreach( LocalWorldName newWorld in worldNames.Values )
                         {
-                            m.Info( $"Found a new World definition: creating '{newWorld.FullName}' entry." );
-                            newWorld.HasDefinitionFile = true;
-                            _worlds.Add( new WorldInfo( this, newWorld ) );
+                            var alreadyDefiner = _store._stackRepos.FirstOrDefault( r => r.Worlds.Any( w => w.WorldName.FullName == newWorld.FullName ) );
+                            if( alreadyDefiner != null )
+                            {
+                                m.Warn( $"World '{newWorld.FullName}' is already defined in repository {alreadyDefiner.OriginUrl}. It is skipped." );
+                            }
+                            else
+                            {
+                                m.Info( $"Found a new World definition: creating '{newWorld.FullName}' entry." );
+                                newWorld.HasDefinitionFile = true;
+                                _worlds.Add( new WorldInfo( this, newWorld ) );
+                            }
                         }
                     }
                 }

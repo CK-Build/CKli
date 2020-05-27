@@ -100,10 +100,8 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public static NormalizedPath minimal_solution_setup( Action<TestUniverse> testCallback, bool useless )
         {
-            using( TestUniverse universe = ImageManager.InstantiateImage(
-                m: TestHelper.Monitor,
-                imagePath: ImageManager.SeedUniverseFolder.AppendPart( "minimal_project.zip" ) )
-            )
+            using( TestUniverse universe = ImageManager.InstantiateImage( TestHelper.Monitor,
+                                                                          imagePath: ImageManager.SeedUniverseFolder.AppendPart( "minimal_project.zip" ) ) )
             {
                 universe.SeedInitialSetup( TestHelper.Monitor );
                 var snapshotPath = universe.SnapshotState( nameof( minimal_solution_setup ) );

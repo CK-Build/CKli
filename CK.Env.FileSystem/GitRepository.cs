@@ -50,7 +50,7 @@ namespace CK.Env
         {
             var r = EnsureWorkingFolder( m, git, workingFolder, ensureHooks, branchName );
             if( r == null ) return null;
-            var g = new GitRepository( git, r, workingFolder, subPath );
+            GitRepository g = new GitRepository( git, r, workingFolder, subPath );
             if( checkOutBranchName
                 && branchName != g.CurrentBranchName
                 && !g.Checkout( m, branchName ).Success )
