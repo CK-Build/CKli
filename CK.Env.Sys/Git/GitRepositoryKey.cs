@@ -74,6 +74,22 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Checks that the 2 urls's string, after a call to <see cref="CheckAndNormalizeRepositoryUrl(Uri)"/>
+        /// are <see cref="StringComparison.OrdinalIgnoreCase"/> equal.
+        /// This is a lot of computation for a boolean and it is hard to "optimize" since we never know if the urls
+        /// have already been normalized.
+        /// </summary>
+        /// <param name="u1">First valid and absolute url.</param>
+        /// <param name="u2">Second valid and absolute url.</param>
+        /// <returns>Whether the 2 urls are equivalent.</returns>
+        public static bool IsEquivalentRepositoryUri( Uri u1, Uri u2 )
+        {
+            u1 = CheckAndNormalizeRepositoryUrl( u1 );
+            u2 = CheckAndNormalizeRepositoryUrl( u2 );
+            return u1.ToString().Equals( u2.ToString(), StringComparison.OrdinalIgnoreCase );
+        }
+
+        /// <summary>
         /// Gets whether the Git repository is public.
         /// Specialized classes may set this property.
         /// </summary>

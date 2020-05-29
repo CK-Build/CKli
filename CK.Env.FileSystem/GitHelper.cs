@@ -678,7 +678,7 @@ namespace CK.Env
                             return null;
                         }
                         r = new Repository( workingFolder );
-                        var remote = r.Network.Remotes.FirstOrDefault( rem => GitRepositoryKey.CheckAndNormalizeRepositoryUrl( new Uri( rem.Url, UriKind.Absolute ) ).Equals( git.OriginUrl ) );
+                        var remote = r.Network.Remotes.FirstOrDefault( rem => GitRepositoryKey.IsEquivalentRepositoryUri( new Uri( rem.Url, UriKind.Absolute ), git.OriginUrl ) );
                         if( remote == null || remote.Name != "origin" )
                         {
 

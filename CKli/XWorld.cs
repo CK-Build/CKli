@@ -165,10 +165,7 @@ namespace CKli
                     {
                         foreach( var b in byActiveBranch )
                         {
-                            using( m.OpenWarn( $"Branch '{b.Key}':" ) )
-                            {
-                                m.Warn( b.Select( g => g.SubPath.Path ).Concatenate() );
-                            }
+                            m.Warn( $"Branch '{b.Key}': " + b.Select( g => g.SubPath.Path ).Concatenate() );
                         }
                     }
                 }
