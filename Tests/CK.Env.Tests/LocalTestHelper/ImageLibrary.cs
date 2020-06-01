@@ -175,7 +175,7 @@ namespace CK.Env.Tests.LocalTestHelper
                            universe.AddSetupScriptInStack( CKTestBuildStackName, $"Write-Host \"Hello World\";\nNew-Item {path};" );
                            return universe.RestartCKli( TestHelper.Monitor );
                        } );
-        public static NormalizedPath init_seed_scratch( Action<TestUniverse> action, bool useless )
+        public static NormalizedPath init_from_scratch( Action<TestUniverse> action, bool useless )
         {
             var fullPath = ImageManager.InitImageFromScratch( TestHelper.Monitor );
             using( TestUniverse universe = ImageManager.InstantiateImage
@@ -185,18 +185,18 @@ namespace CK.Env.Tests.LocalTestHelper
             )
             {
                 //universe.SeedInitialSetup( TestHelper.Monitor );
-                var snapshotPath = universe.SnapshotState( nameof( init_seed_scratch ) );
+                var snapshotPath = universe.SnapshotState( nameof( init_from_scratch ) );
                 action?.Invoke( universe );
                 return snapshotPath;
             }
         }
-        public static NormalizedPath setup_seed_scratch( Action<TestUniverse> action, bool refreshCache )
+        public static NormalizedPath setup_from_scratch( Action<TestUniverse> action, bool refreshCache )
         {
             using
             ( TestUniverse universe = ImageManager.InstantiateImage
                 (
                     m: TestHelper.Monitor,
-                    imagePath: init_seed_scratch( action, refreshCache )
+                    imagePath: init_from_scratch( action, refreshCache )
                 )
             )
             {
@@ -204,15 +204,15 @@ namespace CK.Env.Tests.LocalTestHelper
                 //no config
                 universe.RestartCKli( TestHelper.Monitor );
                 universe.SeedInitialSetup( TestHelper.Monitor );
-                var snapshotPath = universe.SnapshotState( nameof( setup_seed_scratch ) );
+                var snapshotPath = universe.SnapshotState( nameof( setup_from_scratch ) );
                 action?.Invoke( universe );
                 return snapshotPath;
             }
         }
 
-        public static NormalizedPath create_npm_project_from_setup_seed_scratch( Action<TestUniverse, World> action, bool refreshCache )
+        public static NormalizedPath create_npm_project_from_setup_from_scratch( Action<TestUniverse, World> action, bool refreshCache )
         {
-            ImageBuilderHelper<Action<TestUniverse>>( CKTestBuildStackName, action, refreshCache, setup_seed_scratch,
+            ImageBuilderHelper<Action<TestUniverse>>( CKTestBuildStackName, action, refreshCache, setup_from_scratch,
                ( universe ) => universe.CreateAndAddNpmProject( TestHelper.Monitor, "baseNpmProject", CKTestBuildStackName ) );
             return null;
         }

@@ -157,19 +157,19 @@ namespace CK.Env.Tests
         [Test]
         public void create_seed_universe_from_scratch_as_image_does_not_throw()
         {
-            ImageLibrary.init_seed_scratch( universe => { }, TestHelper.IsExplicitAllowed );
+            ImageLibrary.init_from_scratch( universe => { }, TestHelper.IsExplicitAllowed );
         }
 
         [Test]
         public void setup_seed_universe_from_scratch_does_not_throw()
         {
-            ImageLibrary.setup_seed_scratch( universe => { }, TestHelper.IsExplicitAllowed );
+            ImageLibrary.setup_from_scratch( universe => { }, TestHelper.IsExplicitAllowed );
         }
 
         [Test]
         public void add_npm_project_to_universe_setup_from_scratch_does_not_throw()
         {
-            ImageLibrary.create_npm_project_from_setup_seed_scratch( (universe, world) => { }, TestHelper.IsExplicitAllowed );
+            ImageLibrary.create_npm_project_from_setup_from_scratch( (universe, world) => { }, TestHelper.IsExplicitAllowed );
         }
     }
 }
