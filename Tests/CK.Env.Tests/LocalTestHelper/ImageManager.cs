@@ -35,7 +35,7 @@ namespace CK.Env.Tests.LocalTestHelper
         public static NormalizedPath InitImageFromScratch( IActivityMonitor monitor )
         {
             string imageName = $"minimal_project_scratch.zip";
-            string imageFullPath = Path.Combine( SeedUniverseFolder, imageName );
+            string imageFullPath = Path.Combine( CacheUniverseFolder, imageName );
 
             var directories = new List<string>()
             {
