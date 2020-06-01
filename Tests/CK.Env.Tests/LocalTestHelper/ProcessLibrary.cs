@@ -225,9 +225,15 @@ namespace CK.Env.Tests.LocalTestHelper
             return universe;
         }
 
-        public static TestUniverse CreateAndAddNpmProject(this TestUniverse univers, IActivityMonitor m, string projectName)
+        public static TestUniverse CreateAndAddNpmProject( this TestUniverse universe, IActivityMonitor m, string projectName, string worldName )
         {
-            throw new NotImplementedException();
+            var p = new ProcessHelper();
+            var tempPath = new NormalizedPath( Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() ) );
+            Directory.CreateDirectory( tempPath );
+            var projectPath = p.CreateNpmProject( tempPath, "basenpm" );
+            p.CreateGitRepository( projectPath, universe.WorldsFolder.AppendPart( worldName ) );
+
+            return universe;
         }
     }
 

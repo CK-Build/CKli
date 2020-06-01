@@ -52,7 +52,7 @@ namespace CK.Env.Tests.LocalTestHelper
         /// </summary>
         /// <param name="testCallback">This action is called after the image was snapshoted.</param>
         /// <param name="refreshCache">Rebuild from scratch the base image, even if the image already exist.</param>
-        /// <param name="parentBuilder">The action that build that build the image that we are based on.</param>
+        /// <param name="parentBuilder">The action that build the image that we are based on.</param>
         /// <param name="buildAction">The action that build the new image.</param>
         /// <param name="newImageName">The name of the new image.</param>
         /// <returns>The path of the new image.</returns>
@@ -198,9 +198,9 @@ namespace CK.Env.Tests.LocalTestHelper
                 imagePath: ImageManager.CacheUniverseFolder.AppendPart( nameof( init_seed_scratch ) + ".zip" ) )
             )
             {
-                universe.InitWorldConfig( TestHelper.Monitor, $"{_cktestBuildStackName}.World.xml" );
+                universe.InitWorldConfig( TestHelper.Monitor, $"{CKTestBuildStackName}.World.xml" );
                 //no config
-                universe.RestartCKli();
+                universe.RestartCKli(TestHelper.Monitor);
                 universe.SeedInitialSetup( TestHelper.Monitor );
                 var snapshotPath = universe.SnapshotState( nameof( setup_seed_scratch ) );
                 action?.Invoke( universe );
@@ -210,8 +210,8 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public static NormalizedPath create_npm_project_from_setup_seed_scratch( Action<TestUniverse, World> action, bool refreshCache )
         {
-            ImageBuilderHelper<Action<TestUniverse>>( _cktestBuildStackName, action, refreshCache, setup_seed_scratch,
-               ( universe ) => universe.CreateAndAddNpmProject( TestHelper.Monitor, "name" ) );
+            ImageBuilderHelper<Action<TestUniverse>>( CKTestBuildStackName, action, refreshCache, setup_seed_scratch,
+               ( universe ) => universe.CreateAndAddNpmProject( TestHelper.Monitor, "baseNpmProject", CKTestBuildStackName ) );
             return null;
         }
     }
