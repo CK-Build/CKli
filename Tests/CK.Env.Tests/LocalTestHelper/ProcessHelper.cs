@@ -31,6 +31,9 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public void CreateGitRepository( string localPath, string remotePath )
         {
+            if( string.IsNullOrWhiteSpace( localPath ) ) throw new ArgumentNullException( nameof( localPath ) );
+            if( string.IsNullOrWhiteSpace( remotePath ) ) throw new ArgumentNullException( nameof( remotePath ) );
+
             var remoteRepoPath = Repository.Init( remotePath, true );
 
             var localRepoPath = Repository.Init( localPath );
@@ -69,6 +72,9 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <returns></returns>
         public NormalizedPath CreateNpmProject( NormalizedPath path, string projectName )
         {
+            if( path == null ) throw new ArgumentNullException( nameof( path ) );
+            if( string.IsNullOrWhiteSpace( projectName ) ) throw new ArgumentNullException( nameof( path ) );
+
             var gitignorePath = TestHelper.TestProjectFolder.AppendPart( "Gitignore" ).AppendPart( "node" ).AppendPart( ".gitignore" );
             var packageJsonPath = TestHelper.TestProjectFolder.AppendPart( "NpmFiles" ).AppendPart( "package.json" );
 
@@ -87,7 +93,7 @@ namespace CK.Env.Tests.LocalTestHelper
 
             foreach( var file in allFilesPaths )
             {
-                File.Copy( file, path.AppendPart(file.LastPart), true );
+                File.Copy( file, path.AppendPart( file.LastPart ), true );
             }
             return path.AppendPart( projectName );
         }
