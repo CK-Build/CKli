@@ -100,14 +100,13 @@ namespace CK.Env
         public static ReleaseRoadmap Create(
             IActivityMonitor m,
             IWorldSolutionContext ctx,
-            XElement previous = null,
-            bool restorePreviousState = true )
+            XElement previous = null )
         {
             if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
             ReleaseSolutionInfo[] infos = new ReleaseSolutionInfo[ctx.Solutions.Count];
             foreach( var (s, d) in ctx.Solutions )
             {
-                var v = d.GitRepository.GetCommitVersionInfo( m );
+                var v = d.GitRepository.ReadVersionInfo( m );
                 if( v == null )
                 {
                     m.Error( $"Unable to get Commit version information for solution {s.Solution}." );

@@ -8,7 +8,7 @@ namespace CK.Env
     /// <summary>
     /// Autonomous <see cref="GitHelper"/> implementation that must be disposed once done.
     /// </summary>
-    public class GitRepository : GitHelper, IDisposable
+    public class GitRepository : GitHelper
     {
         GitRepository( GitRepositoryKey repositoryKey, Repository libRepository, NormalizedPath fullPath, NormalizedPath subPath )
             : base( repositoryKey, libRepository, fullPath, subPath )
@@ -50,7 +50,7 @@ namespace CK.Env
         {
             var r = EnsureWorkingFolder( m, git, workingFolder, ensureHooks, branchName );
             if( r == null ) return null;
-            var g = new GitRepository( git, r, workingFolder, subPath );
+            GitRepository g = new GitRepository( git, r, workingFolder, subPath );
             if( checkOutBranchName
                 && branchName != g.CurrentBranchName
                 && !g.Checkout( m, branchName ).Success )
@@ -60,11 +60,5 @@ namespace CK.Env
             }
             return g;
         }
-
-        /// <summary>
-        /// Disposes the LibGit2Sharp repository.
-        /// </summary>
-        public void Dispose() => Git.Dispose();
-
     }
 }

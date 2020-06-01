@@ -1,6 +1,7 @@
+using CK.Core;
 using System;
 
-namespace CK.Core
+namespace CK.Build
 {
     /// <summary>
     /// Immutable description of artifacts type that can be registered
@@ -28,7 +29,7 @@ namespace CK.Core
         /// Gets the context where potential savors must be defined.
         /// If this type of artifact doesn't require (or support) savors, this is null.
         /// </summary>
-        public CKTraitContext ContextSavors { get; }
+        public CKTraitContext? ContextSavors { get; }
 
         static ArtifactType[] _types = Array.Empty<ArtifactType>();
         static readonly object _lock = new object();
@@ -59,7 +60,7 @@ namespace CK.Core
         /// </summary>
         /// <param name="name">Type name.</param>
         /// <returns>The single registered type or null.</returns>
-        public static ArtifactType SingleOrDefault( string name )
+        public static ArtifactType? SingleOrDefault( string name )
         {
             if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
             var types = _types;
@@ -78,7 +79,7 @@ namespace CK.Core
         /// <returns>The registered type.</returns>
         public static ArtifactType Register( string name, bool isInstallable, char savorSeparator = '\0' )
         {
-            ArtifactType FindSame()
+            ArtifactType? FindSame()
             {
                 var t = SingleOrDefault( name );
                 if( t != null )

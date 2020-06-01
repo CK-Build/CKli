@@ -29,7 +29,7 @@ namespace CK.Env
         /// </summary>
         public ProtoGitFolder ProtoGitFolder => (ProtoGitFolder)RepositoryKey;
 
-        GitFolder( Repository r, ProtoGitFolder data )
+        internal GitFolder( Repository r, ProtoGitFolder data )
             : base( data, r, data.FullPhysicalPath, data.FolderPath )
         {
             _headFolder = new HeadFolder( this );
@@ -40,56 +40,6 @@ namespace CK.Env
             ServiceContainer.Add( this );
             PluginManager = new GitPluginManager( data.PluginRegistry, ServiceContainer, data.CommandRegister, data.World.DevelopBranchName );
             data.CommandRegister.Register( this );
-        }
-
-        // This method SHOULD not exist...
-        // The ctor above should be internal and every checks should have been done before.
-        internal static GitFolder Create( IActivityMonitor m, Repository r, ProtoGitFolder data )
-        {
-            var g = new GitFolder( r, data );
-            // Now checks everything that requires an actual GitFolder.
-            //@Nico... Is this REALLY required?
-            // Upt to me, everything should be done above, BEFORE creating the instance...
-            if( !g.CheckValid( m ) )
-            {
-                g.Dispose();
-                g = null;
-            }
-            return g;
-        }
-
-        bool CheckValid( IActivityMonitor m )
-        {
-            if( !Git.Branches.Any( p => p.Commits.Any() ) )
-            {
-                // Sometimes we fail while cloning the repo.
-                // The issue is that the repo is incorrectly intialized: the commits are not fetched.
-                m.Warn( "Repo does not contain any commits, probably a bad clone." );
-                if( !FetchBranches( m ) ) return false;
-                if( !Git.Branches.Any( p => p.Commits.Any() ) )
-                {
-                    m.Error( "The repository is empty." );
-                    return false;
-                }
-            }
-            // Now we know that the repository have at least one commit. So it has a tracking branch
-            // This branch may not be here locally.
-            if( !Git.Head.Commits.Any() )
-            {
-                // In a case of a failed repository clone, the head is on a local master branch with no commits.
-                if( !Checkout( m, World.DevelopBranchName ).Success ) return false;
-                if( !Git.Head.Commits.Any() )
-                {
-                    m.Error( $"The {World.DevelopBranchName} branch have no commit." );
-                    return false;
-                }
-            }
-            if( Git.Branches.Count() == 0 )
-            {
-                m.Error( "This git repository does not contain any branches." );
-                return false;
-            }
-            return true;
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => SubPath;
@@ -115,17 +65,11 @@ namespace CK.Env
             {
                 return PluginManager.BranchPlugins.EnsurePlugins( m, CurrentBranchName );
             }
-            m.Error( $"No plugins since '{ToString()}' is not on a branch." );
+            m.Error( $"No plugins since '{this}' is not on a branch." );
             return false;
         }
 
         protected override void OnNewCurrentBranch( IActivityMonitor m ) => EnsureCurrentBranchPlugins( m );
-
-        void CheckoutWithPlugins( IActivityMonitor m, Branch branch )
-        {
-            Commands.Checkout( Git, branch );
-            EnsureCurrentBranchPlugins( m );
-        }
 
         /// <summary>
         /// Fires whenever we switched to the local branch.
@@ -174,36 +118,23 @@ namespace CK.Env
             return ProcessRunner.Run( m, arg.StartInfo, arg.StdErrorLevel );
         }
 
-        /// <summary>
-        /// Gets the valid version information from a branch or null.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="branchName">Defaults to <see cref="CurrentBranchName"/>.</param>
-        /// <returns>The commit version info or null if it it cannot be obtained.</returns>
-        public CommitVersionInfo GetCommitVersionInfo( IActivityMonitor m, string branchName = null )
+        class AdaptedLogger : ILogger
         {
-            var info = ReadRepositoryVersionInfo( m, branchName );
-            return info != null
-                    ? new CommitVersionInfo(
-                            info.CommitSha,
-                            info.ValidReleaseTag,
-                            info.BetterExistingVersion?.ThisTag,
-                            info.CommitInfo.BasicInfo?.BestCommitBelow?.ThisTag,
-                            info.CommitInfo.BasicInfo?.BestCommitBelow?.CommitSha,
-                            info.NextPossibleVersions,
-                            info.PossibleVersions,
-                            new CommitAssemblyBuildInfoFromRepo( info ) )
-                    : null;
+            readonly IActivityMonitor _m;
+            public AdaptedLogger( IActivityMonitor m ) => _m = m;
+            public void Error( string msg ) => _m.Error( msg );
+            public void Warn( string msg ) => _m.Warn( msg );
+            public void Info( string msg ) => _m.Info( msg );
         }
 
         /// <summary>
-        /// Gets the simple git version <see cref="RepositoryInfo"/> from a branch.
+        /// Gets the simple git version <see cref="ICommitInfo"/> from a branch.
         /// Returns null if an error occurred or if RepositoryInfo.xml has not been successfully read.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">Defaults to <see cref="CurrentBranchName"/>.</param>
         /// <returns>The RepositoryInfo or null if it it cannot be obtained.</returns>
-        public RepositoryInfo ReadRepositoryVersionInfo( IActivityMonitor m, string branchName = null )
+        public ICommitInfo ReadVersionInfo( IActivityMonitor m, string branchName = null )
         {
             if( branchName == null ) branchName = CurrentBranchName;
             try
@@ -225,20 +156,10 @@ namespace CK.Env
                     m.Error( $"Missing required {pathOpt} file." );
                     return null;
                 }
-                var opt = RepositoryInfoOptions.Read( fOpt.ReadAsXDocument().Root );
-                opt.StartingBranchName = branchName;
-                var result = new RepositoryInfo( Git, opt );
-                if( result.RepositoryError != null )
-                {
-                    m.Error( $"Unable to read RepositoryInfo. RepositoryError: {result.RepositoryError}." );
-                    return null;
-                }
-                if( result.Error != null )
-                {
-                    m.Error( result.ReleaseTagError );
-                    return null;
-                }
-                return result;
+                var opt = new RepositoryInfoOptions( fOpt.ReadAsXDocument().Root ) { HeadBranchName = branchName };
+                var result = new CommitInfo( Git, opt );
+                result.Explain( new AdaptedLogger( m ) );
+                return result.Error == null ? result : null;
             }
             catch( Exception ex )
             {
@@ -345,7 +266,7 @@ namespace CK.Env
         public FileSystem FileSystem => ProtoGitFolder.FileSystem;
 
         /// <summary>
-        /// Pulls current branch by merging changes from remote 'orgin' branch into this repository.
+        /// Pulls current branch by merging changes from remote 'origin' branch into this repository.
         /// The current head must be clean.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -547,7 +468,7 @@ namespace CK.Env
         bool RaiseEnteredLocalBranch( IActivityMonitor m, bool enter )
         {
             PluginManager.BranchPlugins.EnsurePlugins( m, World.LocalBranchName );
-            using( m.OpenTrace( $"{ToString()}: Raising {(enter ? "OnLocalBranchEntered" : "OnLocalBranchLeaving")} event." ) )
+            using( m.OpenTrace( $"{this}: Raising {(enter ? "OnLocalBranchEntered" : "OnLocalBranchLeaving")} event." ) )
             {
                 try
                 {
@@ -758,11 +679,11 @@ namespace CK.Env
             }
         }
 
-        internal void Dispose()
+        public override void Dispose()
         {
             ProtoGitFolder.CommandRegister.Unregister( this );
             ((IDisposable)PluginManager).Dispose();
-            Git.Dispose();
+            base.Dispose();
         }
 
         public override string ToString() => $"{FullPhysicalPath} ({CurrentBranchName ?? "<no branch>" }).";

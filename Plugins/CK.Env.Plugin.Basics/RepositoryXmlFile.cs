@@ -1,26 +1,22 @@
 using CK.Core;
 using CK.Text;
+using SimpleGitVersion;
 using System;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Xml.Linq;
 
 namespace CK.Env.Plugin
 {
     public class RepositoryXmlFile : XmlFilePluginBase, IDisposable, IGitBranchPlugin, ICommandMethodsProvider
     {
-        static readonly XNamespace SVGNS = XNamespace.Get( "http://csemver.org/schemas/2015" );
-        static readonly XName xRootName = SVGNS + "RepositoryInfo";
-        static readonly XName xBranchesName = SVGNS + "Branches";
-        static readonly XName xDebugName = SVGNS + "Debug";
-        static readonly XName XBranchName = SVGNS + "Branch";
-
-        public readonly SolutionDriver _driver;
-        XElement _branches;
+        readonly SolutionDriver _driver;
+        readonly ChildObject<RepositoryInfoOptions> _options;
 
         public RepositoryXmlFile( GitFolder f, NormalizedPath branchPath, SolutionDriver driver )
-            : base( f, branchPath, branchPath.AppendPart( "RepositoryInfo.xml" ), null )
+            : base( f, branchPath, branchPath.AppendPart( "RepositoryInfo.xml" ), XNamespace.None + "RepositoryInfo" )
         {
-            if( PluginBranch == StandardGitStatus.Local )
+            if( StandardPluginBranch == StandardGitStatus.Local )
             {
                 f.OnLocalBranchEntered += OnLocalBranchEntered;
                 f.OnLocalBranchLeaving += OnLocalBranchLeaving;
@@ -28,32 +24,53 @@ namespace CK.Env.Plugin
             _driver = driver;
             _driver.OnStartBuild += OnStartBuild;
             _driver.OnEndBuild += OnEndBuild;
+
+
+            _options = new ChildObject<RepositoryInfoOptions>( this, XNamespace.None + "SimpleGitVersion", LoadWithLegacy, o => o.ToXml() );
+
+            // We use e.Parent so that detection of the old schema can be done (root of the document).
+            // Once migrated, replace this with: e => new RepositoryInfoOptions( e )
+            RepositoryInfoOptions LoadWithLegacy( XElement e )
+            {
+                var o = new RepositoryInfoOptions( e.Parent );
+                if( o.XmlMigrationRequired )
+                {
+                    Document.Root.RemoveAllNamespaces();
+                    Document.Root.Elements( SGVSchema.Branches ).Remove();
+                    Document.Root.Elements( SGVSchema.IgnoreModifiedFiles ).Remove();
+                    Document.Root.Elements( SGVSchema.Debug ).Remove();
+                    e.ReplaceWith( o.ToXml() );
+                }
+                // Fogot these 2 ones.
+                Document.Root.Elements( "StartingVersionForCSemVer" ).Remove();
+                Document.Root.Nodes().OfType<XComment>().Where( c => c.Value.Contains( "Debug IgnoreDirtyWorkingFolder=" ) ).Remove();
+                return o;
+            }
         }
 
         void OnStartBuild( object sender, BuildStartEventArgs e )
         {
-            var debug = EnsureDocument().Root.Element( xDebugName );
-            if( debug == null )
+            var o = _options.EnsureObject();
+            if( !o.IgnoreDirtyWorkingFolder )
             {
-                EnsureDocument().Root.Add( debug = new XElement( xDebugName ) );
-                e.Memory.Add( this, debug );
+                e.Memory.Add( this, this );
+                o.IgnoreDirtyWorkingFolder = true;
+                _options.UpdateXml( e.Monitor, true );
             }
-            if( (bool?)debug.Attribute( "IgnoreDirtyWorkingFolder" ) != true )
-            {
-                debug.SetAttributeValue( "IgnoreDirtyWorkingFolder", "true" );
-                e.Memory[this] = null;
-            }
-            Save( e.Monitor );
         }
 
         void OnEndBuild( object sender, BuildEndEventArgs e )
         {
-            if( !e.BuildStartArgs.IsUsingDirtyFolder
-                && e.BuildStartArgs.Memory.TryGetValue( this, out object mark ) )
+            // We must always reset the in-memory option if we have changed it.
+            if( e.BuildStartArgs.Memory.ContainsKey( this ) )
             {
-                if( mark != null ) ((XElement)mark).Remove();
-                else EnsureDocument().Root.Element( xDebugName ).SetAttributeValue( "IgnoreDirtyWorkingFolder", "false" );
-                Save( e.Monitor );
+                _options.EnsureObject().IgnoreDirtyWorkingFolder = false;
+                // If the build is protected by a Git reset, no need to update the file.
+                if( !e.BuildStartArgs.IsUsingDirtyFolder )
+                {
+                    _options.UpdateXml( e.Monitor, true );
+
+                }
             }
         }
 
@@ -62,13 +79,13 @@ namespace CK.Env.Plugin
         void OnLocalBranchEntered( object sender, EventMonitoredArgs e )
         {
             EnsureLocalBranch( e.Monitor );
-            Save( e.Monitor );
+            _options.UpdateXml( e.Monitor, true );
         }
 
         void OnLocalBranchLeaving( object sender, EventMonitoredArgs e )
         {
             RemoveLocalBranch( e.Monitor );
-            Save( e.Monitor );
+            _options.UpdateXml( e.Monitor, true );
         }
 
         void IDisposable.Dispose()
@@ -85,8 +102,11 @@ namespace CK.Env.Plugin
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
-            EnsureBranchMapping( m, GitFolder.World.DevelopBranchName, "develop" );
-            if( PluginBranch == StandardGitStatus.Local )
+
+            var o = _options.EnsureObject();
+            o.IgnoreDirtyWorkingFolder = false;
+            EnsureBranchMapping( m, GitFolder.World.DevelopBranchName, CIBranchVersionMode.LastReleaseBased, "develop" );
+            if( StandardPluginBranch == StandardGitStatus.Local )
             {
                 EnsureLocalBranch( m );
             }
@@ -94,54 +114,27 @@ namespace CK.Env.Plugin
             {
                 RemoveLocalBranch( m );
             }
-            // If the <Debug > element exists, we set the IgnoreDirtyWorkingFolder attribute to false.
-            EnsureDocument().Root.Element( xDebugName )?.SetAttributeValue( "IgnoreDirtyWorkingFolder", "false" );
-            // Obsolete:
-            Document.Root.Elements( SVGNS + "PossibleVersionsMode" ).Remove();
+            _options.UpdateXml( m, false );
             Save( m );
         }
 
         /// <summary>
-        /// Ensures that the <see cref="XmlFilePluginBase.Document"/> exists.
-        /// </summary>
-        /// <returns>The xml document.</returns>
-        public XDocument EnsureDocument() => Document ?? (Document = new XDocument( new XElement( xRootName ) ));
-
-        /// <summary>
-        /// Ensures that Branches element exists in the non null <see cref="XmlFilePluginBase.Document"/>.
-        /// If the Document is null, this is null.
-        /// </summary>
-        public XElement Branches => _branches ?? (_branches = Document?.Root.EnsureElement( xBranchesName ));
-
-        /// <summary>
-        /// Ensures that document and the branches element exists.
-        /// </summary>
-        public XElement EnsureBranches()
-        {
-            EnsureDocument();
-            return Branches;
-        }
-
-        /// <summary>
-        /// Ensures that the document exists and the specified branch mapping exists.
+        /// Ensures a branch mapping exists.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">The actual branch name (ex: "develop-local").</param>
         /// <param name="versionName">The package suffix (ex: "local").</param>
-        /// <param name="isZeroTimed">True for SimpleGitVersion ci version mode for "ZeroTimed" instead of "LastReleaseBased".</param>
-        void EnsureBranchMapping( IActivityMonitor m, string branchName, string versionName, bool isZeroTimed = false )
+        /// <param name="mode">The CI mode to use for this branch.</param>
+        void EnsureBranchMapping( IActivityMonitor m, string branchName, CIBranchVersionMode mode, string versionName )
         {
-            var branches = EnsureBranches();
-
-            var branch = branches.Elements( XBranchName )
-                                 .FirstOrDefault( b => (string)b.Attribute( "Name" ) == branchName );
-            if( branch == null )
+            var o = _options.EnsureObject();
+            var b = o.Branches.FirstOrDefault( x => x.Name == branchName );
+            if( b == null ) o.Branches.Add( b = new RepositoryInfoOptionsBranch( branchName, mode, versionName ) );
+            else
             {
-                branches.Add( branch = new XElement( XBranchName,
-                                            new XAttribute( "Name", branchName ) ) );
+                b.CIVersionMode = mode;
+                b.VersionName = versionName;
             }
-            branch.SetAttributeValue( "VersionName", versionName );
-            branch.SetAttributeValue( "CIVersionMode", isZeroTimed ? "ZeroTimed" : "LastReleaseBased" );
         }
 
         /// <summary>
@@ -151,10 +144,12 @@ namespace CK.Env.Plugin
         /// <param name="branchName">The actual branch name (ex: "develop-local").</param>
         void RemoveBranchMapping( IActivityMonitor m, string branchName )
         {
-            Document?.Root.Element( xBranchesName )
-                             .Elements( XBranchName )
-                             .Where( b => (string)b.Attribute( "Name" ) == branchName )
-                             .Remove();
+            var o = _options.EnsureObject();
+            int idx = o.Branches.IndexOf( b => b.Name == branchName );
+            if( idx >= 0 )
+            {
+                o.Branches.RemoveAt( idx );
+            }
         }
 
         /// <summary>
@@ -162,7 +157,7 @@ namespace CK.Env.Plugin
         /// <see cref="IWorldName.LocalBranchName"/> is mapped to "local".
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        void EnsureLocalBranch( IActivityMonitor m ) => EnsureBranchMapping( m, GitFolder.World.LocalBranchName, "local", true );
+        void EnsureLocalBranch( IActivityMonitor m ) => EnsureBranchMapping( m, GitFolder.World.LocalBranchName, CIBranchVersionMode.ZeroTimed, "local" );
 
         /// <summary>
         /// Removes the <see cref="IWorldName.LocalBranchName"/> branch mapping if it exists.

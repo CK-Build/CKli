@@ -1,4 +1,6 @@
 using CK.Core;
+using CK.Build;
+using CK.SimpleKeyVault;
 using CKSetup;
 using System;
 using System.Collections.Generic;

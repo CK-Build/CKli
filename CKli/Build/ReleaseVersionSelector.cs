@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Build;
 using CK.Env;
 using CK.Env.DependencyModel;
 using CK.Text;
@@ -19,31 +20,35 @@ namespace CKli
         public void ChooseFinalVersion( IActivityMonitor m, IReleaseVersionSelectorContext c )
         {
             Console.WriteLine( "=========" );
-            Console.Write( $"======== {c.Solution.Solution.Name} " );
-            if( c.PreviousVersionCommitSha != null )
+            Console.WriteLine( $"======== {c.Solution.Solution.Name} {(c.CurrentReleasedVersion != null ? $"last release: {c.CurrentReleasedVersion.ThisTag}" : "(No previous released version)")} " );
+
+            if( c.PublishedUpdates.Count > 0 )
             {
-                Console.Write( $" last release: {c.PreviousVersion}" );
+                Console.WriteLine( $"         --> {c.PublishedUpdates.Count} packages to update in published projects: {GetUpdatesAsText( c.PublishedUpdates )}." );
+            }
+            if( c.NonPublishedUpdates.Count > 0 )
+            {
+                Console.WriteLine( $"         --> {c.NonPublishedUpdates.Count} packages to update in {(c.PublishedUpdates.Count > 0 ? "other" : "non published")} projects: {GetUpdatesAsText( c.NonPublishedUpdates )}." );
+            }
+            if( c.PreviousVersion != null )
+            {
                 var diffResult = c.GetProjectsDiff( m );
                 if( diffResult == null )
                 {
                     c.Cancel();
                     return;
                 }
-
+                Console.Write( "Diff: " );
                 if( diffResult.Diffs.All( d => d.DiffType == DiffRootResultType.None ) && diffResult.Others.DiffType == DiffRootResultType.None )
                 {
-                    Console.WriteLine( $" (No change in {c.Solution.Solution.GeneratedArtifacts.Select( p => p.Artifact.Name ).Concatenate()})" );
+                    Console.WriteLine( $"No change in {c.Solution.Solution.GeneratedArtifacts.Select( p => p.Artifact.Name ).Concatenate()}" );
                 }
                 else
                 {
-                    Console.WriteLine( ", changes:" );
+                    Console.WriteLine( "Changes:" );
                 }
 
                 Console.WriteLine( diffResult.ToString() );
-            }
-            else
-            {
-                Console.WriteLine( "(No previous released version)" );
             }
 
             var projExRefNotRelease = c.Solution.Solution.Projects
@@ -51,12 +56,12 @@ namespace CKli
                 .Select( p =>
                 {
                     List<ProjectPackageReference> pcks = p.PackageReferences
-                    .Where( q => q.Kind == ArtifactDependencyKind.Transitive )
-                    .Where(
-                        q => !c.Solution.ImportedLocalPackages
-                                .Any( s => s.Package.Artifact == q.Target.Artifact )
-                         )
-                    .ToList();
+                                                            .Where( q => q.Kind == ArtifactDependencyKind.Transitive )
+                                                            .Where(
+                                                                q => !c.Solution.ImportedLocalPackages
+                                                                        .Any( s => s.Package.Artifact == q.Target.Artifact )
+                                                                 )
+                                                            .ToList();
                     if( pcks.Any() )
                     {
                         PackageQuality worstQuality = pcks.Select( q => q.Target.Version.PackageQuality ).Min();
@@ -66,7 +71,8 @@ namespace CKli
                     return (p, Array.Empty<ProjectPackageReference>());
                 } )//There should be at least one package reference
                 .Where( x => x.p != null )
-                .GroupBy( p => p.Item2.First().Target.Version.PackageQuality ).ToList(); //ugliest LINQ i ever wrote, should take 3 lines.
+                .GroupBy( p => p.Item2.First().Target.Version.PackageQuality )
+                .ToList(); //ugliest LINQ i ever wrote, should take 3 lines.
             var min = projExRefNotRelease.Any() ? projExRefNotRelease.Min( q => q.Key ) : PackageQuality.None;
             var worst = min != PackageQuality.None
                             ? projExRefNotRelease.SingleOrDefault( p => p.Key == min )
@@ -149,6 +155,13 @@ namespace CKli
                     }
                     Console.WriteLine();
                 }
+            }
+
+            static string GetUpdatesAsText( IReadOnlyList<(ImportedLocalPackage LocalRef, SVersion NewVersion)> updates )
+            {
+                return updates.GroupBy( u => (u.LocalRef.Package, u.NewVersion) )
+                              .Select( p => p.Key.Package.ToString() + " <= " + p.Key.NewVersion + "(" + p.Select( i => i.LocalRef.Importer.Name ).Concatenate() + ")" )
+                              .Concatenate();
             }
         }
 

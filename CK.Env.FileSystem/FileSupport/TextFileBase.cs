@@ -3,6 +3,8 @@ using CK.Text;
 using System;
 using System.Text;
 
+#nullable enable
+
 namespace CK.Env
 {
     /// <summary>
@@ -10,27 +12,32 @@ namespace CK.Env
     /// </summary>
     public abstract class TextFileBase
     {
-        ITextFileInfo _file;
+        ITextFileInfo? _file;
         readonly Encoding _encoding;
 
         /// <summary>
+        /// Gets the UTF-8 encoding without BOM.
+        /// </summary>
+        public readonly static Encoding UTF8EncodingNoBOM = new UTF8Encoding( false );
+
+        /// <summary>
         /// Initializes a new <see cref="TextFileBase"/>.
+        /// You can use <see cref="UTF8EncodingNoBOM"/> to specify that no BOM should be emitted.
         /// </summary>
         /// <param name="fs">The file system.</param>
         /// <param name="filePath">The path to the file relative to the file system root.</param>
         /// <param name="encoding">The encoding that defaults to UTF-8.</param>
-        protected TextFileBase( FileSystem fs, NormalizedPath filePath, Encoding encoding = null )
+        protected TextFileBase( FileSystem fs, NormalizedPath filePath, Encoding? encoding = null )
         {
             FileSystem = fs;
             FilePath = filePath;
-            _encoding = encoding;
+            _encoding = encoding ?? Encoding.UTF8;
         }
 
         /// <summary>
         /// Fires whenever this file has been deleted or saved.
         /// </summary>
-        public event EventHandler<EventMonitoredArgs> OnSavedOrDeleted;
-
+        public event EventHandler<EventMonitoredArgs>? OnSavedOrDeleted;
 
         ITextFileInfo GetFile() => _file ?? (_file = FileSystem.GetFileInfo( FilePath ).AsTextFileInfo( ignoreExtension: true ));
 
@@ -49,7 +56,7 @@ namespace CK.Env
         /// To update this content, <see cref="CreateOrUpdate(IActivityMonitor, string)"/> must
         /// be used.
         /// </summary>
-        public string TextContent => GetFile()?.TextContent;
+        public string? TextContent => GetFile()?.TextContent;
 
         /// <summary>
         /// Deletes the file if it exists.
@@ -96,9 +103,9 @@ namespace CK.Env
         /// <param name="newContent">The content. Null to delete the file.</param>
         /// <param name="forceSave">True to always save the file.</param>
         /// <returns>True on success, false on error.</returns>
-        protected bool CreateOrUpdate( IActivityMonitor m, string newContent, bool forceSave = false )
+        protected bool CreateOrUpdate( IActivityMonitor m, string? newContent, bool forceSave = false )
         {
-            string oldContent = GetFile()?.TextContent;
+            string? oldContent = GetFile()?.TextContent;
             if( oldContent == newContent && !forceSave ) return true;
             if( newContent == null )
             {

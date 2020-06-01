@@ -11,10 +11,10 @@ namespace CK.Env
         /// <param name="branchPath">The actual branch.</param>
         public GitBranchPluginImpl( GitFolder f, NormalizedPath branchPath )
         {
-            if( branchPath.LastPart == f.World.LocalBranchName ) PluginBranch = StandardGitStatus.Local;
-            else if( branchPath.LastPart == f.World.DevelopBranchName ) PluginBranch = StandardGitStatus.Develop;
-            else if( branchPath.LastPart == f.World.MasterBranchName ) PluginBranch = StandardGitStatus.Master;
-            else PluginBranch = StandardGitStatus.Unknown;
+            if( branchPath.LastPart == f.World.LocalBranchName ) StandardPluginBranch = StandardGitStatus.Local;
+            else if( branchPath.LastPart == f.World.DevelopBranchName ) StandardPluginBranch = StandardGitStatus.Develop;
+            else if( branchPath.LastPart == f.World.MasterBranchName ) StandardPluginBranch = StandardGitStatus.Master;
+            else StandardPluginBranch = StandardGitStatus.Unknown;
             BranchPath = branchPath;
             Folder = f;
         }
@@ -38,6 +38,6 @@ namespace CK.Env
         /// It is <see cref="StandardGitStatus.Unknown"/> if the actual branch is not one
         /// the 3 standard ones.
         /// </summary>
-        public StandardGitStatus PluginBranch { get; }
+        public StandardGitStatus StandardPluginBranch { get; }
     }
 }

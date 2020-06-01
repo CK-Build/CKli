@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.SimpleKeyVault;
 using System.Net.Http;
 
 namespace CK.Env.CKSetup

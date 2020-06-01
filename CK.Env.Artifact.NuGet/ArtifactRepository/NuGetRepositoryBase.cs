@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Build;
 using CK.Text;
 using CSemVer;
 using NuGet.Configuration;
@@ -94,7 +95,7 @@ namespace CK.Env.NuGet
         {
         }
 
-        private protected override bool CanRetry( MetadataResource meta, NuGetLoggerAdapter logger, Exception ex )
+        private protected override bool CanRetry( INuGetResource meta, NuGetLoggerAdapter logger, Exception ex )
         {
             var secretName = SecretKeyName;
             if( !String.IsNullOrWhiteSpace( secretName ) )
@@ -123,7 +124,7 @@ namespace CK.Env.NuGet
             if( packageId == null ) throw new ArgumentNullException( nameof( packageId ) );
             if( version == null ) throw new ArgumentNullException( nameof( version ) );
             var p = new PackageIdentity( packageId, NuGetVersion.Parse( version.ToString() ) );
-            return await SafeCall( m, ( sources, meta, logger ) => meta.Exists( p, Client.SourceCache, logger, CancellationToken.None ) );
+            return await SafeCall<MetadataResource,bool>( m, ( sources, meta, logger ) => meta.Exists( p, Client.SourceCache, logger, CancellationToken.None ) );
         }
 
 
@@ -139,7 +140,7 @@ namespace CK.Env.NuGet
             string apiKey = ResolvePushAPIKey( m );
             try
             {
-                await SafeCall( m, async ( sources, meta, logger ) =>
+                await SafeCall<MetadataResource,int>( m, async ( sources, meta, logger ) =>
                 {
                     var exist = files.Select( file => (file, id: new PackageIdentity( file.PackageId, NuGetVersion.Parse( file.Version.ToNormalizedString() ) )) )
                                      .Select( fId => (fId.file, exists: meta.Exists( fId.id, Client.SourceCache, logger, CancellationToken.None )) )

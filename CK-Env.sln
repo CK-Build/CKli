@@ -71,7 +71,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Artifact.NuGet", "CK
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Npm.Net.Tests", "Tests\Npm.Net.Tests\Npm.Net.Tests.csproj", "{3A9F2DC4-65AE-4DD1-9E68-298AA4451718}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Artifact.Model", "CK.Artifact.Model\CK.Artifact.Model.csproj", "{20706B63-81A3-466B-9B12-5E5EB3C0696F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Build.Artifact.Model", "CK.Build.Artifact.Model\CK.Build.Artifact.Model.csproj", "{20706B63-81A3-466B-9B12-5E5EB3C0696F}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.Dotnet", "Plugins\CK.Env.Plugin.Dotnet\CK.Env.Plugin.Dotnet.csproj", "{777AC8E9-32CE-4B63-8606-6C9D8B531E88}"
 EndProject
@@ -88,6 +88,8 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Plugins", "Plugins", "{60D6E9BB-13A8-463A-ACBF-66EE940FCCE5}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.Workstation", "Plugins\CK.Env.Plugin.Workstation\CK.Env.Plugin.Workstation.csproj", "{B679ACB9-9FAA-46AB-B01E-E833722E1362}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Build.Artifact.Cache", "CK.Build.Artifact.Cache\CK.Build.Artifact.Cache.csproj", "{256FA6AB-FC79-4503-AD31-32960AC03846}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -377,6 +379,14 @@ Global
 		{B679ACB9-9FAA-46AB-B01E-E833722E1362}.Release|Any CPU.Build.0 = Release|Any CPU
 		{B679ACB9-9FAA-46AB-B01E-E833722E1362}.Release|x64.ActiveCfg = Release|Any CPU
 		{B679ACB9-9FAA-46AB-B01E-E833722E1362}.Release|x64.Build.0 = Release|Any CPU
+		{256FA6AB-FC79-4503-AD31-32960AC03846}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{256FA6AB-FC79-4503-AD31-32960AC03846}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{256FA6AB-FC79-4503-AD31-32960AC03846}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{256FA6AB-FC79-4503-AD31-32960AC03846}.Debug|x64.Build.0 = Debug|Any CPU
+		{256FA6AB-FC79-4503-AD31-32960AC03846}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{256FA6AB-FC79-4503-AD31-32960AC03846}.Release|Any CPU.Build.0 = Release|Any CPU
+		{256FA6AB-FC79-4503-AD31-32960AC03846}.Release|x64.ActiveCfg = Release|Any CPU
+		{256FA6AB-FC79-4503-AD31-32960AC03846}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

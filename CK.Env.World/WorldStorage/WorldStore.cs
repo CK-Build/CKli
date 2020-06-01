@@ -89,7 +89,7 @@ namespace CK.Env
 
         /// <summary>
         /// Gets or creates the <see cref="LocalWorldState"/> for a world.
-        /// Default implemenation implements xml state file in the root world directory.
+        /// Default implementation implements xml state file in the root world directory.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="w">The world name. It must exist in this store.</param>

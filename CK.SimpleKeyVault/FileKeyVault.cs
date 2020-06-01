@@ -1,34 +1,36 @@
 using CK.Core;
-using CK.SimpleKeyVault;
 using CK.Text;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
-namespace CK.Env
+namespace CK.SimpleKeyVault
 {
-    public sealed class UserKeyVault : IDisposable
+    /// <summary>
+    /// Simple file based key vault that handles a <see cref="KeyStore"/>: keys are automatically
+    /// loaded and saved in this file.
+    /// </summary>
+    public sealed class FileKeyVault : IDisposable
     {
         readonly SecretKeyStore _store;
-        readonly Dictionary<string, string> _vaultContent;
-        string _passPhrase;
+        readonly Dictionary<string, string?> _vaultContent;
+        string? _passPhrase;
 
-        public UserKeyVault( NormalizedPath userHostPath )
+        /// <summary>
+        /// Initializes a new vault based on a file path (that may exist or not).
+        /// </summary>
+        /// <param name="keyVaultPath">The vault file path.</param>
+        public FileKeyVault( in NormalizedPath keyVaultPath )
         {
             _store = new SecretKeyStore();
             _store.SecretDeclared += OnSecretDeclared;
-            _vaultContent = new Dictionary<string, string>();
-            KeyVaultKeyName = "CKLI-" + Environment.UserDomainName
-                                         .Replace( '-', '_' )
-                                         .Replace( '/', '_' )
-                                         .Replace( '\\', '_' )
-                                         .Replace( '.', '_' )
-                                         .ToUpperInvariant();
-            KeyVaultPath = userHostPath.AppendPart( KeyVaultKeyName + ".KeyVault.txt" );
+            _vaultContent = new Dictionary<string, string?>();
+            KeyVaultPath = keyVaultPath;
         }
 
-        void OnSecretDeclared( object sender, SecretKeyInfoDeclaredArgs e )
+        void OnSecretDeclared( object? sender, SecretKeyInfoDeclaredArgs e )
         {
             if( IsKeyVaultOpened && _vaultContent.TryGetValue( e.Declared.Name, out var secret ) )
             {
@@ -47,19 +49,12 @@ namespace CK.Env
         public string KeyVaultPath { get; }
 
         /// <summary>
-        /// Gets the name of the primary secret required to open the key vault.
-        /// This is: "CKLI_" + <see cref="Environment.UserDomainName"/> in upper
-        /// case where '\', '/', '.' and '-' are replaced with '_'.
-        /// </summary>
-        public string KeyVaultKeyName { get; }
-
-        /// <summary>
         /// Gets whether there is a file for this vault. When no file exists it must be created.
         /// </summary>
         public bool KeyVaultFileExists => File.Exists( KeyVaultPath );
 
         /// <summary>
-        /// Gets whether the key vault bound to the current <see cref="IWorldName"/> is opened.
+        /// Gets whether this key vault is opened.
         /// </summary>
         public bool IsKeyVaultOpened => _passPhrase != null;
 
@@ -72,7 +67,7 @@ namespace CK.Env
         /// <param name="secret">The secret to update. Null or empty clears the secret.</param>
         /// <param name="autoSave">False to not automatically saves the vault.</param>
         /// <returns>True if secret has been changed, false otherwise.</returns>
-        public bool UpdateSecret( IActivityMonitor m, string key, string secret, bool autoSave = true )
+        public bool UpdateSecret( IActivityMonitor m, string key, string? secret, bool autoSave = true )
         {
             if( !_store.SetSecret( m, key, secret ) ) return false;
             if( autoSave && IsKeyVaultOpened )
@@ -153,18 +148,14 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="newPassPhrase">Optional new passphrase.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool SaveKeyVault( IActivityMonitor m, string newPassPhrase = null )
+        public bool SaveKeyVault( IActivityMonitor m, string? newPassPhrase = null )
         {
             if( _passPhrase == null )
             {
                 m.Info( "Key vault is closed." );
                 return false;
             }
-            if( newPassPhrase == null )
-            {
-                newPassPhrase = _passPhrase;
-            }
-            else
+            if( newPassPhrase != null )
             {
                 if( !CheckPassPhraseConstraints( m, newPassPhrase ) ) return false;
                 _passPhrase = newPassPhrase;
@@ -173,8 +164,9 @@ namespace CK.Env
             return true;
         }
 
-        void DoSaveKeyVault( IActivityMonitor m )
+        void DoSaveKeyVault( IActivityMonitor? m )
         {
+            Debug.Assert( _passPhrase != null, "The file is opened." );
             foreach( var e in _store.OptimalAvailableInfos )
             {
                 _vaultContent[e.Name] = e.Secret;

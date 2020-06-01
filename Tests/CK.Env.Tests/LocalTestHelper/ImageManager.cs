@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Threading;
 using static CK.Testing.MonitorTestHelper;
 
 namespace CK.Env.Tests.LocalTestHelper
@@ -12,7 +13,7 @@ namespace CK.Env.Tests.LocalTestHelper
     /// <summary>
     /// Manage images. Diposing this class will delete all the generated images.
     /// </summary>
-    public class ImageManager
+    public static class ImageManager
     {
         /// <summary>
         /// Path to the folder storing the **Universe Zips** used for the Tests.
@@ -23,6 +24,8 @@ namespace CK.Env.Tests.LocalTestHelper
         /// Path to the folder storing the Seed Zips.
         /// </summary>
         public static NormalizedPath SeedUniverseFolder => TestHelper.TestProjectFolder.AppendPart( "SeedZips" );
+
+        public static NormalizedPath WorkFolder => Path.Combine( Path.GetTempPath(), "CKliTestWorkFolder" );
 
         /// <summary>
         /// Create a zip file
@@ -63,11 +66,15 @@ namespace CK.Env.Tests.LocalTestHelper
         public static TestUniverse InstantiateImage( IActivityMonitor m, NormalizedPath imagePath )
         {
             if( !File.Exists( imagePath ) ) throw new FileNotFoundException( nameof( imagePath ) );
-            NormalizedPath tempPath = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
-            m.Info( $"Creating temp directory {tempPath} and dezipping '{imagePath}' into." );
-            Directory.CreateDirectory( tempPath );
-            ZipFile.ExtractToDirectory( imagePath, tempPath );
-            return TestUniverse.Create( m, tempPath );
+            m.Info( $"Creating temp directory {WorkFolder} and dezipping '{imagePath}' into." );
+            if( Directory.Exists( WorkFolder ) )
+            {
+                m.Info( $"Deleting '{WorkFolder} content.'" );
+                FileHelper.RawDeleteLocalDirectory( TestHelper.Monitor, WorkFolder );
+            }
+            Directory.CreateDirectory( WorkFolder );
+            ZipFile.ExtractToDirectory( imagePath, WorkFolder );
+            return TestUniverse.Create( m, WorkFolder );
         }
 
         public static NormalizedPath EnsureImage<T>(
@@ -125,7 +132,6 @@ namespace CK.Env.Tests.LocalTestHelper
             {
                 _a = a;
                 _b = b;
-
             }
 
             public void Dispose()
@@ -134,26 +140,19 @@ namespace CK.Env.Tests.LocalTestHelper
                 _b.Dispose();
             }
 
-
             public IEnumerable<ZipArchiveEntry> AExceptB => _a.Entries.Except( _b.Entries, _comparer );
 
             public IEnumerable<ZipArchiveEntry> BExceptA => _b.Entries.Except( _a.Entries, _comparer );
 
         }
 
-
         public static ZipComparer CompareBuildedImages( string imageAName, string imageBName ) =>
-            CompareBuildedImages(
+            CompareBuiltImages(
                 CacheUniverseFolder.AppendPart( imageAName + ".zip" ),
                 CacheUniverseFolder.AppendPart( imageBName + ".zip" )
             );
 
-        internal static TestUniverse InstantiateImage( object monitor, NormalizedPath tempZip )
-        {
-            throw new NotImplementedException();
-        }
-
-        public static ZipComparer CompareBuildedImages( NormalizedPath imageA, NormalizedPath imageB ) =>
+        public static ZipComparer CompareBuiltImages( NormalizedPath imageA, NormalizedPath imageB ) =>
             new ZipComparer(
                 ZipFile.OpenRead( imageA ),
                 ZipFile.OpenRead( imageB )

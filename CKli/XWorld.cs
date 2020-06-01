@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Env;
+using CK.SimpleKeyVault;
 using CK.Text;
 using SimpleGitVersion;
 using System;
@@ -164,10 +165,7 @@ namespace CKli
                     {
                         foreach( var b in byActiveBranch )
                         {
-                            using( m.OpenWarn( $"Branch '{b.Key}':" ) )
-                            {
-                                m.Warn( b.Select( g => g.SubPath.Path ).Concatenate() );
-                            }
+                            m.Warn( $"Branch '{b.Key}': " + b.Select( g => g.SubPath.Path ).Concatenate() );
                         }
                     }
                 }

@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Build;
 using CK.Env;
 
 namespace CKli
@@ -7,6 +8,7 @@ namespace CKli
     {
         public XArtifactCenter(
             Initializer initializer,
+            WorldStore worldStore,
             FileSystem fs )
             : base( initializer )
         {

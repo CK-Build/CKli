@@ -1,4 +1,6 @@
 using CK.Core;
+using CK.Build;
+using CK.SimpleKeyVault;
 using CK.Text;
 using CSemVer;
 using NuGet.Common;
@@ -301,7 +303,7 @@ namespace CK.Env.NuGet
             {
             }
 
-            private protected override bool CanRetry( MetadataResource meta, NuGetLoggerAdapter logger, Exception ex )
+            private protected override bool CanRetry( INuGetResource meta, NuGetLoggerAdapter logger, Exception ex )
             {
                 var secretOrName = Feed.Credentials?.PasswordOrSecretKeyName;
                 if( String.IsNullOrWhiteSpace( secretOrName ) )

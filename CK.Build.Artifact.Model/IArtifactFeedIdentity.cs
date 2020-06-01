@@ -1,4 +1,4 @@
-namespace CK.Core
+namespace CK.Build
 {
     /// <summary>
     /// Models the identity of a packages' feed (packages are installable artifacts).

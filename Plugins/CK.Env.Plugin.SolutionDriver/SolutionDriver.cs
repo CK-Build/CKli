@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Build;
 using CK.Env.DependencyModel;
 using CK.Env.Diff;
 using CK.Env.MSBuildSln;
@@ -58,7 +59,7 @@ namespace CK.Env.Plugin
             ISolution s = GetSolution( e.Monitor, true );
             if( s != null )
             {
-                e.StartInfo.EnvironmentVariables.Add( "CKLI_CURRENT_SOLUTION_NAME", s.FullPath.LastPart );
+                e.StartInfo.EnvironmentVariables.Add( "CKLI_CURRENT_SOLUTION_NAME", s.Name );
             }
         }
 
@@ -81,10 +82,10 @@ namespace CK.Env.Plugin
         /// <summary>
         /// Gets whether this plugin is able to work.
         /// It provides services only on local or develop and if the <see cref="GitFolder.StandardGitStatus"/>
-        /// is the same as <see cref="GitBranchPluginBase.PluginBranch"/>.
+        /// is the same as <see cref="GitBranchPluginBase.StandardPluginBranch"/>.
         /// </summary>
-        bool IsActive => GitFolder.StandardGitStatus == PluginBranch
-                         && (PluginBranch == StandardGitStatus.Local || PluginBranch == StandardGitStatus.Develop);
+        bool IsActive => GitFolder.StandardGitStatus == StandardPluginBranch
+                         && (StandardPluginBranch == StandardGitStatus.Local || StandardPluginBranch == StandardGitStatus.Develop);
 
         /// <summary>
         /// Gets the solution driver of the <see cref="IGitRepository.CurrentBranchName"/>.
@@ -92,7 +93,7 @@ namespace CK.Env.Plugin
         /// <returns>This solution driver or the one of the current branch.</returns>
         public ISolutionDriver GetCurrentBranchDriver()
         {
-            return GitFolder.StandardGitStatus == PluginBranch
+            return GitFolder.StandardGitStatus == StandardPluginBranch
                 ? this
                 : GitFolder.PluginManager.BranchPlugins[GitFolder.CurrentBranchName].GetPlugin<SolutionDriver>();
         }
@@ -593,9 +594,8 @@ namespace CK.Env.Plugin
             }
             if( !msP.Solution.Save( monitor ) ) return false;
 
-            ICommitAssemblyBuildInfo b = CommitAssemblyBuildInfo.ZeroBuildInfo;
             string commonArgs = $@" --no-dependencies";
-            string versionArgs = $@" --configuration {b.BuildConfiguration} /p:Version=""{b.Version}"" /p:AssemblyVersion=""{b.AssemblyVersion}"" /p:FileVersion=""{b.FileVersion}"" /p:InformationalVersion=""{b.InformationalVersion}"" ";
+            string versionArgs = $@" --configuration Release /p:Version=""{SVersion.ZeroVersion}"" /p:AssemblyVersion=""{InformationalVersion.ZeroAssemblyVersion}"" /p:FileVersion=""{InformationalVersion.ZeroFileVersion}"" /p:InformationalVersion=""{InformationalVersion.ZeroInformationalVersion}"" ";
             var args = info.MustPack
                         ? $@"pack --output ""{_localFeedProvider.ZeroBuild.PhysicalPath}"""
                         : $@"publish --output ""{_localFeedProvider.GetZeroVersionCodeCakeBuilderExecutablePath( solution.Name ).RemoveLastPart()}""";
@@ -627,7 +627,7 @@ namespace CK.Env.Plugin
             var solution = GetSolution( monitor, allowInvalidSolution: false );
             if( solution == null ) return false;
 
-            var feed = PluginBranch == StandardGitStatus.Local
+            var feed = StandardPluginBranch == StandardGitStatus.Local
                         ? _localFeedProvider.Local
                         : _localFeedProvider.CI;
 
@@ -646,7 +646,7 @@ namespace CK.Env.Plugin
         bool LocalCommit( IActivityMonitor m )
         {
             Debug.Assert( IsActive );
-            bool amend = PluginBranch == StandardGitStatus.Local || GitFolder.Head.Message == "Local build auto commit.";
+            bool amend = StandardPluginBranch == StandardGitStatus.Local || GitFolder.Head.Message == "Local build auto commit.";
             return GitFolder.Commit( m, "Local build auto commit.", amend ? CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage : CommitBehavior.CreateNewCommit );
         }
 
@@ -706,13 +706,13 @@ namespace CK.Env.Plugin
             if( solution == null ) return false;
 
             // Version is always provided by the current commit point.
-            var v = GitFolder.ReadRepositoryVersionInfo( monitor )?.FinalVersion;
+            var v = GitFolder.ReadVersionInfo( monitor )?.FinalBuildInfo.Version;
             if( v == null ) return false;
 
             BuildType buildType;
 
             IEnvLocalFeed feed;
-            if( PluginBranch == StandardGitStatus.Local )
+            if( StandardPluginBranch == StandardGitStatus.Local )
             {
                 if( !v.WithBuildMetaData( null ).NormalizedText.EndsWith( "-local" ) )
                 {
@@ -855,7 +855,6 @@ namespace CK.Env.Plugin
                                 ? ev.CodeCakeBuilderExecutableFile + " SolutionDirectoryIsCurrentDirectory"
                                 : "run --project CodeCakeBuilder";
                     args += " -autointeraction";
-                    args += " -PublishDirtyRepo=" + (ev.IsUsingDirtyFolder ? 'Y' : 'N');
                     args += " -PushToRemote=" + (ev.WithPushToRemote ? 'Y' : 'N');
                     if( !ev.BuildIsRequired ) args += " -target=\"Unit-Testing\" -exclusiveOptional -IgnoreNoArtifactsToProduce=Y";
                     if( !ev.WithUnitTest ) args += " -RunUnitTests=N";

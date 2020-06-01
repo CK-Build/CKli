@@ -3,6 +3,8 @@ using System;
 using System.Text;
 using System.Xml.Linq;
 
+#nullable enable
+
 namespace CK.Env.Plugin
 {
     /// <summary>
@@ -12,8 +14,16 @@ namespace CK.Env.Plugin
     {
         readonly GitBranchPluginImpl _pluginImpl;
 
-        public XmlFilePluginBase( GitFolder f, NormalizedPath branchPath, NormalizedPath filePath, Encoding encoding )
-            : base( f.FileSystem, filePath, encoding )
+        /// <summary>
+        /// Initializes a new Xml file plugin.
+        /// </summary>
+        /// <param name="f">The Git folder.</param>
+        /// <param name="branchPath">The branch path in the Git folder.</param>
+        /// <param name="filePath">The file path (relative to the <see cref="FileSystem"/>). It must start with the <paramref name="branchPath"/>.</param>
+        /// <param name="rootName">The document's root element name. See <see cref="RootName"/>.</param>
+        /// <param name="encoding">Optional encoding that defaults to UTF-8.</param>
+        public XmlFilePluginBase( GitFolder f, NormalizedPath branchPath, NormalizedPath filePath, XName rootName, Encoding? encoding = null )
+            : base( f.FileSystem, filePath, rootName, encoding )
         {
             if( !filePath.StartsWith( branchPath ) ) throw new ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
             _pluginImpl = new GitBranchPluginImpl( f, branchPath );
@@ -38,6 +48,6 @@ namespace CK.Env.Plugin
         /// It is <see cref="StandardGitStatus.Unknown"/> if the actual branch is not one
         /// the 3 standard ones.
         /// </summary>
-        public StandardGitStatus PluginBranch => _pluginImpl.PluginBranch;
+        public StandardGitStatus StandardPluginBranch => _pluginImpl.StandardPluginBranch;
     }
 }

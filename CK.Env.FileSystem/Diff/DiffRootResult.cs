@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -6,10 +7,12 @@ namespace CK.Env.Diff
     /// <summary>
     /// Object representation of multiples diffs.
     /// </summary>
-    public class DiffRootResult : IDiffRootResult
+    public sealed class DiffRootResult : IDiffRootResult
     {
         public IReadOnlyList<IAddedDiff> AddedDiffs { get; }
+
         public IReadOnlyList<IDeletedDiff> DeletedDiffs { get; }
+
         public IReadOnlyList<IModifiedDiff> ModifiedDiffs { get; }
 
         /// <summary>
@@ -24,6 +27,19 @@ namespace CK.Env.Diff
             DeletedDiffs = deletedDiffs;
             ModifiedDiffs = modifiedDiffs;
             DiffType = addedDiffs.Count + deletedDiffs.Count + modifiedDiffs.Count == 0 ? DiffRootResultType.None : DiffRootResultType.Changed;
+        }
+
+        /// <summary>
+        /// Initializes an new <see cref="DiffRootResult"/> empty.
+        /// </summary>
+        /// <param name="name">The package name.</param>
+        internal DiffRootResult( IDiffRoot definition )
+        {
+            Definition = definition;
+            AddedDiffs = Array.Empty<AddedDiff>();
+            DeletedDiffs = Array.Empty<DeletedDiff>();
+            ModifiedDiffs = Array.Empty<ModifiedDiff>();
+            DiffType = DiffRootResultType.None;
         }
 
         public override string ToString()

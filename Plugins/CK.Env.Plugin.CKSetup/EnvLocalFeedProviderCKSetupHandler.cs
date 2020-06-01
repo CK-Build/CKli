@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Build;
 using CK.Env.CKSetup;
 using CKSetup;
 using System.Collections.Generic;

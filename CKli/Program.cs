@@ -1,7 +1,9 @@
 using CK.Core;
 using CK.Env;
 using CK.Monitoring;
+using CK.SimpleKeyVault;
 using CK.Text;
+using NuGet.Protocol.Plugins;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,19 +18,7 @@ namespace CKli
     {
         static void Main( string[] args )
         {
-            static string GetHeaderVersion()
-            {
-                var a = (AssemblyInformationalVersionAttribute)Attribute.GetCustomAttribute( Assembly.GetExecutingAssembly(), typeof( AssemblyInformationalVersionAttribute ) );
-                var thisFramework = Assembly.GetExecutingAssembly().CustomAttributes
-                   .Where( x => x.AttributeType.FullName == "System.Runtime.Versioning.TargetFrameworkAttribute" )
-                   .Select( x => x.ConstructorArguments )
-                   .Where( p => p.Count > 0 )
-                   .Select( p => p[0].Value as string )
-                   .FirstOrDefault();
-                return "CKli " + (thisFramework ?? "<no TargetFrameworkAttribute>") + " - " + (a != null ? a.InformationalVersion : "<no version>");
-            }
-
-            Console.WriteLine( GetHeaderVersion() );
+            Console.WriteLine( "CKli " + CSemVer.InformationalVersion.ReadFromAssembly( Assembly.GetExecutingAssembly() ).ToString() );
             Console.WriteLine();
 
             ReadLine.HistoryEnabled = true;
@@ -47,11 +37,10 @@ namespace CKli
             IBasicApplicationLifetime appLife = new FakeApplicationLifetime();
             try
             {
-                using( var host = new UserHost( appLife, userHostPath ) )
+                using( var host = UserHost.Create( monitor, appLife, userHostPath ) )
                 {
-                    host.Initialize( monitor );
                     OpenKeyVault( monitor, host );
-                    if( host.UserKeyVault.IsKeyVaultOpened ) host.Initialize( monitor );
+                    if( host.UserKeyVault.IsKeyVaultOpened ) host.WorldStore.ReadWorlds( monitor, true );
                     DumpWorlds( host.WorldStore.ReadWorlds( monitor ) );
                     InteractiveRun( monitor, host );
                 }
@@ -243,9 +232,9 @@ namespace CKli
             }
         }
 
-        static void DumpSecrets( UserKeyVault v )
+        static void DumpSecrets( FileKeyVault v )
         {
-            string FirstPadding( int paddingSize, string sourceProviderName, bool missing )
+            static string FirstPadding( int paddingSize, string sourceProviderName, bool missing )
             {
                 bool provided = !string.IsNullOrWhiteSpace( sourceProviderName );
                 if( missing && provided ) throw new InvalidOperationException( "Cannot be both missing and provided" );
@@ -260,9 +249,9 @@ namespace CKli
                     : new string( ' ', paddingSize + 2 );
             }
 
-            string PaddingByDepth( int depth ) => new string( ' ', depth * 5 );
+            static string PaddingByDepth( int depth ) => new string( ' ', depth * 5 );
 
-            void DoesThingWithGray( Action action )
+            static void DoesThingWithGray( Action action )
             {
                 var prev = Console.ForegroundColor;
                 Console.ForegroundColor = ConsoleColor.Gray;
@@ -270,8 +259,9 @@ namespace CKli
                 Console.ForegroundColor = prev;
             }
 
-            void WhitePipe() => DoesThingWithGray( () => Console.Write( "│" ) );
-            void RightArrow()
+            static void WhitePipe() => DoesThingWithGray( () => Console.Write( "│" ) );
+
+            static void RightArrow()
             {
                 DoesThingWithGray( () => Console.Write( "└────┬> " ) );
             }
@@ -395,16 +385,26 @@ namespace CKli
                 foreach( var h in handlers )
                 {
                     if( host.ApplicationLifetime.StopRequested( m ) ) break;
-                    h.Execute( m, payload );
+                    // Stops the loop at the first error.
+                    if( h.Execute( m, payload ) != null ) break;
                 }
             }
             else
             {
-                var tasks = handlers.Select( h => Task.Run( () =>
+                // Using parallel execution, it's not so easy to "stop at the first" error:
+                // we let the commands be executed.
+                var tasks = handlers.Select( h =>
                 {
-                    ActivityMonitor monitor = new ActivityMonitor();
-                    h.Execute( monitor, payload );
-                } ) ).ToArray();
+                    var token = m.DependentActivity().CreateToken();
+                    return Task.Run( () =>
+                    {
+                        ActivityMonitor monitor = new ActivityMonitor();
+                        using( monitor.StartDependentActivity( token ) )
+                        {
+                            h.Execute( monitor, payload );
+                        }
+                    } );
+                } ).ToArray();
                 Task.WaitAll( tasks );
             }
         }

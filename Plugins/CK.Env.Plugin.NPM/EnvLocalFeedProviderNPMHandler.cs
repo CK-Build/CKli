@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Env.NPM;
+using CK.Build;
 using System.Collections.Generic;
 
 namespace CK.Env

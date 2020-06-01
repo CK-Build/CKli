@@ -2,6 +2,7 @@ using CK.Core;
 using CK.Env.DependencyModel;
 using CK.Env.Diff;
 using CSemVer;
+using SimpleGitVersion;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -14,7 +15,7 @@ namespace CK.Env
     class ReleaseSolutionInfo : IReleaseSolutionInfo
     {
         readonly IGitRepository _repository;
-        readonly CommitVersionInfo _commitVersionInfo;
+        readonly ICommitInfo _commitVersionInfo;
         ReleaseRoadmap _releaser;
         ReleaseInfo _previouslyResolvedInfo;
         ReleaseInfo _releaseInfo;
@@ -22,7 +23,7 @@ namespace CK.Env
         internal ReleaseSolutionInfo(
             IGitRepository repository,
             DependentSolution solution,
-            CommitVersionInfo versionInfo,
+            ICommitInfo versionInfo,
             XElement previous = null )
         {
             Debug.Assert( repository != null && solution != null && versionInfo != null );
@@ -60,7 +61,7 @@ namespace CK.Env
         /// Gets the previous version, associated to a commit below the current one.
         /// This is null if no previous version has been found.
         /// </summary>
-        public CSVersion PreviousVersion => _commitVersionInfo.PreviousVersion;
+        public CSVersion PreviousVersion => _commitVersionInfo.BestCommitBelow?.ThisTag;
 
         /// <summary>
         /// Gets or sets the release note.
@@ -155,19 +156,22 @@ namespace CK.Env
             readonly ReleaseSolutionInfo _info;
             readonly PossibleVersions _possible;
             IDiffResult _diffResult;
-            bool _diffsComputed;
 
             public SelectorContext(
                     ReleaseSolutionInfo info,
                     ReleaseInfo requirements,
-                    IReadOnlyList<CSVersion> possibles )
+                    IReadOnlyList<CSVersion> possibles,
+                    IReadOnlyList<(ImportedLocalPackage,SVersion)> publishedUpdates,
+                    IReadOnlyList<(ImportedLocalPackage, SVersion)> nonPublishedUpdates )
             {
                 _info = info;
                 Requirements = requirements;
-                _possible = new PossibleVersions( requirements, info._commitVersionInfo.PreviousVersion, possibles );
+                _possible = new PossibleVersions( requirements, CurrentReleasedVersion?.ThisTag, possibles );
                 CanUsePreviouslyResolvedInfo = info._previouslyResolvedInfo.IsValid
                                                && info._previouslyResolvedInfo.IsCompatibleWith( requirements.Level, requirements.Constraint )
                                                && _possible.AllPossibleVersions.Contains( info._previouslyResolvedInfo.Version );
+                PublishedUpdates = publishedUpdates ?? Array.Empty<(ImportedLocalPackage, SVersion)>();
+                NonPublishedUpdates = nonPublishedUpdates ?? Array.Empty<(ImportedLocalPackage, SVersion)>();
             }
 
             public DependentSolution Solution => _info.Solution;
@@ -176,26 +180,33 @@ namespace CK.Env
 
             public bool CanUsePreviouslyResolvedInfo { get; }
 
+            public IReadOnlyList<(ImportedLocalPackage, SVersion)> PublishedUpdates { get; }
+
+            public IReadOnlyList<(ImportedLocalPackage, SVersion)> NonPublishedUpdates { get; }
+
             public IReadOnlyDictionary<ReleaseLevel, IReadOnlyList<CSVersion>> PossibleVersions => _possible;
 
             public IReadOnlyCollection<CSVersion> AllPossibleVersions => _possible.AllPossibleVersions;
 
             public ReleaseInfo Requirements { get; }
 
-            public CSVersion PreviousVersion => _info._commitVersionInfo.PreviousVersion;
+            public ITagCommit? CurrentReleasedVersion => _info._commitVersionInfo.AlreadyExistingVersion ?? _info._commitVersionInfo.BestCommitBelow;
 
-            public string PreviousVersionCommitSha => _info._commitVersionInfo.PreviousVersionCommitSha;
+            public ITagCommit? PreviousVersion => _info._commitVersionInfo.BestCommitBelow;
 
             public string ReleaseNote { get => _info.ReleaseNote; set => _info.ReleaseNote = value; }
 
             public IDiffResult GetProjectsDiff( IActivityMonitor m )
             {
-                if( !_diffsComputed )
+                if( _diffResult == null )
                 {
+                    if( _info._commitVersionInfo.BestCommitBelow == null ) throw new InvalidOperationException( nameof( PreviousVersion ) );
                     m.Debug( $"Computing diff for {Solution.Solution.Name}." );
-                    _diffsComputed = true;
                     var diffRoots = Solution.Solution.GeneratedArtifacts.Select( g => new DiffRoot( g.Artifact.TypedName, g.Project.ProjectSources ) );
-                    _diffResult = _info._repository.GetDiff( m, PreviousVersionCommitSha, diffRoots );
+                    if( _info._commitVersionInfo.BestCommitBelow != null )
+                    {
+                        _diffResult = _info._repository.GetDiff( m, _info._commitVersionInfo.BestCommitBelow.CommitSha, diffRoots );
+                    }
                 }
                 return _diffResult;
             }
@@ -234,20 +245,36 @@ namespace CK.Env
             // matches the dependency order).
             // But, we need to iterate though all Requirements in order to not miss a version
             // package upgrade.
-            bool hasUpdates = false;
+            List<(ImportedLocalPackage, SVersion)> nonPublishedUpdates = null;
+            List<(ImportedLocalPackage, SVersion)> publishedUpdates = null;
             foreach( var s in Solution.Requirements )
             {
                 var sInfo = _releaser.GetReleaseInfo( s.Index ).EnsureReleaseInfo( m, versionSelector );
                 if( !sInfo.IsValid ) return new ReleaseInfo();
-                if( Solution.PublishedRequirements.Contains( s ) )
+                bool isPublishedRequirement = Solution.PublishedRequirements.Contains( s );
+                if( isPublishedRequirement )
                 {
                     requirements = requirements.CombineRequirement( sInfo );
                 }
                 // Ignores build project dependencies here.
                 // They will be upgraded by the ReleaseBuilder but don't participate in
                 // impact propagation.
-                hasUpdates |= Solution.ImportedLocalPackages
-                                      .Any( p => p.Solution == s && p.Package.Version != sInfo.Version );
+                foreach( var p in Solution.ImportedLocalPackages )
+                {
+                    if( p.Solution == s && p.Package.Version != sInfo.Version )
+                    {
+                        if( isPublishedRequirement )
+                        {
+                            if( publishedUpdates == null ) publishedUpdates = new List<(ImportedLocalPackage, SVersion)>();
+                            publishedUpdates.Add( (p, sInfo.Version) );
+                        }
+                        else
+                        {
+                            if( nonPublishedUpdates == null ) nonPublishedUpdates = new List<(ImportedLocalPackage, SVersion)>();
+                            nonPublishedUpdates.Add( (p, sInfo.Version) );
+                        }
+                    }
+                }
             }
 
             // Handle package references updates.
@@ -256,7 +283,7 @@ namespace CK.Env
             //  - For all other cases, we compute the correct AllPossibleVersions and adjust the Release
             //    level of the requirements.
             IReadOnlyList<CSVersion> possibleVersions;
-            if( hasUpdates )
+            if( publishedUpdates != null || nonPublishedUpdates != null )
             {
                 // Since we'll need a commit to upgrade the package versions, we consider the NextPossibleVersions.
                 possibleVersions = _commitVersionInfo.NextPossibleVersions;
@@ -270,34 +297,34 @@ namespace CK.Env
                 // In both cases, we must keep the ReleaseLevel.None, however, the requirements may
                 // not be None if we are processing an existing roadmap and updates have been
                 // already applied to the files.
-                if( _commitVersionInfo.ReleaseVersion != null )
+                if( _commitVersionInfo.ReleaseTag != null )
                 {
-                    m.Warn( $"This commit has already a version tag: {_commitVersionInfo.ReleaseVersion}." );
-                    if( !versionSelector.OnAlreadyReleased( m, Solution, _commitVersionInfo.ReleaseVersion, false ) )
+                    m.Warn( $"This commit has already a version tag: {_commitVersionInfo.ReleaseTag}." );
+                    if( !versionSelector.OnAlreadyReleased( m, Solution, _commitVersionInfo.ReleaseTag, false ) )
                     {
                         return new ReleaseInfo();
                     }
-                    return new ReleaseInfo().WithVersion( _commitVersionInfo.ReleaseVersion );
+                    return new ReleaseInfo().WithVersion( _commitVersionInfo.ReleaseTag );
                 }
-                if( _commitVersionInfo.ReleaseContentVersion != null )
+                if( _commitVersionInfo.AlreadyExistingVersion != null )
                 {
                     // TODO: ensure that this is the tag of the commit point merged into master branch.
-                    m.Info( $"This commit has a content version tag: {_commitVersionInfo.ReleaseContentVersion}. We use it." );
-                    if( !versionSelector.OnAlreadyReleased( m, Solution, _commitVersionInfo.ReleaseContentVersion, true ) )
+                    m.Info( $"This commit has a content version tag: {_commitVersionInfo.AlreadyExistingVersion.ThisTag}. We use it." );
+                    if( !versionSelector.OnAlreadyReleased( m, Solution, _commitVersionInfo.AlreadyExistingVersion.ThisTag, true ) )
                     {
                         return new ReleaseInfo();
                     }
-                    return new ReleaseInfo().WithVersion( _commitVersionInfo.ReleaseContentVersion );
+                    return new ReleaseInfo().WithVersion( _commitVersionInfo.AlreadyExistingVersion.ThisTag );
                 }
                 possibleVersions = _commitVersionInfo.PossibleVersions;
             }
-            var ctx = new SelectorContext( this, requirements, possibleVersions );
+            var ctx = new SelectorContext( this, requirements, possibleVersions, publishedUpdates, nonPublishedUpdates );
             versionSelector.ChooseFinalVersion( m, ctx );
             return ctx.IsCanceled
                     ? new ReleaseInfo()
                     : (ctx.HasChoice
                         ? requirements.WithLevel( ctx.FinalLevel ).WithVersion( ctx.FinalVersion )
-                        : throw new InvalidOperationException( "At least Canel or SetChoice must have been called." ));
+                        : throw new InvalidOperationException( "At least Cancel or SetChoice must have been called." ));
         }
 
         /// <summary>
@@ -339,7 +366,7 @@ namespace CK.Env
             return new XElement( XmlNames.xS,
                         new XAttribute( XmlNames.xName, Solution.Solution.Name ),
                         new XAttribute( XmlNames.xSubPath, Solution.Solution.FullPath ),
-                        new XAttribute( XmlNames.xCommitSha, _commitVersionInfo.CommitSha ),
+                        new XAttribute( XmlNames.xCommitSha, _commitVersionInfo.FinalBuildInfo.CommitSha ),
                         _releaseInfo.ToXml(),
                         new XElement( XmlNames.xReleaseNote, new XCData( ReleaseNote ?? String.Empty ) ) );
         }

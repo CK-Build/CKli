@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Text;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace System.Xml.Linq
@@ -179,6 +180,7 @@ namespace System.Xml.Linq
         /// Throws a xml exception with line/column information if possible.
         /// </summary>
         /// <param name="message">The exception message. Must not be null or empty.</param>
+        [DoesNotReturn]
         public void ThrowXmlException( string message )
         {
             if( String.IsNullOrWhiteSpace( message ) ) throw new ArgumentException( nameof( message ) );
@@ -351,20 +353,13 @@ namespace System.Xml.Linq
                     case "add":
                         {
                             var item = builder( WithElement( e, true ) );
-                            if( !set.Add( item ) ) Throw( e, $"Item '{item}' already exists. There must be a <remove> first." );
+                            if( !set.Add( item ) ) e.Throw( $"Item '{item}' already exists. There must be a <remove> first." );
                             break;
                         }
-                    default: Throw( e, $"Expected only <add>, <remove> or <clear/> element in '{Element.Name}'." ); break;
+                    default: e.Throw( $"Expected only <add>, <remove> or <clear/> element in '{Element.Name}'." ); break;
                 }
             }
             return set;
-        }
-
-        void Throw( XObject culprit, string message )
-        {
-            var p = culprit.GetLineColumnInfo();
-            if( p.HasLineInfo() ) throw new XmlException( message + culprit.GetLineColumnString(), null, p.LineNumber, p.LinePosition );
-            throw new XmlException( message );
         }
 
     }

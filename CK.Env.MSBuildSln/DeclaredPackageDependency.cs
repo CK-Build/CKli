@@ -1,5 +1,6 @@
 using CK.Core;
 using CSemVer;
+using CK.Build;
 using System.Xml.Linq;
 
 namespace CK.Env.MSBuildSln

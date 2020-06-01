@@ -6,7 +6,7 @@ using System.Reflection;
 
 namespace CK.Core
 {
-    using Required = IReadOnlyList<KeyValuePair<object, Type>>;
+    using Required = IReadOnlyList<KeyValuePair<object?, Type>>;
 
     public class SimpleObjectActivator : ISimpleObjectActivator
     {
@@ -18,14 +18,14 @@ namespace CK.Core
         /// <param name="services">Available services to inject.</param>
         /// <param name="requiredParameters">Optional required parameters.</param>
         /// <returns>The object instance or null on error.</returns>
-        public object Create( IActivityMonitor monitor, Type t, IServiceProvider services, IEnumerable<object> requiredParameters = null )
+        public object? Create( IActivityMonitor monitor, Type t, IServiceProvider services, IEnumerable<object>? requiredParameters = null )
         {
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
             if( t == null ) throw new ArgumentNullException( nameof( t ) );
             try
             {
                 Required required = requiredParameters == null
-                        ? Array.Empty<KeyValuePair<object, Type>>()
+                        ? Array.Empty<KeyValuePair<object?, Type>>()
                         : (Required)requiredParameters.Select( r => new KeyValuePair<object, Type>( r, r.GetType() ) ).ToList();
 
                 var longestCtor = t.GetTypeInfo().GetConstructors()
@@ -69,7 +69,7 @@ namespace CK.Core
                 }
                 if( failCount > 0 )
                 {
-                    monitor.Error( $"Unable to resolve parameters for '{t.FullName}'. Considered longest constructor: {longestCtor.Ctor.ToString()}." );
+                    monitor.Error( $"Unable to resolve parameters for '{t.FullName}'. Considered longest constructor: {longestCtor.Ctor}." );
                     return null;
                 }
                 return longestCtor.Ctor.Invoke( longestCtor.Mapped );

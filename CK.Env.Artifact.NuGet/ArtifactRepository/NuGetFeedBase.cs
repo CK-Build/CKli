@@ -1,9 +1,13 @@
 using CK.Core;
+using CK.Build;
+using CK.SimpleKeyVault;
 using CSemVer;
 using NuGet.Configuration;
 using NuGet.Protocol.Core.Types;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -96,7 +100,7 @@ namespace CK.Env.NuGet
 
             public async Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, string artifactName )
             {
-                return await _baseFeed.SafeCall( m, ( sources, meta, logger ) => GetAvailable( meta, logger, artifactName ) );
+                return await _baseFeed.SafeCall<MetadataResource,ArtifactAvailableInstances>( m, ( sources, meta, logger ) => GetAvailable( meta, logger, artifactName ) );
             }
 
             async Task<ArtifactAvailableInstances> GetAvailable( MetadataResource meta, NuGetLoggerAdapter logger, string name )
@@ -162,7 +166,7 @@ namespace CK.Env.NuGet
             return _feed = new ReadFeed( this, name, creds );
         }
 
-        protected async Task<T> SafeCall<T>( IActivityMonitor m, Func<SourceRepository, MetadataResource, NuGetLoggerAdapter, Task<T>> f )
+        protected async Task<T> SafeCall<TResource,T>( IActivityMonitor m, Func<SourceRepository, TResource, NuGetLoggerAdapter, Task<T>> f ) where TResource : class, INuGetResource
         {
             bool retry = false;
             var logger = new NuGetLoggerAdapter( m );
@@ -171,10 +175,10 @@ namespace CK.Env.NuGet
                 _sourceRepository = new SourceRepository( PackageSource, NuGetClient.StaticProviders );
             }
         again:
-            MetadataResource meta = null;
+            TResource meta = null;
             try
             {
-                meta = await _sourceRepository.GetResourceAsync<MetadataResource>();
+                meta = await _sourceRepository.GetResourceAsync<TResource>();
                 return await f( _sourceRepository, meta, logger );
             }
             catch( MissingRequiredSecretException )
@@ -195,6 +199,6 @@ namespace CK.Env.NuGet
             }
         }
 
-        private protected abstract bool CanRetry( MetadataResource meta, NuGetLoggerAdapter logger, Exception ex );
+        private protected abstract bool CanRetry( INuGetResource meta, NuGetLoggerAdapter logger, Exception ex );
     }
 }

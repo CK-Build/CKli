@@ -1,5 +1,8 @@
 using CK.Text;
 using System;
+using System.Text;
+
+#nullable enable
 
 namespace CK.Env.Plugin
 {
@@ -10,8 +13,8 @@ namespace CK.Env.Plugin
     {
         readonly GitBranchPluginImpl _pluginImpl;
 
-        protected TextFilePluginBase( GitFolder f, NormalizedPath branchPath, NormalizedPath filePath )
-            : base( f.FileSystem, filePath )
+        protected TextFilePluginBase( GitFolder f, NormalizedPath branchPath, NormalizedPath filePath, Encoding? encoding = null )
+            : base( f.FileSystem, filePath, encoding )
         {
             if( !filePath.StartsWith( branchPath ) ) throw new ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
             _pluginImpl = new GitBranchPluginImpl( f, branchPath );
@@ -36,6 +39,6 @@ namespace CK.Env.Plugin
         /// It is <see cref="StandardGitStatus.Unknown"/> if the actual branch is not one
         /// the 3 standard ones.
         /// </summary>
-        public StandardGitStatus PluginBranch => _pluginImpl.PluginBranch;
+        public StandardGitStatus StandardPluginBranch => _pluginImpl.StandardPluginBranch;
     }
 }

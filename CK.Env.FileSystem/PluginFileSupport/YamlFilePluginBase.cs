@@ -33,6 +33,6 @@ namespace CK.Env.Plugin
         /// It is <see cref="StandardGitStatus.Unknown"/> if the actual branch is not one
         /// the 3 standard ones.
         /// </summary>
-        public StandardGitStatus PluginBranch => _pluginImpl.PluginBranch;
+        public StandardGitStatus StandardPluginBranch => _pluginImpl.StandardPluginBranch;
     }
 }

@@ -8,12 +8,14 @@ namespace CK.Env
     public class SharedWorldState : BaseWorldState
     {
         readonly XElement _cidKeyVault;
+        readonly XElement _artifactCache;
 
         public SharedWorldState( WorldStore store, IWorldName w, XDocument d = null )
             : base( store, w, false, d )
         {
             var r = XDocument.Root;
             _cidKeyVault = r.EnsureElement( XmlNames.xCICDKeyVault );
+            _artifactCache = r.EnsureElement( XmlNames.xArtifactCache );
         }
 
         /// <summary>
@@ -28,6 +30,21 @@ namespace CK.Env
                 if( value != _cidKeyVault.Value )
                 {
                     _cidKeyVault.SetValue( value );
+                }
+            }
+        }
+
+        /// <summary>
+        /// Stores the cached artifact informations in base64.
+        /// </summary>
+        public string ArtifactCache
+        {
+            get => _artifactCache.Value;
+            set
+            {
+                if( value != _artifactCache.Value )
+                {
+                    _artifactCache.SetValue( value );
                 }
             }
         }

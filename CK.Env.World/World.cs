@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Build;
 using CK.Env.DependencyModel;
 using CK.SimpleKeyVault;
 using CK.Text;
@@ -8,6 +9,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Xml.Linq;
 
@@ -281,6 +283,13 @@ namespace CK.Env
         /// Gets the registered solution drivers.
         /// </summary>
         public DriversCollection SolutionDrivers => _solutionDrivers;
+
+        /// <summary>
+        /// Gets the set of <see cref="IGitRepository"/> that has been discovered
+        /// (thanks to the registration of at one <see cref="ISolutionDriver"/> on a branch).
+        /// </summary>
+        public IReadOnlyCollection<IGitRepository> GitRepositories => _gitRepositories;
+
 
         /// <summary>
         /// Secure the execution of the lambda in a try/catch.
@@ -559,12 +568,8 @@ namespace CK.Env
             } );
         }
 
-        [CommandMethod]
-        public void ShowExternalDependencies( IActivityMonitor m, bool compact = true, bool onlyMultipleVersions = false )
+        IReadOnlyList<PackageReference> GetExternalPackageReferences( IActivityMonitor m, IWorldSolutionContext ctx )
         {
-            var ctx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
-            if( ctx == null ) return;
-
             var externals = ctx.DependencyContext.Analyzer.ExternalReferences;
             if( externals.Count == 0 )
             {
@@ -580,6 +585,15 @@ namespace CK.Env
                     }
                 }
             }
+            return externals;
+        }
+
+        [CommandMethod]
+        public void ShowExternalDependencies( IActivityMonitor m, bool compact = true, bool onlyMultipleVersions = false, PackageQuality quality = PackageQuality.None )
+        {
+            var ctx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
+            if( ctx == null ) return;
+            var externals = GetExternalPackageReferences( m, ctx );
             ConsoleColor stdForeColor = Console.ForegroundColor;
             ConsoleColor stdBackColor = Console.BackgroundColor;
             foreach( var byType in externals.GroupBy( g => g.Target.Artifact.Type ).OrderBy( g => g.Key.Name ) )
@@ -596,7 +610,7 @@ namespace CK.Env
                     {
                         var maxVersion = byVersion.Select( v => v.Key ).Max();
                         var externalVersionDisplay = _artifacts.GetExternalVersions( m, byName.Key )
-                                                               .SelectMany( a => a.Versions.Where( v => v > maxVersion ).Select( v => (v, a.FeedName) ) )
+                                                               .SelectMany( a => a.Versions.Where( v => v.PackageQuality >= quality && v > maxVersion ).Select( v => (v, a.FeedName) ) )
                                                                .GroupBy( v => v.v )
                                                                .OrderByDescending( v => v.Key )
                                                                .Select( g => $"{g.Key} ({g.Select( vn => vn.FeedName ).Concatenate()})" )
@@ -851,8 +865,7 @@ namespace CK.Env
         public bool EditRoadmap( IActivityMonitor monitor, bool pull = true )
         {
             if( !CanEditRoadmap ) throw new InvalidOperationException( nameof( CanEditRoadmap ) );
-            if( !CheckGlobalGitStatus( monitor, StandardGitStatus.Develop ) ) return false;
-            if( !CheckAndPullReposAndReloadIfNeeded( monitor, pull ) ) return false;
+            if( !CheckBeforeReleaseBuildOrEdit( monitor, pull ) ) return false;
             return DoEditRoadmap( monitor, false ) != null;
         }
 
@@ -875,17 +888,23 @@ namespace CK.Env
                                   && WorkStatus == GlobalWorkStatus.Idle
                                   && CachedGlobalGitStatus == StandardGitStatus.Develop;
 
-        bool CheckAndPullReposAndReloadIfNeeded( IActivityMonitor m, bool pull )
+        public bool CheckBeforeReleaseBuildOrEdit( IActivityMonitor m, bool pull )
         {
+            if( !CheckGlobalGitStatus( m, StandardGitStatus.Develop ) ) return false;
             bool reloadNeeded = false;
             foreach( var g in _gitRepositories )
             {
                 if( !g.CheckCleanCommit( m ) ) return false;
                 if( pull )
                 {
-                    var (Success, ReloadNeeded) = g.Pull( m );
+                    // We first Checkout and pulls the Master branch
+                    // Ensuring a successful CheckOut of Master is a welcome security.
+                    if( !g.Checkout( m, WorldName.MasterBranchName ).Success ) return false;
+                    // Checking out the Develop branch back.
+                    var (Success, ReloadNeeded) = g.Checkout( m, WorldName.DevelopBranchName, skipFetchBranches: true );
                     if( !Success ) return false;
                     reloadNeeded |= ReloadNeeded;
+
                 }
             }
             if( reloadNeeded && GetWorldSolutionContext( m, true ) == null ) return false;
@@ -903,9 +922,7 @@ namespace CK.Env
         public bool Release( IActivityMonitor monitor, bool pull = true, bool resetRoadmap = false )
         {
             if( !CanRelease ) throw new InvalidOperationException( nameof( CanRelease ) );
-            if( !CheckGlobalGitStatus( monitor, StandardGitStatus.Develop ) ) return false;
-
-            if( !CheckAndPullReposAndReloadIfNeeded( monitor, pull ) ) return false;
+            if( !CheckBeforeReleaseBuildOrEdit( monitor, pull ) ) return false;
 
             var roadmap = DoEditRoadmap( monitor, resetRoadmap );
             if( roadmap == null ) return false;

@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.SimpleKeyVault;
 using CK.Text;
 using System;
 using System.Linq;

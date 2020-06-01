@@ -12,10 +12,8 @@ namespace CK.Env
 {
     /// <summary>
     /// Abstract base that adds useful methods to LibGit2Sharp <see cref="Repository"/>.
-    /// This is abstract since this base doesn't impose IDisposable support, it is up to
-    /// specialized classes to handle disposing.
     /// </summary>
-    public abstract class GitHelper : IGitHeadInfo
+    public abstract class GitHelper : IGitHeadInfo, IDisposable
     {
         /// <summary>
         /// Initializes a new <see cref="GitHelper"/>.
@@ -55,7 +53,13 @@ namespace CK.Env
         /// </summary>
         protected readonly Repository Git;
 
-        public IQueryableCommitLog Commits => Git.Commits; // you wont like it but i needed it.
+        /// <summary>
+        /// Disposes the <see cref="Git"/> member.
+        /// </summary>
+        public virtual void Dispose()
+        {
+            Git.Dispose();
+        }
 
         /// <summary>
         /// Gets whether the Git repository is public or private.
@@ -227,7 +231,7 @@ namespace CK.Env
                 }
                 catch( Exception ex )
                 {
-                    using( m.OpenFatal( "This error need manual fix : " ) )
+                    using( m.OpenFatal( "The following error need manual fix:" ) )
                     {
                         m.Fatal( ex );
                     }
@@ -280,15 +284,16 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor.</param>
         /// <param name="branchName">The local name of the branch.</param>
+        /// <param name="skipFetchBranches">True to not call <see cref="FetchBranches(IActivityMonitor, bool)"/>.</param>
         /// <returns>
         /// Success is true on success, false on error (such as merge conflicts) and in case of success,
         /// the result states whether a reload should be required or if nothing changed.
         /// </returns>
-        public (bool Success, bool ReloadNeeded) Checkout( IActivityMonitor m, string branchName )
+        public (bool Success, bool ReloadNeeded) Checkout( IActivityMonitor m, string branchName, bool skipFetchBranches = false )
         {
             using( m.OpenInfo( $"Checking out branch '{branchName}' in '{SubPath}'." ) )
             {
-                if( !FetchBranches( m ) ) return (false, false);
+                if( !skipFetchBranches && !FetchBranches( m ) ) return (false, false);
                 try
                 {
                     bool reloadNeeded = false;
@@ -673,7 +678,7 @@ namespace CK.Env
                             return null;
                         }
                         r = new Repository( workingFolder );
-                        var remote = r.Network.Remotes.FirstOrDefault( rem => rem.Url.Equals( git.OriginUrl.ToString(), StringComparison.OrdinalIgnoreCase ) );
+                        var remote = r.Network.Remotes.FirstOrDefault( rem => GitRepositoryKey.IsEquivalentRepositoryUri( new Uri( rem.Url, UriKind.Absolute ), git.OriginUrl ) );
                         if( remote == null || remote.Name != "origin" )
                         {
 

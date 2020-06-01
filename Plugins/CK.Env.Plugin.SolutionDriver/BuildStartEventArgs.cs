@@ -4,6 +4,8 @@ using CSemVer;
 using System;
 using System.Collections.Generic;
 
+#nullable enable
+
 namespace CK.Env.Plugin
 {
     /// <summary>
@@ -80,7 +82,7 @@ namespace CK.Env.Plugin
         /// Gets a bag of objects that enables state sharing between participants and from <see cref="BuildStartEventArgs"/>
         /// to <see cref="BuildEndEventArgs"/>.
         /// </summary>
-        public IDictionary<object, object> Memory { get; }
+        public IDictionary<object, object?> Memory { get; }
 
         internal BuildStartEventArgs(
             IActivityMonitor m,
@@ -101,7 +103,7 @@ namespace CK.Env.Plugin
             BuildType = buildType;
             SolutionPhysicalPath = solutionPhysicalPath;
             CodeCakeBuilderExecutableFile = codeCakeBuilderExecutableFile;
-            Memory = new Dictionary<object, object>();
+            Memory = new Dictionary<object, object?>();
         }
     }
 }

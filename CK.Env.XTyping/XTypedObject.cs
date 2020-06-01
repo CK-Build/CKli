@@ -7,6 +7,8 @@ namespace CK.Env
 {
     public class XTypedObject
     {
+        IReadOnlyList<XTypedObject>? _children;
+
         public class Initializer
         {
             /// <summary>
@@ -32,10 +34,7 @@ namespace CK.Env
             /// <param name="root">Root factory.</param>
             /// <param name="eReader">The element reader.</param>
             /// <param name="baseProvider">Can be null.</param>
-            internal Initializer(
-                XTypedFactory root,
-                in XElementReader eReader,
-                IServiceProvider baseProvider )
+            internal Initializer( XTypedFactory root, in XElementReader eReader, IServiceProvider? baseProvider )
             {
                 Reader = eReader;
                 Services = new SimpleServiceContainer( baseProvider );
@@ -63,7 +62,7 @@ namespace CK.Env
             /// <summary>
             /// Gets the parent typed object.
             /// </summary>
-            public XTypedObject Parent { get; }
+            public XTypedObject? Parent { get; }
 
             /// <summary>
             /// Gets the service container for siblings and children elements.
@@ -96,18 +95,18 @@ namespace CK.Env
         /// <summary>
         /// Gets the parent typed object.
         /// </summary>
-        public XTypedObject Parent { get; }
+        public XTypedObject? Parent { get; }
 
         /// <summary>
         /// Gets the first child.
         /// </summary>
-        public XTypedObject FirstChild => Children?.Count == 0 ? null : Children[0];
+        public XTypedObject? FirstChild => (_children == null || _children.Count == 0) ? null : _children[0];
 
         /// <summary>
         /// Gets the children typed objects.
         /// This is available right before <see cref="OnCreated(Initializer)"/> is called. 
         /// </summary>
-        public IReadOnlyList<XTypedObject> Children { get; private set; }
+        public IReadOnlyList<XTypedObject> Children => _children!;
 
         /// <summary>
         /// Enumerates through all descendants of the given element, returning the topmost
@@ -127,7 +126,7 @@ namespace CK.Env
             var current = FirstChild;
             while( current != null )
             {
-                XTypedObject next = null;
+                XTypedObject? next = null;
                 if( predicate( current ) )
                 {
                     yield return current;
@@ -179,7 +178,7 @@ namespace CK.Env
         /// Gets the next sibling.
         /// Null if this is the last children of the <see cref="Parent"/>.
         /// </summary>
-        public XTypedObject NextSibling { get; private set; }
+        public XTypedObject? NextSibling { get; private set; }
 
         /// <summary>
         /// Gets the next siblings.
@@ -217,14 +216,14 @@ namespace CK.Env
 
         internal bool OnChildrenCreated( Initializer initializer, IReadOnlyList<XTypedObject> children )
         {
-            XTypedObject sibling = null;
+            XTypedObject? sibling = null;
             for( int i = children.Count - 1; i >= 0; --i )
             {
                 var c = children[i];
                 c.NextSibling = sibling;
                 sibling = c;
             }
-            Children = children;
+            _children = children;
             foreach( var c in children )
             {
                 c.OnSiblingsCreated( initializer.Monitor );

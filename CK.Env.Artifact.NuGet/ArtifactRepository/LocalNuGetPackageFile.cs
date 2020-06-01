@@ -1,4 +1,4 @@
-using CK.Core;
+using CK.Build;
 using CSemVer;
 using System.IO;
 using System.Text.RegularExpressions;

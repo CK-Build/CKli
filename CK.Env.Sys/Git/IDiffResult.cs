@@ -4,8 +4,8 @@ namespace CK.Env
 {
     public interface IDiffResult
     {
-        bool IsValid { get; }
         IReadOnlyList<IDiffRootResult> Diffs { get; }
+
         IDiffRootResult Others { get; }
     }
 }

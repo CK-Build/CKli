@@ -24,7 +24,7 @@ namespace CK.Env.Plugin
             _localFeedProvider = localFeedProvider;
             // Always monitor branch change even if _settings.ProduceCKSetupComponents is false
             // so that we delete the test file on leaving local if it happens to exist.
-            if( PluginBranch == StandardGitStatus.Local )
+            if( StandardPluginBranch == StandardGitStatus.Local )
             {
                 f.OnLocalBranchEntered += OnLocalBranchEntered;
                 f.OnLocalBranchLeaving += OnLocalBranchLeaving;
@@ -71,7 +71,7 @@ namespace CK.Env.Plugin
         {
             // This is an untracked file. It has to be removed, even with BuildType.IsUsingDirtyFolder
             // (except of course on the local branch).
-            if( PluginBranch != StandardGitStatus.Local ) Delete( e.Monitor );
+            if( StandardPluginBranch != StandardGitStatus.Local ) Delete( e.Monitor );
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
@@ -82,7 +82,7 @@ namespace CK.Env.Plugin
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
-            if( PluginBranch == StandardGitStatus.Local
+            if( StandardPluginBranch == StandardGitStatus.Local
                 && _solutionSpec.UseCKSetup
                 && !_solutionSpec.NoDotNetUnitTests )
             {
@@ -96,7 +96,7 @@ namespace CK.Env.Plugin
 
         public void Dispose()
         {
-            if( PluginBranch == StandardGitStatus.Local )
+            if( StandardPluginBranch == StandardGitStatus.Local )
             {
                 GitFolder.OnLocalBranchEntered -= OnLocalBranchEntered;
                 GitFolder.OnLocalBranchLeaving -= OnLocalBranchLeaving;

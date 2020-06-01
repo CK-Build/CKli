@@ -1,3 +1,4 @@
+using CK.SimpleKeyVault;
 using System;
 using System.Text.RegularExpressions;
 
@@ -18,11 +19,9 @@ namespace CK.Env
         /// <param name="isPublic">Whether this repository is public.</param>
         public GitRepositoryKey( SecretKeyStore secretKeyStore, Uri url, bool isPublic )
         {
-            if( url == null ) throw new ArgumentNullException( nameof( url ) );
-            if( secretKeyStore == null ) throw new ArgumentNullException( nameof( secretKeyStore ) );
+            OriginUrl = CheckAndNormalizeRepositoryUrl( url );
+            SecretKeyStore = secretKeyStore ?? throw new ArgumentNullException( nameof( secretKeyStore ) );
             IsPublic = isPublic;
-            OriginUrl = url;
-            SecretKeyStore = secretKeyStore;
 
             if( url.Authority.Equals( "github.com", StringComparison.OrdinalIgnoreCase ) ) KnownGitProvider = KnownGitProvider.GitHub;
             else if( url.Authority.Equals( "gitlab.com", StringComparison.OrdinalIgnoreCase ) ) KnownGitProvider = KnownGitProvider.GitLab;
@@ -33,7 +32,7 @@ namespace CK.Env
             if( KnownGitProvider == KnownGitProvider.FileSystem ) return; // No credentials needed.
             if( KnownGitProvider != KnownGitProvider.Unknown )
             {
-                string GetReadPATDescription( SecretKeyInfo current )
+                string GetReadPATDescription( SecretKeyInfo? current )
                 {
                     var d = current?.Description ?? $"Used to read/clone private repositories hosted by '{KnownGitProvider}'.";
                     if( (current == null || !current.IsRequired) && !IsPublic )
@@ -53,6 +52,44 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Normalizes a valid, absolute, url. If the path ends with ".git" (case insensitive), this suffix is removed.
+        /// </summary>
+        /// <param name="url">The valid, absolut, url.</param>
+        /// <returns>The normalized url.</returns>
+        public static Uri CheckAndNormalizeRepositoryUrl( Uri url )
+        {
+            if( url == null ) throw new ArgumentNullException( nameof( url ) );
+            if( !url.IsAbsoluteUri ) throw new ArgumentException( $"Invalid Url. It must be absolute: {url}", nameof( url ) );
+            if( url.Query.Length == 0 )
+            {
+                // Security: since execution paths may differ before reaching the constructor, multiple suffix may be handled or not.
+                // Here we ensure that all suffixes are removed.
+                while( url.AbsolutePath.EndsWith( ".git", StringComparison.OrdinalIgnoreCase ) )
+                {
+                    var s = url.AbsoluteUri;
+                    url = new Uri( s.Remove( s.Length - 4 ) );
+                }
+            }
+            return url;
+        }
+
+        /// <summary>
+        /// Checks that the 2 urls's string, after a call to <see cref="CheckAndNormalizeRepositoryUrl(Uri)"/>
+        /// are <see cref="StringComparison.OrdinalIgnoreCase"/> equal.
+        /// This is a lot of computation for a boolean and it is hard to "optimize" since we never know if the urls
+        /// have already been normalized.
+        /// </summary>
+        /// <param name="u1">First valid and absolute url.</param>
+        /// <param name="u2">Second valid and absolute url.</param>
+        /// <returns>Whether the 2 urls are equivalent.</returns>
+        public static bool IsEquivalentRepositoryUri( Uri u1, Uri u2 )
+        {
+            u1 = CheckAndNormalizeRepositoryUrl( u1 );
+            u2 = CheckAndNormalizeRepositoryUrl( u2 );
+            return u1.ToString().Equals( u2.ToString(), StringComparison.OrdinalIgnoreCase );
+        }
+
+        /// <summary>
         /// Gets whether the Git repository is public.
         /// Specialized classes may set this property.
         /// </summary>
@@ -60,6 +97,9 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the remote origin url.
+        /// This is checked in the constructor as an absolute url and if the url has no query part 
+        /// and the path ends with ".git", the trailing .git is removed.
+        /// See https://stackoverflow.com/a/11069413/. 
         /// </summary>
         public Uri OriginUrl { get; }
 
@@ -78,16 +118,17 @@ namespace CK.Env
         /// Note that if <see cref="IsPublic"/> is true, this PAT should be useless: anyone should be able to
         /// read/clone the repository.
         /// </summary>
-        public string ReadPATKeyName { get; }
+        public string? ReadPATKeyName { get; }
 
         /// <summary>
         /// Gets the write PAT key name for this repository.
         /// This PAT must allow pushes to the repository.
         /// </summary>
-        public string WritePATKeyName { get; }
+        public string? WritePATKeyName { get; }
 
         /// <summary>
         /// Helper that formats the PAT name based on the kind of provider.
+        /// <see cref="KnownGitProvider"/> must not be Unknown.
         /// </summary>
         /// <param name="suffix">Suffix to use.</param>
         /// <returns>The PAT name or null if <see cref="KnownGitProvider"/> is Unknown.</returns>
@@ -95,7 +136,7 @@ namespace CK.Env
         {
             switch( KnownGitProvider )
             {
-                case KnownGitProvider.Unknown: return null;
+                case KnownGitProvider.Unknown: throw new InvalidOperationException( "Unknown GitProvider." );
                 case KnownGitProvider.AzureDevOps:
                     var regex = Regex.Match( OriginUrl.PathAndQuery, @"/([^\/]*)" );
                     string organization = regex.Groups[1].Value;
