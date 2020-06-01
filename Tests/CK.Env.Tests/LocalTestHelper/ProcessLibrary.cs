@@ -230,7 +230,7 @@ namespace CK.Env.Tests.LocalTestHelper
             var p = new ProcessHelper();
             var tempPath = new NormalizedPath( Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() ) );
             Directory.CreateDirectory( tempPath );
-            var projectPath = p.CreateNpmProject( tempPath, "basenpm" );
+            var projectPath = p.CreateNpmProject( tempPath, projectName );
             p.CreateGitRepository( projectPath, universe.WorldsFolder.AppendPart( worldName ) );
 
             return universe;
