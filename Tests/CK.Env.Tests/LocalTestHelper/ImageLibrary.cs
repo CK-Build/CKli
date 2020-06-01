@@ -192,15 +192,17 @@ namespace CK.Env.Tests.LocalTestHelper
         }
         public static NormalizedPath setup_seed_scratch( Action<TestUniverse> action, bool refreshCache )
         {
-            using( TestUniverse universe = ImageManager.InstantiateImage
-            (
-                m: TestHelper.Monitor,
-                imagePath: ImageManager.CacheUniverseFolder.AppendPart( nameof( init_seed_scratch ) + ".zip" ) )
+            using
+            ( TestUniverse universe = ImageManager.InstantiateImage
+                (
+                    m: TestHelper.Monitor,
+                    imagePath: init_seed_scratch( action, refreshCache )
+                )
             )
             {
                 universe.InitWorldConfig( TestHelper.Monitor, $"{CKTestBuildStackName}.World.xml" );
                 //no config
-                universe.RestartCKli(TestHelper.Monitor);
+                universe.RestartCKli( TestHelper.Monitor );
                 universe.SeedInitialSetup( TestHelper.Monitor );
                 var snapshotPath = universe.SnapshotState( nameof( setup_seed_scratch ) );
                 action?.Invoke( universe );
