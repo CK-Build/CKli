@@ -39,15 +39,14 @@ namespace CK.Env.Tests
         [Test]
         public void a_simple_project_can_be_opened()
         {
-            ImageLibrary.minimal_solution_open( _ => { }, TestHelper.IsExplicitAllowed );
+            ImageLibrary.minimal_solution_open( ( a, b ) => { }, TestHelper.IsExplicitAllowed );
         }
 
         [Test]
         public void Exceptions_raised_by_Commands_stop_the_test_on_error()
         {
-            ImageLibrary.minimal_solution_open( universe =>
+            ImageLibrary.minimal_solution_open( ( universe, world ) =>
             {
-                var world = universe.EnsureWorldOpened( TestHelper.Monitor, "CKTest-Build" );
                 GitPluginSampleMock.ThrowOnExecuteSomething = true;
                 try
                 {
@@ -64,13 +63,13 @@ namespace CK.Env.Tests
         [Test]
         public void a_simple_project_can_apply_settings()
         {
-            ImageLibrary.minimal_solution_apply_settings( ( universe ) => { }, TestHelper.IsExplicitAllowed );
+            ImageLibrary.minimal_solution_apply_settings( ( a, b ) => { }, TestHelper.IsExplicitAllowed );
         }
 
         [Test]
         public void a_simple_project_can_be_built_once()
         {
-            EnsureCallbackIsCalled( (Action<(TestUniverse, World)> action, object[] parameters) =>
+            EnsureCallbackIsCalled( ( Action<(TestUniverse, World)> action, object[] parameters ) =>
                 ImageLibrary.minimal_solution_first_ci_build(
                     ( universe, world ) => action( (universe, world) ),
                     (bool)parameters[0] ),
@@ -98,7 +97,7 @@ namespace CK.Env.Tests
         [Test]
         public void dll_should_not_change_after_rebuild()
         {
-            ImageLibrary.minimal_solution_second_ci_build( (universe, world) => { }, TestHelper.IsExplicitAllowed ); //We are now sure this image, and it's base exist.
+            ImageLibrary.minimal_solution_second_ci_build( ( universe, world ) => { }, TestHelper.IsExplicitAllowed ); //We are now sure this image, and it's base exist.
             using( var compare = ImageManager.CompareBuildedImages(
                 nameof( ImageLibrary.minimal_solution_first_ci_build ),
                 nameof( ImageLibrary.minimal_solution_second_ci_build ) ) )

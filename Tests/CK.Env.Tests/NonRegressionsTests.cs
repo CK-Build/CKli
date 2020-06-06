@@ -104,5 +104,19 @@ namespace CK.Env.Tests
                 File.Exists( worldInfo.Repo.Root.AppendPart( proofOfExecution ) ).Should().BeTrue();
             }, TestHelper.IsExplicitAllowed );
         }
+
+        [Test]
+        public void cannot_add_same_repo_2_time()
+        {
+            ImageLibrary.minimal_solution_open( ( universe, world ) =>
+            {
+                universe.UserHost.WorldSelector.CloseWorld( TestHelper.Monitor );
+                int stackCount = universe.UserHost.WorldStore.StackRepositories.Count;
+                universe.UserHost.EnsureStackRepository( TestHelper.Monitor, universe.StackBareGitPath.AppendPart( ".git" ), true );
+                universe.UserHost.EnsureStackRepository( TestHelper.Monitor, universe.StackBareGitPath.ToString().ToUpper(), true );
+                int stackCountPostChange = universe.UserHost.WorldStore.StackRepositories.Count;
+                stackCountPostChange.Should().Be( stackCount );
+            }, TestHelper.IsExplicitAllowed );
+        }
     }
 }

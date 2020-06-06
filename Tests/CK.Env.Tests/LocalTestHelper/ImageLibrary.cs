@@ -110,21 +110,21 @@ namespace CK.Env.Tests.LocalTestHelper
             }
         }
 
-        public static NormalizedPath minimal_solution_open( Action<TestUniverse> testCallback, bool refreshCache ) =>
-            ImageBuilderHelper<Action<TestUniverse>>( testCallback, refreshCache, minimal_solution_setup,
+        public static NormalizedPath minimal_solution_open( Action<TestUniverse, World> testCallback, bool refreshCache ) =>
+            ImageBuilderHelper<Action<TestUniverse>>( CKTestBuildStackName, testCallback, refreshCache, minimal_solution_setup,
                 universe =>
                 {
                     universe.EnsureWorldOpened( TestHelper.Monitor, CKTestBuildStackName );
                     return universe;
                 } );
 
-        public static NormalizedPath minimal_solution_apply_settings( Action<TestUniverse> testCallback, bool refreshCache ) =>
-            ImageBuilderHelper<Action<TestUniverse>>( testCallback, refreshCache, minimal_solution_open, universe =>
+        public static NormalizedPath minimal_solution_apply_settings( Action<TestUniverse, World> testCallback, bool refreshCache ) =>
+            ImageBuilderHelper<Action<TestUniverse, World>>( CKTestBuildStackName, testCallback, refreshCache, minimal_solution_open, universe =>
                 universe.RunCommands( TestHelper.Monitor, CKTestBuildStackName, "**ApplySettings", true )
                     .CommitAll( TestHelper.Monitor, "Applied all settings.", CKTestBuildStackName ) );
 
         public static NormalizedPath minimal_solution_first_ci_build( Action<TestUniverse, World> testCallback, bool refreshCache ) =>
-            ImageBuilderHelper<Action<TestUniverse>>( CKTestBuildStackName, testCallback, refreshCache, minimal_solution_apply_settings,
+            ImageBuilderHelper<Action<TestUniverse, World>>( CKTestBuildStackName, testCallback, refreshCache, minimal_solution_apply_settings,
                 ( universe, world ) =>
                 {
                     world.GitRepositories.All( g => g.CheckCleanCommit( TestHelper.Monitor ) ).Should().BeTrue( "All repositories should be clean before AllBuild." );
