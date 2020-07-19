@@ -36,6 +36,7 @@ namespace CK.Env.Plugin
             EnsureLine( lines, "*.suo" );
             EnsureLine( lines, "*.user" );
             EnsureLine( lines, "CodeCakeBuilder/UnitTestsDone.*.txt" );
+            EnsureLine( lines, "$StObjGen/" );
 
             if( !_solutionSpec.NoDotNetUnitTests )
             {
