@@ -58,9 +58,9 @@ namespace CK.Env.Plugin
 
             var passPhrase = _secretStore.GetSecretKey( m, SolutionDriver.CODECAKEBUILDER_SECRET_KEY, true );
 
-            // Opens the actual current vault: if more secrets are defined we keep them.
-            Dictionary<string, string> current = KeyVault.DecryptValues( TextContent, passPhrase );
-            current.Clear();
+            // We forget the current vault: if more secrets are defined we lose them but this eases the
+            // reset of the system with a new CODECAKEBUILDER_SECRET_KEY.
+            var current = new Dictionary<string, string>();
 
             // The central CICDKeyVault is protected with the same CODECAKEBUILDER_SECRET_KEY secret.
             Dictionary<string, string> centralized = KeyVault.DecryptValues( _sharedState.CICDKeyVault, passPhrase );
@@ -70,7 +70,7 @@ namespace CK.Env.Plugin
             {
                 if( !centralized.TryGetValue( name, out var secret ) )
                 {
-                    m.Error( $"Missing required build secret '{name}' in central CICDKeyVault. It must be added." );
+                    m.Error( $"Missing required build secret '{name}' in central CICDKeyVault. Use the CICDKeyVaultUpdate command to add it." );
                     complete = false;
                 }
                 else
@@ -85,6 +85,5 @@ namespace CK.Env.Plugin
                 CreateOrUpdate( m, result );
             }
         }
-
     }
 }
