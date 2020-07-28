@@ -8,6 +8,7 @@ using System;
 using System.Linq;
 using System.Text;
 using SimpleGitVersion;
+using CK.Core;
 
 namespace CodeCake
 {
@@ -16,7 +17,6 @@ namespace CodeCake
     /// </summary>
     public class NPMProject
     {
-
         protected NPMProject(
             StandardGlobalInfo globalInfo,
             NPMSolution npmSolution,
@@ -59,7 +59,6 @@ namespace CodeCake
         /// Runs "npm ci" (instead of "npm install") on this project.
         /// See https://docs.npmjs.com/cli/ci.html.
         /// </summary>
-        /// <param name="globalInfo">The global information object.</param>
         public virtual void RunNpmCi()
         {
             GlobalInfo.Cake.Information( $"Running 'npm ci' in {DirectoryPath.Path}" );
@@ -111,7 +110,6 @@ namespace CodeCake
         /// is thrown. To emit a Cake warning (and return null) if the script can't be found,
         /// let <paramref name="scriptMustExist"/> be false.
         /// </summary>
-        /// <param name="globalInfo">The global info object.</param>
         /// <param name="name">Base script name to look for.</param>
         /// <param name="scriptMustExist">
         /// False to emit a warning and return null if the script doesn't exist.
@@ -207,9 +205,9 @@ namespace CodeCake
             return TempFileTextModification.TemporaryReplacePackageVersion( !targetOutputPath ? PackageJson.JsonFilePath : OutputPath.AppendPart( "package.json" ), version );
         }
 
-        private protected IDisposable TemporaryPrePack( SVersion version, Action<JObject> packageJsonPreProcessor, bool ckliLocalFeedMode )
+        private protected IDisposable TemporaryPrePack( IActivityMonitor m, SVersion version, Action<JObject> packageJsonPreProcessor )
         {
-            return TempFileTextModification.TemporaryReplaceDependenciesVersion( NpmSolution, OutputPath.AppendPart( "package.json" ), ckliLocalFeedMode, version, packageJsonPreProcessor );
+            return TempFileTextModification.TemporaryReplaceDependenciesVersion( m, NpmSolution, OutputPath.AppendPart( "package.json" ), version, packageJsonPreProcessor );
         }
 
         #region .npmrc configuration

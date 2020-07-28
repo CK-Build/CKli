@@ -3,6 +3,7 @@ using Cake.Npm;
 using Cake.Npm.Pack;
 using CK.Text;
 using CodeCake.Abstractions;
+using CodeCakeBuilder.npm;
 using Newtonsoft.Json.Linq;
 using System;
 using System.IO;
@@ -11,15 +12,11 @@ namespace CodeCake
 {
     public class NPMPublishedProject : NPMProject, ILocalArtifact
     {
-        readonly bool _ckliLocalFeedMode;
-
         NPMPublishedProject( StandardGlobalInfo globalInfo, NPMSolution npmSolution, SimplePackageJsonFile json, NormalizedPath outputPath )
             : base( globalInfo, npmSolution, json, outputPath )
         {
-            _ckliLocalFeedMode = json.CKliLocalFeedMode;
             ArtifactInstance = new ArtifactInstance( new Artifact( "NPM", json.Name ), globalInfo.BuildInfo.Version );
-            string tgz = json.Name.Replace( "@", "" ).Replace( '/', '-' );
-            TGZName = tgz + "-" + globalInfo.BuildInfo.Version.WithBuildMetaData( "" ).ToNormalizedString() + ".tgz";
+            TGZName = NPMHelpers.GetPackageTarballFilename( json.Name, globalInfo.BuildInfo.Version );
         }
 
         /// <summary>
@@ -74,27 +71,13 @@ namespace CodeCake
             var tgz = OutputPath.AppendPart( TGZName );
             using( TemporarySetPackageVersion( ArtifactInstance.Version, true ) )
             {
-                using( TemporaryPrePack( ArtifactInstance.Version, packageJsonPreProcessor, false ) )
+                using( TemporaryPrePack( GlobalInfo.Cake.Log, ArtifactInstance.Version, packageJsonPreProcessor ) )
                 {
                     GlobalInfo.Cake.NpmPack( new NpmPackSettings()
                     {
                         LogLevel = NpmLogLevel.Info,
                         WorkingDirectory = OutputPath.ToString()
                     } );
-                }
-
-                if(_ckliLocalFeedMode)
-                {
-                    //It meant that we just build a "dirty" package: we need to build the one that will actually get published.
-                    File.Move( tgz, tgz.Path + ".local" );
-                    using( TemporaryPrePack( ArtifactInstance.Version, packageJsonPreProcessor, true ) )
-                    {
-                        GlobalInfo.Cake.NpmPack( new NpmPackSettings()
-                        {
-                            LogLevel = NpmLogLevel.Info,
-                            WorkingDirectory = OutputPath.ToString()
-                        } );
-                    }
                 }
             }
             if( !File.Exists( tgz ) )

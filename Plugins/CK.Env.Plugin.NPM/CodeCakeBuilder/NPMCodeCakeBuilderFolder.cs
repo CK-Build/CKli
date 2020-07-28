@@ -49,6 +49,7 @@ namespace CK.Env.Plugin
                 SetTextResource( m, "npm/NPMSolution.cs" );
                 SetTextResource( m, "npm/NPMProjectContainer.cs" );
                 SetTextResource( m, "npm/TempFileTextModification.cs" );
+                SetTextResource( m, "npm/NPMHelpers.cs" );
                 SetTextResource( m, "npm/SimplePackageJsonFile.cs" );
                 SetTextResource( m, "npm/AngularWorkspace.cs" );
             }

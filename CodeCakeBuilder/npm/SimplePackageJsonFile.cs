@@ -19,7 +19,6 @@ namespace CodeCake
         public readonly string Version;
         public readonly IReadOnlyList<string> Scripts;
         public readonly bool IsPrivate;
-        public readonly bool CKliLocalFeedMode;
 
         SimplePackageJsonFile(
             NormalizedPath jsonFilePath,
@@ -28,8 +27,7 @@ namespace CodeCake
             string shortName,
             string version,
             IReadOnlyList<string> scripts,
-            bool isPrivate,
-            bool ckliLocalFeedMode )
+            bool isPrivate )
         {
             JsonFilePath = jsonFilePath;
             Name = name;
@@ -38,7 +36,6 @@ namespace CodeCake
             Version = version;
             Scripts = scripts;
             IsPrivate = isPrivate;
-            CKliLocalFeedMode = ckliLocalFeedMode;
         }
 
 
@@ -62,44 +59,10 @@ namespace CodeCake
                 scope = null;
                 shortName = name;
             }
-            string version = json.Value<string>( "version" );
-            IReadOnlyList<string> scripts;
-            if( json.TryGetValue( "scripts", out JToken scriptsToken ) && scriptsToken.HasValues )
-            {
-                scripts = scriptsToken.Children<JProperty>().Select( p => p.Name ).ToArray();
-            }
-            else
-            {
-                scripts = Array.Empty<string>();
-            }
-
-            string[] _dependencyPropNames = new string[]
-            {
-                "dependencies",
-                "peerDependencies",
-                "bundledDependencies",
-                "optionalDependencies",
-            };
-            bool ckliLocalFeedMode = false;
-
-
-            if( _dependencyPropNames //this monstrosity return true when a dependency end with a .tgz
-                    .Where( p => json.ContainsKey( p ) )
-                    .Any( dependencyPropName =>
-                        ((IEnumerable<KeyValuePair<string, JToken>>)(JObject)json[dependencyPropName]) // Blame NewtonSoft.JSON for explicit implementation.
-                            .Select( s => new KeyValuePair<string, string>( s.Key, s.Value.ToString() ) )
-                            .Where( p => p.Value.StartsWith( "file:" ) )
-                            .Any( p => p.Value.EndsWith( ".tgz" ) ) ) )
-            {
-                ckliLocalFeedMode = true;
-                cake.Warning(
-                    "***********************************************************\n" +
-                    "* A package.json contains a dependency ending in \".tgz\".*\n" +
-                    "* This is only supported for builds launched by CKli.     *\n" +
-                    "***********************************************************" );
-            }
-
-            return new SimplePackageJsonFile( jsonFilePath, name, scope, shortName, version, scripts, isPrivate, ckliLocalFeedMode );
+            IReadOnlyList<string> scripts = json.TryGetValue( "scripts", out JToken scriptsToken ) && scriptsToken.HasValues
+                ? scriptsToken.Children<JProperty>().Select( p => p.Name ).ToArray()
+                : Array.Empty<string>();
+            return new SimplePackageJsonFile( jsonFilePath, name, scope, shortName, json.Value<string>( "version" ), scripts, isPrivate );
         }
     }
 }
