@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text;
 using SimpleGitVersion;
 using CK.Core;
+using Cake.Core.Diagnostics;
 
 namespace CodeCake
 {
@@ -205,9 +206,9 @@ namespace CodeCake
             return TempFileTextModification.TemporaryReplacePackageVersion( !targetOutputPath ? PackageJson.JsonFilePath : OutputPath.AppendPart( "package.json" ), version );
         }
 
-        private protected IDisposable TemporaryPrePack( IActivityMonitor m, SVersion version, Action<JObject> packageJsonPreProcessor )
+        private protected IDisposable TemporaryPrePack( ICakeLog logger, SVersion version, Action<JObject> packageJsonPreProcessor )
         {
-            return TempFileTextModification.TemporaryReplaceDependenciesVersion( m, NpmSolution, OutputPath.AppendPart( "package.json" ), version, packageJsonPreProcessor );
+            return TempFileTextModification.TemporaryReplaceDependenciesVersion( logger, NpmSolution, OutputPath.AppendPart( "package.json" ), version, packageJsonPreProcessor );
         }
 
         #region .npmrc configuration
