@@ -44,7 +44,7 @@ namespace CK.Env.Plugin
                 //npm itself
                 SetTextResource( m, "npm/Build.NPMArtifactType.cs", text => AdaptBuildNPMArtifactForPushFeeds( text, solution ) );
                 SetTextResource( m, "npm/Build.NPMFeed.cs" );
-                SetTextResource( m, "npm/NPMProject.cs" );
+                SetTextResource( m, "npm/YarnWorkspace.cs" );
                 SetTextResource( m, "npm/NPMPublishedProject.cs" );
                 SetTextResource( m, "npm/NPMSolution.cs" );
                 SetTextResource( m, "npm/NPMProjectContainer.cs" );
