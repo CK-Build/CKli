@@ -10,15 +10,17 @@ using System.Text;
 using SimpleGitVersion;
 using CK.Core;
 using Cake.Core.Diagnostics;
+using Cake.Core.IO;
+using System.IO;
 
 namespace CodeCake
 {
     /// <summary>
     /// Basic (unpublished) NPM project.
     /// </summary>
-    public class NPMProject
+    public class YarnWorkspace
     {
-        protected NPMProject(
+        protected YarnWorkspace(
             StandardGlobalInfo globalInfo,
             NPMSolution npmSolution,
             SimplePackageJsonFile json,
@@ -32,15 +34,16 @@ namespace CodeCake
             NpmSolution = npmSolution;
         }
 
-        protected static NPMProject CreateNPMProject(
+        protected static YarnWorkspace CreateYarnWorkspace(
             StandardGlobalInfo globalInfo,
             NPMSolution npmSolution,
             SimplePackageJsonFile json,
             NormalizedPath outputPath )
         {
-            return new NPMProject( globalInfo, npmSolution, json, outputPath );
+            return new YarnWorkspace( globalInfo, npmSolution, json, outputPath );
         }
 
+        public bool IsYarn => Directory.Exists( DirectoryPath.AppendPart( ".yarn" ) );
 
         public StandardGlobalInfo GlobalInfo { get; }
 
@@ -57,13 +60,25 @@ namespace CodeCake
         public NormalizedPath NPMRCPath { get; }
 
         /// <summary>
-        /// Runs "npm ci" (instead of "npm install") on this project.
-        /// See https://docs.npmjs.com/cli/ci.html.
+        /// Runs yarn install.
         /// </summary>
-        public virtual void RunNpmCi()
+        public virtual void Install( bool immutable = true )
         {
-            GlobalInfo.Cake.Information( $"Running 'npm ci' in {DirectoryPath.Path}" );
-            GlobalInfo.Cake.NpmCi( settings =>
+            if( IsYarn )
+            {
+                string arg = immutable ? "install --immutable" : "install";
+                GlobalInfo.Cake.Information( $"'.yarn' file found, running yarn {arg} in {DirectoryPath.Path}" );
+                GlobalInfo.Cake.ProcessRunner.Start( "yarn", new ProcessSettings()
+                {
+                    Arguments = arg,
+                    WorkingDirectory = DirectoryPath.Path,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                } );
+                return;
+            }
+            GlobalInfo.Cake.Information( $"'.yarn' directory not found, running 'npm install' in {DirectoryPath.Path}" );
+            GlobalInfo.Cake.NpmInstall( settings =>
             {
                 settings.LogLevel = NpmLogLevel.Warn;
                 settings.WorkingDirectory = DirectoryPath.Path;
@@ -161,6 +176,17 @@ namespace CodeCake
         /// <param name="runInBuildDirectory">Whether the script should be run in <see cref="OutputPath"/> or <see cref="DirectoryPath"/> if false.</param>
         private protected virtual void DoRunScript( string scriptName, bool runInBuildDirectory )
         {
+            if( IsYarn )
+            {
+                GlobalInfo.Cake.ProcessRunner.Start( "yarn", new ProcessSettings()
+                {
+                    Arguments = "run " + scriptName,
+                    WorkingDirectory = DirectoryPath.Path,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                } );
+                return;
+            }
             GlobalInfo.Cake.NpmRunScript(
                     new NpmRunScriptSettings()
                     {

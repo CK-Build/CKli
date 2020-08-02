@@ -10,9 +10,9 @@ using System.IO;
 
 namespace CodeCake
 {
-    public class NPMPublishedProject : NPMProject, ILocalArtifact
+    public class NPMPublishedProject : YarnWorkspace, ILocalArtifact
     {
-        NPMPublishedProject( StandardGlobalInfo globalInfo, NPMSolution npmSolution, SimplePackageJsonFile json, NormalizedPath outputPath )
+        NPMPublishedProject( StandardGlobalInfo globalInfo, NodeSolution npmSolution, SimplePackageJsonFile json, NormalizedPath outputPath )
             : base( globalInfo, npmSolution, json, outputPath )
         {
             ArtifactInstance = new ArtifactInstance( new Artifact( "NPM", json.Name ), globalInfo.BuildInfo.Version );
@@ -20,19 +20,19 @@ namespace CodeCake
         }
 
         /// <summary>
-        /// Create a <see cref="NPMProject"/> that can be a <see cref="NPMPublishedProject"/>.
+        /// Create a <see cref="YarnWorkspace"/> that can be a <see cref="NPMPublishedProject"/>.
         /// </summary>
         /// <param name="globalInfo">The global info of the CodeCakeBuilder.</param>
         /// <param name="dirPath">The directory path where is located the npm package.</param>
         /// <param name="outputPath">The directory path where the build output is. It can be the same than <paramref name="dirPath"/>.</param>
         /// <returns></returns>
-        public static NPMProject Create( StandardGlobalInfo globalInfo, NPMSolution solution, NormalizedPath dirPath, NormalizedPath outputPath )
+        public static YarnWorkspace Create( StandardGlobalInfo globalInfo, NodeSolution solution, NormalizedPath dirPath, NormalizedPath outputPath )
         {
             var json = SimplePackageJsonFile.Create( globalInfo.Cake, dirPath );
-            NPMProject output;
+            YarnWorkspace output;
             if( json.IsPrivate )
             {
-                output = CreateNPMProject( globalInfo, solution, json, outputPath );
+                output = CreateYarnWorkspace( globalInfo, solution, json, outputPath );
             }
             else
             {

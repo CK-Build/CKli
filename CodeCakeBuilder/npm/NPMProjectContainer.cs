@@ -9,7 +9,7 @@ namespace CodeCake
     /// </summary>
     public class NPMProjectContainer
     {
-        readonly List<NPMProject> _projects;
+        readonly List<YarnWorkspace> _projects;
         readonly List<NPMProjectContainer> _containers;
 
         /// <summary>
@@ -17,14 +17,14 @@ namespace CodeCake
         /// </summary>
         public NPMProjectContainer()
         {
-            _projects = new List<NPMProject>();
+            _projects = new List<YarnWorkspace>();
             _containers = new List<NPMProjectContainer>();
         }
 
         /// <summary>
         /// Gets the projects of this container.
         /// </summary>
-        public IReadOnlyList<NPMProject> SimpleProjects => _projects;
+        public IReadOnlyList<YarnWorkspace> SimpleProjects => _projects;
 
         /// <summary>
         /// Gets the projects of this container that can be published.
@@ -39,14 +39,14 @@ namespace CodeCake
         /// <summary>
         /// Return All the projects, including All the projects of the <see cref="Containers"/>.
         /// </summary>
-        public IEnumerable<NPMProject> AllProjects => SimpleProjects.Concat( Containers.SelectMany( s => s.AllProjects ) );
+        public IEnumerable<YarnWorkspace> AllProjects => SimpleProjects.Concat( Containers.SelectMany( s => s.AllProjects ) );
 
         /// <summary>
-        /// Return All the <see cref="NPMProject"/> that are <see cref="NPMPublishedProject"/>, including All the projects that can be published in the <see cref="Containers"/>.
+        /// Return All the <see cref="YarnWorkspace"/> that are <see cref="NPMPublishedProject"/>, including All the projects that can be published in the <see cref="Containers"/>.
         /// </summary>
         public IEnumerable<NPMPublishedProject> AllPublishedProjects => SimplePublishedProjects.Concat( Containers.SelectMany( s => s.AllPublishedProjects ) );
 
-        public void Add( NPMProject project )
+        public void Add( YarnWorkspace project )
         {
             if( _projects.Contains( project ) ) throw new InvalidOperationException( "Element was already present in the list." );
             _projects.Add( project );

@@ -81,61 +81,9 @@ namespace CodeCake
             return temp;
         }
 
-        public static IDisposable TemporarySwitchToLocal( ICakeLog m, NormalizedPath localFeed, NormalizedPath jsonPath )
-        {
-            NormalizedPath[] files = Directory.GetFiles( localFeed, "*.tgz", SearchOption.AllDirectories ).Select( s => new NormalizedPath( s ) ).ToArray();
-            if( files.Length == 0 ) return Disposable.Empty;
-            (string content, TempFileTextModification temp) = CreateTempFileTextModification( jsonPath );
-            JObject json = JObject.Parse( content );
-            m.Debug( "Scanning dependencies to find a local package..." );
-            {
-                foreach( var dependencyPropName in new string[]
-                {
-                    "dependencies",
-                    "peerDependencies",
-                    "bundledDependencies",
-                    "optionalDependencies",
-                    "devDependencies"
-                } )
-                {
-                    m.Debug( $"|   Scanning {dependencyPropName}..." );
-                    {
-                        if( json.ContainsKey( dependencyPropName ) )
-                        {
-                            JObject dependencies = (JObject)json[dependencyPropName];
-                            foreach( KeyValuePair<string, JToken> kvp in dependencies )
-                            {
-                                SVersion version = SVersion.TryParse( kvp.Value.ToString(), false, false );
-                                if( version is null )
-                                {
-                                    m.Debug( $"|   |   {kvp.Key} has an invalid version:'{kvp.Value}'. Skipping." );
-                                    continue;
-                                }
-                                string tarballName = NPMHelpers.GetPackageTarballFilename( kvp.Key, version );
-                                m.Debug( $"|   |   {kvp.Key} tarball name would be {tarballName}." );
-                                NormalizedPath[] tarballPaths = files.Where( s => s.LastPart == tarballName ).ToArray();
-                                if( tarballPaths.Length == 0 )
-                                {
-                                    m.Debug( "|   |   But no tarball with name could be found. Skipping." );
-                                    continue;
-                                }
-                                else
-                                {
-                                    var path = tarballPaths.Single();
-                                    m.Information( $"|   |   Setting tarball for the dependency '{kvp.Key}': '{path}'." );
-                                    dependencies[kvp.Key] = path.ToString();
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            File.WriteAllText( jsonPath, json.ToString() );
-            return temp;
-        }
         public static IDisposable TemporaryReplaceDependenciesVersion(
             ICakeLog logger,
-            NPMSolution npmSolution,
+            NodeSolution npmSolution,
             NormalizedPath jsonPath,
             SVersion version,
             Action<JObject> packageJsonPreProcessor

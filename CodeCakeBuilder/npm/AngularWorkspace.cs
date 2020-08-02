@@ -10,11 +10,11 @@ namespace CodeCake
 {
     public class AngularWorkspace : NPMProjectContainer
     {
-        public NPMProject WorkspaceProject { get; }
+        public YarnWorkspace WorkspaceProject { get; }
 
         AngularWorkspace(
-            NPMProject workspaceProject,
-            IReadOnlyList<NPMProject> projects )
+            YarnWorkspace workspaceProject,
+            IReadOnlyList<YarnWorkspace> projects )
             : base()
         {
             WorkspaceProject = workspaceProject;
@@ -31,7 +31,7 @@ namespace CodeCake
             JObject packageJson = JObject.Parse( File.ReadAllText( packageJsonPath ) );
             JObject angularJson = JObject.Parse( File.ReadAllText( angularJsonPath ) );
             if( !(packageJson["private"]?.ToObject<bool>() ?? false) ) throw new InvalidDataException( "A workspace project should be private." );
-            List<NPMProject> projects = new List<NPMProject>();
+            List<YarnWorkspace> projects = new List<YarnWorkspace>();
             var jsonProject = angularJson["projects"].ToObject<JObject>();
             foreach( var project in jsonProject.Properties() )
             {

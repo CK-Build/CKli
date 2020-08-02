@@ -12,12 +12,12 @@ namespace CodeCake
     public static class StandardGlobalInfoNPMExtension
     {
         /// <summary>
-        /// Adds the <see cref="NPMSolution"/> to the <paramref name="globalInfo"/>
+        /// Adds the <see cref="NodeSolution"/> to the <paramref name="globalInfo"/>
         /// </summary>
         /// <param name="this">This global info.</param>
         /// <param name="solution">The NPM solution.</param>
         /// <returns>This info.</returns>
-        public static StandardGlobalInfo AddNPM( this StandardGlobalInfo globalInfo, NPMSolution solution )
+        public static StandardGlobalInfo AddNode( this StandardGlobalInfo globalInfo, NodeSolution solution )
         {
             SVersion minmimalNpmVersionRequired = SVersion.Create( 6, 7, 0 );
             string npmVersion = globalInfo.Cake.NpmGetNpmVersion();
@@ -30,14 +30,14 @@ namespace CodeCake
         }
 
         /// <summary>
-        /// Adds the <see cref="Build.NPMArtifactType"/> for NPM based on <see cref="NPMSolution.ReadFromNPMSolutionFile"/>
+        /// Adds the <see cref="Build.NPMArtifactType"/> for NPM based on <see cref="NodeSolution.ReadFromNPMSolutionFile"/>
         /// (projects are defined by "CodeCakeBuilder/NPMSolution.xml" file).
         /// </summary>
         /// <param name="this">This global info.</param>
         /// <returns>This info.</returns>
-        public static StandardGlobalInfo AddNPM( this StandardGlobalInfo @this )
+        public static StandardGlobalInfo AddNode( this StandardGlobalInfo @this )
         {
-            return AddNPM( @this, NPMSolution.ReadFromNPMSolutionFile( @this ) );
+            return AddNode( @this, NodeSolution.ReadFromNPMSolutionFile( @this ) );
         }
 
         /// <summary>
@@ -45,25 +45,25 @@ namespace CodeCake
         /// </summary>
         /// <param name="this">This global info.</param>
         /// <returns>The NPM solution.</returns>
-        public static NPMSolution GetNPMSolution( this StandardGlobalInfo @this )
+        public static NodeSolution GetNodeSolution( this StandardGlobalInfo @this )
         {
-            return @this.Solutions.OfType<NPMSolution>().Single();
+            return @this.Solutions.OfType<NodeSolution>().Single();
         }
 
     }
 
     /// <summary>
-    /// Encapsulates a set of <see cref="NPMProject"/> that can be <see cref="NPMPublishedProject"/>.
+    /// Encapsulates a set of <see cref="YarnWorkspace"/> that can be <see cref="NPMPublishedProject"/>.
     /// </summary>
-    public partial class NPMSolution : NPMProjectContainer, ICIWorkflow
+    public partial class NodeSolution : NPMProjectContainer, ICIWorkflow
     {
         readonly StandardGlobalInfo _globalInfo;
 
         /// <summary>
-        /// Initiaizes a new <see cref="NPMSolution" />.
+        /// Initiaizes a new <see cref="NodeSolution" />.
         /// </summary>
         /// <param name="projects">Set of projects.</param>
-        NPMSolution(
+        NodeSolution(
             StandardGlobalInfo globalInfo )
             : base()
         {
@@ -73,22 +73,22 @@ namespace CodeCake
         public IEnumerable<AngularWorkspace> AngularWorkspaces => Containers.OfType<AngularWorkspace>();
 
 
-        public void RunNpmCI()
+        public void Install()
         {
             foreach( var p in SimpleProjects )
             {
-                p.RunNpmCi();
+                p.Install();
             }
 
             foreach( var p in AngularWorkspaces )
             {
-                p.WorkspaceProject.RunNpmCi();
+                p.WorkspaceProject.Install();
             }
         }
 
         public void Clean()
         {
-            RunNpmCI();
+            Install();
 
             foreach( var p in SimpleProjects )
             {
@@ -166,10 +166,10 @@ namespace CodeCake
         /// </summary>
         /// <param name="version">The version of all published packages.</param>
         /// <returns>The solution object.</returns>
-        public static NPMSolution ReadFromNPMSolutionFile( StandardGlobalInfo globalInfo )
+        public static NodeSolution ReadFromNPMSolutionFile( StandardGlobalInfo globalInfo )
         {
             var document = XDocument.Load( "CodeCakeBuilder/NPMSolution.xml" ).Root;
-            var solution = new NPMSolution(globalInfo);
+            var solution = new NodeSolution(globalInfo);
 
             foreach( var item in document.Elements( "AngularWorkspace" ) )
             {
