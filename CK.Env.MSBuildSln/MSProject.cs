@@ -8,6 +8,8 @@ using System.Diagnostics;
 using System.Linq;
 using System.Xml.Linq;
 
+#nullable enable
+
 namespace CK.Env.MSBuildSln
 {
     public class MSProject : Project
@@ -24,7 +26,7 @@ namespace CK.Env.MSBuildSln
         /// The <see cref="CKTraitContext.Separator"/> is the ';' to match the one used by csproj (parsing and
         /// string representation becomes straightforward).
         /// </summary>
-        public static readonly CKTraitContext Savors = NuGetArtifactType.ContextSavors;
+        public static readonly CKTraitContext Savors = NuGetArtifactType.ContextSavors!;
 
         /// <summary>
         /// Captures <see cref="DeclaredPackageDependency"/> and <see cref="ProjectToProjectDependency"/>.
@@ -87,11 +89,11 @@ namespace CK.Env.MSBuildSln
 
         }
 
-        MSProjFile _primaryFile;
+        MSProjFile? _primaryFile;
         // Packages.props or Common/CentralPackages.props or whatever has been
         // successfully read from <CentralPackagesFile> property.
         // See https://github.com/microsoft/MSBuildSdks/tree/master/src/CentralPackageVersions#extensibility
-        MSProjFile _centralPackagesFile;
+        MSProjFile? _centralPackagesFile;
         Dependencies _dependencies;
 
         internal MSProject(
@@ -109,7 +111,7 @@ namespace CK.Env.MSBuildSln
         /// Gets the project file. This is loaded when the <see cref="Solution"/>
         /// is created. This is null if an error occurred while loading.
         /// </summary>
-        public MSProjFile ProjectFile => _primaryFile;
+        public MSProjFile? ProjectFile => _primaryFile;
 
         internal override bool Initialize(
             FileSystem fs,
@@ -120,7 +122,7 @@ namespace CK.Env.MSBuildSln
             return ReloadProjectFile( fs, m, cache ) != null;
         }
 
-        MSProjFile ReloadProjectFile( FileSystem fs, IActivityMonitor m, Dictionary<NormalizedPath, MSProjFile> cache )
+        MSProjFile? ReloadProjectFile( FileSystem fs, IActivityMonitor m, Dictionary<NormalizedPath, MSProjFile> cache )
         {
             _primaryFile = MSProjFile.FindOrLoadProjectFile( fs, m, Path, cache );
             if( _primaryFile != null )
@@ -143,11 +145,12 @@ namespace CK.Env.MSBuildSln
                     OutputType = _primaryFile.Document.Root.Elements( "PropertyGroup" ).Elements( "OutputType" ).LastOrDefault()?.Value;
                     IsPackable = (bool?)_primaryFile.Document.Root.Elements( "PropertyGroup" ).Elements( "IsPackable" ).LastOrDefault();
 
-                    bool useMicrosoftBuildCentralPackageVersions = _primaryFile.Document.Root.Elements( "Sdk" )
+                    UseMicrosoftBuildCentralPackageVersions = _primaryFile.Document.Root.Elements( "Sdk" )
                                                                                     .Attributes( "Name" )
                                                                                     .Any( a => a.Value == "Microsoft.Build.CentralPackageVersions" );
-                    if( useMicrosoftBuildCentralPackageVersions )
+                    if( UseMicrosoftBuildCentralPackageVersions )
                     {
+                        m.Debug( "Microsoft.Build.CentralPackageVersions is used." );
                         NormalizedPath packageFile;
                         var definer = _primaryFile.AllFiles.Select( file => file.Document.Root )
                                              .SelectMany( root => root.Elements( "PropertyGroup" ) )
@@ -161,6 +164,7 @@ namespace CK.Env.MSBuildSln
                         }
                         else
                         {
+                            m.Info( $"No CentralPackagesFile property found: looking for Packages.props in the Solution folder." );
                             packageFile = Solution.SolutionFolderPath.AppendPart( "Packages.props" );
                         }
                         _centralPackagesFile = MSProjFile.FindOrLoadProjectFile( fs, m, packageFile, cache );
@@ -191,25 +195,32 @@ namespace CK.Env.MSBuildSln
         /// Gets the LangVersion value of the primary project file.
         /// Null if the project can not be read or if LangVersion is not defined.
         /// </summary>
-        public string LangVersion { get; private set; }
+        public string? LangVersion { get; private set; }
 
         /// <summary>
         /// Gets the OutputType element's value that is "Exe" for executable.
         /// Null if the project can not be read or if OutputType is not defined.
         /// </summary>
-        public string OutputType { get; private set; }
+        public string? OutputType { get; private set; }
 
         /// <summary>
         /// Gets the target frameforks (from the <see cref="Savors"/> context).
         /// Null if the project can not be read.
         /// </summary>
-        public CKTrait TargetFrameworks { get; private set; }
+        public CKTrait? TargetFrameworks { get; private set; }
 
         /// <summary>
         /// Gets whether Microsoft.Build.CentralPackageVersions is used thanks to:
         ///         &lt;Sdk Name="Microsoft.Build.CentralPackageVersions" Version="..." /&gt;
         /// </summary>
-        public bool UseMicrosoftBuildCentralPackageVersions => _centralPackagesFile != null;
+        public bool UseMicrosoftBuildCentralPackageVersions { get; private set; }
+
+        /// <summary>
+        /// Gets the .props file that contains the versions of all the packages.
+        /// When <see cref="UseMicrosoftBuildCentralPackageVersions"/> is true, this SHOULD be not null.
+        /// However, if the props file was not found, this is null (and this is an error that should be fixed by the user). 
+        /// </summary>
+        public MSProjFile? CentralPackageVersionsFile => _centralPackagesFile;
 
         /// <summary>
         /// Gets the dependencies.
@@ -224,7 +235,7 @@ namespace CK.Env.MSBuildSln
         /// <summary>
         /// Gets whether this csproj file or one of its depdendencies have changed.
         /// </summary>
-        public bool IsDirty => _primaryFile.IsDirty || (_centralPackagesFile?.IsDirty ?? false);
+        public bool IsDirty => _primaryFile != null && (_primaryFile.IsDirty || (_centralPackagesFile?.IsDirty ?? false));
 
         /// <summary>
         /// Saves all files that have been modified.
@@ -234,6 +245,7 @@ namespace CK.Env.MSBuildSln
         public bool Save( IActivityMonitor m )
         {
             if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
+            Debug.Assert( _primaryFile != null );
             return _primaryFile.Save( m, Solution.FileSystem )
                    && (_centralPackagesFile?.Save( m, Solution.FileSystem ) ?? true);
         }
@@ -288,6 +300,8 @@ namespace CK.Env.MSBuildSln
         {
             if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
             if( frameworks.IsEmpty ) throw new ArgumentException( "Must not be empty.", nameof( frameworks ) );
+
+            Debug.Assert( TargetFrameworks != null && ProjectFile != null );
             var actualFrameworks = TargetFrameworks.Intersect( frameworks );
             if( actualFrameworks.IsEmpty ) throw new ArgumentException( $"No {frameworks} in {TargetFrameworks}.", nameof( frameworks ) );
             if( throwProjectDependendencies && _dependencies.Projects.Any( p => p.TargetProject.ProjectName == packageId ) )
@@ -296,7 +310,7 @@ namespace CK.Env.MSBuildSln
             }
             var sV = version.ToString();
             int changeCount = 0;
-            CKTrait pFrameworks = null;
+            CKTrait? pFrameworks = null;
             foreach( var p in _dependencies.Packages.Where( p => p.PackageId == packageId
                                                                  && !(pFrameworks = p.Frameworks.Intersect( actualFrameworks )).IsEmpty ) )
             {
@@ -369,8 +383,9 @@ namespace CK.Env.MSBuildSln
             return changeCount;
         }
 
-        void DoSetSimpleProperty( IActivityMonitor m, string elementName, string value )
+        void DoSetSimpleProperty( IActivityMonitor m, string elementName, string? value )
         {
+            Debug.Assert( _primaryFile != null );
             _primaryFile.Document.Root
                     .Elements( "PropertyGroup" )
                     .Elements( elementName ).Remove();
@@ -508,6 +523,7 @@ namespace CK.Env.MSBuildSln
 
         void DoInitializeDependencies( IActivityMonitor m )
         {
+            Debug.Assert( _primaryFile != null );
             var packageRefs = _primaryFile.AllFiles.Select( f => f.Document.Root )
                              .SelectMany( root => root.Elements( "ItemGroup" )
                                                         .Elements()
@@ -540,17 +556,24 @@ namespace CK.Env.MSBuildSln
                             return;
                         }
 
-                        XElement propertyDef = null;
+                        XElement? propertyDef = null;
                         bool isVersionOverride = false;
                         bool versionLocked = false;
-                        SVersion version = null;
+                        SVersion? version = null;
 
                         if( p.RawVersion == null )
                         {
                             // No Version attribute nor element: we must use Central packages!
                             if( _centralPackagesFile == null )
                             {
-                                m.Warn( $"Missing Version attribute (or child element) on element {p.Origin} (and Microsoft.Build.CentralPackageVersions is not used). This is ignored." );
+                                if( UseMicrosoftBuildCentralPackageVersions )
+                                {
+                                    m.Error( $"Missing Version attribute (or child element) on element {p.Origin} and Microsoft.Build.CentralPackageVersions is not operational: the props file (via CentralPackagesFile property or Packages.props in solution folder) has not been found." );
+                                }
+                                else
+                                {
+                                    m.Warn( $"Missing Version attribute (or child element) on element {p.Origin} (and Microsoft.Build.CentralPackageVersions is not used). This is ignored." );
+                                }
                                 continue;
                             }
                             else
@@ -613,6 +636,7 @@ namespace CK.Env.MSBuildSln
                             }
                             if( isPropVersion )
                             {
+                                Debug.Assert( version != null );
                                 propertyDef = FollowRefPropertyVersion( m, p, ref versionLocked, ref version );
                                 if( propertyDef == null ) return;
                             }
@@ -621,7 +645,7 @@ namespace CK.Env.MSBuildSln
 
                         string[] defaultValues = new string[] { "compile", "runtime", "contentFiles", "build", "analyzers", "native" };
 
-                        CKTrait frameworks = ComputeFrameworks( m, p.Origin, conditionEvaluator );
+                        CKTrait? frameworks = ComputeFrameworks( m, p.Origin, conditionEvaluator );
                         if( frameworks == null ) return;
                         if( frameworks.IsEmpty )
                         {
@@ -649,7 +673,7 @@ namespace CK.Env.MSBuildSln
                         uselessDeps.Add( p.Origin );
                         continue;
                     }
-                    CKTrait frameworks = ComputeFrameworks( m, p.Origin, conditionEvaluator );
+                    CKTrait? frameworks = ComputeFrameworks( m, p.Origin, conditionEvaluator );
                     if( frameworks == null ) return;
                     if( frameworks.IsEmpty )
                     {
@@ -669,8 +693,9 @@ namespace CK.Env.MSBuildSln
             _dependencies = new Dependencies( deps, projs, uselessDeps );
         }
 
-        CKTrait ComputeFrameworks( IActivityMonitor m, XElement e, PartialEvaluator evaluator )
+        CKTrait? ComputeFrameworks( IActivityMonitor m, XElement e, PartialEvaluator evaluator )
         {
+            Debug.Assert( TargetFrameworks != null );
             CKTrait frameworks = TargetFrameworks;
             foreach( var framework in TargetFrameworks.AtomicTraits )
             {
@@ -693,8 +718,9 @@ namespace CK.Env.MSBuildSln
             return frameworks;
         }
 
-        XElement FollowRefPropertyVersion( IActivityMonitor m, (XElement Origin, string PackageId, string RawVersion, string) p, ref bool versionLocked, ref SVersion version )
+        XElement? FollowRefPropertyVersion( IActivityMonitor m, (XElement Origin, string PackageId, string RawVersion, string) p, ref bool versionLocked, ref SVersion version )
         {
+            Debug.Assert( _primaryFile != null );
             if( !p.RawVersion.EndsWith( "Version)" ) )
             {
                 m.Error( $"Invalid $(PropertyVersion) on element {p.Origin}. Its name must end with 'Version'." );
