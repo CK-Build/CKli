@@ -1,9 +1,10 @@
 # CKli
+[![Build status](https://ci.appveyor.com/api/projects/status/0j268t7v0ac9n4lp/branch/develop?svg=true)](https://ci.appveyor.com/project/Signature-OpenSource/ckli/branch/develop)
+[![Nuget](https://img.shields.io/nuget/v/CKli)](https://www.nuget.org/packages/CKli/)
 
-## What is CKli ?
 
 CKli is a tool for <u>multi-repositories</u> stacks.
-It allows to automate actions, on <u>Worlds</u> (a group of repositories), and concentrates information in a single place.
+It allows to automate actions(build, package upgrade, etc...), on <u>Worlds</u> (a group of repositories), and concentrates informations in a single place.
 
 ## Getting Started
 
@@ -22,7 +23,7 @@ dotnet tool install CKli -g
 
 ### Run CKli
 
-If you installed CKli globally, you can run `ckli` in any command prompt to start it.  
+If you installed CKli globally, you can run `ckli` in any command prompt to start it.
 
 :warning: On Linux, the Path environment variable of your shell need to be updated.
 
@@ -38,7 +39,7 @@ stacks that require authorizations: some **secrets will be required** (and of co
 CKli manages a [KeyVault](docs/KeyVault.md) where all your secrets are stored. You must enter a password to secure this key vault, and every time you
 start CKli, you will be prompted for your KeyVault password. (If you trust your desktop security, this password doesn't need to be strong.)
 
-Once the required KeyVault password is entered, press `enter`: 
+Once the required KeyVault password is entered, press `enter`:
 
 ```
 --------- Worlds ---------
@@ -65,7 +66,7 @@ These <u>basic commands</u> are available everywhere but the actual commands are
 
 `run` and `list` first parameter is a command name or a pattern with simple wildcards (* and ?).
 
-For example, `list home*`  will return any command starting with `home` : 
+For example, `list home*`  will return any command starting with `home` :
 
 ```
 Available Commands matching 'home*':
@@ -105,7 +106,7 @@ Gets the URL of the stack you want to clone:
 
 Type `run Home/EnsureStackRepository` (or `run *ensure*` since there is no other command with `Ensure` in its name) and press `enter`.
 
-You now need to fill the argument of this command that is the url and whether it is a Public or a Private stack: 
+You now need to fill the argument of this command that is the url and whether it is a Public or a Private stack:
 
 ```powershell
 [required] - url:                                  #The Url of the stack you are cloning
@@ -119,7 +120,7 @@ Type `secret` to see all the secrets needed by CKli. You may not need to fill al
 
 To set a secret, type `secret set SECRET_NAME`.
 
-Once the required secrets entered, press `enter`: 
+Once the required secrets entered, press `enter`:
 
 ```
 --------- Worlds ---------
@@ -166,7 +167,7 @@ It is not recommended to interact with them directly, but having a look at them 
 
 #### Add an existing Stack
 
-CKli does not know where your stack are defined.  
+CKli does not know where your stack are defined.
 
 ##### Ensure Stack Repository
 
@@ -204,7 +205,7 @@ For Your Information, here are the URLs to create your PATs on other git service
 - GitHub: https://github.com/settings/tokens
 
 - Azure
-  
+
   - Invenietis: https://dev.azure.com/invenietis/_usersSettings/tokens
   - Signature-OpenSource: https://dev.azure.com/Signature-OpenSource/_usersSettings/tokens
   - Signature-Code: https://dev.azure.com/Signature-Code/_usersSettings/tokens
