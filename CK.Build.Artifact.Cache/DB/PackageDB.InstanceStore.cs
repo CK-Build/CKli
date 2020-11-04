@@ -1,4 +1,5 @@
 using CK.Core;
+using CSemVer;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -48,9 +49,11 @@ namespace CK.Build
                     for( int j = 0; j < dependencies.Length; j++ )
                     {
                         var applicableSavors = savors != null ? ctx.ReadExistingTrait( savors.Context ) : null;
+                        SVersionLock vL = (SVersionLock)ctx.Reader.ReadByte();
+                        PackageQuality vQ = (PackageQuality)ctx.Reader.ReadByte();
                         ArtifactDependencyKind kind = (ArtifactDependencyKind)ctx.Reader.ReadByte();
                         int idx = ctx.Reader.ReadInt32();
-                        dependencies[j] = new PackageInstance.Reference( _instances[idx], kind, applicableSavors );
+                        dependencies[j] = new PackageInstance.Reference( _instances[idx], vL, vQ, kind, applicableSavors );
                     }
                     _instances[i] = new PackageInstance( instance, savors, dependencies, regDate );
                 }
@@ -80,7 +83,6 @@ namespace CK.Build
                     ctx.Writer.Write( p.Key.Version.NormalizedText );
                     ctx.Writer.Write( p.RegistrationDate );
                     ctx.Write( p.Savors );
-                    Debug.Assert( Enum.GetValues( typeof( ArtifactDependencyKind ) ).Cast<int>().All( v => v >= 0 && v <= 256 ) );
                     ctx.Writer.WriteNonNegativeSmallInt32( p.Dependencies.Count );
                     foreach( var dep in p.Dependencies )
                     {
@@ -89,8 +91,10 @@ namespace CK.Build
                             Debug.Assert( dep.ApplicableSavors != null );
                             ctx.WriteExistingTrait( dep.ApplicableSavors );
                         }
+                        ctx.Writer.Write( (byte)dep.Lock );
+                        ctx.Writer.Write( (byte)dep.MinQuality );
                         ctx.Writer.Write( (byte)dep.DependencyKind );
-                        var cc = new Comparable( pInstance => dep.Target.Key.CompareTo( pInstance.Key ) );
+                        var cc = new Comparable( pInstance => dep.BaseTargetKey.CompareTo( pInstance.Key ) );
                         // Lookup only from 0 to our index: our dependencies are before us.
                         Debug.Assert( _instances.AsSpan( 0, i ).BinarySearch( cc ) >= 0 );
                         ctx.Writer.Write( _instances.AsSpan( 0, i ).BinarySearch( cc ) );

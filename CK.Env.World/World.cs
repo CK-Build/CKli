@@ -1053,7 +1053,7 @@ namespace CK.Env
                         {
                             success &= Git.PushVersionTag( m, Info.Version );
                             // Since we have a version: we may be on master.
-                            if( success && Info.Version.PackageQuality == PackageQuality.Release )
+                            if( success && Info.Version.PackageQuality == PackageQuality.Stable )
                             {
                                 success &= Git.Push( m, WorldName.MasterBranchName );
                             }

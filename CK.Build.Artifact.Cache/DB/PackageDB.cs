@@ -166,7 +166,7 @@ namespace CK.Build
                         m.Error( $"Dependency Target(s) of {candidate.info.Key} not registered: {targets.Where( t => t.Item2 == null ).Select( t => t.Target.ToString() ).Concatenate()}" );
                         return null;
                     }
-                    var deps = candidate.info.Dependencies.Zip( targets, ( d, t ) => new PackageInstance.Reference( t.Item2!, d.Kind, d.Savors ) )
+                    var deps = candidate.info.Dependencies.Zip( targets, ( d, t ) => new PackageInstance.Reference( t.Item2!, d.Lock, d.MinQuality, d.Kind, d.Savors ) )
                                    .ToArray();                   
                     initialization[i].p = p = new PackageInstance( candidate.info.Key, candidate.info.Savors, deps, regDate );
                     ++newCount;

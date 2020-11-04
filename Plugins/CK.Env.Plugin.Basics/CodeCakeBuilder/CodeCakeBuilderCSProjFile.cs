@@ -57,7 +57,7 @@ namespace CK.Env.Plugin
             void EnsurePackageReference( string packageId, string v, bool required = false )
             {
                 var version = SVersion.Parse( v );
-                var current = ccbProject.Deps.Packages.Where( p => p.PackageId == packageId ).Max( p => p.Version );
+                var current = ccbProject.Deps.Packages.Where( p => p.PackageId == packageId ).Max( p => p.Version.Base );
                 if( current == null )
                 {
                     if( required ) ccbProject.SetPackageReferenceVersion( m, framework, packageId, version, addIfNotExists: true );

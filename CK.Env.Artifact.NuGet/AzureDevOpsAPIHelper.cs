@@ -74,7 +74,7 @@ namespace CK.Env
             string apiUrl = AzureDevOpsAPIHelper.GetUrl( projectName, organization, feedName, isNPM, "packagesBatch", "api-version=5.0-preview.1" );
             var basicAuth = Convert.ToBase64String( Encoding.ASCII.GetBytes( ":" + personalAccessToken ) );
             var byLabels = packages
-                                .SelectMany( p => p.Version.PackageQuality.GetLabels().Select( label => (label, p) ) )
+                                .SelectMany( p => p.Version.PackageQuality.GetAllQualities().Select( label => (label, p) ) )
                                 .GroupBy( labeledPackage => labeledPackage.label, labeledPackage => labeledPackage.p );
             foreach( var set in byLabels )
             {

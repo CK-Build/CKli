@@ -348,11 +348,11 @@ namespace CK.Env.Plugin
             var p = project.Tag<MSProject>();
             foreach( DeclaredPackageDependency dep in p.Deps.Packages )
             {
-                toRemove.Remove( dep.Package.Artifact );
-                project.EnsurePackageReference(
-                    dep.Package,
-                    dep.PrivateAsset.Equals( "all", StringComparison.OrdinalIgnoreCase ) ? ArtifactDependencyKind.Private : ArtifactDependencyKind.Transitive,
-                    dep.Frameworks );
+                var d = dep.BaseArtifactInstance;
+                toRemove.Remove( d.Artifact );
+                project.EnsurePackageReference( d,
+                                                dep.PrivateAsset.Equals( "all", StringComparison.OrdinalIgnoreCase ) ? ArtifactDependencyKind.Private : ArtifactDependencyKind.Transitive,
+                                                dep.Frameworks );
             }
             foreach( var noMore in toRemove ) project.RemovePackageReference( noMore );
         }

@@ -1,4 +1,5 @@
 using CK.Core;
+using CSemVer;
 using System;
 using System.Collections.Generic;
 
@@ -10,14 +11,46 @@ namespace CK.Build
     public class PackageInstance : IEquatable<PackageInstance>, IComparable<PackageInstance>
     {
         /// <summary>
-        /// The reference from a <see cref="PackageInstance"/> to another one.
+        /// The reference from a <see cref="PackageInstance"/> to a <see cref="Target"/> within a <see cref="VersionBound"/>.
         /// </summary>
         public readonly struct Reference
         {
             /// <summary>
-            /// Get the target of this reference.
+            /// This target corresponds to the lower bound of this <see cref="VersionBound"/> for this <see cref="Target"/>.
+            /// This is used to optimize storage and memory: this value type weights 2 object references and 3 bytes.
             /// </summary>
-            public PackageInstance Target { get; }
+            readonly PackageInstance _baseTarget;
+            readonly CKTrait? _applicableSavors;
+
+            /// <summary>
+            /// Gets the target artifact (type and name).
+            /// </summary>
+            public Artifact Target => _baseTarget.Key.Artifact;
+
+            /// <summary>
+            /// Gets the target key (type, name and version) with the <see cref="BaseVersion"/>.
+            /// </summary>
+            public ArtifactInstance BaseTargetKey => _baseTarget.Key;
+
+            /// <summary>
+            /// Gets the version bound of this reference.
+            /// </summary>
+            public SVersionBound VersionBound => new SVersionBound( _baseTarget.Key.Version, Lock, MinQuality );
+
+            /// <summary>
+            /// See <see cref="SVersionBound.Base"/>.
+            /// </summary>
+            public SVersion BaseVersion => _baseTarget.Key.Version;
+
+            /// <summary>
+            /// See <see cref="SVersionBound.Lock"/>.
+            /// </summary>
+            public SVersionLock Lock { get; }
+
+            /// <summary>
+            /// See <see cref="SVersionBound.MinQuality"/>.
+            /// </summary>
+            public PackageQuality MinQuality { get; }
 
             /// <summary>
             /// Get the kind of dependency to <see cref="Target"/>.
@@ -28,13 +61,15 @@ namespace CK.Build
             /// Gets the savors that, when not null, is a subset of the <see cref="Savors"/> (or all the
             /// owner's savors) and cannot be empty.
             /// </summary>
-            public CKTrait? ApplicableSavors { get; }
+            public CKTrait? ApplicableSavors => _applicableSavors;
 
-            internal Reference( PackageInstance target, ArtifactDependencyKind kind, CKTrait? applicableSavors )
+            internal Reference( PackageInstance baseTarget, SVersionLock vL, PackageQuality vQ, ArtifactDependencyKind kind, CKTrait? applicableSavors )
             {
-                Target = target;
+                _baseTarget = baseTarget;
+                _applicableSavors = applicableSavors;
+                Lock = vL;
+                MinQuality = vQ;
                 DependencyKind = kind;
-                ApplicableSavors = applicableSavors;
             }
         }
 

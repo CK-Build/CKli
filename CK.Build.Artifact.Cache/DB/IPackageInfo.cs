@@ -1,4 +1,5 @@
 using CK.Core;
+using CSemVer;
 using System.Collections.Generic;
 
 namespace CK.Build
@@ -24,7 +25,7 @@ namespace CK.Build
         /// <summary>
         /// Gets the set of dependencies.
         /// </summary>
-        IEnumerable<(ArtifactInstance Target, ArtifactDependencyKind Kind, CKTrait? Savors)> Dependencies { get; }
+        IEnumerable<(ArtifactInstance Target, SVersionLock Lock, PackageQuality MinQuality, ArtifactDependencyKind Kind, CKTrait? Savors)> Dependencies { get; }
 
     }
 }

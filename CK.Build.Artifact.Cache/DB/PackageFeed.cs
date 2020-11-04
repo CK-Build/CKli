@@ -144,9 +144,9 @@ namespace CK.Build
             SVersion? ci = null, exp = null, pre = null, lat = null, sta = null;
             foreach( var p in GetInstances( name ) )
             {
-                PackageQualityVersions.Apply( p.Key.Version, ref ci, ref exp, ref pre, ref lat, ref sta );
+                PackageQualityVector.Apply( p.Key.Version, ref ci, ref exp, ref pre, ref lat, ref sta );
             }
-            var versions = new PackageQualityVersions( ci, exp, pre, lat, sta );
+            var versions = new PackageQualityVector( ci, exp, pre, lat, sta );
             return new ArtifactAvailableInstances( this, name, versions );
         }
 
