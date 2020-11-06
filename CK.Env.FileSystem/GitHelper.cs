@@ -653,7 +653,7 @@ namespace CK.Env
                             {
                                 try
                                 {
-                                    Repository.Clone( git.OriginUrl.ToString(), workingFolder, new CloneOptions()
+                                    Repository.Clone( git.OriginUrl.AbsoluteUri, workingFolder, new CloneOptions()
                                     {
                                         CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, git ),
                                         Checkout = true

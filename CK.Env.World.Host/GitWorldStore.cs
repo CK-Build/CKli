@@ -185,7 +185,7 @@ namespace CK.Env
         {
             if( DisableRepositoryAndStacksCommands ) throw new InvalidOperationException( nameof( DisableRepositoryAndStacksCommands ) );
             if( String.IsNullOrWhiteSpace( url ) || !Uri.TryCreate( url, UriKind.Absolute, out var uri ) ) throw new ArgumentException( "Must be a valid url.", nameof( url ) );
-            int idx = _stackRepos.IndexOf( r => r.OriginUrl.ToString().Equals( url, StringComparison.OrdinalIgnoreCase ) );
+            int idx = _stackRepos.IndexOf( r => r.OriginUrl.AbsoluteUri.Equals( url, StringComparison.OrdinalIgnoreCase ) );
             if( idx < 0 ) m.Warn( $"Stack repository '{url}' not found." );
             else
             {
@@ -194,7 +194,7 @@ namespace CK.Env
                 WriteStacksToLocalStacksFilePath( m );
             }
         }
-
+        
         /// <summary>
         /// Whether <see cref="DisableRepositoryAndStacksCommands"/> is false.
         /// </summary>
