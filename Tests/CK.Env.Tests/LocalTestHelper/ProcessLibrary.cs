@@ -201,6 +201,7 @@ namespace CK.Env.Tests.LocalTestHelper
         {
             GitWorldStore.WorldInfo world = universe.GetWorldByName( worldName );
             XDocument xml = XDocument.Parse( File.ReadAllText( world.WorldName.XmlDescriptionFilePath ) );
+            stackModifier( xml );
             File.WriteAllText( world.WorldName.XmlDescriptionFilePath, xml.ToString() );
             return universe.RestartCKli( m );
         }
