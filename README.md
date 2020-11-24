@@ -50,7 +50,9 @@ Once the required KeyVault password is entered, press `enter`:
      > 3 CK-Build[NetCore2] => /Dev/CK-Build[NetCore2]
 ```
 
-This lists the available Stacks and Worlds an to open (and clone if needed) a whole World, type its number and press `enter`.
+This lists the available Stacks and their Worlds.
+By submiting the number of a World (type the number and press `enter`) you can open it.
+CKli will clone every missing repository.
 
 ### Commands
 

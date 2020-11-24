@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Text;
+using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -11,7 +12,7 @@ using static CK.Testing.MonitorTestHelper;
 namespace CK.Env.Tests.LocalTestHelper
 {
     /// <summary>
-    /// Manage images. Diposing this class will delete all the generated images.
+    /// Helpers methods to manage images.
     /// </summary>
     public static class ImageManager
     {
@@ -25,8 +26,6 @@ namespace CK.Env.Tests.LocalTestHelper
         /// </summary>
         public static NormalizedPath SeedUniverseFolder => TestHelper.TestProjectFolder.AppendPart( "SeedZips" );
 
-        public static NormalizedPath WorkFolder => Path.Combine( Path.GetTempPath(), "CKliTestWorkFolder" );
-
         /// <summary>
         /// Instantiate a <see cref="TestUniverse"/> from the given path.
         /// </summary>
@@ -35,16 +34,17 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <returns></returns>
         public static TestUniverse InstantiateImage( IActivityMonitor m, NormalizedPath imagePath )
         {
+            NormalizedPath workFolder = Path.Combine( Path.GetTempPath(), "CKliTestWorkFolder" );
             if( !File.Exists( imagePath ) ) throw new FileNotFoundException( nameof( imagePath ) );
-            m.Info( $"Creating temp directory {WorkFolder} and dezipping '{imagePath}' into." );
-            if( Directory.Exists( WorkFolder ) )
+            m.Info( $"Creating temp directory {workFolder} and dezipping '{imagePath}' into." );
+            if( Directory.Exists( workFolder ) )
             {
-                m.Info( $"Deleting '{WorkFolder} content.'" );
-                FileHelper.RawDeleteLocalDirectory( TestHelper.Monitor, WorkFolder );
+                m.Info( $"Deleting '{workFolder} content.'" );
+                FileHelper.RawDeleteLocalDirectory( TestHelper.Monitor, workFolder );
             }
-            Directory.CreateDirectory( WorkFolder );
-            ZipFile.ExtractToDirectory( imagePath, WorkFolder );
-            return TestUniverse.Create( m, WorkFolder );
+            Directory.CreateDirectory( workFolder );
+            ZipFile.ExtractToDirectory( imagePath, workFolder );
+            return TestUniverse.Create( m, workFolder );
         }
 
         public static NormalizedPath EnsureImage<T>(

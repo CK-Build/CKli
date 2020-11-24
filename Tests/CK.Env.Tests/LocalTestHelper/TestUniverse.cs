@@ -101,7 +101,7 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public static void ChangeStringInAllSubPathAndFileContent( IActivityMonitor m, NormalizedPath folder, string oldString, string newString )
         {
-            // The Ministry of Truth Function
+            // It change all the mention of a string to another one, it's the implementation of the Ministry of Truth.
             string[] dirs = Directory.GetDirectories( folder );
             for( int i = 0; i < dirs.Length; i++ )
             {
@@ -143,6 +143,11 @@ namespace CK.Env.Tests.LocalTestHelper
 
         }
 
+        /// <summary>
+        /// Create a ZipFile containing the current state of the app.
+        /// </summary>
+        /// <param name="imageName"></param>
+        /// <returns></returns>
         public NormalizedPath SnapshotState( string imageName )
         {
             NormalizedPath tempPath = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
@@ -155,9 +160,6 @@ namespace CK.Env.Tests.LocalTestHelper
             return output;
         }
 
-        public void Dispose()
-        {
-            UserHost.Dispose();
-        }
+        public void Dispose() => UserHost.Dispose();
     }
 }

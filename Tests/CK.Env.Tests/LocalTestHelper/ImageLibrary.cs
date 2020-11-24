@@ -101,7 +101,7 @@ namespace CK.Env.Tests.LocalTestHelper
         public static NormalizedPath minimal_solution_setup( Action<TestUniverse> testCallback, bool useless )
         {
             using( TestUniverse universe = ImageManager.InstantiateImage( TestHelper.Monitor,
-                                                                          imagePath: ImageManager.SeedUniverseFolder.AppendPart( "minimal_project.zip" ) ) )
+                imagePath: ImageManager.SeedUniverseFolder.AppendPart( "minimal_project.zip" ) ) )
             {
                 universe.SeedInitialSetup( TestHelper.Monitor );
                 var snapshotPath = universe.SnapshotState( nameof( minimal_solution_setup ) );
@@ -171,7 +171,7 @@ namespace CK.Env.Tests.LocalTestHelper
                        ( universe ) =>
                        {
                            var path = universe.GetWorldByName( CKTestBuildStackName ).Repo.Root.AppendPart( "workstation_setup_ran" );
-                           universe.AddSetupScriptInStack( CKTestBuildStackName, $"Write-Host \"Hello World\";\nNew-Item {path};" );
+                           universe.AddSetupScriptInStack( TestHelper.Monitor, CKTestBuildStackName, $"Write-Host \"Hello World\";\nNew-Item {path};" );
                            return universe.RestartCKli( TestHelper.Monitor );
                        } );
     }

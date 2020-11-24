@@ -60,35 +60,42 @@ namespace CK.Env.Tests
                 {
                     string cktestCodeCake = "CKTest-CodeCake";
                     NormalizedPath tempDir = Path.Combine( Path.GetTempPath(), Path.GetRandomFileName() );
-                    Repository.Clone(
-                        "file:///" + Path.GetFullPath( universe.WorldsFolder.AppendPart( world.WorldName.Name ).AppendPart( cktestCodeCake ) ).Replace( "\\", "/" ),
-                        tempDir );
-                    string testFileName = "testFile";
-                    using( Repository concurrentUser = new Repository( tempDir ) )
+                    try
                     {
-                        Branch master = concurrentUser.Branches["master"];
-                        Commands.Checkout( concurrentUser, master );
-                        NormalizedPath testFile = tempDir.AppendPart( testFileName );
-                        File.AppendAllText( testFile, "test" );
-                        Commands.Stage( concurrentUser, testFile );
-                        Signature testSignature = new Signature( "CKlitest", "nobody@test.com", DateTimeOffset.Now );
-                        concurrentUser.Commit( "Test commit.", testSignature, testSignature );
-                        concurrentUser.Network.Push( master );
-                    }
 
-                    world.CheckBeforeReleaseBuildOrEdit( TestHelper.Monitor, true );
-                    foreach( IGitRepository repository in world.GitRepositories )
-                    {
-                        (bool Success, bool ReloadNeeded) = repository.Pull( TestHelper.Monitor );
-                        Success.Should().BeTrue();
-                    }
-                    NormalizedPath repoPath = universe.DevDirectory.AppendPart( "CKTest-Build" ).AppendPart( cktestCodeCake );
-                    using( Repository repo = new Repository( repoPath ) )
-                    {
-                        Commands.Checkout( repo, repo.Branches["master"] );
-                    }
-                    File.Exists( Path.GetFullPath( repoPath.AppendPart( testFileName ) ) ).Should().BeTrue();
+                        Repository.Clone(
+                            "file:///" + Path.GetFullPath( universe.WorldsFolder.AppendPart( world.WorldName.Name ).AppendPart( cktestCodeCake ) ).Replace( "\\", "/" ),
+                            tempDir );
+                        string testFileName = "testFile";
+                        using( Repository concurrentUser = new Repository( tempDir ) )
+                        {
+                            Branch master = concurrentUser.Branches["master"];
+                            Commands.Checkout( concurrentUser, master );
+                            NormalizedPath testFile = tempDir.AppendPart( testFileName );
+                            File.AppendAllText( testFile, "test" );
+                            Commands.Stage( concurrentUser, testFile );
+                            Signature testSignature = new Signature( "CKlitest", "nobody@test.com", DateTimeOffset.Now );
+                            concurrentUser.Commit( "Test commit.", testSignature, testSignature );
+                            concurrentUser.Network.Push( master );
+                        }
 
+                        world.CheckBeforeReleaseBuildOrEdit( TestHelper.Monitor, true );
+                        foreach( IGitRepository repository in world.GitRepositories )
+                        {
+                            (bool Success, bool ReloadNeeded) = repository.Pull( TestHelper.Monitor );
+                            Success.Should().BeTrue();
+                        }
+                        NormalizedPath repoPath = universe.DevDirectory.AppendPart( "CKTest-Build" ).AppendPart( cktestCodeCake );
+                        using( Repository repo = new Repository( repoPath ) )
+                        {
+                            Commands.Checkout( repo, repo.Branches["master"] );
+                        }
+                        File.Exists( Path.GetFullPath( repoPath.AppendPart( testFileName ) ) ).Should().BeTrue();
+                    }
+                    finally
+                    {
+                        FileHelper.RawDeleteLocalDirectory( TestHelper.Monitor, tempDir );
+                    }
                 }, TestHelper.IsExplicitAllowed );
         }
 

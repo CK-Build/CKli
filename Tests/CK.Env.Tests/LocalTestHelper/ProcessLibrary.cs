@@ -1,7 +1,9 @@
 using CK.Core;
+using CK.Env.MSBuildSln;
 using CK.Text;
 using FluentAssertions;
 using LibGit2Sharp;
+using NUnit.Framework.Internal;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -168,10 +170,10 @@ namespace CK.Env.Tests.LocalTestHelper
             => universe.UserHost.WorldStore.StackRepositories.Single( s => s.OriginUrl == uri );
 
         public static GitWorldStore.WorldInfo GetWorldByName( this TestUniverse universe, string worldName )
-        {
-            GitWorldStore.StackRepo stack = universe.UserHost.WorldStore.StackRepositories.Single( s => s.Worlds.Any( s => s.WorldName.FullName == worldName ) );
-            return stack.Worlds.Single( s => s.WorldName.FullName == worldName );
-        }
+            => universe.UserHost.WorldStore.StackRepositories
+                .SelectMany( s => s.Worlds )
+                .Where( s => s.WorldName.FullName == worldName )
+                .Single();
 
         /// <summary>
         /// Add a setup script to a world.
@@ -180,36 +182,57 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <param name="worldName"></param>
         /// <param name="script"></param>
         /// <returns></returns>
-        public static TestUniverse AddSetupScriptInStack( this TestUniverse universe, string worldName, string script )
+        public static TestUniverse AddSetupScriptInStack( this TestUniverse universe, IActivityMonitor m, string worldName, string script )
+            => universe.EditStackAndReload( m, worldName, ( xml ) =>
+            {
+                XElement root = xml.Root;
+                root.EnsureElement( "Workstation" ).EnsureElement( "Setup" ).Add( new XElement( "Script", script ) );
+                string workstationPlugin = "CK.Env.Plugin.Workstation";
+                var libs = root.Elements( "LoadLibrary" );
+                if( !libs.Any( s => s.Attribute( "Name" ).Value == workstationPlugin ) )
+                {
+                    var plugin = new XElement( "LoadLibrary" );
+                    plugin.SetAttributeValue( "Name", workstationPlugin );
+                    libs.Last().AddAfterSelf( plugin );
+                }
+            } );
+
+        public static TestUniverse EditStackAndReload( this TestUniverse universe, IActivityMonitor m, string worldName, Action<XDocument> stackModifier )
         {
             GitWorldStore.WorldInfo world = universe.GetWorldByName( worldName );
             XDocument xml = XDocument.Parse( File.ReadAllText( world.WorldName.XmlDescriptionFilePath ) );
-            XElement root = xml.Root;
-            static XElement EnsureElement( XElement xElement, string elementName )
-            {
-                XElement elem = xElement.Element( elementName );
-                if( elem != null ) return elem;
-                elem = new XElement( elementName );
-                xElement.Add( elem );
-                return elem;
-            }
-            EnsureElement( EnsureElement( root, "Workstation" ), "Setup" ).Add( new XElement( "Script", script ) );
-            string workstationPlugin = "CK.Env.Plugin.Workstation";
-            var libs = root.Elements( "LoadLibrary" );
-            if( !libs.Any( s => s.Attribute( "Name" ).Value == workstationPlugin ) )
-            {
-                var plugin = new XElement( "LoadLibrary" );
-                plugin.SetAttributeValue( "Name", workstationPlugin );
-                libs.Last().AddAfterSelf( plugin );
-            }
+            stackModifier( xml );
             File.WriteAllText( world.WorldName.XmlDescriptionFilePath, xml.ToString() );
-            return universe;
+            return universe.RestartCKli( m );
         }
 
         public static TestUniverse RestartCKli( this TestUniverse universe, IActivityMonitor m )
         {
             universe.Dispose();
             return TestUniverse.Create( m, universe.UniversePath );
+        }
+
+        public static TestUniverse CreateEmptyRepoAndAddToStack( this TestUniverse testUniverse, IActivityMonitor m, string worldName, string repoName )
+        {
+            NormalizedPath gitServerPath = testUniverse.StackBareGitPath.AppendPart( repoName );
+            Repository.Init( gitServerPath, true );
+            string gitServerUrl;
+            using( var repo = new Repository( gitServerPath ) )
+            {
+                gitServerUrl = repo.Network.Remotes.Single().Url;
+            }
+            testUniverse.EditStackAndReload( m, worldName, ( xml ) =>
+            {
+                var folder = xml.Root.EnsureElement( "Folder" );
+                var gitFolder = new XElement( "GitFolder" );
+                gitFolder.SetAttributeValue( "Name", worldName );
+                gitFolder.SetAttributeValue( "Url", gitServerUrl );
+                var branch = new XElement( "Branch" );
+                branch.SetAttributeValue( "Name", "develop" );
+                gitFolder.SetValue( branch );
+                folder.Add( gitFolder );
+            } );
+            return testUniverse;
         }
     }
 }
