@@ -34,13 +34,13 @@ namespace CK.Env
         string SecretKeyName { get; }
 
         /// <summary>
-        /// Ensures that the secret behind the <see cref="IArtifactRepositoryInfo.SecretKeyName"/> is available
+        /// Ensures that the secret behind the <see cref="SecretKeyName"/> is available
         /// and if not, must return null.
         /// The implementation must ensure that the secret only depends from the <see cref="SecretKeyName"/>:
         /// if two repositories share the same SecretKeyName, the resolved secret must be the same.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="throwOnEmpty">True to throw a <see cref="MissingRequiredSecretException"/> instead of returning a null or empty string.</param>
+        /// <param name="throwOnEmpty">True to throw an exception instead of returning a null or empty string.</param>
         /// <returns>The non empty secret or null.</returns>
         string? ResolveSecret( IActivityMonitor m, bool throwOnEmpty = false );
 

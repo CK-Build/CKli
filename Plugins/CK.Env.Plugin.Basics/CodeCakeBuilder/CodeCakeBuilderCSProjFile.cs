@@ -49,7 +49,7 @@ namespace CK.Env.Plugin
                 ("NuGet.Protocol", "5.8.0", false),
                 ("NuGet.Credentials", "5.8.0", false),
                 ("CK.Text", "9.0.0", false),
-                ("SimpleGitVersion.Cake", "4.0.2", false),
+                ("SimpleGitVersion.Cake", "5.0.0", false),
                 ("CKSetup.Cake", "11.2.0", false),
                 ("Newtonsoft.Json", "12.0.3", false)
             };

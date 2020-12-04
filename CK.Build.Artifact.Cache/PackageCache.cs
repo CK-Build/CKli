@@ -11,14 +11,14 @@ namespace CK.Build
     /// <summary>
     /// Wraps the immutable <see cref="PackageDB"/> object.
     /// </summary>
-    public class ArtifactCache
+    public class PackageCache
     {
         PackageDB _db;
 
         /// <summary>
         /// Initializes a new empty cache.
         /// </summary>
-        public ArtifactCache()
+        public PackageCache()
         {
             _db = new PackageDB();
         }
@@ -75,7 +75,7 @@ namespace CK.Build
         /// False to log an error and return null if info is already registered.
         /// </param>
         /// <returns>The new database or null on error.</returns>
-        public PackageDB? Add( IActivityMonitor m, FullPackageInfo info, bool skipExisting = true ) => Add( m, new[] { info }, skipExisting );
+        public PackageDB? Add( IActivityMonitor m, IFullPackageInfo info, bool skipExisting = true ) => Add( m, new[] { info }, skipExisting );
 
         /// <summary>
         /// Registers multiple packages at once. Any <see cref="FullPackageInfo.Dependencies"/> must
@@ -88,7 +88,7 @@ namespace CK.Build
         /// By default, existing packages are silently ignored.
         /// </param>
         /// <returns>The new database or null on error.</returns>
-        public PackageDB? Add( IActivityMonitor m, IEnumerable<FullPackageInfo> infos, bool skipExisting = true )
+        public PackageDB? Add( IActivityMonitor m, IEnumerable<IFullPackageInfo> infos, bool skipExisting = true )
         {
             bool success = false;
             var newDb = Util.InterlockedSet( ref _db, origin =>

@@ -97,7 +97,8 @@ namespace CK.Build
 
         /// <summary>
         /// Registers multiple packages at once. Any <see cref="IPackageInfo.Dependencies"/> must
-        /// be already registered or appear before the dependent package.
+        /// be already registered (the <see cref="PackageInstance.Reference.BaseTargetKey"/> of the reference exists in the DB)
+        /// or appear before the dependent package.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="infos">The package informations.</param>
@@ -116,7 +117,7 @@ namespace CK.Build
             int newCount = 0;
             // The new feeds (if needed, it will be initially a copy of the current _feeds).
             Dictionary<string, PackageFeed>? newFeeds = null;
-            // The packages to add to an existing or new feed or to remove from an exisiting feed.
+            // The packages to add to an existing or new feed or to remove from an existing feed.
             List<PackageFeed.Diff>? feedDiff = null;
             for( int i = 0; i < initialization.Length; ++i )
             {
@@ -159,7 +160,7 @@ namespace CK.Build
                                                                 .Take( i )
                                                                 .Select( t => t.p )
                                                                 .FirstOrDefault( p => p != null
-                                                                                 && p.Key == d.Target )) )
+                                                                                      && p.Key == d.Target )) )
                                            .ToArray();
                     if( targets.Any( t => t.Item2 == null ) )
                     {

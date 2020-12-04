@@ -316,8 +316,7 @@ namespace CK.Env.MSBuildSln
             {
                 if( !p.Version.Satisfy( version ) )
                 {
-                    m.Warn( $"The version '{version}' is not compatible with the {packageId} version range that is '{p.Version}'. You need to change it manually." );
-                    continue;
+                    m.Info( $"The new version '{version}' is not compatible with the {packageId} previous version range that is '{p.Version}'." );
                 }
                 actualFrameworks = actualFrameworks.Except( pFrameworks );
                 var currentVersion = p.Version.Base;

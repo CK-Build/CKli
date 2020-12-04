@@ -44,7 +44,7 @@ namespace CK.Build
         public string FeedName { get; }
 
         /// <summary>
-        /// Gets the artifact.
+        /// Gets the artifact type and name.
         /// </summary>
         public Artifact Artifact { get; }
 
@@ -94,7 +94,8 @@ namespace CK.Build
 
         /// <summary>
         /// Gets whether the <see cref="Artifact"/> is valid.
-        /// There may be no available versions (<see cref="PackageQualityVersions.IsValid"/> may be false).
+        /// This artifact type and nam may be valid but there may be no available
+        /// versions (<see cref="PackageQualityVersions.IsValid"/> may be false).
         /// </summary>
         public bool IsValid => Artifact.IsValid;
 

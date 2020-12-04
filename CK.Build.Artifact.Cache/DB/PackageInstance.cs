@@ -12,6 +12,7 @@ namespace CK.Build
     {
         /// <summary>
         /// The reference from a <see cref="PackageInstance"/> to a <see cref="Target"/> within a <see cref="VersionBound"/>.
+        /// This is a basically the target's <see cref="ArtifactBound"/> with a <see cref="DependencyKind"/> and optionals <see cref="ApplicableSavors"/>.
         /// </summary>
         public readonly struct Reference
         {
@@ -28,14 +29,21 @@ namespace CK.Build
             public Artifact Target => _baseTarget.Key.Artifact;
 
             /// <summary>
-            /// Gets the target key (type, name and version) with the <see cref="BaseVersion"/>.
+            /// Gets the target key (type, name and version) that is the lower bound of
+            /// this <see cref="VersionBound"/> for this <see cref="Target"/>.
             /// </summary>
             public ArtifactInstance BaseTargetKey => _baseTarget.Key;
 
             /// <summary>
             /// Gets the version bound of this reference.
             /// </summary>
-            public SVersionBound VersionBound => new SVersionBound( _baseTarget.Key.Version, Lock, MinQuality );
+            public SVersionBound VersionBound => new SVersionBound( BaseVersion, Lock, MinQuality );
+
+            /// <summary>
+            /// Gets the artifact bound of this reference: this contains <see cref="Target"/> (the <see cref="Artifact.Type"/> and <see cref="Artifact.Name"/>),
+            /// and the <see cref="VersionBound"/> (with the <see cref="BaseVersion"/>, the <see cref="Lock"/> and <see cref="MinQuality"/>).
+            /// </summary>
+            public ArtifactBound ArtifactBound => new ArtifactBound( Target, VersionBound );
 
             /// <summary>
             /// See <see cref="SVersionBound.Base"/>.

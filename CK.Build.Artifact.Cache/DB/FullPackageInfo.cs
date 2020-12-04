@@ -12,16 +12,10 @@ namespace CK.Build
     /// </summary>
     public class FullPackageInfo : PackageInfo, IFullPackageInfo
     {
-        /// <summary>
-        /// Gets or sets whether the <see cref="FeedNames"/> are all the feeds that contain this package.
-        /// When false, feed names are only a subset of the feeds that contain this package.
-        /// </summary>
+        /// <inheritdoc />
         public bool AllFeedNamesAreKnown { get; set; }
 
-        /// <summary>
-        /// Gets the name of the feeds that are known to contain this package.
-        /// This can be empty: a package can exist in a <see cref="PackageDB"/> without being in any <see cref="PackageFeed"/>.
-        /// </summary>
+        /// <inheritdoc cref="IFullPackageInfo.FeedNames" />
         public List<string> FeedNames { get; } = new List<string>();
 
         IEnumerable<string> IFullPackageInfo.FeedNames => FeedNames;

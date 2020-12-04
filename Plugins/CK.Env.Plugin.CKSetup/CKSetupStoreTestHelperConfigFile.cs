@@ -119,10 +119,11 @@ namespace CK.Env.Plugin
         {
             if( !_localFeedProvider.EnsureCKSetupStores( m ) ) return false;
             var text = "<configuration><appSettings>" + Environment.NewLine;
-            text += "  -- This forces the Solutions that generate components to use the LocalFeed CKSetupStore" + Environment.NewLine; ;
+            text += "  -- This forces the Solutions that generate components to use the LocalFeed CKSetupStore." + Environment.NewLine;
             text += $@"  <add key=""CKSetup/DefaultStoreUrl"" value=""{storePath}"" />" + Environment.NewLine;
             text += $@"  <add key=""CKSetup/DefaultStorePath"" value=""{storePath}"" />" + Environment.NewLine;
             text += "</appSettings></configuration>";
+            m.Trace( $"Updating '{FilePath}' to:{Environment.NewLine}{text}" );
             return CreateOrUpdate( m, text );
         }
     }

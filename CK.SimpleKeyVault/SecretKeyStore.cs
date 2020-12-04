@@ -187,7 +187,7 @@ namespace CK.SimpleKeyVault
 
 
         /// <summary>
-        /// Gets whether a secret key has been declared (the returned is not null) and if whether the
+        /// Gets whether a secret key has been declared (the returned is not null) and whether its
         /// secret is available or not.
         /// </summary>
         /// <param name="m">The monitor to use.</param>

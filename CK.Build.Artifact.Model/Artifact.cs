@@ -1,5 +1,6 @@
 using CSemVer;
 using System;
+using System.Diagnostics;
 
 namespace CK.Build
 {
@@ -10,8 +11,9 @@ namespace CK.Build
     {
         /// <summary>
         /// Gets the artifact type.
+        /// This is null when <see cref="IsValid"/> is false.
         /// </summary>
-        public ArtifactType Type { get; }
+        public ArtifactType? Type { get; }
 
         /// <summary>
         /// Gets the artifact name.
@@ -108,6 +110,13 @@ namespace CK.Build
         public ArtifactInstance WithVersion( SVersion v ) => new ArtifactInstance( this, v );
 
         /// <summary>
+        /// Returns a <see cref="ArtifactBound"/>.
+        /// </summary>
+        /// <param name="b">The version bound.</param>
+        /// <returns>The artifact bound.</returns>
+        public ArtifactBound WithBound( SVersionBound b ) => new ArtifactBound( this, b );
+
+        /// <summary>
         /// Checks equality.
         /// </summary>
         /// <param name="other">The other artifact.</param>
@@ -125,7 +134,7 @@ namespace CK.Build
         /// Overrsidden to combine <see cref="Type"/> and <see cref="Name"/>.
         /// </summary>
         /// <returns>The hash code.</returns>
-        public override int GetHashCode() => Type.GetHashCode() ^ StringComparer.OrdinalIgnoreCase.GetHashCode( Name );
+        public override int GetHashCode() => (Type?.GetHashCode() ??0) ^ StringComparer.OrdinalIgnoreCase.GetHashCode( Name );
 
         /// <summary>
         /// Implements == operator.
@@ -161,6 +170,7 @@ namespace CK.Build
                 return other.IsValid ? -1 : 0;
             }
             if( !other.IsValid ) return 1;
+            Debug.Assert( Type != null && other.Type != null );
             int cmp = Type.CompareTo( other.Type );
             return cmp != 0 ? cmp : Name.CompareTo( other.Name );
         }

@@ -12,9 +12,7 @@ namespace CK.Build
     {
         CKTrait? _savors;
 
-        /// <summary>
-        /// Gets or sets the key of this package.
-        /// </summary>
+        /// <inheritdoc />
         public ArtifactInstance Key { get; set; }
 
         /// <summary>
@@ -33,6 +31,7 @@ namespace CK.Build
 
         /// <summary>
         /// Gets the mutable list of dependencies.
+        /// This will be transformed into <see cref="PackageInstance.Dependencies"/> that is a set of <see cref="PackageInstance.Reference"/>.
         /// </summary>
         public List<(ArtifactInstance Target, SVersionLock Lock, PackageQuality MinQuality, ArtifactDependencyKind Kind, CKTrait? Savors)> Dependencies { get; } = new List<(ArtifactInstance, SVersionLock, PackageQuality, ArtifactDependencyKind, CKTrait?)>();
 
