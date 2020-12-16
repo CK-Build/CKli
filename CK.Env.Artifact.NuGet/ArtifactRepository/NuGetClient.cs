@@ -264,19 +264,6 @@ namespace CK.Env.NuGet
             var name = r.HandleRequiredAttribute<string>( "Name" );
             var xCreds = r.Element.Element( "Credentials" );
             var creds = xCreds != null ? new SimpleCredentials( r.WithElement( xCreds, true ) ) : null;
-            var uri = new Uri( url );
-            if( uri.Host == "pkgs.dev.azure.com" )
-            {
-                bool privateFeed = uri.Segments[2] == "_packaging/";
-                if( privateFeed && (creds == null) )
-                {
-                    r.ThrowXmlException( "Detected an azure private feed. Credentials are expected." );
-                }
-                if( !privateFeed && (creds != null) )
-                {
-                    r.ThrowXmlException( "Detected an azure public feed. There should be no credentials." );
-                }
-            }
             var internals = repositories.OfType<NuGetFeedBase>().Concat( feeds.OfType<NuGetFeedBase>() );
             foreach( var i in internals )
             {
