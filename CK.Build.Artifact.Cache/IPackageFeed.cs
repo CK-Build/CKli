@@ -11,7 +11,7 @@ namespace CK.Build
     {
         /// <summary>
         /// Gets the package information in this feed or null if it doesn't exist in this feed.
-        /// Exceptions must be thrown for any access problems.
+        /// Exceptions must be thrown for any access issues.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="instance">The instance to lookup.</param>

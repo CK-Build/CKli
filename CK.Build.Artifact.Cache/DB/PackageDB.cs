@@ -266,7 +266,7 @@ namespace CK.Build
         /// <summary>
         /// Gets all the feeds.
         /// </summary>
-        public IEnumerable<PackageFeed> Feeds => _feeds.Values;
+        public IReadOnlyCollection<PackageFeed> Feeds => _feeds.Values;
 
         /// <summary>
         /// Finds a feed by its <see cref="IArtifactFeedIdentity.TypedName"/>.

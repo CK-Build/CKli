@@ -17,7 +17,7 @@ namespace CK.Build
 
         /// <summary>
         /// Gets or sets the savors if any.
-        /// It is null by default, and note that <see cref="CKTrait.IsEmpty"/> is forbidden and raises an ArgumentExceptiuon if set.
+        /// It is null by default, and note that <see cref="CKTrait.IsEmpty"/> is forbidden and raises an ArgumentException if set.
         /// </summary>
         public CKTrait? Savors
         {

@@ -18,18 +18,21 @@ namespace CK.Build
     public class LivePackageCache
     {
         readonly PackageCache _cache;
-        readonly IPackageFeed[] _feeds;
-        readonly List<(ArtifactInstance, TaskCompletionSource<IFullPackageInfo?>)> _currentRequests;
+        IPackageFeed[] _feeds;
+        readonly Dictionary<ArtifactInstance, TaskCompletionSource<FullPackageInfo?>> _currentRequests;
         readonly object _addLock;
-        readonly bool _isFullFeeds;
 
-        public LivePackageCache( PackageCache cache, IEnumerable<IPackageFeed> feeds, bool isFullFeeds )
+        /// <summary>
+        /// Initializes a new <see cref="LivePackageCache"/>.
+        /// </summary>
+        /// <param name="cache">The cache to update.</param>
+        /// <param name="feeds">Optional initial set of feeds to consider.</param>
+        public LivePackageCache( PackageCache cache, IEnumerable<IPackageFeed>? feeds = null )
         {
             _cache = cache;
-            _feeds = feeds.ToArray();
-            _currentRequests = new List<(ArtifactInstance, TaskCompletionSource<IFullPackageInfo?>)>();
+            _feeds = feeds?.ToArray() ?? Array.Empty<IPackageFeed>();
+            _currentRequests = new Dictionary<ArtifactInstance, TaskCompletionSource<FullPackageInfo?>>();
             _addLock = new object();
-            _isFullFeeds = isFullFeeds;
         }
 
         /// <summary>
@@ -38,36 +41,80 @@ namespace CK.Build
         public PackageCache Cache => _cache;
 
         /// <summary>
-        /// Gets the set of feeds.
+        /// Gets the feeds from which package informations are retrieved.
+        /// This list is mutable: use <see cref="AddFeed"/> and <see cref="RemoveFeed"/> to change it.
         /// </summary>
         public IReadOnlyList<IPackageFeed> Feeds => _feeds;
 
         /// <summary>
-        /// Attempts to locate or add a <see cref="PackageInstance"/> and all its dependencies recusively (all
+        /// Adds a feed into the <see cref="Feeds"/>.
+        /// </summary>
+        /// <param name="f">The feed to add.</param>
+        public void AddFeed( IPackageFeed f ) => Util.InterlockedAdd( ref _feeds, f );
+
+        /// <summary>
+        /// Removes a feed from the <see cref="Feeds"/>.
+        /// </summary>
+        /// <param name="f">The feed to remove.</param>
+        public void RemoveFeed( IPackageFeed f ) => Util.InterlockedRemove( ref _feeds, f );
+
+        /// <summary>
+        /// Clears the current cache of feed requests that triggered an error and/or the ones
+        /// that were unable to resolve the package instance. 
+        /// </summary>
+        /// <param name="forgetErrors">True to clear all existing request errors.</param>
+        /// <param name="forgetUnresolved">True to clear previsously unresolved package instance lookup.</param>
+        public void ClearFeedRequestCache( bool forgetErrors, bool forgetUnresolved )
+        {
+            if( forgetErrors || forgetUnresolved )
+            {
+                lock( _currentRequests )
+                {
+                    IEnumerable<KeyValuePair<ArtifactInstance, TaskCompletionSource<FullPackageInfo?>>> all = _currentRequests;
+                    if( forgetErrors ) all = all.Where( kv => kv.Value.Task.IsFaulted );
+                    if( forgetUnresolved ) all = all.Where( kv => kv.Value.Task.IsCompletedSuccessfully && kv.Value.Task.Result == null );
+                    foreach( var k in all.Select( kv => kv.Key ).ToList() )
+                    {
+                        _currentRequests.Remove( k );
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Attempts to locate or add a <see cref="PackageInstance"/> and all its dependencies recursively (all
         /// its <see cref="PackageInstance.Reference.BaseTargetKey"/>) to the <see cref="Cache"/>.
         /// Any resolution error (a missing dependency or when all feeds access fail for a package) is an exception.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="instance">The instance to resolve.</param>
         /// <returns>Null if the package cannot be found in any of the <see cref="Feeds"/>.</returns>
-        public async Task<PackageInstance?> AddAsync( IActivityMonitor monitor, ArtifactInstance instance )
+        public async Task<PackageInstance?> EnsureAsync( IActivityMonitor monitor, ArtifactInstance instance )
         {
-            var p = _cache.DB.Find( instance );
+            PackageInstance? p = null;
+
+            // First, consider this cache (fast path).
+            p = _cache.DB.Find( instance );
             if( p != null ) return p;
 
-            IFullPackageInfo? info = await ReadFullInfoAsync( monitor, instance );
+            // Second, ask our feeds to locate the package.
+            // If it cannot be found in any of our feeds or an exception is thrown here, then we give up.
+
+            // Captures the _feeds array.
+            var feeds = _feeds;
+            FullPackageInfo? info = await ReadFullInfoAsync( monitor, instance, feeds );
             if( info == null ) return null;
 
-            List<IFullPackageInfo>? allDeps = new List<IFullPackageInfo>();
+            var allDeps = new List<FullPackageInfo>();
             try
             {
-                // The info object will be appended to the allDeps list.
-                if( !await ReadMissingDependencies( monitor, info, allDeps ) )
+                // The info object will be appended to the allDeps list even if an exception is raised here.
+                if( !await ReadMissingDependencies( monitor, info, allDeps, feeds ) )
                 {
                     throw new Exception( $"Unable to resolve a dependency for package '{info.Key}'. See logs for details." );
                 }
                 // Even if the Add is thread safe (it uses an Interlocked set), I prefer here
-                // to serialize the call to avoid intermediate allocations.
+                // to serialize the call to Add to avoid intermediate allocations.
                 lock( _addLock )
                 {
                     if( _cache.Add( monitor, allDeps ) == null || (p = _cache.DB.Find( instance )) == null )
@@ -79,73 +126,89 @@ namespace CK.Build
             }
             finally
             {
-                // Cleanup the current requests.
+                // Cleanup the current requests: removes only the successful
+                // requests: errors are cached as well as unresolved (null).
                 lock( _currentRequests )
                 {
                     foreach( var i in allDeps )
                     {
-                        int idx = _currentRequests.IndexOf( c => c.Item1 == i.Key );
-                        if( idx >= 0 ) _currentRequests.RemoveAt( idx );
+                        if( i.FeedNames.Count > 0 ) _currentRequests.Remove( i.Key );
                     }
                 }
             }
         }
 
-        async Task<bool> DoAddAsync( IActivityMonitor monitor, ArtifactInstance instance, List<IFullPackageInfo> allDeps )
+        async Task<bool> DoAddAsync( IActivityMonitor monitor, ArtifactInstance instance, List<FullPackageInfo> allDeps, IPackageFeed[] feeds )
         {
             if( _cache.DB.Find( instance ) != null || allDeps.Any( p => p.Key == instance ) ) return true;
-            IFullPackageInfo? info = await ReadFullInfoAsync( monitor, instance );
+            FullPackageInfo? info = await ReadFullInfoAsync( monitor, instance, feeds );
             if( info == null )
             {
-                monitor.Error( $"Unable to find package '{instance}' in feeds {_feeds.Where( f => f.ArtifactType == instance.Artifact.Type ).Select( f => f.Name ).Concatenate()}." );
+                monitor.Error( $"Unable to find package '{instance}' in feeds {feeds.Where( f => f.ArtifactType == instance.Artifact.Type ).Select( f => f.Name ).Concatenate()}." );
                 return false;
             }
-            return await ReadMissingDependencies( monitor, info, allDeps );
+            return await ReadMissingDependencies( monitor, info, allDeps, feeds );
         }
 
-        async Task<bool> ReadMissingDependencies( IActivityMonitor monitor, IFullPackageInfo info, List<IFullPackageInfo> allDeps )
+        async Task<bool> ReadMissingDependencies( IActivityMonitor monitor, FullPackageInfo info, List<FullPackageInfo> allDeps, IPackageFeed[] feeds )
         {
+            // From a starting FullPackageInfo (necessarily not null), recusively crawls the dependencies and always
+            // append the starting FullPackageInfo to the allDeps list.
+            // On error (a dependency failed to be read, either not found - null - or an exception is being thrown), we use
+            // the FullPackageInfo.FeedNames by clearing it: this invalidates the starting FullPackageInfo but we
+            // nevertheless add it to the allDeps list so that we can skip it when clearing the request cache (failed resolution
+            // only must be kept in cache).
+            bool success = true;
             try
             {
                 foreach( var d in info.Dependencies )
                 {
-                    if( !await DoAddAsync( monitor, d.Target, allDeps ) )
+                    if( !await DoAddAsync( monitor, d.Target, allDeps, feeds ) )
                     {
                         monitor.Error( $"Unable to satisfy dependency '{d.Target}' of package '{info.Key}'." );
-                        return false;
                     }
                 }
             }
+            catch
+            {
+                success = false;
+                throw;
+            }
             finally
             {
+                if( !success ) info.FeedNames.Clear();
                 allDeps.Add( info );
             }
-            return true;
+            return success;
         }
 
-        Task<IFullPackageInfo?> ReadFullInfoAsync( IActivityMonitor monitor, ArtifactInstance instance )
+        Task<FullPackageInfo?> ReadFullInfoAsync( IActivityMonitor monitor, ArtifactInstance instance, IPackageFeed[] feeds )
         {
-            // We use a simple locked list to handle request duplicates.
+            // We use a simple dictionary to handle request duplicates.
             // Here we lookup the list for a pending TaskCompletionSource.
             // If we don't find it, we add a new one and launch the work.
-            // The cleanup of this list is done at the root Add call.
-            TaskCompletionSource<IFullPackageInfo?>? asyncPath = null;
+            // The cleanup of this list is done at the end of the root EnsureAsync call.
+            TaskCompletionSource<FullPackageInfo?>? tcs = null;
             lock( _currentRequests )
             {
-                int idx = _currentRequests.IndexOf( c => c.Item1 == instance );
-                if( idx >= 0 ) return _currentRequests[idx].Item2.Task;
-                asyncPath = new TaskCompletionSource<IFullPackageInfo?>();
-                _currentRequests.Add( (instance, asyncPath) );
+                if( _currentRequests.TryGetValue( instance, out tcs ) )
+                {
+                    return tcs.Task;
+                }
+                tcs = new TaskCompletionSource<FullPackageInfo?>();
+                _currentRequests.Add( instance, tcs );
             }
-            _ = DoReadFullInfoAsync( monitor, instance, asyncPath );
-            return asyncPath.Task;
+            _ = DoReadFullInfoAsync( monitor, instance, tcs, feeds );
+            return tcs.Task;
         }
 
-        async Task DoReadFullInfoAsync( IActivityMonitor monitor, ArtifactInstance instance, TaskCompletionSource<IFullPackageInfo?> result )
+        // This never throws. The TCS is resolved.
+        async Task DoReadFullInfoAsync( IActivityMonitor monitor, ArtifactInstance instance, TaskCompletionSource<FullPackageInfo?> result, IPackageFeed[] feeds )
         {
             FullPackageInfo p = new FullPackageInfo();
             List<Exception>? feedExceptions = null;
-            foreach( var f in _feeds )
+            Exception? invalidSameError = null;
+            foreach( var f in feeds )
             {
                 if( f.ArtifactType == instance.Artifact.Type )
                 {
@@ -172,7 +235,8 @@ namespace CK.Build
                         {
                             if( !p.CheckSame( info, monitor ) )
                             {
-                                throw new Exception( $"Package info for {p.Key} from feed '{p.FeedNames[0]}' differ from the one of '{f.TypedName}'. See previous log error for details." );
+                                invalidSameError = new Exception( $"Package info for {p.Key} from feed '{p.FeedNames[0]}' differ from the one of '{f.TypedName}'. See previous log error for details." );
+                                break;
                             }
                             p.FeedNames.Add( f.Name );
                         }
@@ -195,10 +259,18 @@ namespace CK.Build
             }
             else
             {
-                // We have at least one feed that has the package.
-                // If we have no errors and the feeds are "all the feeds", then we can update the "removed from feeds".
-                p.AllFeedNamesAreKnown = _isFullFeeds && feedExceptions == null;
-                result.SetResult( p );
+                // We have at least one feed that has the package...
+                if( invalidSameError != null )
+                {
+                    // If data is not consistent accross feeds, this is serious!
+                    result.SetException( invalidSameError );
+                }
+                else
+                {
+                    // If we have feedExceptions, we forget them (they are logged): we have a package
+                    // description and that's the most important.
+                    result.SetResult( p );
+                }
             }
         }
     }

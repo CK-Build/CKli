@@ -8,11 +8,12 @@ namespace CKli
     {
         public XArtifactCenter(
             Initializer initializer,
+            IRootedWorldName worldName,
             WorldStore worldStore,
             FileSystem fs )
             : base( initializer )
         {
-            ArtifactCenter = new ArtifactCenter();
+            ArtifactCenter = new ArtifactCenter( worldStore.GetWorkingLocalFolder( worldName ) );
             fs.ServiceContainer.Add( ArtifactCenter );
             initializer.Services.Add( ArtifactCenter );
             // Quick & dirty registration.

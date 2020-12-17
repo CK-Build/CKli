@@ -10,6 +10,10 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using NuGet.Protocol;
+using NuGet.Packaging.Core;
+using NuGet.Versioning;
+using NuGet.Frameworks;
 
 namespace CK.Env.NuGet
 {
@@ -98,9 +102,9 @@ namespace CK.Env.NuGet
                 return _checkedSecret ?? false;
             }
 
-            public async Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, string artifactName )
+            public Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, string artifactName )
             {
-                return await _baseFeed.SafeCall<MetadataResource,ArtifactAvailableInstances>( m, ( sources, meta, logger ) => GetAvailable( meta, logger, artifactName ) );
+                return _baseFeed.SafeCall<MetadataResource,ArtifactAvailableInstances>( m, ( sources, meta, logger ) => GetAvailable( meta, logger, artifactName ) );
             }
 
             async Task<ArtifactAvailableInstances> GetAvailable( MetadataResource meta, NuGetLoggerAdapter logger, string name )
@@ -119,6 +123,21 @@ namespace CK.Env.NuGet
                 }
                 return v;
             }
+
+            //public Task<IPackageInfo?> GetPackageInfoAsync( IActivityMonitor m, ArtifactInstance instance )
+            //{
+            //    return _baseFeed.SafeCall<PackageSearchResource, IPackageInfo?>( m, ( sources, meta, logger ) => GetPackageInfo( meta, logger, instance ) );
+            //}
+
+            //private async Task<IPackageInfo?> GetPackageInfo( PackageSearchResource meta, NuGetLoggerAdapter logger, ArtifactInstance instance )
+            //{
+            //    var search = $"packageId:{instance.Artifact.Name} version:{instance.Version}";
+            //    var s = await meta.SearchAsync( search, new SearchFilter( true ), 0, 100, logger, CancellationToken.None );
+            //    if( s == null ) return null;
+            //    var result = new PackageInfo();
+            //    result.Key = instance;
+            //    return result;
+            //}
         }
 
         /// <summary>

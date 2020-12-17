@@ -1,5 +1,8 @@
 using CSemVer;
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace CK.Build
 {
@@ -7,7 +10,7 @@ namespace CK.Build
     /// Immutable that defines an Artifact associated to a set of available versions (a <see cref="PackageQualityVector"/>)
     /// in a specific <see cref="Feed"/>.
     /// </summary>
-    public class ArtifactAvailableInstances
+    public class ArtifactAvailableInstances : IEnumerable<ArtifactInstance>
     {
         /// <summary>
         /// Initializes a new <see cref="ArtifactAvailableInstances"/> from an actual feed.
@@ -131,6 +134,14 @@ namespace CK.Build
         /// <returns>A readable string.</returns>
         public override string ToString() => IsValid ? $"{Artifact} ({Versions})" : String.Empty;
 
+        /// <summary>
+        /// Gets the set of instances of this <see cref="Artifact"/> with its <see cref="Versions"/>.
+        /// Instances are CI, Exploratory, Preview, ReleaseCandidate, Stable (in this order and if they exist).
+        /// </summary>
+        /// <returns>The available instances.</returns>
+        public IEnumerator<ArtifactInstance> GetEnumerator() => Versions.Select( v => new ArtifactInstance( Artifact, v ) ).GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
 }
