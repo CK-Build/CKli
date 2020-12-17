@@ -32,7 +32,7 @@ namespace CK.Env.Plugin
             var solution = _driver.GetSolution( m, allowInvalidSolution: true );
             if( solution == null ) return;
 
-            var projects = _npmDriver.GetNPMProjects( m );
+            var projects = _npmDriver.GetAllNPMProjects( m );
             if( projects == null ) return;
             bool useNpm = projects.Any();
             if( useNpm )
