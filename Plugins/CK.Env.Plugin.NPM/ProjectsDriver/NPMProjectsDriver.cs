@@ -120,10 +120,16 @@ namespace CK.Env.Plugin
             return _angularWorkspaces.SelectMany( s => s.Projects ).All( p => p.RefreshStatus( m ) == NPMProjectStatus.Valid );
         }
 
-        public IReadOnlyList<NPMProject> GetNPMProjects( IActivityMonitor m )
+        public IReadOnlyList<NPMProject> GetSimpleNPMProjects( IActivityMonitor m )
         {
             return _driver.GetSolution( m, allowInvalidSolution: true ) != null ? _npmProjects : null;
         }
+
+        public IEnumerable<NPMProject> GetAllNPMProjects( IActivityMonitor m )
+        {
+            return _driver.GetSolution( m, allowInvalidSolution: true ) != null ? AllNpmProjects : null;
+        }
+
         public IReadOnlyList<AngularWorkspace> GetAngularWorkspaces( IActivityMonitor m )
         {
             return _driver.GetSolution( m, allowInvalidSolution: true ) != null ? _angularWorkspaces : null;

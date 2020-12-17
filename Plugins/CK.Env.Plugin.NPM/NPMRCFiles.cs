@@ -41,7 +41,7 @@ namespace CK.Env.Plugin
         {
             if( !this.CheckCurrentBranch( m ) ) return;
 
-            var projects = _driver.GetNPMProjects( m );
+            var projects = _driver.GetSimpleNPMProjects( m );
             if( projects == null ) return;
             foreach( var f in projects.Select( p => p.FullPath.AppendPart( ".npmrc" ) ) )
             {
