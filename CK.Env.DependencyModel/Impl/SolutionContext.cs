@@ -106,7 +106,7 @@ namespace CK.Env.DependencyModel
         /// Gets the current version. This changes each time
         /// anything changes in the solutions or projects.
         /// </summary>
-        public int Version => _version;
+        public int UpdateSerialNumber => _version;
 
         /// <summary>
         /// Gets the solution by its name or by its <see cref="Solution.FullPath"/>.
@@ -122,7 +122,7 @@ namespace CK.Env.DependencyModel
         public IEnumerator<Solution> GetEnumerator() => _list.GetEnumerator();
 
         /// <summary>
-        /// Gets a <see cref="DependencyAnalyzer"/> that is up to date (based on the <see cref="SolutionContext.Version"/>).
+        /// Gets a <see cref="DependencyAnalyzer"/> that is up to date (based on the <see cref="SolutionContext.UpdateSerialNumber"/>).
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="traceGraphDetails">True to trace the details of the input and output (sorted) graphs.</param>
