@@ -1,8 +1,8 @@
 using CK.Core;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
+using System.Diagnostics;
 using System.Threading;
 
 namespace CK.Build
