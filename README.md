@@ -104,7 +104,8 @@ Gets the URL of the stack you want to clone:
 | CK-Build   | https://github.com/CK-Build/CK-Build-Stack                          | **Public** |
 | Engie      | https://invenietis@dev.azure.com/invenietis/Cofely/_git/Engie-Stack | Private    |
 | SC         | https://gitlab.com/signature-code/signature-code-stack              | Private    |
-| S-Mos      | https://gitlab.com/signature-mosaic/Signature-Mosaic-Stack          | Private    |
+| SMos       | https://gitlab.com/signature-mosaic/Signature-Mosaic-Stack          | Private    |
+| SLog       | https://gitlab.com/signature-logistic/slog-stack                    | Private    |
 
 Type `run Home/EnsureStackRepository` (or `run *ensure*` since there is no other command with `Ensure` in its name) and press `enter`.
 

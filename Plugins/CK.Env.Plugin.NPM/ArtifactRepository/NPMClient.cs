@@ -36,7 +36,7 @@ namespace CK.Env.NPM
         public IArtifactRepository CreateRepository( in XElementReader r )
         {
             IArtifactRepository result = null;
-            var qualityFilter = new PackageQualityFilter( r.HandleOptionalAttribute<string>( "QualityFilter", null ) );
+            PackageQualityFilter.TryParse( r.HandleOptionalAttribute<string>( "QualityFilter", String.Empty ), out var qualityFilter );
             switch( r.HandleOptionalAttribute<string>( "Type", null ) )
             {
                 case "NPMAzure":

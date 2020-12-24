@@ -171,15 +171,6 @@ namespace CK.Env.NuGet
         static NuGetClient()
         {
             NuGetType = ArtifactType.Register( "NuGet", true, ';' );
-
-            // Workaround for dev/NuGet.Client\src\NuGet.Core\NuGet.Protocol\Plugins\PluginFactory.cs line 161:
-            // FileName = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH"),
-            // This line should be:
-            // FileName = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
-            //
-            // Issue: https://github.com/NuGet/Home/issues/7438
-            //
-            Environment.SetEnvironmentVariable( "DOTNET_HOST_PATH", "dotnet" );
             StaticProviders = new List<Lazy<INuGetResourceProvider>>();
             StaticProviders.AddRange( Repository.Provider.GetCoreV3() );
             _secretKeysLock = new object();
@@ -216,7 +207,7 @@ namespace CK.Env.NuGet
         public IArtifactRepository CreateRepository( in XElementReader r )
         {
             IArtifactRepository result = null;
-            var qualityFilter = new PackageQualityFilter( r.HandleOptionalAttribute<string>( "QualityFilter", null ) );
+            PackageQualityFilter.TryParse( r.HandleOptionalAttribute<string>( "QualityFilter", String.Empty ), out var qualityFilter );
             switch( r.HandleOptionalAttribute<string>( "Type", null ) )
             {
                 case "NuGetAzure":

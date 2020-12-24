@@ -139,6 +139,12 @@ namespace CK.SimpleKeyVault
         /// </summary>
         public bool IsSecretAvailable => _secret != null;
 
+        /// <summary>
+        /// Gets the secret or null if <see cref="IsSecretAvailable"/> is false).
+        /// (Note that this secret may be defined by the <see cref="SuperKey"/>.)
+        /// </summary>
+        public string? Secret => _secret;
+
         public SecretKeyInfo FinalSubKey
         {
             get
@@ -160,12 +166,6 @@ namespace CK.SimpleKeyVault
             bool isValidAvailable = _secret != null && (SuperKey?._secret == null || SuperKey._secret == _secret);
             Debug.Assert( isValidNull || isValidAvailable );
         }
-
-        /// <summary>
-        /// Gets the secret or null if <see cref="IsSecretAvailable"/> is false).
-        /// (Note that this secret may be defined by the <see cref="SuperKey"/>.)
-        /// </summary>
-        public string? Secret => _secret;
 
         /// <summary>
         /// Imports a secret, typically stored in an external safe place.

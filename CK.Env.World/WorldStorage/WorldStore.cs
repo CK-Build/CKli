@@ -1,3 +1,4 @@
+using CK.Build;
 using CK.Core;
 using CK.Text;
 using System;
@@ -101,6 +102,14 @@ namespace CK.Env
             if( d == null ) m.Info( $"Creating new local state for {w.FullName}." );
             return new LocalWorldState( this, w, d );
         }
+
+        /// <summary>
+        /// Implementation must return a local folder where any local stuff associated
+        /// to the world may be stored.
+        /// </summary>
+        /// <param name="w">The world name. It must exist in this store.</param>
+        /// <returns>A local path to an existing and writable directory.</returns>
+        public abstract NormalizedPath GetWorkingLocalFolder( IWorldName w );
 
         /// <summary>
         /// Gets the local state by reading the file <see cref="ToLocalStateFilePath(IWorldName)"/> if it exists.

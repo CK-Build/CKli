@@ -5,29 +5,25 @@ using System.Diagnostics;
 
 namespace CK.Env.Plugin
 {
-    /// <summary>
-    /// This is temporary waiting for the CKSetup v13 to be used everywhere: v13 uses the CKSetupStore.txt redirection file
-    /// for its tests as well as for its normal run.
-    /// </summary>
-    public class CKSetupStoreTestHelperConfigFile : TextFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider, IDisposable
+    public class CKSetupStoreRedirectionFile : TextFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider, IDisposable
     {
         readonly SolutionSpec _solutionSpec;
         readonly SolutionDriver _solutionDriver;
         readonly IEnvLocalFeedProvider _localFeedProvider;
 
-        public CKSetupStoreTestHelperConfigFile(
+        public CKSetupStoreRedirectionFile(
             GitFolder f,
             SolutionDriver solutionDriver,
             SolutionSpec settings,
             IEnvLocalFeedProvider localFeedProvider,
             NormalizedPath branchPath )
-            : base( f, branchPath, branchPath.AppendPart( "RemoteStore.TestHelper.config" ) )
+            : base( f, branchPath, branchPath.AppendPart( "CKSetupStore.txt" ) )
         {
             _solutionSpec = settings;
             _solutionDriver = solutionDriver;
             _localFeedProvider = localFeedProvider;
-            // Always monitor branch change even if _settings.ProduceCKSetupComponents is false
-            // so that we delete the test file on leaving local if it happens to exist.
+            // Always monitor branch change so that we delete the redirection file
+            // on leaving local if it happens to exist.
             if( StandardPluginBranch == StandardGitStatus.Local )
             {
                 f.OnLocalBranchEntered += OnLocalBranchEntered;
@@ -46,29 +42,16 @@ namespace CK.Env.Plugin
             Debug.Assert( _solutionSpec.UseCKSetup );
             if( !e.IsUsingDirtyFolder ) return;
 
-            // The CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL environment variable is always required
-            // except when building in 'remote develop' and 'local'.
-            // The Build script must handle these two cases (so that CodeCakebuilder can be run
-            // directly): on 'develop', the actual remote is used normally and in local, the script
-            // MUST map the local store. Typically:
-            //
-            //    if( globalInfo.IsLocalCIRelease )
-            //    {
-            //        storeConf.TargetStoreUrl = System.IO.Path.Combine( globalInfo.LocalFeedPath, "CKSetupStore" );
-            //    }
-            //
-
             // Ensures that the local stores exist.
             if( !_localFeedProvider.EnsureCKSetupStores( e.Monitor ) ) return;
 
-            var targetStore = _localFeedProvider.GetCKSetupStorePath( e.Monitor, e.BuildType );
-            if( !_solutionSpec.NoDotNetUnitTests )
-            {
-                EnsureStorePath( e.Monitor, targetStore );
-            }
-            e.EnvironmentVariables.Add( ("CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL", targetStore) );
-            e.EnvironmentVariables.Add( ("CKSETUP_STORE", targetStore) );
-            e.EnvironmentVariables.Add( ("CKSETUP_REMOTE", targetStore) );
+            var store = _localFeedProvider.GetCKSetupStorePath( e.Monitor, e.BuildType );
+            EnsureStorePath( e.Monitor, store );
+            // By setting this environment variable, CCB will not use the CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL from
+            // its key vault (that contains the actual target remote): components will be pushed to the local store.
+            // When using CCB, it is the "Publish" commands that do the actual job of transfering locally produced components
+            // to the remote target store.
+            e.EnvironmentVariables.Add( ("CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL", store) );
         }
 
         void OnEndBuild( object sender, EventMonitoredArgs e )
@@ -122,13 +105,8 @@ namespace CK.Env.Plugin
         public bool EnsureStorePath( IActivityMonitor m, string storePath )
         {
             if( !_localFeedProvider.EnsureCKSetupStores( m ) ) return false;
-            var text = "<configuration><appSettings>" + Environment.NewLine;
-            text += "  -- This forces the Solutions that generate components to use the LocalFeed CKSetupStore." + Environment.NewLine;
-            text += $@"  <add key=""CKSetup/DefaultStoreUrl"" value=""{storePath}"" />" + Environment.NewLine;
-            text += $@"  <add key=""CKSetup/DefaultStorePath"" value=""{storePath}"" />" + Environment.NewLine;
-            text += "</appSettings></configuration>";
-            m.Trace( $"Updating '{FilePath}' to:{Environment.NewLine}{text}" );
-            return CreateOrUpdate( m, text );
+            m.Info( $"CKSetupStore redirection file '{FilePath}' is: '{storePath}'." );
+            return CreateOrUpdate( m, storePath );
         }
     }
 }

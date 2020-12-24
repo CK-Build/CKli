@@ -5,13 +5,13 @@ namespace CK.Env.DependencyModel
 {
     /// <summary>
     /// Solution context handles a set of solutions and their projects.
-    /// The centralized <see cref="Version"/> enables any derived information
+    /// The centralized <see cref="UpdateSerialNumber"/> enables any derived information
     /// from these solutions to handle synchronization.
     /// </summary>
     public interface ISolutionContext : IReadOnlyCollection<ISolution>
     {
         /// <summary>
-        /// Gets a <see cref="DependencyAnalyzer"/> that is up to date (based on the <see cref="Version"/>).
+        /// Gets a <see cref="DependencyAnalyzer"/> that is up to date (based on the <see cref="UpdateSerialNumber"/>).
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="traceGraphDetails">True to trace the details of the input and output (sorted) graphs.</param>
@@ -19,10 +19,10 @@ namespace CK.Env.DependencyModel
         DependencyAnalyzer GetDependencyAnalyser( IActivityMonitor m, bool traceGraphDetails );
 
         /// <summary>
-        /// Gets the current version. This changes each time
+        /// Gets the current update serial number. This changes each time
         /// anything changes in the solutions or projects.
         /// </summary>
-        int Version { get; }
+        int UpdateSerialNumber { get; }
 
     }
 }

@@ -155,6 +155,7 @@ namespace CK.Env.NuGet
                     }
                     var toPush = exist.Where( e => !e.exists.Result ).Select( e => e.file ).ToArray();
 
+                    var symbolPackageUpdateResource = await sources.GetResourceAsync<SymbolPackageUpdateResourceV3>();
                     var updater = await sources.GetResourceAsync<PackageUpdateResource>();
                     foreach( var f in toPush )
                     {
@@ -166,6 +167,8 @@ namespace CK.Env.NuGet
                             getApiKey: endpoint => apiKey,
                             getSymbolApiKey: symbolsEndpoint => null,
                             noServiceEndpoint: false,
+                            skipDuplicate: true,
+                            symbolPackageUpdateResource: symbolPackageUpdateResource,
                             log: logger );
                         await OnPackagePushed( logger, f );
                     }

@@ -314,13 +314,12 @@ namespace CK.Env.MSBuildSln
             foreach( var p in _dependencies.Packages.Where( p => p.PackageId == packageId
                                                                  && !(pFrameworks = p.Frameworks.Intersect( actualFrameworks )).IsEmpty ) )
             {
-                if( p.VersionLocked )
+                if( !p.Version.Satisfy( version ) )
                 {
-                    m.Warn( $"The version({p.Version}) of the package {packageId} was manually locked. You need to change it manually." );
-                    continue;
+                    m.Info( $"The new version '{version}' is not compatible with the {packageId} previous version range that is '{p.Version}'." );
                 }
                 actualFrameworks = actualFrameworks.Except( pFrameworks );
-                var currentVersion = p.Version;
+                var currentVersion = p.Version.Base;
                 if( currentVersion != version )
                 {
                     if( !preserveExisting )
@@ -548,113 +547,107 @@ namespace CK.Env.MSBuildSln
                         m.Warn( $"Element {p.Origin} misses Include attribute. It is ignored." );
                         continue;
                     }
-                    else
-                    {
                         if( string.IsNullOrWhiteSpace( p.PackageId ) )
                         {
                             m.Error( $"Invalid Include attribute on element {p.Origin}." );
                             return;
                         }
 
-                        XElement? propertyDef = null;
-                        bool isVersionOverride = false;
-                        bool versionLocked = false;
-                        SVersion? version = null;
+                    XElement? propertyDef = null;
+                    bool isVersionOverride = false;
+                    // Since we play with flags, static analysis fails to detect that this is always initialized.
+                    SVersionBound.ParseResult versionBound = new SVersionBound.ParseResult( "Never happen." );
 
-                        if( p.RawVersion == null )
+                    if( p.RawVersion == null )
+                    {
+                        // No Version attribute nor element: we must use Central packages!
+                        if( _centralPackagesFile == null )
                         {
-                            // No Version attribute nor element: we must use Central packages!
-                            if( _centralPackagesFile == null )
+                            if( UseMicrosoftBuildCentralPackageVersions )
                             {
-                                if( UseMicrosoftBuildCentralPackageVersions )
-                                {
-                                    m.Error( $"Missing Version attribute (or child element) on element {p.Origin} and Microsoft.Build.CentralPackageVersions is not operational: the props file (via CentralPackagesFile property or Packages.props in solution folder) has not been found." );
-                                }
-                                else
-                                {
-                                    m.Warn( $"Missing Version attribute (or child element) on element {p.Origin} (and Microsoft.Build.CentralPackageVersions is not used). This is ignored." );
-                                }
-                                continue;
+                                m.Error( $"Missing Version attribute (or child element) on element {p.Origin} and Microsoft.Build.CentralPackageVersions is not operational: the props file (via CentralPackagesFile property or Packages.props in solution folder) has not been found." );
                             }
                             else
                             {
-                                // We are using CentralPackageVersions: VersionOverride may be used!
-                                var vO = (string)p.Origin.Attribute( "VersionOverride" );
-                                if( vO != null )
-                                {
-                                    isVersionOverride = true;
-                                    if( !((versionLocked, version) = SVersionRange.TryParseSimpleRange( m, vO )).version.IsValid )
-                                    {
-                                        m.Error( $"Unable to parse VersionOverride attribute on element {p.Origin}: {version.ErrorMessage}" );
-                                        return;
-                                    }
-                                    m.Warn( $"VersionOverride is used for package {p.PackageId}: {vO}." );
-                                }
+                                m.Warn( $"Missing Version attribute (or child element) on element {p.Origin} (and Microsoft.Build.CentralPackageVersions is not used). This is ignored." );
                             }
-                            if( !isVersionOverride )
+                            continue;
+                        }
+                        // We are using CentralPackageVersions: VersionOverride may be used!
+                        var vO = (string)p.Origin.Attribute( "VersionOverride" );
+                        if( vO != null )
+                        {
+                            isVersionOverride = true;
+                            versionBound = ParseNugetBound( m, vO );
+                            if( !versionBound.IsValid )
                             {
-                                // We must find the <Package Update= ... version.
+                                m.Error( $"Unable to parse VersionOverride attribute on element {p.Origin}: {versionBound.Error}" );
+                                return;
+                            }
+                            m.Warn( $"VersionOverride is used for package {p.PackageId}: {versionBound}." );
+                        }
+                        if( !isVersionOverride )
+                        {
+                            // We must find the <Package Update= ... version.
+                            propertyDef = _centralPackagesFile.Document.Root.Elements().Where( e => e.Name.LocalName == "ItemGroup" )
+                                                                            .Elements().Where( e => e.Name.LocalName == "PackageReference" )
+                                                                            .FirstOrDefault( e => (string)e.Attribute( "Update" ) == p.PackageId );
+                            if( propertyDef == null )
+                            {
                                 propertyDef = _centralPackagesFile.Document.Root.Elements().Where( e => e.Name.LocalName == "ItemGroup" )
-                                                                                .Elements().Where( e => e.Name.LocalName == "PackageReference" )
-                                                                                .FirstOrDefault( e => (string)e.Attribute( "Update" ) == p.PackageId );
+                                                                                    .Elements().Where( e => e.Name.LocalName == "PackageReference" )
+                                                                                    .FirstOrDefault( e => p.PackageId.Equals( (string)e.Attribute( "Update" ), StringComparison.OrdinalIgnoreCase ) );
                                 if( propertyDef == null )
                                 {
-                                    propertyDef = _centralPackagesFile.Document.Root.Elements().Where( e => e.Name.LocalName == "ItemGroup" )
-                                                                                        .Elements().Where( e => e.Name.LocalName == "PackageReference" )
-                                                                                        .FirstOrDefault( e => p.PackageId.Equals( (string)e.Attribute( "Update" ), StringComparison.OrdinalIgnoreCase ) );
-                                    if( propertyDef == null )
-                                    {
-                                        m.Error( $"Unable to find a version for '{p.PackageId}' in central package file '{_centralPackagesFile.Path}'." );
-                                        return;
-                                    }
-                                    m.Warn( $"Found a package version for '{p.PackageId}' in central package file '{_centralPackagesFile.Path}': '{propertyDef.Attribute( "Update" )}' case differ." );
+                                    m.Error( $"Unable to find a version for '{p.PackageId}' in central package file '{_centralPackagesFile.Path}'." );
+                                    return;
                                 }
-                                if( !((versionLocked, version) = SVersionRange.TryParseSimpleRange( m, (string)propertyDef.Attribute( "Version" ) )).version.IsValid )
-                                {
-                                    m.Error( $"Unable to parse Version attribute on element {propertyDef} in central package file '{_centralPackagesFile.Path}': {version.ErrorMessage}" );
-                                }
+                                m.Warn( $"Found a package version for '{p.PackageId}' in central package file '{_centralPackagesFile.Path}': '{propertyDef.Attribute( "Update" )}' case differ." );
+                            }
+                            if( !(versionBound = ParseNugetBound( m, (string)propertyDef.Attribute( "Version" ) )).IsValid )
+                            {
+                                m.Error( $"Unable to parse Version attribute on element {propertyDef} in central package file '{_centralPackagesFile.Path}': {versionBound.Error}" );
+                                return;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Check empty or whitespace.
+                        if( string.IsNullOrWhiteSpace( p.RawVersion ) )
+                        {
+                            m.Error( $"Invalid Version attribute on element {p.Origin}." );
+                            return;
+                        }
+                        bool isPropVersion = p.RawVersion.StartsWith( "$(" );
+                        if( !isPropVersion )
+                        {
+                            versionBound = ParseNugetBound( m, p.RawVersion );
+                            if( !versionBound.IsValid )
+                            {
+                                m.Error( $"Unable to parse Version attribute on element {p.Origin}: {versionBound.Error}" );
+                                return;
                             }
                         }
                         else
                         {
-                            bool isPropVersion;
-                            if( string.IsNullOrWhiteSpace( p.RawVersion )
-                                || (
-                                     !(isPropVersion = p.RawVersion.StartsWith( "$(" ))
-                                     && !((versionLocked, version) = SVersionRange.TryParseSimpleRange( m, p.RawVersion )).version.IsValid
-                                   ) )
-                            {
-                                if( version != null )
-                                {
-                                    m.Error( $"Unable to parse Version attribute on element {p.Origin}: {version.ErrorMessage}" );
-                                }
-                                else
-                                {
-                                    m.Error( $"Invalid Version attribute on element {p.Origin}." );
-                                }
-                                return;
-                            }
-                            if( isPropVersion )
-                            {
-                                Debug.Assert( version != null );
-                                propertyDef = FollowRefPropertyVersion( m, p, ref versionLocked, ref version );
-                                if( propertyDef == null ) return;
-                            }
+                            versionBound = FollowRefPropertyVersion( m, p, out propertyDef );
+                            if( !versionBound.IsValid ) return;
                         }
-
-
-                        string[] defaultValues = new string[] { "compile", "runtime", "contentFiles", "build", "analyzers", "native" };
-
-                        CKTrait? frameworks = ComputeFrameworks( m, p.Origin, conditionEvaluator );
-                        if( frameworks == null ) return;
-                        if( frameworks.IsEmpty )
-                        {
-                            m.Warn( $"Useless PackageReference (applies to undeclared frameworks): {p.Origin}." );
-                            uselessDeps.Add( p.Origin );
-                            continue;
-                        }
-                        deps.Add( new DeclaredPackageDependency( this, p.PackageId, versionLocked, version, p.Origin, propertyDef, frameworks, p.PrivateAssets, isVersionOverride ) );
                     }
+
+
+                    string[] defaultValues = new string[] { "compile", "runtime", "contentFiles", "build", "analyzers", "native" };
+
+                    CKTrait? frameworks = ComputeFrameworks( m, p.Origin, conditionEvaluator );
+                    if( frameworks == null ) return;
+                    if( frameworks.IsEmpty )
+                    {
+                        m.Warn( $"Useless PackageReference (applies to undeclared frameworks): {p.Origin}." );
+                        uselessDeps.Add( p.Origin );
+                        continue;
+                    }
+                    deps.Add( new DeclaredPackageDependency( this, p.PackageId, versionBound.Result, p.Origin, propertyDef, frameworks, p.PrivateAssets, isVersionOverride ) );
                 }
                 else
                 {
@@ -693,6 +686,17 @@ namespace CK.Env.MSBuildSln
             _dependencies = new Dependencies( deps, projs, uselessDeps );
         }
 
+        static SVersionBound.ParseResult ParseNugetBound( IActivityMonitor m, string r )
+        {
+            SVersionBound.ParseResult v = SVersionBound.NugetTryParse( r );
+            if( v.IsValid )
+            {
+                if( v.FourthPartLost ) m.Warn( $"4th part (or more) ingored in version range: '{r}'." );
+                if( v.IsApproximated ) m.Warn( $"Version range '{r}' has been approximated to version bound '{v.Result}'." );
+            }
+            return v;
+        }
+
         CKTrait? ComputeFrameworks( IActivityMonitor m, XElement e, PartialEvaluator evaluator )
         {
             Debug.Assert( TargetFrameworks != null );
@@ -718,13 +722,13 @@ namespace CK.Env.MSBuildSln
             return frameworks;
         }
 
-        XElement? FollowRefPropertyVersion( IActivityMonitor m, (XElement Origin, string PackageId, string RawVersion, string) p, ref bool versionLocked, ref SVersion version )
+        SVersionBound.ParseResult FollowRefPropertyVersion( IActivityMonitor m, (XElement Origin, string PackageId, string RawVersion, string) p, out XElement? propertyDef )
         {
+            propertyDef = null;
             Debug.Assert( _primaryFile != null );
             if( !p.RawVersion.EndsWith( "Version)" ) )
             {
-                m.Error( $"Invalid $(PropertyVersion) on element {p.Origin}. Its name must end with 'Version'." );
-                return null;
+                return new SVersionBound.ParseResult( $"Invalid $(PropertyVersion) on element {p.Origin}. Its name must end with 'Version'." );
             }
             // Lookup for the property.
             string propName = p.RawVersion.Substring( 2, p.RawVersion.Length - 3 );
@@ -734,24 +738,20 @@ namespace CK.Env.MSBuildSln
                                  .Where( e => e.Name.LocalName == propName ).ToList();
             if( candidates.Count == 0 )
             {
-                m.Error( $"Unable to find $({propName}) version definition for element {p.Origin}." );
-                return null;
+                return new SVersionBound.ParseResult( $"Unable to find $({propName}) version definition for element {p.Origin}." );
             }
             if( candidates.Count > 1 )
             {
-                m.Error( $"Found more than one $({propName}) version definition for element {p.Origin}." );
-                return null;
+                return new SVersionBound.ParseResult( $"Found more than one $({propName}) version definition for element {p.Origin}." );
             }
-            XElement propertyDef = candidates[0];
-            var v = SVersionRange.TryParseSimpleRange( m, propertyDef.Value );
-            if( !v.Version.IsValid )
+            var pDef = candidates[0];
+            var v = ParseNugetBound( m, pDef.Value );
+            if( !v.IsValid )
             {
-                m.Error( $"Invalid $({propName}) version definition {p.Origin} in {propertyDef}: {version.ErrorMessage}." );
-                return null;
+                return v.AddError( $"Invalid $({propName}) version definition {p.Origin} in {pDef}." );
             }
-            version = v.Version;
-            versionLocked = v.Locked;
-            return propertyDef;
+            propertyDef = pDef;
+            return v;
         }
 
     }

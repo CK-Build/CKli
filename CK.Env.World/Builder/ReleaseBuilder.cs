@@ -96,7 +96,7 @@ namespace CK.Env
                 {
                     driver.GitRepository.ClearVersionTag( m, targetVersion );
                 }
-                if( targetVersion.PackageQuality == PackageQuality.Release )
+                if( targetVersion.PackageQuality == PackageQuality.Stable )
                 {
                     buildResult &= driver.GitRepository.SwitchMasterToDevelop( m );
                 }
@@ -114,7 +114,7 @@ namespace CK.Env
             try
             {
                 var git = driver.GitRepository;
-                if( targetVersion.PackageQuality == PackageQuality.Release )
+                if( targetVersion.PackageQuality == PackageQuality.Stable )
                 {
                     if( !git.SwitchDevelopToMaster( m ) ) return false;
                     driver = driver.GetCurrentBranchDriver();

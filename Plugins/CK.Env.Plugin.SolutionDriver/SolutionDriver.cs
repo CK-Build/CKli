@@ -348,11 +348,11 @@ namespace CK.Env.Plugin
             var p = project.Tag<MSProject>();
             foreach( DeclaredPackageDependency dep in p.Deps.Packages )
             {
-                toRemove.Remove( dep.Package.Artifact );
-                project.EnsurePackageReference(
-                    dep.Package,
-                    dep.PrivateAsset.Equals( "all", StringComparison.OrdinalIgnoreCase ) ? ArtifactDependencyKind.Private : ArtifactDependencyKind.Transitive,
-                    dep.Frameworks );
+                var d = dep.BaseArtifactInstance;
+                toRemove.Remove( d.Artifact );
+                project.EnsurePackageReference( d,
+                                                dep.PrivateAsset.Equals( "all", StringComparison.OrdinalIgnoreCase ) ? ArtifactDependencyKind.Private : ArtifactDependencyKind.Transitive,
+                                                dep.Frameworks );
             }
             foreach( var noMore in toRemove ) project.RemovePackageReference( noMore );
         }
@@ -608,6 +608,11 @@ namespace CK.Env.Plugin
             OnZeroBuildProject?.Invoke( this, new ZeroBuildEventArgs( monitor, true, info ) );
             try
             {
+                // 23 dec. 2020: On CKSetup.Core change, the 0.0.0-0 ref to CK.ActivityMonitor was ignored (the resulting
+                // nupkg had the previous CI versions). However breaking here and manually executing the dotnet pack
+                // was okay...
+                // This should be a (vicious) cache issue and may be a first "dotnet clean" helps.
+                ProcessRunner.Run( monitor, path, "dotnet", "clean" );
                 return ProcessRunner.Run( monitor, path, "dotnet", args );
             }
             finally

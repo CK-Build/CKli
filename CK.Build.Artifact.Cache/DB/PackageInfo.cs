@@ -1,4 +1,5 @@
 using CK.Core;
+using CSemVer;
 using System;
 using System.Collections.Generic;
 
@@ -11,14 +12,12 @@ namespace CK.Build
     {
         CKTrait? _savors;
 
-        /// <summary>
-        /// Gets or sets the key of this package.
-        /// </summary>
+        /// <inheritdoc />
         public ArtifactInstance Key { get; set; }
 
         /// <summary>
         /// Gets or sets the savors if any.
-        /// It is null by default, and note that <see cref="CKTrait.IsEmpty"/> is forbidden and raises an ArgumentExceptiuon if set.
+        /// It is null by default, and note that <see cref="CKTrait.IsEmpty"/> is forbidden and raises an ArgumentException if set.
         /// </summary>
         public CKTrait? Savors
         {
@@ -32,10 +31,11 @@ namespace CK.Build
 
         /// <summary>
         /// Gets the mutable list of dependencies.
+        /// This will be transformed into <see cref="PackageInstance.Dependencies"/> that is a set of <see cref="PackageInstance.Reference"/>.
         /// </summary>
-        public List<(ArtifactInstance Target, ArtifactDependencyKind Kind, CKTrait? Savors)> Dependencies { get; } = new List<(ArtifactInstance, ArtifactDependencyKind, CKTrait?)>();
+        public List<(ArtifactInstance Target, SVersionLock Lock, PackageQuality MinQuality, ArtifactDependencyKind Kind, CKTrait? Savors)> Dependencies { get; } = new List<(ArtifactInstance, SVersionLock, PackageQuality, ArtifactDependencyKind, CKTrait?)>();
 
-        IEnumerable<(ArtifactInstance Target, ArtifactDependencyKind Kind, CKTrait? Savors)> IPackageInfo.Dependencies => Dependencies;
+        IEnumerable<(ArtifactInstance Target, SVersionLock Lock, PackageQuality MinQuality, ArtifactDependencyKind Kind, CKTrait? Savors)> IPackageInfo.Dependencies => Dependencies;
 
     }
 }

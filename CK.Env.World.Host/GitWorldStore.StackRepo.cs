@@ -102,10 +102,16 @@ namespace CK.Env
             internal bool Refresh( IActivityMonitor m, bool force = true )
             {
                 bool isOpened = false;
+                var localDir = Root.AppendPart( "$Local" );
                 if( _git == null )
                 {
                     _git = GitRepository.Create( m, this, Root, Root.LastPart, false, BranchName, checkOutBranchName: true );
                     if( _git == null ) return false;
+                    // Ensures that the $Local directory is created and that the .gitignore ignores it.
+                    // The .gitignore file is created only once.
+                    Directory.CreateDirectory( localDir );
+                    var ignore = Root.AppendPart( ".gitignore" );
+                    if( !File.Exists( ignore ) ) File.WriteAllText( ignore, "$Locals/" + Environment.NewLine );
                     isOpened = true;
                 }
                 if( force || isOpened )
@@ -159,6 +165,11 @@ namespace CK.Env
                                 newWorld.HasDefinitionFile = true;
                                 _worlds.Add( new WorldInfo( this, newWorld ) );
                             }
+                        }
+                        // Finally: ensures that the $Local/FullName directory exists.
+                        foreach( var w in _worlds )
+                        {
+                            Directory.CreateDirectory( localDir.AppendPart( w.WorldName.FullName ) );
                         }
                     }
                 }

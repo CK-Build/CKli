@@ -75,7 +75,8 @@ namespace CK.Env
             ".txt",
             ".cs", ".js", ".sql",
             ".sln", ".csproj", ".proj",
-            ".yml", ".json", ".xml"
+            ".yml", ".json", ".xml",
+            ".editorconfig", ".config"
         };
 
         class Origin : ITextFileInfo

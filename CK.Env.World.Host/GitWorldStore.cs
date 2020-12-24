@@ -12,7 +12,7 @@ using System.Xml.Linq;
 namespace CK.Env
 {
     /// <summary>
-    /// Implements a World store based on Git repositories: the <see cref="Worlds"/>
+    /// Implements a World store based on Git repositories: the <see cref="StackRepositories"/>
     /// </summary>
     public sealed partial class GitWorldStore : WorldStore, ICommandMethodsProvider, IDisposable
     {
@@ -49,7 +49,6 @@ namespace CK.Env
         /// Gets the root path of the store: it contains the <see cref="StackRepo"/>'s git working folder.
         /// </summary>
         public NormalizedPath RootPath => _rootPath;
-
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => UserHost.WorldCommandPath;
 
@@ -409,6 +408,49 @@ namespace CK.Env
             var def = local.XmlDescriptionFilePath;
             Debug.Assert( def.EndsWith( ".World.xml" ) );
             return (local, def.RemoveLastPart().AppendPart( def.LastPart.Substring( 0, def.LastPart.Length - 3 ) + "SharedState.xml" ));
+        }
+
+        /// <summary>
+        /// Overridden to return the file $Local/FullName/LocalState.xml in the stack repository (see <see cref="GetWorkingLocalFolder(IActivityMonitor, IWorldName)"/>)
+        /// (base WorldStore consider it by default at the root of the world but with the git store, we prefere to have it in the local folder).
+        /// </summary>
+        /// <param name="w">The world name.</param>
+        /// <returns>The path to use to read/write the local state.</returns>
+        protected override NormalizedPath ToLocalStateFilePath( IWorldName w ) => GetWorkingLocalFolder( w ).AppendPart( "LocalState.xml" );
+
+
+        protected override XDocument GetLocalState( IActivityMonitor m, IWorldName w )
+        {
+            var path = ToLocalStateFilePath( w );
+
+            // Temporary. Before v0.5.0, the local state was located at the world root (this is how the base WorldStore works).
+            //            If the previoaus file is found, move it to its new location.
+            if( !File.Exists( path ) )
+            {
+                var previously = base.ToLocalStateFilePath( w );
+                if( File.Exists( previously ) )
+                {
+                    m.Info( $"File '{previously}' is moving to '{path}' (since version v0.5.0)." );
+                    File.Move( previously, path );
+                }
+            }
+            // /Temporary (the base GetLocalState method would do the job).
+
+            return File.Exists( path ) ? XDocument.Load( path ) : null;
+        }
+
+
+        /// <summary>
+        /// Returns the "$Local" folder in the <see cref="StackRepo"/> repository.
+        /// </summary>
+        /// <param name="w">The world name. It must exist in this store.</param>
+        /// <returns>A local path to an existing and writable directory.</returns>
+        public override NormalizedPath GetWorkingLocalFolder( IWorldName w )
+        {
+            var local = ToLocal( w );
+            var def = local.XmlDescriptionFilePath;
+            Debug.Assert( def.EndsWith( ".World.xml" ) );
+            return def.RemoveLastPart().AppendPart( "$Local" ).AppendPart( w.FullName );
         }
 
         public void Dispose()

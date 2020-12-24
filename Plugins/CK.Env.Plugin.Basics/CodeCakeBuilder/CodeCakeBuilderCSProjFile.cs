@@ -46,10 +46,10 @@ namespace CK.Env.Plugin
             // This should be modeled in the world xml.
             var framework = MSProject.Savors.FindOrCreate( "netcoreapp3.1" );
             var dependencies = new[] {
-                ("NuGet.Protocol", "5.5.1", false),
-                ("NuGet.Credentials", "5.5.1", false),
+                ("NuGet.Protocol", "5.8.0", false),
+                ("NuGet.Credentials", "5.8.0", false),
                 ("CK.Text", "9.0.0", false),
-                ("SimpleGitVersion.Cake", "4.0.2", false),
+                ("SimpleGitVersion.Cake", "5.0.0", false),
                 ("CKSetup.Cake", "11.2.0", false),
                 ("Newtonsoft.Json", "12.0.3", false)
             };
@@ -57,7 +57,7 @@ namespace CK.Env.Plugin
             void EnsurePackageReference( string packageId, string v, bool required = false )
             {
                 var version = SVersion.Parse( v );
-                var current = ccbProject.Deps.Packages.Where( p => p.PackageId == packageId ).Max( p => p.Version );
+                var current = ccbProject.Deps.Packages.Where( p => p.PackageId == packageId ).Max( p => p.Version.Base );
                 if( current == null )
                 {
                     if( required ) ccbProject.SetPackageReferenceVersion( m, framework, packageId, version, addIfNotExists: true );
