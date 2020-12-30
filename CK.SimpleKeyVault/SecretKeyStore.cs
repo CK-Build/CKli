@@ -245,7 +245,8 @@ namespace CK.SimpleKeyVault
                     {
                         exceptionInfo += "\nOr better: " + k.ToString();
                         k = k.SuperKey;
-                    } while( k != null );
+                    }
+                    while( k != null );
                 }
                 throw new MissingRequiredSecretException( exceptionInfo );
             }

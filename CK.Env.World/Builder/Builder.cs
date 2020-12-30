@@ -18,7 +18,7 @@ namespace CK.Env
         readonly BuildResultType _type;
         readonly Dictionary<Artifact, SVersion> _packagesVersion;
         readonly List<UpdatePackageInfo>[] _upgrades;
-        readonly SVersion[] _targetVersions;
+        readonly SVersion?[] _targetVersions;
         readonly ArtifactCenter _artifacts;
 
         protected Builder(
@@ -35,7 +35,7 @@ namespace CK.Env
             DependentSolutionContext = ctx ?? throw new ArgumentNullException( nameof( ctx ) );
             _packagesVersion = new Dictionary<Artifact, SVersion>();
             _upgrades = new List<UpdatePackageInfo>[ctx.Solutions.Count];
-            _targetVersions = new SVersion[ctx.Solutions.Count];
+            _targetVersions = new SVersion?[ctx.Solutions.Count];
         }
 
         /// <summary>
@@ -48,11 +48,11 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The BuildResult on success, null on error.</returns>
-        public BuildResult Run( IActivityMonitor m, bool forceRebuild )
+        public BuildResult? Run( IActivityMonitor m, bool forceRebuild )
         {
             if( _packagesVersion.Count > 0 ) throw new InvalidOperationException();
 
-            BuildResult result = CreateResultByPreparingBuilds( m, forceRebuild );
+            BuildResult? result = CreateResultByPreparingBuilds( m, forceRebuild );
             if( result == null ) return null;
             using( m.OpenInfo( "Running builds." ) )
             {
@@ -101,9 +101,9 @@ namespace CK.Env
             return result;
         }
 
-        BuildResult CreateResultByPreparingBuilds( IActivityMonitor m, bool forceRebuild )
+        BuildResult? CreateResultByPreparingBuilds( IActivityMonitor m, bool forceRebuild )
         {
-            BuildResult result = null;
+            BuildResult? result = null;
             using( m.OpenInfo( "Preparing builds." ) )
             {
                 if( !RunPrepareBuild( m ) )
@@ -133,7 +133,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The build result. Null on error.</returns>
-        protected virtual BuildResult CreateBuildResult( IActivityMonitor m )
+        protected virtual BuildResult? CreateBuildResult( IActivityMonitor m )
         {
             return BuildResult.Create( m, _type, _artifacts, DependentSolutionContext, _targetVersions, GetReleaseNotes() );
         }
@@ -143,7 +143,7 @@ namespace CK.Env
         /// from the roadmap.
         /// </summary>
         /// <returns>Null or the release notes.</returns>
-        protected virtual IReadOnlyList<ReleaseNoteInfo> GetReleaseNotes()
+        protected virtual IReadOnlyList<ReleaseNoteInfo>? GetReleaseNotes()
         {
             return null;
         }
@@ -162,7 +162,7 @@ namespace CK.Env
                                          .SelectMany( z => z.UpgradePackages
                                                .Select( a => new UpdatePackageInfo(
                                                    z.Project,
-                                                   new ArtifactInstance( a.Type, a.Name, _packagesVersion[a] ) ) ) )
+                                                   new ArtifactInstance( a.Type!, a.Name, _packagesVersion[a] ) ) ) )
                                          .ToList();
         }
 
@@ -177,7 +177,7 @@ namespace CK.Env
                 var upgrades = s.Solution.ImportedLocalPackages
                                 .Select( p => new UpdatePackageInfo(
                                                     p.Importer,
-                                                    new ArtifactInstance( p.Package.Artifact.Type, p.Package.Artifact.Name, _packagesVersion[p.Package.Artifact] ) ) )
+                                                    new ArtifactInstance( p.Package.Artifact.Type!, p.Package.Artifact.Name, _packagesVersion[p.Package.Artifact] ) ) )
                                 .ToList();
                 _upgrades[i] = upgrades;
                 using( m.OpenInfo( $"Preparing {s} build." ) )
@@ -236,7 +236,7 @@ namespace CK.Env
         /// <param name="driver">The solution driver.</param>
         /// <param name="upgrades">The set of required package upgrades.</param>
         /// <returns>The version (or null if an error occurred) and whether the build must be actually done or skipped.</returns>
-        protected abstract (SVersion Version, bool MustBuild) PrepareBuild( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades );
+        protected abstract (SVersion? Version, bool MustBuild) PrepareBuild( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades );
 
         /// <summary>
         /// Builds the solution.

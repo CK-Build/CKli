@@ -20,6 +20,6 @@ namespace CK.Env
         /// <summary>
         /// Gets or sets the release note.
         /// </summary>
-        string ReleaseNote { get; set; }
+        string? ReleaseNote { get; set; }
     }
 }

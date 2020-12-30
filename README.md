@@ -46,7 +46,7 @@ Once the required KeyVault password is entered, press `enter`:
   - CK
      > 1 CK => /Dev/CK
   - CK-Build
-     > 2 CK-Build => /Dev/CK
+     > 2 CK-Build => /Dev/CK-Build
      > 3 CK-Build[NetCore2] => /Dev/CK-Build[NetCore2]
 ```
 
@@ -106,6 +106,8 @@ Gets the URL of the stack you want to clone:
 | SC         | https://gitlab.com/signature-code/signature-code-stack              | Private    |
 | SMos       | https://gitlab.com/signature-mosaic/Signature-Mosaic-Stack          | Private    |
 | SLog       | https://gitlab.com/signature-logistic/slog-stack                    | Private    |
+| FirstDown  | https://dev.azure.com/invenietis/FirstDown/_git/FirstDown-Stack     | Private    |
+
 
 Type `run Home/EnsureStackRepository` (or `run *ensure*` since there is no other command with `Ensure` in its name) and press `enter`.
 

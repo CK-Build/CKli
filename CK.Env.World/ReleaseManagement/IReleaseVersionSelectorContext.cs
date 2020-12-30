@@ -46,7 +46,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The set of diff or null on error.</returns>
-        IDiffResult GetProjectsDiff( IActivityMonitor m );
+        IDiffResult? GetProjectsDiff( IActivityMonitor m );
 
         /// <summary>
         /// Gets the list of the packages that must be updated in non published projects (typically in Tests projects).
@@ -63,7 +63,7 @@ namespace CK.Env
         /// <summary>
         /// Gets or sets the release note.
         /// </summary>
-        string ReleaseNote { get; set; }
+        string? ReleaseNote { get; set; }
 
         /// <summary>
         /// Gets the current requirements that results from solution dependencies.

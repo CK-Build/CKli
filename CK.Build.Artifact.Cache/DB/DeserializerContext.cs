@@ -35,7 +35,10 @@ namespace CK.Build
             return t;
         }
 
-        public CKTrait ReadExistingTrait( CKTraitContext ctx ) => ctx.FindOrCreate( Reader.ReadSharedString() );
-
+        public CKTrait? ReadKnownContextTrait( CKTraitContext ctx )
+        {
+            var t = Reader.ReadSharedString();
+            return t != null ? ctx.FindOrCreate( t ) : null;
+        }
     }
 }

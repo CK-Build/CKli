@@ -24,7 +24,7 @@ namespace CK.Env
             IGitRepository repository,
             DependentSolution solution,
             ICommitInfo versionInfo,
-            XElement previous = null )
+            XElement? previous = null )
         {
             Debug.Assert( repository != null && solution != null && versionInfo != null );
             Solution = solution;
@@ -61,12 +61,12 @@ namespace CK.Env
         /// Gets the previous version, associated to a commit below the current one.
         /// This is null if no previous version has been found.
         /// </summary>
-        public CSVersion PreviousVersion => _commitVersionInfo.BestCommitBelow?.ThisTag;
+        public CSVersion? PreviousVersion => _commitVersionInfo.BestCommitBelow?.ThisTag;
 
         /// <summary>
         /// Gets or sets the release note.
         /// </summary>
-        public string ReleaseNote { get; set; }
+        public string? ReleaseNote { get; set; }
 
         /// <summary>
         /// This is the heart of the global releaser system.
@@ -102,14 +102,14 @@ namespace CK.Env
             static readonly ReleaseLevel[] _levels = new[] { ReleaseLevel.None, ReleaseLevel.Fix, ReleaseLevel.Feature, ReleaseLevel.BreakingChange };
             readonly IReadOnlyList<CSVersion>[] _versionList;
 
-            public PossibleVersions( ReleaseInfo requirement, CSVersion lastRelease, IReadOnlyList<CSVersion> possibles )
+            public PossibleVersions( ReleaseInfo requirement, CSVersion? lastRelease, IReadOnlyList<CSVersion> possibles )
             {
                 // For None level, we may choose to not release at all: use the last release.
                 bool hasLastRelease = requirement.Level == ReleaseLevel.None && lastRelease != null;
                 _versionList = new IReadOnlyList<CSVersion>[]
                 {
                     hasLastRelease
-                            ? new CSVersion[]{ lastRelease }
+                            ? new CSVersion[]{ lastRelease! }
                             : Array.Empty<CSVersion>(),
                     // For Fix level, possible versions are filtered by the original constraint.
                     requirement.Level <= ReleaseLevel.Fix
@@ -155,14 +155,14 @@ namespace CK.Env
         {
             readonly ReleaseSolutionInfo _info;
             readonly PossibleVersions _possible;
-            IDiffResult _diffResult;
+            IDiffResult? _diffResult;
 
             public SelectorContext(
                     ReleaseSolutionInfo info,
                     ReleaseInfo requirements,
                     IReadOnlyList<CSVersion> possibles,
-                    IReadOnlyList<(ImportedLocalPackage,SVersion)> publishedUpdates,
-                    IReadOnlyList<(ImportedLocalPackage, SVersion)> nonPublishedUpdates )
+                    IReadOnlyList<(ImportedLocalPackage,SVersion)>? publishedUpdates,
+                    IReadOnlyList<(ImportedLocalPackage, SVersion)>? nonPublishedUpdates )
             {
                 _info = info;
                 Requirements = requirements;
@@ -194,9 +194,9 @@ namespace CK.Env
 
             public ITagCommit? PreviousVersion => _info._commitVersionInfo.BestCommitBelow;
 
-            public string ReleaseNote { get => _info.ReleaseNote; set => _info.ReleaseNote = value; }
+            public string? ReleaseNote { get => _info.ReleaseNote; set => _info.ReleaseNote = value; }
 
-            public IDiffResult GetProjectsDiff( IActivityMonitor m )
+            public IDiffResult? GetProjectsDiff( IActivityMonitor m )
             {
                 if( _diffResult == null )
                 {
@@ -212,7 +212,7 @@ namespace CK.Env
             }
 
             internal ReleaseLevel FinalLevel;
-            internal CSVersion FinalVersion;
+            internal CSVersion? FinalVersion;
 
             public bool IsCanceled { get; private set; }
 
@@ -245,8 +245,8 @@ namespace CK.Env
             // matches the dependency order).
             // But, we need to iterate though all Requirements in order to not miss a version
             // package upgrade.
-            List<(ImportedLocalPackage, SVersion)> nonPublishedUpdates = null;
-            List<(ImportedLocalPackage, SVersion)> publishedUpdates = null;
+            List<(ImportedLocalPackage, SVersion)>? nonPublishedUpdates = null;
+            List<(ImportedLocalPackage, SVersion)>? publishedUpdates = null;
             foreach( var s in Solution.Requirements )
             {
                 var sInfo = _releaser.GetReleaseInfo( s.Index ).EnsureReleaseInfo( m, versionSelector );
@@ -276,6 +276,8 @@ namespace CK.Env
                     }
                 }
             }
+
+            Debug.Assert( _commitVersionInfo.NextPossibleVersions != null && _commitVersionInfo.PossibleVersions != null, "The commit info is valid." );
 
             // Handle package references updates.
             //  - if none and a Release tag already exists on the commit point, there
@@ -320,10 +322,11 @@ namespace CK.Env
             }
             var ctx = new SelectorContext( this, requirements, possibleVersions, publishedUpdates, nonPublishedUpdates );
             versionSelector.ChooseFinalVersion( m, ctx );
+            Debug.Assert( !ctx.HasChoice || ctx.FinalVersion != null, "HasChoice => FinalVersion != null" );
             return ctx.IsCanceled
                     ? new ReleaseInfo()
                     : (ctx.HasChoice
-                        ? requirements.WithLevel( ctx.FinalLevel ).WithVersion( ctx.FinalVersion )
+                        ? requirements.WithLevel( ctx.FinalLevel ).WithVersion( ctx.FinalVersion! )
                         : throw new InvalidOperationException( "At least Cancel or SetChoice must have been called." ));
         }
 

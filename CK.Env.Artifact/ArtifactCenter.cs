@@ -201,12 +201,21 @@ namespace CK.Env
                 // Don't use parallel resolution here because of the monitor (and parallel here is quite useless).
                 var result = new List<ArtifactAvailableInstances>();
                 var cache = EnsurePackageCache( m );
+                var db = cache.Cache.DB;
                 foreach( var f in _feeds.Where( f => f.ArtifactType == artifact.Type ) )
                 {
                     ArtifactAvailableInstances available = GetVersionsAsync( m, artifact, cache, f ).GetAwaiter().GetResult();
                     result.Add( available );
                 }
                 _cachedArtifacts.Add( artifact, instances = result );
+                if( db != cache.Cache.DB )
+                {
+                    m.Info( $"Saving Package database: {cache.Cache.DB}." );
+                    using( var output = File.OpenWrite( _packageCacheFilePath ) )
+                    {
+                        cache.Cache.Write( new CKBinaryWriter( output ) );
+                    }
+                }
             }
             return instances;
         }
@@ -214,12 +223,9 @@ namespace CK.Env
         static async Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, Artifact artifact, LivePackageCache cache, IArtifactFeed f )
         {
             var available = await f.GetVersionsAsync( m, artifact.Name );
-            if( f is IPackageFeed pF )
+            foreach( var a in available )
             {
-                foreach( var a in available )
-                {
-                    await cache.EnsureAsync( m, a );
-                }
+                await cache.EnsureAsync( m, a );
             }
             return available;
         }

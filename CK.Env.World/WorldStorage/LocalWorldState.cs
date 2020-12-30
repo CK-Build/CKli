@@ -22,7 +22,7 @@ namespace CK.Env
         LogFilter _logFilter;
         LogFilter _monitorLogFilter;
 
-        public LocalWorldState( WorldStore store, IWorldName w, XDocument d = null )
+        public LocalWorldState( WorldStore store, IWorldName w, XDocument? d = null )
             : base( store, w, true, d )
         {
             var r = XDocument.Root;

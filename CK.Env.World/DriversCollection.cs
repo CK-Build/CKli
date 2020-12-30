@@ -16,9 +16,9 @@ namespace CK.Env
         internal class WorldBranchContext : IWorldSolutionContext
         {
             readonly List<ISolutionDriver> _drivers;
-            readonly SolutionContext _context;
+            readonly SolutionContext? _context;
             readonly PairList _pairList;
-            SolutionDependencyContext _depContext;
+            SolutionDependencyContext? _depContext;
 
             /// <summary>
             /// Initializes an empty context for a given branch.
@@ -47,11 +47,11 @@ namespace CK.Env
             /// Gets the branch name.
             /// This is null for "current" branches context.
             /// </summary>
-            public string BranchName { get; }
+            public string? BranchName { get; }
 
-            public SolutionDependencyContext DependencyContext => _depContext;
+            SolutionDependencyContext IWorldSolutionContext.DependencyContext => _depContext!;
 
-            public IReadOnlyList<DependentSolution> DependentSolutions => _depContext.Solutions;
+            IReadOnlyList<DependentSolution> IWorldSolutionContext.DependentSolutions => _depContext!.Solutions;
 
             public IReadOnlyList<ISolutionDriver> Drivers => _drivers;
 
@@ -61,13 +61,13 @@ namespace CK.Env
 
                 public PairList( WorldBranchContext c ) => _c = c;
 
-                public (DependentSolution Solution, ISolutionDriver Driver) this[int index] => (_c.DependentSolutions[index], _c._drivers[index]);
+                public (DependentSolution Solution, ISolutionDriver Driver) this[int index] => (_c._depContext!.Solutions[index], _c._drivers[index]);
 
                 public int Count => _c._drivers.Count;
 
                 public IEnumerator<(DependentSolution Solution, ISolutionDriver Driver)> GetEnumerator()
                 {
-                    return _c.DependentSolutions.Select( s => (s, _c._drivers[s.Index]) ).GetEnumerator();
+                    return _c._depContext!.Solutions.Select( s => (s, _c._drivers[s.Index]) ).GetEnumerator();
                 }
 
                 IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
@@ -75,7 +75,7 @@ namespace CK.Env
 
             public IReadOnlyList<(DependentSolution Solution, ISolutionDriver Driver)> Solutions => _pairList;
 
-            public bool Refresh( IActivityMonitor m, bool forceReload )
+            public IWorldSolutionContext? Refresh( IActivityMonitor m, bool forceReload )
             {
                 var solutions = new ISolution[_drivers.Count];
                 int idxSolution = 0;
@@ -87,9 +87,9 @@ namespace CK.Env
                         m.Error( $"Failed to load and configure solution from '{d.GitRepository.SubPath}'." );
                         idxSolution = -1;
                     }
-                    if( idxSolution != -1 ) solutions[idxSolution++] = s;
+                    if( idxSolution != -1 ) solutions[idxSolution++] = s!;
                 }
-                if( idxSolution == -1 ) return false;
+                if( idxSolution == -1 ) return null;
 
                 if( _depContext == null || _depContext.HasError || _depContext.IsObsolete )
                 {
@@ -106,7 +106,7 @@ namespace CK.Env
                         if( da == null )
                         {
                             m.Error( "Error while creating the DependencyAnalyzer." );
-                            return false;
+                            return null;
                         }
                         solutionDependencyContext = da.DefaultDependencyContext;
                     }
@@ -118,13 +118,13 @@ namespace CK.Env
                         _drivers.Sort( ( d1, d2 ) => aliasCtx[d1.GetSolution( m, false, false )].Index - aliasCtx[d2.GetSolution( m, false, false )].Index );
                     }
                 }
-                return true;
+                return this;
             }
-
 
             internal SolutionContext OnRegisterDriver( ISolutionDriver d )
             {
                 Debug.Assert( d != null && !_drivers.Contains( d ) );
+                Debug.Assert( _context != null, "This is called only on real context, not 'current branches' one." );
                 _drivers.Add( d );
                 _depContext = null;
                 return _context;
@@ -164,11 +164,11 @@ namespace CK.Env
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="reloadSolutions">True to force a reload of the solutions.</param>
         /// <returns>The context or null on error.</returns>
-        public IWorldSolutionContext GetSolutionDependencyContextOnCurrentBranches( IActivityMonitor monitor, bool reloadSolutions = false )
+        public IWorldSolutionContext? GetSolutionDependencyContextOnCurrentBranches( IActivityMonitor monitor, bool reloadSolutions = false )
         {
             var currentDrivers = GetDriversOnCurrentBranch();
             var c = new WorldBranchContext( currentDrivers );
-            return c.Refresh( monitor, reloadSolutions ) ? c : null;
+            return c.Refresh( monitor, reloadSolutions );
         }
 
         /// <summary>
@@ -199,7 +199,7 @@ namespace CK.Env
         public IEnumerable<ISolutionDriver> GetDriversOnBranch( string branchName ) => _solutionDrivers.Where( p => p.BranchName == branchName );
 
         /// <summary>
-        /// Enslist a new driver in the root HashSet, ensures that a <see cref="WorldBranchContext"/> exists
+        /// Enslists a new driver in the root HashSet, ensures that a <see cref="WorldBranchContext"/> exists
         /// for the <see cref="ISolutionDriver.BranchName"/> and returns it.
         /// The driver is not registered in the WorldBranchContext at this level.
         /// </summary>

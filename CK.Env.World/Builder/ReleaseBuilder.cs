@@ -29,7 +29,7 @@ namespace CK.Env
         }
 
 
-        protected override (SVersion Version, bool MustBuild) PrepareBuild(
+        protected override (SVersion? Version, bool MustBuild) PrepareBuild(
             IActivityMonitor m,
             DependentSolution s,
             ISolutionDriver driver,

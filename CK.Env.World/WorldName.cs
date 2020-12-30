@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CK.Env
 {
@@ -15,7 +16,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the parallel name. Normalized to null for default world.
         /// </summary>
-        public string ParallelName { get; }
+        public string? ParallelName { get; }
 
         /// <summary>
         /// Gets the develop branch name.
@@ -49,7 +50,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="stackName">The name. Must not be null or empty.</param>
         /// <param name="parallelName">The parallel world. Can be null or empty.</param>
-        public WorldName( string stackName, string parallelName )
+        public WorldName( string stackName, string? parallelName )
         {
             if( String.IsNullOrWhiteSpace( stackName ) ) throw new ArgumentNullException( nameof( stackName ) );
             if( stackName.IndexOf( '.' ) >= 0 ) throw new ArgumentException( nameof( stackName ) + " can't contain a '.' character" );
@@ -71,12 +72,12 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Tries to parse a full name.
+        /// Tries to parse a full name of a world.
         /// </summary>
         /// <param name="fullName">The full name to parse.</param>
         /// <param name="name">The world name on success.</param>
         /// <returns>True on success, false otherwise.</returns>
-        public static bool TryParse( string fullName, out WorldName name )
+        public static bool TryParse( string fullName, [NotNullWhen( returnValue: true )]out WorldName? name )
         {
             name = null;
             if( !String.IsNullOrWhiteSpace( fullName ) )
@@ -95,11 +96,25 @@ namespace CK.Env
             return name != null;
         }
 
-        public override bool Equals( object obj ) => obj is IWorldName n ? Equals( n ) : false;
+        /// <summary>
+        /// Overridden to handle equality against any other <see cref="IWorldName"/>.
+        /// </summary>
+        /// <param name="obj">The other object.</param>
+        /// <returns>Whether other is the same name or not.</returns>
+        public override bool Equals( object? obj ) => obj is IWorldName n ? Equals( n ) : false;
 
-        public override int GetHashCode() => FullName.GetHashCode();
+        /// <summary>
+        /// Gets the <see cref="FullName"/>' has code using <see cref="StringComparer.OrdinalIgnoreCase"/>.
+        /// </summary>
+        /// <returns>The hash code.</returns>
+        public override int GetHashCode() => StringComparer.OrdinalIgnoreCase.GetHashCode( FullName );
 
-        public bool Equals( IWorldName other ) => FullName.Equals( other.FullName, StringComparison.OrdinalIgnoreCase );
+        /// <summary>
+        /// Equality is based on case insensitive <see cref="FullName"/>.
+        /// </summary>
+        /// <param name="other">The other name.</param>
+        /// <returns>Whether other is the same name or not.</returns>
+        public bool Equals( IWorldName? other ) => FullName.Equals( other?.FullName, StringComparison.OrdinalIgnoreCase );
 
     }
 }

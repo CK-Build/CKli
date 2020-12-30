@@ -31,6 +31,7 @@ namespace CK.Build
                 _instances = new PackageInstance[len];
                 ArtifactType? type = null;
                 string? name = null;
+                var deferred = new List<(PackageInstance.Reference[], int, int, SVersionLock, PackageQuality, ArtifactDependencyKind, CKTrait?)>();
                 for( int i = 0; i < _instances.Length; ++i )
                 {
                     switch( ctx.Reader.ReadByte() )
@@ -41,24 +42,34 @@ namespace CK.Build
                             name = ctx.Reader.ReadString(); break;
                     }
                     Debug.Assert( type != null && name != null );
-                    ArtifactInstance instance = new ArtifactInstance( type, name, CSemVer.SVersion.Parse( ctx.Reader.ReadString() ) );
-                    var regDate = ctx.Reader.ReadDateTime();
+                    ArtifactInstance instance = new ArtifactInstance( type, name, SVersion.Parse( ctx.Reader.ReadString() ) );
                     var savors = ctx.ReadCKTrait();
                     int dependenciesCount = ctx.Reader.ReadNonNegativeSmallInt32();
                     var dependencies = new PackageInstance.Reference[dependenciesCount];
                     for( int j = 0; j < dependencies.Length; j++ )
                     {
-                        var applicableSavors = savors != null ? ctx.ReadExistingTrait( savors.Context ) : null;
+                        var applicableSavors = savors != null ? ctx.ReadKnownContextTrait( savors.Context ) : null;
                         SVersionLock vL = (SVersionLock)ctx.Reader.ReadByte();
                         PackageQuality vQ = (PackageQuality)ctx.Reader.ReadByte();
                         ArtifactDependencyKind kind = (ArtifactDependencyKind)ctx.Reader.ReadByte();
                         int idx = ctx.Reader.ReadInt32();
-                        dependencies[j] = new PackageInstance.Reference( _instances[idx], vL, vQ, kind, applicableSavors );
+                        Debug.Assert( idx != i );
+                        if( idx < i )
+                        {
+                            dependencies[j] = new PackageInstance.Reference( _instances[idx], vL, vQ, kind, applicableSavors );
+                        }
+                        else
+                        {
+                            deferred.Add( (dependencies,j,idx,vL,vQ,kind,applicableSavors) );
+                        }
                     }
-                    _instances[i] = new PackageInstance( instance, savors, dependencies, regDate );
+                    _instances[i] = new PackageInstance( instance, savors, dependencies );
+                }
+                foreach( var d in deferred )
+                {
+                    d.Item1[d.Item2] = new PackageInstance.Reference( _instances[d.Item3], d.Item4, d.Item5, d.Item6, d.Item7 );
                 }
             }
-
 
             public void Write( in SerializerContext ctx )
             {
@@ -81,23 +92,18 @@ namespace CK.Build
                     }
                     else ctx.Writer.Write( (byte)0 );
                     ctx.Writer.Write( p.Key.Version.NormalizedText );
-                    ctx.Writer.Write( p.RegistrationDate );
                     ctx.Write( p.Savors );
                     ctx.Writer.WriteNonNegativeSmallInt32( p.Dependencies.Count );
                     foreach( var dep in p.Dependencies )
                     {
                         if( p.Savors != null )
                         {
-                            Debug.Assert( dep.ApplicableSavors != null );
-                            ctx.WriteExistingTrait( dep.ApplicableSavors );
+                            ctx.WriteKnownContextTrait( dep.ApplicableSavors );
                         }
                         ctx.Writer.Write( (byte)dep.Lock );
                         ctx.Writer.Write( (byte)dep.MinQuality );
                         ctx.Writer.Write( (byte)dep.DependencyKind );
-                        var cc = new Comparable( pInstance => dep.BaseTargetKey.CompareTo( pInstance.Key ) );
-                        // Lookup only from 0 to our index: our dependencies are before us.
-                        Debug.Assert( _instances.AsSpan( 0, i ).BinarySearch( cc ) >= 0 );
-                        ctx.Writer.Write( _instances.AsSpan( 0, i ).BinarySearch( cc ) );
+                        ctx.Writer.Write( IndexOf( dep.BaseTargetKey ) );
                     }
                 }
             }

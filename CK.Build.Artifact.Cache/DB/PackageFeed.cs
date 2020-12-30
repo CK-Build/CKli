@@ -106,7 +106,7 @@ namespace CK.Build
         /// <summary>
         /// Gets the artifact type that this feed supports.
         /// </summary>
-        public ArtifactType ArtifactType => _name.Type;
+        public ArtifactType ArtifactType => _name.Type!;
 
         /// <summary>
         /// Gets the list of all the packages that this feed contains.
@@ -150,5 +150,10 @@ namespace CK.Build
             return new ArtifactAvailableInstances( this, name, versions );
         }
 
+        /// <summary>
+        /// Overridden to return the <see cref="TypedName"/> and <see cref="Instances"/> count.
+        /// </summary>
+        /// <returns>A readable string.</returns>
+        public override string ToString() => $"{TypedName} ({_instances.Count} packages)";
     }
 }

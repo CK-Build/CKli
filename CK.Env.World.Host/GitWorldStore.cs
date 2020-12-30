@@ -93,12 +93,12 @@ namespace CK.Env
             }
             if( _stackRepos.Count == 0 )
             {
-                using( m.OpenInfo( "Since there is no Stack defined, we initialize CK and CK-Build mapped to '/Dev/CK' by default." ) )
+                using( m.OpenInfo( "Since there is no Stack defined, we initialize CK and CK-Build mapped to '/Dev/' by default." ) )
                 {
                     m.Info( $"Use 'run World/{nameof( SetWorldMapping )}' command to change this default mapping if you want." );
                     _stackRepos.Add( new StackRepo( this, new Uri( "https://github.com/signature-opensource/CK-Stack" ), true ) );
                     _stackRepos.Add( new StackRepo( this, new Uri( "https://github.com/CK-Build/CK-Build-Stack" ), true ) );
-                    WorldLocalMapping.SetMap( m, "CK-Build", "/Dev/CK" );
+                    WorldLocalMapping.SetMap( m, "CK-Build", "/Dev/CK-Build" );
                     WorldLocalMapping.SetMap( m, "CK", "/Dev/CK" );
                     WriteStacksToLocalStacksFilePath( m );
                 }

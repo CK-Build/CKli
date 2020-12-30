@@ -30,6 +30,7 @@ namespace CK.Env.Plugin
             {
                 SetBinaryResource( m, "SharedKey.snk" );
             }
+            SetBinaryResource( m, "PackageIcon.png", overwrite: false );
         }
     }
 }

@@ -26,7 +26,7 @@ namespace CK.Build
         {
             if( TraitPool.MustWrite( t ) )
             {
-                Debug.Assert( t != null, "If it lust be written, then it is not null." );
+                Debug.Assert( t != null, "If it must be written, then it is not null." );
                 if( TraitContextPool.MustWrite( t.Context ) )
                 {
                     t.Context.Write( Writer );
@@ -35,7 +35,7 @@ namespace CK.Build
             }
         }
 
-        public void WriteExistingTrait( CKTrait t ) => Writer.WriteSharedString( t.ToString() );
+        public void WriteKnownContextTrait( CKTrait? t ) => Writer.WriteSharedString( t?.ToString() );
 
     }
 }

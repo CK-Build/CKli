@@ -33,6 +33,11 @@ namespace CK.Env.NuGet
         /// </summary>
         public static readonly ArtifactType NuGetType;
 
+        /// <summary>
+        /// Gets the non null NuGet savors traits.
+        /// </summary>
+        public static CKTraitContext Savors => NuGetType.ContextSavors!;
+
         internal static readonly List<Lazy<INuGetResourceProvider>> StaticProviders;
 
         readonly SourcePackageProvider _sourcePackageProvider;

@@ -21,6 +21,7 @@ namespace CK.Env
             NoSharedPropsFile = r.HandleOptionalAttribute( nameof( NoSharedPropsFile ), false );
             DisableSourceLink = r.HandleOptionalAttribute( nameof( DisableSourceLink ), false );
             GlobalJsonSdkVersion = r.HandleOptionalAttribute<string>( nameof( GlobalJsonSdkVersion ), null );
+            SPDXLicense = r.HandleOptionalAttribute<string>( nameof( SPDXLicense ), null );
 
             ArtifactTargets = r.HandleCollection(
                     nameof( ArtifactTargets ),
@@ -57,6 +58,7 @@ namespace CK.Env
             NoStrongNameSigning = r.HandleOptionalAttribute( nameof( NoStrongNameSigning ), other.NoStrongNameSigning );
             NoSharedPropsFile = r.HandleOptionalAttribute( nameof( NoSharedPropsFile ), other.NoSharedPropsFile );
             GlobalJsonSdkVersion = r.HandleOptionalAttribute( nameof( GlobalJsonSdkVersion ), other.GlobalJsonSdkVersion );
+            SPDXLicense = r.HandleOptionalAttribute( nameof( SPDXLicense ), other.SPDXLicense );
 
             var excludedNuGetSourceNames = new HashSet<string>( other.RemoveNuGetSourceNames );
             var excludedNPMScopeNames = new HashSet<string>( other.RemoveNPMScopeNames );
@@ -89,7 +91,12 @@ namespace CK.Env
         /// Gets the SDK version that must appear in the global.json file at the root.
         /// Defaults to null: no global.json file appear at the root and the latest installed SDK is used. 
         /// </summary>
-        public string GlobalJsonSdkVersion { get; }
+        public string? GlobalJsonSdkVersion { get; }
+
+        /// <summary>
+        /// Gets the licence: it must be a https://spdx.org/licenses/ or null if no licence applies.
+        /// </summary>
+        public string? SPDXLicense { get; }
 
         /// <summary>
         /// Gets whether the solution has no unit tests.

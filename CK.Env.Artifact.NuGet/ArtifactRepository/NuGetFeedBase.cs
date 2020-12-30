@@ -14,6 +14,7 @@ using NuGet.Protocol;
 using NuGet.Packaging.Core;
 using NuGet.Versioning;
 using NuGet.Frameworks;
+using System.Linq;
 
 namespace CK.Env.NuGet
 {
@@ -27,7 +28,7 @@ namespace CK.Env.NuGet
         /// Implements a feed (a package source) on the basis of an already existing one (typically an artefact target).
         /// The credentials can be null or may differ from the base feed ones.
         /// </summary>
-        class ReadFeed : INuGetFeed
+        class ReadFeed : INuGetFeed, IPackageFeed
         {
             readonly NuGetFeedBase _baseFeed;
             bool? _checkedSecret;
@@ -55,7 +56,7 @@ namespace CK.Env.NuGet
             {
                 if( _checkedSecret.HasValue ) return _checkedSecret.Value;
                 // If we are bound to a repository that has a secret, its configuration, if available, is the one to use!
-                INuGetRepository repo = _baseFeed as INuGetRepository;
+                INuGetRepository? repo = _baseFeed as INuGetRepository;
                 bool isBoundToProtectedRepository = repo != null && !String.IsNullOrEmpty( repo.SecretKeyName );
                 if( isBoundToProtectedRepository )
                 {
@@ -124,20 +125,140 @@ namespace CK.Env.NuGet
                 return v;
             }
 
-            //public Task<IPackageInfo?> GetPackageInfoAsync( IActivityMonitor m, ArtifactInstance instance )
-            //{
-            //    return _baseFeed.SafeCall<PackageSearchResource, IPackageInfo?>( m, ( sources, meta, logger ) => GetPackageInfo( meta, logger, instance ) );
-            //}
+            public Task<IPackageInfo?> GetPackageInfoAsync( IActivityMonitor m, ArtifactInstance instance )
+            {
+                return _baseFeed.SafeCall<DependencyInfoResource, IPackageInfo?>( m, ( sources, meta, logger ) => GetPackageInfo( meta, logger, instance, default ) );
+            }
 
-            //private async Task<IPackageInfo?> GetPackageInfo( PackageSearchResource meta, NuGetLoggerAdapter logger, ArtifactInstance instance )
-            //{
-            //    var search = $"packageId:{instance.Artifact.Name} version:{instance.Version}";
-            //    var s = await meta.SearchAsync( search, new SearchFilter( true ), 0, 100, logger, CancellationToken.None );
-            //    if( s == null ) return null;
-            //    var result = new PackageInfo();
-            //    result.Key = instance;
-            //    return result;
-            //}
+            class PackageInfoReader
+            {
+                static readonly Type _tResolver;
+                static readonly MethodInfo _mGetDependencies;
+                static readonly FieldInfo _fClient;
+                static readonly FieldInfo _fRegResource;
+
+                static PackageInfoReader()
+                {
+                    /*
+                    None of the exposed DependencyInfoResource.ResolvePackages returns the whole set of dependencies for a single version.
+                    We use the static ResolverMetadataClient internal class GetDependencies method:
+
+                    public static async Task<IEnumerable<RemoteSourceDependencyInfo>> GetDependencies(
+                            HttpSource httpClient,
+                            Uri registrationUri,
+                            string packageId,
+                            VersionRange range,
+                            SourceCacheContext cacheContext,
+                            ILogger log,
+                            CancellationToken token)
+                    */
+                    _tResolver = Type.GetType( "NuGet.Protocol.ResolverMetadataClient, NuGet.Protocol", throwOnError: false )!;
+                    _mGetDependencies = _tResolver.GetMethod( "GetDependencies", BindingFlags.Static | BindingFlags.Public )!;
+                    var tDependencyInfoResourceV3 = typeof( DependencyInfoResourceV3 );
+                    _fClient = tDependencyInfoResourceV3.GetField( "_client", BindingFlags.Instance | BindingFlags.NonPublic )!;
+                    _fRegResource = tDependencyInfoResourceV3.GetField( "_regResource", BindingFlags.Instance | BindingFlags.NonPublic )!;
+                }
+
+                static void CheckReflection()
+                {
+                    if( _tResolver == null ) throw new CKException( "NuGet implementation changed: unable to get private class NuGet.Protocol.ResolverMetadataClient." );
+                    if( _mGetDependencies == null ) throw new CKException( "NuGet implementation changed: unable to get static NuGet.Protocol.ResolverMetadataClient.GetDependencies method." );
+                    if( _fClient == null ) throw new CKException( "NuGet implementation changed: unable to get private field NuGet.Protocol.DependencyInfoResourceV3._fClient." );
+                    if( _fRegResource == null ) throw new CKException( "NuGet implementation changed: unable to get private field NuGet.Protocol.DependencyInfoResourceV3._fRegResource." );
+                }
+
+                readonly SourceCacheContext _sourceCache;
+                readonly RegistrationResourceV3 _regResource;
+                readonly HttpSource _client;
+
+                public DependencyInfoResource CurrentInfoResource { get; }
+
+                public PackageInfoReader( DependencyInfoResource meta, SourceCacheContext sourceCache )
+                {
+                    // Check reflection here: avoid type initialization error.
+                    CheckReflection();
+                    CurrentInfoResource = meta;
+                    _sourceCache = sourceCache;
+                    _regResource = (RegistrationResourceV3)_fRegResource.GetValue( meta )!;
+                    _client = (HttpSource)_fClient.GetValue( meta )!;
+                }
+
+                public async Task<IPackageInfo?> GetPackageInfoAsync( NuGetLoggerAdapter logger, ArtifactInstance instance, CancellationToken token )
+                { 
+                    var packageId = instance.Artifact.Name;
+                    var version = NuGetVersion.Parse( instance.Version.ParsedText );
+                    var singleVersion = new VersionRange( minVersion: version, includeMinVersion: true, maxVersion: version, includeMaxVersion: true );
+                    // Construct the registration index url
+                    var uri = _regResource.GetUri( instance.Artifact.Name );
+                    var param = new object[] { _client, uri, packageId, singleVersion, _sourceCache, logger, token };
+                    var o = await ((Task<IEnumerable<RemoteSourceDependencyInfo>>)_mGetDependencies.Invoke( null, param )!);
+                    if( o == null || !o.Any() ) return null;
+                    // Okay... This should never happens... but who really knows ?!
+                    var deps = o.SingleOrDefault();
+                    if( deps == null )
+                    {
+                        logger.SafeLog( m =>
+                        {
+                            using( m.OpenWarn( $"Obtained {o.Count()} dependency groups for single version {instance.Version.ParsedText} of {packageId}. Ignoring them." ) )
+                            {
+                                foreach( var g in o )
+                                {
+                                    m.Error( $"{g.ContentUri}: {g.DependencyGroups}." );
+                                }
+                            }
+                        } );
+                        return null;
+                    }
+                    var result = new PackageInfo();
+                    result.Key = instance;
+                    var savors = NuGetClient.Savors.EmptyTrait;
+                    foreach( var d in deps.DependencyGroups )
+                    {
+                        var tf = NuGetClient.Savors.FindOrCreate( d.TargetFramework.GetShortFolderName() );
+                        savors = savors.Union( tf );
+                        foreach( var p in d.Packages )
+                        {
+                            var range = p.VersionRange.ToString();
+                            SVersionBound.ParseResult v = SVersionBound.NugetTryParse( range );
+                            if( !v.IsValid )
+                            {
+                                logger.SafeLog( m => m.Warn( $"Unable to parse version '{range}' (Error: {v.Error}) from dependency group '{tf}' of {instance}. Skipped dependency." ) );
+                                continue;
+                            }
+                            var a = new ArtifactInstance( NuGetClient.NuGetType, p.Id, v.Result.Base );
+                            var kind = p.Exclude.Contains( "All" ) ? ArtifactDependencyKind.Development : ArtifactDependencyKind.Transitive;
+
+                            var idxExists = result.Dependencies.IndexOf( d => d.Target == a && d.Lock == v.Result.Lock && d.MinQuality == v.Result.MinQuality && d.Kind == kind );
+                            if( idxExists < 0 )
+                            {
+                                result.Dependencies.Add( (a, v.Result.Lock, v.Result.MinQuality, kind, tf) );
+                            }
+                            else
+                            {
+                                var ef = result.Dependencies[idxExists].Savors;
+                                Debug.Assert( ef != null );
+                                result.Dependencies[idxExists] = (a, v.Result.Lock, v.Result.MinQuality, kind, tf.Union( ef ));
+                            }
+                        }
+                    }
+                    if( !savors.IsEmpty ) result.Savors = savors;
+                    return result;
+                }
+
+            }
+
+            PackageInfoReader? _packageReader;
+
+            Task<IPackageInfo?> GetPackageInfo( DependencyInfoResource meta, NuGetLoggerAdapter logger, ArtifactInstance instance, CancellationToken token )
+            {
+                if( _packageReader == null || _packageReader.CurrentInfoResource != meta )
+                {
+                    _packageReader = new PackageInfoReader( meta, _baseFeed.Client.SourceCache );
+                }
+                return _packageReader.GetPackageInfoAsync( logger, instance, token );
+            }
+
+            public override string ToString() => TypedName;
         }
 
         /// <summary>

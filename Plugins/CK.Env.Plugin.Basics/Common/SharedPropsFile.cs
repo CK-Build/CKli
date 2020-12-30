@@ -49,6 +49,8 @@ namespace CK.Env.Plugin
             HandleZeroVersion( m );
             HandleGenerateDocumentation( m );
             HandleSourceLink( m, useCentralPackage );
+            HandleSourceLinkDebuggingWorkaround( m );
+            HandleSPDXLicense( m );
 
             Document.Root.Elements( "PropertyGroup" )
                          .Where( e => !e.HasElements )
@@ -86,11 +88,14 @@ namespace CK.Env.Plugin
   <!-- SolutionDir is defined by Visual Studio, we unify the behavior here. -->
   <SolutionDir Condition="" '$(SolutionDir)' == '' "">$([System.IO.Path]::GetDirectoryName($([System.IO.Path]::GetDirectoryName($(MSBuildThisFileDirectory)))))/</SolutionDir>
 
-  <!-- CakeBuild is obsolete: the new standard ContinuousIntegrationBuild should be used. -->
+  <!-- CakeBuild drives the standard ContinuousIntegrationBuild that should be used.
+
+  -->
   <ContinuousIntegrationBuild Condition="" '$(CakeBuild)' == 'true' "">true</ContinuousIntegrationBuild>
 
-  <!-- Always enable Deterministic build. -->
-  <Deterministic>true</Deterministic>
+  <!-- Enable Deterministic build. https://github.com/clairernovotny/DeterministicBuilds -->
+  <EmbedUntrackedSources>true</EmbedUntrackedSources>
+
   <!-- Always allow the repository url to appear in the nuget package. -->
   <PublishRepositoryUrl>true</PublishRepositoryUrl>
 
@@ -114,6 +119,7 @@ namespace CK.Env.Plugin
 <ItemGroup>
   <SourceRoot Include=""$(SolutionDir)"" />
 </ItemGroup>" );
+
             section.SetContent( propertyGroup, itemGroup );
         }
 
@@ -137,6 +143,7 @@ namespace CK.Env.Plugin
                             new XElement( "Authors", "Signature Code" ),
                             new XElement( "Copyright", @"Copyright Signature-Code 2007-$([System.DateTime]::UtcNow.ToString(""yyyy""))" ),
                             new XElement( "RepositoryType", "git" ),
+                            new XElement( "PackageIcon", "PackageIcon.png" ),
                             new XComment( "Removes annoying Pack warning: The package version ... uses SemVer 2.0.0 or components of SemVer 1.0.0 that are not supported on legacy clients..." ),
                             new XElement( "NoWarn", "NU5105" ) );
 
@@ -146,8 +153,46 @@ namespace CK.Env.Plugin
                        new XElement( "SignAssembly", true ),
                        new XElement( "PublicSign", new XAttribute( "Condition", " '$(OS)' != 'Windows_NT' " ), true ) );
             }
-            section.SetContent( p );
+
+            p.Add( new XElement( "PackageIcon", "PackageIcon.png" ) );
+            var i = new XElement( "ItemGroup",
+                        new XElement( "None", new XAttribute( "Include", "$(MSBuildThisFileDirectory)PackageIcon.png" ), new XAttribute( "Pack", "true" ), new XAttribute( "PackagePath", "\\" ) ) );
+
+            section.SetContent( p, i );
         }
+
+        void HandleSourceLinkDebuggingWorkaround( IActivityMonitor m )
+        {
+            const string sectionName = "SourceLinkDebuggingWorkaround";
+            var section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
+            section.StartComment = ": See  https://github.com/dotnet/sdk/issues/1458#issuecomment-695119194 ";
+            section.SetContent(
+                XElement.Parse(
+@"<PropertyGroup Condition="" '$(GenerateDocumentationFile)' == '' And '$(IsInTestsFolder)' != 'true' And ('$(ContinuousIntegrationBuild)' == 'true' Or '$(Configuration)' == 'Release') "">
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>" ) );
+        }
+
+        void HandleSPDXLicense( IActivityMonitor m )
+        {
+            const string sectionName = "SPDXLicense";
+            bool mustBe = _solutionSpec.SPDXLicense != null;
+            var section = XCommentSection.FindOrCreate( Document.Root, sectionName, mustBe );
+            if( mustBe )
+            {
+                section.StartComment = ": See https://docs.microsoft.com/en-us/nuget/reference/msbuild-targets#packing-a-license-expression-or-a-license-file and https://spdx.org/licenses/ ";
+                section.SetContent(
+                    XElement.Parse(
+$@"<PropertyGroup>
+	<PackageLicenseExpression>{_solutionSpec.SPDXLicense}</PackageLicenseExpression>
+</PropertyGroup>" ) );
+            }
+            else
+            {
+                section?.Remove();
+            }
+        }
+
 
         void HandleGenerateDocumentation( IActivityMonitor m )
         {
@@ -164,10 +209,18 @@ namespace CK.Env.Plugin
             }
             section.StartComment = ": When in IsInTestsFolder and in Release or during ContinuousIntegrationBuild builds. Each project can override GenerateDocumentationFile property. ";
             section.SetContent(
-                XElement.Parse(
-@"<PropertyGroup Condition="" '$(GenerateDocumentationFile)' == '' And '$(IsInTestsFolder)' != 'true' And ('$(ContinuousIntegrationBuild)' == 'true' Or '$(Configuration)' == 'Release') "">
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-  </PropertyGroup>" ) );
+                XElement.Parse( @"
+  <Target Name=""_ResolveCopyLocalNuGetPackagePdbsAndXml"" Condition=""$(CopyLocalLockFileAssemblies) == true"" AfterTargets=""ResolveReferences"">
+    <ItemGroup>
+      <ReferenceCopyLocalPaths
+        Include=""@(ReferenceCopyLocalPaths->'%(RootDir)%(Directory)%(Filename).pdb')""
+        Condition=""'%(ReferenceCopyLocalPaths.NuGetPackageId)' != '' and Exists('%(RootDir)%(Directory)%(Filename).pdb')"" />
+      <ReferenceCopyLocalPaths
+        Include=""@(ReferenceCopyLocalPaths->'%(RootDir)%(Directory)%(Filename).xml')""
+        Condition=""'%(ReferenceCopyLocalPaths.NuGetPackageId)' != '' and Exists('%(RootDir)%(Directory)%(Filename).xml')"" />
+    </ItemGroup>
+  </Target>" ) );
+
         }
 
         void HandleZeroVersion( IActivityMonitor m )

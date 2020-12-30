@@ -31,7 +31,7 @@ namespace CK.Env
         /// A null or empty SecretKeyName means that the repository does not require any protection (or
         /// uses a different, external, security architecture).
         /// </summary>
-        string SecretKeyName { get; }
+        string? SecretKeyName { get; }
 
         /// <summary>
         /// Ensures that the secret behind the <see cref="SecretKeyName"/> is available

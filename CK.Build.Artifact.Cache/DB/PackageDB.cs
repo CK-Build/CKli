@@ -13,7 +13,7 @@ namespace CK.Build
         readonly InstanceStore _instances;
         readonly Dictionary<string, PackageFeed> _feeds;
         readonly DateTime _lastUpdate;
-        readonly int _version;
+        readonly int _updateSerialNumber;
 
         /// <summary>
         /// Initializes a new, empty, database.
@@ -74,7 +74,7 @@ namespace CK.Build
 
         PackageDB( PackageDB origin, InstanceStore? store, Dictionary<string, PackageFeed>? newFeeds, DateTime lastUpdate )
         {
-            _version = origin._version + 1;
+            _updateSerialNumber = origin._updateSerialNumber + 1;
             _feeds = newFeeds ?? origin._feeds;
             _instances = store ?? origin._instances;
             _lastUpdate = lastUpdate;
@@ -167,9 +167,10 @@ namespace CK.Build
                         m.Error( $"Dependency Target(s) of {candidate.info.Key} not registered: {targets.Where( t => t.Item2 == null ).Select( t => t.Target.ToString() ).Concatenate()}" );
                         return null;
                     }
-                    var deps = candidate.info.Dependencies.Zip( targets, ( d, t ) => new PackageInstance.Reference( t.Item2!, d.Lock, d.MinQuality, d.Kind, d.Savors ) )
+                    var allSavors = candidate.info.Savors;
+                    var deps = candidate.info.Dependencies.Zip( targets, ( d, t ) => new PackageInstance.Reference( t.Item2!, d.Lock, d.MinQuality, d.Kind, d.Savors == allSavors ? null : d.Savors ) )
                                    .ToArray();                   
-                    initialization[i].p = p = new PackageInstance( candidate.info.Key, candidate.info.Savors, deps, regDate );
+                    initialization[i].p = p = new PackageInstance( candidate.info.Key, candidate.info.Savors, deps );
                     ++newCount;
                 }
 
@@ -258,10 +259,10 @@ namespace CK.Build
         }
 
         /// <summary>
-        /// Gets the version number.
+        /// Gets the update serial number number.
         /// It is an always increasing number (that may roll to negative... in years).
         /// </summary>
-        public int Version => _version;
+        public int UpdateSerialNumber => _updateSerialNumber;
 
         /// <summary>
         /// Gets all the feeds.
@@ -306,6 +307,12 @@ namespace CK.Build
         {
             return _instances.GetInstances( package );
         }
+
+        /// <summary>
+        /// Overridden to return the <see cref="UpdateSerialNumber"/>, <see cref="Instances"/> count and the list of feeds.
+        /// </summary>
+        /// <returns>A readable string.</returns>
+        public override string ToString() => $"UpdateSerialNumber: {_updateSerialNumber}, PackageCount: {_instances.Count}, Feeds: {Feeds.Select( f => f.ToString() ).Concatenate()}";
 
     }
 }

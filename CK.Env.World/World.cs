@@ -456,7 +456,7 @@ namespace CK.Env
             if( saveOnChange ) _localState.SaveState( m );
         }
 
-        string GetCleanBranchName( IActivityMonitor monitor )
+        string? GetCleanBranchName( IActivityMonitor monitor )
         {
             if( !CheckGlobalGitStatusLocalXorDevelop( monitor ) ) return null;
             bool allClean = true;
@@ -478,13 +478,13 @@ namespace CK.Env
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="reloadSolutions">True to force a reload of the solutions.</param>
         /// <returns>The context or null on error.</returns>
-        IWorldSolutionContext GetWorldSolutionContext( IActivityMonitor monitor, bool reloadSolutions = false )
+        IWorldSolutionContext? GetWorldSolutionContext( IActivityMonitor monitor, bool reloadSolutions = false )
         {
             var branchName = GetCleanBranchName( monitor );
             if( branchName == null ) return null;
             var c = _solutionDrivers.GetContextOnBranch( branchName )
                 ?? throw new Exception( $"No solution context available for branch {branchName}. GitBranchPlugins are not initialized or a ISolutionDriver plugin implementation is missing." );
-            return c.Refresh( monitor, reloadSolutions ) ? c : null;
+            return c.Refresh( monitor, reloadSolutions );
         }
 
         /// <summary>
@@ -652,7 +652,7 @@ namespace CK.Env
         }
 
         [CommandMethod]
-        public void UpgradeDependency( IActivityMonitor m, string packageName, string versionToUpgrade = null )
+        public void UpgradeDependency( IActivityMonitor m, string packageName, string? versionToUpgrade = null )
         {
             var worldCtx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
             if( worldCtx == null ) return;
@@ -668,7 +668,7 @@ namespace CK.Env
                 m.Error( $"No solution contain the package {packageName}." );
                 return;
             }
-            var types = new HashSet<ArtifactType>( artifactUses.Select( p => p.Target.Artifact.Type ) );
+            var types = new HashSet<ArtifactType>( artifactUses.Select( p => p.Target.Artifact.Type! ) );
             if( types.Count > 1 )
             {
                 m.Error( $"Ambiguous package name '{packageName}', use its TypedName to disambiguate: {types.Select( t => t.Name + ':' + packageName ).Concatenate( " or " )}." );
@@ -839,7 +839,7 @@ namespace CK.Env
             } );
         }
 
-        ReleaseRoadmap LoadRoadmap( IActivityMonitor monitor )
+        ReleaseRoadmap? LoadRoadmap( IActivityMonitor monitor )
         {
             var depContext = GetWorldSolutionContext( monitor );
             if( depContext == null ) return null;
@@ -869,7 +869,7 @@ namespace CK.Env
             return DoEditRoadmap( monitor, false ) != null;
         }
 
-        ReleaseRoadmap DoEditRoadmap( IActivityMonitor monitor, bool forgetAllExistingRoadmapVersions )
+        ReleaseRoadmap? DoEditRoadmap( IActivityMonitor monitor, bool forgetAllExistingRoadmapVersions )
         {
             var roadmap = LoadRoadmap( monitor );
             if( roadmap == null ) return null;
@@ -1120,7 +1120,7 @@ namespace CK.Env
             return RunSafe( monitor, $"Publishing Release.", ( m, error ) =>
             {
                 var buildResults = _localState.GetBuildResult( BuildResultType.Release );
-                if( buildResults != null && !DoPushArtifacts( m, buildResults ) ) return;
+                if( buildResults == null || !DoPushArtifacts( m, buildResults ) ) return;
                 if( !HandleReleaseVersionTags( m, true ) ) return;
                 _localState.PublishBuildResult( buildResults.Type );
                 if( !error() )

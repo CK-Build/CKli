@@ -84,13 +84,11 @@ namespace CK.Build
         internal PackageInstance(
             in ArtifactInstance instance,
             CKTrait? savors,
-            IReadOnlyList<Reference> deps,
-            DateTime registrationDate )
+            IReadOnlyList<Reference> deps )
         {
             Key = instance;
             Savors = savors;
             Dependencies = deps;
-            RegistrationDate = registrationDate;
         }
 
         /// <summary>
@@ -118,11 +116,6 @@ namespace CK.Build
         /// Gets the list of the dependencies.
         /// </summary>
         public IReadOnlyList<Reference> Dependencies { get; }
-
-        /// <summary>
-        /// Gets the time at which this instance has been registered.
-        /// </summary>
-        public DateTime RegistrationDate { get; }
 
         /// <summary>
         /// Compares this instance to another: <see cref="Key"/> is the key:

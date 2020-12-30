@@ -213,14 +213,18 @@ namespace CK.Build
                 if( f.ArtifactType == instance.Artifact.Type )
                 {
                     IPackageInfo? info = null;
-                    try
+                    using( monitor.OpenInfo( $"Reading package info of '{instance.Artifact.Name}/{instance.Version}' from feed '{f.TypedName}'." ) )
                     {
-                        info = await f.GetPackageInfoAsync( monitor, instance );
-                    }
-                    catch( Exception ex )
-                    {
-                        if( feedExceptions == null ) feedExceptions = new List<Exception>();
-                        feedExceptions.Add( ex );
+                        try
+                        {
+                            info = await f.GetPackageInfoAsync( monitor, instance );
+                        }
+                        catch( Exception ex )
+                        {
+                            monitor.Error( "Adding error to feed exceptions: this error is captured and cached.", ex );
+                            if( feedExceptions == null ) feedExceptions = new List<Exception>();
+                            feedExceptions.Add( ex );
+                        }
                     }
                     if( info != null )
                     {
