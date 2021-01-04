@@ -31,6 +31,7 @@ namespace CK.Env.MSBuildSln.Tests
                         ".editorconfig",
                         ".gitignore",
                         "nuget.config",
+                        "Common/PackageIcon.png",
                         "README.md",
                         "Common/SharedKey.snk" );
             }
