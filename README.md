@@ -103,9 +103,9 @@ Gets the URL of the stack you want to clone:
 | CK         | https://github.com/signature-opensource/CK-Stack                    | **Public** |
 | CK-Build   | https://github.com/CK-Build/CK-Build-Stack                          | **Public** |
 | Engie      | https://invenietis@dev.azure.com/invenietis/Cofely/_git/Engie-Stack | Private    |
-| SC         | https://gitlab.com/signature-code/signature-code-stack              | Private    |
-| SMos       | https://gitlab.com/signature-mosaic/Signature-Mosaic-Stack          | Private    |
-| SLog       | https://gitlab.com/signature-logistic/slog-stack                    | Private    |
+| SC         | https://gitlab.com/signature-code/SC-Stack                          | Private    |
+| SMos       | https://gitlab.com/signature-mosaic/SMos-Stack                      | Private    |
+| SLog       | https://gitlab.com/signature-logistic/SLog-Stack                    | Private    |
 | FirstDown  | https://dev.azure.com/invenietis/FirstDown/_git/FirstDown-Stack     | Private    |
 
 
