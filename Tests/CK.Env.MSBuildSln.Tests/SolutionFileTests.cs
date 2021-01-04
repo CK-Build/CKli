@@ -30,6 +30,7 @@ namespace CK.Env.MSBuildSln.Tests
                     .Should().BeEquivalentTo(
                         ".editorconfig",
                         ".gitignore",
+                        "appveyor.yml",
                         "nuget.config",
                         "Common/PackageIcon.png",
                         "README.md",
