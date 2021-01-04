@@ -111,7 +111,7 @@ namespace CK.Env
                     // The .gitignore file is created only once.
                     Directory.CreateDirectory( localDir );
                     var ignore = Root.AppendPart( ".gitignore" );
-                    if( !File.Exists( ignore ) ) File.WriteAllText( ignore, "$Locals/" + Environment.NewLine );
+                    if( !File.Exists( ignore ) ) File.WriteAllText( ignore, "$Local/" + Environment.NewLine );
                     isOpened = true;
                 }
                 if( force || isOpened )
