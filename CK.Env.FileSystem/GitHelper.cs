@@ -662,8 +662,7 @@ namespace CK.Env
                                 }
                                 catch( Exception ex )
                                 {
-                                    m.Error( "Git clone failed. Deleting the repository.", ex );
-                                    FileHelper.RawDeleteLocalDirectory( m, workingFolder );
+                                    m.Error( "Git clone failed. Leaving existing directory as-is.", ex );
                                     return null;
                                 }
                             }
