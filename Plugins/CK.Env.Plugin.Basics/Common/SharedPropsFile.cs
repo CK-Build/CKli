@@ -156,7 +156,11 @@ namespace CK.Env.Plugin
 
             p.Add( new XElement( "PackageIcon", "PackageIcon.png" ) );
             var i = new XElement( "ItemGroup",
-                        new XElement( "None", new XAttribute( "Include", "$(MSBuildThisFileDirectory)PackageIcon.png" ), new XAttribute( "Pack", "true" ), new XAttribute( "PackagePath", "\\" ) ) );
+                        new XElement( "None",
+                            new XAttribute( "Include", "$(MSBuildThisFileDirectory)PackageIcon.png" ),
+                            new XAttribute( "Pack", "true" ),
+                            new XAttribute( "PackagePath", "\\" ),
+                            new XAttribute( "Visible", "false" ) ) );
 
             section.SetContent( p, i );
         }
