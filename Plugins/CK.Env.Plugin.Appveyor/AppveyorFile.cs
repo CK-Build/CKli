@@ -106,29 +106,6 @@ namespace CK.Env.Plugin
             EnsureDefaultBranches( firstMapping );
             SetSequence( firstMapping, "build_script", new YamlValue( "dotnet run --project CodeCakeBuilder -nointeraction" ) );
             firstMapping["test"] = new YamlValue( "off" );
-            firstMapping["artifacts"] = new YamlSequence()
-            {
-                new YamlMapping()
-                {
-                    ["path"] = new YamlValue(@"'**\*.log'"),
-                    ["name"] = new YamlValue("Log file")
-                },
-                new YamlMapping()
-                {
-                    ["path"] = new YamlValue(@"'**\*.trx'"),
-                    ["name"] = new YamlValue("Visual studio test results file")
-                },
-                new YamlMapping()
-                {
-                    ["path"] = new YamlValue(@"'**\Tests\**\TestResult*.xml'"),
-                    ["name"] = new YamlValue("NUnit tests result files")
-                },
-                new YamlMapping()
-                {
-                    ["path"] = new YamlValue(@"'**Tests\**\Logs\**\*'"),
-                    ["name"] = new YamlValue("Log files")
-                }
-            };
             CreateOrUpdate( m, YamlMappingToString( m ) );
         }
 
