@@ -65,7 +65,7 @@ namespace CK.Env
 
 
         /// <summary>
-        /// Reads the Stacks.xml file and instanciates the <see cref="StackRepo"/> objects and
+        /// Reads the Stacks.xml file and instantiates the <see cref="StackRepo"/> objects and
         /// their <see cref="WorldInfo"/>: creating the StackRepo registers the required secrets
         /// in the key store.
         /// </summary>
@@ -139,12 +139,12 @@ namespace CK.Env
         /// (that are NOT world: it's meta) to appear in "Home/" command namespace instead of "World/".
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="url">The repository url. Must not be numm or empty.</param>
+        /// <param name="url">The repository URL. Must not be null or empty.</param>
         /// <param name="isPublic">Whether this repository contains public (Open Source) worlds.</param>
         public void EnsureStackRepository( IActivityMonitor m, string url, bool isPublic )
         {
             if( DisableRepositoryAndStacksCommands ) throw new InvalidOperationException( nameof( DisableRepositoryAndStacksCommands ) );
-            if( String.IsNullOrWhiteSpace( url ) || !Uri.TryCreate( url, UriKind.Absolute, out var uri ) ) throw new ArgumentException( $"Must be a valid, absolute, url: {url}", nameof( url ) );
+            if( String.IsNullOrWhiteSpace( url ) || !Uri.TryCreate( url, UriKind.Absolute, out var uri ) ) throw new ArgumentException( $"Must be a valid, absolute, URL: {url}", nameof( url ) );
             uri = ProtoGitFolder.CheckAndNormalizeRepositoryUrl( uri );
             int idx = _stackRepos.IndexOf( r => r.OriginUrl.Equals( uri ) );
             if( idx < 0 )
@@ -179,11 +179,11 @@ namespace CK.Env
         /// (that are NOT world: it's meta) to appear in "Home/" command namespace instead of "World/".
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="url">The url of the repository to remove.</param>
+        /// <param name="url">The URL of the repository to remove.</param>
         public void DeleteStackRepository( IActivityMonitor m, string url )
         {
             if( DisableRepositoryAndStacksCommands ) throw new InvalidOperationException( nameof( DisableRepositoryAndStacksCommands ) );
-            if( String.IsNullOrWhiteSpace( url ) || !Uri.TryCreate( url, UriKind.Absolute, out var uri ) ) throw new ArgumentException( "Must be a valid url.", nameof( url ) );
+            if( String.IsNullOrWhiteSpace( url ) || !Uri.TryCreate( url, UriKind.Absolute, out var uri ) ) throw new ArgumentException( "Must be a valid URL.", nameof( url ) );
             int idx = _stackRepos.IndexOf( r => r.OriginUrl.AbsoluteUri.Equals( url, StringComparison.OrdinalIgnoreCase ) );
             if( idx < 0 ) m.Warn( $"Stack repository '{url}' not found." );
             else
@@ -412,7 +412,7 @@ namespace CK.Env
 
         /// <summary>
         /// Overridden to return the file $Local/FullName/LocalState.xml in the stack repository (see <see cref="GetWorkingLocalFolder(IActivityMonitor, IWorldName)"/>)
-        /// (base WorldStore consider it by default at the root of the world but with the git store, we prefere to have it in the local folder).
+        /// (base WorldStore consider it by default at the root of the world but with the git store, we prefer to have it in the local folder).
         /// </summary>
         /// <param name="w">The world name.</param>
         /// <returns>The path to use to read/write the local state.</returns>
@@ -424,7 +424,7 @@ namespace CK.Env
             var path = ToLocalStateFilePath( w );
 
             // Temporary. Before v0.5.0, the local state was located at the world root (this is how the base WorldStore works).
-            //            If the previoaus file is found, move it to its new location.
+            //            If the previous file is found, move it to its new location.
             if( !File.Exists( path ) )
             {
                 var previously = base.ToLocalStateFilePath( w );

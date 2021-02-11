@@ -41,7 +41,7 @@ namespace CK.Env
         /// already exists or if an error prevents it to be created.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="source">The soure origin of the world. It must exist in the current worlds. See <see cref="IWorldName"/>.</param>
+        /// <param name="source">The source origin of the world. It must exist in the current worlds. See <see cref="IWorldName"/>.</param>
         /// <param name="parallelName">The parallel world name to create. Must not be null or empty. See <see cref="IWorldName"/>.</param>
         /// <param name="content">The initial content. Must not be null.</param>
         /// <returns>The new world or null on error.</returns>
@@ -57,7 +57,7 @@ namespace CK.Env
         /// Must create a new world in this store or returns null if the world already exists.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="source">The soure origin of the world. It must exist in the current worlds. See <see cref="IWorldName"/>.</param>
+        /// <param name="source">The source origin of the world. It must exist in the current worlds. See <see cref="IWorldName"/>.</param>
         /// <param name="parallelName">The parallel world name to create. See <see cref="IWorldName"/>.</param>
         /// <param name="content">The initial content.</param>
         /// <returns>The new world or null on error.</returns>

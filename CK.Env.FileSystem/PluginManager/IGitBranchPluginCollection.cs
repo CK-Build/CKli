@@ -10,7 +10,7 @@ namespace CK.Env
     {
         /// <summary>
         /// Gets the plugins for a specified branch. The collection is created as needed but if an error occurred
-        /// (typically during plugin instanciation), this throws the error.
+        /// (typically during plugin instantiation), this throws the error.
         /// Use <see cref="EnsurePlugins(IActivityMonitor, string, string)"/> to load the plugins in a safer way.
         /// </summary>
         /// <param name="branchName">The branch name. Cannot be null or whitespace.</param>
@@ -18,7 +18,7 @@ namespace CK.Env
         IGitPluginCollection<IGitBranchPlugin> this[string branchName] { get; }
 
         /// <summary>
-        /// Ensures that the collection is created and plugins are instanciated.
+        /// Ensures that the collection is created and plugins are instantiated.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">The branch name. Cannot be null or whitespace.</param>
