@@ -40,7 +40,7 @@ namespace CK.Env.Plugin
                     Document.Root.Elements( SGVSchema.Debug ).Remove();
                     e.ReplaceWith( o.ToXml() );
                 }
-                // Fogot these 2 ones.
+                // Forgot these 2 ones.
                 Document.Root.Elements( "StartingVersionForCSemVer" ).Remove();
                 Document.Root.Nodes().OfType<XComment>().Where( c => c.Value.Contains( "Debug IgnoreDirtyWorkingFolder=" ) ).Remove();
                 return o;

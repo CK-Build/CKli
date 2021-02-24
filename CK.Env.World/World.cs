@@ -1229,17 +1229,30 @@ namespace CK.Env
                         p.Repo.EnsureBranch( m, newWorldName.DevelopBranchName, noWarnOnCreate: true );
                         if( p.Repo.Checkout( m, newWorldName.DevelopBranchName, skipFetchBranches: true, skipPullMerge: true ).Success )
                         {
-                            // On the parallel develop branch, sets the SingleMajor to the current one and commit.
+                            int currentMajor = p.Current.FinalBuildInfo.Version.Major;
+                            // On the parallel develop branch, sets the SingleMajor to the current
+                            // one or sets the OnlyPatch to true if it is the 0 major... and commit.
                             var repoXmlFile = p.Repo.FullPhysicalPath.AppendPart( "RepositoryInfo.xml" );
                             var repoXmlDoc = XDocument.Load( repoXmlFile );
-                            repoXmlDoc.Root.EnsureElement( SimpleGitVersion.SGVSchema.SimpleGitVersion )
-                                            .SetAttributeValue( SimpleGitVersion.SGVSchema.SingleMajor, p.Current.FinalBuildInfo.Version.Major );
+                            string commitMessage;
+                            if( currentMajor == 0 )
+                            {
+                                repoXmlDoc.Root.EnsureElement( SimpleGitVersion.SGVSchema.SimpleGitVersion )
+                                                .SetAttributeValue( SimpleGitVersion.SGVSchema.OnlyPatch, true );
+                                commitMessage = $"Creating parallel world '{newWorldName}': Version Major is locked to {currentMajor}.";
+                            }
+                            else
+                            {
+                                repoXmlDoc.Root.EnsureElement( SimpleGitVersion.SGVSchema.SimpleGitVersion )
+                                                .SetAttributeValue( SimpleGitVersion.SGVSchema.SingleMajor, currentMajor );
+                                commitMessage = $"Creating parallel world '{newWorldName}': Only patch versions {currentMajor}.{p.Current.FinalBuildInfo.Version.Minor}.X where X > {p.Current.FinalBuildInfo.Version.Patch} can be produced.";
+                            }
                             repoXmlDoc.Save( repoXmlFile );
-                            if( !p.Repo.Commit( m, $"Creating parallel world '{newWorldName}': produced version Major is now locked to {p.Current.FinalBuildInfo.Version.Major}." ) )
+                            if( !p.Repo.Commit( m, commitMessage ) )
                             {
                                 error = true;
                             }
-                            m.Info( $"SingleMajor for {p.Repo.SubPath} '{newWorldName.DevelopBranchName}' is now locked to '{p.Current.FinalBuildInfo.Version.Major}'." );
+                            m.Info( $"SingleMajor for {p.Repo.SubPath}: '{commitMessage}'." );
                         }
                         else
                         {
@@ -1253,8 +1266,10 @@ namespace CK.Env
                         }
                         else
                         {
-                            // On the current develop branch (the default world), sets the StartingVersion to the next Major.0.0-alpha.
-                            var starting = $"{p.Current.FinalBuildInfo.Version.Major + 1}.0.0-alpha";
+                            // On the current develop branch (the default world), sets the StartingVersion to the (Major+1).0.0-alpha 
+                            // or, if the Major is 0 to the 0.(Minor+1).0-alpha.
+                            int currentMajor = p.Current.FinalBuildInfo.Version.Major;
+                            var starting = currentMajor > 0 ? $"{currentMajor + 1}.0.0-alpha" : $"{currentMajor}.{p.Current.FinalBuildInfo.Version.Minor + 1}.0-alpha";
                             var repoXmlFile = p.Repo.FullPhysicalPath.AppendPart( "RepositoryInfo.xml" );
                             var repoXmlDoc = XDocument.Load( repoXmlFile );
                             repoXmlDoc.Root.EnsureElement( SimpleGitVersion.SGVSchema.SimpleGitVersion )

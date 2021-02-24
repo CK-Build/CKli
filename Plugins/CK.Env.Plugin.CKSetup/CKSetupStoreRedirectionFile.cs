@@ -49,7 +49,7 @@ namespace CK.Env.Plugin
             EnsureStorePath( e.Monitor, store );
             // By setting this environment variable, CCB will not use the CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL from
             // its key vault (that contains the actual target remote): components will be pushed to the local store.
-            // When using CCB, it is the "Publish" commands that do the actual job of transfering locally produced components
+            // When using CCB, it is the "Publish" commands that do the actual job of transferring locally produced components
             // to the remote target store.
             e.EnvironmentVariables.Add( ("CKSETUP_CAKE_TARGET_STORE_APIKEY_AND_URL", store) );
         }
