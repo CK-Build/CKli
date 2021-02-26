@@ -34,7 +34,17 @@ namespace CK.SimpleKeyVault
         {
             if( IsKeyVaultOpened && _vaultContent.TryGetValue( e.Declared.Name, out var secret ) )
             {
-                e.Declared.SetSecret( secret );
+                var key = e.Declared;
+                if( key.IsSecretAvailable )
+                {
+                    // Secret has been set by other means (typically the "undeclared").
+                    // We update our content, even if the "save" refreshes its content from the "Optimal keys".
+                    _vaultContent[key.Name] = secret;
+                }
+                else
+                {
+                    key.SetSecret( secret );
+                }
             }
         }
 
@@ -167,7 +177,7 @@ namespace CK.SimpleKeyVault
         void DoSaveKeyVault( IActivityMonitor? m )
         {
             Debug.Assert( _passPhrase != null, "The file is opened." );
-            foreach( var e in _store.OptimalAvailableInfos )
+            foreach( var e in _store.OptimalNamedSecrets )
             {
                 _vaultContent[e.Name] = e.Secret;
             }
