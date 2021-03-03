@@ -180,6 +180,11 @@ namespace CKli
             string prompt;
             if( host.UserKeyVault.KeyVaultFileExists )
             {
+                if( host.UserKeyVault.OpenKeyVault( monitor ) )
+                {
+                    Console.WriteLine( "Your personal KeyVault is opened (it is not no protected)." );
+                    return;
+                }
                 Console.WriteLine( "Your personal KeyVault should be opened." );
                 prompt = "Enter the passphrase to open it [Hidden]: ";
             }
@@ -187,11 +192,11 @@ namespace CKli
             {
                 Console.WriteLine( $"Personal KeyVault not found at: '{host.UserKeyVault.KeyVaultPath}'" );
                 Console.WriteLine( "It will contain encrypted secrets required by the different operations on all stacks." );
-                prompt = "It should be created. Enter its passphrase (and memorize it!) [Hidden]: ";
+                prompt = "It should be created. Enter its passphrase and memorize it, or leave it empty to set it later [Hidden]: ";
             }
             var s = ReadLine.ReadPassword( prompt );
-            if( s != null ) host.UserKeyVault.OpenKeyVault( monitor, s );
-            else Console.WriteLine( "KeyVault opening cancelled." );
+            if( string.IsNullOrWhiteSpace( s ) ) s = "CKli";
+            host.UserKeyVault.OpenKeyVault( monitor, s );
 
             if( host.UserKeyVault.IsKeyVaultOpened )
             {
