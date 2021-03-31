@@ -2,6 +2,7 @@ using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace CK.SimpleKeyVault
@@ -261,7 +262,7 @@ namespace CK.SimpleKeyVault
         /// <param name="name">The secret name.</param>
         /// <param name="throwOnUnavailable">True to throw an exception if the secret cannot be obtained.</param>
         /// <returns>The secret or null if it's not available (and <paramref name="throwOnUnavailable"/> is false).</returns>
-        public string? GetSecretKey( IActivityMonitor m, string name, bool throwOnUnavailable )
+        public string? GetSecretKey( IActivityMonitor m, string name, [DoesNotReturnIf(true)]bool throwOnUnavailable )
         {
             if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentException( nameof( name ) );
             if( !_keyInfos.TryGetValue( name, out SecretKeyInfo? keyInfo ) )

@@ -15,19 +15,6 @@ using System.Xml.Linq;
 
 namespace CK.Env
 {
-    static class StringBuilderExtension
-    {
-        public static StringBuilder AppendGraphName( this StringBuilder b, string name ) =>
-            b.Append( "\"" )
-                .Append( name )
-                .Append( "\"" );
-
-        public static StringBuilder AppendDependency( this StringBuilder b, string dependent, string dependencies ) =>
-            b.AppendGraphName( dependencies )
-            .Append( " -> " )
-            .AppendGraphName( dependent );
-    }
-
     /// <summary>
     /// Primary World object. Handles the solutions, the solution drivers, the local
     /// and shared states and supports numerous commands.
@@ -162,14 +149,22 @@ namespace CK.Env
         }
 
 
+        static StringBuilder AppendGraphName( StringBuilder b, string name ) => b.Append( '"' ).Append( name ).Append( '"' );
+
+        static StringBuilder AppendDependency( StringBuilder b, string dependent, string dependencies )
+        {
+            AppendGraphName( b, dependencies ).Append( " -> " );
+            return AppendGraphName( b, dependent );
+        }
+
         [CommandMethod]
         public bool DumpWorldGraph( IActivityMonitor m )
         {
             StringBuilder b = new StringBuilder();
             var ctx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
             if( ctx == null ) return false;
-            b.Append( "digraph " )
-                .AppendGraphName( WorldName.Name );
+            b.Append( "digraph " );
+            AppendGraphName( b, WorldName.Name );
             using( new OpenGraph( b ) )
             {
                 foreach( var slnGroupped in ctx.Solutions.GroupBy( p => p.Solution.Rank ) )
@@ -185,20 +180,19 @@ namespace CK.Env
                         foreach( var sln in slnGroupped )
                         {
 
-                            b.AppendGraphName( sln.Solution.Solution.Name )
-                           .AppendLine( ";" );
+                            AppendGraphName( b, sln.Solution.Solution.Name );
+                            b.AppendLine( ";" );
                             foreach( var slnDep in sln.Solution.PublishedRequirements )
                             {
-                                b.AppendDependency( sln.Solution.Solution.Name, slnDep.Solution.Name )
-                                    .AppendLine( ";" );
+                                AppendDependency( b, sln.Solution.Solution.Name, slnDep.Solution.Name );
+                                b.AppendLine( ";" );
                             }
 
                             foreach( var slnBuildDep in sln.Solution.Requirements.Except( sln.Solution.PublishedRequirements ) )
                             {
-                                b.AppendDependency( sln.Solution.Solution.Name, slnBuildDep.Solution.Name )
-                                    .AppendLine( @" [style=""dotted""];" );
+                                AppendDependency( b, sln.Solution.Solution.Name, slnBuildDep.Solution.Name );
+                                b.AppendLine( @" [style=""dotted""];" );
                             }
-
                         }
                     }
                 }
@@ -214,8 +208,8 @@ namespace CK.Env
             StringBuilder b = new StringBuilder();
             var ctx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
             if( ctx == null ) return false;
-            b.Append( "digraph " )
-                .AppendGraphName( WorldName.Name );
+            b.Append( "digraph " );
+            AppendGraphName( b, WorldName.Name );
             using( new OpenGraph( b ) )
             {
                 b.AppendLine( "concentrate=true" )
@@ -230,8 +224,8 @@ namespace CK.Env
                     i++;
                     using( new OpenGraph( b ) )
                     {
-                        b.Append( "label=" )
-                            .AppendGraphName( sln.Solution.Solution.Name )
+                        b.Append( "label=" );
+                        AppendGraphName( b, sln.Solution.Solution.Name )
                             .AppendLine( ";" )
                             .AppendLine( "style=filled;" )
                             .AppendLine( "node [style=filled];" )
@@ -240,12 +234,10 @@ namespace CK.Env
                             .AppendLine( ";" );
                         foreach( var proj in sln.Solution.Solution.Projects.Where( p => p.IsPublished ) )
                         {
-                            b.AppendGraphName( proj.Name )
-                                    .AppendLine( ";" );
+                            AppendGraphName( b, proj.Name ).AppendLine( ";" );
                             foreach( var projDep in proj.ProjectReferences.Where( p => p.Target.IsPublished ) )
                             {
-                                b.AppendDependency( proj.Name, projDep.Target.Name )
-                                    .AppendLine( ";" );
+                                AppendDependency( b, proj.Name, projDep.Target.Name ).AppendLine( ";" );
                             }
                         }
 
@@ -255,8 +247,7 @@ namespace CK.Env
                 foreach( var dep in ctx.DependencyContext.PackageDependencies )
                 {
                     if( !dep.OriginIsPublishedProject ) continue;
-                    b.AppendDependency( dep.RefererOrigin.Name, dep.TargetProject.Name )
-                        .AppendLine( ";" );
+                    AppendDependency( b, dep.RefererOrigin.Name, dep.TargetProject.Name ).AppendLine( ";" );
                 }
             }
             File.WriteAllText( "graph.gv", b.ToString() );
@@ -1154,14 +1145,14 @@ namespace CK.Env
             } );
         }
 
-        public bool CanGenerateParallelWorld => WorldName.ParallelName == null
-                            && WorkStatus == GlobalWorkStatus.Idle
-                            && CachedGlobalGitStatus == StandardGitStatus.Develop;
+        public bool CanCreateLTS => WorldName.ParallelName == null
+                                    && WorkStatus == GlobalWorkStatus.Idle
+                                    && CachedGlobalGitStatus == StandardGitStatus.Develop;
 
         [CommandMethod( confirmationRequired: true )]
-        public bool GenerateParallelWorld( IActivityMonitor m, string parallelName )
+        public bool CreateLTS( IActivityMonitor m, string parallelName )
         {
-            if( !CanGenerateParallelWorld ) throw new InvalidOperationException( nameof( CanGenerateParallelWorld ) );
+            if( !CanCreateLTS ) throw new InvalidOperationException( nameof( CanCreateLTS ) );
             if( String.IsNullOrWhiteSpace( parallelName ) ) throw new ArgumentException( "Must not be null or white space.", nameof( parallelName ) );
 
             if( !CheckGlobalGitStatus( m, StandardGitStatus.Develop ) ) return false;
