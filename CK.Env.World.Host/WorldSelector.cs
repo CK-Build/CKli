@@ -18,6 +18,7 @@ namespace CK.Env
         readonly CommandRegister _command;
         readonly IBasicApplicationLifetime _appLife;
         readonly HashSet<ICommandHandler> _existingCommands;
+        readonly Func<IReleaseVersionSelector> _releaseVersionSelectorFactory;
         FileSystem _fs;
         XTypedObject _root;
 
@@ -28,12 +29,14 @@ namespace CK.Env
         /// <param name="commandRegister">The command register.</param>
         /// <param name="factory">The factory for XTypedObjects.</param>
         /// <param name="userKeyStore">The user key store.</param>
+        /// <param name="releaseVersionSelectorFactory">Factory for <see cref="IReleaseVersionSelector"/> that the world will use.</param>
         /// <param name="appLife">Simple application lifetime controller.</param>
         public WorldSelector(
             GitWorldStore store,
             CommandRegister commandRegister,
             XTypedFactory factory,
             SecretKeyStore userKeyStore,
+            Func<IReleaseVersionSelector> releaseVersionSelectorFactory,
             IBasicApplicationLifetime appLife )
         {
             Store = store ?? throw new ArgumentNullException( nameof( store ) );
@@ -43,6 +46,7 @@ namespace CK.Env
             _factory = factory ?? throw new ArgumentNullException( nameof( factory ) );
             commandRegister.Register( this );
             _existingCommands = new HashSet<ICommandHandler>( commandRegister.GetAllCommands( false ) );
+            _releaseVersionSelectorFactory = releaseVersionSelectorFactory;
         }
 
         /// <summary>
@@ -136,6 +140,7 @@ namespace CK.Env
                 baseProvider.Add( Store );
                 baseProvider.Add( _appLife );
                 baseProvider.Add( _userKeyStore );
+                baseProvider.Add( _releaseVersionSelectorFactory );
                 var original = Store.ReadWorldDescription( m, w ).Root;
                 var expanded = XTypedFactory.PreProcess( m, original );
                 if( expanded.Errors.Count > 0 ) return false;

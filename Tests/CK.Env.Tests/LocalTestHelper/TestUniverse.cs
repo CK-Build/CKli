@@ -1,6 +1,8 @@
 using CK.Core;
+using CK.Env.DependencyModel;
 using CK.Text;
 using CKli;
+using CSemVer;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
@@ -82,6 +84,19 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public NormalizedPath CKliMapping => UniversePath.AppendPart( _ckliMapping );
 
+        class FakeReleaseVersionSelector : IReleaseVersionSelector
+        {
+            public void ChooseFinalVersion( IActivityMonitor m, IReleaseVersionSelectorContext context )
+            {
+                throw new NotImplementedException();
+            }
+
+            public bool OnAlreadyReleased( IActivityMonitor m, DependentSolution solution, CSVersion version, bool isContentTag )
+            {
+                throw new NotImplementedException();
+            }
+        }
+
         /// <summary>
         /// Create a <see cref="TestUniverse"/> in a given folder.
         /// </summary>
@@ -91,7 +106,7 @@ namespace CK.Env.Tests.LocalTestHelper
         {
             m.Info( $"Creating TestUniverse from {path}." );
             NormalizedPath ckliPath = path.AppendPart( _ckliMapping );
-            var userHost = UserHost.Create( m, new FakeApplicationLifetime(), ckliPath );
+            var userHost = UserHost.Create( m, new FakeApplicationLifetime(), ckliPath, () => new FakeReleaseVersionSelector() );
             var output = new TestUniverse( path, userHost );
             userHost.WorldStore.DestroyWorld( m, "CK" );
             userHost.WorldStore.DestroyWorld( m, "CK-Build" );

@@ -29,6 +29,7 @@ namespace CKli
             SecretKeyStore keyStore,
             ArtifactCenter artifacts,
             CommandRegister commandRegister,
+            IReleaseVersionSelector releaseVersionSelector,
             IBasicApplicationLifetime appLife,
             Initializer initializer )
             : base( initializer )
@@ -42,7 +43,7 @@ namespace CKli
             bool isPublic = initializer.Reader.HandleRequiredAttribute<bool>( "IsPublic" );
             _world = new World( commandRegister, artifacts, worldStore, worldName, isPublic, _localFeeds, keyStore, _userMonitorFilter, appLife )
             {
-                VersionSelector = new ReleaseVersionSelector()
+                VersionSelector = releaseVersionSelector
             };
             _world.DumpWorldStatus += ( o, e ) => OnDumpWorldStatus( e.Monitor );
             initializer.Services.Add( _world );
@@ -64,7 +65,7 @@ namespace CKli
         }
 
         /// <summary>
-        /// Initializes the Git folders: this instanciates the <see cref="GitFolder"/> from the
+        /// Initializes the Git folders: this instantiates the <see cref="GitFolder"/> from the
         /// <see cref="XGitFolder.ProtoGitFolder"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>

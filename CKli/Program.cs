@@ -37,7 +37,7 @@ namespace CKli
             IBasicApplicationLifetime appLife = new FakeApplicationLifetime();
             try
             {
-                using( var host = UserHost.Create( monitor, appLife, userHostPath ) )
+                using( var host = UserHost.Create( monitor, appLife, userHostPath, () => new ConsoleReleaseVersionSelector() ) )
                 {
                     OpenKeyVault( monitor, host );
                     if( host.UserKeyVault.IsKeyVaultOpened ) host.WorldStore.ReadWorlds( monitor, true );

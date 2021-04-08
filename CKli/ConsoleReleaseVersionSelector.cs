@@ -10,7 +10,7 @@ using System.Linq;
 
 namespace CKli
 {
-    public class ReleaseVersionSelector : IReleaseVersionSelector
+    public class ConsoleReleaseVersionSelector : IReleaseVersionSelector
     {
         /// <summary>
         /// This method must choose between possible versions. It may return null to cancel the process.

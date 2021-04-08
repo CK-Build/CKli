@@ -23,7 +23,7 @@ namespace CK.Env
         readonly SimpleWorldLocalMapping _worldMapping;
         readonly GitWorldStore _store;
 
-        UserHost( IBasicApplicationLifetime lifetime, NormalizedPath userHostPath )
+        UserHost( IBasicApplicationLifetime lifetime, NormalizedPath userHostPath, Func<IReleaseVersionSelector> releaseVersionSelectorFatory )
         {
             Directory.CreateDirectory( userHostPath );
             ApplicationLifetime = lifetime;
@@ -32,7 +32,7 @@ namespace CK.Env
             UserKeyVault = new FileKeyVault( userHostPath.AppendPart( "Personal.KeyVault.txt" ) );
             _worldMapping = new SimpleWorldLocalMapping( userHostPath.AppendPart( "WorldLocalMapping.txt" ) );
             _store = new GitWorldStore( userHostPath, _worldMapping, UserKeyVault.KeyStore, CommandRegister );
-            WorldSelector = new WorldSelector( _store, CommandRegister, _xTypedObjectfactory, UserKeyVault.KeyStore, lifetime );
+            WorldSelector = new WorldSelector( _store, CommandRegister, _xTypedObjectfactory, UserKeyVault.KeyStore, releaseVersionSelectorFatory, lifetime );
             CommandRegister.Register( this );
         }
 
@@ -42,10 +42,11 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="lifetime">The lifetime controller.</param>
         /// <param name="userHostPath">The base path that will contain the stack's Git repositories, the user key vault and the world mapping.</param>
+        /// <param name="releaseVersionSelectorFactory">Factory for <see cref="IReleaseVersionSelector"/>.</param>
         /// <returns>A UserHost.</returns>
-        public static UserHost Create( IActivityMonitor m, IBasicApplicationLifetime lifetime, NormalizedPath userHostPath )
+        public static UserHost Create( IActivityMonitor m, IBasicApplicationLifetime lifetime, NormalizedPath userHostPath, Func<IReleaseVersionSelector> releaseVersionSelectorFatory )
         {
-            var u = new UserHost( lifetime, userHostPath );
+            var u = new UserHost( lifetime, userHostPath, releaseVersionSelectorFatory );
             // Suppresing the previous UserDomainName based name.
             if( !u.UserKeyVault.KeyVaultFileExists )
             {
@@ -96,7 +97,7 @@ namespace CK.Env
         /// This method is exposed as a command here in order to appear in the "Home/" command namespace (instead of the "World/").
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="url">The repository url. Must not be numm or empty.</param>
+        /// <param name="url">The repository url. Must not be null or empty.</param>
         /// <param name="isPublic">Whether this repository contains public (Open Source) worlds.</param>
         [CommandMethod]
         public void EnsureStackRepository( IActivityMonitor m, string url, bool isPublic ) => _store.EnsureStackRepository( m, url, isPublic );
