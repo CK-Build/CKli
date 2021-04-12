@@ -10,13 +10,13 @@ namespace CKli
     [XName( "Folder" )]
     public class XPathItem : XTypedObject
     {
-        IFileInfo _fileInfo;
-        IDirectoryContents _contents;
+        IFileInfo? _fileInfo;
+        IDirectoryContents? _contents;
 
         public XPathItem(
             Initializer initializer,
             FileSystem fs,
-            XPathItem parent = null )
+            XPathItem? parent = null )
             : this( initializer, fs, parent?.FullPath ?? new NormalizedPath() )
         {
         }
@@ -84,7 +84,7 @@ namespace CKli
         /// <summary>
         /// Gets the <see cref="IDirectoryContents"/> or null if <see cref="IsFolder"/> is false.
         /// </summary>
-        public IDirectoryContents DirectoryContents => _contents ?? (_contents = FileInfo.IsDirectory ? FileSystem.GetDirectoryContents( FullPath ) : null);
+        public IDirectoryContents? DirectoryContents => _contents ?? (_contents = FileInfo.IsDirectory ? FileSystem.GetDirectoryContents( FullPath ) : null);
 
         public override string ToString() => FullPath;
     }

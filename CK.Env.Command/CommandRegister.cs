@@ -171,7 +171,7 @@ namespace CK.Env
                 {
                     throw new Exception( $"Method {enabled} must not have any parameter and return a boolean." );
                 }
-                return () => (bool)enabled.Invoke( instance, Array.Empty<object>() );
+                return () => (bool)enabled.Invoke( instance, Array.Empty<object>() )!;
             }
             return null;
         }

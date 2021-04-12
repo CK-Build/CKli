@@ -13,7 +13,7 @@ namespace CKli
         {
             _branches = new List<XBranch>();
             initializer.ChildServices.Add( this );
-            ProtoGitFolder = FileSystem.FindOrCreateProtoGitFolder( initializer.Monitor, world.WorldName, FullPath, Url, world.IsPublicWorld );
+            ProtoGitFolder = FileSystem.FindOrCreateProtoGitFolder( initializer.Monitor, world.WorldName, FullPath, Url!, world.IsPublicWorld );
         }
 
         /// <summary>

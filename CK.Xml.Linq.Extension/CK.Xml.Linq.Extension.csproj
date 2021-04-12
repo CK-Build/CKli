@@ -1,19 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <Import Project="..\Common\NotPackaged.props" />
+
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
-    <IsPackable>False</IsPackable>
-    <LangVersion>9.0</LangVersion>
-    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="NuGetizer" Version="0.6.2">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
-    </PackageReference>
-  </ItemGroup>
-  
   <ItemGroup>
     <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="14.0.0" />
   </ItemGroup>
