@@ -16,7 +16,7 @@ namespace CK.Env
     public static class ProcessRunner
     {
         /// <summary>
-        /// Wether we are running on Unix.
+        /// Whether we are running on Unix.
         /// </summary>
         public static bool IsRunningOnUnix => Environment.OSVersion.Platform == PlatformID.Unix;
 
@@ -150,7 +150,9 @@ namespace CK.Env
                 cmdProcess.Start();
                 cmdProcess.BeginErrorReadLine();
                 cmdProcess.BeginOutputReadLine();
-                cmdProcess.WaitForExit();
+                // See https://github.com/dotnet/msbuild/issues/2981
+                // and https://stackoverflow.com/questions/8207994/how-to-wait-on-a-process-and-all-its-child-processes-to-exit/37983587#37983587
+                cmdProcess.WaitForExit( Int32.MaxValue - 1 );
                 if( errorCapture.Length > 0 )
                 {
                     using( m.OpenGroup( stdErrorLevel, "Received errors on <StdErr>:" ) )
