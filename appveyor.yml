@@ -20,5 +20,7 @@ artifacts:
     name: Visual studio test results file
   - path: '**\Tests\**\TestResult*.xml'
     name: NUnit tests result files
-  - path: '**Tests\**\Logs\**\*'
+  - path: '**Tests\**\Logs\**\*' #I'm not sure this globbing is working.
     name: Log files
+  - path: '**\*.log.tmp'
+    name: Partial Log Files.
