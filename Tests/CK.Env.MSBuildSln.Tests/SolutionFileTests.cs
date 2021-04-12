@@ -31,6 +31,7 @@ namespace CK.Env.MSBuildSln.Tests
                         ".editorconfig",
                         ".gitignore",
                         "appveyor.yml",
+                        "Common/NotPackaged.props",
                         "nuget.config",
                         "Common/PackageIcon.png",
                         "README.md",
