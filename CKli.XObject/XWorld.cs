@@ -30,7 +30,6 @@ namespace CKli
             ArtifactCenter artifacts,
             CommandRegister commandRegister,
             IReleaseVersionSelector releaseVersionSelector,
-            IBasicApplicationLifetime appLife,
             Initializer initializer )
             : base( initializer )
         {
@@ -41,7 +40,7 @@ namespace CKli
             if( _userMonitorFilter == null ) throw new InvalidOperationException();
 
             bool isPublic = initializer.Reader.HandleRequiredAttribute<bool>( "IsPublic" );
-            _world = new World( commandRegister, artifacts, worldStore, worldName, isPublic, _localFeeds, keyStore, _userMonitorFilter, appLife )
+            _world = new World( commandRegister, artifacts, worldStore, worldName, isPublic, _localFeeds, keyStore, _userMonitorFilter )
             {
                 VersionSelector = releaseVersionSelector
             };

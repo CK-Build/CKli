@@ -6,6 +6,7 @@ using CK.Text;
 using NuGet.Protocol.Plugins;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -34,16 +35,37 @@ namespace CKli
             monitor.Output.RegisterClient( new ColoredActivityMonitorConsoleClient() );
             monitor.MinimalFilter = LogFilter.Debug;
 
-            IBasicApplicationLifetime appLife = new FakeApplicationLifetime();
+            MultipleWorldHome? multiHome = null;
             try
             {
-                using( var host = UserHost.Create( monitor, appLife, userHostPath, () => new ConsoleReleaseVersionSelector() ) )
+                // We register the available XTypedObject once in a shared factory.
+                var sharedTypedFactory = new XTypedFactory();
+                Assembly.Load( "CKli.XObject" );
+                sharedTypedFactory.AutoRegisterFromLoadedAssemblies( monitor );
+                sharedTypedFactory.SetLocked();
+
+                var mappings = new FileWorldLocalMapping( userHostPath.AppendPart( "WorldLocalMapping.txt" ) );
+                var keyVault = new FileKeyVault( userHostPath.AppendPart( "Personal.KeyVault.txt" ) );
+
+                OpenKeyVault( monitor, keyVault );
+
+                Func<IReleaseVersionSelector> releaseVersionSelectorFactory = () => new ConsoleReleaseVersionSelector();
+
+                var target = mappings.ReverseMap( Environment.CurrentDirectory );
+                if( target != null )
                 {
-                    OpenKeyVault( monitor, host );
-                    if( host.UserKeyVault.IsKeyVaultOpened ) host.WorldStore.ReadWorlds( monitor, true );
-                    DumpWorlds( host.WorldStore.ReadWorlds( monitor ) );
-                    InteractiveRun( monitor, host );
+                    var home = SingleWorldHome.Create( monitor, userHostPath, sharedTypedFactory, target, keyVault.KeyStore, new CommandRegister(), releaseVersionSelectorFactory );
+                    if( home != null )
+                    {
+                        bool keepAlive = InteractiveRun( monitor, keyVault, null, home );
+                        home.Dispose( monitor );
+                        if( !keepAlive ) return;
+                    }
                 }
+                multiHome = MultipleWorldHome.Create( monitor, userHostPath, sharedTypedFactory, keyVault, mappings, () => new ConsoleReleaseVersionSelector() );
+                DumpWorlds( multiHome.WorldStore.ReadWorlds( monitor ) );
+                InteractiveRun( monitor, keyVault, multiHome, null );
+                multiHome.Dispose( monitor );
             }
             catch( Exception ex )
             {
@@ -53,18 +75,27 @@ namespace CKli
             }
         }
 
-        static void InteractiveRun( IActivityMonitor monitor, UserHost host )
+        static bool InteractiveRun( IActivityMonitor monitor, FileKeyVault vault, MultipleWorldHome? multiHome, SingleWorldHome? home )
         {
             const string textCommands = "[run <globbed command name> | list [<globbed command name>] | cls | secret [clear NAME|set NAME|save] | exit]";
+            const string textCommandsWithClose = "[run <globbed command name> | list [<globbed command name>] | close | cls | secret [clear NAME|set NAME|save] | exit]";
+            CommandRegister commandRegister;
+            if( multiHome != null )
+            {
+                commandRegister = multiHome.CommandRegister;
+            }
+            else
+            {
+                Debug.Assert( home != null );
+                commandRegister = home.CommandRegister;
+            }
             for(; ; )
             {
-                if( host.ApplicationLifetime.CanCancelStopRequest ) host.ApplicationLifetime.CancelStopRequest();
-
-                bool hasWorld = host.WorldSelector.CurrentWorld != null;
+                var world = home?.World ?? multiHome?.WorldSelector.CurrentWorld;
                 Console.WriteLine();
-                if( hasWorld )
+                if( world != null )
                 {
-                    Console.WriteLine( $"> World: {host.WorldSelector.CurrentWorld.WorldName.FullName} - {textCommands }" );
+                    Console.WriteLine( $"> World: {world.WorldName.FullName} - {textCommandsWithClose }" );
                 }
                 else
                 {
@@ -74,21 +105,35 @@ namespace CKli
                 string rep = ReadLine.Read().Trim();
                 if( rep.Length == 0 )
                 {
-                    if( hasWorld ) host.CommandRegister["World/DumpWorldState"].Execute( monitor, null );
-                    else DumpWorlds( host.WorldStore.ReadWorlds( monitor ) );
+                    if( world != null )
+                    {
+                        commandRegister["World/DumpWorldState"]!.Execute( monitor, null );
+                    }
+                    else if( multiHome != null )
+                    {
+                        DumpWorlds( multiHome.WorldStore.ReadWorlds( monitor ) );
+                    }
                     continue;
                 }
+                if( rep == "exit" ) return false;
                 if( rep == "cls" )
                 {
                     Console.Clear();
                     continue;
                 }
+                if( rep == "close" )
+                {
+                    if( home != null ) return true;
+                    Debug.Assert( multiHome != null );
+                    commandRegister["World/CloseWorld"]!.Execute( monitor, null );
+                    continue;
+                }
                 if( rep.StartsWith( "secret" ) )
                 {
-                    if( !host.UserKeyVault.IsKeyVaultOpened )
+                    if( !vault.IsKeyVaultOpened )
                     {
                         Console.WriteLine( "Your personal KeyVault is not opened." );
-                        OpenKeyVault( monitor, host );
+                        OpenKeyVault( monitor, vault );
                     }
                     bool changedVault = false;
                     rep = rep.Substring( 6 ).Trim();
@@ -100,7 +145,7 @@ namespace CKli
                             if( two[0].Equals( "save", StringComparison.OrdinalIgnoreCase ) )
                             {
                                 var s = ReadLine.ReadPassword( "Enter new passphrase (empty to cancel) [Hidden]: " );
-                                if( s != null ) host.UserKeyVault.SaveKeyVault( monitor, s );
+                                if( s != null ) vault.SaveKeyVault( monitor, s );
                             }
                             else two = null;
                         }
@@ -108,14 +153,14 @@ namespace CKli
                         {
                             if( two[0].Equals( "clear", StringComparison.OrdinalIgnoreCase ) )
                             {
-                                host.UserKeyVault.UpdateSecret( monitor, two[1], null );
+                                vault.UpdateSecret( monitor, two[1], null );
                             }
                             else if( two[0].Equals( "set", StringComparison.OrdinalIgnoreCase ) )
                             {
                                 var s = ReadLine.ReadPassword( $"Enter '{two[1]}' secret (empty to cancel) [Hidden]: " );
                                 if( s != null )
                                 {
-                                    changedVault = host.UserKeyVault.UpdateSecret( monitor, two[1], s );
+                                    changedVault = vault.UpdateSecret( monitor, two[1], s );
                                 }
                             }
                             else two = null;
@@ -125,8 +170,8 @@ namespace CKli
                             Console.WriteLine( "Invalid syntax. Expected: 'clear NAME', 'set NAME' or 'save'." );
                         }
                     }
-                    DumpSecrets( host.UserKeyVault );
-                    if( changedVault ) host.WorldStore.ReadWorlds( monitor );
+                    DumpSecrets( vault );
+                    if( changedVault && multiHome != null ) multiHome.WorldStore.ReadWorlds( monitor );
                     continue;
                 }
                 if( rep.StartsWith( "list" ) )
@@ -136,12 +181,12 @@ namespace CKli
                     if( rep.Length == 0 )
                     {
                         Console.Write( $"Available Commands:" );
-                        commands = host.CommandRegister.GetAllCommands();
+                        commands = commandRegister.GetAllCommands();
                     }
                     else
                     {
                         Console.Write( $"Available Commands matching '{rep}':" );
-                        commands = host.CommandRegister.GetCommands( rep );
+                        commands = commandRegister.GetCommands( rep );
                     }
 
                     bool atLeastOne = false;
@@ -161,26 +206,25 @@ namespace CKli
                 if( rep.StartsWith( "run " ) )
                 {
                     rep = rep.Substring( 4 ).Trim();
-                    RunCommand( monitor, host, rep );
+                    RunCommand( monitor, commandRegister, rep );
                     continue;
                 }
-                if( rep == "exit" ) return;
-                if( !hasWorld && Int32.TryParse( rep, out var idx ) )
+                if( world == null && multiHome != null && Int32.TryParse( rep, out var idx ) )
                 {
-                    host.WorldSelector.OpenWorld( monitor, idx.ToString() );
+                    multiHome.WorldSelector.OpenWorld( monitor, idx.ToString() );
                     continue;
                 }
                 Console.WriteLine( "Unrecognized command." );
             }
         }
 
-        static void OpenKeyVault( IActivityMonitor monitor, UserHost host )
+        static void OpenKeyVault( IActivityMonitor monitor, FileKeyVault vault )
         {
             Console.WriteLine();
             string prompt;
-            if( host.UserKeyVault.KeyVaultFileExists )
+            if( vault.KeyVaultFileExists )
             {
-                if( host.UserKeyVault.OpenKeyVault( monitor ) )
+                if( vault.OpenKeyVault( monitor ) )
                 {
                     Console.WriteLine( "Your personal KeyVault is opened (it is not no protected)." );
                     return;
@@ -190,15 +234,15 @@ namespace CKli
             }
             else
             {
-                Console.WriteLine( $"Personal KeyVault not found at: '{host.UserKeyVault.KeyVaultPath}'" );
+                Console.WriteLine( $"Personal KeyVault not found at: '{vault.KeyVaultPath}'" );
                 Console.WriteLine( "It will contain encrypted secrets required by the different operations on all stacks." );
                 prompt = "It should be created. Enter its passphrase and memorize it, or leave it empty to set it later [Hidden]: ";
             }
             var s = ReadLine.ReadPassword( prompt );
             if( string.IsNullOrWhiteSpace( s ) ) s = "CKli";
-            host.UserKeyVault.OpenKeyVault( monitor, s );
+            vault.OpenKeyVault( monitor, s );
 
-            if( host.UserKeyVault.IsKeyVaultOpened )
+            if( vault.IsKeyVaultOpened )
             {
                 Console.WriteLine( "KeyVault opened." );
             }
@@ -239,7 +283,7 @@ namespace CKli
 
         static void DumpSecrets( FileKeyVault v )
         {
-            static string FirstPadding( int paddingSize, string sourceProviderName, bool missing )
+            static string FirstPadding( int paddingSize, string? sourceProviderName, bool missing )
             {
                 bool provided = !string.IsNullOrWhiteSpace( sourceProviderName );
                 if( missing && provided ) throw new InvalidOperationException( "Cannot be both missing and provided" );
@@ -250,7 +294,7 @@ namespace CKli
                 }
 
                 return provided
-                    ? $"[{sourceProviderName}]" + new string( ' ', paddingSize - sourceProviderName.Length )
+                    ? $"[{sourceProviderName}]" + new string( ' ', paddingSize - sourceProviderName!.Length )
                     : new string( ' ', paddingSize + 2 );
             }
 
@@ -328,9 +372,9 @@ namespace CKli
             }
         }
 
-        static void RunCommand( IActivityMonitor m, UserHost host, string rep )
+        static void RunCommand( IActivityMonitor m, CommandRegister commandRegister, string rep )
         {
-            var handlers = host.CommandRegister.GetCommands( rep ).ToList();
+            var handlers = commandRegister.GetCommands( rep ).ToList();
             var handlersBySig = handlers
                                     .GroupBy( c => c.PayloadSignature )
                                     .ToList();
@@ -389,7 +433,6 @@ namespace CKli
             {
                 foreach( var h in handlers )
                 {
-                    if( host.ApplicationLifetime.StopRequested( m ) ) break;
                     // Stops the loop at the first error.
                     if( h.Execute( m, payload ) != null ) break;
                 }
@@ -432,7 +475,7 @@ namespace CKli
             return c == 'Y' || c == 'y';
         }
 
-        static void DumpPayLoad( object payload )
+        static void DumpPayLoad( object? payload )
         {
             if( payload != null )
             {
@@ -447,7 +490,7 @@ namespace CKli
             }
         }
 
-        static bool ReadPayload( IActivityMonitor monitor, object payload )
+        static bool ReadPayload( IActivityMonitor monitor, object? payload )
         {
             if( payload == null ) return true;
             if( !(payload is SimplePayload simple) )
@@ -503,7 +546,7 @@ namespace CKli
                     Console.WriteLine( isFlags ? "Combinable flags:" : "Values: " );
                     foreach( var enumValue in Enum.GetValues( f.Type ) )
                     {
-                        Console.WriteLine( $"    {Convert.ChangeType( enumValue, Enum.GetUnderlyingType( f.Type ) )}:{Enum.GetName( f.Type, enumValue )}" );
+                        Console.WriteLine( $"    {Convert.ChangeType( enumValue, Enum.GetUnderlyingType( f.Type ) )}:{Enum.GetName( f.Type, enumValue! )}" );
                     }
                     var s = ReadNullableString();
                     if( s == null )

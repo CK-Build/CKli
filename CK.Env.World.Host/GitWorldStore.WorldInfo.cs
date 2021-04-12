@@ -33,15 +33,15 @@ namespace CK.Env
             {
                 Repo = r;
                 var n = (string)e.AttributeRequired( nameof( WorldName.FullName ) );
-                _name = LocalWorldName.TryParse( r.Root.AppendPart( n + ".World.xml" ), r.Store.WorldLocalMapping );
-                _name.HasDefinitionFile = (bool?)e.Attribute( nameof( WorldName.HasDefinitionFile ) ) ?? false;
-                _name.IsHidden = (bool?)e.Attribute( nameof( WorldName.IsHidden ) ) ?? false;
+                var name = LocalWorldName.TryParse( r.Root.AppendPart( n + ".World.xml" ), r.Store.WorldLocalMapping );
+                if( name == null ) throw new InvalidDataException( $"Unable to parse world name '{n}'." );
+                name.HasDefinitionFile = (bool?)e.Attribute( nameof( WorldName.HasDefinitionFile ) ) ?? false;
+                _name = name;
             }
 
             internal XElement ToXml() => new XElement( nameof(WorldInfo),
                                             new XAttribute( nameof( WorldName.FullName ), _name.FullName ),
-                                            new XAttribute( nameof( WorldName.HasDefinitionFile ), _name.HasDefinitionFile ),
-                                            new XAttribute( nameof( WorldName.IsHidden ), _name.IsHidden ) );
+                                            new XAttribute( nameof( WorldName.HasDefinitionFile ), _name.HasDefinitionFile ) );
 
             /// <summary>
             /// Gets the repository.
@@ -76,7 +76,7 @@ namespace CK.Env
                         File.Delete( p );
                         Repo.OnDestroy( this );
                         _name.HasDefinitionFile = false;
-                        _name = null;
+                        _name = null!;
                     }
                     catch( Exception ex )
                     {

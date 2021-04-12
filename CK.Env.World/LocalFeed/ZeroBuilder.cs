@@ -46,7 +46,7 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="mustReloadSolutions">True if solutions must be reloaded.</param>
         /// <returns>True on success, false on error.</returns>
-        bool Run( IActivityMonitor m, IBasicApplicationLifetime appLife, out bool mustReloadSolutions )
+        bool Run( IActivityMonitor m, out bool mustReloadSolutions )
         {
             Debug.Assert( _mustBuild.Count == ZeroBuildProjects.Count );
             ReadCurrentSha( m );
@@ -102,7 +102,6 @@ namespace CK.Env
                                 m.CloseGroup( $"Project '{p}' is up to date. Build skipped." );
                             }
                         }
-                        if( appLife.StopRequested( m ) ) return false;
                     }
                 }
                 if( _mustBuild.Count == 0 )
@@ -121,6 +120,7 @@ namespace CK.Env
                             using( m.OpenInfo( $"{action} {p}." ) )
                             {
                                 var driver = _context.FindDriver( p.Project );
+                                Debug.Assert( driver != null );
                                 if( !driver.ZeroBuildProject( m, p ) )
                                 {
                                     _sha1Cache.Remove( p.Project.FullFolderPath );
@@ -131,7 +131,6 @@ namespace CK.Env
                                 AddCurrentShaToCache( m, p );
                                 m.CloseGroup( "Success." );
                             }
-                            if( appLife.StopRequested( m ) ) return false;
                         }
                     }
                 }
@@ -188,28 +187,26 @@ namespace CK.Env
         /// <param name="feeds">The local feeds.</param>
         /// <param name="ctx">The world solution context to consider.</param>
         /// <returns>The ZeroBuilder on success, null on error.</returns>
-        public static ZeroBuilder EnsureZeroBuildProjects(
+        public static ZeroBuilder? EnsureZeroBuildProjects(
             IActivityMonitor m,
             IEnvLocalFeedProvider feeds,
-            IWorldSolutionContext ctx,
-            IBasicApplicationLifetime appLife )
+            IWorldSolutionContext ctx )
         {
             using( m.OpenInfo( $"Building ZeroVersion projects." ) )
             {
                 var builder = Create( m, feeds, ctx );
                 if( builder == null ) return null;
-                bool success = builder.Run( m, appLife, out bool mustReloadSolutions );
+                bool success = builder.Run( m, out bool mustReloadSolutions );
                 if( mustReloadSolutions ) ctx.Refresh( m, true );
                 return success ? builder : null;
             }
         }
 
-        ZeroBuilder(
-            IEnvLocalFeedProvider localFeedProvider,
-            NormalizedPath memPath,
-            Dictionary<string, HashSet<string>> sha1Cache,
-            HashSet<string> initialMustBuild,
-            IWorldSolutionContext ctx )
+        ZeroBuilder( IEnvLocalFeedProvider localFeedProvider,
+                     NormalizedPath memPath,
+                     Dictionary<string, HashSet<string>> sha1Cache,
+                     HashSet<string> initialMustBuild,
+                     IWorldSolutionContext ctx )
         {
             _localFeedProvider = localFeedProvider;
             _memPath = memPath;
@@ -229,7 +226,7 @@ namespace CK.Env
         /// <param name="driverFinder">The driver finder by solution name.</param>
         /// <param name="solutionReloader">Optional solutions reloader.</param>
         /// <returns>The ZeroBuilder on success, null on error.</returns>
-        static ZeroBuilder Create(
+        static ZeroBuilder? Create(
             IActivityMonitor m,
             IEnvLocalFeedProvider feeds,
             IWorldSolutionContext context )

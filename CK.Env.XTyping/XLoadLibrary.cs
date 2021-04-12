@@ -25,7 +25,7 @@ namespace CK.Env
                 try
                 {
                     var a = Assembly.Load( Name );
-                    factory.AutoRegisterFromdAssembly( m, a );
+                    factory.AutoRegisterFromAssembly( m, a );
                 }
                 catch( Exception ex )
                 {

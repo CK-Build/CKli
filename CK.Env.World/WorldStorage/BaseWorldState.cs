@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Xml.Linq;
 
 namespace CK.Env
@@ -11,7 +12,7 @@ namespace CK.Env
     {
         readonly WorldStore _store;
 
-        internal BaseWorldState( WorldStore store, IWorldName w, bool isLocal, XDocument d = null )
+        internal BaseWorldState( WorldStore store, IWorldName w, bool isLocal, XDocument? d = null )
         {
             if( store == null ) throw new ArgumentNullException( nameof( store ) );
             if( w == null ) throw new ArgumentNullException( nameof( w ) );
@@ -64,7 +65,6 @@ namespace CK.Env
             }
             return true;
         }
-
 
         /// <summary>
         /// Overridden to return the xml document as a string.

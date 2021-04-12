@@ -60,6 +60,16 @@ namespace CK.SimpleKeyVault
         }
 
         /// <summary>
+        /// Copy constructor. Initializes a copy key store.
+        /// </summary>
+        /// <param name="other">The source.</param>
+        public SecretKeyStore( SecretKeyStore other )
+            : this()
+        {
+            other.CreateSnapshot().RestoreTo( this );
+        }
+
+        /// <summary>
         /// Raised each time a secret is declared.
         /// </summary>
         public event EventHandler<SecretKeyInfoDeclaredArgs>? SecretDeclared;
@@ -168,7 +178,7 @@ namespace CK.SimpleKeyVault
         }
 
         /// <summary>
-        /// Sets or clears a secret that must have been declared.
+        /// Sets or clears a secret that may have been declared or not.
         /// Updates it when <paramref name="secret"/> is not null or empty, otherwise clears it.
         /// Returns true if secret has been changed, false otherwise.
         /// </summary>
@@ -183,9 +193,9 @@ namespace CK.SimpleKeyVault
             if( !_keyInfos.TryGetValue( name, out var info ) )
             {
                 bool already = _undeclaredSecrets.ContainsKey( name );
-                if (clear)
+                if( clear )
                 {
-                    if (_undeclaredSecrets.Remove( name ) )
+                    if( _undeclaredSecrets.Remove( name ) )
                     {
                         m.Info( $"Secret '{name}' has been cleared." );
                     }

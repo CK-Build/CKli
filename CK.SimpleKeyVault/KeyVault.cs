@@ -48,7 +48,7 @@ namespace CK.SimpleKeyVault
         /// Throws <see cref="InvalidDataException"/> on error (bad password or invalid format).
         /// A missing first line with the "-- Version: " will be considered the <see cref="CurrentVersion"/>. 
         /// </summary>
-        /// <param name="crypted">The crypted string. Can be null or empty.</param>
+        /// <param name="crypted">The encrypted string. Can be null or empty.</param>
         /// <param name="passPhrase">Secret to use. Must not be null, empty or white space.</param>
         /// <param name="salt">Specific salt to use (this default value comes from https://github.com/appveyor/secure-file implementation).</param>
         /// <returns>The list of key value pairs.</returns>
@@ -95,7 +95,7 @@ namespace CK.SimpleKeyVault
                         {
                             if( !r.ReadBytes( _magicHeader.Length ).SequenceEqual( _magicHeader ) )
                             {
-                                throw new InvalidDataException( $"Invalid crypted content." );
+                                throw new InvalidDataException( $"Invalid encrypted content." );
                             }
                         }
                         try
@@ -114,13 +114,13 @@ namespace CK.SimpleKeyVault
                         }
                         catch( Exception ex )
                         {
-                            throw new InvalidDataException( $"Invalid crypted content.", ex );
+                            throw new InvalidDataException( $"Invalid encrypted content.", ex );
                         }
                     }
                 }
                 keys.Add( l );
             }
-            throw new InvalidDataException( "Unable to find crypted values section." );
+            throw new InvalidDataException( "Unable to find encrypted values section." );
         }
 
         /// <summary>

@@ -4,6 +4,7 @@ using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace CK.Env
@@ -11,16 +12,14 @@ namespace CK.Env
     /// <summary>
     /// Exposes a <see cref="CurrentWorld"/> among the ones in a <see cref="Store"/>.
     /// </summary>
-    public sealed class WorldSelector : ICommandMethodsProvider
+    public sealed partial class WorldSelector : ICommandMethodsProvider
     {
         readonly XTypedFactory _factory;
         readonly SecretKeyStore _userKeyStore;
         readonly CommandRegister _command;
-        readonly IBasicApplicationLifetime _appLife;
-        readonly HashSet<ICommandHandler> _existingCommands;
+        readonly HashSet<ICommandHandler> _otherCommands;
         readonly Func<IReleaseVersionSelector> _releaseVersionSelectorFactory;
-        FileSystem _fs;
-        XTypedObject _root;
+        readonly WorldBearer _worldBearer;
 
         /// <summary>
         /// Initializes a new WorldSelector that exposes a <see cref="CurrentWorld"/>.
@@ -36,17 +35,16 @@ namespace CK.Env
             CommandRegister commandRegister,
             XTypedFactory factory,
             SecretKeyStore userKeyStore,
-            Func<IReleaseVersionSelector> releaseVersionSelectorFactory,
-            IBasicApplicationLifetime appLife )
+            Func<IReleaseVersionSelector> releaseVersionSelectorFactory )
         {
             Store = store ?? throw new ArgumentNullException( nameof( store ) );
             _command = commandRegister ?? throw new ArgumentNullException( nameof( commandRegister ) );
             _userKeyStore = userKeyStore ?? throw new ArgumentNullException( nameof( userKeyStore ) );
-            _appLife = appLife ?? throw new ArgumentNullException( nameof( appLife ) );
             _factory = factory ?? throw new ArgumentNullException( nameof( factory ) );
             commandRegister.Register( this );
-            _existingCommands = new HashSet<ICommandHandler>( commandRegister.GetAllCommands( false ) );
+            _otherCommands = new HashSet<ICommandHandler>( commandRegister.GetAllCommands( false ) );
             _releaseVersionSelectorFactory = releaseVersionSelectorFactory;
+            _worldBearer = new WorldBearer();
         }
 
         /// <summary>
@@ -58,14 +56,14 @@ namespace CK.Env
         /// Gets the current world.
         /// Can be null if <see cref="Open(IActivityMonitor, string)"/> failed.
         /// </summary>
-        public World CurrentWorld { get; private set; }
+        public World? CurrentWorld => _worldBearer.World;
 
-        NormalizedPath ICommandMethodsProvider.CommandProviderName => UserHost.WorldCommandPath;
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => MultipleWorldHome.WorldCommandPath;
 
         /// <summary>
         /// Closing current world: current world must not be null.
         /// </summary>
-        public bool CanCloseWorld => CurrentWorld != null;
+        public bool CanCloseWorld => _worldBearer.World != null;
 
         /// <summary>
         /// Closes the current world.
@@ -75,8 +73,10 @@ namespace CK.Env
         public void CloseWorld( IActivityMonitor m )
         {
             if( !CanCloseWorld ) throw new InvalidOperationException();
-            m.Info( $"Closing current world: {CurrentWorld.WorldName.FullName}." );
-            Close();
+            Debug.Assert( CurrentWorld != null );
+            _worldBearer.Close( m );
+            _command.UnregisterAll( _otherCommands.Contains );
+            Store.DisableRepositoryAndStacksCommands = false;
         }
 
         /// <summary>
@@ -127,76 +127,19 @@ namespace CK.Env
                     return false;
                 }
                 Debug.Assert( w != null );
-                Close();
-                var keySnapshot = _userKeyStore.CreateSnapshot();
-                var baseProvider = new SimpleServiceContainer();
-                _fs = new FileSystem( w.Root, _command, _userKeyStore, baseProvider );
-                baseProvider.Add<ISimpleObjectActivator>( new SimpleObjectActivator() );
-                baseProvider.Add( _command );
-                baseProvider.Add( _fs );
-                baseProvider.Add<IWorldName>( w );
-                baseProvider.Add( w );
-                baseProvider.Add<WorldStore>( Store );
-                baseProvider.Add( Store );
-                baseProvider.Add( _appLife );
-                baseProvider.Add( _userKeyStore );
-                baseProvider.Add( _releaseVersionSelectorFactory );
-                var original = Store.ReadWorldDescription( m, w ).Root;
-                var expanded = XTypedFactory.PreProcess( m, original );
-                if( expanded.Errors.Count > 0 ) return false;
-                bool resetSecrets = true;
-                _root = _factory.CreateInstance<XTypedObject>( m, expanded.Result, baseProvider );
-                if( _root != null )
-                {
-                    var xW = _root.Descendants<IXTypedObjectProvider<World>>().FirstOrDefault();
-                    if( xW != null )
-                    {
 
-                        CurrentWorld = xW.GetObject( m );//We try to load the world even if required secret are not present.
-                        if( CurrentWorld != null )
-                        {
-                            Store.DisableRepositoryAndStacksCommands = true;
-                            return true;
-                        }
-                        // The world couldn't be opened
-                        var missingSecrets = _userKeyStore.Infos.Where( secret => secret.IsRequired && !secret.IsSecretAvailable ).Select( s => s.Name );
-                        if(missingSecrets.Any())
-                        {
-                            m.Error( $"Missing one or more secrets. These are required to continue: {missingSecrets.Concatenate()}." );
-                            resetSecrets = false;
-                        }
-                    }
-                    else m.Error( "Missing expected World definition element." );
+                bool success = _worldBearer.OpenWorld( m, w, _factory, _command, Store, _userKeyStore, _releaseVersionSelectorFactory );
+                if( success )
+                {
+                    Store.DisableRepositoryAndStacksCommands = true;
+                    return true;
                 }
-                if( resetSecrets ) keySnapshot.RestoreTo( _userKeyStore );
-                Close();
-                return false;
+                else
+                {
+                    return false;
+                }
             }
         }
 
-        void Close()
-        {
-            if( _fs != null )
-            {
-                if( _root != null )
-                {
-                    foreach( var e in _root.Descendants<IDisposable>().Reverse() )
-                    {
-                        e.Dispose();
-                    }
-                    _root = null;
-                }
-                _command.UnregisterAll( keepFilter: _existingCommands.Contains );
-                if( CurrentWorld != null )
-                {
-                    CurrentWorld = null;
-                }
-                _fs.Dispose();
-                _fs = null;
-            }
-            Store.DisableRepositoryAndStacksCommands = false;
-        }
-
-        public void Dispose() => Close();
     }
 }

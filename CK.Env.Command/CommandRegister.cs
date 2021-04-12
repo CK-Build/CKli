@@ -36,7 +36,7 @@ namespace CK.Env
         /// <summary>
         /// Unregisters a command.
         /// </summary>
-        /// <param name="uniqueName">The commande name.</param>
+        /// <param name="uniqueName">The command name.</param>
         public void Unregister( NormalizedPath uniqueName )
         {
             _commands.Remove( uniqueName );

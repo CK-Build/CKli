@@ -4,6 +4,7 @@ using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
@@ -19,25 +20,32 @@ namespace CK.Env
         public class StackRepo : GitRepositoryKey, IDisposable
         {
             readonly GitWorldStore _store;
-            GitRepository _git;
+            GitRepository? _git;
             readonly List<WorldInfo> _worlds;
 
-            internal StackRepo( GitWorldStore store, Uri uri, bool isPublic, string branchName = null )
+            internal StackRepo( GitWorldStore store, Uri uri, bool isPublic, string? branchName = null )
                 : base( store.SecretKeyStore, uri, isPublic )
             {
                 _store = store;
                 BranchName = branchName ?? "master";
                 var cleanPath = CleanPathDirName( uri.AbsolutePath );
-                Root = store._rootPath.AppendPart( cleanPath );
+                Root = store._rootStorePath.AppendPart( cleanPath );
                 _worlds = new List<WorldInfo>();
             }
 
-            internal static StackRepo Parse( GitWorldStore store, XElement e )
+            internal static StackRepo Parse( GitWorldStore store, XElement e, XElement? singleWorld = null )
             {
                 var uri = new Uri( (string)e.AttributeRequired( nameof( OriginUrl ) ) );
                 var pub = (bool?)e.Attribute( nameof( IsPublic ) ) ?? false;
                 var r = new StackRepo( store, uri, pub, null );
-                r._worlds.AddRange( e.Elements( "Worlds" ).Elements( nameof( WorldInfo ) ).Select( eW => new WorldInfo( r, eW ) ) );
+                if( singleWorld == null )
+                {
+                    r._worlds.AddRange( e.Elements( "Worlds" ).Elements( nameof( WorldInfo ) ).Select( eW => new WorldInfo( r, eW ) ) );
+                }
+                else
+                {
+                    r._worlds.Add( new WorldInfo( r, singleWorld ) );
+                }
                 return r;
             }
 
@@ -49,7 +57,7 @@ namespace CK.Env
             /// <summary>
             /// Gets the root store.
             /// </summary>
-            public GitWorldStore Store => _store;
+            internal GitWorldStore Store => _store;
 
             /// <summary>
             /// Gets or whether the Git repository is public.
@@ -77,14 +85,14 @@ namespace CK.Env
             /// <returns>True on success, false on error.</returns>
             internal bool PushChanges( IActivityMonitor m )
             {
-                Debug.Assert( IsOpen );
+                Debug.Assert( _git != null );
                 return _git.Commit( m, "Automatic synchronization commit." ) && _git.Push( m );
             }
 
             /// <summary>
             /// Return true if the Git Repository is open.
             /// </summary>
-            public bool IsOpen => _git != null;
+            internal bool IsOpen => _git != null;
 
             /// <summary>
             /// Gets the root path of this repository: it is a folder in <see cref="GitWorldStore.RootPath"/>
@@ -93,37 +101,56 @@ namespace CK.Env
             public NormalizedPath Root { get; }
 
             /// <summary>
-            /// Ensures that the the Git Repository is opened and updates the <see cref="Worlds"/>.
+            /// Ensures that the Git Repository of this stack is opened (pulls it on opening) and checks that the single world file definition exists.
+            /// The .World.xml definition file must exist.
             /// Returns true on success, false on error.
             /// </summary>
             /// <param name="m">The monitor to use.</param>
-            /// <param name="force">True to refresh the <see cref="Worlds"/> even if <see cref="IsOpen"/> is already true.</param>
-            /// <returns>Whether this repository has been successfully opened.</returns>
-            internal bool Refresh( IActivityMonitor m, bool force = true )
+            /// <param name="LocalWorldName">The local single name.</param>
+            /// <returns>True on success, false otherwise.</returns>
+            internal bool RefreshSingle( IActivityMonitor m, out LocalWorldName name )
             {
-                bool isOpened = false;
-                var localDir = Root.AppendPart( "$Local" );
-                if( _git == null )
+                Debug.Assert( _store.SingleWorld != null );
+                Debug.Assert( _worlds.Count == 1 );
+                name = _worlds[0].WorldName;
+                if( !DoOpen( m, out var opened, out var localDir ) ) return false;
+                Debug.Assert( _git != null );
+                if( opened )
                 {
-                    _git = GitRepository.Create( m, this, Root, Root.LastPart, false, BranchName, checkOutBranchName: true );
-                    if( _git == null ) return false;
-                    // Ensures that the $Local directory is created and that the .gitignore ignores it.
-                    // The .gitignore file is created only once.
-                    Directory.CreateDirectory( localDir );
-                    var ignore = Root.AppendPart( ".gitignore" );
-                    if( !File.Exists( ignore ) ) File.WriteAllText( ignore, "$Local/" + Environment.NewLine );
-                    isOpened = true;
+                    // Ignores errors so we can work off line.
+                    _git.Pull( m, MergeFileFavor.Theirs );
                 }
-                if( force || isOpened )
+                var f = _worlds[0].WorldName.XmlDescriptionFilePath;
+                if( !File.Exists( f ) )
                 {
-                    if( _git.Pull( m, MergeFileFavor.Theirs ).ReloadNeeded || isOpened )
+                    m.Error( $"File '{f}' cannot be found." );
+                    return false;
+                }
+                return true;
+            }
+
+            /// <summary>
+            /// Ensures that the Git Repository of this stack is opened and updates the <see cref="Worlds"/> from the files.
+            /// Returns true on success, false on error.
+            /// </summary>
+            /// <param name="m">The monitor to use.</param>
+            /// <param name="forcePullAndRefresh">True to pull and refresh the <see cref="Worlds"/> list even if <see cref="IsOpen"/> is already true.</param>
+            /// <returns>Whether this repository has been successfully opened.</returns>
+            internal bool RefreshMultiple( IActivityMonitor m, bool forcePullAndRefresh )
+            {
+                Debug.Assert( _store.SingleWorld == null );
+                if( !DoOpen( m, out var opened, out var localDir ) ) return false;
+                Debug.Assert( _git != null );
+                if( forcePullAndRefresh || opened )
+                {
+                    if( _git.Pull( m, MergeFileFavor.Theirs ).ReloadNeeded || opened )
                     {
                         var worldNames = Directory.GetFiles( Root, "*.World.xml" )
                                                   .Select( p => LocalWorldName.TryParse( p, _store.WorldLocalMapping ) )
                                                   .Where( w => w != null )
-                                                  .ToDictionary( w => w.FullName );
+                                                  .ToDictionary( w => w!.FullName, w => w! );
 
-                        var invalidParallels = worldNames.Values.Where( p => p.ParallelName != null && !worldNames.ContainsKey( p.Name ) ).ToList();
+                        var invalidParallels = worldNames.Values.Where( p => p!.ParallelName != null && !worldNames.ContainsKey( p.Name ) ).ToList();
                         foreach( var orphan in invalidParallels )
                         {
                             m.Warn( $"Invalid Parallel World '{orphan.FullName}': unable to find the default stack definition '{orphan.Name}' in the repository. It is ignored." );
@@ -174,6 +201,24 @@ namespace CK.Env
                     }
                 }
                 return IsOpen;
+            }
+
+            bool DoOpen( IActivityMonitor m, out bool opened, out NormalizedPath localDir )
+            {
+                opened = false;
+                localDir = Root.AppendPart( "$Local" );
+                if( _git == null )
+                {
+                    _git = GitRepository.Create( m, this, Root, Root.LastPart, false, BranchName, checkOutBranchName: true );
+                    if( _git == null ) return false;
+                    // Ensures that the $Local directory is created and that the .gitignore ignores it.
+                    // The .gitignore file is created only once.
+                    Directory.CreateDirectory( localDir );
+                    var ignore = Root.AppendPart( ".gitignore" );
+                    if( !File.Exists( ignore ) ) File.WriteAllText( ignore, "$Local/" + Environment.NewLine );
+                    opened = true;
+                }
+                return true;
             }
 
             /// <summary>

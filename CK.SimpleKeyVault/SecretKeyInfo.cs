@@ -176,7 +176,7 @@ namespace CK.SimpleKeyVault
         public bool ImportSecret( IActivityMonitor m, string secret )
         {
             if( String.IsNullOrEmpty( secret ) ) throw new ArgumentNullException( nameof( secret ) );
-            if( !string.IsNullOrWhiteSpace( SourceProviderName ) ) throw new InvalidOperationException( "This secret is provided you cannot import a non-stored secret." );
+            if( !string.IsNullOrWhiteSpace( SourceProviderName ) ) throw new InvalidOperationException( $"This secret is provided by '{SourceProviderName}' you cannot import a transient secret." );
             if( IsSecretAvailable )
             {
                 if( SuperKey != null && SuperKey.IsSecretAvailable )
@@ -207,7 +207,10 @@ namespace CK.SimpleKeyVault
         public bool SetSecret( string? secret )
         {
             CheckSecretPropagation();
-            if( SuperKey != null && SuperKey.IsSecretAvailable ) throw new InvalidOperationException( $"Secret is defined by the SuperKey '{SuperKey.Name}'." );
+            if( SuperKey != null && SuperKey.IsSecretAvailable )
+            {
+                throw new InvalidOperationException( $"Secret is available at the SuperKey '{SuperKey.Name}' level. It cannot be set on '{Name}'." );
+            }
             if( String.IsNullOrEmpty( secret ) ) secret = null;
             bool changed = false;
             SecretKeyInfo? k = this;

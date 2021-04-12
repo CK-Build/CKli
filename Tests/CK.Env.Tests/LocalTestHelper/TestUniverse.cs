@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Env.DependencyModel;
+using CK.SimpleKeyVault;
 using CK.Text;
 using CKli;
 using CSemVer;
@@ -37,12 +38,14 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public const string PlaceHolderString = "PLACEHOLDER_CKLI_TESTS";
 
+        static XTypedFactory? _xTypedFactory;
+
         /// <summary>
-        /// Instanciates a new <see cref="TestUniverse"/>.
+        /// Instantiates a new <see cref="TestUniverse"/>.
         /// </summary>
         /// <param name="tempPath">Path of the TestHost.</param>
-        /// <param name="userHost">The UserHost instantied with this path.</param>
-        TestUniverse( NormalizedPath tempPath, UserHost userHost )
+        /// <param name="userHost">The UserHost instantiated with this path.</param>
+        TestUniverse( NormalizedPath tempPath, MultipleWorldHome userHost )
         {
             UniversePath = tempPath;
             UserHost = userHost;
@@ -51,7 +54,7 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <summary>
         /// The <see cref="UserHost"/> used to run tests on.
         /// </summary>
-        public UserHost UserHost { get; }
+        public MultipleWorldHome UserHost { get; }
 
         /// <summary>
         /// Temp path of the TestHost.
@@ -102,14 +105,25 @@ namespace CK.Env.Tests.LocalTestHelper
         /// </summary>
         /// <param name="path"> The path where the <see cref="TestUniverse"/> will be. The Directory will be deleted when disposed.</param>
         /// <returns></returns>
-        public static TestUniverse Create( IActivityMonitor m, NormalizedPath path )
+        public static TestUniverse Create( IActivityMonitor monitor, NormalizedPath path )
         {
-            m.Info( $"Creating TestUniverse from {path}." );
+            monitor.Info( $"Creating TestUniverse from {path}." );
+            if( _xTypedFactory == null )
+            {
+                System.Reflection.Assembly.Load( "CKli.XObject" );
+                _xTypedFactory = new XTypedFactory();
+                _xTypedFactory.AutoRegisterFromLoadedAssemblies( monitor );
+                _xTypedFactory.SetLocked();
+            }
             NormalizedPath ckliPath = path.AppendPart( _ckliMapping );
-            var userHost = UserHost.Create( m, new FakeApplicationLifetime(), ckliPath, () => new FakeReleaseVersionSelector() );
+
+            var mappings = new FileWorldLocalMapping( ckliPath.AppendPart( "WorldLocalMapping.txt" ) );
+            var keyVault = new FileKeyVault( ckliPath.AppendPart( "Personal.KeyVault.txt" ) );
+            keyVault.OpenKeyVault( monitor );
+            var userHost = MultipleWorldHome.Create( monitor, ckliPath, _xTypedFactory, keyVault, mappings, () => new FakeReleaseVersionSelector() );
             var output = new TestUniverse( path, userHost );
-            userHost.WorldStore.DestroyWorld( m, "CK" );
-            userHost.WorldStore.DestroyWorld( m, "CK-Build" );
+            userHost.WorldStore.DestroyWorld( monitor, "CK" );
+            userHost.WorldStore.DestroyWorld( monitor, "CK-Build" );
             return output;
         }
 
@@ -175,6 +189,6 @@ namespace CK.Env.Tests.LocalTestHelper
             return output;
         }
 
-        public void Dispose() => UserHost.Dispose();
+        public void Dispose() => UserHost.Dispose( TestHelper.Monitor );
     }
 }

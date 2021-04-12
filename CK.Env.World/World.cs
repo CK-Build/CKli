@@ -30,8 +30,6 @@ namespace CK.Env
         readonly HashSet<IGitRepository> _gitRepositories;
         readonly IActivityMonitorFilteredClient _userMonitorClient;
 
-        readonly IBasicApplicationLifetime _appLife;
-
         LocalWorldState _localState;
         SharedWorldState _sharedState;
         StandardGitStatus _cachedGlobalGitStatus;
@@ -56,8 +54,7 @@ namespace CK.Env
             bool isPublicWorld,
             IEnvLocalFeedProvider localFeedProvider,
             SecretKeyStore keyStore,
-            IActivityMonitorFilteredClient userMonitorClient,
-            IBasicApplicationLifetime appLife )
+            IActivityMonitorFilteredClient userMonitorClient )
         {
             _artifacts = artifacts ?? throw new ArgumentNullException( nameof( artifacts ) );
             _store = store ?? throw new ArgumentNullException( nameof( store ) );
@@ -65,7 +62,6 @@ namespace CK.Env
             _localFeedProvider = localFeedProvider ?? throw new ArgumentNullException( nameof( localFeedProvider ) );
             _keyStore = keyStore ?? throw new ArgumentNullException( nameof( keyStore ) );
             IsPublicWorld = isPublicWorld;
-            _appLife = appLife;
             _solutionDrivers = new DriversCollection();
             _gitRepositories = new HashSet<IGitRepository>();
             _userMonitorClient = userMonitorClient;
@@ -537,8 +533,7 @@ namespace CK.Env
             {
                 foreach( var g in _gitRepositories )
                 {
-                    if( !g.SwitchDevelopToLocal( m, autoCommit: true ) ) return;
-                    if( _appLife.StopRequested( m ) )
+                    if( !g.SwitchDevelopToLocal( m, autoCommit: true ) )
                     {
                         UpdateGlobalGitStatus();
                         return;
@@ -550,7 +545,7 @@ namespace CK.Env
                 var depContext = GetWorldSolutionContext( m );
                 if( depContext == null ) return;
 
-                if( ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, _appLife ) == null ) return;
+                if( ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext ) == null ) return;
 
                 if( !error() )
                 {
@@ -722,7 +717,7 @@ namespace CK.Env
             {
                 var depContext = GetWorldSolutionContext( m );
                 if( depContext == null ) return;
-                ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, _appLife );
+                ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext );
             } );
         }
 
@@ -745,7 +740,7 @@ namespace CK.Env
                 var ctx = GetWorldSolutionContext( m );
                 if( ctx == null ) return;
 
-                ZeroBuilder zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, ctx, _appLife );
+                ZeroBuilder zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, ctx );
                 if( zBuilder == null ) return;
 
                 ctx = GetWorldSolutionContext( m );
@@ -814,7 +809,7 @@ namespace CK.Env
                 var depContext = GetWorldSolutionContext( m );
                 if( depContext == null ) return;
 
-                var zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, _appLife );
+                var zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext );
                 if( zBuilder == null ) return;
 
                 depContext = GetWorldSolutionContext( m );
@@ -947,7 +942,7 @@ namespace CK.Env
                 var depContext = GetWorldSolutionContext( m );
                 if( depContext == null ) return;
 
-                ZeroBuilder zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, _appLife );
+                ZeroBuilder? zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext );
                 if( zBuilder == null ) return;
 
                 var roadmap = LoadRoadmap( monitor );
