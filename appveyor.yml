@@ -15,6 +15,6 @@ test: off
 install: []
 
 on_finish:
-  - Get-ChildItem -Recurse *.log | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName 'Log files' }
-  - Get-ChildItem -Recurse **\Tests\**\TestResult*.xml | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName 'NUnit tests result files' }
-  - Get-ChildItem -Recurse **Tests\**\Logs\**\* | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName 'Log files' }
+  - ps: Get-ChildItem -Recurse *.log | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName 'Log files' }
+  - ps: Get-ChildItem -Recurse **\Tests\**\TestResult*.xml | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName 'NUnit tests result files' }
+  - ps: Get-ChildItem -Recurse **Tests\**\Logs\**\* | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName 'Log files' }
