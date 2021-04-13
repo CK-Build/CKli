@@ -37,12 +37,11 @@ namespace CK.Env.Tests.LocalTestHelper
             if( !File.Exists( imagePath ) ) throw new FileNotFoundException( nameof( imagePath ) );
 
             NormalizedPath workFolder = Path.Combine( Path.GetTempPath(), "CKliTest" );
+            m.Info( $"Deleting '{workFolder}' content.'" );
             if( Directory.Exists( workFolder ) )
             {
-                m.Info( $"Deleting '{workFolder}' content.'" );
                 FileHelper.RawDeleteLocalDirectory( TestHelper.Monitor, workFolder );
             }
-            workFolder = workFolder.AppendPart( Guid.NewGuid().ToString() );
             m.Info( $"Creating temp directory '{workFolder}' and unzipping '{imagePath}' into." );
             Directory.CreateDirectory( workFolder );
             ZipFile.ExtractToDirectory( imagePath, workFolder );
