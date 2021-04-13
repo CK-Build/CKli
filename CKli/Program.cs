@@ -54,7 +54,7 @@ namespace CKli
                 var target = mappings.ReverseMap( Environment.CurrentDirectory );
                 if( target != null )
                 {
-                    var home = SingleWorldHome.Create( monitor, userHostPath, sharedTypedFactory, target, keyVault.KeyStore, new CommandRegister(), releaseVersionSelectorFactory );
+                    var home = SingleWorldHome.Create( monitor, userHostPath, sharedTypedFactory, target, keyVault.KeyStore, releaseVersionSelectorFactory );
                     if( home != null )
                     {
                         bool keepAlive = InteractiveRun( monitor, keyVault, null, home );
