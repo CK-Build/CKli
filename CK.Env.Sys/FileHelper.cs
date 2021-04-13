@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -53,6 +54,7 @@ namespace CK.Env
                         Thread.Sleep( initialTimeout * (int)Math.Pow( timeoutFactor, attempt - 1 ) );
                         continue;
                     }
+                    m.Fatal( "GitHelper count: " + ((List<object>)(Type.GetType( "CK.Env.GitHelper" )!).GetField( "HackToRemove" )!.GetValue( null )!).Count );
 
                     m.Trace( string.Format( "{0}The directory '{1}' could not be deleted ({2} attempts were made) due to a {3}: {4}" +
                                                   "{0}Most of the time, this is due to an external process accessing the files in the temporary repositories created during the test runs, and keeping a handle on the directory, thus preventing the deletion of those files." +

@@ -15,6 +15,9 @@ namespace CK.Env
     /// </summary>
     public abstract class GitHelper : IGitHeadInfo, IDisposable
     {
+
+        public static List<GitHelper> HackToRemove = new List<GitHelper>();
+
         /// <summary>
         /// Initializes a new <see cref="GitHelper"/>.
         /// </summary>
@@ -32,7 +35,7 @@ namespace CK.Env
             Git = libRepository ?? throw new ArgumentNullException( nameof( libRepository ) );
             FullPhysicalPath = fullPath;
             SubPath = subPath;
-
+            HackToRemove.Add( this );
             if( FullPhysicalPath != libRepository.Info.WorkingDirectory )
             {
                 throw new ArgumentException( "Path mismatch.", nameof( fullPath ) );
@@ -59,6 +62,7 @@ namespace CK.Env
         public virtual void Dispose()
         {
             Git.Dispose();
+            HackToRemove.Remove( this );
         }
 
         /// <summary>
