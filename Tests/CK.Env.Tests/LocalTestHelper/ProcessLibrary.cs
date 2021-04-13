@@ -207,13 +207,8 @@ namespace CK.Env.Tests.LocalTestHelper
             XDocument xml = XDocument.Parse( File.ReadAllText( world.WorldName.XmlDescriptionFilePath ) );
             stackModifier( xml );
             File.WriteAllText( world.WorldName.XmlDescriptionFilePath, xml.ToString() );
-            return universe.RestartCKli( m );
-        }
-
-        public static TestUniverse RestartCKli( this TestUniverse universe, IActivityMonitor m )
-        {
-            universe.Dispose();
-            return TestUniverse.Create( m, universe.UniversePath );
+            universe.Restart( m );
+            return universe;
         }
 
         public static TestUniverse CreateEmptyRepoAndAddToStack( this TestUniverse testUniverse, IActivityMonitor m, string worldName, string repoName )
