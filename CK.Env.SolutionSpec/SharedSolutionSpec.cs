@@ -22,9 +22,9 @@ namespace CK.Env
             DisableSourceLink = r.HandleOptionalAttribute( nameof( DisableSourceLink ), false );
             GlobalJsonSdkVersion = r.HandleOptionalAttribute<string>( nameof( GlobalJsonSdkVersion ), null );
             SPDXLicense = r.HandleOptionalAttribute<string>( nameof( SPDXLicense ), null );
-            BuildTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( BuildTimeoutMilliseconds ), 30000 );
-            RunTestTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( RunTestTimeoutMilliseconds ), 30000 );
-            RemotePushTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( RemotePushTimeoutMilliseconds ), 30000 );
+            BuildTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( BuildTimeoutMilliseconds ), 5 * 60_000 );
+            RunTestTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( RunTestTimeoutMilliseconds ), 5 * 60_000 );
+            RemotePushTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( RemotePushTimeoutMilliseconds ), 60_000 );
 
             ArtifactTargets = r.HandleCollection(
                     nameof( ArtifactTargets ),
