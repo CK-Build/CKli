@@ -29,13 +29,13 @@ namespace CK.Env.Tests.LocalTestHelper
             bool refreshCache,
             Func<T, bool, NormalizedPath> parentBuilder,
             Func<TestUniverse, TestUniverse> buildAction,
-            [CallerMemberName] string newImageName = null )
+            [CallerMemberName] string? newImageName = null )
         {
             TestUniverse universe = ImageManager.InstantiateImage( TestHelper.Monitor, parentBuilder, refreshCache );
             try
             {
                 universe = buildAction( universe );
-                var snapshotPath = universe.SnapshotState( newImageName );
+                var snapshotPath = universe.SnapshotState( newImageName! );
                 testCallback?.Invoke( universe );
                 return snapshotPath;
             }

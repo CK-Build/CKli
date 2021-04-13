@@ -68,13 +68,13 @@ namespace CK.Env
         /// <summary>
         /// Closes the current world.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
         [CommandMethod( confirmationRequired: false )]
-        public void CloseWorld( IActivityMonitor m )
+        public void CloseWorld( IActivityMonitor monitor )
         {
             if( !CanCloseWorld ) throw new InvalidOperationException();
             Debug.Assert( CurrentWorld != null );
-            _worldBearer.Close( m );
+            _worldBearer.Close( monitor );
             _command.UnregisterAll( _otherCommands.Contains );
             Store.DisableRepositoryAndStacksCommands = false;
         }
