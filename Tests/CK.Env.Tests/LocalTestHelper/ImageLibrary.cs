@@ -172,7 +172,8 @@ namespace CK.Env.Tests.LocalTestHelper
                        {
                            var path = universe.GetWorldByName( CKTestBuildStackName ).Repo.Root.AppendPart( "workstation_setup_ran" );
                            universe.AddSetupScriptInStack( TestHelper.Monitor, CKTestBuildStackName, $"Write-Host \"Hello World\";\nNew-Item {path};" );
-                           return universe.RestartCKli( TestHelper.Monitor );
+                           universe.Restart( TestHelper.Monitor );
+                           return universe;
                        } );
     }
 }
