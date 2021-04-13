@@ -13,14 +13,8 @@ build_script:
   - dotnet run --project CodeCakeBuilder -nointeraction
 test: off
 install: []
-artifacts:
-  - path: '**\*.log'
-    name: Log file
-  - path: '**\*.trx'
-    name: Visual studio test results file
-  - path: '**\Tests\**\TestResult*.xml'
-    name: NUnit tests result files
-  - path: '**Tests\**\Logs\**\*' #I'm not sure this globbing is working.
-    name: Log files
-  - path: '**\*.log.tmp'
-    name: Partial Log Files.
+
+on_finish:
+  - Get-ChildItem -Recurse *.log | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName 'Log files' }
+  - Get-ChildItem -Recurse **\Tests\**\TestResult*.xml | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName 'NUnit tests result files' }
+  - Get-ChildItem -Recurse **Tests\**\Logs\**\* | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName 'Log files' }
