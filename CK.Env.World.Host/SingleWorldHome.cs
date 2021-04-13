@@ -45,13 +45,12 @@ namespace CK.Env
                                                XTypedFactory sharedFactory,
                                                IRootedWorldName singleWorld,
                                                SecretKeyStore keyStore,
-                                               CommandRegister commands,
                                                Func<IReleaseVersionSelector> releaseVersionSelectorFatory )
         {
             var u = new SingleWorldHome( rootStorePath, sharedFactory, singleWorld, keyStore, releaseVersionSelectorFatory );
             if( !u._store.ReadStacksFromLocalStacksFilePath( m )
                 || !u._store.StackRepositories[0].RefreshSingle( m, out var name )
-                || !u._worldBearer.OpenWorld( m, name, new XTypedFactory( sharedFactory ), commands, u.WorldStore, keyStore, releaseVersionSelectorFatory ) )
+                || !u._worldBearer.OpenWorld( m, name, new XTypedFactory( sharedFactory ), u.CommandRegister, u.WorldStore, keyStore, releaseVersionSelectorFatory ) )
             {
                 return null;
             }
