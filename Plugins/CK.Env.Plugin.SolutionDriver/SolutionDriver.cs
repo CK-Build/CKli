@@ -612,8 +612,8 @@ namespace CK.Env.Plugin
                 // nupkg had the previous CI versions). However breaking here and manually executing the dotnet pack
                 // was okay...
                 // This should be a (vicious) cache issue and may be a first "dotnet clean" helps.
-                ProcessRunner.Run( monitor, path, "dotnet", "clean" );
-                return ProcessRunner.Run( monitor, path, "dotnet", args );
+                ProcessRunner.Run( monitor, path, "dotnet", "clean", 7000 );
+                return ProcessRunner.Run( monitor, path, "dotnet", args, 7000 );
             }
             finally
             {
@@ -741,6 +741,9 @@ namespace CK.Env.Plugin
 
             monitor.Info( $"Version to build: '{v}'." );
 
+            // Base time is to wait one second.
+            // This will be increased below.
+            int timeout = 1000;
 
             var expectedArtifacts = solution.GeneratedArtifacts.Select( g => g.Artifact.WithVersion( v ) );
             var missing = feed.GetMissing( monitor, expectedArtifacts );
@@ -763,13 +766,19 @@ namespace CK.Env.Plugin
             else if( missing.Count == 0 )
             {
                 monitor.Info( $"No artifacts have to be generated. Build is required." );
+                timeout += _solutionSpec.BuildTimeoutMilliseconds;
             }
-            if( withUnitTest && !_solutionSpec.NoDotNetUnitTests ) buildType |= BuildType.WithUnitTests;
+            if( withUnitTest && !_solutionSpec.NoDotNetUnitTests )
+            {
+                buildType |= BuildType.WithUnitTests;
+                timeout += _solutionSpec.RunTestTimeoutMilliseconds;
+            }
             if( withPushToRemote )
             {
                 if( buildType == BuildType.CI )
                 {
                     buildType |= BuildType.WithPushToRemote;
+                    timeout += _solutionSpec.RemotePushTimeoutMilliseconds;
                 }
                 else
                 {
@@ -790,7 +799,7 @@ namespace CK.Env.Plugin
                 }
             }
 
-            string ccbPath = _localFeedProvider.GetZeroVersionCodeCakeBuilderExecutablePath( solution.Name );
+            string? ccbPath = _localFeedProvider.GetZeroVersionCodeCakeBuilderExecutablePath( solution.Name );
 
             if( System.IO.File.Exists( ccbPath ) )
             {
@@ -813,6 +822,8 @@ namespace CK.Env.Plugin
             if( (buildType & BuildType.WithZeroBuilder) != BuildType.WithZeroBuilder )
             {
                 monitor.Info( "Using CodeCakeBuilder with source compilation (dotnet run)." );
+                // Consider that 7 seconds to build the CodeCakeBuilder is enough.
+                timeout += 7000;
             }
             var ev = new BuildStartEventArgs(
                             monitor,
@@ -821,7 +832,8 @@ namespace CK.Env.Plugin
                             v,
                             buildType,
                             GitFolder.FullPhysicalPath,
-                            ccbPath );
+                            ccbPath,
+                            timeout );
 
             bool FireEvent( bool start, bool success )
             {
@@ -863,7 +875,7 @@ namespace CK.Env.Plugin
                     args += " -PushToRemote=" + (ev.WithPushToRemote ? 'Y' : 'N');
                     if( !ev.BuildIsRequired ) args += " -target=\"Unit-Testing\" -exclusiveOptional -IgnoreNoArtifactsToProduce=Y";
                     if( !ev.WithUnitTest ) args += " -RunUnitTests=N";
-                    if( !ProcessRunner.Run( m, ev.SolutionPhysicalPath, "dotnet", args, LogLevel.Warn, ev.EnvironmentVariables ) )
+                    if( !ProcessRunner.Run( m, ev.SolutionPhysicalPath, "dotnet", args, ev.TimeoutMilliseconds, LogLevel.Warn, ev.EnvironmentVariables ) )
                     {
                         return false;
                     }

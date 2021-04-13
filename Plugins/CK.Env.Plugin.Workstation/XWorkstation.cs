@@ -159,6 +159,7 @@ Invoke-Command -ScriptBlock $ScriptBlock";
                                                 script.WorkingDir,
                                                 tempPS1.Path,
                                                 new[] { script.Arguments },
+                                                5 * 60 * 1000,
                                                 stdErrorLevel: LogLevel.Warn,
                                                 variables ) )
                                     {

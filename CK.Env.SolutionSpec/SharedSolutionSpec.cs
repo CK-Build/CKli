@@ -22,6 +22,9 @@ namespace CK.Env
             DisableSourceLink = r.HandleOptionalAttribute( nameof( DisableSourceLink ), false );
             GlobalJsonSdkVersion = r.HandleOptionalAttribute<string>( nameof( GlobalJsonSdkVersion ), null );
             SPDXLicense = r.HandleOptionalAttribute<string>( nameof( SPDXLicense ), null );
+            BuildTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( BuildTimeoutMilliseconds ), 30000 );
+            RunTestTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( RunTestTimeoutMilliseconds ), 30000 );
+            RemotePushTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( RemotePushTimeoutMilliseconds ), 30000 );
 
             ArtifactTargets = r.HandleCollection(
                     nameof( ArtifactTargets ),
@@ -59,6 +62,9 @@ namespace CK.Env
             NoSharedPropsFile = r.HandleOptionalAttribute( nameof( NoSharedPropsFile ), other.NoSharedPropsFile );
             GlobalJsonSdkVersion = r.HandleOptionalAttribute( nameof( GlobalJsonSdkVersion ), other.GlobalJsonSdkVersion );
             SPDXLicense = r.HandleOptionalAttribute( nameof( SPDXLicense ), other.SPDXLicense );
+            BuildTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( BuildTimeoutMilliseconds ), other.BuildTimeoutMilliseconds );
+            RunTestTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( RunTestTimeoutMilliseconds ), other.RunTestTimeoutMilliseconds );
+            RemotePushTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( RemotePushTimeoutMilliseconds ), other.RemotePushTimeoutMilliseconds );
 
             var excludedNuGetSourceNames = new HashSet<string>( other.RemoveNuGetSourceNames );
             var excludedNPMScopeNames = new HashSet<string>( other.RemoveNPMScopeNames );
@@ -94,7 +100,7 @@ namespace CK.Env
         public string? GlobalJsonSdkVersion { get; }
 
         /// <summary>
-        /// Gets the licence: it must be a https://spdx.org/licenses/ or null if no licence applies.
+        /// Gets the license: it must be a https://spdx.org/licenses/ or null if no license applies.
         /// </summary>
         public string? SPDXLicense { get; }
 
@@ -124,6 +130,21 @@ namespace CK.Env
         public bool DisableSourceLink { get; }
 
         /// <summary>
+        /// Gets the maximal time to wait for a build before killing the process.
+        /// </summary>
+        public int BuildTimeoutMilliseconds { get; }
+
+        /// <summary>
+        /// Gets the maximal time to wait for tests to run before killing the process.
+        /// </summary>
+        public int RunTestTimeoutMilliseconds { get; }
+
+        /// <summary>
+        /// Gets the maximal time to wait for artifacts to be pushed to the remotes before killing the process.
+        /// </summary>
+        public int RemotePushTimeoutMilliseconds { get; }
+
+        /// <summary>
         /// Gets the NuGet source names that must be excluded.
         /// Must be used to clean up existing source names that must no more be used.
         /// Impacts NuGet.config file.
@@ -150,7 +171,7 @@ namespace CK.Env
         /// <summary>
         /// Defines the set of Git or GitBranch plugins type that must NOT be activated.
         /// By default, all available Git plugins are active.
-        /// Note that the excluded type must actually axist otherwise an exception is thrown.
+        /// Note that the excluded type must actually exist otherwise an exception is thrown.
         /// </summary>
         public IReadOnlyCollection<Type> ExcludedPlugins { get; }
     }

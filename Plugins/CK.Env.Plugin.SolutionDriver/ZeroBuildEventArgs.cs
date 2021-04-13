@@ -12,7 +12,7 @@ namespace CK.Env.Plugin
         /// Initializes a new event instance.
         /// </summary>
         /// <param name="m">The monitor.</param>
-        /// <param name="starting">Whether the build is strating or has been executed.</param>
+        /// <param name="starting">Whether the build is starting or has been executed.</param>
         /// <param name="info">The build info.</param>
         public ZeroBuildEventArgs( IActivityMonitor m, bool starting, ZeroBuildProjectInfo info )
             : base( m )

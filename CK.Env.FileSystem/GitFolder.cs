@@ -111,12 +111,12 @@ namespace CK.Env
         /// <param name="arguments">the raw string of arguments.</param>
         /// <returns>True on success. False on error.</returns>
         [CommandMethod( ParallelMode = ParallelCommandMode.UserChoice )]
-        public bool RunProcess( IActivityMonitor m, string fileName, string arguments )
+        public bool RunProcess( IActivityMonitor m, string fileName, string arguments, int timeoutSeconds = 60 )
         {
             ProcessStartInfo info = ProcessRunner.ConfigureProcessInfo( FullPhysicalPath, fileName, arguments );
             RunCommandEventArgs arg = new RunCommandEventArgs( m, info );
             RunProcessStarting?.Invoke( this, arg );
-            return ProcessRunner.Run( m, arg.StartInfo, arg.StdErrorLevel );
+            return ProcessRunner.Run( m, arg.StartInfo, timeoutSeconds * 1000, arg.StdErrorLevel );
         }
 
         class AdaptedLogger : ILogger

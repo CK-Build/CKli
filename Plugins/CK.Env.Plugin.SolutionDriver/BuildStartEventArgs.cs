@@ -70,7 +70,7 @@ namespace CK.Env.Plugin
         /// <summary>
         /// Gets the physical path CodeCakeBuilder executable file path.
         /// </summary>
-        public string CodeCakeBuilderExecutableFile { get; }
+        public string? CodeCakeBuilderExecutableFile { get; }
 
         /// <summary>
         /// Gets whether the Code Cake Builder should be compiled first or the existing <see cref="CodeCakeBuilderExecutableFile"/>
@@ -79,20 +79,25 @@ namespace CK.Env.Plugin
         public bool BuildCodeCakeBuilderIsRequired { get; }
 
         /// <summary>
+        /// Gets the timeout to wait before killing the process.
+        /// </summary>
+        public int TimeoutMilliseconds { get; }
+
+        /// <summary>
         /// Gets a bag of objects that enables state sharing between participants and from <see cref="BuildStartEventArgs"/>
         /// to <see cref="BuildEndEventArgs"/>.
         /// </summary>
         public IDictionary<object, object?> Memory { get; }
 
-        internal BuildStartEventArgs(
-            IActivityMonitor m,
-            bool buildRequired,
-            ISolution solution,
-            SVersion version,
-            BuildType buildType,
-            string solutionPhysicalPath,
-            string codeCakeBuilderExecutableFile )
-            : base( m )
+        internal BuildStartEventArgs( IActivityMonitor monitor,
+                                      bool buildRequired,
+                                      ISolution solution,
+                                      SVersion version,
+                                      BuildType buildType,
+                                      string solutionPhysicalPath,
+                                      string? codeCakeBuilderExecutableFile,
+                                      int timeoutMilliseconds )
+            : base( monitor )
         {
             if( !buildRequired && (buildType & (BuildType.WithUnitTests | BuildType.WithPushToRemote)) == 0 ) throw new ArgumentException( "No build, tests or push." );
 
@@ -101,6 +106,7 @@ namespace CK.Env.Plugin
             Version = version ?? throw new ArgumentNullException( nameof( version ) );
             EnvironmentVariables = new List<(string KeyName, string Value)>();
             BuildType = buildType;
+            TimeoutMilliseconds = timeoutMilliseconds;
             SolutionPhysicalPath = solutionPhysicalPath;
             CodeCakeBuilderExecutableFile = codeCakeBuilderExecutableFile;
             Memory = new Dictionary<object, object?>();

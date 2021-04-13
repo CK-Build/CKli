@@ -21,20 +21,22 @@ namespace CK.Env
         public static bool IsRunningOnUnix => Environment.OSVersion.Platform == PlatformID.Unix;
 
         /// <summary>
-        /// Runs a .ps1 file by running "Powershell.exe" that must be in the path.
+        /// Runs a .ps1 file by running "Powershell.exe" (or "pwsh") that must be in the path.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
         /// <param name="workingDir">The working directory.</param>
         /// <param name="scriptFileName">The script file name.</param>
         /// <param name="arguments">The script arguments.</param>
+        /// <param name="timeoutMilliseconds">Maximal time to wait for the process to terminate before killing it.</param>
         /// <param name="stdErrorLevel">Trace level of Standard Error stream.</param>
         /// <param name="environmentVariables">Optional environment variables for the child process.</param>
         /// <returns>True on success, false on error.</returns>
         public static bool RunPowerShell(
-                IActivityMonitor m,
+                IActivityMonitor monitor,
                 string workingDir,
                 string scriptFileName,
                 IEnumerable<string> arguments,
+                int timeoutMilliseconds,
                 LogLevel stdErrorLevel = LogLevel.Warn,
                 IEnumerable<(string, string)>? environmentVariables = null )
         {
@@ -48,8 +50,13 @@ namespace CK.Env
                 fileName += " " + arg;
             }
 
-            return
-                Run( m, workingDir, IsRunningOnUnix ? "pwsh" : "Powershell.exe", "-executionpolicy unrestricted "+ fileName, stdErrorLevel, environmentVariables );
+            return Run( monitor,
+                        workingDir,
+                        IsRunningOnUnix ? "pwsh" : "Powershell.exe",
+                        "-executionpolicy unrestricted "+ fileName,
+                        timeoutMilliseconds,
+                        stdErrorLevel,
+                        environmentVariables );
         }
 
         /// <summary>
@@ -59,19 +66,20 @@ namespace CK.Env
         /// <param name="workingDir">The working directory.</param>
         /// <param name="fileName">The file name to run.</param>
         /// <param name="arguments">Command arguments.</param>
+        /// <param name="timeoutMilliseconds">Maximal time to wait for the process to terminate before killing it.</param>
         /// <param name="stdErrorLevel">Trace level of Standard Error stream.</param>
         /// <param name="environmentVariables">Optional environment variables for the child process.</param>
         /// <returns>True on success (<see cref="Process.ExitCode"/> is equal to 0), false otherwise.</returns>
-        public static bool Run(
-                 IActivityMonitor m,
-                 string workingDir,
-                 string fileName,
-                 string arguments,
-                 LogLevel stdErrorLevel = LogLevel.Warn,
-                 IEnumerable<(string, string)>? environmentVariables = null )
+        public static bool Run( IActivityMonitor m,
+                                string workingDir,
+                                string fileName,
+                                string arguments,
+                                int timeoutMilliseconds,
+                                LogLevel stdErrorLevel = LogLevel.Warn,
+                                IEnumerable<(string, string)>? environmentVariables = null )
         {
             ProcessStartInfo cmdStartInfo = ConfigureProcessInfo( workingDir, fileName, arguments, environmentVariables );
-            return Run( m, cmdStartInfo, stdErrorLevel );
+            return Run( m, cmdStartInfo, timeoutMilliseconds, stdErrorLevel );
         }
 
         /// <summary>
@@ -110,9 +118,10 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="startInfo">Process start info.</param>
+        /// <param name="timeoutMilliseconds">Maximal time to wait for the process to terminate before killing it.</param>
         /// <param name="stdErrorLevel">Trace level of Standard Error stream.</param>
         /// <returns>True on success (<see cref="Process.ExitCode"/> is equal to 0), false otherwise.</returns>
-        public static bool Run( IActivityMonitor m, ProcessStartInfo startInfo, LogLevel stdErrorLevel = LogLevel.Warn )
+        public static bool Run( IActivityMonitor m, ProcessStartInfo startInfo, int timeoutMilliseconds, LogLevel stdErrorLevel = LogLevel.Warn )
         {
             // Arguments defaults to empty. Corrects it here if ever it is null. 
             if( startInfo.Arguments == null ) startInfo.Arguments = string.Empty;
@@ -143,16 +152,25 @@ namespace CK.Env
             using( m.OpenTrace( $"{startInfo.FileName} {startInfo.Arguments}" ) )
             using( Process cmdProcess = new Process() )
             {
+                bool dumpLogs = true;
                 StringBuilder errorCapture = new StringBuilder();
+                DataReceivedEventHandler outputReceived = delegate ( object o, DataReceivedEventArgs e ) { if( dumpLogs && e.Data != null ) m.Info( "<StdOut> " + e.Data ); };
+                DataReceivedEventHandler errorReceived = delegate ( object o, DataReceivedEventArgs e ) { if( dumpLogs && !string.IsNullOrEmpty( e.Data ) ) errorCapture.AppendLine( e.Data ); };
+
                 cmdProcess.StartInfo = startInfo;
-                cmdProcess.ErrorDataReceived += ( o, e ) => { if( !string.IsNullOrEmpty( e.Data ) ) errorCapture.AppendLine( e.Data ); };
-                cmdProcess.OutputDataReceived += ( o, e ) => { if( e.Data != null ) m.Info( "<StdOut> " + e.Data ); };
+                cmdProcess.OutputDataReceived += outputReceived;
+                cmdProcess.ErrorDataReceived += errorReceived;
                 cmdProcess.Start();
                 cmdProcess.BeginErrorReadLine();
                 cmdProcess.BeginOutputReadLine();
                 // See https://github.com/dotnet/msbuild/issues/2981
                 // and https://stackoverflow.com/questions/8207994/how-to-wait-on-a-process-and-all-its-child-processes-to-exit/37983587#37983587
-                cmdProcess.WaitForExit( Int32.MaxValue - 1 );
+                bool hasExited = cmdProcess.WaitForExit( timeoutMilliseconds );
+                // It happens that, even if the process has exited, we may be receiving data here.
+                dumpLogs = false;
+                cmdProcess.OutputDataReceived -= outputReceived;
+                cmdProcess.ErrorDataReceived -= errorReceived;
+
                 if( errorCapture.Length > 0 )
                 {
                     using( m.OpenGroup( stdErrorLevel, "Received errors on <StdErr>:" ) )
@@ -160,6 +178,23 @@ namespace CK.Env
                         m.Log( stdErrorLevel, errorCapture.ToString() );
                     }
                 }
+
+                if( !hasExited )
+                {
+                    using( m.OpenError( $"Process ran out of time ({timeoutMilliseconds} ms). Killing it (including its child processes)." ) )
+                    {
+                        try
+                        {
+                            cmdProcess.Kill( entireProcessTree: true );
+                        }
+                        catch( Exception ex )
+                        {
+                            m.Error( ex );
+                        }
+                    }
+                    return false;
+                }
+
                 if( cmdProcess.ExitCode != 0 )
                 {
                     m.Error( $"Process returned ExitCode {cmdProcess.ExitCode}." );
