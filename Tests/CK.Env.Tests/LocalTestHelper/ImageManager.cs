@@ -36,7 +36,7 @@ namespace CK.Env.Tests.LocalTestHelper
         {
             if( !File.Exists( imagePath ) ) throw new FileNotFoundException( nameof( imagePath ) );
 
-            NormalizedPath workFolder = Path.Combine( Path.GetTempPath(), "CKliTestWorkFolder" );
+            NormalizedPath workFolder = Path.Combine( Path.GetTempPath(), "CKliTest" );
             if( Directory.Exists( workFolder ) )
             {
                 m.Info( $"Deleting '{workFolder}' content.'" );

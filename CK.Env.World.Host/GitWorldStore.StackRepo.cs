@@ -240,15 +240,25 @@ namespace CK.Env
             /// </summary>
             /// <param name="path">The original path.</param>
             /// <returns>The cleaned up path.</returns>
-            public static string CleanPathDirName( string path ) =>//TODO: find a better home for this function.
-                    path.Replace( ".git", "" )
-                        .Replace( "_git", "" )
-                        .Replace( '/', '_' )
-                        .Replace( ':', '_' )
-                        .Replace( "__", "_" )
-                        .Trim( '_' )
-                        .ToLowerInvariant();
-
+            public static string CleanPathDirName( string path )
+            {
+                var p = path.Replace( ".git", "" )
+                            .Replace( "_git", "" )
+                            .Replace( '/', '_' )
+                            .Replace( ':', '_' )
+                            .Replace( "__", "_" )
+                            .Trim( '_' )
+                            .ToLowerInvariant();
+                if( p.Length > 50 )
+                {
+                    p = p.Replace( "-stack", "" );
+                }
+                if( p.Length > 50 )
+                {
+                    p = SHA1Value.ComputeSHA1( System.Text.Encoding.ASCII.GetBytes( p ) ).ToString();
+                }
+                return p;
+            }
         }
 
     }
