@@ -207,7 +207,7 @@ namespace CK.Env.NPM
                     string tarPath = Path.GetFullPath( tarballPath );
                     string distTagArg = distTag != null ? $"--tag {distTag.ToLowerInvariant()}" : "";
                     string access = isPublic ? "public" : "private";
-                    return ProcessRunner.Run( m, tempDirectory, "cmd.exe", $"/C npm publish \"{tarPath}\" --access {access} {distTagArg}", 2000, LogLevel.Info );
+                    return ProcessRunner.Run( m, tempDirectory, "cmd.exe", $"/C npm publish \"{tarPath}\" --access {access} {distTagArg}", 10 * 60 * 1000, LogLevel.Info );
                 }
                 catch( Exception ex )
                 {

@@ -766,8 +766,8 @@ namespace CK.Env.Plugin
             else if( missing.Count == 0 )
             {
                 monitor.Info( $"No artifacts have to be generated. Build is required." );
-                timeout += _solutionSpec.BuildTimeoutMilliseconds;
             }
+            timeout += _solutionSpec.BuildTimeoutMilliseconds;
             if( withUnitTest && !_solutionSpec.NoDotNetUnitTests )
             {
                 buildType |= BuildType.WithUnitTests;
@@ -822,8 +822,8 @@ namespace CK.Env.Plugin
             if( (buildType & BuildType.WithZeroBuilder) != BuildType.WithZeroBuilder )
             {
                 monitor.Info( "Using CodeCakeBuilder with source compilation (dotnet run)." );
-                // Consider that 7 seconds to build the CodeCakeBuilder is enough.
-                timeout += 7000;
+                // Consider that 10 seconds to build the CodeCakeBuilder is enough.
+                timeout += 10 * 1000;
             }
             var ev = new BuildStartEventArgs(
                             monitor,

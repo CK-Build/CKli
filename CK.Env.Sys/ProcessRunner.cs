@@ -152,10 +152,9 @@ namespace CK.Env
             using( m.OpenTrace( $"{startInfo.FileName} {startInfo.Arguments}" ) )
             using( Process cmdProcess = new Process() )
             {
-                bool dumpLogs = true;
                 StringBuilder errorCapture = new StringBuilder();
-                DataReceivedEventHandler outputReceived = delegate ( object o, DataReceivedEventArgs e ) { if( dumpLogs && e.Data != null ) m.Info( "<StdOut> " + e.Data ); };
-                DataReceivedEventHandler errorReceived = delegate ( object o, DataReceivedEventArgs e ) { if( dumpLogs && !string.IsNullOrEmpty( e.Data ) ) errorCapture.AppendLine( e.Data ); };
+                DataReceivedEventHandler outputReceived = delegate ( object o, DataReceivedEventArgs e ) { if( e.Data != null ) m.Info( "<StdOut> " + e.Data ); };
+                DataReceivedEventHandler errorReceived = delegate ( object o, DataReceivedEventArgs e ) { if( !string.IsNullOrEmpty( e.Data ) ) errorCapture.AppendLine( e.Data ); };
 
                 cmdProcess.StartInfo = startInfo;
                 cmdProcess.OutputDataReceived += outputReceived;
@@ -163,13 +162,14 @@ namespace CK.Env
                 cmdProcess.Start();
                 cmdProcess.BeginErrorReadLine();
                 cmdProcess.BeginOutputReadLine();
-                // See https://github.com/dotnet/msbuild/issues/2981
-                // and https://stackoverflow.com/questions/8207994/how-to-wait-on-a-process-and-all-its-child-processes-to-exit/37983587#37983587
+
                 bool hasExited = cmdProcess.WaitForExit( timeoutMilliseconds );
-                // It happens that, even if the process has exited, we may be receiving data here.
-                dumpLogs = false;
+                int exitCode = hasExited ? cmdProcess.ExitCode : 0;
+
                 cmdProcess.OutputDataReceived -= outputReceived;
                 cmdProcess.ErrorDataReceived -= errorReceived;
+
+                cmdProcess.Close();
 
                 if( errorCapture.Length > 0 )
                 {
@@ -195,7 +195,7 @@ namespace CK.Env
                     return false;
                 }
 
-                if( cmdProcess.ExitCode != 0 )
+                if( exitCode != 0 )
                 {
                     m.Error( $"Process returned ExitCode {cmdProcess.ExitCode}." );
                     return false;
