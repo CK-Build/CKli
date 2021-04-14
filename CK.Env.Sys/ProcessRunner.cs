@@ -166,9 +166,7 @@ namespace CK.Env
                 bool hasExited = cmdProcess.WaitForExit( timeoutMilliseconds );
                 int exitCode = hasExited ? cmdProcess.ExitCode : 0;
 
-                cmdProcess.OutputDataReceived -= outputReceived;
-                cmdProcess.ErrorDataReceived -= errorReceived;
-
+                // This flushes the streams and waits for the message pumps to end.
                 cmdProcess.Close();
 
                 if( errorCapture.Length > 0 )
@@ -197,7 +195,7 @@ namespace CK.Env
 
                 if( exitCode != 0 )
                 {
-                    m.Error( $"Process returned ExitCode {cmdProcess.ExitCode}." );
+                    m.Error( $"Process returned ExitCode {exitCode}." );
                     return false;
                 }
                 return true;
