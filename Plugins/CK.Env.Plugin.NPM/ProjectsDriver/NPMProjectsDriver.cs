@@ -120,7 +120,12 @@ namespace CK.Env.Plugin
             return _angularWorkspaces.SelectMany( s => s.Projects ).All( p => p.RefreshStatus( m ) == NPMProjectStatus.Valid );
         }
 
-        public IReadOnlyList<NPMProject> GetSimpleNPMProjects( IActivityMonitor m )
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="m"></param>
+        /// <returns>Null on error.</returns>
+        public IReadOnlyList<NPMProject>? GetSimpleNPMProjects( IActivityMonitor m )
         {
             return _driver.GetSolution( m, allowInvalidSolution: true ) != null ? _npmProjects : null;
         }

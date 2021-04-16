@@ -28,9 +28,11 @@ namespace CK.Env.Plugin
         public void ApplySettings( IActivityMonitor m )
         {
             if( !_f.EnsureDirectory( m ) ) return;
+
             var projects = _driver.GetSimpleNPMProjects( m );
-            var workspace = _driver.GetAngularWorkspaces( m );
             if( projects == null ) return;
+
+            var workspace = _driver.GetAngularWorkspaces( m );
             if( (projects.Count + workspace.Count) == 0 )
             {
                 Delete( m );
