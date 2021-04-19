@@ -93,7 +93,7 @@ yield return new SignatureVSTSFeed( this, "Signature-OpenSource","NetCore3", "Fe
             /// <summary>
             /// Gets the local target feeds.
             /// </summary>
-            /// <returns>The set of remote NuGet feeds (in practice at moste one).</returns>
+            /// <returns>The set of remote NuGet feeds (in practice at most one).</returns>
             protected override IEnumerable<ArtifactFeed> GetLocalFeeds()
             {
                 return new NuGetHelper.NuGetFeed[] {
