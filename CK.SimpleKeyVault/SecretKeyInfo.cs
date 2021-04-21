@@ -10,29 +10,28 @@ namespace CK.SimpleKeyVault
     /// </summary>
     public class SecretKeyInfo
     {
+        readonly SecretKeyStore _store;
         string? _secret;
         string _description;
-        CKTrait _tags;
         bool _isRequired;
 
-        /// <summary>
-        /// Gets the <see cref="Tags"/>'s context.
-        /// </summary>
-        public static CKTraitContext TagsContext = CKTraitContext.Create( "SecretCategory", '|' );
-
-        internal SecretKeyInfo( string name, Func<SecretKeyInfo?, string> descriptionBuilder, bool isRequired, string? sourceProviderName )
-            : this( name, descriptionBuilder, sourceProviderName )
+        internal SecretKeyInfo( SecretKeyStore store,
+                                string name,
+                                Func<SecretKeyInfo?, string> descriptionBuilder,
+                                bool isRequired,
+                                string? sourceProviderName )
+            : this( store, name, descriptionBuilder, sourceProviderName )
         {
             _isRequired = isRequired;
         }
 
-        internal SecretKeyInfo(
-            string name,
-            Func<SecretKeyInfo?, string> descriptionBuilder,
-            SecretKeyInfo subKey,
-            IReadOnlyDictionary<string, SecretKeyInfo> keyInfos,
-            string? sourceProviderName )
-            : this( name, descriptionBuilder, sourceProviderName )
+        internal SecretKeyInfo( SecretKeyStore store,
+                                string name,
+                                Func<SecretKeyInfo?, string> descriptionBuilder,
+                                SecretKeyInfo subKey,
+                                IReadOnlyDictionary<string, SecretKeyInfo> keyInfos,
+                                string? sourceProviderName )
+            : this( store, name, descriptionBuilder, sourceProviderName )
         {
             SubKey = subKey ?? throw new ArgumentNullException( nameof( subKey ) );
             if( subKey.SuperKey != null )
@@ -51,16 +50,15 @@ namespace CK.SimpleKeyVault
         /// </summary>
         /// <param name="data">Data captured by <see cref="GetData"/>.</param>
         /// <param name="keyInfos">Current set of secrets being restored.</param>
-        internal SecretKeyInfo(
-            (string name, string description, string? secret, bool isRequired, string tags, string? subKey, string? sourceProviderName) data,
-            IReadOnlyDictionary<string, SecretKeyInfo> keyInfos )
+        internal SecretKeyInfo( SecretKeyStore store,
+                                (string name, string description, string? secret, bool isRequired, string? subKey, string? sourceProviderName) data,
+                                IReadOnlyDictionary<string, SecretKeyInfo> keyInfos )
         {
             SourceProviderName = data.sourceProviderName;
             Name = data.name;
             _description = data.description;
             _secret = data.secret;
             _isRequired = data.isRequired;
-            _tags = TagsContext.FindOrCreate( data.tags );
             if( data.subKey != null )
             {
                 SubKey = keyInfos[data.subKey];
@@ -72,18 +70,18 @@ namespace CK.SimpleKeyVault
         /// Exports data for "serialization".
         /// </summary>
         /// <returns>The raw data.</returns>
-        internal (string name, string description, string? secret, bool isRequired, string tags, string? subKey, string? sourceProviderName) GetData()
+        internal (string name, string description, string? secret, bool isRequired, string? subKey, string? sourceProviderName) GetData()
         {
-            return (Name, _description, _secret, _isRequired, _tags.ToString(), SubKey?.Name, SourceProviderName);
+            return (Name, _description, _secret, _isRequired, SubKey?.Name, SourceProviderName);
         }
 
-        SecretKeyInfo( string name, Func<SecretKeyInfo?, string> descriptionBuilder, string? sourceProviderName )
+        SecretKeyInfo( SecretKeyStore store, string name, Func<SecretKeyInfo?, string> descriptionBuilder, string? sourceProviderName )
         {
+            _store = store;
             SourceProviderName = sourceProviderName;
             Name = name ?? throw new ArgumentNullException( nameof( name ) );
             _description = String.Empty;
             SetDescription( descriptionBuilder );
-            _tags = TagsContext.EmptyTrait;
         }
 
         internal void Reconfigure( Func<SecretKeyInfo?, string> descriptionBuilder, bool isRequired )
@@ -145,20 +143,6 @@ namespace CK.SimpleKeyVault
         /// </summary>
         public string? Secret => _secret;
 
-        public SecretKeyInfo FinalSubKey
-        {
-            get
-            {
-                var k = this;
-                while( k.SubKey != null )
-                {
-                    k = k.SubKey;
-                    Debug.Assert( k != this, "The way we initialize these objects cannot create cycles." );
-                }
-                return k;
-            }
-        }
-
         [Conditional( "DEBUG" )]
         void CheckSecretPropagation()
         {
@@ -173,7 +157,7 @@ namespace CK.SimpleKeyVault
         /// <param name="m">The monitor to use.</param>
         /// <param name="secret">The secret to set. Must not be null or empty.</param>
         /// <returns>True if the secret has been updated, false if nothing has changed.</returns>
-        public bool ImportSecret( IActivityMonitor m, string secret )
+        internal bool ImportSecret( IActivityMonitor m, string secret )
         {
             if( String.IsNullOrEmpty( secret ) ) throw new ArgumentNullException( nameof( secret ) );
             if( !string.IsNullOrWhiteSpace( SourceProviderName ) ) throw new InvalidOperationException( $"This secret is provided by '{SourceProviderName}' you cannot import a transient secret." );
@@ -206,12 +190,13 @@ namespace CK.SimpleKeyVault
         /// <returns>True if a secret has been updated, false if nothing has changed.</returns>
         public bool SetSecret( string? secret )
         {
+            using var l = _store.AcquireLock();
             CheckSecretPropagation();
+            if( String.IsNullOrEmpty( secret ) ) secret = null;
             if( SuperKey != null && SuperKey.IsSecretAvailable )
             {
                 throw new InvalidOperationException( $"Secret is available at the SuperKey '{SuperKey.Name}' level. It cannot be set on '{Name}'." );
             }
-            if( String.IsNullOrEmpty( secret ) ) secret = null;
             bool changed = false;
             SecretKeyInfo? k = this;
             do
@@ -222,21 +207,6 @@ namespace CK.SimpleKeyVault
             }
             while( k != null );
             return changed;
-        }
-
-        /// <summary>
-        /// Gets or sets one or more tags. When set to null, tags is set to the <see cref="CKTraitContext.EmptyTrait"/>.
-        /// When not null, tags must belong to <see cref="TagsContext"/>
-        /// </summary>
-        public CKTrait Tags
-        {
-            get => _tags;
-            set
-            {
-                if( value == null ) value = TagsContext.EmptyTrait;
-                else if( value.Context != TagsContext ) throw new ArgumentException( "Tag context mismatch." );
-                _tags = value;
-            }
         }
 
         /// <summary>

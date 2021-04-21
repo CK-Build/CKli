@@ -9,8 +9,6 @@
 
     When NoBuild is defined (-double dash-no-build in CI), we set the Nugetizer BuildOnPack to false.
     -->
-
-    <!--<BuildOnPack Condition=" '$(NoBuild)' == 'true' ">false</BuildOnPack>-->
     <BuildOnPack Condition=" '$(NoBuild)' == 'true' ">false</BuildOnPack>
     <BuildProjectReferences Condition=" '$(NoBuild)' == 'true' ">false</BuildProjectReferences>
   </PropertyGroup>

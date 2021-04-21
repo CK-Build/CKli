@@ -21,11 +21,12 @@ namespace CK.SimpleKeyVault
         /// </summary>
         public struct Snapshot
         {
-            readonly (string name, string description, string? secret, bool isRequired, string tags, string? subKey, string? sourceProviderName)[] _data;
+            readonly (string name, string description, string? secret, bool isRequired, string? subKey, string? sourceProviderName)[] _data;
 
             internal Snapshot( SecretKeyStore store )
             {
-                _data = new (string name, string description, string? secret, bool isRequired, string tags, string? subKey, string? sourceProviderName)[store._orderedInfos.Count];
+                using var l = store.AcquireLock();
+                _data = new (string name, string description, string? secret, bool isRequired, string? subKey, string? sourceProviderName)[store._orderedInfos.Count];
                 for( int i = 0; i < store._orderedInfos.Count; i++ )
                 {
                     _data[i] = store._orderedInfos[i].GetData();
@@ -38,11 +39,12 @@ namespace CK.SimpleKeyVault
             /// <param name="store">The target store.</param>
             public void RestoreTo( SecretKeyStore store )
             {
-                store.Clear();
+                using var l = store.AcquireLock();
+                store.DoClear();
                 int max = _data.Length - 1;
                 for( int i = 0; i <= max; i++ )
                 {
-                    var s = new SecretKeyInfo( _data[max - i], store._keyInfos );
+                    var s = new SecretKeyInfo( store, _data[max - i], store._keyInfos );
                     store._orderedInfos.Insert( 0, s );
                     store._keyInfos.Add( s.Name, s );
                 }
@@ -69,6 +71,12 @@ namespace CK.SimpleKeyVault
             other.CreateSnapshot().RestoreTo( this );
         }
 
+        internal IDisposable AcquireLock()
+        {
+            System.Threading.Monitor.Enter( _undeclaredSecrets );
+            return Util.CreateDisposableAction( () => System.Threading.Monitor.Exit( _undeclaredSecrets ) );
+        }
+
         /// <summary>
         /// Raised each time a secret is declared.
         /// </summary>
@@ -83,16 +91,28 @@ namespace CK.SimpleKeyVault
         /// <summary>
         /// Gets a filtered list of available named secrets without useless subordinate keys.
         /// </summary>
-        public IEnumerable<(string Name, string Secret)> OptimalNamedSecrets => _orderedInfos.Where( i => i.IsSecretAvailable && (i.SuperKey == null || !i.SuperKey.IsSecretAvailable) )
-                                                                                             .Select( i => (i.Name, i.Secret!) )
-                                                                                             .Concat( _undeclaredSecrets.Select( kv => (kv.Key, kv.Value) ) );
+        public IEnumerable<(string Name, string Secret)> OptimalNamedSecrets
+        {
+            get
+            {
+                using var l = AcquireLock();
+                return _orderedInfos.Where( i => i.IsSecretAvailable && (i.SuperKey == null || !i.SuperKey.IsSecretAvailable) )
+                             .Select( i => (i.Name, i.Secret!) )
+                             .Concat( _undeclaredSecrets.Select( kv => (kv.Key, kv.Value) ) )
+                             .ToList();
+            }
+        }
 
         /// <summary>
         /// Gets the secret key info or null if it doesn't exist.
         /// </summary>
         /// <param name="name">The name of the key.</param>
         /// <returns>The info or null.</returns>
-        public SecretKeyInfo? Find( string name ) => _keyInfos.GetValueOrDefault( name );
+        public SecretKeyInfo? Find( string name )
+        {
+            using var l = AcquireLock();
+            return _keyInfos.GetValueOrDefault( name );
+        }
 
         /// <summary>
         /// Creates a new <see cref="Snapshot"/>.
@@ -105,6 +125,12 @@ namespace CK.SimpleKeyVault
         /// </summary>
         public void Clear()
         {
+            using var l = AcquireLock();
+            DoClear();
+        }
+
+        void DoClear()
+        {
             _orderedInfos.Clear();
             _keyInfos.Clear();
             _undeclaredSecrets.Clear();
@@ -113,7 +139,8 @@ namespace CK.SimpleKeyVault
         /// <summary>
         /// Declares a secret key.
         /// Can be called as many times as needed: the <paramref name="descriptionBuilder"/> can
-        /// compose the final description and the <paramref name="isRequired"/> is or'ed.
+        /// compose the final description and the <paramref name="isRequired"/> is combined with a 'or'
+        /// (as soon as one secret is required, then it is required).
         /// </summary>
         /// <param name="name">The name of the secret key.</param>
         /// <param name="descriptionBuilder">Description builder function. Allow to manipulate the description.
@@ -123,18 +150,21 @@ namespace CK.SimpleKeyVault
         public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo?, string> descriptionBuilder, bool isRequired = false, string? sourceProviderName = null )
         {
             bool redeclaration = true;
-            if( !_keyInfos.TryGetValue( name, out var info ) )
+            SecretKeyInfo? info;
+            using( AcquireLock() )
             {
-                redeclaration = false;
-                _keyInfos.Add( name, info = new SecretKeyInfo( name, descriptionBuilder, isRequired, sourceProviderName ) );
-                _orderedInfos.Add( info );
-                LookupFromUndeclared( info );
+                if( !_keyInfos.TryGetValue( name, out info ) )
+                {
+                    redeclaration = false;
+                    _keyInfos.Add( name, info = new SecretKeyInfo( this, name, descriptionBuilder, isRequired, sourceProviderName ) );
+                    _orderedInfos.Add( info );
+                    LookupFromUndeclared( info );
+                }
+                else
+                {
+                    info.Reconfigure( descriptionBuilder, isRequired );
+                }
             }
-            else
-            {
-                info.Reconfigure( descriptionBuilder, isRequired );
-            }
-
             SecretDeclared?.Invoke( this, new SecretKeyInfoDeclaredArgs( info, redeclaration ) );
             return info;
         }
@@ -161,18 +191,21 @@ namespace CK.SimpleKeyVault
         public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo?, string> descriptionBuilder, SecretKeyInfo subKey, string? sourceNameMaxLength = null )
         {
             bool redeclaration = true;
-            if( !_keyInfos.TryGetValue( name, out var info ) )
+            SecretKeyInfo? info;
+            using( AcquireLock() )
             {
-                redeclaration = false;
-                _keyInfos.Add( name, info = new SecretKeyInfo( name, descriptionBuilder, subKey, _keyInfos, sourceNameMaxLength ) );
-                _orderedInfos.Insert( 0, info );
-                LookupFromUndeclared( info );
+                if( !_keyInfos.TryGetValue( name, out info ) )
+                {
+                    redeclaration = false;
+                    _keyInfos.Add( name, info = new SecretKeyInfo( this, name, descriptionBuilder, subKey, _keyInfos, sourceNameMaxLength ) );
+                    _orderedInfos.Insert( 0, info );
+                    LookupFromUndeclared( info );
+                }
+                else
+                {
+                    info.Reconfigure( descriptionBuilder, subKey );
+                }
             }
-            else
-            {
-                info.Reconfigure( descriptionBuilder, subKey );
-            }
-
             SecretDeclared?.Invoke( this, new SecretKeyInfoDeclaredArgs( info, redeclaration ) );
             return info;
         }
@@ -189,6 +222,7 @@ namespace CK.SimpleKeyVault
         public bool SetSecret( IActivityMonitor m, string name, string? secret )
         {
             if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
+            using var l = AcquireLock();
             bool clear = String.IsNullOrEmpty( secret );
             if( !_keyInfos.TryGetValue( name, out var info ) )
             {
@@ -228,8 +262,6 @@ namespace CK.SimpleKeyVault
             return false;
         }
 
-
-
         /// <summary>
         /// Gets whether a secret key has been declared (the returned is not null) and whether its
         /// secret is available or not.
@@ -240,6 +272,7 @@ namespace CK.SimpleKeyVault
         public bool? IsSecretKeyAvailable( string name )
         {
             if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentException( nameof( name ) );
+            using var l = AcquireLock();
             if( !_keyInfos.TryGetValue( name, out var info ) ) return null;
             return info.IsSecretAvailable;
         }
@@ -252,6 +285,7 @@ namespace CK.SimpleKeyVault
         public void ImportSecretKeys( IActivityMonitor m, IReadOnlyDictionary<string, string?> secrets )
         {
             if( secrets == null ) throw new ArgumentException( nameof( secrets ) );
+            using var l = AcquireLock();
             foreach( var info in Infos )
             {
                 if( secrets.TryGetValue( info.Name, out var secret ) )
@@ -275,6 +309,7 @@ namespace CK.SimpleKeyVault
         public string? GetSecretKey( IActivityMonitor m, string name, [DoesNotReturnIf(true)]bool throwOnUnavailable )
         {
             if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentException( nameof( name ) );
+            using var l = AcquireLock();
             if( !_keyInfos.TryGetValue( name, out SecretKeyInfo? keyInfo ) )
             {
                 throw new InvalidOperationException( $"Secret '{name}' must be declared before any use of it." );
