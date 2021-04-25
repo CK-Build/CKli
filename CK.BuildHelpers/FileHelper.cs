@@ -1,5 +1,7 @@
 using CK.Core;
+using CK.Text;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -118,6 +120,34 @@ namespace CK.Env
                 NormalizeAttributes( subdirectoryPath );
             }
             File.SetAttributes( directoryPath, FileAttributes.Normal );
+        }
+
+        public static void DeleteFiles( IActivityMonitor m, string deletionPattern, string? targetPath = null )
+        {
+            targetPath ??= Directory.GetCurrentDirectory();
+            DirectoryInfo dir = new( targetPath );
+            using( m.OpenTrace( $"Deleting file in directory {targetPath} with pattern {targetPath}." ) )
+            {
+                foreach( FileInfo item in dir.EnumerateFiles( deletionPattern ) )
+                {
+                    m.Trace( $"Deleting {Path.GetRelativePath( deletionPattern, item.FullName )}." );
+                    item.Delete();
+                }
+            }
+        }
+
+        public static void DeleteDirectories( IActivityMonitor m, IEnumerable<NormalizedPath> paths )
+            => DeleteDirectories( m, paths.Select( s => s.Path ) );
+
+        public static void DeleteDirectories( IActivityMonitor m, IEnumerable<string> paths )
+        {
+            using( m.OpenTrace( "Deleting multiple directories..." ) )
+            {
+                foreach( string item in paths )
+                {
+                    Directory.Delete( item, true );
+                }
+            }
         }
     }
 }

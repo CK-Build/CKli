@@ -1,12 +1,13 @@
-using Cake.Common.Diagnostics;
-using Cake.Common.Solution;
-using Cake.Common.Tools.DotNetCore;
-using Cake.Common.Tools.DotNetCore.Pack;
+using CK.Core;
+using CK.Text;
 using CodeCake.Abstractions;
 using CSemVer;
+using Kuinox.TypedCLI.Dotnet;
 using SimpleGitVersion;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using static CodeCake.Build;
 
 namespace CodeCake
@@ -14,7 +15,7 @@ namespace CodeCake
 
     public partial class DotnetSolution : ICIPublishWorkflow
     {
-        private ArtifactType _artifactType;
+        private ArtifactType? _artifactType;
 
         public ArtifactType ArtifactType
         {
@@ -25,21 +26,31 @@ namespace CodeCake
             }
         }
 
-        public void Pack()
+        public async Task<bool> Pack( IActivityMonitor m )
         {
             var nugetInfo = _globalInfo.ArtifactTypes.OfType<NuGetArtifactType>().Single();
-            var settings = new DotNetCorePackSettings().AddVersionArguments( _globalInfo.BuildInfo, c =>
-            {
-                c.NoBuild = true;
-                c.IncludeSymbols = true;
-                c.Configuration = _globalInfo.BuildInfo.BuildConfiguration;
-                c.OutputDirectory = _globalInfo.ReleasesFolder.Path;
-            } );
+            ICommitBuildInfo info = _globalInfo.BuildInfo;
             foreach( var p in nugetInfo.GetNuGetArtifacts() )
             {
-                _globalInfo.Cake.Information( p.ArtifactInstance );
-                _globalInfo.Cake.DotNetCorePack( p.Project.Path.FullPath, settings );
+                m.Info( p.ArtifactInstance.ToString() );
+                bool result = await Dotnet.Pack( m,
+                    projectOrSolution: p.ProjectPath,
+                    noBuild: true,
+                    includeSymbols: true,
+                    configuration: _globalInfo.BuildInfo.BuildConfiguration,
+                    outputDirectory: _globalInfo.ReleasesFolder,
+                    msbuildProperties: new Dictionary<string, string>()
+                    {
+                        { "CakeBuild","true" },
+                        { "Version", info.Version.ToString() },
+                        { "AssemblyVersion", info.AssemblyVersion },
+                        { "FileVersion", info.FileVersion },
+                        { "InformationalVersion", info.InformationalVersion }
+                    }
+                );
+                if( !result ) return false;
             }
+            return true;
         }
     }
 
@@ -57,15 +68,16 @@ namespace CodeCake
 
             public class NuGetArtifact : ILocalArtifact
             {
-                public NuGetArtifact( SolutionProject p, SVersion v )
+                public NuGetArtifact( NormalizedPath projectPath, SVersion v )
                 {
-                    Project = p;
+                    ProjectPath = projectPath;
+                    string name = Path.GetFileNameWithoutExtension( projectPath );
                     ArtifactInstance = new ArtifactInstance( "NuGet", p.Name, v );
                 }
 
                 public ArtifactInstance ArtifactInstance { get; }
 
-                public SolutionProject Project { get; }
+                public NormalizedPath ProjectPath { get; }
             }
 
 
@@ -86,9 +98,10 @@ namespace CodeCake
             /// </summary>
             /// <returns>The set of remote NuGet feeds (in practice at most one).</returns>
             protected override IEnumerable<ArtifactFeed> GetRemoteFeeds()
-            {if( GlobalInfo.BuildInfo.Version.PackageQuality >= CSemVer.PackageQuality.ReleaseCandidate ) yield return new RemoteFeed( this, "nuget.org", "https://api.nuget.org/v3/index.json", "NUGET_ORG_PUSH_API_KEY" );
-yield return new SignatureVSTSFeed( this, "Signature-OpenSource","NetCore3", "Feeds");
-}
+            {
+                if( GlobalInfo.BuildInfo.Version.PackageQuality >= CSemVer.PackageQuality.ReleaseCandidate ) yield return new RemoteFeed( this, "nuget.org", "https://api.nuget.org/v3/index.json", "NUGET_ORG_PUSH_API_KEY" );
+                yield return new SignatureVSTSFeed( this, "Signature-OpenSource", "NetCore3", "Feeds" );
+            }
 
             /// <summary>
             /// Gets the local target feeds.

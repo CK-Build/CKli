@@ -22,33 +22,24 @@ namespace CodeCake
     /// </summary>
     public class StandardGlobalInfo
     {
-        readonly ICakeContext _ctx;
-        readonly HashSet<ICIWorkflow> _solutions = new HashSet<ICIWorkflow>();
+        readonly HashSet<ISolution> _solutions = new HashSet<ISolution>();
         List<ArtifactPush> _artifactPushes;
         bool _ignoreNoArtifactsToProduce;
 
-        static StandardGlobalInfo()
+        public StandardGlobalInfo( NormalizedPath rootFolder, ICommitBuildInfo finalBuildInfo )
         {
-            SharedHttpClient = new HttpClient();
-        }
-
-        public StandardGlobalInfo( ICakeContext ctx, ICommitBuildInfo finalBuildInfo )
-        {
-            _ctx = ctx;
+            RootFolder = rootFolder;
             BuildInfo = finalBuildInfo;
             ReleasesFolder = "CodeCakeBuilder/Releases";
             Directory.CreateDirectory( ReleasesFolder );
         }
 
-        public void RegisterSolution( ICIWorkflow solution )
+        public void RegisterSolution( ISolution solution )
         {
             _solutions.Add( solution );
         }
 
-        /// <summary>
-        /// Gets the Cake context.
-        /// </summary>
-        public ICakeContext Cake => _ctx;
+        public NormalizedPath RootFolder { get; }
 
         /// <summary>
         /// Gets the <see cref="ICommitBuildInfo"/> for this commit.
@@ -85,7 +76,7 @@ namespace CodeCake
         /// See: https://aspnetmonsters.com/2016/08/2016-08-27-httpclientwrong/
         /// Do not add any default on it.
         /// </summary>
-        public static readonly HttpClient SharedHttpClient;
+        public static readonly HttpClient SharedHttpClient = new HttpClient();
 
         /// <summary>
         /// Gets whether artifacts should be pushed to remote feeds.
@@ -149,7 +140,7 @@ namespace CodeCake
         /// </summary>
         public bool ShouldStop => NoArtifactsToProduce && !IgnoreNoArtifactsToProduce;
 
-        public IReadOnlyCollection<ICIWorkflow> Solutions => _solutions;
+        public IReadOnlyCollection<ISolution> Solutions => _solutions;
 
         #region Memory key support.
 

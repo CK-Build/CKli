@@ -55,7 +55,7 @@ namespace CodeCake
     /// <summary>
     /// Encapsulates a set of <see cref="NPMProject"/> that can be <see cref="NPMPublishedProject"/>.
     /// </summary>
-    public partial class NPMSolution : NPMProjectContainer, ICIWorkflow
+    public partial class NPMSolution : NPMProjectContainer, ISolution
     {
         readonly StandardGlobalInfo _globalInfo;
 

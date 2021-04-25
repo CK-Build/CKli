@@ -1,20 +1,24 @@
+using CK.Core;
+using System;
+using System.Threading.Tasks;
+
 namespace CodeCake.Abstractions
 {
-    public interface ICIWorkflow
+    public interface ISolution
     {
         /// <summary>
         /// Try to clean the folder, for example by deleting bin & obj.
         /// </summary>
-        void Clean();
+        Task<bool> Clean( IActivityMonitor m );
 
         /// <summary>
         /// Build the solution.
         /// </summary>
-        void Build();
+        Task<bool> Build( IActivityMonitor m );
 
         /// <summary>
         /// Run the unit tests of the solution.
         /// </summary>
-        void Test();
+        Task<bool> Test( IActivityMonitor m );
     }
 }
