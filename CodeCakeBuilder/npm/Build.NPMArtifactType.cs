@@ -1,5 +1,7 @@
+using CK.Core;
 using CodeCake.Abstractions;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using static CodeCake.Build;
 
 namespace CodeCake
@@ -18,7 +20,7 @@ namespace CodeCake
             }
         }
 
-        public void Pack() => RunPack();
+        public Task<bool> Pack( IActivityMonitor m ) => RunPack( m );
     }
 
 

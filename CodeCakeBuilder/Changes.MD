@@ -1,6 +1,5 @@
-Currently:
-Made CK.Env.Sys packable, I think this will make it a publishable nuget packet and will be shared by CKli/CCB
-Copy/Pasted TemporarySolution from Cake.Common.
+TODO:
+CCB doesnt handle verbosity options at all.
 
 Planned:
 Removing Cake from CCB.

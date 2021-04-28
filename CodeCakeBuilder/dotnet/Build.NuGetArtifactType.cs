@@ -72,7 +72,7 @@ namespace CodeCake
                 {
                     ProjectPath = projectPath;
                     string name = Path.GetFileNameWithoutExtension( projectPath );
-                    ArtifactInstance = new ArtifactInstance( "NuGet", p.Name, v );
+                    ArtifactInstance = new ArtifactInstance( "NuGet", name, v );
                 }
 
                 public ArtifactInstance ArtifactInstance { get; }

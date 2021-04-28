@@ -1,10 +1,12 @@
-using Cake.Npm;
+using CK.Core;
 using CodeCake.Abstractions;
 using CSemVer;
+using Kuinox.TypedCLI.NPM;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 
 namespace CodeCake
@@ -17,16 +19,16 @@ namespace CodeCake
         /// <param name="this">This global info.</param>
         /// <param name="solution">The NPM solution.</param>
         /// <returns>This info.</returns>
-        public static StandardGlobalInfo AddNPM( this StandardGlobalInfo globalInfo, NPMSolution solution )
+        public static async Task AddNPM( this StandardGlobalInfo globalInfo, IActivityMonitor m, NPMSolution solution )
         {
             SVersion minmimalNpmVersionRequired = SVersion.Create( 6, 7, 0 );
-            string npmVersion = globalInfo.Cake.NpmGetNpmVersion();
+            string? npmVersion = await Npm.Version( m );
+            if( npmVersion is null ) throw new InvalidOperationException( "Could not fetch the npm version." );
             if( SVersion.Parse( npmVersion ) < minmimalNpmVersionRequired )
             {
-                globalInfo.Cake.TerminateWithError( "Outdated npm. Version older than v6.7.0 are known to fail on publish." );
+                throw new InvalidOperationException( "Outdated npm. Version older than v6.7.0 are known to fail on publish." );
             }
             globalInfo.RegisterSolution( solution );
-            return globalInfo;
         }
 
         /// <summary>
@@ -35,10 +37,8 @@ namespace CodeCake
         /// </summary>
         /// <param name="this">This global info.</param>
         /// <returns>This info.</returns>
-        public static StandardGlobalInfo AddNPM( this StandardGlobalInfo @this )
-        {
-            return AddNPM( @this, NPMSolution.ReadFromNPMSolutionFile( @this ) );
-        }
+        public static Task AddNPM( this StandardGlobalInfo @this, IActivityMonitor m )
+            => AddNPM( @this, m, NPMSolution.ReadFromNPMSolutionFile( m, @this ) );
 
         /// <summary>
         /// Gets the NPM solution handled by the single <see cref="Build.NPMArtifactType"/>.
@@ -46,9 +46,7 @@ namespace CodeCake
         /// <param name="this">This global info.</param>
         /// <returns>The NPM solution.</returns>
         public static NPMSolution GetNPMSolution( this StandardGlobalInfo @this )
-        {
-            return @this.Solutions.OfType<NPMSolution>().Single();
-        }
+            => @this.Solutions.OfType<NPMSolution>().Single();
 
     }
 
@@ -73,32 +71,33 @@ namespace CodeCake
         public IEnumerable<AngularWorkspace> AngularWorkspaces => Containers.OfType<AngularWorkspace>();
 
 
-        public void RunNpmCI()
+        public async Task<bool> RunInstall( IActivityMonitor m )
         {
             foreach( var p in SimpleProjects )
             {
-                p.RunNpmCi();
+                if( !await p.RunInstall( m ) ) return false;
             }
 
             foreach( var p in AngularWorkspaces )
             {
-                p.WorkspaceProject.RunNpmCi();
+                if( !await p.WorkspaceProject.RunInstall( m ) ) return false;
             }
+            return true;
         }
 
-        public void Clean()
+        public async Task<bool> Clean( IActivityMonitor m )
         {
-            RunNpmCI();
-
+            if( !await RunInstall( m ) ) return false;
             foreach( var p in SimpleProjects )
             {
-                p.RunClean();
+                if( !await p.RunClean( m ) ) return false;
             }
 
             foreach( var p in AngularWorkspaces )
             {
-                p.WorkspaceProject.RunClean();
+                if( !await p.WorkspaceProject.RunClean( m ) ) return false;
             }
+            return true;
         }
 
 
@@ -111,16 +110,17 @@ namespace CodeCake
         /// False to only emit a warning and return false if the script doesn't exist instead of
         /// throwing an exception.
         /// </param>
-        public void Build()
+        public async Task<bool> Build( IActivityMonitor m )
         {
             foreach( var p in SimpleProjects )
             {
-                p.RunBuild();
+                if( !await p.RunBuild( m ) ) return false;
             }
             foreach( var p in AngularWorkspaces )
             {
-                p.WorkspaceProject.RunBuild();
+                if( !await p.WorkspaceProject.RunBuild( m ) ) return false;
             }
+            return true;
         }
 
         /// <summary>
@@ -132,16 +132,17 @@ namespace CodeCake
         /// False to only emit a warning and return false if the script doesn't exist instead of
         /// throwing an exception.
         /// </param>
-        public void Test()
+        public async Task<bool> Test( IActivityMonitor m )
         {
             foreach( var p in SimpleProjects )
             {
-                p.RunTest();
+                if( !await p.RunTest( m ) ) return false;
             }
             foreach( var p in AngularWorkspaces )
             {
-                p.WorkspaceProject.RunTest();
+                if( !await p.WorkspaceProject.RunTest( m ) ) return false;
             }
+            return true;
         }
 
         /// <summary>
@@ -153,12 +154,14 @@ namespace CodeCake
         /// By default, "scripts" and "devDependencies" are removed from the package.json file.
         /// </param>
         /// <param name="packageJsonPreProcessor">Optional package.json pre processor.</param>
-        public void RunPack( Action<JObject> packageJsonPreProcessor = null )
+        public async Task<bool> RunPack( IActivityMonitor m, Action<JObject>? packageJsonPreProcessor = null )
         {
             foreach( var p in AllPublishedProjects )
             {
-                p.RunPack( packageJsonPreProcessor );
+                bool res = await p.RunPack( m, packageJsonPreProcessor );
+                if( !res ) return false;
             }
+            return true;
         }
 
         /// <summary>
@@ -166,20 +169,20 @@ namespace CodeCake
         /// </summary>
         /// <param name="version">The version of all published packages.</param>
         /// <returns>The solution object.</returns>
-        public static NPMSolution ReadFromNPMSolutionFile( StandardGlobalInfo globalInfo )
+        public static NPMSolution ReadFromNPMSolutionFile( IActivityMonitor m, StandardGlobalInfo globalInfo )
         {
             var document = XDocument.Load( "CodeCakeBuilder/NPMSolution.xml" ).Root;
-            var solution = new NPMSolution(globalInfo);
+            var solution = new NPMSolution( globalInfo );
 
             foreach( var item in document.Elements( "AngularWorkspace" ) )
             {
-                solution.Add( AngularWorkspace.Create( globalInfo,
+                solution.Add( AngularWorkspace.Create( m, globalInfo,
                          solution,
                          (string)item.Attribute( "Path" ) ) );
             }
             foreach( var item in document.Elements( "Project" ) )
             {
-                solution.Add( NPMPublishedProject.Create(
+                solution.Add( NPMPublishedProject.Create( m,
                         globalInfo,
                         solution,
                         (string)item.Attribute( "Path" ),

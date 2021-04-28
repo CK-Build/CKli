@@ -1,5 +1,3 @@
-using Cake.Common.Diagnostics;
-using Cake.Core;
 using CK.Text;
 using CSemVer;
 using Newtonsoft.Json.Linq;
@@ -81,7 +79,7 @@ namespace CodeCake
             NormalizedPath jsonPath,
             bool ckliLocalFeedMode,
             SVersion version,
-            Action<JObject> packageJsonPreProcessor
+            Action<JObject>? packageJsonPreProcessor
         )
         {
             (string content, TempFileTextModification temp) = CreateTempFileTextModification( jsonPath );

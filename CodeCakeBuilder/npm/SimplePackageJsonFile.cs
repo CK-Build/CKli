@@ -1,5 +1,4 @@
-using Cake.Common.Diagnostics;
-using Cake.Core;
+using CK.Core;
 using CK.Text;
 using Newtonsoft.Json.Linq;
 using System;
@@ -13,20 +12,20 @@ namespace CodeCake
     public readonly struct SimplePackageJsonFile
     {
         public readonly NormalizedPath JsonFilePath;
-        public readonly string Name;
-        public readonly string Scope;
-        public readonly string ShortName;
-        public readonly string Version;
+        public readonly string? Name;
+        public readonly string? Scope;
+        public readonly string? ShortName;
+        public readonly string? Version;
         public readonly IReadOnlyList<string> Scripts;
         public readonly bool IsPrivate;
         public readonly bool CKliLocalFeedMode;
 
         SimplePackageJsonFile(
             NormalizedPath jsonFilePath,
-            string name,
-            string scope,
-            string shortName,
-            string version,
+            string? name,
+            string? scope,
+            string? shortName,
+            string? version,
             IReadOnlyList<string> scripts,
             bool isPrivate,
             bool ckliLocalFeedMode )
@@ -42,29 +41,29 @@ namespace CodeCake
         }
 
 
-        public static SimplePackageJsonFile Create( ICakeContext cake, NormalizedPath folderPath )
+        public static SimplePackageJsonFile Create( IActivityMonitor m, NormalizedPath folderPath )
         {
             var jsonFilePath = folderPath.AppendPart( "package.json" );
             JObject json = JObject.Parse( File.ReadAllText( jsonFilePath ) );
-            string name = json.Value<string>( "name" );
+            string? name = json.Value<string>( "name" );
             bool isPrivate = json.Value<bool?>( "private" ) ?? false;
-            string shortName;
-            string scope;
-            Match m;
+            string? shortName;
+            string? scope;
+            Match match;
             if( name != null
-                && (m = Regex.Match( name, "(?<1>@[a-z\\d][\\w-.]+)/(?<2>[a-z\\d][\\w-.]*)", RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture )).Success )
+                && (match = Regex.Match( name, "(?<1>@[a-z\\d][\\w-.]+)/(?<2>[a-z\\d][\\w-.]*)", RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture )).Success )
             {
-                scope = m.Groups[1].Value;
-                shortName = m.Groups[2].Value;
+                scope = match.Groups[1].Value;
+                shortName = match.Groups[2].Value;
             }
             else
             {
                 scope = null;
                 shortName = name;
             }
-            string version = json.Value<string>( "version" );
+            string? version = json.Value<string>( "version" );
             IReadOnlyList<string> scripts;
-            if( json.TryGetValue( "scripts", out JToken scriptsToken ) && scriptsToken.HasValues )
+            if( json.TryGetValue( "scripts", out JToken? scriptsToken ) && scriptsToken.HasValues )
             {
                 scripts = scriptsToken.Children<JProperty>().Select( p => p.Name ).ToArray();
             }
@@ -86,13 +85,13 @@ namespace CodeCake
             if( _dependencyPropNames //this monstrosity return true when a dependency end with a .tgz
                     .Where( p => json.ContainsKey( p ) )
                     .Any( dependencyPropName =>
-                        ((IEnumerable<KeyValuePair<string, JToken>>)(JObject)json[dependencyPropName]) // Blame NewtonSoft.JSON for explicit implementation.
+                        ((IEnumerable<KeyValuePair<string, JToken>>?)(JObject?)json[dependencyPropName]) // Blame NewtonSoft.JSON for explicit implementation.
                             .Select( s => new KeyValuePair<string, string>( s.Key, s.Value.ToString() ) )
                             .Where( p => p.Value.StartsWith( "file:" ) )
                             .Any( p => p.Value.EndsWith( ".tgz" ) ) ) )
             {
                 ckliLocalFeedMode = true;
-                cake.Warning(
+                m.Warn(
                     "***********************************************************\n" +
                     "* A package.json contains a dependency ending in \".tgz\".*\n" +
                     "* This is only supported for builds launched by CKli.     *\n" +

@@ -1,38 +1,43 @@
-using Cake.Common.IO;
-using Cake.Core;
-using Cake.Core.Diagnostics;
 using CK.Core;
+using CodeCakeBuilder.Helpers;
+using System.Threading.Tasks;
 
 namespace CodeCake
 {
-    public partial class Build : CodeCakeHost
+    public partial class Build
     {
-        public Build()
+        readonly CCBOptions? _cCBOptions;
+
+        public StandardGlobalInfo GlobalInfo { get; }
+        public Build( IActivityMonitor m, CCBOptions cCBOptions, string? solutionDirectory )
         {
-            Cake.Log.Verbosity = Verbosity.Diagnostic;
+            GlobalInfo = CreateStandardGlobalInfo( m, solutionDirectory, cCBOptions );
+            _cCBOptions = cCBOptions;
+        }
 
-            StandardGlobalInfo globalInfo = CreateStandardGlobalInfo()
-                                                .AddDotnet()
-                                                .SetCIBuildTag();
-            var m = new ActivityMonitor();
-            globalInfo.TerminateIfShouldStop();
-            globalInfo.GetDotnetSolution().Clean( m );
+        public async Task<bool> RunAsync( IActivityMonitor m )
+        {
+            await GlobalInfo.AddDotnet( m );
+            GlobalInfo.SetCIBuildTag( m );
+            if( GlobalInfo.GetShouldStop( m ) ) return true;
+            if( !await GlobalInfo.GetDotnetSolution().Clean( m ) ) return false;
+            if( !await GlobalInfo.GetDotnetSolution().Build( m ) ) return false;
 
-            globalInfo.GetDotnetSolution().Build( m );
 
-            if( Cake.InteractiveMode() == InteractiveMode.NoInteraction
-            || Cake.ReadInteractiveOption( "RunUnitTests", "Run Unit Tests?", 'Y', 'N' ) == 'Y' )
+            if( GlobalInfo.InteractiveMode == InteractiveMode.NoInteraction
+            || GlobalInfo.ReadInteractiveOption( m, "RunUnitTests", "Run Unit Tests?", 'Y', 'N' ) == 'Y' )
             {
-                globalInfo.GetDotnetSolution().Test( m );
+                await GlobalInfo.GetDotnetSolution().Test( m );
             }
 
-            globalInfo.GetDotnetSolution().Pack();
+            if( !await GlobalInfo.GetDotnetSolution().Pack( m ) ) return false;
 
 
-            if( globalInfo.IsValid )
+            if( GlobalInfo.IsValid )
             {
-                globalInfo.PushArtifacts();
+                if( !await GlobalInfo.PushArtifacts( m ) ) return false;
             }
+            return true;
         }
     }
 }

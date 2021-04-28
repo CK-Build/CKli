@@ -1,5 +1,3 @@
-using Cake.Common.Diagnostics;
-using Cake.Core;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -60,38 +58,5 @@ new CKSetupComponent( "ProjectFolder", "TargetFramework" )
             /// <returns>The bin path.</returns>
             public string GetBinPath( string buildConfiguration ) => $"{ProjectPath}/bin/{buildConfiguration}/{TargetFramework}";
         }
-
-        /// <summary>
-        /// Pushes components to remote store. See <see cref="CKSetupCakeContextExtensions.CKSetupCreateDefaultConfiguration(ICakeContext)"/>.
-        /// </summary>
-        /// <param name="globalInfo">The configured <see cref="CheckRepositoryInfo"/>.</param>
-        /// <param name="components">The set of component to push. When null (the default), <see cref="GetCKSetupComponents"/> is used.</param>
-        void StandardPushCKSetupComponents( StandardGlobalInfo globalInfo, IEnumerable<CKSetupComponent> components = null )
-        {
-            var storeConf = Cake.CKSetupCreateDefaultConfiguration();
-            if( globalInfo.IsLocalCIRelease )
-            {
-                storeConf.TargetStoreUrl = Path.Combine( globalInfo.LocalFeedPath, "CKSetupStore" );
-            }
-            if( !storeConf.IsValid )
-            {
-                Cake.Information( "CKSetupStoreConfiguration is invalid. Skipped push to remote store." );
-                return;
-            }
-
-            Cake.Information( $"Using CKSetupStoreConfiguration: {storeConf}" );
-            if( components == null ) components = GetCKSetupComponents();
-            if( !Cake.CKSetupPublishAndAddComponentFoldersToStore(
-                        storeConf,
-                        components.Select( c => c.GetBinPath( globalInfo.BuildInfo.BuildConfiguration ) ) ) )
-            {
-                Cake.TerminateWithError( "Error while registering components in local temporary store." );
-            }
-            if( !Cake.CKSetupPushLocalToRemoteStore( storeConf ) )
-            {
-                Cake.TerminateWithError( "Error while pushing components to remote store." );
-            }
-        }
-
     }
 }

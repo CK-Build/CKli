@@ -1,6 +1,3 @@
-using Cake.Common.Diagnostics;
-using Cake.Npm;
-using Cake.Npm.RunScript;
 using CK.Text;
 using CSemVer;
 using Newtonsoft.Json.Linq;
@@ -8,6 +5,9 @@ using System;
 using System.Linq;
 using System.Text;
 using SimpleGitVersion;
+using System.Threading.Tasks;
+using CK.Core;
+using Kuinox.TypedCLI.NPM;
 
 namespace CodeCake
 {
@@ -54,21 +54,6 @@ namespace CodeCake
         public NormalizedPath OutputPath { get; }
 
         public NormalizedPath NPMRCPath { get; }
-
-        /// <summary>
-        /// Runs "npm ci" (instead of "npm install") on this project.
-        /// See https://docs.npmjs.com/cli/ci.html.
-        /// </summary>
-        /// <param name="globalInfo">The global information object.</param>
-        public virtual void RunNpmCi()
-        {
-            GlobalInfo.Cake.Information( $"Running 'npm ci' in {DirectoryPath.Path}" );
-            GlobalInfo.Cake.NpmCi( settings =>
-            {
-                settings.LogLevel = NpmLogLevel.Warn;
-                settings.WorkingDirectory = DirectoryPath.Path;
-            } );
-        }
 
         /// <summary>
         /// Gets whether this package has a named script entry.
@@ -118,25 +103,24 @@ namespace CodeCake
         /// By default if no script is found an <see cref="InvalidOperationException"/> is thrown.
         /// </param>
         /// <returns>The best script (or null if it doesn't exist and <paramref name="scriptMustExist"/> is false).</returns>
-        public string FindBestScript( string name, bool scriptMustExist = true )
+        public string? FindBestScript( IActivityMonitor m, string name, bool scriptMustExist = true )
         {
             string n = FindBestScript( name, scriptMustExist ? (bool?)true : null );
             if( n == null )
             {
-                GlobalInfo.Cake.Warning( $"Missing script '{name}' in '{PackageJson.JsonFilePath}'." );
+                m.Warn( $"Missing script '{name}' in '{PackageJson.JsonFilePath}'." );
             }
             return n;
         }
+
+        public virtual Task<bool> RunInstall( IActivityMonitor m ) => Npm.Install( m, workingDirectory: DirectoryPath );
 
         /// <summary>
         /// Run clean script (that must exist, see <see cref="FindBestScript(string, bool)"/>). 
         /// </summary>
         /// <param name="cleanScriptName">Clean script name.</param>
         /// <returns></returns>
-        public virtual void RunClean()
-        {
-            RunScript( "clean", false, true );
-        }
+        public virtual Task<bool> RunClean( IActivityMonitor m ) => RunScript( m, "clean", false, true );
 
         /// <summary>
         /// Runs the 'name-debug', 'name-release' or 'name' script (see <see cref="FindBestScript(string, bool)"/>).
@@ -147,12 +131,11 @@ namespace CodeCake
         /// </param>
         /// <param name="runInBuildDirectory">Whether the script should be run in <see cref="OutputPath"/> or <see cref="DirectoryPath"/> if false.</param>
         /// <returns>False if the script doesn't exist (<paramref name="scriptMustExist"/> is false), otherwise true.</returns>
-        public bool RunScript( string name, bool runInBuildDirectory, bool scriptMustExist )
+        public Task<bool> RunScript( IActivityMonitor m, string name, bool runInBuildDirectory, bool scriptMustExist )
         {
             string n = FindBestScript( name, scriptMustExist );
-            if( n == null ) return false;
-            DoRunScript( n, runInBuildDirectory );
-            return true;
+            if( n == null ) return Task.FromResult( false );
+            return DoRunScript( m, n, runInBuildDirectory );
         }
 
         /// <summary>
@@ -160,17 +143,8 @@ namespace CodeCake
         /// </summary>
         /// <param name="scriptName">The npm script to run.</param>
         /// <param name="runInBuildDirectory">Whether the script should be run in <see cref="OutputPath"/> or <see cref="DirectoryPath"/> if false.</param>
-        private protected virtual void DoRunScript( string scriptName, bool runInBuildDirectory )
-        {
-            GlobalInfo.Cake.NpmRunScript(
-                    new NpmRunScriptSettings()
-                    {
-                        ScriptName = scriptName,
-                        LogLevel = NpmLogLevel.Info,
-                        WorkingDirectory = runInBuildDirectory ? OutputPath.Path : DirectoryPath.Path
-                    }
-                );
-        }
+        private protected virtual Task<bool> DoRunScript( IActivityMonitor m, string scriptName, bool runInBuildDirectory )
+            => Npm.RunScript( m, scriptName, workingDirectory: runInBuildDirectory ? OutputPath.Path : DirectoryPath.Path );
 
         /// <summary>
         /// Runs "build" script: see <see cref="RunScript(string, bool)"/>.
@@ -181,7 +155,7 @@ namespace CodeCake
         /// throwing an exception.
         /// </param>
         /// <returns>False if the script doesn't exist (<paramref name="scriptMustExist"/> is false), otherwise true.</returns>
-        public bool RunBuild( bool scriptMustExist = true ) => RunScript( "build", false, scriptMustExist );
+        public Task<bool> RunBuild( IActivityMonitor m, bool scriptMustExist = true ) => RunScript( m, "build", false, scriptMustExist );
 
         /// <summary>
         /// Runs "test" script: see <see cref="RunScript(string, bool)"/>.
@@ -192,14 +166,16 @@ namespace CodeCake
         /// throwing an exception.
         /// </param>
         /// <returns>False if the script doesn't exist (<paramref name="scriptMustExist"/> is false), otherwise true.</returns>
-        public void RunTest()
+        public async Task<bool> RunTest( IActivityMonitor m )
         {
             var key = DirectoryPath.AppendPart( "test" );
-            if( !GlobalInfo.CheckCommitMemoryKey( key ) )
+            if( !GlobalInfo.CheckCommitMemoryKey( m, key ) )
             {
-                RunScript( "test", false, true );
+                bool result = await RunScript( m, "test", false, true );
                 GlobalInfo.WriteCommitMemoryKey( key );
+                return result;
             }
+            return true;
         }
 
         private protected IDisposable TemporarySetPackageVersion( SVersion version, bool targetOutputPath = false )
@@ -207,7 +183,7 @@ namespace CodeCake
             return TempFileTextModification.TemporaryReplacePackageVersion( !targetOutputPath ? PackageJson.JsonFilePath : OutputPath.AppendPart( "package.json" ), version );
         }
 
-        private protected IDisposable TemporaryPrePack( SVersion version, Action<JObject> packageJsonPreProcessor, bool ckliLocalFeedMode )
+        private protected IDisposable TemporaryPrePack( SVersion version, Action<JObject>? packageJsonPreProcessor, bool ckliLocalFeedMode )
         {
             return TempFileTextModification.TemporaryReplaceDependenciesVersion( NpmSolution, OutputPath.AppendPart( "package.json" ), ckliLocalFeedMode, version, packageJsonPreProcessor );
         }

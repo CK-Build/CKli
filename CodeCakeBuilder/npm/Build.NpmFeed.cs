@@ -1,10 +1,8 @@
-using Cake.Common.Diagnostics;
-using Cake.Common.IO;
-using Cake.Npm;
-using Cake.Npm.Publish;
+using CK.Core;
 using CK.Text;
 using CodeCake.Abstractions;
 using CSemVer;
+using Kuinox.TypedCLI.NPM;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -30,13 +28,17 @@ namespace CodeCake
             /// </summary>
             /// <param name="pushes">The instances to push (that necessary target this feed).</param>
             /// <returns>The awaitable.</returns>
-            public override async Task PushAsync( IEnumerable<ArtifactPush> pushes )
+            public override async Task<bool> PushAsync( IActivityMonitor m, IEnumerable<ArtifactPush> pushes )
             {
-                var tasks = pushes.Select( p => PublishOnePackageAsync( p ) ).ToArray();
-                await System.Threading.Tasks.Task.WhenAll( tasks );
-                await OnAllArtifactsPushed( pushes );
+                bool result = true;
+                foreach( ArtifactPush artifactPush in pushes )
+                {
+                    if( !await PublishOnePackageAsync( m, artifactPush ) ) result = false;
+                }
+                result &= await OnAllArtifactsPushed( m, pushes );
+                return result;
             }
-            protected abstract Task PublishOnePackageAsync( ArtifactPush push );
+            protected abstract Task<bool> PublishOnePackageAsync( IActivityMonitor m, ArtifactPush push );
 
             /// <summary>
             /// Called once all the packages are pushed.
@@ -44,10 +46,7 @@ namespace CodeCake
             /// </summary>
             /// <param name="pushes">The instances to push (that necessary target this feed).</param>
             /// <returns>The awaitable.</returns>
-            protected virtual Task OnAllArtifactsPushed( IEnumerable<ArtifactPush> pushes )
-            {
-                return System.Threading.Tasks.Task.CompletedTask;
-            }
+            protected virtual Task<bool> OnAllArtifactsPushed( IActivityMonitor m, IEnumerable<ArtifactPush> pushes ) => Task.FromResult( true );
         }
 
         class NPMLocalFeed : NPMFeed
@@ -62,7 +61,7 @@ namespace CodeCake
                 _pathToLocalFeed = pathToLocalFeed;
             }
 
-            public override Task<IEnumerable<ArtifactPush>> CreatePushListAsync( IEnumerable<ILocalArtifact> artifacts )
+            public override Task<IEnumerable<ArtifactPush>> CreatePushListAsync( IActivityMonitor m, IEnumerable<ILocalArtifact> artifacts )
             {
                 var result = artifacts.Cast<NPMPublishedProject>()
                                 .Select( a => (A: a, P: _pathToLocalFeed.AppendPart( a.TGZName )) )
@@ -72,14 +71,14 @@ namespace CodeCake
                 return System.Threading.Tasks.Task.FromResult<IEnumerable<ArtifactPush>>( result );
             }
 
-            protected override Task PublishOnePackageAsync( ArtifactPush p )
+            protected override Task<bool> PublishOnePackageAsync( IActivityMonitor m, ArtifactPush p )
             {
                 if( p.Feed != this ) throw new ArgumentException( "ArtifactPush: feed mismatch." );
                 var project = (NPMPublishedProject)p.LocalArtifact;
                 var target = _pathToLocalFeed.AppendPart( project.TGZName );
                 var source = ArtifactType.GlobalInfo.ReleasesFolder.AppendPart( project.TGZName );
-                Cake.CopyFile( source.Path, target.Path );
-                return System.Threading.Tasks.Task.CompletedTask;
+                File.Copy( source.Path, target.Path );
+                return Task.FromResult( true );
             }
         }
 
@@ -98,63 +97,67 @@ namespace CodeCake
 
             public string SecretKeyName { get; }
 
-            public string ResolveAPIKey()
+            public string? ResolveAPIKey( IActivityMonitor m )
             {
-                string output = Cake.InteractiveEnvironmentVariable( SecretKeyName );
+                string? output = GlobalInfo.InteractiveEnvironmentVariable( m, SecretKeyName );
                 if( string.IsNullOrWhiteSpace( output ) )
                 {
-                    Cake.Warning( "Missing environement variable " + SecretKeyName );
+                    m.Warn( "Missing environement variable " + SecretKeyName );
                 }
                 return output;
             }
 
-            protected abstract IDisposable TokenInjector( NPMPublishedProject project );
+            protected abstract IDisposable TokenInjector( IActivityMonitor m, NPMPublishedProject project );
 
-            public override Task<IEnumerable<ArtifactPush>> CreatePushListAsync( IEnumerable<ILocalArtifact> artifacts )
+            public override async Task<IEnumerable<ArtifactPush>> CreatePushListAsync( IActivityMonitor m, IEnumerable<ILocalArtifact> artifacts )
             {
-                var result = artifacts.Cast<NPMPublishedProject>()
-                         .Where( a =>
-                            {
-                                using( TokenInjector( a ) )
-                                {
-                                    string viewString = Cake.NpmView( a.Name, a.DirectoryPath );
-                                    if( string.IsNullOrEmpty( viewString ) ) return true;
-                                    JObject json = JObject.Parse( viewString );
-                                    if( json.TryGetValue( "versions", out JToken versions ) )
-                                    {
-                                        return !((JArray)versions).ToObject<string[]>().Contains( a.ArtifactInstance.Version.ToNormalizedString() );
-                                    }
-                                    return true;
-                                }
-                            } )
-                         .Select( a => new ArtifactPush( a, this ) )
-                         .ToList();
-                return System.Threading.Tasks.Task.FromResult<IEnumerable<ArtifactPush>>( result );
-            }
-
-            protected override Task PublishOnePackageAsync( ArtifactPush p )
-            {
-                var tags = p.Version.PackageQuality.GetLabels().Select( l => l.ToString().ToLowerInvariant() ).ToList();
-                var project = (NPMPublishedProject)p.LocalArtifact;
-                using( TokenInjector( project ) )
+                List<ArtifactPush> result = new();
+                foreach( ILocalArtifact item in artifacts )
                 {
-                    var absTgzPath = Path.GetFullPath( ArtifactType.GlobalInfo.ReleasesFolder.AppendPart( project.TGZName ) );
-                    Cake.NpmPublish(
-                        new NpmPublishSettings()
-                        {
-                            Source = absTgzPath,
-                            WorkingDirectory = project.DirectoryPath.Path,
-                            Tag = tags.First()
-                        } );
-                    foreach( string tag in tags.Skip( 1 ) )
+                    NPMPublishedProject artifact = (NPMPublishedProject)item;
+                    using( TokenInjector( m, artifact ) )
                     {
-                        Cake.Information( $"Setting tag '{tag}' on '{project.Name}' to '{project.ArtifactInstance.Version.ToNormalizedString()}' version." );
-                        // The FromPath is actually required - if executed outside the relevant directory,
-                        // it will miss the .npmrc with registry configs.
-                        Cake.NpmDistTagAdd( project.Name, project.ArtifactInstance.Version.ToNormalizedString(), tag, s => s.FromPath( project.DirectoryPath.Path ) );
+                        string? viewString = await Npm.View( m, thingToView: artifact.Name, workingDirectory: artifact.DirectoryPath, json: true );
+                        if( ShouldUpload( artifact, viewString ) ) result.Add( new ArtifactPush( artifact, this ) );
                     }
                 }
-                return System.Threading.Tasks.Task.CompletedTask;
+
+                bool ShouldUpload( NPMPublishedProject artifact, string? viewString )
+                {
+                    if( string.IsNullOrEmpty( viewString ) ) return true;
+                    JObject json = JObject.Parse( viewString );
+                    if( json.TryGetValue( "versions", out JToken? versions ) )
+                    {
+                        return !((JArray?)versions).ToObject<string[]>().Contains( artifact.ArtifactInstance.Version.ToNormalizedString() );
+                    }
+                    return true;
+                }
+
+                return result;
+            }
+
+            protected override async Task<bool> PublishOnePackageAsync( IActivityMonitor m, ArtifactPush p )
+            {
+                var tags = p.Version.PackageQuality.GetAllQualities().Select( l => l.ToString().ToLowerInvariant() ).ToList();
+                var project = (NPMPublishedProject)p.LocalArtifact;
+                using( TokenInjector( m, project ) )
+                {
+                    var absTgzPath = Path.GetFullPath( ArtifactType.GlobalInfo.ReleasesFolder.AppendPart( project.TGZName ) );
+                    bool result = await Npm.Publish( m,
+                        workingDirectory: project.DirectoryPath,
+                        thingsToPublish: new string[] { absTgzPath },
+                        tag: tags.First() );
+                    if( !result ) return false;
+                    using( m.OpenInfo( $"Settings tags '{tags.Concatenate( ", " )} on '{project.Name}' to '{project.ArtifactInstance.Version.ToNormalizedString()}' version." ) )
+                    {
+                        bool tagSet = await Npm.DistTag.Add( m, project.Name, tags.Skip( 1 ), project.DirectoryPath );
+                        if( !tagSet )
+                        {
+                            m.Warn( "Could not set the package tags !!! Since this is not critical, we keep going." );
+                        }
+                    }
+                }
+                return true;
             }
         }
 
@@ -171,11 +174,11 @@ namespace CodeCake
                 _usePassword = usePassword;
             }
 
-            protected override IDisposable TokenInjector( NPMPublishedProject project )
+            protected override IDisposable TokenInjector( IActivityMonitor m, NPMPublishedProject project )
             {
                 return _usePassword
-                        ? project.TemporarySetPushTargetAndPasswordLogin( FeedUri, ResolveAPIKey() )
-                        : project.TemporarySetPushTargetAndTokenLogin( FeedUri, ResolveAPIKey() );
+                        ? project.TemporarySetPushTargetAndPasswordLogin( FeedUri, ResolveAPIKey( m ) )
+                        : project.TemporarySetPushTargetAndTokenLogin( FeedUri, ResolveAPIKey( m ) );
             }
 
         }
@@ -200,7 +203,7 @@ namespace CodeCake
                                                                    .Replace( ' ', '_' )
                                                      + "_PAT";
 
-            public AzureNPMFeed( NPMArtifactType t, string organization, string feedName, string projectName )
+            public AzureNPMFeed( NPMArtifactType t, string organization, string feedName, string? projectName )
                 : base( t,
                         GetSecretKeyName( organization ),
                         projectName != null ?
@@ -216,13 +219,13 @@ namespace CodeCake
 
             public string FeedName { get; }
 
-            public string ProjectName { get; }
+            public string? ProjectName { get; }
 
             public override string Name => $"AzureNPM:{Organization}/{FeedName}";
 
-            protected override IDisposable TokenInjector( NPMPublishedProject project )
+            protected override IDisposable TokenInjector( IActivityMonitor m, NPMPublishedProject project )
             {
-                return project.TemporarySetPushTargetAndAzurePatLogin( FeedUri, ResolveAPIKey() );
+                return project.TemporarySetPushTargetAndAzurePatLogin( FeedUri, ResolveAPIKey( m ) );
             }
 
             /// <summary>
@@ -231,39 +234,39 @@ namespace CodeCake
             /// <param name="ctx">The Cake context.</param>
             /// <param name="pushes">The set of artifacts to promote.</param>
             /// <returns>The awaitable.</returns>
-            protected override async Task OnAllArtifactsPushed( IEnumerable<ArtifactPush> pushes )
+            protected override async Task<bool> OnAllArtifactsPushed( IActivityMonitor m, IEnumerable<ArtifactPush> pushes )
             {
-                var basicAuth = Convert.ToBase64String( Encoding.ASCII.GetBytes( ":" + Cake.InteractiveEnvironmentVariable( SecretKeyName ) ) );
+                var basicAuth = Convert.ToBase64String( Encoding.ASCII.GetBytes( ":" + GlobalInfo.InteractiveEnvironmentVariable( m, SecretKeyName ) ) );
                 foreach( var p in pushes )
                 {
                     bool isNpm = p.Feed.ArtifactType is NPMArtifactType;
                     string uriProtocol = isNpm ? "npm" : "nuget";
-                    foreach( var view in p.Version.PackageQuality.GetLabels() )
+                    foreach( var view in p.Version.PackageQuality.GetAllQualities() )
                     {
                         var url = ProjectName != null ?
                               $"https://pkgs.dev.azure.com/{Organization}/{ProjectName}/_apis/packaging/feeds/{FeedName}/{uriProtocol}/packagesBatch?api-version=5.0-preview.1"
                             : $"https://pkgs.dev.azure.com/{Organization}/_apis/packaging/feeds/{FeedName}/{uriProtocol}/packagesBatch?api-version=5.0-preview.1";
-                        using( HttpRequestMessage req = new HttpRequestMessage( HttpMethod.Post, url ) )
+                        using( HttpRequestMessage req = new( HttpMethod.Post, url ) )
                         {
                             req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue( "Basic", basicAuth );
                             var body = GetPromotionJSONBody( p.Name, p.Version.ToNormalizedString(), view.ToString(), isNpm );
                             req.Content = new StringContent( body, Encoding.UTF8, "application/json" );
-                            using( var m = await StandardGlobalInfo.SharedHttpClient.SendAsync( req ) )
+                            using( var message = await StandardGlobalInfo.SharedHttpClient.SendAsync( req ) )
                             {
-                                if( m.IsSuccessStatusCode )
+                                if( message.IsSuccessStatusCode )
                                 {
-                                    Cake.Information( $"Package '{p.Name}' promoted to view '@{view}'." );
+                                    m.Info( $"Package '{p.Name}' promoted to view '@{view}'." );
                                 }
                                 else
                                 {
-                                    Cake.Error( $"Package '{p.Name}' promotion to view '@{view}' failed." );
-                                    // Throws!
-                                    m.EnsureSuccessStatusCode();
+                                    m.Error( $"Package '{p.Name}' promotion to view '@{view}' failed." );
+                                    return false;
                                 }
                             }
                         }
                     }
                 }
+                return true;
             }
 
             string GetPromotionJSONBody( string packageName, string packageVersion, string viewId, bool npm )

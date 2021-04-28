@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Text;
+using Microsoft.Extensions.FileSystemGlobbing;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -122,19 +123,21 @@ namespace CK.Env
             File.SetAttributes( directoryPath, FileAttributes.Normal );
         }
 
-        public static void DeleteFiles( IActivityMonitor m, string deletionPattern, string? targetPath = null )
+public static void DeleteFiles( IActivityMonitor m, string deletionPattern, string? targetPath = null )
+{
+    targetPath ??= Directory.GetCurrentDirectory();
+    using( m.OpenTrace( $"Deleting file in directory {targetPath} with pattern {targetPath}." ) )
+    {
+        Matcher matcher = new();
+        matcher.AddInclude( deletionPattern );
+        var files = Directory.EnumerateFiles( Directory.GetCurrentDirectory(), "*", SearchOption.AllDirectories );
+        foreach( var item in matcher.Match( files ).Files )
         {
-            targetPath ??= Directory.GetCurrentDirectory();
-            DirectoryInfo dir = new( targetPath );
-            using( m.OpenTrace( $"Deleting file in directory {targetPath} with pattern {targetPath}." ) )
-            {
-                foreach( FileInfo item in dir.EnumerateFiles( deletionPattern ) )
-                {
-                    m.Trace( $"Deleting {Path.GetRelativePath( deletionPattern, item.FullName )}." );
-                    item.Delete();
-                }
-            }
+            m.Trace( $"Deleting {Path.GetRelativePath( deletionPattern, item.Path )}." );
+            File.Delete( item.Path );
         }
+    }
+}
 
         public static void DeleteDirectories( IActivityMonitor m, IEnumerable<NormalizedPath> paths )
             => DeleteDirectories( m, paths.Select( s => s.Path ) );
