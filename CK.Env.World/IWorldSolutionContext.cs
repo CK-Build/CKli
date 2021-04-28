@@ -43,8 +43,8 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="forceReload">True to force the reload of all the solutions.</param>
-        /// <returns>True on success, false on error.</returns>
-        bool Refresh( IActivityMonitor m, bool forceReload );
+        /// <returns>An updated context or null on error.</returns>
+        IWorldSolutionContext? Refresh( IActivityMonitor m, bool forceReload );
     }
 
 
@@ -54,8 +54,8 @@ namespace CK.Env
         /// Finds the driver that handles a project or returns null if not found.
         /// </summary>
         /// <param name="p">The project for which the dirver must be obtained.</param>
-        /// <returns>The driver of null idf not found.</returns>
-        public static ISolutionDriver FindDriver( this IWorldSolutionContext @this, IProject p )
+        /// <returns>The driver of null if not found.</returns>
+        public static ISolutionDriver? FindDriver( this IWorldSolutionContext @this, IProject p )
         {
             var idx = @this.DependencyContext[p.Solution]?.Index;
             return idx != null ? @this.Drivers[idx.Value] : null;

@@ -14,13 +14,35 @@ namespace CK.Env
     {
         readonly XTypedFactory? _base;
         readonly Dictionary<XName, Type> _typeRegister;
+        readonly HashSet<Assembly> _already;
+        bool _isLocked;
 
         public XTypedFactory( XTypedFactory? baseFactory = null )
         {
             _base = baseFactory;
             _typeRegister = new Dictionary<XName, Type>();
+            _already = new HashSet<Assembly>();
         }
 
+        /// <summary>
+        /// Gets whether this factory does not allow any new registrations.
+        /// It can only be used to create instances based on existing registrations.
+        /// </summary>
+        public bool IsLocked => _isLocked;
+
+        /// <summary>
+        /// Sets <see cref="IsLocked"/> to true.
+        /// </summary>
+        public void SetLocked() => _isLocked = true;
+
+        /// <summary>
+        /// Explicit name to type registration.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="n">The element name.</param>
+        /// <param name="t">The type of the associated object.</param>
+        /// <param name="throwOnConflict">False to ignore name conflicts.</param>
+        /// <returns>True on success, false on name conflict.</returns>
         public bool RegisterName( IActivityMonitor monitor, XName n, Type t, bool throwOnConflict = true )
         {
             if( n == null ) throw new ArgumentNullException( nameof( n ) );
@@ -30,7 +52,7 @@ namespace CK.Env
 
         /// <summary>
         /// Registers a set of <see cref="XTypedObject"/> types that must not be abstract.
-        /// Xml enlement names are produced by the <paramref name="namer"/>.
+        /// Xml element names are produced by the <paramref name="namer"/>.
         /// Default "namer" is <see cref="AutoNamesFromType"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
@@ -54,19 +76,34 @@ namespace CK.Env
             }
         }
 
+        /// <summary>
+        /// Gets whether the assembly has already been registered in this factory
+        /// or a base one.
+        /// </summary>
+        /// <param name="a">The assembly to challenge.</param>
+        /// <returns>True if it has already been registered. False otherwise.</returns>
+        public bool HasAlreadyRegistered( Assembly a ) => _already.Contains( a ) || (_base?.HasAlreadyRegistered( a ) ?? false);
+
         public void AutoRegisterFromLoadedAssemblies( IActivityMonitor monitor )
         {
-            AutoRegisterFromdAssemblies( monitor, AppDomain.CurrentDomain.GetAssemblies() );
+            AutoRegisterFromAssemblies( monitor, AppDomain.CurrentDomain.GetAssemblies() );
         }
 
-        public void AutoRegisterFromdAssemblies( IActivityMonitor monitor, IEnumerable<Assembly> a )
+        public void AutoRegisterFromAssemblies( IActivityMonitor monitor, IEnumerable<Assembly> a )
         {
-            foreach( var one in a ) AutoRegisterFromdAssembly( monitor, one );
+            foreach( var one in a ) AutoRegisterFromAssembly( monitor, one );
         }
 
-        public void AutoRegisterFromdAssembly( IActivityMonitor monitor, Assembly a )
+        /// <summary>
+        /// Registers all public non abstract <see cref="XTypedObject"/> in an assembly.
+        /// </summary>
+        /// <param name="monitor">The monitor.</param>
+        /// <param name="a">The assembly to register.</param>
+        public void AutoRegisterFromAssembly( IActivityMonitor monitor, Assembly a )
         {
-            if( !a.IsDynamic )
+            CheckLocked();
+            // Always add the assembly in the local already processed.
+            if( !a.IsDynamic && _already.Add( a ) && (_base == null || !_base.HasAlreadyRegistered( a )) )
             {
                 var allTypes = a.ExportedTypes
                             .Where( t => !t.IsAbstract && typeof( XTypedObject ).IsAssignableFrom( t ) );
@@ -86,6 +123,7 @@ namespace CK.Env
 
         bool DoRegister( IActivityMonitor monitor, XName n, Type t, bool throwOnConflict )
         {
+            CheckLocked();
             if( _typeRegister.TryGetValue( n, out var exists ) )
             {
                 if( exists != t )
@@ -105,6 +143,11 @@ namespace CK.Env
                 _typeRegister.Add( n, t );
             }
             return true;
+        }
+
+        void CheckLocked()
+        {
+            if( _isLocked ) throw new InvalidOperationException( "Locked XTypedFactory cannot register new types." );
         }
 
         public Type? GetNameMappping( XName n )
@@ -135,7 +178,6 @@ namespace CK.Env
             {
                 if( e == null ) throw new ArgumentNullException( nameof( e ) );
                 if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
-                if( _typeRegister.Count == 0 ) AutoRegisterFromLoadedAssemblies( monitor );
 
                 e.Changing += PreventAnyChangesToXElement;
                 var eReader = new XElementReader( monitor, e, new HashSet<XObject>() );
@@ -184,9 +226,9 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Enacapsulates <see cref="Errors"/> and <see cref="Result"/> of <see cref="PreProcess(IActivityMonitor, XElement)"/>.
+        /// Encapsulates <see cref="Errors"/> and <see cref="Result"/> of <see cref="PreProcess(IActivityMonitor, XElement)"/>.
         /// </summary>
-        public struct PreProcessResult
+        public readonly struct PreProcessResult
         {
             internal PreProcessResult( IReadOnlyList<ActivityMonitorSimpleCollector.Entry>? errors, XElement result )
             {
@@ -232,7 +274,7 @@ namespace CK.Env
 
             /// <summary>
             /// Initializes a <see cref="ReusableWrapper"/> on an element.
-            /// Regions are "transparent": <see cref="Parent"/> goes accross &lt;Region&gt; elements.
+            /// Regions are "transparent": <see cref="Parent"/> goes across &lt;Region&gt; elements.
             /// </summary>
             /// <param name="directParent">The parent element (may be a region).</param>
             /// <param name="e">The element to wrap.</param>

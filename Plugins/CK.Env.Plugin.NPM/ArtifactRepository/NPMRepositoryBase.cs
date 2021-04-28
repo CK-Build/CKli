@@ -138,7 +138,7 @@ namespace CK.Env.NPM
                     }
                     else
                     {
-                        string firstDistTag = file.Instance.Version.PackageQuality.GetLabels()[0].ToString();
+                        string firstDistTag = file.Instance.Version.PackageQuality.ToString();
                         using( FileStream fileStream = File.OpenRead( file.FullPath ) )
                         {
                             if( GetRegistry( m, true ).Publish( m,
@@ -160,7 +160,7 @@ namespace CK.Env.NPM
                 {
                     foreach( var file in pushed.Concat( skipped ) )
                     {
-                        foreach( var label in file.Instance.Version.PackageQuality.GetLabels().Skip( 1 ) )
+                        foreach( var label in file.Instance.Version.PackageQuality.GetAllQualities().Skip( 1 ) )
                         {
                             success &= await GetRegistry( m, true ).AddDistTag( m, file.Instance.Artifact.Name, file.Instance.Version, label.ToString() );
                         }

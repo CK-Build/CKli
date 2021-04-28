@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <IsPackable>true</IsPackable>
+    <!--
+    We use NuGetizer to easily pack the dependencies because there is no easy way.
+    See this issue (opened on 8 Nov 2016) https://github.com/NuGet/Home/issues/3891
+
+    When NoBuild is defined (-double dash-no-build in CI), we set the Nugetizer BuildOnPack to false.
+    -->
+
+    <!--<BuildOnPack Condition=" '$(NoBuild)' == 'true' ">false</BuildOnPack>-->
+    <BuildOnPack Condition=" '$(NoBuild)' == 'true' ">false</BuildOnPack>
+    <BuildProjectReferences Condition=" '$(NoBuild)' == 'true' ">false</BuildProjectReferences>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NuGetizer" Version="0.6.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="..\CKli.XObject\CKli.XObject.csproj" />
+  </ItemGroup>
+
+</Project>

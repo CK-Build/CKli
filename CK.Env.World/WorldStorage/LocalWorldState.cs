@@ -22,7 +22,7 @@ namespace CK.Env
         LogFilter _logFilter;
         LogFilter _monitorLogFilter;
 
-        public LocalWorldState( WorldStore store, IWorldName w, XDocument d = null )
+        public LocalWorldState( WorldStore store, IWorldName w, XDocument? d = null )
             : base( store, w, true, d )
         {
             var r = XDocument.Root;
@@ -153,19 +153,19 @@ namespace CK.Env
         /// </summary>
         /// <param name="type">The build type.</param>
         /// <returns>The build result or null.</returns>
-        public BuildResult GetBuildResult( BuildResultType type )
+        public BuildResult? GetBuildResult( BuildResultType type )
         {
             if( type == BuildResultType.None ) return null;
             if( _buildResults[(int)type - 1] == null )
             {
-                XElement e = GetParentBuildResultElement( type );
+                XElement? e = GetParentBuildResultElement( type );
                 e = e?.Elements().FirstOrDefault();
                 if( e != null ) _buildResults[(int)type - 1] = new BuildResult( e );
             }
             return _buildResults[(int)type - 1];
         }
 
-        XElement GetParentBuildResultElement( BuildResultType type )
+        XElement? GetParentBuildResultElement( BuildResultType type )
         {
             switch( type )
             {

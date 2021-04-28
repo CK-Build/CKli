@@ -1,4 +1,5 @@
 using CK.Core;
+using Cake.Common.Build.AzurePipelines;
 using CK.Text;
 using CodeCake.Abstractions;
 using CodeCakeBuilder.Helpers;

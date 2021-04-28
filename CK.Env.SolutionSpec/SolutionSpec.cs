@@ -45,11 +45,9 @@ namespace CK.Env
 
         /// <summary>
         /// Gets whether the solution uses CKSetup components (defaults to false).
-        /// When true (and when <see cref="SharedSolutionSpec.NoDotNetUnitTests"/> is false), a
-        /// RemoteStore.TestHelper.config file is created during build so that stores in /LocalFeed
-        /// folders are used instead of the default local (%UserProfile%AppData\Local\CKSetupStore) and default
-        /// remote (https://cksetup.invenietis.net).
-        /// Note that <see cref="CKSetupComponentProjects"/> (that describes CKSetup produceds components) is
+        /// When true, a CKSetupStore.txt file is created during build at the root of the solution so that one of the
+        /// store in /LocalFeed folders is used instead of the default local (%UserProfile%AppData\Local\CKSetupStore).
+        /// Note that <see cref="CKSetupComponentProjects"/> (that describes CKSetup produces components) is
         /// independent of this configuration (using CKSetup components is independent of producing them).
         /// </summary>
         public bool UseCKSetup { get; }

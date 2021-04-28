@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <ClassDiagram MajorVersion="1" MinorVersion="1">
   <Class Name="CK.Env.Artifact">
-    <Position X="4" Y="6.75" Width="1.5" />
+    <Position X="3.75" Y="7.5" Width="1.5" />
     <Members>
       <Method Name="Artifact" Hidden="true" />
       <Method Name="Equals" Hidden="true" />
@@ -15,7 +15,7 @@
     <Lollipop Position="0.2" />
   </Class>
   <Class Name="CK.Env.ArtifactInstance">
-    <Position X="1.25" Y="6.5" Width="1.5" />
+    <Position X="1" Y="7.25" Width="2" />
     <Members>
       <Method Name="ArtifactInstance" Hidden="true" />
       <Method Name="Equals" Hidden="true" />
@@ -42,7 +42,7 @@
     <Lollipop Position="0.728" />
   </Class>
   <Struct Name="CK.Env.DependencyModel.GeneratedArtifact">
-    <Position X="6.75" Y="6.5" Width="1.75" />
+    <Position X="6.75" Y="7.25" Width="1.75" />
     <Members>
       <Method Name="GeneratedArtifact" Hidden="true" />
       <Method Name="ToString" Hidden="true" />
@@ -53,18 +53,15 @@
     </TypeIdentifier>
   </Struct>
   <Struct Name="CK.Env.DependencyModel.PackageReference">
-    <Position X="0.75" Y="4.75" Width="1.5" />
+    <Position X="1" Y="5.75" Width="1.5" />
     <Members>
       <Method Name="PackageReference" Hidden="true" />
       <Method Name="ToString" Hidden="true" />
     </Members>
     <TypeIdentifier>
-      <HashCode>AAAAAACAAABAAAAEAAAAACAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <HashCode>AAAAAAAAAAAAAAAEAAAAACAAAAAAAAAEAAAAAAAAAAA=</HashCode>
       <FileName>PackageReference.cs</FileName>
     </TypeIdentifier>
-    <ShowAsAssociation>
-      <Property Name="Owner" />
-    </ShowAsAssociation>
   </Struct>
   <Struct Name="CK.Env.DependencyModel.ProjectReference">
     <Position X="7" Y="4.75" Width="1.5" />
@@ -84,7 +81,7 @@
       </Path>
     </AssociationLine>
     <TypeIdentifier>
-      <HashCode>AAAAAACAAABAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <HashCode>AAAAAACAAABAAAAEAAAAACAAAAAAMQAAAAAAAAAAAAA=</HashCode>
       <FileName>ProjectReference.cs</FileName>
     </TypeIdentifier>
     <ShowAsAssociation>
@@ -93,25 +90,17 @@
     </ShowAsAssociation>
   </Struct>
   <Interface Name="CK.Env.DependencyModel.IProject">
-    <Position X="3.75" Y="3.5" Width="2" />
+    <Position X="3.75" Y="2.75" Width="2" />
     <AssociationLine Name="Solution" Type="CK.Env.DependencyModel.ISolution" FixedToPoint="true">
       <Path>
-        <Point X="3.75" Y="3.814" />
-        <Point X="2.5" Y="3.814" />
+        <Point X="3.75" Y="4.064" />
+        <Point X="2.5" Y="4.064" />
       </Path>
       <MemberNameLabel ManuallyPlaced="true" ManuallySized="true">
         <Position X="0.159" Y="0.088" Height="0.162" Width="0.784" />
       </MemberNameLabel>
     </AssociationLine>
-    <AssociationLine Name="GeneratedArtifacts" Type="CK.Env.DependencyModel.GeneratedArtifact" FixedFromPoint="true" FixedToPoint="true">
-      <Path>
-        <Point X="4.75" Y="6.271" />
-        <Point X="4.75" Y="6.431" />
-        <Point X="5.91" Y="6.431" />
-        <Point X="5.91" Y="6.26" />
-        <Point X="6.969" Y="6.26" />
-        <Point X="6.969" Y="6.5" />
-      </Path>
+    <AssociationLine Name="GeneratedArtifacts" Type="CK.Env.DependencyModel.GeneratedArtifact">
       <MemberNameLabel ManuallyPlaced="true">
         <Position X="-0.211" Y="0.228" />
       </MemberNameLabel>
@@ -123,7 +112,7 @@
       </Path>
     </AssociationLine>
     <TypeIdentifier>
-      <HashCode>CAAAABAAAAAAAAAIAgAAAAQAgAgAAQAAAYAgBBAAAAA=</HashCode>
+      <HashCode>CAAAAJAAAAAAAAAIAgAAAAQAgAgAAQAAAYAgBBAAAAA=</HashCode>
       <FileName>IProject.cs</FileName>
     </TypeIdentifier>
     <ShowAsAssociation>
@@ -131,16 +120,15 @@
     </ShowAsAssociation>
     <ShowAsCollectionAssociation>
       <Property Name="GeneratedArtifacts" />
-      <Property Name="PackageReferences" />
       <Property Name="ProjectReferences" />
     </ShowAsCollectionAssociation>
   </Interface>
   <Interface Name="CK.Env.DependencyModel.ISolution">
-    <Position X="0.5" Y="2.25" Width="2" />
+    <Position X="0.5" Y="2.5" Width="2" />
     <AssociationLine Name="Projects" Type="CK.Env.DependencyModel.IProject" FixedFromPoint="true">
       <Path>
-        <Point X="2.5" Y="4.494" />
-        <Point X="3.75" Y="4.494" />
+        <Point X="2.5" Y="4.744" />
+        <Point X="3.75" Y="4.744" />
       </Path>
       <MemberNameLabel ManuallyPlaced="true">
         <Position X="0.284" Y="-0.176" />
@@ -152,7 +140,7 @@
       </MemberNameLabel>
     </AssociationLine>
     <TypeIdentifier>
-      <HashCode>KAAAABAAEAAACAAAAAAAAAQAAAAAAAAAAAAgAIAAAQA=</HashCode>
+      <HashCode>KAAAABAAEAAACAAAAAAAAAQIAAAAAAAEAAAgAIAAAQA=</HashCode>
       <FileName>ISolution.cs</FileName>
     </TypeIdentifier>
     <ShowAsAssociation>
@@ -165,15 +153,22 @@
   <Interface Name="CK.Env.DependencyModel.ISolutionContext">
     <Position X="6" Y="0.5" Width="2.25" />
     <TypeIdentifier>
-      <HashCode>IAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAA=</HashCode>
+      <HashCode>AAAAAAAAAAAAAAAAAAABAAAABAAAAAAAAAAAAAAAAAA=</HashCode>
       <FileName>ISolutionContext.cs</FileName>
     </TypeIdentifier>
   </Interface>
   <Interface Name="CK.Env.DependencyModel.ITaggedObject">
-    <Position X="1.5" Y="0.5" Width="2.25" />
+    <Position X="1.25" Y="0.5" Width="2.25" />
     <TypeIdentifier>
       <HashCode>AAAAAAAABAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
       <FileName>ITaggedObject.cs</FileName>
+    </TypeIdentifier>
+  </Interface>
+  <Interface Name="CK.Env.DependencyModel.IPackageReferer">
+    <Position X="3.75" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAABAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>IPackageReferer.cs</FileName>
     </TypeIdentifier>
   </Interface>
   <Enum Name="CK.Env.DependencyModel.ProjectDependencyKind">

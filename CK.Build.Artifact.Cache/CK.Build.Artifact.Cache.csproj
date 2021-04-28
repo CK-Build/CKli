@@ -1,14 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <Import Project="..\Common\NotPackaged.props" />
+
   <PropertyGroup>
-    <TargetFramework>netstandard2.1</TargetFramework>
-    <IsPackable>False</IsPackable>
-    <Nullable>enable</Nullable>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="13.3.0" />
     <ProjectReference Include="..\CK.Build.Artifact.Model\CK.Build.Artifact.Model.csproj" />
+    
+    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="14.0.0" />
+    <PackageReference Include="System.Threading.Channels" Version="4.7.1" />
+
   </ItemGroup>
 
 </Project>

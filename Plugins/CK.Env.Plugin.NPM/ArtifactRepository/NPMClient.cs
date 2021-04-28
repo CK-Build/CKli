@@ -36,7 +36,7 @@ namespace CK.Env.NPM
         public IArtifactRepository CreateRepository( in XElementReader r )
         {
             IArtifactRepository result = null;
-            var qualityFilter = new PackageQualityFilter( r.HandleOptionalAttribute<string>( "QualityFilter", null ) );
+            PackageQualityFilter.TryParse( r.HandleOptionalAttribute<string>( "QualityFilter", String.Empty ), out var qualityFilter );
             switch( r.HandleOptionalAttribute<string>( "Type", null ) )
             {
                 case "NPMAzure":
@@ -85,6 +85,11 @@ namespace CK.Env.NPM
             IReadOnlyList<IArtifactFeed> feeds )
         {
             if( r.HandleOptionalAttribute<string>( "Type", null ) != NPMType.Name ) return null;
+            // UsePassword: uses basic authentication: this is done by the Registry constructor with 4 parameters.
+            // 
+            //  string basic = Convert.ToBase64String( Encoding.ASCII.GetBytes( $"{username}:{password}" ) );
+            //  _authHeader = new AuthenticationHeaderValue( "Basic", basic );
+            //
             var usePassword = r.HandleOptionalAttribute( "UsePassword", false );
             var url = r.HandleRequiredAttribute<string>( "Url" );
             var scope = r.HandleRequiredAttribute<string>( "Scope" );
@@ -122,14 +127,13 @@ namespace CK.Env.NPM
                                                     .FirstOrDefault( repo => repo.Url.Equals( url, StringComparison.OrdinalIgnoreCase ) )?.GetRegistry( m, false );
                 if( registry != null ) return registry;
 
+                if( creds == null ) return new Registry( HttpClient, uri );
                 string secret = creds.IsSecretKeyName
-                                ? SecretKeyStore.GetSecretKey( m, creds.PasswordOrSecretKeyName, creds != null )
-                                : creds.PasswordOrSecretKeyName;
-
+                                    ? SecretKeyStore.GetSecretKey( m, creds.PasswordOrSecretKeyName, throwOnUnavailable: true )
+                                    : creds.PasswordOrSecretKeyName;
                 return usePassword
                             ? new Registry( HttpClient, creds.UserName, secret, uri )
                             : new Registry( HttpClient, secret, uri );
-                ;
             } );
         }
     }

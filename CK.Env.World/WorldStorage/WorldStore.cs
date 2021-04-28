@@ -1,32 +1,85 @@
+using CK.Build;
 using CK.Core;
 using CK.Text;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Xml.Linq;
 
 namespace CK.Env
 {
     /// <summary>
-    /// Base implementation of a store for worlds. Local state is handled by
-    /// default at this level (this can be overridden): local state file is stored
+    /// Base implementation of a store for multiple worlds or single world.
+    /// Local state is handled by default at this level (this can be overridden): local state file is stored
     /// at the root of the world.
     /// </summary>
     public abstract class WorldStore
     {
+        protected class SingleWorldMapping : IWorldLocalMapping
+        {
+            internal SingleWorldMapping( IRootedWorldName w )
+            {
+                WorldName = w;
+            }
+
+            public bool CanSetMapping => false;
+
+            public IRootedWorldName WorldName { get; private set; }
+
+            public event EventHandler? MappingChanged;
+
+            public NormalizedPath GetRootPath( IWorldName w ) => w.FullName == WorldName.FullName ? WorldName.Root : default;
+
+            public bool SetMap( IActivityMonitor m, string worldFullName, in NormalizedPath mappedPath )
+            {
+                throw new InvalidOperationException( nameof( CanSetMapping ) );
+            }
+
+            /// <summary>
+            /// Updates the <see cref="WorldName"/> with another object that
+            /// must have the same FullName as the current one.
+            /// This is mostly an optimization: the object may carry more information than
+            /// mere IRootedWorldName.
+            /// </summary>
+            /// <param name="newName">The new object name.</param>
+            public void UpdateSingleName( IRootedWorldName newName )
+            {
+                if( WorldName.FullName != newName.FullName )
+                {
+                    throw new ArgumentOutOfRangeException( nameof( newName ) );
+                }
+                WorldName = newName;
+            }
+        }
+
         /// <summary>
-        /// Initializes a new <see cref="WorldStore"/>.
+        /// Initializes a new <see cref="WorldStore"/> for multiple worlds.
         /// </summary>
         /// <param name="worldLocalMapping">Required path mapper.</param>
-        public WorldStore( IWorldLocalMapping worldLocalMapping )
+        protected WorldStore( IWorldLocalMapping worldLocalMapping )
         {
             WorldLocalMapping = worldLocalMapping ?? throw new ArgumentNullException( nameof( worldLocalMapping ) );
         }
 
         /// <summary>
-        /// Gets the mapper.
+        /// Initializes a new <see cref="WorldStore"/> for a single world.
+        /// </summary>
+        /// <param name="w">The rooted world name.</param>
+        protected WorldStore( IRootedWorldName w )
+        {
+            WorldLocalMapping = SingleWorld = new SingleWorldMapping( w );
+        }
+
+        /// <summary>
+        /// Gets the mapper that is the <see cref="SingleWorld"/> if this is a single world host.
         /// </summary>
         public IWorldLocalMapping WorldLocalMapping { get; }
+
+        /// <summary>
+        /// Gets the single mapping if this is a single world store. Null otherwise.
+        /// </summary>
+        protected SingleWorldMapping? SingleWorld { get; }
 
         /// <summary>
         /// Returns all the available worlds with their potential local path (ordered by <see cref="IWorldName.FullName"/>).
@@ -38,29 +91,34 @@ namespace CK.Env
         /// <summary>
         /// Creates a new world in this store from an existing source or returns null if the world
         /// already exists or if an error prevents it to be created.
+        /// <para>
+        /// This can be called only if this is a multiple world store otherwise an <see cref="InvalidOperationException"/> is thrown.
+        /// </para>
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="source">The soure origin of the world. It must exist in the current worlds. See <see cref="IWorldName"/>.</param>
+        /// <param name="source">The source origin of the world. It must exist in the current worlds. See <see cref="IWorldName"/>.</param>
         /// <param name="parallelName">The parallel world name to create. Must not be null or empty. See <see cref="IWorldName"/>.</param>
         /// <param name="content">The initial content. Must not be null.</param>
         /// <returns>The new world or null on error.</returns>
-        public IRootedWorldName CreateNewParrallel( IActivityMonitor m, IRootedWorldName source, string parallelName, XDocument content )
+        public IRootedWorldName? CreateNewParrallel( IActivityMonitor m, IRootedWorldName source, string parallelName, XDocument content )
         {
             if( source == null ) throw new ArgumentNullException( nameof( source ) );
             if( content == null ) throw new ArgumentNullException( nameof( content ) );
             if( String.IsNullOrWhiteSpace( parallelName ) ) throw new ArgumentNullException( nameof( parallelName ) );
+            if( SingleWorld != null ) throw new InvalidOperationException( nameof( SingleWorld ) );
             return DoCreateNewParallel( m, source, parallelName, content );
         }
 
         /// <summary>
         /// Must create a new world in this store or returns null if the world already exists.
+        /// This is never called in single World mode.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="source">The soure origin of the world. It must exist in the current worlds. See <see cref="IWorldName"/>.</param>
+        /// <param name="source">The source origin of the world. It must exist in the current worlds. See <see cref="IWorldName"/>.</param>
         /// <param name="parallelName">The parallel world name to create. See <see cref="IWorldName"/>.</param>
         /// <param name="content">The initial content.</param>
         /// <returns>The new world or null on error.</returns>
-        protected abstract LocalWorldName DoCreateNewParallel( IActivityMonitor m, IRootedWorldName source, string parallelName, XDocument content );
+        protected abstract IRootedWorldName? DoCreateNewParallel( IActivityMonitor m, IRootedWorldName source, string parallelName, XDocument content );
 
         /// <summary>
         /// Gets the world description of one world.
@@ -89,31 +147,37 @@ namespace CK.Env
 
         /// <summary>
         /// Gets or creates the <see cref="LocalWorldState"/> for a world.
-        /// Default implementation implements xml state file in the root world directory.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="w">The world name. It must exist in this store.</param>
         /// <returns>The existing or new world local state.</returns>
-        public LocalWorldState GetOrCreateLocalState( IActivityMonitor m, IWorldName w )
-        {
-            if( w == null ) throw new ArgumentNullException( nameof( w ) );
-            var d = GetLocalState( m, w );
-            if( d == null ) m.Info( $"Creating new local state for {w.FullName}." );
-            return new LocalWorldState( this, w, d );
-        }
+        public abstract LocalWorldState GetOrCreateLocalState( IActivityMonitor m, IWorldName w );
 
         /// <summary>
-        /// Gets the local state by reading the file <see cref="ToLocalStateFilePath(IWorldName)"/> if it exists.
-        /// Returns null otherwise.
+        /// Saves the local state xml document.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="w">The world name.</param>
-        /// <returns>The Xml document or null.</returns>
-        protected virtual XDocument GetLocalState( IActivityMonitor m, IWorldName w )
-        {
-            var path = ToLocalStateFilePath( w );
-            return File.Exists( path ) ? XDocument.Load( path ) : null;
-        }
+        /// <param name="d">The document state.</param>
+        /// <returns>True on success, false on error.</returns>
+        protected abstract bool SaveLocalState( IActivityMonitor m, IWorldName w, XDocument d );
+
+        /// <summary>
+        /// Must saves the shared state xml document.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="w">The world name.</param>
+        /// <param name="d">The document state.</param>
+        /// <returns>True on success, false on error.</returns>
+        protected abstract bool SaveSharedState( IActivityMonitor m, IWorldName w, XDocument d );
+
+        /// <summary>
+        /// Implementation must return a local folder where any local stuff associated
+        /// to the world may be stored.
+        /// </summary>
+        /// <param name="w">The world name. It must exist in this store.</param>
+        /// <returns>A local path to an existing and writable directory.</returns>
+        public abstract NormalizedPath GetWorkingLocalFolder( IWorldName w );
 
         /// <summary>
         /// Saves an existing world's state.
@@ -139,39 +203,5 @@ namespace CK.Env
             }
         }
 
-        /// <summary>
-        /// Saves the local state xml document in <see cref="ToLocalStateFilePath(IWorldName)"/> file.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="w">The world name.</param>
-        /// <param name="d">The document state.</param>
-        /// <returns>True on success, false on error.</returns>
-        protected virtual bool SaveLocalState( IActivityMonitor m, IWorldName w, XDocument d )
-        {
-            d.Save( ToLocalStateFilePath( w ) );
-            return true;
-        }
-
-
-        /// <summary>
-        /// Must saves the shared state xml document.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="w">The world name.</param>
-        /// <param name="d">The document state.</param>
-        /// <returns>True on success, false on error.</returns>
-        protected abstract bool SaveSharedState( IActivityMonitor m, IWorldName w, XDocument d );
-
-        /// <summary>
-        /// Computes the path of the local state file: it is stored at the root of the world
-        /// path (see <see cref="IWorldLocalMapping.GetRootPath(IWorldName)"/>).
-        /// </summary>
-        /// <param name="w">The world name.</param>
-        /// <returns>The path to use to read/write the local state.</returns>
-        protected virtual NormalizedPath ToLocalStateFilePath( IWorldName w )
-        {
-            var p = w is IRootedWorldName r ? r.Root : WorldLocalMapping.GetRootPath( w );
-            return p.AppendPart( w.FullName + ".World.State.xml" );
-        }
     }
 }

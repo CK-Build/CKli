@@ -241,7 +241,7 @@ namespace System.Xml.Linq
         /// <param name="name">The attribute name.</param>
         /// <param name="defaultValue">Default value to use.</param>
         /// <returns>The attribute.</returns>
-        public T HandleOptionalAttribute<T>( XName name, T defaultValue )
+        public T? HandleOptionalAttribute<T>( XName name, [AllowNull]T defaultValue )
         {
             var a = Element.Attribute( name );
             if( a == null ) return defaultValue;

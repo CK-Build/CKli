@@ -37,7 +37,7 @@ namespace CK.Env
 
             public bool EnsurePlugins( IActivityMonitor m, string branchName ) => DoFindOrCreate( true, branchName, m ) != null;
 
-            PluginCollection<IGitBranchPlugin> DoFindOrCreate( bool ensureFirstLoad, string branchName, IActivityMonitor m = null )
+            PluginCollection<IGitBranchPlugin> DoFindOrCreate( bool ensureFirstLoad, string branchName, IActivityMonitor? m = null )
             {
                 if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
                 if( !_branchPlugins.TryGetValue( branchName, out var c )

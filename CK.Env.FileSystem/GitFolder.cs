@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Xml.Linq;
 
 namespace CK.Env
 {
@@ -110,12 +111,12 @@ namespace CK.Env
         /// <param name="arguments">the raw string of arguments.</param>
         /// <returns>True on success. False on error.</returns>
         [CommandMethod( ParallelMode = ParallelCommandMode.UserChoice )]
-        public bool RunProcess( IActivityMonitor m, string fileName, string arguments )
+        public bool RunProcess( IActivityMonitor m, string fileName, string arguments, int timeoutSeconds = 60 )
         {
             ProcessStartInfo info = ProcessRunner.ConfigureProcessInfo( FullPhysicalPath, fileName, arguments );
             RunCommandEventArgs arg = new RunCommandEventArgs( m, info );
             RunProcessStarting?.Invoke( this, arg );
-            return ProcessRunner.Run( m, arg.StartInfo, arg.StdErrorLevel );
+            return ProcessRunner.Run( m, arg.StartInfo, timeoutSeconds * 1000, arg.StdErrorLevel );
         }
 
         class AdaptedLogger : ILogger
@@ -133,7 +134,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">Defaults to <see cref="CurrentBranchName"/>.</param>
-        /// <returns>The RepositoryInfo or null if it it cannot be obtained.</returns>
+        /// <returns>The RepositoryInfo or null if it cannot be obtained.</returns>
         public ICommitInfo ReadVersionInfo( IActivityMonitor m, string branchName = null )
         {
             if( branchName == null ) branchName = CurrentBranchName;
@@ -341,7 +342,7 @@ namespace CK.Env
                     {
                         if( commitSha == current.Tip.Sha )
                         {
-                            m.Info( $"Current branch '{current}' is alredy on restored state." );
+                            m.Info( $"Current branch '{current}' is already on restored state." );
                             return true;
                         }
                         Git.Reset( ResetMode.Hard, commitSha );
@@ -356,7 +357,7 @@ namespace CK.Env
                     }
                     if( commitSha == b.Tip.Sha )
                     {
-                        m.Info( $"Current branch '{branchName}' is alredy on restored state." );
+                        m.Info( $"Current branch '{branchName}' is already on restored state." );
                         return true;
                     }
                     Commands.Checkout( Git, b );

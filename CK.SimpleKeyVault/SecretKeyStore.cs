@@ -1,6 +1,8 @@
 using CK.Core;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace CK.SimpleKeyVault
@@ -11,6 +13,7 @@ namespace CK.SimpleKeyVault
     public class SecretKeyStore
     {
         readonly Dictionary<string, SecretKeyInfo> _keyInfos;
+        readonly Dictionary<string, string> _undeclaredSecrets;
         readonly List<SecretKeyInfo> _orderedInfos;
 
         /// <summary>
@@ -52,7 +55,18 @@ namespace CK.SimpleKeyVault
         public SecretKeyStore()
         {
             _keyInfos = new Dictionary<string, SecretKeyInfo>();
+            _undeclaredSecrets = new Dictionary<string, string>();
             _orderedInfos = new List<SecretKeyInfo>();
+        }
+
+        /// <summary>
+        /// Copy constructor. Initializes a copy key store.
+        /// </summary>
+        /// <param name="other">The source.</param>
+        public SecretKeyStore( SecretKeyStore other )
+            : this()
+        {
+            other.CreateSnapshot().RestoreTo( this );
         }
 
         /// <summary>
@@ -67,10 +81,11 @@ namespace CK.SimpleKeyVault
         public IReadOnlyList<SecretKeyInfo> Infos => _orderedInfos;
 
         /// <summary>
-        /// Gets a filtered list of <see cref="SecretKeyInfo"/> for which secret is available and
-        /// without useless subordinate keys.
+        /// Gets a filtered list of available named secrets without useless subordinate keys.
         /// </summary>
-        public IEnumerable<SecretKeyInfo> OptimalAvailableInfos => _orderedInfos.Where( i => i.IsSecretAvailable && (i.SuperKey == null || !i.SuperKey.IsSecretAvailable) );
+        public IEnumerable<(string Name, string Secret)> OptimalNamedSecrets => _orderedInfos.Where( i => i.IsSecretAvailable && (i.SuperKey == null || !i.SuperKey.IsSecretAvailable) )
+                                                                                             .Select( i => (i.Name, i.Secret!) )
+                                                                                             .Concat( _undeclaredSecrets.Select( kv => (kv.Key, kv.Value) ) );
 
         /// <summary>
         /// Gets the secret key info or null if it doesn't exist.
@@ -92,6 +107,7 @@ namespace CK.SimpleKeyVault
         {
             _orderedInfos.Clear();
             _keyInfos.Clear();
+            _undeclaredSecrets.Clear();
         }
 
         /// <summary>
@@ -112,6 +128,7 @@ namespace CK.SimpleKeyVault
                 redeclaration = false;
                 _keyInfos.Add( name, info = new SecretKeyInfo( name, descriptionBuilder, isRequired, sourceProviderName ) );
                 _orderedInfos.Add( info );
+                LookupFromUndeclared( info );
             }
             else
             {
@@ -120,6 +137,15 @@ namespace CK.SimpleKeyVault
 
             SecretDeclared?.Invoke( this, new SecretKeyInfoDeclaredArgs( info, redeclaration ) );
             return info;
+        }
+
+        void LookupFromUndeclared( SecretKeyInfo info )
+        {
+            if( _undeclaredSecrets.TryGetValue( info.Name, out var known ) )
+            {
+                info.SetSecret( known );
+                _undeclaredSecrets.Remove( info.Name );
+            }
         }
 
         /// <summary>
@@ -140,6 +166,7 @@ namespace CK.SimpleKeyVault
                 redeclaration = false;
                 _keyInfos.Add( name, info = new SecretKeyInfo( name, descriptionBuilder, subKey, _keyInfos, sourceNameMaxLength ) );
                 _orderedInfos.Insert( 0, info );
+                LookupFromUndeclared( info );
             }
             else
             {
@@ -151,7 +178,7 @@ namespace CK.SimpleKeyVault
         }
 
         /// <summary>
-        /// Sets or clears a secret that must have been declared.
+        /// Sets or clears a secret that may have been declared or not.
         /// Updates it when <paramref name="secret"/> is not null or empty, otherwise clears it.
         /// Returns true if secret has been changed, false otherwise.
         /// </summary>
@@ -165,8 +192,25 @@ namespace CK.SimpleKeyVault
             bool clear = String.IsNullOrEmpty( secret );
             if( !_keyInfos.TryGetValue( name, out var info ) )
             {
-                m.Error( $"Secret '{name}' is not declared." );
-                return false;
+                bool already = _undeclaredSecrets.ContainsKey( name );
+                if( clear )
+                {
+                    if( _undeclaredSecrets.Remove( name ) )
+                    {
+                        m.Info( $"Secret '{name}' has been cleared." );
+                    }
+                    else
+                    {
+                        m.Warn( $"Secret'{name}' not found." );
+                    }
+                }
+                else
+                {
+                    Debug.Assert( secret != null );
+                    _undeclaredSecrets[name] = secret;
+                    m.Warn( $"Secret '{name}' has been {(already ? "updated" : "registered")} but is not declared yet." );
+                }
+                return true;
             }
             if( info.IsSecretAvailable
                 && info.SuperKey != null
@@ -187,7 +231,7 @@ namespace CK.SimpleKeyVault
 
 
         /// <summary>
-        /// Gets whether a secret key has been declared (the returned is not null) and if whether the
+        /// Gets whether a secret key has been declared (the returned is not null) and whether its
         /// secret is available or not.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -228,7 +272,7 @@ namespace CK.SimpleKeyVault
         /// <param name="name">The secret name.</param>
         /// <param name="throwOnUnavailable">True to throw an exception if the secret cannot be obtained.</param>
         /// <returns>The secret or null if it's not available (and <paramref name="throwOnUnavailable"/> is false).</returns>
-        public string? GetSecretKey( IActivityMonitor m, string name, bool throwOnUnavailable )
+        public string? GetSecretKey( IActivityMonitor m, string name, [DoesNotReturnIf(true)]bool throwOnUnavailable )
         {
             if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentException( nameof( name ) );
             if( !_keyInfos.TryGetValue( name, out SecretKeyInfo? keyInfo ) )
@@ -245,7 +289,8 @@ namespace CK.SimpleKeyVault
                     {
                         exceptionInfo += "\nOr better: " + k.ToString();
                         k = k.SuperKey;
-                    } while( k != null );
+                    }
+                    while( k != null );
                 }
                 throw new MissingRequiredSecretException( exceptionInfo );
             }

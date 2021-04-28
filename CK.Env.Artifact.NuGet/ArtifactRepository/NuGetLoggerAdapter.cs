@@ -20,7 +20,23 @@ namespace CK.Env.NuGet
             _lock = new object();
         }
 
+        /// <summary>
+        /// Dangerous reference to the inner monitor.
+        /// Use <see cref="SafeLog"/> method.
+        /// </summary>
         public readonly IActivityMonitor Monitor;
+
+        /// <summary>
+        /// Takes the lock and calls the action.
+        /// </summary>
+        /// <param name="log">The log action.</param>
+        public void SafeLog( Action<IActivityMonitor> log )
+        {
+            lock( _lock )
+            {
+                log( Monitor );
+            }
+        }
 
         public void LogDebug( string data ) { lock( _lock ) LogWithRetries( () => Monitor.Debug( $"NuGet: {data}" ) ); }
         public void LogVerbose( string data ) { lock( _lock ) LogWithRetries( () => Monitor.Info( $"NuGet: {data}" ) ); }

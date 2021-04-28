@@ -16,6 +16,7 @@ namespace CK.Env
 
         /// <summary>
         /// Ensures that a local branch exists.
+        /// If the branch is created, it will point at the same commit as the current <see cref="Head"/>.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">The branch name.</param>
@@ -42,11 +43,11 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">Defaults to <see cref="CurrentBranchName"/>.</param>
-        /// <returns>The RepositoryInfo or null if it it cannot be obtained.</returns>
+        /// <returns>The RepositoryInfo or null if it cannot be obtained.</returns>
         ICommitInfo? ReadVersionInfo( IActivityMonitor m, string? branchName = null );
 
         /// <summary>
-        /// Gets the sha of the given branch tip or null if the branch doesnt' exist.
+        /// Gets the sha of the given branch tip or null if the branch doesn't exist.
         /// </summary>
         /// <param name="m">The monitor ti use.</param>
         /// <param name="branchName">The branch name. Must not be null or empty.</param>
@@ -62,10 +63,10 @@ namespace CK.Env
         /// <summary>
         /// Gets the set of <see cref="DirectoryDiff"/> for a set of folders from the current head.
         /// </summary>
-        /// <param name="m">The minitor to use.</param>
+        /// <param name="m">The monitor to use.</param>
         /// <param name="previousVersionCommitSha">Previous commit.</param>
-        /// <param name="solutionRelativeFolders">Folders for which diffs must be computed.</param>
-        /// <returns>The set of diff or null on error.</returns>
+        /// <param name="solutionRelativeFolders">Folders for which differences must be computed.</param>
+        /// <returns>The set of differences or null on error.</returns>
         IDiffResult GetDiff( IActivityMonitor m, string previousVersionCommitSha, IEnumerable<IDiffRoot> solutionRelativeFolders );
 
         /// <summary>
@@ -83,7 +84,7 @@ namespace CK.Env
         bool Commit( IActivityMonitor m, string commitMessage, CommitBehavior commitBehavior = CommitBehavior.CreateNewCommit );
 
         /// <summary>
-        /// Amends the current commit, optionaly changing its message and/or its date.
+        /// Amends the current commit, optionally changing its message and/or its date.
         /// <see cref="CanAmendCommit"/> must be true otherwise an <see cref="InvalidOperationException"/> is thrown.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -178,11 +179,12 @@ namespace CK.Env
         /// <param name="m">The monitor.</param>
         /// <param name="branchName">The local name of the branch.</param>
         /// <param name="skipFetchBranches">True to not call <see cref="FetchBranches"/>.</param>
+        /// <param name="skipPullMerge">True to not "pull merge" from the remote after having checked out the branch.</param>
         /// <returns>
         /// Success is true on success, false on error (such as merge conflicts) and in case of success,
         /// the result states whether a reload should be required or if nothing changed.
         /// </returns>
-        (bool Success, bool ReloadNeeded) Checkout( IActivityMonitor m, string branchName, bool skipFetchBranches = false );
+        (bool Success, bool ReloadNeeded) Checkout( IActivityMonitor m, string branchName, bool skipFetchBranches = false, bool skipPullMerge = false );
 
         /// <summary>
         /// Pulls current branch by merging changes from remote 'origin' branch into this repository.
@@ -200,7 +202,7 @@ namespace CK.Env
         /// If the repository is not already on the 'master' branch, it must be on 'develop' and on a clean commit.
         /// The 'master' branch is created if needed and checked out.
         /// 'develop' branch is always merged into it.
-        /// If the the merge fails, a manual operation is required.
+        /// If the merge fails, a manual operation is required.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
@@ -218,8 +220,8 @@ namespace CK.Env
         /// Checkouts the <see cref="IWorldName.LocalBranchName"/>, always merging <see cref="IWorldName.DevelopBranchName"/> into it.
         /// If the repository is not on the 'local' branch, it must be on 'develop' (a <see cref="Commit"/> is done to save any
         /// current work if <paramref name="autoCommit"/> is true), the 'local' branch is created if needed and checked out.
-        /// 'develop' branch is always merged into it, privilegiating file modifications from the 'develop' branch.
-        /// If the the merge fails, a manual operation is required.
+        /// 'develop' branch is always merged into it, privileging file modifications from the 'develop' branch.
+        /// If the merge fails, a manual operation is required.
         /// On success, the solution inside should be purely local: there should not be any possible remote interactions (except
         /// possibly importing fully external packages).
         /// </summary>

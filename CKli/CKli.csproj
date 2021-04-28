@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <PackAsTool>True</PackAsTool>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -20,20 +21,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Plugins\CK.Env.Plugin.Appveyor\CK.Env.Plugin.Appveyor.csproj" />
-    <ProjectReference Include="..\Plugins\CK.Env.Plugin.Basics\CK.Env.Plugin.Basics.csproj" />
-    <ProjectReference Include="..\Plugins\CK.Env.Plugin.CKSetup\CK.Env.Plugin.CKSetup.csproj" />
-    <ProjectReference Include="..\Plugins\CK.Env.Plugin.Dotnet\CK.Env.Plugin.Dotnet.csproj" />
-    <ProjectReference Include="..\Plugins\CK.Env.Plugin.GitLab\CK.Env.Plugin.GitLab.csproj" />
-    <ProjectReference Include="..\Plugins\CK.Env.Plugin.NPM\CK.Env.Plugin.NPM.csproj" />
-    <ProjectReference Include="..\Plugins\CK.Env.Plugin.NuGet\CK.Env.Plugin.NuGet.csproj" />
-    <ProjectReference Include="..\Plugins\CK.Env.Plugin.SolutionDriver\CK.Env.Plugin.SolutionDriver.csproj" />
-    <ProjectReference Include="..\CK.Env.SolutionSpec\CK.Env.SolutionSpec.csproj" />
-    <ProjectReference Include="..\CK.Env.World.Host\CK.Env.World.Host.csproj" />
-    <ProjectReference Include="..\Plugins\CK.Env.Plugin.Workstation\CK.Env.Plugin.Workstation.csproj" />
-  </ItemGroup>
-  
-  <ItemGroup>
+    <ProjectReference Include="..\CKli.XObject\CKli.XObject.csproj" />
     <PackageReference Include="ReadLine" Version="2.0.1" />
     <!-- Fix run: cannot find git2-8e0b172.dll-->
     <PackageReference Include="LibGit2Sharp" Version="0.26.2" />

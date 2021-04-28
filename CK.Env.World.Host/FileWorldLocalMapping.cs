@@ -10,12 +10,12 @@ namespace CK.Env
     /// <summary>
     /// Basic implementation based on a text file of the <see cref="IWorldLocalMapping"/>.
     /// </summary>
-    public class SimpleWorldLocalMapping : IWorldLocalMapping
+    public class FileWorldLocalMapping : IWorldLocalMapping
     {
         readonly NormalizedPath _filePath;
         readonly Dictionary<string, NormalizedPath> _map;
 
-        public SimpleWorldLocalMapping( in NormalizedPath filePath )
+        public FileWorldLocalMapping( in NormalizedPath filePath )
         {
             _filePath = filePath;
             _map = new Dictionary<string, NormalizedPath>( StringComparer.OrdinalIgnoreCase );
@@ -27,7 +27,7 @@ namespace CK.Env
                         .Select( p => (p[0].Trim(), p[1].Trim()) )
                         .Where( p => p.Item1.Length > 0 && p.Item2.Length > 0 ) )
                 {
-                    _map[kv.Item1] = kv.Item2;
+                    _map[kv.Item1] = Path.GetFullPath( kv.Item2 );
                 }
             }
         }
@@ -35,12 +35,17 @@ namespace CK.Env
         /// <summary>
         /// Fires when <see cref="SetMap"/> changed a mapping (and has persisted the change).
         /// </summary>
-        public event EventHandler MappingChanged;
+        public event EventHandler? MappingChanged;
+
+        /// <summary>
+        /// Always true. 
+        /// </summary>
+        public bool CanSetMapping => true;
 
         /// <summary>
         /// Gets the root path for a World.
         /// If the <see cref="IWorldName.FullName"/> is defined, the mapped path is taken as-is.
-        /// Otherwise, on a parallel world and if the if the Stack name is mapped (the default world),
+        /// Otherwise, on a parallel world and if the Stack name is mapped (the default world),
         /// we map the parallel world next to the default one.
         /// </summary>
         /// <param name="w">The world name.</param>
@@ -64,8 +69,6 @@ namespace CK.Env
             }
             return p;
         }
-
-        internal bool IsMapped( string worldFullName ) => _map.ContainsKey( worldFullName );
 
         /// <summary>
         /// Creates or updates a mapping between a <see cref="IWorldName.FullName"/> and a local path.
@@ -95,6 +98,28 @@ namespace CK.Env
         void Save()
         {
             File.WriteAllLines( _filePath, _map.OrderBy( k => k.Key ).Select( k => k.Key + " > " + k.Value ) );
+        }
+
+        /// <summary>
+        /// Tries to find a <see cref="IRootedWorldName"/> from its mapped path (any path below).
+        /// </summary>
+        /// <param name="path">The path to challenge.</param>
+        /// <returns>The rooted world name.</returns>
+        public IRootedWorldName? ReverseMap( in NormalizedPath path )
+        {
+            if( path.IsEmptyPath ) throw new ArgumentException( nameof( path.IsEmptyPath ) ); 
+            foreach( var e in _map )
+            {
+                if( path.StartsWith( e.Value, strict: false ) )
+                {
+                    if( !WorldName.TryParse( e.Key, out var n ) )
+                    {
+                        throw new Exception( $"Invalid world name {e.Key} in {_filePath}." );
+                    }
+                    return new RootedWorldName( n.Name, n.ParallelName, e.Value );
+                }
+            }
+            return null;
         }
 
     }

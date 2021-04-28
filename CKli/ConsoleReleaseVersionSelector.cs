@@ -10,7 +10,7 @@ using System.Linq;
 
 namespace CKli
 {
-    public class ReleaseVersionSelector : IReleaseVersionSelector
+    public class ConsoleReleaseVersionSelector : IReleaseVersionSelector
     {
         /// <summary>
         /// This method must choose between possible versions. It may return null to cancel the process.
@@ -77,9 +77,9 @@ namespace CKli
             var worst = min != PackageQuality.None
                             ? projExRefNotRelease.SingleOrDefault( p => p.Key == min )
                             : null;
-            if( worst == null || worst.Key == PackageQuality.Release )
+            if( worst == null || worst.Key == PackageQuality.Stable )
             {
-                Console.WriteLine( "Nothing prevent to choose the Release quality." );
+                Console.WriteLine( "Nothing prevent to choose the Stable quality." );
             }
             else
             {
@@ -102,7 +102,7 @@ namespace CKli
                     CSVersion version = kv.Value[i];
                     var prev = Console.ForegroundColor;
                     Console.ForegroundColor = kv.Key != ReleaseLevel.None
-                        ? version.PackageQuality > (worst?.Key ?? PackageQuality.Release) ? ConsoleColor.Red : ConsoleColor.Green
+                        ? version.PackageQuality > (worst?.Key ?? PackageQuality.Stable) ? ConsoleColor.Red : ConsoleColor.Green
                         : ConsoleColor.White;
                     Console.Write( version.NormalizedText );
                     if( i < kv.Value.Count - 1 ) Console.Write( ", " );

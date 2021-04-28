@@ -18,7 +18,7 @@ namespace CK.Env.Tests.LocalTestHelper
         /// Helper to build an image, save it, then run test against it.
         /// Instantiate an image, then run a build action, then snapshot the image, and then run the test callback on it.
         /// </summary>
-        /// <param name="testCallback">This action is called after the image was snapshoted.</param>
+        /// <param name="testCallback">This action is called after the image was snapshotted.</param>
         /// <param name="refreshCache">Rebuild from scratch the base image, even if the image already exist.</param>
         /// <param name="parentBuilder">The action that build the image that we are based on.</param>
         /// <param name="buildAction">The action that build the new image.</param>
@@ -29,13 +29,13 @@ namespace CK.Env.Tests.LocalTestHelper
             bool refreshCache,
             Func<T, bool, NormalizedPath> parentBuilder,
             Func<TestUniverse, TestUniverse> buildAction,
-            [CallerMemberName] string newImageName = null )
+            [CallerMemberName] string? newImageName = null )
         {
             TestUniverse universe = ImageManager.InstantiateImage( TestHelper.Monitor, parentBuilder, refreshCache );
             try
             {
                 universe = buildAction( universe );
-                var snapshotPath = universe.SnapshotState( newImageName );
+                var snapshotPath = universe.SnapshotState( newImageName! );
                 testCallback?.Invoke( universe );
                 return snapshotPath;
             }
@@ -49,7 +49,7 @@ namespace CK.Env.Tests.LocalTestHelper
         /// Helper to build an image, save it, then run test against it.
         /// Instantiate an image, then run a build action, then snapshot the image, and then run the test callback on it.
         /// </summary>
-        /// <param name="testCallback">This action is called after the image was snapshoted.</param>
+        /// <param name="testCallback">This action is called after the image was snapshotted.</param>
         /// <param name="refreshCache">Rebuild from scratch the base image, even if the image already exist.</param>
         /// <param name="parentBuilder">The action that build that build the image that we are based on.</param>
         /// <param name="buildAction">The action that build the new image.</param>
@@ -61,7 +61,7 @@ namespace CK.Env.Tests.LocalTestHelper
         bool refreshCache,
         Func<T, bool, NormalizedPath> parentBuilder,
         Func<TestUniverse, TestUniverse> buildAction,
-        [CallerMemberName] string newImageName = null ) =>
+        [CallerMemberName] string? newImageName = null ) =>
             ImageBuilderHelper(
                 ( universe ) => testCallback?.Invoke( universe, universe.EnsureWorldOpened( TestHelper.Monitor, worldName ) ),
                 refreshCache,
@@ -73,7 +73,7 @@ namespace CK.Env.Tests.LocalTestHelper
         /// Helper to build an image, save it, then run test against it.
         /// Instantiate an image, then run a build action, then snapshot the image, and then run the test callback on it.
         /// </summary>
-        /// <param name="testCallback">This action is called after the image was snapshoted.</param>
+        /// <param name="testCallback">This action is called after the image was snapshotted.</param>
         /// <param name="refreshCache">Rebuild from scratch the base image, even if the image already exist.</param>
         /// <param name="parentBuilder">The action that builds the image that we are based on.</param>
         /// <param name="buildAction">The action that build the new image.</param>
@@ -85,7 +85,7 @@ namespace CK.Env.Tests.LocalTestHelper
             bool refreshCache,
             Func<T, bool, NormalizedPath> parentBuilder,
             Func<TestUniverse, World, TestUniverse> buildAction,
-            [CallerMemberName] string newImageName = null ) =>
+            [CallerMemberName] string? newImageName = null ) =>
                 ImageBuilderHelper( worldName, testCallback,
                     refreshCache,
                     parentBuilder,
@@ -172,7 +172,8 @@ namespace CK.Env.Tests.LocalTestHelper
                        {
                            var path = universe.GetWorldByName( CKTestBuildStackName ).Repo.Root.AppendPart( "workstation_setup_ran" );
                            universe.AddSetupScriptInStack( TestHelper.Monitor, CKTestBuildStackName, $"Write-Host \"Hello World\";\nNew-Item {path};" );
-                           return universe.RestartCKli( TestHelper.Monitor );
+                           universe.Restart( TestHelper.Monitor );
+                           return universe;
                        } );
     }
 }

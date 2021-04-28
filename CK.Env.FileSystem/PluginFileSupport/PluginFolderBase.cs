@@ -162,15 +162,44 @@ namespace CK.Env.Plugin
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="name">The name of the binary file (without ".bin" suffix).</param>
+        /// <param name="overwrite">True to overwrite the file regardless of its content.</param>
         /// <returns>True on success, false on error.</returns>
-        protected bool SetBinaryResource( IActivityMonitor m, string name )
+        protected bool SetBinaryResource( IActivityMonitor m, string name, bool overwrite = true )
         {
             var fs = GitFolder.FileSystem;
             var target = FolderPath.AppendPart( name );
-            using( var s = _resourceAssembly.GetManifestResourceStream( _resourcePrefix + name + ".bin" ) )
+            var exists = fs.GetFileInfo( target );
+            if( exists.Exists )
             {
-                return fs.CopyTo( m, s, target );
+                if( !overwrite )
+                {
+                    m.Debug( $"File '{target}' exists and is not overwritten." );
+                    return true;
+                }
+                var content = exists.ReadAllBytes();
+                ReadOnlySpan<byte> newContent;
+                using var s = _resourceAssembly.GetManifestResourceStream( _resourcePrefix + name + ".bin" );
+                using var mem = new MemoryStream();
+                s.CopyTo( mem );
+                newContent = mem.GetBuffer().AsSpan().Slice( 0, (int)mem.Position );
+                if( newContent.SequenceEqual( content ) )
+                {
+                    m.Debug( $"File '{target}' is up-to-date." );
+                }
+                else
+                {
+                    mem.Position = 0;
+                    fs.CopyTo( m, mem, target );
+                }
             }
+            else
+            {
+                using( var s = _resourceAssembly.GetManifestResourceStream( _resourcePrefix + name + ".bin" ) )
+                {
+                    fs.CopyTo( m, s, target );
+                }
+            }
+            return true;
         }
 
         void EnsureTextResources()

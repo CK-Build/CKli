@@ -5,6 +5,10 @@ using System.Diagnostics;
 
 namespace CK.Env.Plugin
 {
+    /// <summary>
+    /// This is temporary waiting for the CKSetup v13 to be used everywhere: v13 uses the CKSetupStore.txt redirection file
+    /// for its tests as well as for its normal run.
+    /// </summary>
     public class CKSetupStoreTestHelperConfigFile : TextFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider, IDisposable
     {
         readonly SolutionSpec _solutionSpec;
@@ -119,10 +123,11 @@ namespace CK.Env.Plugin
         {
             if( !_localFeedProvider.EnsureCKSetupStores( m ) ) return false;
             var text = "<configuration><appSettings>" + Environment.NewLine;
-            text += "  -- This forces the Solutions that generate components to use the LocalFeed CKSetupStore" + Environment.NewLine; ;
+            text += "  -- This forces the Solutions that generate components to use the LocalFeed CKSetupStore." + Environment.NewLine;
             text += $@"  <add key=""CKSetup/DefaultStoreUrl"" value=""{storePath}"" />" + Environment.NewLine;
             text += $@"  <add key=""CKSetup/DefaultStorePath"" value=""{storePath}"" />" + Environment.NewLine;
             text += "</appSettings></configuration>";
+            m.Trace( $"Updating '{FilePath}' to:{Environment.NewLine}{text}" );
             return CreateOrUpdate( m, text );
         }
     }

@@ -1,48 +1,36 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<ClassDiagram MajorVersion="1" MinorVersion="1">
-  <Struct Name="CK.Env.Artifact">
-    <Position X="9.25" Y="3" Width="3" />
+<ClassDiagram MajorVersion="1" MinorVersion="1" MembersFormat="FullSignature">
+  <Class Name="CK.Env.ArtifactCenter">
+    <Position X="11" Y="6.5" Width="7.5" />
     <Members>
-      <Method Name="Equals" Hidden="true" />
-      <Method Name="GetHashCode" Hidden="true" />
-      <Method Name="ToString" Hidden="true" />
+      <Field Name="_cachedArtifacts" Hidden="true" />
+      <Field Name="_feeds" Hidden="true" />
+      <Field Name="_repositories" Hidden="true" />
+      <Field Name="_typeHandlers" Hidden="true" />
+      <Method Name="InstanciateFeed" Hidden="true" />
+      <Method Name="InstanciateRepository" Hidden="true" />
     </Members>
+    <Compartments>
+      <Compartment Name="Fields" Collapsed="true" />
+    </Compartments>
     <TypeIdentifier>
-      <HashCode>AAAAQAAAAAAAAAAEgAgAAAQAAAAAAIAAAQAAAAAEAiA=</HashCode>
-      <FileName>Artifact.cs</FileName>
+      <HashCode>ABCAAAAAAAAAAQAIBYAAAAQAAAIBAAAASAAAAAAAAAA=</HashCode>
+      <FileName>ArtifactCenter.cs</FileName>
     </TypeIdentifier>
-    <Lollipop Position="0.2" />
-  </Struct>
-  <Struct Name="CK.Env.ArtifactInstance">
-    <Position X="6.25" Y="3.75" Width="2" />
-    <Members>
-      <Method Name="Equals" Hidden="true" />
-      <Method Name="GetHashCode" Hidden="true" />
-      <Method Name="ToString" Hidden="true" />
-    </Members>
-    <AssociationLine Name="Artifact" Type="CK.Env.Artifact">
-      <MemberNameLabel ManuallyPlaced="true">
-        <Position X="0.173" Y="0.053" />
-      </MemberNameLabel>
-    </AssociationLine>
-    <TypeIdentifier>
-      <HashCode>IAAAAAAAAACAAAAEgAAAAAAAAAAAAIAAAAAAAAAAAiA=</HashCode>
-      <FileName>ArtifactInstance.cs</FileName>
-    </TypeIdentifier>
-    <ShowAsAssociation>
-      <Property Name="Artifact" />
-    </ShowAsAssociation>
-    <Lollipop Position="0.2" />
-  </Struct>
+    <ShowAsCollectionAssociation>
+      <Property Name="Feeds" />
+      <Property Name="Repositories" />
+    </ShowAsCollectionAssociation>
+  </Class>
   <Interface Name="CK.Env.IEnvLocalFeed">
-    <Position X="0.5" Y="1.25" Width="1.5" />
+    <Position X="1" Y="3.25" Width="1.5" />
     <TypeIdentifier>
       <HashCode>AAAAAEAAAAAAAAQAAAAABAAAAAAAAAAAIAAAAAAAAAg=</HashCode>
       <FileName>EnvLocal\IEnvLocalFeed.cs</FileName>
     </TypeIdentifier>
   </Interface>
   <Interface Name="CK.Env.IEnvLocalFeedProvider">
-    <Position X="3" Y="1.75" Width="2.75" />
+    <Position X="3.5" Y="3.75" Width="2.75" />
     <AssociationLine Name="Release" Type="CK.Env.IEnvLocalFeed">
       <MemberNameLabel ManuallyPlaced="true">
         <Position X="0.145" Y="0.039" />
@@ -60,34 +48,35 @@
     </ShowAsAssociation>
   </Interface>
   <Interface Name="CK.Env.IEnvLocalFeedProviderArtifactHandler">
-    <Position X="6.5" Y="0.75" Width="2.75" />
+    <Position X="6.75" Y="3.25" Width="2.75" />
     <TypeIdentifier>
       <HashCode>AAAAAEAAAAAAAAAAAAAABAAAAAAAACAAAAACAAAAAAA=</HashCode>
       <FileName>EnvLocal\IEnvLocalFeedProviderArtifactHandler.cs</FileName>
     </TypeIdentifier>
   </Interface>
   <Interface Name="CK.Env.IArtifactRepository">
-    <Position X="3.5" Y="4" Width="1.75" />
+    <Position X="4.25" Y="5.5" Width="2.75" />
     <TypeIdentifier>
-      <HashCode>AAAAAAIAAAAAAAAAAAgIAAAAAAAAAAAAAAAAAEAAAAA=</HashCode>
+      <HashCode>AAAAAAIAAAAAAkAAAAgIAAAAAAAAAQAAAAAAAAAAAAA=</HashCode>
       <FileName>IArtifactRepository.cs</FileName>
     </TypeIdentifier>
-    <ShowAsAssociation>
-      <Property Name="Info" />
-    </ShowAsAssociation>
   </Interface>
-  <Interface Name="CK.Env.IArtifactRepositoryInfo">
-    <Position X="0.5" Y="4.25" Width="2.25" />
+  <Interface Name="CK.Env.IArtifactFeed">
+    <Position X="0.5" Y="7.5" Width="4" />
     <TypeIdentifier>
-      <HashCode>AAAAAAAAAAAAAkAAAAAAAAAAAAAAAAAQAAAAAAAAAAA=</HashCode>
-      <FileName>IArtifactRepositoryInfo.cs</FileName>
+      <HashCode>AACAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAA=</HashCode>
+      <FileName>IArtifactFeed.cs</FileName>
     </TypeIdentifier>
   </Interface>
-  <Interface Name="CK.Env.IArtifactRepositoryFactory">
-    <Position X="0.5" Y="6" Width="2.25" />
+  <Interface Name="CK.Build.IArtifactFeedIdentity">
+    <Position X="1" Y="5.5" Width="2" />
+    <TypeIdentifier />
+  </Interface>
+  <Interface Name="CK.Env.IArtifactTypeHandler">
+    <Position X="5.25" Y="8.75" Width="5.5" />
     <TypeIdentifier>
-      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAQAAAAAA=</HashCode>
-      <FileName>IArtifactRepositoryFactory.cs</FileName>
+      <HashCode>AAAAAAAAEAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>IArtifactTypeHandler.cs</FileName>
     </TypeIdentifier>
   </Interface>
   <Font Name="Segoe UI" Size="9" />

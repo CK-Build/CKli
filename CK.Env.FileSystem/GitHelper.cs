@@ -127,14 +127,14 @@ namespace CK.Env
         {
             if( Git.RetrieveStatus().IsDirty )
             {
-                m.Error( $"Repository '{SubPath}' has uncommited changes ({CurrentBranchName})." );
+                m.Error( $"Repository '{SubPath}' has uncommitted changes ({CurrentBranchName})." );
                 return false;
             }
             return true;
         }
 
         /// <summary>
-        /// Gets the sha of the given branch tip or null if the branch doesnt' exist.
+        /// Gets the sha of the given branch tip or null if the branch doesn't exist.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">The branch name. Must not be null or empty.</param>
@@ -174,6 +174,7 @@ namespace CK.Env
 
         /// <summary>
         /// Ensures that a local branch exists.
+        /// If the branch is created, it will point at the same commit as the current <see cref="Head"/>.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">The branch name.</param>
@@ -183,7 +184,7 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Ensure that a branch exists.
+        /// Ensure that a branch exists. If the branch is created, it will point at the same commit as the current <see cref="Head"/>.
         /// </summary>
         /// <param name="m">The monitor.</param>
         /// <param name="r">The repository.</param>
@@ -285,11 +286,12 @@ namespace CK.Env
         /// <param name="m">The monitor.</param>
         /// <param name="branchName">The local name of the branch.</param>
         /// <param name="skipFetchBranches">True to not call <see cref="FetchBranches(IActivityMonitor, bool)"/>.</param>
+        /// <param name="skipPullMerge">True to not "pull merge" from the remote after having checked out the branch.</param>
         /// <returns>
         /// Success is true on success, false on error (such as merge conflicts) and in case of success,
         /// the result states whether a reload should be required or if nothing changed.
         /// </returns>
-        public (bool Success, bool ReloadNeeded) Checkout( IActivityMonitor m, string branchName, bool skipFetchBranches = false )
+        public (bool Success, bool ReloadNeeded) Checkout( IActivityMonitor m, string branchName, bool skipFetchBranches = false, bool skipPullMerge = false )
         {
             using( m.OpenInfo( $"Checking out branch '{branchName}' in '{SubPath}'." ) )
             {
@@ -306,17 +308,29 @@ namespace CK.Env
                     else
                     {
                         if( !CheckCleanCommit( m ) ) return (false, false);
+                        var savedCurrent = CurrentBranchName;
                         m.Info( $"Checking out {branchName} (leaving {CurrentBranchName})." );
                         Commands.Checkout( Git, b );
-                        OnNewCurrentBranch( m );
-                        reloadNeeded = true;
+                        try
+                        {
+                            OnNewCurrentBranch( m );
+                            reloadNeeded = true;
+                        }
+                        catch( Exception ex )
+                        {
+                            m.Error( $"Error while calling OnNewCurrentBranch. Restoring '{savedCurrent}' checked out branch.", ex );
+                            Commands.Checkout( Git, Git.Branches[savedCurrent] );
+                            return (false, false);
+                        }
                     }
+                    if( skipPullMerge ) return (true, reloadNeeded);
+
                     (bool Success, bool ReloadNeeded) = DoPull( m, MergeFileFavor.Theirs );
                     return (Success, reloadNeeded || ReloadNeeded);
                 }
                 catch( Exception ex )
                 {
-                    m.Error( ex );
+                    m.Fatal( "Unexpected error. Manual fix should be required.", ex );
                     return (false, true);
                 }
             }
@@ -662,8 +676,7 @@ namespace CK.Env
                                 }
                                 catch( Exception ex )
                                 {
-                                    m.Error( "Git clone failed. Deleting the repository.", ex );
-                                    FileHelper.RawDeleteLocalDirectory( m, workingFolder );
+                                    m.Error( "Git clone failed. Leaving existing directory as-is.", ex );
                                     return null;
                                 }
                             }

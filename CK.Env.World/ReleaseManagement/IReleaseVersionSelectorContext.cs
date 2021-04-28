@@ -17,7 +17,7 @@ namespace CK.Env
         DependentSolution Solution { get; }
 
         /// <summary>
-        /// Gets the <see cref="ReleaseInfo"/> that has already been choosen: <see cref="ReleaseInfo.IsValid"/>
+        /// Gets the <see cref="ReleaseInfo"/> that has already been chosen: <see cref="ReleaseInfo.IsValid"/>
         /// is true only if this information has already been determined by a previous <see cref="ReleaseRoadmap.UpdateRoadmap"/>,
         /// however it may be invalid in the new update context: see <see cref="CanUsePreviouslyResolvedInfo"/>.
         /// </summary>
@@ -46,7 +46,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The set of diff or null on error.</returns>
-        IDiffResult GetProjectsDiff( IActivityMonitor m );
+        IDiffResult? GetProjectsDiff( IActivityMonitor m );
 
         /// <summary>
         /// Gets the list of the packages that must be updated in non published projects (typically in Tests projects).
@@ -63,7 +63,7 @@ namespace CK.Env
         /// <summary>
         /// Gets or sets the release note.
         /// </summary>
-        string ReleaseNote { get; set; }
+        string? ReleaseNote { get; set; }
 
         /// <summary>
         /// Gets the current requirements that results from solution dependencies.

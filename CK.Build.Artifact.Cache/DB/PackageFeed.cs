@@ -106,7 +106,7 @@ namespace CK.Build
         /// <summary>
         /// Gets the artifact type that this feed supports.
         /// </summary>
-        public ArtifactType ArtifactType => _name.Type;
+        public ArtifactType ArtifactType => _name.Type!;
 
         /// <summary>
         /// Gets the list of all the packages that this feed contains.
@@ -144,11 +144,16 @@ namespace CK.Build
             SVersion? ci = null, exp = null, pre = null, lat = null, sta = null;
             foreach( var p in GetInstances( name ) )
             {
-                PackageQualityVersions.Apply( p.Key.Version, ref ci, ref exp, ref pre, ref lat, ref sta );
+                PackageQualityVector.Apply( p.Key.Version, ref ci, ref exp, ref pre, ref lat, ref sta );
             }
-            var versions = new PackageQualityVersions( ci, exp, pre, lat, sta );
+            var versions = new PackageQualityVector( ci, exp, pre, lat, sta );
             return new ArtifactAvailableInstances( this, name, versions );
         }
 
+        /// <summary>
+        /// Overridden to return the <see cref="TypedName"/> and <see cref="Instances"/> count.
+        /// </summary>
+        /// <returns>A readable string.</returns>
+        public override string ToString() => $"{TypedName} ({_instances.Count} packages)";
     }
 }

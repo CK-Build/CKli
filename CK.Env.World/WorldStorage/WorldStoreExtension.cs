@@ -12,7 +12,7 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="state">The state to save.</param>
         /// <param name="a">The state modifier.</param>
-        /// <returns>True on succes, false on error.</returns>
+        /// <returns>True on success, false on error.</returns>
         public static bool SetLocalState( this WorldStore @this, IActivityMonitor m, LocalWorldState state, Action<LocalWorldState> a )
         {
             a( state );

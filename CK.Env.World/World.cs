@@ -15,19 +15,6 @@ using System.Xml.Linq;
 
 namespace CK.Env
 {
-    static class StringBuilderExtension
-    {
-        public static StringBuilder AppendGraphName( this StringBuilder b, string name ) =>
-            b.Append( "\"" )
-                .Append( name )
-                .Append( "\"" );
-
-        public static StringBuilder AppendDependency( this StringBuilder b, string dependent, string dependencies ) =>
-            b.AppendGraphName( dependencies )
-            .Append( " -> " )
-            .AppendGraphName( dependent );
-    }
-
     /// <summary>
     /// Primary World object. Handles the solutions, the solution drivers, the local
     /// and shared states and supports numerous commands.
@@ -42,8 +29,6 @@ namespace CK.Env
         readonly DriversCollection _solutionDrivers;
         readonly HashSet<IGitRepository> _gitRepositories;
         readonly IActivityMonitorFilteredClient _userMonitorClient;
-
-        readonly IBasicApplicationLifetime _appLife;
 
         LocalWorldState _localState;
         SharedWorldState _sharedState;
@@ -69,8 +54,7 @@ namespace CK.Env
             bool isPublicWorld,
             IEnvLocalFeedProvider localFeedProvider,
             SecretKeyStore keyStore,
-            IActivityMonitorFilteredClient userMonitorClient,
-            IBasicApplicationLifetime appLife )
+            IActivityMonitorFilteredClient userMonitorClient )
         {
             _artifacts = artifacts ?? throw new ArgumentNullException( nameof( artifacts ) );
             _store = store ?? throw new ArgumentNullException( nameof( store ) );
@@ -78,7 +62,6 @@ namespace CK.Env
             _localFeedProvider = localFeedProvider ?? throw new ArgumentNullException( nameof( localFeedProvider ) );
             _keyStore = keyStore ?? throw new ArgumentNullException( nameof( keyStore ) );
             IsPublicWorld = isPublicWorld;
-            _appLife = appLife;
             _solutionDrivers = new DriversCollection();
             _gitRepositories = new HashSet<IGitRepository>();
             _userMonitorClient = userMonitorClient;
@@ -162,14 +145,22 @@ namespace CK.Env
         }
 
 
+        static StringBuilder AppendGraphName( StringBuilder b, string name ) => b.Append( '"' ).Append( name ).Append( '"' );
+
+        static StringBuilder AppendDependency( StringBuilder b, string dependent, string dependencies )
+        {
+            AppendGraphName( b, dependencies ).Append( " -> " );
+            return AppendGraphName( b, dependent );
+        }
+
         [CommandMethod]
         public bool DumpWorldGraph( IActivityMonitor m )
         {
             StringBuilder b = new StringBuilder();
             var ctx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
             if( ctx == null ) return false;
-            b.Append( "digraph " )
-                .AppendGraphName( WorldName.Name );
+            b.Append( "digraph " );
+            AppendGraphName( b, WorldName.Name );
             using( new OpenGraph( b ) )
             {
                 foreach( var slnGroupped in ctx.Solutions.GroupBy( p => p.Solution.Rank ) )
@@ -185,20 +176,19 @@ namespace CK.Env
                         foreach( var sln in slnGroupped )
                         {
 
-                            b.AppendGraphName( sln.Solution.Solution.Name )
-                           .AppendLine( ";" );
+                            AppendGraphName( b, sln.Solution.Solution.Name );
+                            b.AppendLine( ";" );
                             foreach( var slnDep in sln.Solution.PublishedRequirements )
                             {
-                                b.AppendDependency( sln.Solution.Solution.Name, slnDep.Solution.Name )
-                                    .AppendLine( ";" );
+                                AppendDependency( b, sln.Solution.Solution.Name, slnDep.Solution.Name );
+                                b.AppendLine( ";" );
                             }
 
                             foreach( var slnBuildDep in sln.Solution.Requirements.Except( sln.Solution.PublishedRequirements ) )
                             {
-                                b.AppendDependency( sln.Solution.Solution.Name, slnBuildDep.Solution.Name )
-                                    .AppendLine( @" [style=""dotted""];" );
+                                AppendDependency( b, sln.Solution.Solution.Name, slnBuildDep.Solution.Name );
+                                b.AppendLine( @" [style=""dotted""];" );
                             }
-
                         }
                     }
                 }
@@ -214,8 +204,8 @@ namespace CK.Env
             StringBuilder b = new StringBuilder();
             var ctx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
             if( ctx == null ) return false;
-            b.Append( "digraph " )
-                .AppendGraphName( WorldName.Name );
+            b.Append( "digraph " );
+            AppendGraphName( b, WorldName.Name );
             using( new OpenGraph( b ) )
             {
                 b.AppendLine( "concentrate=true" )
@@ -230,8 +220,8 @@ namespace CK.Env
                     i++;
                     using( new OpenGraph( b ) )
                     {
-                        b.Append( "label=" )
-                            .AppendGraphName( sln.Solution.Solution.Name )
+                        b.Append( "label=" );
+                        AppendGraphName( b, sln.Solution.Solution.Name )
                             .AppendLine( ";" )
                             .AppendLine( "style=filled;" )
                             .AppendLine( "node [style=filled];" )
@@ -240,12 +230,10 @@ namespace CK.Env
                             .AppendLine( ";" );
                         foreach( var proj in sln.Solution.Solution.Projects.Where( p => p.IsPublished ) )
                         {
-                            b.AppendGraphName( proj.Name )
-                                    .AppendLine( ";" );
+                            AppendGraphName( b, proj.Name ).AppendLine( ";" );
                             foreach( var projDep in proj.ProjectReferences.Where( p => p.Target.IsPublished ) )
                             {
-                                b.AppendDependency( proj.Name, projDep.Target.Name )
-                                    .AppendLine( ";" );
+                                AppendDependency( b, proj.Name, projDep.Target.Name ).AppendLine( ";" );
                             }
                         }
 
@@ -255,8 +243,7 @@ namespace CK.Env
                 foreach( var dep in ctx.DependencyContext.PackageDependencies )
                 {
                     if( !dep.OriginIsPublishedProject ) continue;
-                    b.AppendDependency( dep.RefererOrigin.Name, dep.TargetProject.Name )
-                        .AppendLine( ";" );
+                    AppendDependency( b, dep.RefererOrigin.Name, dep.TargetProject.Name ).AppendLine( ";" );
                 }
             }
             File.WriteAllText( "graph.gv", b.ToString() );
@@ -380,7 +367,7 @@ namespace CK.Env
 
 
         /// <summary>
-        /// Calls <see cref="UpdateGlobalGitStatus"/> and checks the curent Git status.
+        /// Calls <see cref="UpdateGlobalGitStatus"/> and checks the current Git status.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="expected">Expected or rejected (depends on <paramref name="not"/>).</param>
@@ -399,7 +386,7 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Calls <see cref="UpdateGlobalGitStatus"/> and checks the curent Git status.
+        /// Calls <see cref="UpdateGlobalGitStatus"/> and checks the current Git status.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True if the Git status is on 'local' or 'develop' branch.</returns>
@@ -456,7 +443,7 @@ namespace CK.Env
             if( saveOnChange ) _localState.SaveState( m );
         }
 
-        string GetCleanBranchName( IActivityMonitor monitor )
+        string? GetCleanBranchName( IActivityMonitor monitor )
         {
             if( !CheckGlobalGitStatusLocalXorDevelop( monitor ) ) return null;
             bool allClean = true;
@@ -478,13 +465,13 @@ namespace CK.Env
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="reloadSolutions">True to force a reload of the solutions.</param>
         /// <returns>The context or null on error.</returns>
-        IWorldSolutionContext GetWorldSolutionContext( IActivityMonitor monitor, bool reloadSolutions = false )
+        IWorldSolutionContext? GetWorldSolutionContext( IActivityMonitor monitor, bool reloadSolutions = false )
         {
             var branchName = GetCleanBranchName( monitor );
             if( branchName == null ) return null;
             var c = _solutionDrivers.GetContextOnBranch( branchName )
                 ?? throw new Exception( $"No solution context available for branch {branchName}. GitBranchPlugins are not initialized or a ISolutionDriver plugin implementation is missing." );
-            return c.Refresh( monitor, reloadSolutions ) ? c : null;
+            return c.Refresh( monitor, reloadSolutions );
         }
 
         /// <summary>
@@ -546,8 +533,7 @@ namespace CK.Env
             {
                 foreach( var g in _gitRepositories )
                 {
-                    if( !g.SwitchDevelopToLocal( m, autoCommit: true ) ) return;
-                    if( _appLife.StopRequested( m ) )
+                    if( !g.SwitchDevelopToLocal( m, autoCommit: true ) )
                     {
                         UpdateGlobalGitStatus();
                         return;
@@ -559,7 +545,7 @@ namespace CK.Env
                 var depContext = GetWorldSolutionContext( m );
                 if( depContext == null ) return;
 
-                if( ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, _appLife ) == null ) return;
+                if( ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext ) == null ) return;
 
                 if( !error() )
                 {
@@ -652,7 +638,7 @@ namespace CK.Env
         }
 
         [CommandMethod]
-        public void UpgradeDependency( IActivityMonitor m, string packageName, string versionToUpgrade = null )
+        public void UpgradeDependency( IActivityMonitor m, string packageName, string? versionToUpgrade = null )
         {
             var worldCtx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
             if( worldCtx == null ) return;
@@ -668,7 +654,7 @@ namespace CK.Env
                 m.Error( $"No solution contain the package {packageName}." );
                 return;
             }
-            var types = new HashSet<ArtifactType>( artifactUses.Select( p => p.Target.Artifact.Type ) );
+            var types = new HashSet<ArtifactType>( artifactUses.Select( p => p.Target.Artifact.Type! ) );
             if( types.Count > 1 )
             {
                 m.Error( $"Ambiguous package name '{packageName}', use its TypedName to disambiguate: {types.Select( t => t.Name + ':' + packageName ).Concatenate( " or " )}." );
@@ -731,7 +717,7 @@ namespace CK.Env
             {
                 var depContext = GetWorldSolutionContext( m );
                 if( depContext == null ) return;
-                ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, _appLife );
+                ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext );
             } );
         }
 
@@ -754,7 +740,7 @@ namespace CK.Env
                 var ctx = GetWorldSolutionContext( m );
                 if( ctx == null ) return;
 
-                ZeroBuilder zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, ctx, _appLife );
+                ZeroBuilder zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, ctx );
                 if( zBuilder == null ) return;
 
                 ctx = GetWorldSolutionContext( m );
@@ -823,7 +809,7 @@ namespace CK.Env
                 var depContext = GetWorldSolutionContext( m );
                 if( depContext == null ) return;
 
-                var zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, _appLife );
+                var zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext );
                 if( zBuilder == null ) return;
 
                 depContext = GetWorldSolutionContext( m );
@@ -839,7 +825,7 @@ namespace CK.Env
             } );
         }
 
-        ReleaseRoadmap LoadRoadmap( IActivityMonitor monitor )
+        ReleaseRoadmap? LoadRoadmap( IActivityMonitor monitor )
         {
             var depContext = GetWorldSolutionContext( monitor );
             if( depContext == null ) return null;
@@ -869,7 +855,7 @@ namespace CK.Env
             return DoEditRoadmap( monitor, false ) != null;
         }
 
-        ReleaseRoadmap DoEditRoadmap( IActivityMonitor monitor, bool forgetAllExistingRoadmapVersions )
+        ReleaseRoadmap? DoEditRoadmap( IActivityMonitor monitor, bool forgetAllExistingRoadmapVersions )
         {
             var roadmap = LoadRoadmap( monitor );
             if( roadmap == null ) return null;
@@ -899,6 +885,7 @@ namespace CK.Env
                 {
                     // We first Checkout and pulls the Master branch
                     // Ensuring a successful CheckOut of Master is a welcome security.
+                    g.EnsureBranch( m, WorldName.MasterBranchName );
                     if( !g.Checkout( m, WorldName.MasterBranchName ).Success ) return false;
                     // Checking out the Develop branch back.
                     var (Success, ReloadNeeded) = g.Checkout( m, WorldName.DevelopBranchName, skipFetchBranches: true );
@@ -916,7 +903,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="pull">Pull all branches first.</param>
-        /// <param name="resetRoadmap">True to forget the current roadmap (it if exists) and ask for each and every version.</param>
+        /// <param name="resetRoadmap">True to forget the current road-map (it if exists) and ask for each and every version.</param>
         /// <returns>True on success, false on error.</returns>
         [CommandMethod]
         public bool Release( IActivityMonitor monitor, bool pull = true, bool resetRoadmap = false )
@@ -955,13 +942,13 @@ namespace CK.Env
                 var depContext = GetWorldSolutionContext( m );
                 if( depContext == null ) return;
 
-                ZeroBuilder zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext, _appLife );
+                ZeroBuilder? zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, depContext );
                 if( zBuilder == null ) return;
 
                 var roadmap = LoadRoadmap( monitor );
                 if( roadmap == null || !roadmap.IsValid )
                 {
-                    monitor.Error( $"Road map is invalid. Current release should be cancelled." );
+                    monitor.Error( $"Road map is invalid. Current release should be canceled." );
                     return;
                 }
 
@@ -996,7 +983,7 @@ namespace CK.Env
 
         bool DoCancellingRelease( IActivityMonitor monitor )
         {
-            return RunSafe( monitor, $"Cancelling current Release.", ( m, error ) =>
+            return RunSafe( monitor, $"Canceling current Release.", ( m, error ) =>
             {
                 if( !HandleReleaseVersionTags( m, false ) ) return;
                 var snapshot = _localState.GetGitSnapshot();
@@ -1044,7 +1031,7 @@ namespace CK.Env
                 {
                     if( Git == null )
                     {
-                        m.Fatal( $"Unable to find Git repository for {SubPath} from current Roadmap." );
+                        m.Fatal( $"Unable to find Git repository for {SubPath} from current Road-map." );
                         return false;
                     }
                     if( pushVersionTagsAndBranches )
@@ -1053,7 +1040,7 @@ namespace CK.Env
                         {
                             success &= Git.PushVersionTag( m, Info.Version );
                             // Since we have a version: we may be on master.
-                            if( success && Info.Version.PackageQuality == PackageQuality.Release )
+                            if( success && Info.Version.PackageQuality == PackageQuality.Stable )
                             {
                                 success &= Git.Push( m, WorldName.MasterBranchName );
                             }
@@ -1120,7 +1107,7 @@ namespace CK.Env
             return RunSafe( monitor, $"Publishing Release.", ( m, error ) =>
             {
                 var buildResults = _localState.GetBuildResult( BuildResultType.Release );
-                if( buildResults != null && !DoPushArtifacts( m, buildResults ) ) return;
+                if( buildResults == null || !DoPushArtifacts( m, buildResults ) ) return;
                 if( !HandleReleaseVersionTags( m, true ) ) return;
                 _localState.PublishBuildResult( buildResults.Type );
                 if( !error() )
@@ -1153,58 +1140,165 @@ namespace CK.Env
             } );
         }
 
-        public bool CanGenerateParallelWorld => WorldName.ParallelName == null
-                            && WorkStatus == GlobalWorkStatus.Idle
-                            && (CachedGlobalGitStatus == StandardGitStatus.Local
-                            || CachedGlobalGitStatus == StandardGitStatus.Develop);
+        public bool CanCreateLTS => WorldName.ParallelName == null
+                                    && WorkStatus == GlobalWorkStatus.Idle
+                                    && CachedGlobalGitStatus == StandardGitStatus.Develop;
 
         [CommandMethod( confirmationRequired: true )]
-        public bool GenerateParallelWorld( IActivityMonitor m, string parallelName )
+        public bool CreateLTS( IActivityMonitor m, string parallelName )
         {
-            if( !CanGenerateParallelWorld ) throw new InvalidOperationException( nameof( CanGenerateParallelWorld ) );
-            if( String.IsNullOrWhiteSpace( parallelName ) ) throw new ArgumentException( "Must not be nul or white space.", nameof( parallelName ) );
-            m.Info( "Fetching all branches." );
-            foreach( var repo in _gitRepositories )
+            if( !CanCreateLTS ) throw new InvalidOperationException( nameof( CanCreateLTS ) );
+            if( String.IsNullOrWhiteSpace( parallelName ) ) throw new ArgumentException( "Must not be null or white space.", nameof( parallelName ) );
+
+            if( !CheckGlobalGitStatus( m, StandardGitStatus.Develop ) ) return false;
+
+            using( m.OpenInfo( "Checking working folders and pulling remote." ) )
             {
-                if( !repo.FetchBranches( m ) )
+                foreach( var repo in _gitRepositories )
                 {
-                    m.Error( "Could not fetch branches, aborting" );
-                    return false;
-                }
-            }
-            var worldData = _store.ReadWorldDescription( m, WorldName );
-            var worldRoot = worldData.Root;
-            var newWorldName = new WorldName( WorldName.Name, parallelName );
-            Dictionary<IGitRepository, string> branchesToPush = new Dictionary<IGitRepository, string>();
-            using( m.OpenInfo( $"Changing the xml world definition." ) )
-            {
-                worldRoot.Name = $"{newWorldName.Name}-{newWorldName.ParallelName}.World";
-                m.Trace( $"Setting root element name to '{worldRoot.Name}'." );
-                foreach( XElement branch in worldData.Root.Descendants( "Branch" ) )
-                {
-                    var oldBranch = branch.AttributeRequired( "Name" );
-                    string oldBranchName = (string)oldBranch;
-                    var branchName = oldBranchName == WorldName.MasterBranchName ? newWorldName.MasterBranchName : newWorldName.DevelopBranchName;
-                    if( oldBranchName == WorldName.MasterBranchName || oldBranchName == WorldName.DevelopBranchName )
+                    if( !repo.CheckCleanCommit( m ) )
                     {
-                        string url = (string)branch.Parent.AttributeRequired( "Url" );
-                        var repo = _gitRepositories.Single( p => url.Equals( p.OriginUrl.ToString(), StringComparison.OrdinalIgnoreCase ) );
-                        repo.EnsureBranch( m, branchName, true );
-                        m.Trace( $"Branch '{oldBranchName}' renamed to '{branchName}'." );
-                        oldBranch.Value = branchName;
-                        branchesToPush.Add( repo, branchName );
+                        m.Error( "Working folder must be clean. Aborting." );
+                        return false;
+                    }
+                    if( !repo.Checkout( m, repo.CurrentBranchName ).Success )
+                    {
+                        m.Error( "Failed to pull current branch. Aborting." );
+                        return false;
                     }
                 }
             }
-            if( _store.CreateNewParrallel( m, WorldName, parallelName, worldData ) == null ) return false;
-            bool error = false;
-            using( m.OpenInfo( $"Pushing branches." ) )
+
+            var worldData = _store.ReadWorldDescription( m, WorldName );
+            var worldRoot = worldData.Root;
+            var newWorldName = new WorldName( WorldName.Name, parallelName );
+
+            var toProcess = new List<(IGitRepository Repo, SimpleGitVersion.ICommitInfo Current)>();
+
+            worldRoot.Name = $"{newWorldName.Name}-{newWorldName.ParallelName}.World";
+            using( m.OpenInfo( $"Changing the xml world definition: root element name becomes '{worldRoot.Name}'. Changing Branch elements Name from '{WorldName.DevelopBranchName}' to '{newWorldName.DevelopBranchName}' (or '{WorldName.MasterBranchName}' to '{newWorldName.MasterBranchName}')." ) )
             {
-                foreach( var kvp in branchesToPush )
+                foreach( XElement xBranch in worldData.Root.Descendants( "Branch" ) )
                 {
-                    if( !kvp.Key.Push( m, kvp.Value ) )
+                    var oldBranch = xBranch.AttributeRequired( "Name" );
+                    string oldBranchName = (string)oldBranch;
+                    Uri uri = GitRepositoryKey.CheckAndNormalizeRepositoryUrl( new Uri( (string)xBranch.Parent.AttributeRequired( "Url" ) ) );
+
+                    if( oldBranchName == WorldName.MasterBranchName || oldBranchName == WorldName.DevelopBranchName )
                     {
+                        var branchName = oldBranchName == WorldName.MasterBranchName ? newWorldName.MasterBranchName : newWorldName.DevelopBranchName;
+                        var repo = _gitRepositories.Single( p =>  uri == p.OriginUrl );
+                        var commitInfo = repo.ReadVersionInfo( m );
+                        if( commitInfo == null )
+                        {
+                            m.Error( $"Unable to read version on '{repo.SubPath}'. Aborting." );
+                            return false;
+                        }
+                        toProcess.Add( (repo, commitInfo) );
+                        oldBranch.Value = branchName;
+                    }
+                    else
+                    {
+                        m.Error( $"Branch for '{uri}': Name is '{oldBranchName}', it should be '{WorldName.MasterBranchName}' nor '{newWorldName.DevelopBranchName}'. Aborting" );
+                        return false;
+                    }
+                }
+            }
+            bool error = false;
+            using( m.OpenInfo( $"Processing changes (updating Repository.xml in both branches)." ) )
+            {
+                foreach( var p in toProcess )
+                {
+                    try
+                    {
+                        // Creating the parallel world develop branch and checking it out.
+                        p.Repo.EnsureBranch( m, newWorldName.DevelopBranchName, noWarnOnCreate: true );
+                        if( p.Repo.Checkout( m, newWorldName.DevelopBranchName, skipFetchBranches: true, skipPullMerge: true ).Success )
+                        {
+                            int currentMajor = p.Current.FinalBuildInfo.Version.Major;
+                            // On the parallel develop branch, sets the SingleMajor to the current
+                            // one or sets the OnlyPatch to true if it is the 0 major... and commit.
+                            var repoXmlFile = p.Repo.FullPhysicalPath.AppendPart( "RepositoryInfo.xml" );
+                            var repoXmlDoc = XDocument.Load( repoXmlFile );
+                            string commitMessage;
+                            if( currentMajor == 0 )
+                            {
+                                repoXmlDoc.Root.EnsureElement( SimpleGitVersion.SGVSchema.SimpleGitVersion )
+                                                .SetAttributeValue( SimpleGitVersion.SGVSchema.OnlyPatch, true );
+                                commitMessage = $"Creating parallel world '{newWorldName}': Version Major is locked to {currentMajor}.";
+                            }
+                            else
+                            {
+                                repoXmlDoc.Root.EnsureElement( SimpleGitVersion.SGVSchema.SimpleGitVersion )
+                                                .SetAttributeValue( SimpleGitVersion.SGVSchema.SingleMajor, currentMajor );
+                                commitMessage = $"Creating parallel world '{newWorldName}': Only patch versions {currentMajor}.{p.Current.FinalBuildInfo.Version.Minor}.X where X > {p.Current.FinalBuildInfo.Version.Patch} can be produced.";
+                            }
+                            repoXmlDoc.Save( repoXmlFile );
+                            if( !p.Repo.Commit( m, commitMessage ) )
+                            {
+                                error = true;
+                            }
+                            m.Info( $"SingleMajor for {p.Repo.SubPath}: '{commitMessage}'." );
+                        }
+                        else
+                        {
+                            error = true;
+                        }
+                        // Back to the current default world branch (even if error is true).
+                        if( !p.Repo.Checkout( m, WorldName.DevelopBranchName, skipFetchBranches: true, skipPullMerge: true ).Success )
+                        {
+                            // This is bad...
+                            error = true;
+                        }
+                        else
+                        {
+                            // On the current develop branch (the default world), sets the StartingVersion to the (Major+1).0.0-alpha 
+                            // or, if the Major is 0 to the 0.(Minor+1).0-alpha.
+                            int currentMajor = p.Current.FinalBuildInfo.Version.Major;
+                            var starting = currentMajor > 0 ? $"{currentMajor + 1}.0.0-alpha" : $"{currentMajor}.{p.Current.FinalBuildInfo.Version.Minor + 1}.0-alpha";
+                            var repoXmlFile = p.Repo.FullPhysicalPath.AppendPart( "RepositoryInfo.xml" );
+                            var repoXmlDoc = XDocument.Load( repoXmlFile );
+                            repoXmlDoc.Root.EnsureElement( SimpleGitVersion.SGVSchema.SimpleGitVersion )
+                                            .SetAttributeValue( SimpleGitVersion.SGVSchema.StartingVersion, starting );
+                            repoXmlDoc.Save( repoXmlFile );
+                            if( !p.Repo.Commit( m, $"Creating parallel world '{newWorldName}': minimal version in this branch is now '{starting}'." ) )
+                            {
+                                error = true;
+                            }
+                            m.Info( $"StartingVersion for {p.Repo.SubPath} '{WorldName.DevelopBranchName}' is now '{starting}'." );
+                        }
+                    }
+                    catch( Exception ex )
+                    {
+                        m.Error( "Unexpected error.", ex );
                         error = true;
+                    }
+                    if( error ) break;
+                }
+            }
+            if( !error )
+            {
+                error = _store.CreateNewParrallel( m, WorldName, parallelName, worldData ) == null;
+            }
+            if( error )
+            {
+                using( m.OpenInfo( "An error occurred. Attempting to restore the repositories." ) )
+                {
+                    foreach( var p in toProcess )
+                    {
+                        p.Repo.ResetBranchState( m, newWorldName.DevelopBranchName, string.Empty );
+                        p.Repo.ResetBranchState( m, WorldName.DevelopBranchName, p.Current.FinalBuildInfo.CommitSha );
+                    }
+                }
+            }
+            else
+            {
+                using( m.OpenInfo( $"Parallel world created. Pushing '{newWorldName.DevelopBranchName}' and '{WorldName.DevelopBranchName}' branches to remote." ) )
+                {
+                    foreach( var p in toProcess )
+                    {
+                        p.Repo.Push( m, newWorldName.DevelopBranchName );
+                        p.Repo.Push( m, WorldName.DevelopBranchName );
                     }
                 }
             }

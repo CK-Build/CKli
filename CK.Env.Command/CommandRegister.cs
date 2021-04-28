@@ -36,7 +36,7 @@ namespace CK.Env
         /// <summary>
         /// Unregisters a command.
         /// </summary>
-        /// <param name="uniqueName">The commande name.</param>
+        /// <param name="uniqueName">The command name.</param>
         public void Unregister( NormalizedPath uniqueName )
         {
             _commands.Remove( uniqueName );
@@ -171,7 +171,7 @@ namespace CK.Env
                 {
                     throw new Exception( $"Method {enabled} must not have any parameter and return a boolean." );
                 }
-                return () => (bool)enabled.Invoke( instance, Array.Empty<object>() );
+                return () => (bool)enabled.Invoke( instance, Array.Empty<object>() )!;
             }
             return null;
         }

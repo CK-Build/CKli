@@ -16,7 +16,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the parallel name. Normalized to null for the default world.
         /// </summary>
-        string ParallelName { get; }
+        string? ParallelName { get; }
 
         /// <summary>
         /// Gets the develop branch name.

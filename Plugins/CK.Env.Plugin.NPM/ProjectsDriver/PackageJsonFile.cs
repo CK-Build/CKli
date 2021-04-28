@@ -130,7 +130,7 @@ namespace CK.Env.Plugin
         {
             return ProcessRunner.Run(
                 m, FileSystem.GetFileInfo( FilePath.RemoveLastPart() ).PhysicalPath, "cmd.exe",
-                "/C npm install " + string.Join( ' ', packages.Select( p => p.RawDep ).ToArray() ) );
+                "/C npm install " + string.Join( ' ', packages.Select( p => p.RawDep ).ToArray() ), 10 * 60 * 1000 );
         }
 
         /// <summary>

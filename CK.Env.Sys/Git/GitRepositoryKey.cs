@@ -54,7 +54,7 @@ namespace CK.Env
         /// <summary>
         /// Normalizes a valid, absolute, url. If the path ends with ".git" (case insensitive), this suffix is removed.
         /// </summary>
-        /// <param name="url">The valid, absolut, url.</param>
+        /// <param name="url">The valid, absolute, url.</param>
         /// <returns>The normalized url.</returns>
         public static Uri CheckAndNormalizeRepositoryUrl( Uri url )
         {

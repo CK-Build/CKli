@@ -142,7 +142,7 @@ namespace CK.Env.NPM
         /// <param name="tarball">This stream must be Seek-able. <see cref="Stream"/> of the tarball of the package to push.</param>
         /// <param name="distTag"></param>
         /// <returns></returns>
-        public bool Publish( IActivityMonitor m, NormalizedPath tarballPath, bool isPublic, string scope = null, string distTag = null )
+        public bool Publish( IActivityMonitor m, NormalizedPath tarballPath, bool isPublic, string? scope = null, string? distTag = null )
         {
             if( RegistryUri.IsFile )
             {
@@ -207,7 +207,7 @@ namespace CK.Env.NPM
                     string tarPath = Path.GetFullPath( tarballPath );
                     string distTagArg = distTag != null ? $"--tag {distTag.ToLowerInvariant()}" : "";
                     string access = isPublic ? "public" : "private";
-                    return ProcessRunner.Run( m, tempDirectory, "cmd.exe", $"/C npm publish \"{tarPath}\" --access {access} {distTagArg}", LogLevel.Info );
+                    return ProcessRunner.Run( m, tempDirectory, "cmd.exe", $"/C npm publish \"{tarPath}\" --access {access} {distTagArg}", 2000, LogLevel.Info );
                 }
                 catch( Exception ex )
                 {

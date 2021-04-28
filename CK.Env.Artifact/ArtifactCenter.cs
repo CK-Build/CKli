@@ -4,6 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
+using CK.Text;
+using System.IO;
+using System.Threading.Tasks;
 
 namespace CK.Env
 {
@@ -16,15 +19,17 @@ namespace CK.Env
         readonly List<IArtifactTypeHandler> _typeHandlers;
         readonly List<IArtifactFeed> _feeds;
         readonly List<IArtifactRepository> _repositories;
+        readonly NormalizedPath _packageCacheFilePath;
 
+        LivePackageCache? _packageCache;
         readonly Dictionary<Artifact, IReadOnlyCollection<ArtifactAvailableInstances>> _cachedArtifacts;
 
-        public ArtifactCenter()
+        public ArtifactCenter( NormalizedPath localWorldFolder )
         {
             _typeHandlers = new List<IArtifactTypeHandler>();
             _feeds = new List<IArtifactFeed>();
             _repositories = new List<IArtifactRepository>();
-
+            _packageCacheFilePath = localWorldFolder.AppendPart( "PackageCache.bin" );
             _cachedArtifacts = new Dictionary<Artifact, IReadOnlyCollection<ArtifactAvailableInstances>>();
         }
 
@@ -157,11 +162,37 @@ namespace CK.Env
             return r;
         }
 
+        LivePackageCache EnsurePackageCache( IActivityMonitor m )
+        {
+            if( _packageCache == null )
+            {
+                var c = new PackageCache();
+                if( File.Exists( _packageCacheFilePath ) )
+                {
+                    using var input = File.OpenRead( _packageCacheFilePath );
+                    if( c.Read( m, new CKBinaryReader( input ) ) )
+                    {
+                        m.Info( $"Package cache read from file '{_packageCacheFilePath}' with {c.DB.Instances.Count} packages in {c.DB.Feeds.Count} feeds." );
+                    }
+                    else
+                    {
+                        m.Warn( $"Unable to read package cache from file '{_packageCacheFilePath}'. Reset it." );
+                    }
+                }
+                else
+                {
+                    m.Info( $"Initializing a new package cache (file '{_packageCacheFilePath}')." );
+                }
+                _packageCache = new LivePackageCache( c, _feeds.OfType<IPackageFeed>() );
+            }
+            return _packageCache;
+        }
+
         /// <summary>
         /// Returns a collection of <see cref="ArtifactAvailableInstances"/> for an <see cref="Artifact"/> accross all feeds.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="artifact">The artifact top lookup.</param>
+        /// <param name="artifact">The artifact to lookup.</param>
         /// <returns>The collection of available instances accross all feeds.</returns>
         public IReadOnlyCollection<ArtifactAvailableInstances> GetExternalVersions( IActivityMonitor m, Artifact artifact )
         {
@@ -169,14 +200,34 @@ namespace CK.Env
             {
                 // Don't use parallel resolution here because of the monitor (and parallel here is quite useless).
                 var result = new List<ArtifactAvailableInstances>();
+                var cache = EnsurePackageCache( m );
+                var db = cache.Cache.DB;
                 foreach( var f in _feeds.Where( f => f.ArtifactType == artifact.Type ) )
                 {
-                    var available = f.GetVersionsAsync( m, artifact.Name ).GetAwaiter().GetResult();
+                    ArtifactAvailableInstances available = GetVersionsAsync( m, artifact, cache, f ).GetAwaiter().GetResult();
                     result.Add( available );
                 }
                 _cachedArtifacts.Add( artifact, instances = result );
+                if( db != cache.Cache.DB )
+                {
+                    m.Info( $"Saving Package database: {cache.Cache.DB}." );
+                    using( var output = File.OpenWrite( _packageCacheFilePath ) )
+                    {
+                        cache.Cache.Write( new CKBinaryWriter( output ) );
+                    }
+                }
             }
             return instances;
+        }
+
+        static async Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, Artifact artifact, LivePackageCache cache, IArtifactFeed f )
+        {
+            var available = await f.GetVersionsAsync( m, artifact.Name );
+            foreach( var a in available )
+            {
+                await cache.EnsureAsync( m, a );
+            }
+            return available;
         }
     }
 }

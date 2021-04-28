@@ -15,7 +15,7 @@ namespace CK.Env
         BuildResult(
             BuildResultType type,
             IReadOnlyList<(ArtifactInstance Artifact, string SolutionName, string TargetName)> g,
-            IReadOnlyList<ReleaseNoteInfo> releaseNotes )
+            IReadOnlyList<ReleaseNoteInfo>? releaseNotes )
         {
             Debug.Assert( type != BuildResultType.None );
             Type = type;
@@ -24,18 +24,18 @@ namespace CK.Env
             CreationDate = DateTime.UtcNow;
         }
 
-        internal static BuildResult Create(
+        internal static BuildResult? Create(
             IActivityMonitor m,
             BuildResultType type,
             ArtifactCenter artifacts,
             IWorldSolutionContext ctx,
-            IReadOnlyList<SVersion> versions,
-            IReadOnlyList<ReleaseNoteInfo> releaseNotes )
+            IReadOnlyList<SVersion?> versions,
+            IReadOnlyList<ReleaseNoteInfo>? releaseNotes )
         {
             var result = new List<(ArtifactInstance Artifact, string SolutionName, string TargetName)>();
             foreach( var row in ctx.DependentSolutions
                                    .Where( s => versions[s.Index] != null )
-                                   .SelectMany( s => s.Solution.GeneratedArtifacts.Select( a => (a: a.Artifact.WithVersion( versions[s.Index] ), s) ) ) )
+                                   .SelectMany( s => s.Solution.GeneratedArtifacts.Select( a => (a: a.Artifact.WithVersion( versions[s.Index]! ), s) ) ) )
             {
                 IArtifactRepository[] handlers = row.s.Solution.ArtifactTargets
                                                      .Where( r => r.Accepts( row.a ) )
@@ -94,7 +94,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the release notes infos if this is a release build. Null otherwise.
         /// </summary>
-        public IReadOnlyList<ReleaseNoteInfo> ReleaseNotes { get; }
+        public IReadOnlyList<ReleaseNoteInfo>? ReleaseNotes { get; }
 
         /// <summary>
         /// Gets the creation time (UTC).

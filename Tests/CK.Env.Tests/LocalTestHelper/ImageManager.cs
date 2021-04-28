@@ -34,14 +34,15 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <returns></returns>
         public static TestUniverse InstantiateImage( IActivityMonitor m, NormalizedPath imagePath )
         {
-            NormalizedPath workFolder = Path.Combine( Path.GetTempPath(), "CKliTestWorkFolder" );
             if( !File.Exists( imagePath ) ) throw new FileNotFoundException( nameof( imagePath ) );
-            m.Info( $"Creating temp directory {workFolder} and dezipping '{imagePath}' into." );
+
+            NormalizedPath workFolder = Path.Combine( Path.GetTempPath(), "CKliTest" );
+            m.Info( $"Deleting '{workFolder}' content.'" );
             if( Directory.Exists( workFolder ) )
             {
-                m.Info( $"Deleting '{workFolder} content.'" );
                 FileHelper.RawDeleteLocalDirectory( TestHelper.Monitor, workFolder );
             }
+            m.Info( $"Creating temp directory '{workFolder}' and unzipping '{imagePath}' into." );
             Directory.CreateDirectory( workFolder );
             ZipFile.ExtractToDirectory( imagePath, workFolder );
             return TestUniverse.Create( m, workFolder );

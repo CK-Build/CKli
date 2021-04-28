@@ -12,29 +12,56 @@ using System.Xml.Linq;
 namespace CK.Env
 {
     /// <summary>
-    /// Implements a World store based on Git repositories: the <see cref="Worlds"/>
+    /// Implements a multiple or single World store based on Git repositories: the <see cref="StackRepositories"/>
+    /// are the repositories that contain the <see cref="WorldInfo"/>.
     /// </summary>
     public sealed partial class GitWorldStore : WorldStore, ICommandMethodsProvider, IDisposable
     {
-        readonly NormalizedPath _rootPath;
+        readonly NormalizedPath _rootStorePath;
         readonly List<StackRepo> _stackRepos;
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="rootStorePath">The root path where the stores repositories and local states are hosted.</param>
+        /// <param name="mapping">The world mapping.</param>
+        /// <param name="keyStore">The key store to use.</param>
+        /// <param name="commandRegister">Optional command register.</param>
         public GitWorldStore(
-            NormalizedPath userHostPath,
-            SimpleWorldLocalMapping mapping,
+            NormalizedPath rootStorePath,
+            IWorldLocalMapping mapping,
             SecretKeyStore keyStore,
-            CommandRegister commandRegister )
+            CommandRegister? commandRegister )
             : base( mapping )
         {
-            _rootPath = userHostPath;
+            _rootStorePath = rootStorePath;
             SecretKeyStore = keyStore;
-            StacksFilePath = userHostPath.AppendPart( "Stacks.xml" );
+            StacksFilePath = rootStorePath.AppendPart( "Stacks.xml" );
             _stackRepos = new List<StackRepo>();
             mapping.MappingChanged += Mapping_MappingChanged;
-            commandRegister.Register( this );
+            commandRegister?.Register( this );
         }
 
-        void Mapping_MappingChanged( object sender, EventArgs e )
+        /// <summary>
+        /// Initializes a new single world store.
+        /// A <see cref="WorldStore.SingleWorldMapping"/> mapping is created.
+        /// </summary>
+        /// <param name="rootStorePath">The root path where the stores repositories and local states are hosted.</param>
+        /// <param name="singleWorld">The single world to host.</param>
+        /// <param name="worldRootPath">The world root folder (where the solutions are checked out).</param>
+        /// <param name="keyStore">The key store to use.</param>
+        public GitWorldStore( NormalizedPath rootStorePath,
+                              IRootedWorldName singleWorld,
+                              SecretKeyStore keyStore )
+            : base( singleWorld )
+        {
+            _rootStorePath = rootStorePath;
+            SecretKeyStore = keyStore;
+            StacksFilePath = rootStorePath.AppendPart( "Stacks.xml" );
+            _stackRepos = new List<StackRepo>();
+        }
+
+        void Mapping_MappingChanged( object? sender, EventArgs e )
         {
             foreach( var r in _stackRepos )
             {
@@ -48,12 +75,9 @@ namespace CK.Env
         /// <summary>
         /// Gets the root path of the store: it contains the <see cref="StackRepo"/>'s git working folder.
         /// </summary>
-        public NormalizedPath RootPath => _rootPath;
+        public NormalizedPath RootPath => _rootStorePath;
 
-
-        NormalizedPath ICommandMethodsProvider.CommandProviderName => UserHost.WorldCommandPath;
-
-        new SimpleWorldLocalMapping WorldLocalMapping => (SimpleWorldLocalMapping)base.WorldLocalMapping;
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => MultipleWorldHome.WorldCommandPath;
 
         SecretKeyStore SecretKeyStore { get; }
 
@@ -62,20 +86,25 @@ namespace CK.Env
         /// <summary>
         /// Gets the stacks repositories.
         /// </summary>
-        public IReadOnlyCollection<StackRepo> StackRepositories => _stackRepos;
-
+        public IReadOnlyList<StackRepo> StackRepositories => _stackRepos;
 
         /// <summary>
-        /// Reads the Stacks.xml file and instanciates the <see cref="StackRepo"/> objects and
-        /// their <see cref="WorldInfo"/>: creating the StackRepo registers the required secrets
+        /// Reads the Stacks.xml file and instantiates the <see cref="StackRepo"/> objects and
+        /// their <see cref="WorldInfo"/>: creating the StackRepo declares the required secrets
         /// in the key store.
+        /// <para>
+        /// In multiple words mode, when there is no stack or if an error prevented the file to be read,
+        /// the CK and CK-Build public stacks are automatically created.
+        /// </para>
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        internal void ReadStacksFromLocalStacksFilePath( IActivityMonitor m )
+        /// <returns>Always true in multiple worlds mode. False is the single world failed to be read.</returns>
+        internal bool ReadStacksFromLocalStacksFilePath( IActivityMonitor m )
         {
             if( !File.Exists( StacksFilePath ) )
             {
                 m.Warn( $"File '{StacksFilePath}' not found." );
+                if( SingleWorld != null ) return false;
             }
             else
             {
@@ -83,36 +112,65 @@ namespace CK.Env
                 {
                     try
                     {
+                        IEnumerable<StackRepo> all;
+                        var root = XDocument.Load( StacksFilePath ).Root;
+                        LocalWorldName? localName = null;
+                        if( SingleWorld == null )
+                        {
+                            all = root.Elements().Select( e => StackRepo.Parse( this, e ) );
+                        }
+                        else
+                        {
+                            var wE = root.Elements().Elements( "Worlds" ).Elements().FirstOrDefault( e => (string?)e.Attribute( "FullName" ) == SingleWorld.WorldName.FullName );
+                            if( wE == null )
+                            {
+                                m.Error( $"Unable to find WorldfInfo element with FullName attribute '{SingleWorld.WorldName.FullName}'." );
+                                return false;
+                            }
+                            var r = StackRepo.Parse( this, wE.Parent.Parent, wE );
+                            localName = r.Worlds[0].WorldName;
+                            all = new[] { r };
+                        }
                         _stackRepos.Clear();
-                        _stackRepos.AddRange( XDocument.Load( StacksFilePath ).Root.Elements().Select( e => StackRepo.Parse( this, e ) ) );
+                        _stackRepos.AddRange( all );
+                        if( localName != null )
+                        {
+                            Debug.Assert( SingleWorld != null );
+                            SingleWorld.UpdateSingleName( localName );
+                            return true;
+                        }
                     }
                     catch( Exception ex )
                     {
                         m.Error( $"Unable to read '{StacksFilePath}' file.", ex );
+                        if( SingleWorld != null ) return false;
                     }
                 }
             }
             if( _stackRepos.Count == 0 )
             {
-                using( m.OpenInfo( "Since there is no Stack defined, we initialize CK and CK-Build mapped to '/Dev/CK' by default." ) )
+                using( m.OpenInfo( "Since there is no Stack defined, we initialize CK and CK-Build mapped to '/Dev/' by default." ) )
                 {
                     m.Info( $"Use 'run World/{nameof( SetWorldMapping )}' command to change this default mapping if you want." );
                     _stackRepos.Add( new StackRepo( this, new Uri( "https://github.com/signature-opensource/CK-Stack" ), true ) );
                     _stackRepos.Add( new StackRepo( this, new Uri( "https://github.com/CK-Build/CK-Build-Stack" ), true ) );
-                    WorldLocalMapping.SetMap( m, "CK-Build", "/Dev/CK" );
+                    WorldLocalMapping.SetMap( m, "CK-Build", "/Dev/CK-Build" );
                     WorldLocalMapping.SetMap( m, "CK", "/Dev/CK" );
                     WriteStacksToLocalStacksFilePath( m );
                 }
             }
+            return true;
         }
 
         /// <summary>
         /// Updates the "Stacks.xml" file.
+        /// Called on each change of the <see cref="StackRepositories"/>.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
         bool WriteStacksToLocalStacksFilePath( IActivityMonitor m )
         {
+            Debug.Assert( SingleWorld == null );
             using( m.OpenDebug( $"Saving {StacksFilePath}." ) )
             {
                 try
@@ -135,33 +193,46 @@ namespace CK.Env
         public bool DisableRepositoryAndStacksCommands { get; set; }
 
         /// <summary>
+        /// Whether this is a multiple worlds store and <see cref="DisableRepositoryAndStacksCommands"/> is false.
+        /// </summary>
+        public bool CanEnsureStackRepository => SingleWorld == null && !DisableRepositoryAndStacksCommands;
+
+        /// <summary>
         /// Registers a new <see cref="StackRepo"/> or updates its <see cref="GitRepositoryKey.IsPublic"/> configuration.
-        /// This is exposed as a command by <see cref="UserHost.EnsureStackRepository"/> in order for Stack repository manipulations
+        /// This is exposed as a command by <see cref="MultipleWorldHome.EnsureStackRepository"/> in order for Stack repository manipulations
         /// (that are NOT world: it's meta) to appear in "Home/" command namespace instead of "World/".
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="url">The repository url. Must not be numm or empty.</param>
+        /// <param name="url">The repository URL. Must not be null or empty.</param>
         /// <param name="isPublic">Whether this repository contains public (Open Source) worlds.</param>
         public void EnsureStackRepository( IActivityMonitor m, string url, bool isPublic )
         {
-            if( DisableRepositoryAndStacksCommands ) throw new InvalidOperationException( nameof( DisableRepositoryAndStacksCommands ) );
-            if( String.IsNullOrWhiteSpace( url ) || !Uri.TryCreate( url, UriKind.Absolute, out var uri ) ) throw new ArgumentException( $"Must be a valid, absolute, url: {url}", nameof( url ) );
+            if( !CanEnsureStackRepository ) throw new InvalidOperationException( nameof( CanEnsureStackRepository ) );
+            if( String.IsNullOrWhiteSpace( url ) || !Uri.TryCreate( url, UriKind.Absolute, out var uri ) ) throw new ArgumentException( $"Must be a valid, absolute, URL: {url}", nameof( url ) );
             uri = ProtoGitFolder.CheckAndNormalizeRepositoryUrl( uri );
             int idx = _stackRepos.IndexOf( r => r.OriginUrl.Equals( uri ) );
             if( idx < 0 )
             {
                 var r = new StackRepo( this, uri, isPublic );
-                if( r.Refresh( m ) && r.Worlds.Count > 0 )
+                if( r.RefreshMultiple( m, true ) && r.Worlds.Count > 0 )
                 {
-                    _stackRepos.Add( r );
-                    WriteStacksToLocalStacksFilePath( m );
+                    idx = _stackRepos.IndexOf( r => r.OriginUrl.Equals( uri ) );
+                    if( idx < 0 )
+                    {
+                        _stackRepos.Add( r );
+                        WriteStacksToLocalStacksFilePath( m );
+                    }
+                    else
+                    {
+                        m.Warn( $"Stack repository '{url}' has already been defined by someone else." );
+                    }
                 }
                 else
                 {
                     m.Warn( $"EnsureStackRepository( '{url}', {isPublic} ): no stack added." );
                 }
             }
-            else
+            if( idx >= 0 )
             {
                 var r = _stackRepos[idx];
                 if( r.IsPublic != isPublic )
@@ -174,17 +245,22 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Whether this is a multiple worlds store and <see cref="DisableRepositoryAndStacksCommands"/> is false.
+        /// </summary>
+        public bool CanDeleteStackRepository => SingleWorld == null && !DisableRepositoryAndStacksCommands;
+
+        /// <summary>
         /// Removes a stack repository.
         /// A warning is emitted if the repository is not registered.
-        /// This is exposed as a command by <see cref="UserHost.EnsureStackRepository"/> in order for Stack repository manipulations
+        /// This is exposed as a command by <see cref="MultipleWorldHome.EnsureStackRepository"/> in order for Stack repository manipulations
         /// (that are NOT world: it's meta) to appear in "Home/" command namespace instead of "World/".
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="url">The url of the repository to remove.</param>
+        /// <param name="url">The URL of the repository to remove.</param>
         public void DeleteStackRepository( IActivityMonitor m, string url )
         {
-            if( DisableRepositoryAndStacksCommands ) throw new InvalidOperationException( nameof( DisableRepositoryAndStacksCommands ) );
-            if( String.IsNullOrWhiteSpace( url ) || !Uri.TryCreate( url, UriKind.Absolute, out var uri ) ) throw new ArgumentException( "Must be a valid url.", nameof( url ) );
+            if( !CanDeleteStackRepository ) throw new InvalidOperationException( nameof( CanDeleteStackRepository ) );
+            if( String.IsNullOrWhiteSpace( url ) || !Uri.TryCreate( url, UriKind.Absolute, out var uri ) ) throw new ArgumentException( "Must be a valid URL.", nameof( url ) );
             int idx = _stackRepos.IndexOf( r => r.OriginUrl.AbsoluteUri.Equals( url, StringComparison.OrdinalIgnoreCase ) );
             if( idx < 0 ) m.Warn( $"Stack repository '{url}' not found." );
             else
@@ -196,9 +272,9 @@ namespace CK.Env
         }
         
         /// <summary>
-        /// Whether <see cref="DisableRepositoryAndStacksCommands"/> is false.
+        /// Whether this is a multiple worlds store and <see cref="DisableRepositoryAndStacksCommands"/> is false.
         /// </summary>
-        public bool CanDestroyWorld => !DisableRepositoryAndStacksCommands;
+        public bool CanDestroyWorld => SingleWorld == null && !DisableRepositoryAndStacksCommands;
 
         /// <summary>
         /// Deletes a stack or a world.
@@ -215,7 +291,7 @@ namespace CK.Env
                 m.Error( $"Invalid '{worldFullName}' world name." );
                 return;
             }
-            List<WorldInfo> toRemove = null;
+            List<WorldInfo>? toRemove = null;
             if( name.ParallelName == null )
             {
                 toRemove = _stackRepos.SelectMany( r => r.Worlds ).Where( w => w.WorldName.Name == name.Name ).ToList();
@@ -249,6 +325,11 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Only if this is a multiple worlds store can a World mapping be set.
+        /// </summary>
+        public bool CanSetWorldMapping => WorldLocalMapping.CanSetMapping;
+
+        /// <summary>
         /// Sets a mapping for a world full name.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -258,6 +339,7 @@ namespace CK.Env
         [CommandMethod]
         public bool SetWorldMapping( IActivityMonitor m, string worldFullName, NormalizedPath mappedPath )
         {
+            if( !CanSetWorldMapping ) throw new InvalidOperationException( nameof( CanSetWorldMapping ) );
             var worlds = ReadWorlds( m );
             if( worlds == null ) return false;
             var w = worlds.FirstOrDefault( x => x.FullName.Equals( worldFullName, StringComparison.OrdinalIgnoreCase ) );
@@ -280,18 +362,23 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the list of <see cref="ReadWorlds"/>, optionally pulling the repositories.
+        /// Gets the list of <see cref="IRootedWorldName"/>, optionally pulling the repositories.
+        /// In Single world mode, this method doesn't resynchronize anything and returns the single world.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="withPull">
         /// True to pull the repositories, false to only refresh from the local
-        /// working folders.
+        /// working folders of the stores. Ignored in single world mode.
         /// </param>
         public IReadOnlyList<IRootedWorldName> ReadWorlds( IActivityMonitor m, bool withPull )
         {
+            if( SingleWorld != null )
+            {
+                return new[] { _stackRepos[0].Worlds[0].WorldName };
+            }
             foreach( var r in _stackRepos )
             {
-                if( !r.Refresh( m, withPull ) )
+                if( !r.RefreshMultiple( m, withPull ) )
                 {
                     m.Warn( $"Unable to open repository '{r}'." );
                 }
@@ -329,15 +416,15 @@ namespace CK.Env
             return true;
         }
 
-        protected override LocalWorldName DoCreateNewParallel( IActivityMonitor m, IRootedWorldName source, string parallelName, XDocument content )
+        protected override IRootedWorldName? DoCreateNewParallel( IActivityMonitor m, IRootedWorldName source, string parallelName, XDocument content )
         {
             Debug.Assert( source != null );
             Debug.Assert( content != null );
             Debug.Assert( !String.IsNullOrWhiteSpace( parallelName ) );
 
-            StackRepo repo = null;
-            if( source is LocalWorldName src
-                && (repo = _stackRepos.FirstOrDefault( r => src.XmlDescriptionFilePath.StartsWith( r.Root ) )) == null )
+            StackRepo? repo = null;
+            if( source is not LocalWorldName src
+                || (repo = _stackRepos.FirstOrDefault( r => src.XmlDescriptionFilePath.StartsWith( r.Root ) )) == null )
             {
                 m.Error( $"Unable to find source World." );
                 return null;
@@ -381,6 +468,22 @@ namespace CK.Env
             return true;
         }
 
+        public override LocalWorldState GetOrCreateLocalState( IActivityMonitor m, IWorldName w )
+        {
+            var p = ToLocalStateFilePath( w );
+            if( File.Exists( p ) ) return new LocalWorldState( this, w, XDocument.Load( p, LoadOptions.SetLineInfo ) );
+            m.Info( $"Creating new local state for {w.FullName}." );
+            return new LocalWorldState( this, w );
+        }
+
+        protected override bool SaveLocalState( IActivityMonitor m, IWorldName w, XDocument d )
+        {
+            var p = ToLocalStateFilePath( w );
+            d.Save( p );
+            OnWorkingFolderChanged( m, ToLocal( w ) );
+            return true;
+        }
+
         void OnWorkingFolderChanged( IActivityMonitor m, LocalWorldName local )
         {
             var repo = _stackRepos.FirstOrDefault( r => local.XmlDescriptionFilePath.StartsWith( r.Root ) );
@@ -409,6 +512,21 @@ namespace CK.Env
             var def = local.XmlDescriptionFilePath;
             Debug.Assert( def.EndsWith( ".World.xml" ) );
             return (local, def.RemoveLastPart().AppendPart( def.LastPart.Substring( 0, def.LastPart.Length - 3 ) + "SharedState.xml" ));
+        }
+
+        NormalizedPath ToLocalStateFilePath( IWorldName w ) => GetWorkingLocalFolder( w ).AppendPart( "LocalState.xml" );
+
+        /// <summary>
+        /// Returns the "$Local" folder in the <see cref="StackRepo"/> repository.
+        /// </summary>
+        /// <param name="w">The world name. It must exist in this store.</param>
+        /// <returns>A local path to an existing and writable directory.</returns>
+        public override NormalizedPath GetWorkingLocalFolder( IWorldName w )
+        {
+            var local = ToLocal( w );
+            var def = local.XmlDescriptionFilePath;
+            Debug.Assert( def.EndsWith( ".World.xml" ) );
+            return def.RemoveLastPart().AppendPart( "$Local" ).AppendPart( w.FullName );
         }
 
         public void Dispose()

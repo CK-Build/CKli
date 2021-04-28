@@ -6,6 +6,7 @@ using LibGit2Sharp;
 using NUnit.Framework.Internal;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
@@ -40,6 +41,7 @@ namespace CK.Env.Tests.LocalTestHelper
                     universe.UserHost.WorldSelector.OpenWorld( m, worldName ).Should().BeTrue();
                 }
             }
+            Debug.Assert( universe.UserHost.WorldSelector.CurrentWorld != null );
             return universe.UserHost.WorldSelector.CurrentWorld;
         }
 
@@ -97,10 +99,13 @@ namespace CK.Env.Tests.LocalTestHelper
             EnsureWorldOpened( universe, m, worldName );
             foreach( var command in commands )
             {
-                var payload = (SimplePayload)command.CreatePayload();
-                for( int i = 0; i < args.Length; i++ )
+                var payload = (SimplePayload?)command.CreatePayload();
+                if( payload != null )
                 {
-                    payload.Fields[i].SetValue( args[i] );
+                    for( int i = 0; i < args.Length; i++ )
+                    {
+                        payload.Fields[i].SetValue( args[i] );
+                    }
                 }
                 command.UnsafeExecute( m, payload );
             }
@@ -120,8 +125,7 @@ namespace CK.Env.Tests.LocalTestHelper
         {
             using( m.OpenInfo( $"Running TestUniverse.CommitAll( '{worldName}' )" ) )
             {
-                EnsureWorldOpened( universe, m, worldName );
-                var currentWorld = universe.UserHost.WorldSelector.CurrentWorld;
+                var currentWorld = EnsureWorldOpened( universe, m, worldName );
                 foreach( var gitFolder in currentWorld.GitRepositories )
                 {
                     gitFolder.Commit( m, commitMessage ).Should().BeTrue( "There must be no error when Committing a repository." );
@@ -131,7 +135,7 @@ namespace CK.Env.Tests.LocalTestHelper
         }
 
         /// <summary>
-        /// Run all apply settings and comitting all in a random fashion.
+        /// Run all apply settings and committing all in a random fashion.
         /// </summary>
         /// <param name="universe"></param>
         /// <param name="m"></param>
@@ -203,13 +207,8 @@ namespace CK.Env.Tests.LocalTestHelper
             XDocument xml = XDocument.Parse( File.ReadAllText( world.WorldName.XmlDescriptionFilePath ) );
             stackModifier( xml );
             File.WriteAllText( world.WorldName.XmlDescriptionFilePath, xml.ToString() );
-            return universe.RestartCKli( m );
-        }
-
-        public static TestUniverse RestartCKli( this TestUniverse universe, IActivityMonitor m )
-        {
-            universe.Dispose();
-            return TestUniverse.Create( m, universe.UniversePath );
+            universe.Restart( m );
+            return universe;
         }
 
         public static TestUniverse CreateEmptyRepoAndAddToStack( this TestUniverse testUniverse, IActivityMonitor m, string worldName, string repoName )

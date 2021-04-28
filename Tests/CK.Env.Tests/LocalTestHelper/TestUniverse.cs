@@ -1,6 +1,9 @@
 using CK.Core;
+using CK.Env.DependencyModel;
+using CK.SimpleKeyVault;
 using CK.Text;
 using CKli;
+using CSemVer;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
@@ -35,21 +38,36 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public const string PlaceHolderString = "PLACEHOLDER_CKLI_TESTS";
 
+        static XTypedFactory? _xTypedFactory;
+
         /// <summary>
-        /// Instanciates a new <see cref="TestUniverse"/>.
+        /// Instantiates a new <see cref="TestUniverse"/>.
         /// </summary>
         /// <param name="tempPath">Path of the TestHost.</param>
-        /// <param name="userHost">The UserHost instantied with this path.</param>
-        TestUniverse( NormalizedPath tempPath, UserHost userHost )
+        /// <param name="userHost">The UserHost instantiated with this path.</param>
+        TestUniverse( NormalizedPath tempPath ) => UniversePath = tempPath;
+
+        void Open( IActivityMonitor m )
         {
-            UniversePath = tempPath;
-            UserHost = userHost;
+            NormalizedPath ckliPath = UniversePath.AppendPart( _ckliMapping );
+            var mappings = new FileWorldLocalMapping( ckliPath.AppendPart( "WorldLocalMapping.txt" ) );
+            var keyVault = new FileKeyVault( ckliPath.AppendPart( "Personal.KeyVault.txt" ) );
+            keyVault.OpenKeyVault( m );
+            UserHost = MultipleWorldHome.Create( m, ckliPath, _xTypedFactory!, keyVault, mappings, () => new FakeReleaseVersionSelector() );
+            UserHost.WorldStore.DestroyWorld( m, "CK" );
+            UserHost.WorldStore.DestroyWorld( m, "CK-Build" );
+        }
+
+        public void Restart(IActivityMonitor m)
+        {
+            Dispose();
+            Open( m );
         }
 
         /// <summary>
         /// The <see cref="UserHost"/> used to run tests on.
         /// </summary>
-        public UserHost UserHost { get; }
+        public MultipleWorldHome UserHost { get; private set; } = null!; //Set by Open() which is called by the factory method.
 
         /// <summary>
         /// Temp path of the TestHost.
@@ -82,6 +100,19 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public NormalizedPath CKliMapping => UniversePath.AppendPart( _ckliMapping );
 
+        class FakeReleaseVersionSelector : IReleaseVersionSelector
+        {
+            public void ChooseFinalVersion( IActivityMonitor m, IReleaseVersionSelectorContext context )
+            {
+                throw new NotImplementedException();
+            }
+
+            public bool OnAlreadyReleased( IActivityMonitor m, DependentSolution solution, CSVersion version, bool isContentTag )
+            {
+                throw new NotImplementedException();
+            }
+        }
+
         /// <summary>
         /// Create a <see cref="TestUniverse"/> in a given folder.
         /// </summary>
@@ -90,14 +121,17 @@ namespace CK.Env.Tests.LocalTestHelper
         public static TestUniverse Create( IActivityMonitor m, NormalizedPath path )
         {
             m.Info( $"Creating TestUniverse from {path}." );
-            NormalizedPath ckliPath = path.AppendPart( _ckliMapping );
-            var userHost = UserHost.Create( m, new FakeApplicationLifetime(), ckliPath );
-            var output = new TestUniverse( path, userHost );
-            userHost.WorldStore.DestroyWorld( m, "CK" );
-            userHost.WorldStore.DestroyWorld( m, "CK-Build" );
+            if( _xTypedFactory == null )
+            {
+                System.Reflection.Assembly.Load( "CKli.XObject" );
+                _xTypedFactory = new XTypedFactory();
+                _xTypedFactory.AutoRegisterFromLoadedAssemblies( m );
+                _xTypedFactory.SetLocked();
+            }
+            TestUniverse output = new( path );
+            output.Open( m );
             return output;
         }
-
 
         public static void ChangeStringInAllSubPathAndFileContent( IActivityMonitor m, NormalizedPath folder, string oldString, string newString )
         {
@@ -160,6 +194,6 @@ namespace CK.Env.Tests.LocalTestHelper
             return output;
         }
 
-        public void Dispose() => UserHost.Dispose();
+        public void Dispose() => UserHost.Dispose( TestHelper.Monitor );
     }
 }

@@ -34,7 +34,17 @@ namespace CK.SimpleKeyVault
         {
             if( IsKeyVaultOpened && _vaultContent.TryGetValue( e.Declared.Name, out var secret ) )
             {
-                e.Declared.SetSecret( secret );
+                var key = e.Declared;
+                if( key.IsSecretAvailable )
+                {
+                    // Secret has been set by other means (typically the "undeclared").
+                    // We update our content, even if the "save" refreshes its content from the "Optimal keys".
+                    _vaultContent[key.Name] = secret;
+                }
+                else
+                {
+                    key.SetSecret( secret );
+                }
             }
         }
 
@@ -92,9 +102,12 @@ namespace CK.SimpleKeyVault
         /// <param name="m">The monitor to use.</param>
         /// <param name="passPhrase">The key vault pass phrase.</param>
         /// <returns>True on success.</returns>
-        public bool OpenKeyVault( IActivityMonitor m, string passPhrase )
+        public bool OpenKeyVault( IActivityMonitor m, string passPhrase = "CKli" )
         {
-            if( !CheckPassPhraseConstraints( m, passPhrase ) ) return false;
+            if( !CheckPassPhraseConstraints( m, passPhrase ) )
+            {
+                return false;
+            }
             if( _passPhrase != null )
             {
                 m.Info( $"Key Vault is already opened." );
@@ -104,7 +117,16 @@ namespace CK.SimpleKeyVault
             {
                 try
                 {
-                    var keys = KeyVault.DecryptValues( File.ReadAllText( KeyVaultPath ), passPhrase );
+                    Dictionary<string, string?>? keys;
+                    try
+                    {
+                        keys = KeyVault.DecryptValues( File.ReadAllText( KeyVaultPath ), passPhrase );
+                    }
+                    catch
+                    {
+                        if( passPhrase == "CKli" ) return false;
+                        throw;
+                    }
                     m.OpenInfo( $"Opening existing Key Vault with keys: {keys.Keys.Concatenate()}." );
                     _store.ImportSecretKeys( m, keys );
                     _passPhrase = passPhrase;
@@ -167,7 +189,7 @@ namespace CK.SimpleKeyVault
         void DoSaveKeyVault( IActivityMonitor? m )
         {
             Debug.Assert( _passPhrase != null, "The file is opened." );
-            foreach( var e in _store.OptimalAvailableInfos )
+            foreach( var e in _store.OptimalNamedSecrets )
             {
                 _vaultContent[e.Name] = e.Secret;
             }

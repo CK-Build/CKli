@@ -7,11 +7,12 @@ namespace CK.Env.MSBuildSln
 {
     public class DeclaredPackageDependency
     {
+        static readonly ArtifactType _nugetType = ArtifactType.Single( "NuGet" );
+
         internal DeclaredPackageDependency(
             Project owner,
             string packageId,
-            bool versionLocked,
-            SVersion version,
+            SVersionBound version,
             XElement originElement,
             XElement finalVersionElement,
             CKTrait frameworks,
@@ -19,11 +20,11 @@ namespace CK.Env.MSBuildSln
             bool isVersionOverride )
         {
             Owner = owner;
-            Package = new ArtifactInstance( ArtifactType.Single( "NuGet" ), packageId, version );
+            PackageId = packageId;
+            Version = version;
             OriginElement = originElement;
             FinalVersionElement = finalVersionElement;
             Frameworks = frameworks;
-            VersionLocked = versionLocked;
             PrivateAsset = privateAsset;
             IsVersionOverride = isVersionOverride;
         }
@@ -34,24 +35,19 @@ namespace CK.Env.MSBuildSln
         public Project Owner { get; }
 
         /// <summary>
-        /// Gets the package identifier and version.
-        /// </summary>
-        public ArtifactInstance Package { get; }
-
-        /// <summary>
         /// Gets the package identifier.
         /// </summary>
-        public string PackageId => Package.Artifact.Name;
+        public string PackageId { get; }
 
         /// <summary>
-        /// Gets whether the version is locked: it is inside square brackets (ex. Version="[2.6.4]").
+        /// Gets the <see cref="ArtifactInstance"/> based on the "NuGet" artifact type, the <see cref="PackageId"/> and the <see cref="SVersionBound.Base"/> version.
         /// </summary>
-        public bool VersionLocked { get; }
+        public ArtifactInstance BaseArtifactInstance => new ArtifactInstance( _nugetType, PackageId, Version.Base );
 
         /// <summary>
         /// Gets the version.
         /// </summary>
-        public SVersion Version => Package.Version;
+        public SVersionBound Version { get; }
 
         /// <summary>
         /// Gets the frameworks to which this dependency applies.

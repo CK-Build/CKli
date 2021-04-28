@@ -11,7 +11,7 @@ namespace CK.Env.Plugin
     public class RepositoryXmlFile : XmlFilePluginBase, IDisposable, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly SolutionDriver _driver;
-        readonly ChildObject<RepositoryInfoOptions> _options;
+        readonly ChildObject<RepositoryInfoOptions> _simpleGitVersionOption;
 
         public RepositoryXmlFile( GitFolder f, NormalizedPath branchPath, SolutionDriver driver )
             : base( f, branchPath, branchPath.AppendPart( "RepositoryInfo.xml" ), XNamespace.None + "RepositoryInfo" )
@@ -25,8 +25,7 @@ namespace CK.Env.Plugin
             _driver.OnStartBuild += OnStartBuild;
             _driver.OnEndBuild += OnEndBuild;
 
-
-            _options = new ChildObject<RepositoryInfoOptions>( this, XNamespace.None + "SimpleGitVersion", LoadWithLegacy, o => o.ToXml() );
+            _simpleGitVersionOption = new ChildObject<RepositoryInfoOptions>( this, XNamespace.None + "SimpleGitVersion", LoadWithLegacy, o => o.ToXml() );
 
             // We use e.Parent so that detection of the old schema can be done (root of the document).
             // Once migrated, replace this with: e => new RepositoryInfoOptions( e )
@@ -41,7 +40,7 @@ namespace CK.Env.Plugin
                     Document.Root.Elements( SGVSchema.Debug ).Remove();
                     e.ReplaceWith( o.ToXml() );
                 }
-                // Fogot these 2 ones.
+                // Forgot these 2 ones.
                 Document.Root.Elements( "StartingVersionForCSemVer" ).Remove();
                 Document.Root.Nodes().OfType<XComment>().Where( c => c.Value.Contains( "Debug IgnoreDirtyWorkingFolder=" ) ).Remove();
                 return o;
@@ -50,12 +49,12 @@ namespace CK.Env.Plugin
 
         void OnStartBuild( object sender, BuildStartEventArgs e )
         {
-            var o = _options.EnsureObject();
+            var o = _simpleGitVersionOption.EnsureObject();
             if( !o.IgnoreDirtyWorkingFolder )
             {
                 e.Memory.Add( this, this );
                 o.IgnoreDirtyWorkingFolder = true;
-                _options.UpdateXml( e.Monitor, true );
+                _simpleGitVersionOption.UpdateXml( e.Monitor, true );
             }
         }
 
@@ -64,11 +63,11 @@ namespace CK.Env.Plugin
             // We must always reset the in-memory option if we have changed it.
             if( e.BuildStartArgs.Memory.ContainsKey( this ) )
             {
-                _options.EnsureObject().IgnoreDirtyWorkingFolder = false;
+                _simpleGitVersionOption.EnsureObject().IgnoreDirtyWorkingFolder = false;
                 // If the build is protected by a Git reset, no need to update the file.
                 if( !e.BuildStartArgs.IsUsingDirtyFolder )
                 {
-                    _options.UpdateXml( e.Monitor, true );
+                    _simpleGitVersionOption.UpdateXml( e.Monitor, true );
 
                 }
             }
@@ -79,13 +78,13 @@ namespace CK.Env.Plugin
         void OnLocalBranchEntered( object sender, EventMonitoredArgs e )
         {
             EnsureLocalBranch( e.Monitor );
-            _options.UpdateXml( e.Monitor, true );
+            _simpleGitVersionOption.UpdateXml( e.Monitor, true );
         }
 
         void OnLocalBranchLeaving( object sender, EventMonitoredArgs e )
         {
             RemoveLocalBranch( e.Monitor );
-            _options.UpdateXml( e.Monitor, true );
+            _simpleGitVersionOption.UpdateXml( e.Monitor, true );
         }
 
         void IDisposable.Dispose()
@@ -103,7 +102,7 @@ namespace CK.Env.Plugin
         {
             if( !this.CheckCurrentBranch( m ) ) return;
 
-            var o = _options.EnsureObject();
+            var o = _simpleGitVersionOption.EnsureObject();
             o.IgnoreDirtyWorkingFolder = false;
             EnsureBranchMapping( m, GitFolder.World.DevelopBranchName, CIBranchVersionMode.LastReleaseBased, "develop" );
             if( StandardPluginBranch == StandardGitStatus.Local )
@@ -114,7 +113,7 @@ namespace CK.Env.Plugin
             {
                 RemoveLocalBranch( m );
             }
-            _options.UpdateXml( m, false );
+            _simpleGitVersionOption.UpdateXml( m, false );
             Save( m );
         }
 
@@ -127,7 +126,7 @@ namespace CK.Env.Plugin
         /// <param name="mode">The CI mode to use for this branch.</param>
         void EnsureBranchMapping( IActivityMonitor m, string branchName, CIBranchVersionMode mode, string versionName )
         {
-            var o = _options.EnsureObject();
+            var o = _simpleGitVersionOption.EnsureObject();
             var b = o.Branches.FirstOrDefault( x => x.Name == branchName );
             if( b == null ) o.Branches.Add( b = new RepositoryInfoOptionsBranch( branchName, mode, versionName ) );
             else
@@ -144,7 +143,7 @@ namespace CK.Env.Plugin
         /// <param name="branchName">The actual branch name (ex: "develop-local").</param>
         void RemoveBranchMapping( IActivityMonitor m, string branchName )
         {
-            var o = _options.EnsureObject();
+            var o = _simpleGitVersionOption.EnsureObject();
             int idx = o.Branches.IndexOf( b => b.Name == branchName );
             if( idx >= 0 )
             {

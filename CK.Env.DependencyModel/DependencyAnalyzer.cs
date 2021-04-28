@@ -22,7 +22,7 @@ namespace CK.Env.DependencyModel
         readonly ProjectItem.Cache _projects;
         readonly List<(ISolution Solution, LocalPackageItem LocalPackage)> _solutionDependencies;
         readonly IReadOnlyList<PackageReference> _externalRefs;
-        readonly int _version;
+        readonly int _updateSerialNumber;
         readonly SolutionDependencyContext _defaultDependencyContext;
 
 
@@ -185,7 +185,7 @@ namespace CK.Env.DependencyModel
             _solutions = solutions;
             _solutionContext = solutionCtx;
             _solutionDependencies = solutionDependencies;
-            _version = _solutionContext?.Version ?? 0;
+            _updateSerialNumber = _solutionContext?.UpdateSerialNumber ?? 0;
             _projects = projects;
             _externalRefs = externalRefs;
             _defaultDependencyContext = CreateDependencyContext( m, traceGraphDetails );
@@ -195,7 +195,7 @@ namespace CK.Env.DependencyModel
         /// Gets whether the <see cref="Solutions"/> has changed and this analyzer is no more
         /// up to date: a new one should be obtained from <see cref="ISolutionContext.GetDependencyAnalyser"/>.
         /// </summary>
-        public bool IsObsolete => _solutionContext == null ? true : _version != _solutionContext.Version;
+        public bool IsObsolete => _solutionContext == null ? true : _updateSerialNumber != _solutionContext.UpdateSerialNumber;
 
         /// <summary>
         /// Gets all the external package references.

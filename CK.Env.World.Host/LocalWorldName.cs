@@ -7,11 +7,11 @@ using System.Xml.Linq;
 namespace CK.Env
 {
     /// <summary>
-    /// Local world name is a <see cref="IRootedWorldName"/> that also carries
-    /// its definition file path (<see cref="XmlDescriptionFilePath"/>), whether this file
-    /// is available or not and whether this World name should be hidden. 
+    /// Local world name is a <see cref="RootedWorldName"/> that also carries
+    /// its definition file path (<see cref="XmlDescriptionFilePath"/>) and whether this file
+    /// is available or not. 
     /// </summary>
-    public class LocalWorldName : WorldName, IRootedWorldName
+    public class LocalWorldName : RootedWorldName, IRootedWorldName
     {
         /// <summary>
         /// Initializes a new <see cref="LocalWorldName"/>.
@@ -20,12 +20,11 @@ namespace CK.Env
         /// <param name="stackName">The stack name.</param>
         /// <param name="parallelName">The optional parallel name. Can be null or empty.</param>
         /// <param name="localMap">Required to compute the <see cref="Root"/> folder.</param>
-        public LocalWorldName( NormalizedPath xmlDescriptionFilePath, string stackName, string parallelName, IWorldLocalMapping localMap )
-            : base( stackName, parallelName )
+        public LocalWorldName( NormalizedPath xmlDescriptionFilePath, string stackName, string? parallelName, IWorldLocalMapping localMap )
+            : base( stackName, parallelName, localMap )
         {
             if( String.IsNullOrWhiteSpace( xmlDescriptionFilePath ) ) throw new ArgumentNullException( nameof( xmlDescriptionFilePath ) );
             XmlDescriptionFilePath = xmlDescriptionFilePath;
-            Root = localMap.GetRootPath( this );
         }
 
         /// <summary>
@@ -34,32 +33,10 @@ namespace CK.Env
         public NormalizedPath XmlDescriptionFilePath { get; }
 
         /// <summary>
-        /// Gets the local world root directory path.
-        /// This is <see cref="NormalizedPath.IsEmptyPath"/> if the world is not mapped.
-        /// </summary>
-        public NormalizedPath Root { get; private set; }
-
-        /// <summary>
-        /// Updates the world root.
-        /// It may becomes <see cref="NormalizedPath.IsEmptyPath"/> if this world is no mre mapped.
-        /// </summary>
-        /// <param name="localMap"></param>
-        public void UpdateRoot( IWorldLocalMapping localMap )
-        {
-            Root = localMap.GetRootPath( this );
-        }
-
-        /// <summary>
         /// Gets or sets whether the xml definition file for this stack exists.
         /// Defaults to false.
         /// </summary>
         public bool HasDefinitionFile { get; set; }
-
-        /// <summary>
-        /// Gets or sets whether this world name should be hidden.
-        /// Defauts to true.
-        /// </summary>
-        public bool IsHidden { get; set; }
 
         /// <summary>
         /// Tries to parse a xml World definition file name (must end with ".World.xml").
@@ -67,7 +44,7 @@ namespace CK.Env
         /// <param name="path">The file path.</param>
         /// <param name="localMap">The mapper to use.</param>
         /// <returns>The name or null on error.</returns>
-        public static LocalWorldName TryParse( NormalizedPath path, IWorldLocalMapping localMap )
+        public static LocalWorldName? TryParse( NormalizedPath path, IWorldLocalMapping localMap )
         {
             if( path.IsEmptyPath || !path.LastPart.EndsWith( ".World.xml", StringComparison.OrdinalIgnoreCase ) ) return null;
             try
