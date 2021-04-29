@@ -733,9 +733,9 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="git">The repository key.</param>
         /// <returns>The Credentials object that is null or a <see cref="UsernamePasswordCredentials"/>.</returns>
-        internal static Credentials PATCredentialsHandler( IActivityMonitor m, GitRepositoryKey git )
+        internal static Credentials? PATCredentialsHandler( IActivityMonitor m, GitRepositoryKey git )
         {
-            string pat = git.SecretKeyStore.GetSecretKey( m, git.ReadPATKeyName, !git.IsPublic );
+            string? pat = git.SecretKeyStore.GetSecretKey( m, git.ReadPATKeyName, !git.IsPublic );
             return pat != null
                     ? new UsernamePasswordCredentials() { Username = "CKli", Password = pat }
                     : null;

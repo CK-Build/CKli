@@ -30,25 +30,22 @@ namespace CK.Env
             else if( url.Scheme == Uri.UriSchemeFile ) KnownGitProvider = KnownGitProvider.FileSystem;
 
             if( KnownGitProvider == KnownGitProvider.FileSystem ) return; // No credentials needed.
-            if( KnownGitProvider != KnownGitProvider.Unknown )
+            string GetReadPATDescription( SecretKeyInfo? current )
             {
-                string GetReadPATDescription( SecretKeyInfo? current )
+                var d = current?.Description ?? $"Used to read/clone private repositories hosted by '{KnownGitProvider}'.";
+                if( (current == null || !current.IsRequired) && !IsPublic )
                 {
-                    var d = current?.Description ?? $"Used to read/clone private repositories hosted by '{KnownGitProvider}'.";
-                    if( (current == null || !current.IsRequired) && !IsPublic )
-                    {
-                        d += $" This secret is required since at least '{url}' is not public.";
-                    }
-                    return d;
+                    d += $" This secret is required since at least '{url}' is not public.";
                 }
-
-                // The read PAT is required only if the repository is not public.
-                ReadPATKeyName = GetPATName();
-                var read = secretKeyStore.DeclareSecretKey( ReadPATKeyName, GetReadPATDescription, isRequired: !IsPublic );
-                // The write PAT is the super key of the read PAT.
-                WritePATKeyName = GetPATName( "_WRITE_PAT" );
-                secretKeyStore.DeclareSecretKey( WritePATKeyName, current => current?.Description ?? $"Used to push solutions hosted by '{KnownGitProvider}'. This is required to publish builds.", subKey: read );
+                return d;
             }
+
+            // The read PAT is required only if the repository is not public.
+            ReadPATKeyName = GetPATName();
+            var read = secretKeyStore.DeclareSecretKey( ReadPATKeyName, GetReadPATDescription, isRequired: !IsPublic );
+            // The write PAT is the super key of the read PAT.
+            WritePATKeyName = GetPATName( "_WRITE_PAT" );
+            secretKeyStore.DeclareSecretKey( WritePATKeyName, current => current?.Description ?? $"Used to push solutions hosted by '{KnownGitProvider}'. This is required to publish builds.", subKey: read );
         }
 
         /// <summary>
@@ -156,7 +153,7 @@ namespace CK.Env
             }
         }
 
-        public override string ToString() => $"{OriginUrl} ({(IsPublic ? "Public" : "Private" )})";
+        public override string ToString() => $"{OriginUrl} ({(IsPublic ? "Public" : "Private")})";
     }
 
 }
