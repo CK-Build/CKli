@@ -100,6 +100,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kuinox.TypedCLI.NPM", "..\K
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kuinox.TypedCLI.Helpers", "..\Kuinox.TypedCLI\Kuinox.TypedCLI.Helpers\Kuinox.TypedCLI.Helpers.csproj", "{4ECA0B14-68EB-4EA4-9296-647235F2A4DD}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kuinox.TypedCLI.Dotnet", "..\Kuinox.TypedCLI\Kuinox.TypedCLI.Dotnet\Kuinox.TypedCLI.Dotnet.csproj", "{BF643D11-C5DE-49B6-B4F0-F62700FD5B0B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -420,6 +422,14 @@ Global
 		{4ECA0B14-68EB-4EA4-9296-647235F2A4DD}.Release|Any CPU.Build.0 = Release|Any CPU
 		{4ECA0B14-68EB-4EA4-9296-647235F2A4DD}.Release|x64.ActiveCfg = Release|Any CPU
 		{4ECA0B14-68EB-4EA4-9296-647235F2A4DD}.Release|x64.Build.0 = Release|Any CPU
+		{BF643D11-C5DE-49B6-B4F0-F62700FD5B0B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BF643D11-C5DE-49B6-B4F0-F62700FD5B0B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BF643D11-C5DE-49B6-B4F0-F62700FD5B0B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{BF643D11-C5DE-49B6-B4F0-F62700FD5B0B}.Debug|x64.Build.0 = Debug|Any CPU
+		{BF643D11-C5DE-49B6-B4F0-F62700FD5B0B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BF643D11-C5DE-49B6-B4F0-F62700FD5B0B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BF643D11-C5DE-49B6-B4F0-F62700FD5B0B}.Release|x64.ActiveCfg = Release|Any CPU
+		{BF643D11-C5DE-49B6-B4F0-F62700FD5B0B}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

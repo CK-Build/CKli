@@ -199,7 +199,7 @@ namespace CodeCake
             {
                 private readonly StandardGlobalInfo _ctx;
 
-                public Creds( StandardGlobalInfo ctx ) => _ctx = ctx;
+                public Creds( IActivityMonitor m, StandardGlobalInfo ctx ) => _ctx = ctx;
 
                 public string Id { get; }
 
@@ -215,7 +215,7 @@ namespace CodeCake
                         new CredentialResponse(
                             new NetworkCredential(
                                 "CKli",
-                                _ctx.InteractiveEnvironmentVariable( new ActivityMonitor(),//TODO: we are doing a new ActivityMonitor there, can't we use a shared one ?
+                                _ctx.InteractiveEnvironmentVariable( m,
                                     _vstsFeeds.Single( p => new Uri( p.Url ).ToString() == uri.ToString() ).SecretKeyName
                                 )
                             )
