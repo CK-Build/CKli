@@ -140,6 +140,8 @@ namespace CK.Env
                     Regex badChars = new( "[^A-Za-z_0-9]" );
                     string key = badChars.Replace( OriginUrl.Host + "_" + OriginUrl.LocalPath, "_" );  // I did this in a haste, some URI will probably generate bad PAT name. 
                     if( badChars.IsMatch( key ) ) throw new InvalidOperationException( "TODO better PAT Name autogeneration." );
+                    key = key.ToUpperInvariant();
+                    if( !key.EndsWith( "_GIT" ) ) key += "_GIT";
                     return key;
                 case KnownGitProvider.AzureDevOps:
                     var regex = Regex.Match( OriginUrl.PathAndQuery, @"/([^\/]*)" );
