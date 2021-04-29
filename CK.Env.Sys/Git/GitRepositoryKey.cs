@@ -136,7 +136,11 @@ namespace CK.Env
         {
             switch( KnownGitProvider )
             {
-                case KnownGitProvider.Unknown: throw new InvalidOperationException( "Unknown GitProvider." );
+                case KnownGitProvider.Unknown:
+                    Regex badChars = new( "[^A-Za-z_0-9]" );
+                    string key = badChars.Replace( OriginUrl.Host + "_" + OriginUrl.LocalPath, "_" );  // I did this in a haste, some URI will probably generate bad PAT name. 
+                    if( badChars.IsMatch( key ) ) throw new InvalidOperationException( "TODO better PAT Name autogeneration." );
+                    return key;
                 case KnownGitProvider.AzureDevOps:
                     var regex = Regex.Match( OriginUrl.PathAndQuery, @"/([^\/]*)" );
                     string organization = regex.Groups[1].Value;
