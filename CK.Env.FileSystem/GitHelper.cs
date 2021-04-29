@@ -735,7 +735,6 @@ namespace CK.Env
         /// <returns>The Credentials object that is null or a <see cref="UsernamePasswordCredentials"/>.</returns>
         internal static Credentials PATCredentialsHandler( IActivityMonitor m, GitRepositoryKey git )
         {
-            if( git.KnownGitProvider == KnownGitProvider.Unknown ) throw new InvalidOperationException( "Unknown Git provider." );
             string pat = git.SecretKeyStore.GetSecretKey( m, git.ReadPATKeyName, !git.IsPublic );
             return pat != null
                     ? new UsernamePasswordCredentials() { Username = "CKli", Password = pat }
