@@ -7,6 +7,7 @@ using System.Management.Automation.Runspaces;
 using System.Text;
 using Microsoft.PowerShell;
 using System;
+using System.Threading;
 
 namespace CK.Env
 {
@@ -21,7 +22,8 @@ namespace CK.Env
         public static bool IsRunningOnUnix => Environment.OSVersion.Platform == PlatformID.Unix;
 
         /// <summary>
-        /// Runs a .ps1 file by running "Powershell.exe" (or "pwsh") that must be in the path.
+        /// Runs a .ps1 file by running "Powershell.exe" (or "pwsh" if <see cref="IsRunningOnUnix"/>) that
+        /// must be in the path.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="workingDir">The working directory.</param>
@@ -97,6 +99,8 @@ namespace CK.Env
                 WorkingDirectory = workingDir,
                 UseShellExecute = false,
                 CreateNoWindow = true,
+                // ErrorDialog = false, -- The default is false.
+                // LoadUserProfile = false, -- The default is false.
                 FileName = fileName,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -166,19 +170,14 @@ namespace CK.Env
                 bool hasExited = cmdProcess.WaitForExit( timeoutMilliseconds );
                 int exitCode = hasExited ? cmdProcess.ExitCode : 0;
 
+                cmdProcess.OutputDataReceived -= outputReceived;
+                cmdProcess.ErrorDataReceived -= errorReceived;
                 // This flushes the streams and waits for the message pumps to end.
                 cmdProcess.Close();
 
-                if( errorCapture.Length > 0 )
-                {
-                    using( m.OpenGroup( stdErrorLevel, "Received errors on <StdErr>:" ) )
-                    {
-                        m.Log( stdErrorLevel, errorCapture.ToString() );
-                    }
-                }
-
                 if( !hasExited )
                 {
+                    Thread.Sleep( 50 );
                     using( m.OpenError( $"Process ran out of time ({timeoutMilliseconds} ms). Killing it (including its child processes)." ) )
                     {
                         try
@@ -190,15 +189,28 @@ namespace CK.Env
                             m.Error( ex );
                         }
                     }
+                    DumpStdErr( m, stdErrorLevel, errorCapture );
                     return false;
                 }
 
+                DumpStdErr( m, stdErrorLevel, errorCapture );
                 if( exitCode != 0 )
                 {
                     m.Error( $"Process returned ExitCode {exitCode}." );
                     return false;
                 }
                 return true;
+            }
+
+            static void DumpStdErr( IActivityMonitor m, LogLevel stdErrorLevel, StringBuilder errorCapture )
+            {
+                if( errorCapture.Length > 0 )
+                {
+                    using( m.OpenGroup( stdErrorLevel, "Received errors on <StdErr>:" ) )
+                    {
+                        m.Log( stdErrorLevel, errorCapture.ToString() );
+                    }
+                }
             }
         }
     }
