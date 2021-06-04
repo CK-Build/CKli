@@ -172,8 +172,6 @@ namespace CK.Env
 
                 cmdProcess.OutputDataReceived -= outputReceived;
                 cmdProcess.ErrorDataReceived -= errorReceived;
-                // This flushes the streams and waits for the message pumps to end.
-                cmdProcess.Close();
 
                 if( !hasExited )
                 {
@@ -183,6 +181,8 @@ namespace CK.Env
                         try
                         {
                             cmdProcess.Kill( entireProcessTree: true );
+                            // This flushes the streams and waits for the message pumps to end.
+                            cmdProcess.Close();
                         }
                         catch( Exception ex )
                         {
@@ -193,6 +193,8 @@ namespace CK.Env
                     return false;
                 }
 
+                // This flushes the streams and waits for the message pumps to end.
+                cmdProcess.Close();
                 DumpStdErr( m, stdErrorLevel, errorCapture );
                 if( exitCode != 0 )
                 {
