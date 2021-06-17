@@ -87,7 +87,7 @@ namespace CK.Env.Plugin
             }
             //
             firstMapping.Remove( new YamlValue( "init" ) );
-            firstMapping.Remove( new YamlValue( "artifacts" ) );
+            firstMapping.Remove( "artifacts" );
             if( _solutionSpec.SqlServer != null )
             {
                 firstMapping["services"] = new YamlValue( "mssql" + _solutionSpec.SqlServer.ToLowerInvariant() );
