@@ -87,6 +87,7 @@ namespace CK.Env.Plugin
             }
             //
             firstMapping.Remove( new YamlValue( "init" ) );
+            firstMapping.Remove( new YamlValue( "artifacts" ) );
             if( _solutionSpec.SqlServer != null )
             {
                 firstMapping["services"] = new YamlValue( "mssql" + _solutionSpec.SqlServer.ToLowerInvariant() );
@@ -104,9 +105,9 @@ namespace CK.Env.Plugin
             firstMapping["image"] = new YamlValue( "Visual Studio 2019" );
             firstMapping["clone_folder"] = new YamlValue( "C:\\CKli-World\\" + GitFolder.SubPath.Path.Replace( '/', '\\' ) );
             var onFinish = new YamlSequence();
-            onFinish.Add( CreateKeyValue( "ps", "Get-ChildItem -Recurse *.log | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''Log files'' }" ) );
-            onFinish.Add( CreateKeyValue( "ps", "Get-ChildItem -Recurse **\\Tests\\**\\TestResult*.xml | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''NUnit tests result files'' }" ) );
-            onFinish.Add( CreateKeyValue( "ps", "Get-ChildItem -Recurse **Tests\\**\\Logs\\**\\* | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''Log files'' }" ) );
+            onFinish.Add( CreateKeyValue( "ps", "'Get-ChildItem -Recurse *.log | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''Log files'' }'" ) );
+            onFinish.Add( CreateKeyValue( "ps", "'Get-ChildItem -Recurse **\\Tests\\**\\TestResult*.xml | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''NUnit tests result files'' }'" ) );
+            onFinish.Add( CreateKeyValue( "ps", "'Get-ChildItem -Recurse **Tests\\**\\Logs\\**\\* | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''Log files'' }'" ) );
             firstMapping["on_finish"] = onFinish;
             EnsureDefaultBranches( firstMapping );
             SetSequence( firstMapping, "build_script", new YamlValue( "dotnet run --project CodeCakeBuilder -nointeraction" ) );
