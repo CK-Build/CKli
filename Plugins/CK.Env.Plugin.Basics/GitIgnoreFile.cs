@@ -32,6 +32,10 @@ namespace CK.Env.Plugin
             EnsureLine( lines, "[Oo]bj/" );
             EnsureLine( lines, "[Rr]elease/" );
             EnsureLine( lines, "[Rr]eleases/" );
+            RemoveLine( lines, "[Rr]elease/" );
+            RemoveLine( lines, "[Rr]eleases/" );
+            EnsureLine( lines, "CodeCakeBuilder/[Rr]elease/" );
+            EnsureLine( lines, "CodeCakeBuilder/[Rr]eleases/" );
             EnsureLine( lines, ".vs/" );
             EnsureLine( lines, "*.suo" );
             EnsureLine( lines, "*.user" );
