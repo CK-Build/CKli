@@ -97,7 +97,6 @@ namespace CK.Env.Plugin
             if( solution.GeneratedArtifacts.Any( g => g.Artifact.Type.Name == "NPM" ) )
             {
                 install.Add( CreateKeyValue( "cmd", "npm install -g npm@6.9.0" ) );
-                install.Add( CreateKeyValue( "ps", "Install-Product node 12" ) );
             }
             firstMapping["install"] = install;
 
