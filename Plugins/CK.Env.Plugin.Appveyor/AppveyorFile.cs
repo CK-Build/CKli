@@ -92,13 +92,20 @@ namespace CK.Env.Plugin
             {
                 firstMapping["services"] = new YamlValue( "mssql" + _solutionSpec.SqlServer.ToLowerInvariant() );
             }
-            var install = new YamlSequence();
-            // Temporary: installs the 6.9.0 of npm.
-            if( solution.GeneratedArtifacts.Any( g => g.Artifact.Type.Name == "NPM" ) )
+
+            if( firstMapping["install"] is YamlSequence inst )
             {
-                install.Add( CreateKeyValue( "cmd", "npm install -g npm@6.9.0" ) );
+                if( inst.RemoveWhereAndReturnsRemoved( e => e is YamlMapping m
+                                                            && m["cmd"] is YamlValue v
+                                                            && v.Value.StartsWith( "npm install -g npm@" ) ).Count() > 0 )
+                {
+                    m.Info( "Removed npm install with a specific version (using the Appveyor's installed one)." );
+                }
+                if( inst.Count == 0 )
+                {
+                    firstMapping.Remove( "install" );
+                }
             }
-            firstMapping["install"] = install;
 
             firstMapping["version"] = new YamlValue( "build{build}" );
             firstMapping["image"] = new YamlValue( "Visual Studio 2019" );
