@@ -156,8 +156,9 @@ namespace CK.Env
             using( m.OpenTrace( $"{startInfo.FileName} {startInfo.Arguments}" ) )
             using( Process cmdProcess = new Process() )
             {
+                bool hasExited = false;
                 StringBuilder errorCapture = new StringBuilder();
-                DataReceivedEventHandler outputReceived = delegate ( object o, DataReceivedEventArgs e ) { if( e.Data != null ) m.Info( "<StdOut> " + e.Data ); };
+                DataReceivedEventHandler outputReceived = delegate ( object o, DataReceivedEventArgs e ) { if( e.Data != null && !hasExited ) m.Info( "<StdOut> " + e.Data ); };
                 DataReceivedEventHandler errorReceived = delegate ( object o, DataReceivedEventArgs e ) { if( !string.IsNullOrEmpty( e.Data ) ) errorCapture.AppendLine( e.Data ); };
 
                 cmdProcess.StartInfo = startInfo;
@@ -167,15 +168,13 @@ namespace CK.Env
                 cmdProcess.BeginErrorReadLine();
                 cmdProcess.BeginOutputReadLine();
 
-                bool hasExited = cmdProcess.WaitForExit( timeoutMilliseconds );
+                hasExited = cmdProcess.WaitForExit( timeoutMilliseconds );
                 int exitCode = hasExited ? cmdProcess.ExitCode : 0;
-
                 cmdProcess.OutputDataReceived -= outputReceived;
                 cmdProcess.ErrorDataReceived -= errorReceived;
 
                 if( !hasExited )
                 {
-                    Thread.Sleep( 50 );
                     using( m.OpenError( $"Process ran out of time ({timeoutMilliseconds} ms). Killing it (including its child processes)." ) )
                     {
                         try
@@ -193,8 +192,10 @@ namespace CK.Env
                     return false;
                 }
 
-                // This flushes the streams and waits for the message pumps to end.
+                // This flushes the streams and SHOULD wait for the message pumps to end.
                 cmdProcess.Close();
+                // However, it seems that this is required...
+                Thread.Sleep( 150 );
                 DumpStdErr( m, stdErrorLevel, errorCapture );
                 if( exitCode != 0 )
                 {
