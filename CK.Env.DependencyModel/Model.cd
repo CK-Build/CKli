@@ -1,45 +1,38 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <ClassDiagram MajorVersion="1" MinorVersion="1">
-  <Class Name="CK.Env.Artifact">
-    <Position X="3.75" Y="7.5" Width="1.5" />
-    <Members>
-      <Method Name="Artifact" Hidden="true" />
-      <Method Name="Equals" Hidden="true" />
-      <Method Name="GetHashCode" Hidden="true" />
-      <Method Name="op_Inequality" Hidden="true" />
-      <Method Name="op_Equality" Hidden="true" />
-      <Method Name="ToString" Hidden="true" />
-      <Method Name="WithVersion" Hidden="true" />
-    </Members>
-    <TypeIdentifier />
-    <Lollipop Position="0.2" />
-  </Class>
-  <Class Name="CK.Env.ArtifactInstance">
-    <Position X="1" Y="7.25" Width="2" />
+  <Class Name="CK.Build.ArtifactInstance">
+    <Position X="0.5" Y="7.75" Width="1.5" />
     <Members>
       <Method Name="ArtifactInstance" Hidden="true" />
+      <Method Name="CompareTo" Hidden="true" />
       <Method Name="Equals" Hidden="true" />
       <Method Name="GetHashCode" Hidden="true" />
       <Method Name="op_Inequality" Hidden="true" />
       <Method Name="op_Equality" Hidden="true" />
       <Method Name="ToString" Hidden="true" />
+      <Method Name="TryParse" Hidden="true" />
     </Members>
-    <AssociationLine Name="Artifact" Type="CK.Env.Artifact" FixedFromPoint="true" FixedToPoint="true">
-      <Path>
-        <Point X="2.75" Y="7.052" />
-        <Point X="3.125" Y="7.052" />
-        <Point X="3.125" Y="7.25" />
-        <Point X="4" Y="7.25" />
-      </Path>
-      <MemberNameLabel ManuallyPlaced="true">
-        <Position X="0.124" Y="0.074" />
-      </MemberNameLabel>
-    </AssociationLine>
     <TypeIdentifier />
     <ShowAsAssociation>
       <Property Name="Artifact" />
     </ShowAsAssociation>
-    <Lollipop Position="0.728" />
+  </Class>
+  <Class Name="CK.Build.Artifact">
+    <Position X="3" Y="7.25" Width="1.5" />
+    <Members>
+      <Method Name="Artifact" Hidden="true" />
+      <Method Name="CompareTo" Hidden="true" />
+      <Method Name="Equals" Hidden="true" />
+      <Method Name="GetHashCode" Hidden="true" />
+      <Method Name="op_Inequality" Hidden="true" />
+      <Method Name="op_Equality" Hidden="true" />
+      <Method Name="ToString" Hidden="true" />
+      <Method Name="TryParse" Hidden="true" />
+      <Method Name="TryParseOrCreate" Hidden="true" />
+      <Method Name="WithBound" Hidden="true" />
+      <Method Name="WithVersion" Hidden="true" />
+    </Members>
+    <TypeIdentifier />
   </Class>
   <Struct Name="CK.Env.DependencyModel.GeneratedArtifact">
     <Position X="6.75" Y="7.25" Width="1.75" />
@@ -51,6 +44,9 @@
       <HashCode>AAAAAAAAAACACAAEAAAACAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
       <FileName>GeneratedArtifact.cs</FileName>
     </TypeIdentifier>
+    <ShowAsAssociation>
+      <Property Name="Artifact" />
+    </ShowAsAssociation>
   </Struct>
   <Struct Name="CK.Env.DependencyModel.PackageReference">
     <Position X="1" Y="5.75" Width="1.5" />
@@ -100,9 +96,15 @@
         <Position X="0.159" Y="0.088" Height="0.162" Width="0.784" />
       </MemberNameLabel>
     </AssociationLine>
-    <AssociationLine Name="GeneratedArtifacts" Type="CK.Env.DependencyModel.GeneratedArtifact">
+    <AssociationLine Name="GeneratedArtifacts" Type="CK.Env.DependencyModel.GeneratedArtifact" ManuallyRouted="true" FixedFromPoint="true" FixedToPoint="true">
+      <Path>
+        <Point X="4.625" Y="6.035" />
+        <Point X="4.625" Y="7.058" />
+        <Point X="6.844" Y="7.058" />
+        <Point X="6.844" Y="7.25" />
+      </Path>
       <MemberNameLabel ManuallyPlaced="true">
-        <Position X="-0.211" Y="0.228" />
+        <Position X="0.411" Y="0.289" />
       </MemberNameLabel>
     </AssociationLine>
     <AssociationLine Name="ProjectReferences" Type="CK.Env.DependencyModel.ProjectReference" FixedToPoint="true">
@@ -171,12 +173,5 @@
       <FileName>IPackageReferer.cs</FileName>
     </TypeIdentifier>
   </Interface>
-  <Enum Name="CK.Env.DependencyModel.ProjectDependencyKind">
-    <Position X="6.25" Y="2.75" Width="2" />
-    <TypeIdentifier>
-      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAEAAAgAAACAAAAAEAAAA=</HashCode>
-      <FileName>ProjectDependencyKind.cs</FileName>
-    </TypeIdentifier>
-  </Enum>
   <Font Name="Segoe UI" Size="9" />
 </ClassDiagram>
