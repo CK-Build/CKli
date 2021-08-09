@@ -80,7 +80,7 @@ namespace CK.Env.Plugin
             section.StartComment = ": provides simple and useful definitions.";
             var propertyGroup = XElement.Parse(
 @"<PropertyGroup>
-
+  <Features>strict</Features>
   <!-- Simple IsTestProject and IsInTestsFolder variables. -->
   <IsTestProject Condition="" '$(IsTestProject)' == '' And $(MSBuildProjectName.EndsWith('.Tests'))"">true</IsTestProject>
   <IsInTestsFolder Condition=""$(MSBuildProjectDirectory.Contains('\Tests\')) Or $(MSBuildProjectDirectory.Contains('/Tests/'))"">true</IsInTestsFolder>
