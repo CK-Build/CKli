@@ -613,7 +613,7 @@ namespace CK.Env.Plugin
                 // was okay...
                 // This should be a (vicious) cache issue and may be a first "dotnet clean" helps.
                 ProcessRunner.Run( monitor, path, "dotnet", "clean", 7000 );
-                return ProcessRunner.Run( monitor, path, "dotnet", args, 7000 );
+                return ProcessRunner.Run( monitor, path, "dotnet", args, 120000 );
             }
             finally
             {
