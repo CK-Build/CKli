@@ -55,7 +55,7 @@ namespace CK.Env
             return Run( monitor,
                         workingDir,
                         IsRunningOnUnix ? "pwsh" : "Powershell.exe",
-                        "-executionpolicy unrestricted "+ fileName,
+                        "-executionpolicy unrestricted " + fileName,
                         timeoutMilliseconds,
                         stdErrorLevel,
                         environmentVariables );
@@ -175,6 +175,8 @@ namespace CK.Env
 
                 if( !hasExited )
                 {
+                    hasExited = true;
+                    Thread.Sleep( 150 );
                     using( m.OpenError( $"Process ran out of time ({timeoutMilliseconds} ms). Killing it (including its child processes)." ) )
                     {
                         try
@@ -195,7 +197,8 @@ namespace CK.Env
                 // This flushes the streams and SHOULD wait for the message pumps to end.
                 cmdProcess.Close();
                 // However, it seems that this is required...
-                Thread.Sleep( 150 );
+                Thread.Sleep( 150 ); //TODO .NET 5: fix this.
+                // Why is this so ugly ? Because: https://github.com/dotnet/runtime/issues/51277
                 DumpStdErr( m, stdErrorLevel, errorCapture );
                 if( exitCode != 0 )
                 {
