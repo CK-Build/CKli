@@ -384,11 +384,11 @@ namespace CK.Env
         /// </param>
         /// <returns>True on success, false on error.</returns>
         [CommandMethod]
-        public bool Commit( IActivityMonitor m, string commitMessage, CommitBehavior commitBehavior = CommitBehavior.CreateNewCommit )
+        public CommittingResult Commit( IActivityMonitor m, string commitMessage, CommitBehavior commitBehavior = CommitBehavior.CreateNewCommit )
         {
             if( commitBehavior != CommitBehavior.CreateNewCommit && CanAmendCommit )
             {
-                Func<string, string> modified = null;
+                Func<string, string>? modified = null;
                 switch( commitBehavior )
                 {
                     case CommitBehavior.CreateNewCommit:
@@ -421,9 +421,9 @@ namespace CK.Env
                 if( !s.IsDirty )
                 {
                     m.CloseGroup( "Working folder is up-to-date." );
-                    return true;
+                    return CommittingResult.NoChanges;
                 }
-                return DoCommit( m, commitMessage, DateTimeOffset.Now, false, true );
+                return DoCommit( m, commitMessage, DateTimeOffset.Now, false );
             }
         }
 
@@ -443,10 +443,10 @@ namespace CK.Env
         /// False will force the amend to be done if the date or message changed even if the working folder is clean.
         /// </param>
         /// <returns>True on success, false on error.</returns>
-        public bool AmendCommit(
+        public CommittingResult AmendCommit(
             IActivityMonitor m,
-            Func<string, string> editMessage = null,
-            Func<DateTimeOffset, DateTimeOffset?> editDate = null,
+            Func<string, string>? editMessage = null,
+            Func<DateTimeOffset, DateTimeOffset?>? editDate = null,
             bool skipIfNothingToCommit = true )
         {
             if( !CanAmendCommit ) throw new InvalidOperationException( nameof( CanAmendCommit ) );
@@ -457,7 +457,7 @@ namespace CK.Env
                 if( String.IsNullOrWhiteSpace( message ) )
                 {
                     m.CloseGroup( "Canceled by empty message." );
-                    return false;
+                    return CommittingResult.Error;
                 }
                 DateTimeOffset initialDate = Git.Head.Tip.Committer.When;
                 DateTimeOffset? date = initialDate;
@@ -465,7 +465,7 @@ namespace CK.Env
                 if( date == null )
                 {
                     m.CloseGroup( "Canceled by null date." );
-                    return false;
+                    return CommittingResult.Error;
                 }
                 Commands.Stage( Git, "*" );
                 var s = Git.RetrieveStatus();
@@ -506,52 +506,48 @@ namespace CK.Env
                     if( skipIfNothingToCommit )
                     {
                         m.CloseGroup( "Working folder is up-to-date." );
-                        return true;
+                        return CommittingResult.NoChanges;
                     }
                 }
-                return DoCommit( m, message, date.Value, true, hasChange );
+                return DoCommit( m, message, date.Value, true );
             }
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="m"></param>
-        /// <param name="commitMessage"></param>
-        /// <param name="date"></param>
-        /// <param name="amendPreviousCommit"></param>
-        /// <param name="isDirty"></param>
+        
+
         /// <returns>False on error. True otherwise.</returns>
-        bool DoCommit( IActivityMonitor m, string commitMessage, DateTimeOffset date, bool amendPreviousCommit, bool isDirty )
+        CommittingResult DoCommit( IActivityMonitor m, string commitMessage, DateTimeOffset date, bool amendPreviousCommit )
         {
+            using var grp = m.OpenTrace( "Commiting changes..." );
             try
             {
-                if( isDirty ) m.Info( "Working Folder is dirty. Committing changes." );
-                Signature author = amendPreviousCommit ? Git.Head.Tip.Author : Git.Config.BuildSignature( date );
+                Signature? author = amendPreviousCommit ? Git.Head.Tip.Author : Git.Config.BuildSignature( date );
                 // Let AllowEmptyCommit even when amending: this avoids creating an empty commit.
                 // If we are not amending, this is an error and we let the EmptyCommitException pops.
                 var options = new CommitOptions { AmendPreviousCommit = amendPreviousCommit };
                 var committer = new Signature( "CKli", "none", date );
                 try
                 {
-                    Git.Commit( commitMessage, author ?? committer, committer, options );
+                    Commit commit = Git.Commit( commitMessage, author ?? committer, committer, options );
+                    grp.ConcludeWith( () => $"Commited changes." );
+                    return amendPreviousCommit ? CommittingResult.Amended : CommittingResult.Commited;
                 }
                 catch( EmptyCommitException )
                 {
                     if( !amendPreviousCommit ) throw;
                     Debug.Assert( Git.Head.Tip.Parents.Count() == 1, "This check on merge commit is already done by LibGit2Sharp." );
-                    m.Trace( "No actual changes. Reseting branch to parent commit." );
+                    grp.ConcludeWith( () => "No actual changes. Reseting branch to parent commit." );
                     Git.Reset( ResetMode.Hard, Git.Head.Tip.Parents.Single() );
                     Debug.Assert( options.AmendPreviousCommit = true );
+                    string sha = Git.Head.Tip.Sha;
                     Git.Commit( commitMessage, author, committer, options );
-                    return true;
+                    return sha == Git.Head.Tip.Sha ? CommittingResult.NoChanges : CommittingResult.Amended;
                 }
-                return true;
             }
             catch( Exception ex )
             {
                 m.Error( ex );
-                return false;
+                return CommittingResult.Error;
             }
         }
 
@@ -919,5 +915,4 @@ exit 0
 
         #endregion GitHooks
     }
-
 }

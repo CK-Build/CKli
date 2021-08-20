@@ -652,7 +652,11 @@ namespace CK.Env.Plugin
         {
             Debug.Assert( IsActive );
             bool amend = StandardPluginBranch == StandardGitStatus.Local || GitFolder.Head.Message == "Local build auto commit.";
-            return GitFolder.Commit( m, "Local build auto commit.", amend ? CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage : CommitBehavior.CreateNewCommit );
+            return GitFolder.Commit(
+                m,
+                "Local build auto commit.",
+                amend ? CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage : CommitBehavior.CreateNewCommit
+            ) != CommittingResult.Error;
         }
 
         /// <summary>

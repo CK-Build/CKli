@@ -86,7 +86,13 @@ namespace CK.Env
             internal bool PushChanges( IActivityMonitor m )
             {
                 Debug.Assert( _git != null );
-                return _git.Commit( m, "Automatic synchronization commit." ) && _git.Push( m );
+                CommittingResult result = _git.Commit( m, "Automatic synchronization commit." );
+                if( result == CommittingResult.Error ) return false;
+                if(result == CommittingResult.NoChanges)
+                {
+                    m.Info( "Nothing commited. Skipping push." );
+                }
+                return _git.Push( m );
             }
 
             /// <summary>

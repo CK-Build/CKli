@@ -135,7 +135,7 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">Defaults to <see cref="CurrentBranchName"/>.</param>
         /// <returns>The RepositoryInfo or null if it cannot be obtained.</returns>
-        public ICommitInfo ReadVersionInfo( IActivityMonitor m, string branchName = null )
+        public ICommitInfo? ReadVersionInfo( IActivityMonitor m, string? branchName = null )
         {
             if( branchName == null ) branchName = CurrentBranchName;
             try
@@ -410,7 +410,7 @@ namespace CK.Env
                         }
                         if( autoCommit )
                         {
-                            if( !Commit( m, $"Switching to {World.LocalBranchName} branch." ) ) return false;
+                            if( Commit( m, $"Switching to {World.LocalBranchName} branch." ) == CommittingResult.Error ) return false;
                         }
                         else
                         {
@@ -451,7 +451,7 @@ namespace CK.Env
 
                     if( !RaiseEnteredLocalBranch( m, true ) ) return false;
 
-                    if( !AmendCommit( m ) ) return false;
+                    if( AmendCommit( m ) == CommittingResult.Error ) return false;
                     if( r.Status != MergeStatus.UpToDate )
                     {
                         m.CloseGroup( $"Success (with merge from '{World.DevelopBranchName}')." );
@@ -599,7 +599,7 @@ namespace CK.Env
                     if( bLocal.IsCurrentRepositoryHead )
                     {
                         if( !RaiseEnteredLocalBranch( m, false ) ) return false;
-                        if( !AmendCommit( m ) ) return false;
+                        if( AmendCommit( m ) == CommittingResult.Error ) return false;
                         Commands.Checkout( Git, bDevelop );
                         OnNewCurrentBranch( m );
                         m.Info( $"Coming from {World.LocalBranchName}: privilegiates 'local' file changes during merge." );

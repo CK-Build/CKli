@@ -1187,7 +1187,7 @@ namespace CK.Env
                     if( oldBranchName == WorldName.MasterBranchName || oldBranchName == WorldName.DevelopBranchName )
                     {
                         var branchName = oldBranchName == WorldName.MasterBranchName ? newWorldName.MasterBranchName : newWorldName.DevelopBranchName;
-                        var repo = _gitRepositories.Single( p =>  uri == p.OriginUrl );
+                        var repo = _gitRepositories.Single( p => uri == p.OriginUrl );
                         var commitInfo = repo.ReadVersionInfo( m );
                         if( commitInfo == null )
                         {
@@ -1234,7 +1234,7 @@ namespace CK.Env
                                 commitMessage = $"Creating parallel world '{newWorldName}': Only patch versions {currentMajor}.{p.Current.FinalBuildInfo.Version.Minor}.X where X > {p.Current.FinalBuildInfo.Version.Patch} can be produced.";
                             }
                             repoXmlDoc.Save( repoXmlFile );
-                            if( !p.Repo.Commit( m, commitMessage ) )
+                            if( p.Repo.Commit( m, commitMessage ) == CommittingResult.Error )
                             {
                                 error = true;
                             }
@@ -1261,7 +1261,9 @@ namespace CK.Env
                             repoXmlDoc.Root.EnsureElement( SimpleGitVersion.SGVSchema.SimpleGitVersion )
                                             .SetAttributeValue( SimpleGitVersion.SGVSchema.StartingVersion, starting );
                             repoXmlDoc.Save( repoXmlFile );
-                            if( !p.Repo.Commit( m, $"Creating parallel world '{newWorldName}': minimal version in this branch is now '{starting}'." ) )
+                            if( p.Repo.Commit( m, $"Creating parallel world '{newWorldName}': minimal version in this branch is now '{starting}'." )
+                                == CommittingResult.Error
+                                )
                             {
                                 error = true;
                             }

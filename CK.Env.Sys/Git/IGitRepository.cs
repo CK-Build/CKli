@@ -81,7 +81,7 @@ namespace CK.Env
         /// True to call <see cref="AmendCommit"/> if <see cref="CanAmendCommit"/>. is true.
         /// </param>
         /// <returns>True on success, false on error.</returns>
-        bool Commit( IActivityMonitor m, string commitMessage, CommitBehavior commitBehavior = CommitBehavior.CreateNewCommit );
+        CommittingResult Commit( IActivityMonitor m, string commitMessage, CommitBehavior commitBehavior = CommitBehavior.CreateNewCommit );
 
         /// <summary>
         /// Amends the current commit, optionally changing its message and/or its date.
@@ -99,7 +99,7 @@ namespace CK.Env
         /// False will force the amend to be done if the date or message changed even if the working folder is clean.
         /// </param>
         /// <returns>True on success, false on error.</returns>
-        bool AmendCommit( IActivityMonitor m, Func<string, string>? editMessage = null, Func<DateTimeOffset, DateTimeOffset?>? editDate = null, bool skipIfNothingToCommit = true );
+        CommittingResult AmendCommit( IActivityMonitor m, Func<string, string>? editMessage = null, Func<DateTimeOffset, DateTimeOffset?>? editDate = null, bool skipIfNothingToCommit = true );
 
         /// <summary>
         /// Gets the current branch name (name of the repository's HEAD).
