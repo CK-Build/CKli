@@ -14,7 +14,7 @@ namespace CK.Env.Plugin
         readonly NPMProjectsDriver _npmDriver;
         readonly SolutionDriver _driver;
 
-        public NPMCodeCakeBuilderFolder( GitFolder f, NPMProjectsDriver npmDriver, SolutionDriver driver, NormalizedPath branchPath )
+        public NPMCodeCakeBuilderFolder( GitRepository f, NPMProjectsDriver npmDriver, SolutionDriver driver, NormalizedPath branchPath )
             : base( f, branchPath, "CodeCakeBuilder", "NPM/Res" )
         {
             _npmDriver = npmDriver;

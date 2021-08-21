@@ -64,7 +64,7 @@ namespace CKli
         }
 
         /// <summary>
-        /// Initializes the Git folders: this instantiates the <see cref="GitFolder"/> from the
+        /// Initializes the Git folders: this instantiates the <see cref="GitRepository"/> from the
         /// <see cref="XGitFolder.ProtoGitFolder"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
@@ -72,7 +72,7 @@ namespace CKli
         World IXTypedObjectProvider<World>.GetObject( IActivityMonitor m )
         {
             var proto = Parent.Descendants<XGitFolder>().Select( g => g.ProtoGitFolder ).ToList();
-            List<GitFolder> gitFolders = new List<GitFolder>();
+            List<GitRepository> gitFolders = new List<GitRepository>();
 
             using( m.OpenInfo( $"Initializing {proto.Count} Git folders." ) )
             {
@@ -103,11 +103,11 @@ namespace CKli
         {
             var worldCtx = _world.SolutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
             if( worldCtx == null ) return;
-            var gitFolders = worldCtx.Drivers.Select( x => (GitFolder)x.GitRepository );
+            var gitFolders = worldCtx.Drivers.Select( x => (GitRepository)x.GitRepository );
             DumpGitFolders( m, gitFolders );
         }
 
-        bool DumpGitFolders( IActivityMonitor m, IEnumerable<GitFolder> gitFolders )
+        bool DumpGitFolders( IActivityMonitor m, IEnumerable<GitRepository> gitFolders )
         {
             bool isLogFilterDefault = false;
             LogFilter final = m.ActualFilter;

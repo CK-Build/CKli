@@ -128,7 +128,8 @@ namespace CK.Env.Tests.LocalTestHelper
                 var currentWorld = EnsureWorldOpened( universe, m, worldName );
                 foreach( var gitFolder in currentWorld.GitRepositories )
                 {
-                    gitFolder.Commit( m, commitMessage ).Should().BeTrue( "There must be no error when Committing a repository." );
+                    gitFolder.Commit( m, commitMessage )
+                        .Should().NotBe( CommittingResult.Error, "There must be no error when Committing a repository." );
                 }
             }
             return universe;

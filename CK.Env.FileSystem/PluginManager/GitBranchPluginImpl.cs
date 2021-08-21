@@ -9,7 +9,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="f">The folder.</param>
         /// <param name="branchPath">The actual branch.</param>
-        public GitBranchPluginImpl( GitFolder f, NormalizedPath branchPath )
+        public GitBranchPluginImpl( GitRepository f, NormalizedPath branchPath )
         {
             if( branchPath.LastPart == f.World.LocalBranchName ) StandardPluginBranch = StandardGitStatus.Local;
             else if( branchPath.LastPart == f.World.DevelopBranchName ) StandardPluginBranch = StandardGitStatus.Develop;
@@ -21,10 +21,10 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the Git folder.
-        /// Its <see cref="GitFolder.CurrentBranchName"/> can be different from
+        /// Its <see cref="GitRepository.CurrentBranchName"/> can be different from
         /// the branch of the plugin (see <see cref="BranchPath"/>).
         /// </summary>
-        public GitFolder Folder { get; }
+        public GitRepository Folder { get; }
 
         /// <summary>
         /// Gets the branch path (relative to the <see cref="FileSystem"/>) into

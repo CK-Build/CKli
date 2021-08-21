@@ -7,7 +7,7 @@ using System;
 namespace CK.Env
 {
     /// <summary>
-    /// Captures all information required to instantiate an actual <see cref="GitFolder"/> in two steps.
+    /// Captures all information required to instantiate an actual <see cref="GitRepository"/> in two steps.
     /// This split in two phases is mainly to first collect the secrets required by the
     /// repositories and resolve them before any actual instantiation.
     /// </summary>
@@ -85,10 +85,10 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The GitFolder instance or null on error.</returns>
-        public GitFolder? CreateGitFolder( IActivityMonitor m )
+        public GitRepository? CreateGitFolder( IActivityMonitor m )
         {
             var r = GitHelper.EnsureWorkingFolder( m, this, FullPhysicalPath, true, World.DevelopBranchName );
-            return r != null ? new GitFolder( r, this ) : null;
+            return r != null ? new GitRepository( r, this ) : null;
         }
 
         /// <summary>

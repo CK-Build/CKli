@@ -15,7 +15,7 @@ namespace CK.Env.Plugin
         readonly SecretKeyStore _secretStore;
         XElement _packageSources;
 
-        public NugetConfigFile( GitFolder f, SolutionDriver driver, IEnvLocalFeedProvider localFeedProvider, SecretKeyStore secretStore, SolutionSpec s, NormalizedPath branchPath )
+        public NugetConfigFile( GitRepository f, SolutionDriver driver, IEnvLocalFeedProvider localFeedProvider, SecretKeyStore secretStore, SolutionSpec s, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "NuGet.config" ), null )
         {
             _localFeedProvider = localFeedProvider;

@@ -46,7 +46,7 @@ namespace CK.Env.Plugin
         public BuildType BuildType { get; }
 
         /// <summary>
-        /// Gets whether the build uses a dirty folder: a <see cref="GitFolder.ResetHard(IActivityMonitor)"/> will be executed after
+        /// Gets whether the build uses a dirty folder: a <see cref="GitRepository.ResetHard(IActivityMonitor)"/> will be executed after
         /// the build to restore the solution folder.
         /// </summary>
         public bool IsUsingDirtyFolder => (BuildType & BuildType.IsUsingDirtyFolder) != 0;
