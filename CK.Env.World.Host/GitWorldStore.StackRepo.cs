@@ -91,6 +91,7 @@ namespace CK.Env
                 if(result == CommittingResult.NoChanges)
                 {
                     m.Info( "Nothing commited. Skipping push." );
+                    return true;
                 }
                 return _git.Push( m );
             }
