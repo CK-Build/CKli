@@ -27,7 +27,7 @@ namespace CK.Env
         readonly ArtifactCenter _artifacts;
 
         readonly DriversCollection _solutionDrivers;
-        readonly HashSet<IGitRepository> _gitRepositories;
+        readonly HashSet<GitRepository> _gitRepositories;
         readonly IActivityMonitorFilteredClient _userMonitorClient;
 
         LocalWorldState _localState;
@@ -63,7 +63,7 @@ namespace CK.Env
             _keyStore = keyStore ?? throw new ArgumentNullException( nameof( keyStore ) );
             IsPublicWorld = isPublicWorld;
             _solutionDrivers = new DriversCollection();
-            _gitRepositories = new HashSet<IGitRepository>();
+            _gitRepositories = new HashSet<GitRepository>();
             _userMonitorClient = userMonitorClient;
 
             CommandProviderName = "World";
@@ -272,10 +272,10 @@ namespace CK.Env
         public DriversCollection SolutionDrivers => _solutionDrivers;
 
         /// <summary>
-        /// Gets the set of <see cref="IGitRepository"/> that has been discovered
+        /// Gets the set of <see cref="GitRepository"/> that has been discovered
         /// (thanks to the registration of at one <see cref="ISolutionDriver"/> on a branch).
         /// </summary>
-        public IReadOnlyCollection<IGitRepository> GitRepositories => _gitRepositories;
+        public IReadOnlyCollection<GitRepository> GitRepositories => _gitRepositories;
 
 
         /// <summary>
@@ -1173,7 +1173,7 @@ namespace CK.Env
             var worldRoot = worldData.Root;
             var newWorldName = new WorldName( WorldName.Name, parallelName );
 
-            var toProcess = new List<(IGitRepository Repo, SimpleGitVersion.ICommitInfo Current)>();
+            var toProcess = new List<(GitRepository Repo, SimpleGitVersion.ICommitInfo Current)>();
 
             worldRoot.Name = $"{newWorldName.Name}-{newWorldName.ParallelName}.World";
             using( m.OpenInfo( $"Changing the xml world definition: root element name becomes '{worldRoot.Name}'. Changing Branch elements Name from '{WorldName.DevelopBranchName}' to '{newWorldName.DevelopBranchName}' (or '{WorldName.MasterBranchName}' to '{newWorldName.MasterBranchName}')." ) )

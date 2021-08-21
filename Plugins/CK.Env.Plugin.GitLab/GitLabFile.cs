@@ -6,7 +6,7 @@ namespace CK.Env.Plugin
 {
     public class GitLabFile : YamlFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
-        public GitLabFile( GitFolder f, NormalizedPath branchPath )
+        public GitLabFile( GitRepository f, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( ".gitlab-ci.yml" ) )
         {
         }

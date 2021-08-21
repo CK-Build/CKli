@@ -23,7 +23,7 @@ namespace CK.Env
         readonly CommandRegister _commandRegister;
         readonly SecretKeyStore _secretKeyStore;
         readonly List<ProtoGitFolder> _protoGits;
-        readonly List<GitFolder> _gits;
+        readonly List<GitRepository> _gits;
 
         /// <summary>
         /// Initializes a new <see cref="FileSystem"/> on a physical root path.
@@ -41,7 +41,7 @@ namespace CK.Env
             _commandRegister = commandRegister;
             _secretKeyStore = secretKeyStore;
             _protoGits = new List<ProtoGitFolder>();
-            _gits = new List<GitFolder>();
+            _gits = new List<GitRepository>();
             ServiceContainer = new SimpleServiceContainer( sp );
             ServiceContainer.Add( this );
             ServiceContainer.Add<IFileProvider>( this );
@@ -49,14 +49,14 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the service container at the file system level.
-        /// Each <see cref="GitFolder.ServiceContainer"/> are bound to this one.
+        /// Each <see cref="GitRepository.ServiceContainer"/> are bound to this one.
         /// </summary>
         public SimpleServiceContainer ServiceContainer { get; }
 
         /// <summary>
-        /// Gets the <see cref="GitFolder"/> loaded so far (see <see cref="EnsureGitFolder(NormalizedPath)"/>).
+        /// Gets the <see cref="GitRepository"/> loaded so far (see <see cref="EnsureGitFolder(NormalizedPath)"/>).
         /// </summary>
-        public IReadOnlyList<GitFolder> GitFolders => _gits;
+        public IReadOnlyList<GitRepository> GitFolders => _gits;
 
         /// <summary>
         /// Gets or sets whether this file system is the only one that interacts with the actual files.
@@ -95,12 +95,12 @@ namespace CK.Env
         /// <param name="folderPath">
         /// The folder path is a sub path of <see cref="Root"/> and contains the .git sub folder.
         /// </param>
-        /// <returns>The <see cref="GitFolder"/> or null on error.</returns>
-        public GitFolder EnsureGitFolder( IActivityMonitor m, ProtoGitFolder proto )
+        /// <returns>The <see cref="GitRepository"/> or null on error.</returns>
+        public GitRepository EnsureGitFolder( IActivityMonitor m, ProtoGitFolder proto )
         {
             if( proto == null ) throw new ArgumentNullException( nameof( proto ) );
             if( proto.FileSystem != this ) throw new ArgumentException( "FileSystem mismatch.", nameof( proto ) );
-            GitFolder g = GitFolders.FirstOrDefault( f => f.ProtoGitFolder == proto );
+            GitRepository g = GitFolders.FirstOrDefault( f => f.ProtoGitFolder == proto );
             if( g == null )
             {
                 g = proto.CreateGitFolder( m );
@@ -120,8 +120,8 @@ namespace CK.Env
         /// <param name="folderPath">
         /// The folder path is a sub path of <see cref="Root"/> and contains the .git sub folder.
         /// </param>
-        /// <returns>The <see cref="GitFolder"/> or null if not found.</returns>
-        public GitFolder EnsureGitFolder( IActivityMonitor m, NormalizedPath folderPath )
+        /// <returns>The <see cref="GitRepository"/> or null if not found.</returns>
+        public GitRepository EnsureGitFolder( IActivityMonitor m, NormalizedPath folderPath )
         {
             ProtoGitFolder pg = _protoGits.FirstOrDefault( f => f.FolderPath == folderPath );
             return pg != null ? EnsureGitFolder( m, pg ) : null;
@@ -139,11 +139,11 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Tries to find the <see cref="GitFolder"/> for a path below the <see cref="Root"/>.
+        /// Tries to find the <see cref="GitRepository"/> for a path below the <see cref="Root"/>.
         /// </summary>
         /// <param name="subPath">The path (<see cref="Root"/> based). Can be any path inside the Git folder.</param>
         /// <returns>The Git folder or null if not found.</returns>
-        public GitFolder FindGitFolder( NormalizedPath subPath ) => GitFolders.FirstOrDefault( f => subPath.StartsWith( f.SubPath, strict: false ) );
+        public GitRepository FindGitFolder( NormalizedPath subPath ) => GitFolders.FirstOrDefault( f => subPath.StartsWith( f.SubPath, strict: false ) );
 
         /// <summary>
         /// Gets the directory content for a path below the <see cref="Root"/>.
@@ -160,7 +160,7 @@ namespace CK.Env
         public IDirectoryContents GetDirectoryContents( NormalizedPath sub )
         {
             sub = sub.ResolveDots().With( NormalizedPathRootKind.None );
-            GitFolder g = GitFolders.FirstOrDefault( f => sub.StartsWith( f.SubPath, strict: false ) );
+            GitRepository g = GitFolders.FirstOrDefault( f => sub.StartsWith( f.SubPath, strict: false ) );
             return g != null
                         ? g.GetDirectoryContents( sub.RemovePrefix( g.SubPath ) ) ?? NotFoundDirectoryContents.Singleton
                         : PhysicalGetDirectoryContents( sub );
@@ -182,7 +182,7 @@ namespace CK.Env
         public IFileInfo GetFileInfo( NormalizedPath sub )
         {
             sub = sub.ResolveDots().With( NormalizedPathRootKind.None );
-            GitFolder g = GitFolders.FirstOrDefault( f => sub.StartsWith( f.SubPath, strict: false ) );
+            GitRepository g = GitFolders.FirstOrDefault( f => sub.StartsWith( f.SubPath, strict: false ) );
             return g != null
                         ? g.GetFileInfo( sub.RemovePrefix( g.SubPath ) ) ?? new NotFoundFileInfo( sub.Path )
                         : PhysicalGetFileInfo( sub );
@@ -192,7 +192,7 @@ namespace CK.Env
         /// Copy a <see cref="IFileInfo"/> content to a <paramref name="destination"/> path in this
         /// file system.
         /// The destination must not be an existing folder and must be physically accessible
-        /// (<see cref="IFileInfo.PhysicalPath"/> must not be null): if inside a <see cref="GitFolder"/>, it must
+        /// (<see cref="IFileInfo.PhysicalPath"/> must not be null): if inside a <see cref="GitRepository"/>, it must
         /// be a in the current head (ie. corresponds to a file in the current working directory).
         /// </summary>
         /// <param name="m">The activity monitor.</param>
@@ -212,7 +212,7 @@ namespace CK.Env
         /// Copy a text content to a <paramref name="destination"/> path in this
         /// file system.
         /// The destination must not be an existing folder and must be physically accessible
-        /// (<see cref="IFileInfo.PhysicalPath"/> must not be null): if inside a <see cref="GitFolder"/>, it must
+        /// (<see cref="IFileInfo.PhysicalPath"/> must not be null): if inside a <see cref="GitRepository"/>, it must
         /// be a in the current head (ie. corresponds to a file in the current working directory).
         /// </summary>
         /// <param name="m">The activity monitor.</param>
@@ -250,7 +250,7 @@ namespace CK.Env
         /// Copy a content to a <paramref name="destination"/> path in this
         /// file system.
         /// The destination must not be an existing folder and must be physically accessible
-        /// (<see cref="IFileInfo.PhysicalPath"/> must not be null): if inside a <see cref="GitFolder"/>, it must
+        /// (<see cref="IFileInfo.PhysicalPath"/> must not be null): if inside a <see cref="GitRepository"/>, it must
         /// be a in the current head (ie. corresponds to a file in the current working directory).
         /// </summary>
         /// <param name="m">The activity monitor.</param>
@@ -341,7 +341,7 @@ namespace CK.Env
 
         /// <summary>
         /// Deletes a file or folder. It must be physically accessible
-        /// (<see cref="IFileInfo.PhysicalPath"/> must not be null): if inside a <see cref="GitFolder"/>, it must
+        /// (<see cref="IFileInfo.PhysicalPath"/> must not be null): if inside a <see cref="GitRepository"/>, it must
         /// be a in the current head (ie. corresponds to a file in the current working directory).
         /// </summary>
         /// <param name="m">The monitor.</param>

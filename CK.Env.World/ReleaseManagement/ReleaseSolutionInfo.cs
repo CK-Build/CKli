@@ -14,14 +14,14 @@ namespace CK.Env
 {
     class ReleaseSolutionInfo : IReleaseSolutionInfo
     {
-        readonly IGitRepository _repository;
+        readonly GitRepository _repository;
         readonly ICommitInfo _commitVersionInfo;
         ReleaseRoadmap _releaser;
         ReleaseInfo _previouslyResolvedInfo;
         ReleaseInfo _releaseInfo;
 
         internal ReleaseSolutionInfo(
-            IGitRepository repository,
+            GitRepository repository,
             DependentSolution solution,
             ICommitInfo versionInfo,
             XElement? previous = null )

@@ -20,7 +20,7 @@ namespace CK.Env
         public class StackRepo : GitRepositoryKey, IDisposable
         {
             readonly GitWorldStore _store;
-            GitRepository? _git;
+            SimpleGitRepository? _git;
             readonly List<WorldInfo> _worlds;
 
             internal StackRepo( GitWorldStore store, Uri uri, bool isPublic, string? branchName = null )
@@ -216,7 +216,7 @@ namespace CK.Env
                 localDir = Root.AppendPart( "$Local" );
                 if( _git == null )
                 {
-                    _git = GitRepository.Create( m, this, Root, Root.LastPart, false, BranchName, checkOutBranchName: true );
+                    _git = SimpleGitRepository.Create( m, this, Root, Root.LastPart, false, BranchName, checkOutBranchName: true );
                     if( _git == null ) return false;
                     // Ensures that the $Local directory is created and that the .gitignore ignores it.
                     // The .gitignore file is created only once.

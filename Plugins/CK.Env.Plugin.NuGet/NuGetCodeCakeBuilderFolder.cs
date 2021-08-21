@@ -13,7 +13,7 @@ namespace CK.Env.Plugin
     {
         readonly SolutionDriver _driver;
 
-        public NuGetCodeCakeBuilderFolder( GitFolder f, SolutionDriver driver, NormalizedPath branchPath )
+        public NuGetCodeCakeBuilderFolder( GitRepository f, SolutionDriver driver, NormalizedPath branchPath )
             : base( f, branchPath, "CodeCakeBuilder", "NuGet/Res" )
         {
             _driver = driver;

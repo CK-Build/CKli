@@ -38,7 +38,7 @@ namespace CK.Env.Plugin
         /// Optional type used to locate resources.
         /// By default it is the actual type of this folder object: the defining assembly and namespace are used.
         /// </param>
-        public PluginFolderBase( GitFolder f, NormalizedPath branchPath, NormalizedPath subFolderPath, NormalizedPath? resourcePrefix = null, Type resourceHolder = null )
+        public PluginFolderBase( GitRepository f, NormalizedPath branchPath, NormalizedPath subFolderPath, NormalizedPath? resourcePrefix = null, Type resourceHolder = null )
             : base( f, branchPath )
         {
             FolderPath = branchPath.Combine( subFolderPath ).ResolveDots( branchPath.Parts.Count );

@@ -36,7 +36,7 @@ namespace CK.Env.Plugin
 
         public SolutionDriver(
                 ISolutionDriverWorld w,
-                GitFolder f,
+                GitRepository f,
                 ArtifactCenter artifactCenter,
                 NormalizedPath branchPath,
                 SolutionSpec spec,
@@ -75,20 +75,20 @@ namespace CK.Env.Plugin
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => BranchPath.AppendPart( "SolutionDriver" );
 
-        IGitRepository ISolutionDriver.GitRepository => GitFolder;
+        GitRepository ISolutionDriver.GitRepository => GitFolder;
 
         string ISolutionDriver.BranchName => BranchPath.LastPart;
 
         /// <summary>
         /// Gets whether this plugin is able to work.
-        /// It provides services only on local or develop and if the <see cref="GitFolder.StandardGitStatus"/>
+        /// It provides services only on local or develop and if the <see cref="GitRepository.StandardGitStatus"/>
         /// is the same as <see cref="GitBranchPluginBase.StandardPluginBranch"/>.
         /// </summary>
         bool IsActive => GitFolder.StandardGitStatus == StandardPluginBranch
                          && (StandardPluginBranch == StandardGitStatus.Local || StandardPluginBranch == StandardGitStatus.Develop);
 
         /// <summary>
-        /// Gets the solution driver of the <see cref="IGitRepository.CurrentBranchName"/>.
+        /// Gets the solution driver of the <see cref="GitRepository.CurrentBranchName"/>.
         /// </summary>
         /// <returns>This solution driver or the one of the current branch.</returns>
         public ISolutionDriver GetCurrentBranchDriver()

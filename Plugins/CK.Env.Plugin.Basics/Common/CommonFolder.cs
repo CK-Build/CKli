@@ -9,7 +9,7 @@ namespace CK.Env.Plugin
         readonly SolutionDriver _driver;
         readonly SolutionSpec _settings;
 
-        public CommonFolder( GitFolder f, SolutionDriver driver, SolutionSpec settings, NormalizedPath branchPath )
+        public CommonFolder( GitRepository f, SolutionDriver driver, SolutionSpec settings, NormalizedPath branchPath )
             : base( f, branchPath, "Common", "Basics/Res" )
         {
             _driver = driver;

@@ -12,7 +12,7 @@ namespace CK.Env.Plugin
         readonly IEnvLocalFeedProvider _localFeedProvider;
 
         public CKSetupStoreRedirectionFile(
-            GitFolder f,
+            GitRepository f,
             SolutionDriver solutionDriver,
             SolutionSpec settings,
             IEnvLocalFeedProvider localFeedProvider,
