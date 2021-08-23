@@ -69,7 +69,12 @@ dotnet_diagnostic.CA1040.severity = none
 # Motive: Empty interfaces are "interface markers" and are very useful.
 
 # CA1508: Avoid dead conditional code
-dotnet_diagnostic.CA1508.severity = none
+dotnet_diagnostic.CA1508.severity = none 
 # Motive: Too much false positive: if you follow the suggestion you will remove useful code!
+# Has 45 issues open for this analyzers as 21/08/2021
+
+
+# VSTHRD003: Avoid awaiting foreign Tasks
+dotnet_diagnostic.VSTHRD003.severity = none
 
 # /Signature-Code .editorconfig

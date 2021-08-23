@@ -47,6 +47,7 @@ namespace CK.Env.Plugin
             HandleStandardProperties( m );
             XCommentSection.FindOrCreate( Document.Root, "ReproducibleBuilds", false )?.Remove();
             HandleZeroVersion( m );
+            HandleAnalyzers( m, useCentralPackage );
             HandleGenerateDocumentation( m );
             HandleSourceLink( m, useCentralPackage );
             HandleSourceLinkDebuggingWorkaround( m );
@@ -106,7 +107,8 @@ namespace CK.Env.Plugin
              (only for packages that are ultimately uploaded to nuget.org). -->
   <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
 
-</PropertyGroup>" );
+</PropertyGroup>
+" );
             if( useCentralPackages )
             {
                 propertyGroup.Add(
@@ -247,6 +249,58 @@ $@"<PropertyGroup>
 
         }
 
+        void HandleAnalyzers( IActivityMonitor m, bool useCentralPackages )
+        {
+            var section = XCommentSection.FindOrCreate( Document.Root, "Analyzers", true );
+            const string currentVersion = "16.9.60";
+            const string packageName = "Microsoft.VisualStudio.Threading.Analyzers";
+
+            section.SetContent(
+                    new XElement( "ItemGroup",
+                        new XElement( "PackageReference",
+                            new XAttribute( "Include", packageName ),
+                            useCentralPackages ? null : new XAttribute( "Version", currentVersion ),
+                                    new XAttribute( "PrivateAssets", "All" ),
+                                    new XAttribute( "IncludeAssets", "runtime;build;native;contentfiles;analyzers" )
+                            )
+                    )
+                );
+
+            if( useCentralPackages )
+                SetCentralePackageVersion( m, currentVersion, packageName );
+        }
+
+        private void SetCentralePackageVersion( IActivityMonitor m, string currentVersion, string packageName )
+        {
+            NormalizedPath fName = _commonFolder.FolderPath.AppendPart( "CentralPackages.props" );
+            ITextFileInfo? f = FileSystem.GetFileInfo( fName ).AsTextFileInfo( ignoreExtension: true );
+            if( f != null )
+            {
+                var d = XDocument.Parse( f.ReadAsText() );
+                bool hasChanged = d.Root.RemoveAllNamespaces();
+
+                var link = d.Root.Elements( "ItemGroup" )
+                                    .Elements( "PackageReference" ).FirstOrDefault( e => (string)e.Attribute( "Update" ) == packageName );
+                if( link == null )
+                {
+                    hasChanged = true;
+                    link = new XElement( "PackageReference",
+                                new XAttribute( "Update", packageName ),
+                                new XAttribute( "Version", currentVersion ) );
+                    d.Root.EnsureElement( "ItemGroup" ).Add( link );
+                }
+                else if( (hasChanged = (string)link.Attribute( "Version" ) != currentVersion) )
+                {
+                    link.SetAttributeValue( "Version", currentVersion );
+                }
+                if( hasChanged )
+                {
+                    m.Info( $"Updating '{fName}' for {packageName}/{currentVersion}." );
+                    FileSystem.CopyTo( m, d.ToString(), fName );
+                }
+            }
+        }
+
         void HandleSourceLink( IActivityMonitor m, bool useCentralPackages )
         {
             if( _solutionSpec.DisableSourceLink )
@@ -327,6 +381,7 @@ $@"<PropertyGroup>
             XCommentSection.FindOrCreate( Document.Root, "SourceLink", false )?.Remove();
             // Currently, we let the reference (if it exists) in the CentralPackages.props.
         }
+
 
     }
 }
