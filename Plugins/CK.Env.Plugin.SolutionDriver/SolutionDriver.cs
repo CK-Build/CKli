@@ -612,8 +612,8 @@ namespace CK.Env.Plugin
                 // nupkg had the previous CI versions). However breaking here and manually executing the dotnet pack
                 // was okay...
                 // This should be a (vicious) cache issue and may be a first "dotnet clean" helps.
-                ProcessRunner.Run( monitor, path, "dotnet", "clean", 7000 );
-                return ProcessRunner.Run( monitor, path, "dotnet", args, 7000 );
+                ProcessRunner.Run( monitor, path, "dotnet", "clean", 10_000 );
+                return ProcessRunner.Run( monitor, path, "dotnet", args, 120_000 );
             }
             finally
             {
@@ -822,8 +822,8 @@ namespace CK.Env.Plugin
             if( (buildType & BuildType.WithZeroBuilder) != BuildType.WithZeroBuilder )
             {
                 monitor.Info( "Using CodeCakeBuilder with source compilation (dotnet run)." );
-                // Consider that 10 seconds to build the CodeCakeBuilder is enough.
-                timeout += 10 * 1000;
+                // Consider that 15 seconds to build the CodeCakeBuilder is enough.
+                timeout += 15 * 1000;
             }
             var ev = new BuildStartEventArgs(
                             monitor,
