@@ -13,7 +13,7 @@ namespace CK.Env.Plugin
         readonly SolutionDriver _driver;
         readonly ChildObject<RepositoryInfoOptions> _simpleGitVersionOption;
 
-        public RepositoryXmlFile( GitFolder f, NormalizedPath branchPath, SolutionDriver driver )
+        public RepositoryXmlFile( GitRepository f, NormalizedPath branchPath, SolutionDriver driver )
             : base( f, branchPath, branchPath.AppendPart( "RepositoryInfo.xml" ), XNamespace.None + "RepositoryInfo" )
         {
             if( StandardPluginBranch == StandardGitStatus.Local )

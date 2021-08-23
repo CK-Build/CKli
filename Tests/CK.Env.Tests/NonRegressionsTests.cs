@@ -41,7 +41,7 @@ namespace CK.Env.Tests
                 var monitor = TestHelper.Monitor;
 
                 world.GitRepositories.All( g => g.CheckCleanCommit( monitor ) ).Should().BeTrue( "All repositories should be cleaned." );
-                string runCommand = $"*{nameof( GitFolder.RunProcess )}*";
+                string runCommand = $"*{nameof( GitRepository.RunProcess )}*";
                 universe
                     .RunCommands( monitor, world.WorldName.Name, "*pull*", true )
                     .RunCommands( monitor, world.WorldName.Name, runCommand, true, "git", "checkout master" )
@@ -80,7 +80,7 @@ namespace CK.Env.Tests
                         }
 
                         world.CheckBeforeReleaseBuildOrEdit( TestHelper.Monitor, true );
-                        foreach( IGitRepository repository in world.GitRepositories )
+                        foreach( GitRepository repository in world.GitRepositories )
                         {
                             (bool Success, bool ReloadNeeded) = repository.Pull( TestHelper.Monitor );
                             Success.Should().BeTrue();

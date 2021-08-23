@@ -46,19 +46,22 @@ namespace CK.Env
                             : $"Releasing {targetVersion}. Upgrading release dependencies: {upText}." + Environment.NewLine
                               + Environment.NewLine
                               + info.ReleaseNote;
-                if( !driver.GitRepository.Commit( m, msg ) ) return (null, false);
+                if( driver.GitRepository.Commit( m, msg ) == CommittingResult.Error ) return (null, false);
             }
             _commits[s.Index] = driver.GitRepository.Head.CommitSha;
             return (targetVersion, info.CurrentReleaseInfo.Level != ReleaseLevel.None);
         }
 
-        protected override BuildResult CreateBuildResult( IActivityMonitor m )
+        protected override BuildResult? CreateBuildResult( IActivityMonitor m )
         {
             foreach( var (s, driver) in DependentSolutionContext.Solutions )
             {
                 var buildProjectUpgrades = GetBuildProjectUpgrades( s );
                 if( !driver.UpdatePackageDependencies( m, buildProjectUpgrades ) ) return null;
-                if( !driver.GitRepository.Commit( m, "Updated Build project dependencies.", CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage ) ) return null;
+                if( driver.GitRepository.Commit( m, "Updated Build project dependencies.", CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage )
+                    == CommittingResult.Error
+
+                    ) return null;
                 _commits[s.Index] = driver.GitRepository.Head.CommitSha;
             }
             return base.CreateBuildResult( m );

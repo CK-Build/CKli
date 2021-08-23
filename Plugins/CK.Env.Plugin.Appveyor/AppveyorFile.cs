@@ -19,7 +19,7 @@ namespace CK.Env.Plugin
         /// </summary>
         const string APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY = "APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY";
 
-        public AppveyorFile( GitFolder f, SolutionDriver driver, SolutionSpec settings, SecretKeyStore keyStore, SharedWorldState sharedState, NormalizedPath branchPath )
+        public AppveyorFile( GitRepository f, SolutionDriver driver, SolutionSpec settings, SecretKeyStore keyStore, SharedWorldState sharedState, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "appveyor.yml" ) )
         {
             _driver = driver;

@@ -3,7 +3,7 @@ using System;
 namespace CK.Env
 {
     /// <summary>
-    /// Exposes all we need to know about the head of a <see cref="IGitRepository"/>
+    /// Exposes all we need to know about the head of a <see cref="GitRepository"/>
     /// </summary>
     public interface IGitHeadInfo
     {

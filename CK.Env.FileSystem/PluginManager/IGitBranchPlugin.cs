@@ -30,7 +30,7 @@ namespace CK.Env
     public static class GitBranchPluginExtension
     {
         /// <summary>
-        /// Checks that the <see cref="GitFolder.CurrentBranchName"/> name is the same as the plugin <see cref="IGitBranchPlugin.BranchPath"/>.
+        /// Checks that the <see cref="GitRepository.CurrentBranchName"/> name is the same as the plugin <see cref="IGitBranchPlugin.BranchPath"/>.
         /// </summary>
         /// <param name="this">This branch plugin.</param>
         /// <param name="m">The monitor to use.</param>

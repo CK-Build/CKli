@@ -100,7 +100,7 @@ namespace CK.Env
         /// <param name="filePath">The file path (relative to the <see cref="FileSystem"/>).</param>
         /// <param name="rootName">The document's root element name. See <see cref="RootName"/>.</param>
         /// <param name="encoding">Optional encoding that defaults to UTF-8.</param>
-        public XmlFileBase( FileSystem fs, NormalizedPath filePath, XName rootName, Encoding? encoding = null )
+        public XmlFileBase( FileSystem fs, NormalizedPath filePath, XName? rootName, Encoding? encoding = null )
             : base( fs, filePath, encoding )
         {
             RootName = rootName;
@@ -111,7 +111,7 @@ namespace CK.Env
         /// This is used to initialize the document (via <see cref="EnsureDocument"/>) but this is not enforced:
         /// it can be changed and it's not challenged as long as a document exists.
         /// </summary>
-        public XName RootName { get;}
+        public XName? RootName { get;}
 
         XDocument? GetDocument()
         {

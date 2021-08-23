@@ -10,7 +10,7 @@ namespace CK.Env
     /// <summary>
     /// Registry of <see cref="IGitPlugin"/> and <see cref="IGitBranchPlugin"/> that apply
     /// to a <see cref="FolderPath"/>.
-    /// The <see cref="GitPluginManager"/> of a <see cref="GitFolder"/> uses this registry to instanciate
+    /// The <see cref="GitPluginManager"/> of a <see cref="GitRepository"/> uses this registry to instanciate
     /// the plugins.
     /// </summary>
     public class GitPluginRegistry

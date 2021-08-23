@@ -11,17 +11,17 @@ namespace CK.Env
         /// </summary>
         /// <param name="f">The folder.</param>
         /// <param name="branchPath">The actual branch.</param>
-        protected GitBranchPluginBase( GitFolder f, NormalizedPath branchPath )
+        protected GitBranchPluginBase( GitRepository f, NormalizedPath branchPath )
         {
             _pluginImpl = new GitBranchPluginImpl( f, branchPath );
         }
 
         /// <summary>
         /// Gets the Git folder.
-        /// Its <see cref="GitFolder.CurrentBranchName"/> can be different from
+        /// Its <see cref="GitRepository.CurrentBranchName"/> can be different from
         /// the branch of the plugin (see <see cref="BranchPath"/>).
         /// </summary>
-        public GitFolder GitFolder => _pluginImpl.Folder;
+        public GitRepository GitFolder => _pluginImpl.Folder;
 
         /// <summary>
         /// Gets the branch path (relative to the <see cref="FileSystem"/>) into

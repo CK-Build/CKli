@@ -17,7 +17,7 @@ namespace CK.Env.Plugin
         readonly CodeCakeBuilderKeyVaultFile _keyVaultFile;
 
         public CKSetupCodeCakeBuilderFolder(
-            GitFolder f,
+            GitRepository f,
             SolutionDriver driver,
             CodeCakeBuilderKeyVaultFile keyVaultFile,
             SolutionSpec solutionSpec,
