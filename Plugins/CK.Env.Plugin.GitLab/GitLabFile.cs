@@ -46,9 +46,7 @@ namespace CK.Env.Plugin
                 {
                     ["paths"] = new YamlSequence()
                     {
-                        new YamlValue(@"'**\*.log'"),
-                        new YamlValue(@"'**\*.trx'"),
-                        new YamlValue(@"'**\Tests\**\TestResult*.xml'"),
+                        new YamlValue(@"'**\Tests\**\TestResults\*.trx'"),
                         new YamlValue(@"'**Tests\**\Logs\**\*'"),
                     },
                     ["when"] = new YamlValue( "always" ),
