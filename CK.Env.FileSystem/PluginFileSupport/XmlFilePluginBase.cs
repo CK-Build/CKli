@@ -22,7 +22,7 @@ namespace CK.Env.Plugin
         /// <param name="filePath">The file path (relative to the <see cref="FileSystem"/>). It must start with the <paramref name="branchPath"/>.</param>
         /// <param name="rootName">The document's root element name. See <see cref="RootName"/>.</param>
         /// <param name="encoding">Optional encoding that defaults to UTF-8.</param>
-        public XmlFilePluginBase( GitFolder f, NormalizedPath branchPath, NormalizedPath filePath, XName rootName, Encoding? encoding = null )
+        public XmlFilePluginBase( GitRepository f, NormalizedPath branchPath, NormalizedPath filePath, XName? rootName, Encoding? encoding = null )
             : base( f.FileSystem, filePath, rootName, encoding )
         {
             if( !filePath.StartsWith( branchPath ) ) throw new ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
@@ -31,10 +31,10 @@ namespace CK.Env.Plugin
 
         /// <summary>
         /// Gets the Git folder.
-        /// Its <see cref="GitFolder.CurrentBranchName"/> can be different from
+        /// Its <see cref="GitRepository.CurrentBranchName"/> can be different from
         /// the branch of the plugin (see <see cref="BranchPath"/>).
         /// </summary>
-        public GitFolder GitFolder => _pluginImpl.Folder;
+        public GitRepository GitFolder => _pluginImpl.Folder;
 
         /// <summary>
         /// Gets the branch path (relative to the <see cref="FileSystem"/>) into

@@ -632,7 +632,11 @@ namespace CK.Env.MSBuildSln
                         else
                         {
                             versionBound = FollowRefPropertyVersion( m, p, out propertyDef );
-                            if( !versionBound.IsValid ) return;
+                            if( !versionBound.IsValid )
+                            {
+                                m.Error( versionBound.Error );
+                                return;
+                            }
                         }
                     }
 

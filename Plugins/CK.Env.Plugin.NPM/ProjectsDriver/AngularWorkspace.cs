@@ -26,27 +26,48 @@ namespace CK.Env.Plugin
             NormalizedPath path = driver.BranchPath;
             JObject packageJson = fs.GetFileInfo( path.Combine( packageJsonPath ) ).ReadAsJObject();
             JObject angularJson = fs.GetFileInfo( path.Combine( angularJsonPath ) ).ReadAsJObject();
-            if( !(packageJson["private"]?.ToObject<bool?>() ?? false) ) throw new InvalidDataException( "A workspace project should be private." );
-            string solutionName = packageJson["name"].ToString();
-            List<string> unscopedNames = angularJson["projects"].ToObject<JObject>().Properties().Select( p => p.Name ).ToList();
-
-            List<NPMProject> projects = unscopedNames.Select(
-                unscopedName =>
+            if( !(packageJson["private"]?.ToObject<bool?>() ?? false) )
+            {
+                throw new InvalidDataException( $"A workspace project should be private. File '{packageJsonPath}' must be fixed with a \"private\": true property." );
+            }
+            if( angularJson["projects"] is not JObject jProjects )
+            {
+                throw new InvalidDataException( $"Missing \"projects\" in '{packageJsonPath}'." );
+            }
+            List<NPMProject> projects = new();
+            foreach( var propProject in jProjects.Properties() )
+            {
+                var name = propProject.Name;
+                var projPathRelativeToWorkspace = new NormalizedPath( propProject.Value["root"]?.ToString() );
+                if( projPathRelativeToWorkspace.IsEmptyPath )
                 {
-                    var projPathRelativeToWorkspace = new NormalizedPath( angularJson["projects"][unscopedName]["root"].ToString() );
+                    m.Warn( $"Project '{name}' is missing \"root\" property. It is ignored." );
+                }
+                else
+                {
                     var projPathRelativeToGitRepo = spec.Path.Combine( projPathRelativeToWorkspace );
-                    var projectPathVirtualPath = driver.BranchPath.Combine( projPathRelativeToGitRepo );
-                    JObject json = fs.GetFileInfo( projectPathVirtualPath.AppendPart( "package.json" ) ).ReadAsJObject();
-                    return new NPMProject(
-                        driver,
-                        m,
-                        new NPMProjectSpec(
-                            projPathRelativeToGitRepo,
-                            json["name"].ToString(),
-                            json["private"]?.ToObject<bool>() ?? false
-                        )
-                    );
-                } ).ToList();
+
+                    var packageFile = fs.GetFileInfo( driver.BranchPath.Combine( projPathRelativeToGitRepo ).AppendPart( "package.json" ) );
+                    if( !packageFile.Exists )
+                    {
+                        m.Warn( $"File '{packageFile}' not found. Project '{name}' is ignored." );
+                    }
+                    else
+                    {
+                        JObject json = packageFile.ReadAsJObject();
+                        var projectName = json["name"]?.ToString();
+                        if( string.IsNullOrWhiteSpace( projectName ) )
+                        {
+                            m.Warn( $"Missing or empty \"name\" in '{packageFile}'. Project '{name}' is ignored." );
+                        }
+                        else
+                        {
+                            bool isPrivate = json["private"]?.ToObject<bool>() ?? false;
+                            projects.Add( new NPMProject( driver, m, new NPMProjectSpec( projPathRelativeToGitRepo, projectName, isPrivate ) ) );
+                        }
+                    }
+                }
+            }
             return new AngularWorkspace( driver, spec, projects );
         }
 

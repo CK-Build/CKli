@@ -36,7 +36,7 @@ namespace CK.Env.Plugin
 
         public SolutionDriver(
                 ISolutionDriverWorld w,
-                GitFolder f,
+                GitRepository f,
                 ArtifactCenter artifactCenter,
                 NormalizedPath branchPath,
                 SolutionSpec spec,
@@ -75,20 +75,20 @@ namespace CK.Env.Plugin
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => BranchPath.AppendPart( "SolutionDriver" );
 
-        IGitRepository ISolutionDriver.GitRepository => GitFolder;
+        GitRepository ISolutionDriver.GitRepository => GitFolder;
 
         string ISolutionDriver.BranchName => BranchPath.LastPart;
 
         /// <summary>
         /// Gets whether this plugin is able to work.
-        /// It provides services only on local or develop and if the <see cref="GitFolder.StandardGitStatus"/>
+        /// It provides services only on local or develop and if the <see cref="GitRepository.StandardGitStatus"/>
         /// is the same as <see cref="GitBranchPluginBase.StandardPluginBranch"/>.
         /// </summary>
         bool IsActive => GitFolder.StandardGitStatus == StandardPluginBranch
                          && (StandardPluginBranch == StandardGitStatus.Local || StandardPluginBranch == StandardGitStatus.Develop);
 
         /// <summary>
-        /// Gets the solution driver of the <see cref="IGitRepository.CurrentBranchName"/>.
+        /// Gets the solution driver of the <see cref="GitRepository.CurrentBranchName"/>.
         /// </summary>
         /// <returns>This solution driver or the one of the current branch.</returns>
         public ISolutionDriver GetCurrentBranchDriver()
@@ -612,8 +612,8 @@ namespace CK.Env.Plugin
                 // nupkg had the previous CI versions). However breaking here and manually executing the dotnet pack
                 // was okay...
                 // This should be a (vicious) cache issue and may be a first "dotnet clean" helps.
-                ProcessRunner.Run( monitor, path, "dotnet", "clean", 7000 );
-                return ProcessRunner.Run( monitor, path, "dotnet", args, 7000 );
+                ProcessRunner.Run( monitor, path, "dotnet", "clean", 10_000 );
+                return ProcessRunner.Run( monitor, path, "dotnet", args, 120_000 );
             }
             finally
             {
@@ -652,7 +652,11 @@ namespace CK.Env.Plugin
         {
             Debug.Assert( IsActive );
             bool amend = StandardPluginBranch == StandardGitStatus.Local || GitFolder.Head.Message == "Local build auto commit.";
-            return GitFolder.Commit( m, "Local build auto commit.", amend ? CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage : CommitBehavior.CreateNewCommit );
+            return GitFolder.Commit(
+                m,
+                "Local build auto commit.",
+                amend ? CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage : CommitBehavior.CreateNewCommit
+            ) != CommittingResult.Error;
         }
 
         /// <summary>
@@ -766,8 +770,8 @@ namespace CK.Env.Plugin
             else if( missing.Count == 0 )
             {
                 monitor.Info( $"No artifacts have to be generated. Build is required." );
-                timeout += _solutionSpec.BuildTimeoutMilliseconds;
             }
+            timeout += _solutionSpec.BuildTimeoutMilliseconds;
             if( withUnitTest && !_solutionSpec.NoDotNetUnitTests )
             {
                 buildType |= BuildType.WithUnitTests;
@@ -822,8 +826,8 @@ namespace CK.Env.Plugin
             if( (buildType & BuildType.WithZeroBuilder) != BuildType.WithZeroBuilder )
             {
                 monitor.Info( "Using CodeCakeBuilder with source compilation (dotnet run)." );
-                // Consider that 7 seconds to build the CodeCakeBuilder is enough.
-                timeout += 7000;
+                // Consider that 15 seconds to build the CodeCakeBuilder is enough.
+                timeout += 15 * 1000;
             }
             var ev = new BuildStartEventArgs(
                             monitor,

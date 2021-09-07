@@ -24,7 +24,7 @@ namespace CK.Env
             SPDXLicense = r.HandleOptionalAttribute<string>( nameof( SPDXLicense ), null );
             BuildTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( BuildTimeoutMilliseconds ), 5 * 60_000 );
             RunTestTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( RunTestTimeoutMilliseconds ), 5 * 60_000 );
-            RemotePushTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( RemotePushTimeoutMilliseconds ), 60_000 );
+            RemotePushTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( RemotePushTimeoutMilliseconds ), 5 * 60_000 );
 
             ArtifactTargets = r.HandleCollection(
                     nameof( ArtifactTargets ),
@@ -39,7 +39,7 @@ namespace CK.Env
             ExcludedPlugins = r.HandleCollection(
                                     nameof( ExcludedPlugins ),
                                     new HashSet<Type>(),
-                                    eR => SimpleTypeFinder.WeakResolver( eR.HandleRequiredAttribute<string>( "Type" ), true ) );
+                                    eR => SimpleTypeFinder.WeakResolver( eR.HandleRequiredAttribute<string>( "Type" ), throwOnError: true )! );
 
             var e = r.Element;
 

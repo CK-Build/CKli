@@ -8,7 +8,7 @@ using System.Linq;
 
 namespace CK.Env
 {
-    public partial class GitFolder : IGitRepository, IGitHeadInfo, ICommandMethodsProvider
+    public partial class GitRepository : IGitHeadInfo, ICommandMethodsProvider
     {
         /// <summary>
         /// Gets the set of <see cref="DiffRootResult"/> for packages from the current head.

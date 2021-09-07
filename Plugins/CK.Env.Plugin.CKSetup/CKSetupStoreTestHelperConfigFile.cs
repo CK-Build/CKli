@@ -16,7 +16,7 @@ namespace CK.Env.Plugin
         readonly IEnvLocalFeedProvider _localFeedProvider;
 
         public CKSetupStoreTestHelperConfigFile(
-            GitFolder f,
+            GitRepository f,
             SolutionDriver solutionDriver,
             SolutionSpec settings,
             IEnvLocalFeedProvider localFeedProvider,

@@ -195,6 +195,7 @@ namespace CK.Env.NuGet
         {
             HttpClient = httpClient;
             SecretKeyStore = keyStore;
+            httpClient.Timeout = TimeSpan.FromMinutes( 2 );
             var c = new SourceCacheContext() { NoCache = true };
             SourceCache = c.WithRefreshCacheTrue();
             _sourcePackageProvider = new SourcePackageProvider();

@@ -22,7 +22,7 @@ namespace CK.Env.Tests
         /// </summary>
         /// <param name="f">The folder.</param>
         /// <param name="branchPath">The actual branch.</param>
-        public GitPluginSampleMock( GitFolder f, NormalizedPath branchPath )
+        public GitPluginSampleMock( GitRepository f, NormalizedPath branchPath )
             : base( f, branchPath )
         {
             ++NewedCount;

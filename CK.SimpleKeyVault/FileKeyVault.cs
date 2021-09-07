@@ -11,10 +11,15 @@ namespace CK.SimpleKeyVault
     /// <summary>
     /// Simple file based key vault that handles a <see cref="KeyStore"/>: keys are automatically
     /// loaded and saved in this file.
+    /// <para>
+    /// This is thread-safe (protected by a basic sync lock) and interactions with the <see cref="KeyStore"/>
+    /// (that is also thread-safe) are done outside of any lock.
+    /// </para>
     /// </summary>
     public sealed class FileKeyVault : IDisposable
     {
         readonly SecretKeyStore _store;
+        // This is used as the lock.
         readonly Dictionary<string, string?> _vaultContent;
         string? _passPhrase;
 
@@ -30,20 +35,36 @@ namespace CK.SimpleKeyVault
             KeyVaultPath = keyVaultPath;
         }
 
+        internal IDisposable AcquireLock()
+        {
+            System.Threading.Monitor.Enter( _vaultContent );
+            return Util.CreateDisposableAction( () => System.Threading.Monitor.Exit( _vaultContent ) );
+        }
+
         void OnSecretDeclared( object? sender, SecretKeyInfoDeclaredArgs e )
         {
-            if( IsKeyVaultOpened && _vaultContent.TryGetValue( e.Declared.Name, out var secret ) )
+            var key = e.Declared;
+            if( key.IsSecretAvailable )
             {
-                var key = e.Declared;
-                if( key.IsSecretAvailable )
+                // Secret has been set by other means (typically the "undeclared").
+                // We don't update our content, since the "save" refreshes its content from the "Optimal keys".
+            }
+            else
+            {
+                string? secret = null;
+                if( IsKeyVaultOpened )
                 {
-                    // Secret has been set by other means (typically the "undeclared").
-                    // We update our content, even if the "save" refreshes its content from the "Optimal keys".
-                    _vaultContent[key.Name] = secret;
-                }
-                else
-                {
-                    key.SetSecret( secret );
+                    using( AcquireLock() )
+                    {
+                        if( IsKeyVaultOpened )
+                        {
+                            _vaultContent.TryGetValue( e.Declared.Name, out secret );
+                        }
+                    }
+                    if( secret != null )
+                    {
+                        key.SetSecret( secret );
+                    }
                 }
             }
         }
@@ -80,13 +101,16 @@ namespace CK.SimpleKeyVault
         public bool UpdateSecret( IActivityMonitor m, string key, string? secret, bool autoSave = true )
         {
             if( !_store.SetSecret( m, key, secret ) ) return false;
-            if( autoSave && IsKeyVaultOpened )
+            using( AcquireLock() )
             {
-                if( string.IsNullOrEmpty( secret ) )
+                if( autoSave && IsKeyVaultOpened )
                 {
-                    _vaultContent.Remove( key );
+                    if( string.IsNullOrEmpty( secret ) )
+                    {
+                        _vaultContent.Remove( key );
+                    }
+                    DoSaveKeyVault( m );
                 }
-                DoSaveKeyVault( m );
             }
             return true;
         }
@@ -104,6 +128,8 @@ namespace CK.SimpleKeyVault
         /// <returns>True on success.</returns>
         public bool OpenKeyVault( IActivityMonitor m, string passPhrase = "CKli" )
         {
+            using var l = AcquireLock();
+
             if( !CheckPassPhraseConstraints( m, passPhrase ) )
             {
                 return false;
@@ -172,6 +198,8 @@ namespace CK.SimpleKeyVault
         /// <returns>True on success, false on error.</returns>
         public bool SaveKeyVault( IActivityMonitor m, string? newPassPhrase = null )
         {
+            using var l = AcquireLock();
+
             if( _passPhrase == null )
             {
                 m.Info( "Key vault is closed." );
@@ -203,6 +231,8 @@ namespace CK.SimpleKeyVault
         /// <param name="m">The monitor to use.</param>
         public void DeleteKeyVault( IActivityMonitor m )
         {
+            using var l = AcquireLock();
+
             if( IsKeyVaultOpened )
             {
                 _store.Clear();
@@ -241,8 +271,14 @@ namespace CK.SimpleKeyVault
         {
             if( IsKeyVaultOpened )
             {
-                DoSaveKeyVault( null );
-                _passPhrase = null;
+                using( AcquireLock() )
+                {
+                    if( IsKeyVaultOpened )
+                    {
+                        DoSaveKeyVault( null );
+                        _passPhrase = null;
+                    }
+                }
             }
         }
     }

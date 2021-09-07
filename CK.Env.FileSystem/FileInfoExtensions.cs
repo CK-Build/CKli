@@ -21,11 +21,20 @@ namespace CK.Env
         public static string ReadAsText( this IFileInfo @this )
         {
             if( @this is ITextFileInfo txt ) return txt.TextContent;
-            using( var s = @this.CreateReadStream() )
+            using( var s = CheckFileInfoExists( @this ).CreateReadStream() )
             using( var t = new StreamReader( s ) )
             {
                 return t.ReadToEnd().NormalizeEOL();
             }
+        }
+
+        static IFileInfo CheckFileInfoExists( IFileInfo @this )
+        {
+            if( !@this.Exists )
+            {
+                throw new InvalidOperationException( $"File info '{@this.Name}' (PhysicalPath: {@this.PhysicalPath}) doesn't exist." );
+            }
+            return @this;
         }
 
         /// <summary>
@@ -38,9 +47,9 @@ namespace CK.Env
         {
             using( var t = @this is ITextFileInfo txt
                                 ? (TextReader)new StringReader( txt.TextContent )
-                                : new StreamReader( @this.CreateReadStream() ) )
+                                : new StreamReader( CheckFileInfoExists( @this ).CreateReadStream() ) )
             {
-                string line;
+                string? line;
                 while( (line = t.ReadLine()) != null ) yield return line;
             }
         }
@@ -53,7 +62,7 @@ namespace CK.Env
 
         public static XDocument ReadAsXDocument( this IFileInfo @this )
         {
-            using( var s = @this.CreateReadStream() )
+            using( var s = CheckFileInfoExists( @this ).CreateReadStream() )
             {
                 return XDocument.Load( s );
             }
@@ -62,7 +71,7 @@ namespace CK.Env
         public static byte[] ReadAllBytes( this IFileInfo @this )
         {
             if( @this is Transformed t ) return t.BinContent;
-            using( var s = @this.CreateReadStream() )
+            using( var s = CheckFileInfoExists( @this ).CreateReadStream() )
             {
                 var b = new byte[@this.Length];
                 s.Read( b, 0, b.Length );
@@ -153,7 +162,7 @@ namespace CK.Env
         /// By default only extensions that are known to contain text are considered.
         /// </param>
         /// <returns>A ITextFileInfo or null.</returns>
-        public static ITextFileInfo AsTextFileInfo( this IFileInfo f, bool ignoreExtension = false )
+        public static ITextFileInfo? AsTextFileInfo( this IFileInfo f, bool ignoreExtension = false )
         {
             if( f is ITextFileInfo t ) return t;
             if( f == null || !f.Exists || f.IsDirectory ) return null;

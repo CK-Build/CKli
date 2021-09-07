@@ -6,7 +6,7 @@ namespace CK.Env.Plugin
 {
     public class GitLabFile : YamlFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
-        public GitLabFile( GitFolder f, NormalizedPath branchPath )
+        public GitLabFile( GitRepository f, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( ".gitlab-ci.yml" ) )
         {
         }
@@ -46,9 +46,7 @@ namespace CK.Env.Plugin
                 {
                     ["paths"] = new YamlSequence()
                     {
-                        new YamlValue(@"'**\*.log'"),
-                        new YamlValue(@"'**\*.trx'"),
-                        new YamlValue(@"'**\Tests\**\TestResult*.xml'"),
+                        new YamlValue(@"'**\Tests\**\TestResults\*.trx'"),
                         new YamlValue(@"'**Tests\**\Logs\**\*'"),
                     },
                     ["when"] = new YamlValue( "always" ),

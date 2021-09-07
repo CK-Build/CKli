@@ -40,7 +40,7 @@ namespace CK.Env
             // (When working folder is up-to-date.)
             var upText = upgrades.Select( u => u.PackageUpdate.ToString() ).Concatenate( Environment.NewLine );
             var msg = $"CI build: Upgrading dependencies:{Environment.NewLine}{Environment.NewLine}{upText}.";
-            if( !driver.GitRepository.Commit( m, msg ) ) return (null, false);
+            if( driver.GitRepository.Commit( m, msg ) == CommittingResult.Error ) return (null, false);
             _commits[s.Index] = driver.GitRepository.Head.CommitSha;
             return (driver.GitRepository.ReadVersionInfo( m )?.FinalBuildInfo.Version, true);
         }
@@ -55,11 +55,15 @@ namespace CK.Env
             if( !driver.UpdatePackageDependencies( m, buildProjectsUpgrade ) ) return BuildState.Failed;
             if( driver.GitRepository.CanAmendCommit )
             {
-                if( !driver.GitRepository.AmendCommit( m ) ) return BuildState.Failed;
+                if( driver.GitRepository.AmendCommit( m ) == CommittingResult.Error ) return BuildState.Failed;
             }
             else
             {
-                if( !driver.GitRepository.Commit( m, "Required Build commit (for CI): build dependencies changed." ) ) return BuildState.Failed;
+                if( driver.GitRepository.Commit( m, "Required Build commit (for CI): build dependencies changed." )
+                    == CommittingResult.Error )
+                {
+                    return BuildState.Failed;
+                }
                 var currentSha = driver.GitRepository.Head.CommitSha;
                 if( _commits[s.Index] != currentSha )
                 {

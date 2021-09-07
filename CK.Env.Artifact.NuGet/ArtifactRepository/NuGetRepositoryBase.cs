@@ -135,7 +135,7 @@ namespace CK.Env.NuGet
         /// <param name="files">The set of packages to push.</param>
         /// <param name="timeoutSeconds">Timeout in seconds.</param>
         /// <returns>The awaitable.</returns>
-        public async Task PushPackagesAsync( IActivityMonitor m, IEnumerable<LocalNuGetPackageFile> files, int timeoutSeconds = 20 )
+        public async Task PushPackagesAsync( IActivityMonitor m, IEnumerable<LocalNuGetPackageFile> files, int timeoutSeconds = 2*60 )
         {
             string apiKey = ResolvePushAPIKey( m );
             try

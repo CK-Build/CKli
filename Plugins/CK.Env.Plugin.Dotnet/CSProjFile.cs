@@ -11,7 +11,7 @@ namespace CK.Env.Plugin
         private readonly SolutionDriver _solutionDriver;
 
         public CSProjFile(
-             GitFolder f,
+             GitRepository f,
              NormalizedPath branchPath,
             SolutionDriver solutionDriver )
              : base( f, branchPath )

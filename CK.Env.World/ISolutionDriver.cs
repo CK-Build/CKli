@@ -13,7 +13,7 @@ namespace CK.Env
         /// Gets the Git repository.
         /// This can never be null.
         /// </summary>
-        IGitRepository GitRepository { get; }
+        GitRepository GitRepository { get; }
 
         /// <summary>
         /// Gets the branch name.
@@ -22,7 +22,7 @@ namespace CK.Env
         string BranchName { get; }
 
         /// <summary>
-        /// Gets the solution driver of the <see cref="IGitRepository.CurrentBranchName"/>.
+        /// Gets the solution driver of the <see cref="GitRepository.CurrentBranchName"/>.
         /// </summary>
         /// <returns>This solution driver or the one of the current branch.</returns>
         ISolutionDriver GetCurrentBranchDriver();

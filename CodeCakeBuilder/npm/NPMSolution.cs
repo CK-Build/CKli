@@ -58,7 +58,7 @@ namespace CodeCake
         readonly StandardGlobalInfo _globalInfo;
 
         /// <summary>
-        /// Initiaizes a new <see cref="NPMSolution" />.
+        /// Initializes a new <see cref="NPMSolution" />.
         /// </summary>
         /// <param name="projects">Set of projects.</param>
         NPMSolution(

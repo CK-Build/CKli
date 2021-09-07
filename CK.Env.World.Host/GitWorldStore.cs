@@ -21,7 +21,7 @@ namespace CK.Env
         readonly List<StackRepo> _stackRepos;
 
         /// <summary>
-        /// 
+        /// Initializes a new multiple world store.
         /// </summary>
         /// <param name="rootStorePath">The root path where the stores repositories and local states are hosted.</param>
         /// <param name="mapping">The world mapping.</param>
@@ -97,18 +97,18 @@ namespace CK.Env
         /// the CK and CK-Build public stacks are automatically created.
         /// </para>
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <returns>Always true in multiple worlds mode. False is the single world failed to be read.</returns>
-        internal bool ReadStacksFromLocalStacksFilePath( IActivityMonitor m )
+        /// <param name="monitor">The monitor to use.</param>
+        /// <returns>Always true in multiple worlds mode. False if the single world failed to be read.</returns>
+        public bool ReadStacksFromLocalStacksFilePath( IActivityMonitor monitor )
         {
             if( !File.Exists( StacksFilePath ) )
             {
-                m.Warn( $"File '{StacksFilePath}' not found." );
+                monitor.Warn( $"File '{StacksFilePath}' not found." );
                 if( SingleWorld != null ) return false;
             }
             else
             {
-                using( m.OpenInfo( $"Reading '{StacksFilePath}'." ) )
+                using( monitor.OpenInfo( $"Reading '{StacksFilePath}'." ) )
                 {
                     try
                     {
@@ -124,7 +124,7 @@ namespace CK.Env
                             var wE = root.Elements().Elements( "Worlds" ).Elements().FirstOrDefault( e => (string?)e.Attribute( "FullName" ) == SingleWorld.WorldName.FullName );
                             if( wE == null )
                             {
-                                m.Error( $"Unable to find WorldfInfo element with FullName attribute '{SingleWorld.WorldName.FullName}'." );
+                                monitor.Error( $"Unable to find WorldfInfo element with FullName attribute '{SingleWorld.WorldName.FullName}'." );
                                 return false;
                             }
                             var r = StackRepo.Parse( this, wE.Parent.Parent, wE );
@@ -142,21 +142,21 @@ namespace CK.Env
                     }
                     catch( Exception ex )
                     {
-                        m.Error( $"Unable to read '{StacksFilePath}' file.", ex );
+                        monitor.Error( $"Unable to read '{StacksFilePath}' file.", ex );
                         if( SingleWorld != null ) return false;
                     }
                 }
             }
             if( _stackRepos.Count == 0 )
             {
-                using( m.OpenInfo( "Since there is no Stack defined, we initialize CK and CK-Build mapped to '/Dev/' by default." ) )
+                using( monitor.OpenInfo( "Since there is no Stack defined, we initialize CK and CK-Build mapped to '/Dev/' by default." ) )
                 {
-                    m.Info( $"Use 'run World/{nameof( SetWorldMapping )}' command to change this default mapping if you want." );
+                    monitor.Info( $"Use 'run World/{nameof( SetWorldMapping )}' command to change this default mapping if you want." );
                     _stackRepos.Add( new StackRepo( this, new Uri( "https://github.com/signature-opensource/CK-Stack" ), true ) );
                     _stackRepos.Add( new StackRepo( this, new Uri( "https://github.com/CK-Build/CK-Build-Stack" ), true ) );
-                    WorldLocalMapping.SetMap( m, "CK-Build", "/Dev/CK-Build" );
-                    WorldLocalMapping.SetMap( m, "CK", "/Dev/CK" );
-                    WriteStacksToLocalStacksFilePath( m );
+                    WorldLocalMapping.SetMap( monitor, "CK-Build", "/Dev/CK-Build" );
+                    WorldLocalMapping.SetMap( monitor, "CK", "/Dev/CK" );
+                    WriteStacksToLocalStacksFilePath( monitor );
                 }
             }
             return true;

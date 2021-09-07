@@ -3,6 +3,7 @@ using CK.Text;
 using SharpYaml;
 using SharpYaml.Model;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 
@@ -10,16 +11,16 @@ namespace CK.Env
 {
     public class YamlFileBase : TextFileBase
     {
-        YamlStream _yamlStream;
-        YamlDocument _doc;
-        YamlMapping _firstMapping;
+        YamlStream? _yamlStream;
+        YamlDocument? _doc;
+        YamlMapping? _firstMapping;
 
         public YamlFileBase( FileSystem fs, NormalizedPath filePath )
             : base( fs, filePath )
         {
         }
 
-        protected YamlMapping GetFirstMapping( IActivityMonitor m, bool autoCreate )
+        protected YamlMapping? GetFirstMapping( IActivityMonitor m, bool autoCreate )
         {
             if( _firstMapping == null )
             {
@@ -44,10 +45,11 @@ namespace CK.Env
             return _firstMapping;
         }
 
-        protected string YamlMappingToString( IActivityMonitor m )
+        protected string? YamlMappingToString( IActivityMonitor m )
         {
             if( GetFirstMapping( m, false ) != null )
             {
+                Debug.Assert( _yamlStream != null );
                 var output = new StringBuilder();
                 using( var w = new StringWriter( output ) )
                 {
@@ -99,7 +101,7 @@ namespace CK.Env
 
         protected YamlMapping FindOrCreateYamlElement( IActivityMonitor m, YamlMapping mapping, string elementName )///Too similar with AppveyorFile.FindOrCreateEnvironement. We should mutualise these.
         {
-            YamlMapping jobMapping;
+            YamlMapping? jobMapping;
             YamlElement job = mapping[elementName];
             if( job != null )
             {

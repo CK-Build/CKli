@@ -19,7 +19,7 @@ namespace CK.Env.Plugin
         /// </summary>
         const string APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY = "APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY";
 
-        public AppveyorFile( GitFolder f, SolutionDriver driver, SolutionSpec settings, SecretKeyStore keyStore, SharedWorldState sharedState, NormalizedPath branchPath )
+        public AppveyorFile( GitRepository f, SolutionDriver driver, SolutionSpec settings, SecretKeyStore keyStore, SharedWorldState sharedState, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "appveyor.yml" ) )
         {
             _driver = driver;
@@ -87,22 +87,34 @@ namespace CK.Env.Plugin
             }
             //
             firstMapping.Remove( new YamlValue( "init" ) );
+            firstMapping.Remove( "artifacts" );
             if( _solutionSpec.SqlServer != null )
             {
                 firstMapping["services"] = new YamlValue( "mssql" + _solutionSpec.SqlServer.ToLowerInvariant() );
             }
-            var install = new YamlSequence();
-            // Temporary: installs the 6.9.0 of npm.
-            if( solution.GeneratedArtifacts.Any( g => g.Artifact.Type.Name == "NPM" ) )
+
+            if( firstMapping["install"] is YamlSequence inst )
             {
-                install.Add( CreateKeyValue( "cmd", "npm install -g npm@6.9.0" ) );
-                install.Add( CreateKeyValue( "ps", "Install-Product node 12" ) );
+                if( inst.RemoveWhereAndReturnsRemoved( e => e is YamlMapping m
+                                                            && m["cmd"] is YamlValue v
+                                                            && v.Value.StartsWith( "npm install -g npm@" ) ).Count() > 0 )
+                {
+                    m.Info( "Removed npm install with a specific version (using the Appveyor's installed one)." );
+                }
+                if( inst.Count == 0 )
+                {
+                    firstMapping.Remove( "install" );
+                }
             }
-            firstMapping["install"] = install;
 
             firstMapping["version"] = new YamlValue( "build{build}" );
             firstMapping["image"] = new YamlValue( "Visual Studio 2019" );
             firstMapping["clone_folder"] = new YamlValue( "C:\\CKli-World\\" + GitFolder.SubPath.Path.Replace( '/', '\\' ) );
+            var onFinish = new YamlSequence();
+            onFinish.Add( CreateKeyValue( "ps", "'Get-ChildItem -Recurse *.log | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''Log files'' }'" ) );
+            onFinish.Add( CreateKeyValue( "ps", "'Get-ChildItem -Recurse **\\Tests\\**\\TestResult*.xml | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''NUnit tests result files'' }'" ) );
+            onFinish.Add( CreateKeyValue( "ps", "'Get-ChildItem -Recurse **Tests\\**\\Logs\\**\\* | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''Log files'' }'" ) );
+            firstMapping["on_finish"] = onFinish;
             EnsureDefaultBranches( firstMapping );
             SetSequence( firstMapping, "build_script", new YamlValue( "dotnet run --project CodeCakeBuilder -nointeraction" ) );
             firstMapping["test"] = new YamlValue( "off" );

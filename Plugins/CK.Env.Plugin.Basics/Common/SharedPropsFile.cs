@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Env.DependencyModel;
 using CK.Text;
+using System.Diagnostics;
 using System.Linq;
 using System.Xml.Linq;
 
@@ -80,7 +81,7 @@ namespace CK.Env.Plugin
             section.StartComment = ": provides simple and useful definitions.";
             var propertyGroup = XElement.Parse(
 @"<PropertyGroup>
-
+  <Features>strict</Features>
   <!-- Simple IsTestProject and IsInTestsFolder variables. -->
   <IsTestProject Condition="" '$(IsTestProject)' == '' And $(MSBuildProjectName.EndsWith('.Tests'))"">true</IsTestProject>
   <IsInTestsFolder Condition=""$(MSBuildProjectDirectory.Contains('\Tests\')) Or $(MSBuildProjectDirectory.Contains('/Tests/'))"">true</IsInTestsFolder>
@@ -125,6 +126,7 @@ namespace CK.Env.Plugin
 
         void HandleStandardProperties( IActivityMonitor m )
         {
+            Debug.Assert( Document != null );
             const string sectionName = "StandardProperties";
             var section = XCommentSection.FindOrCreate( Document.Root, sectionName, false );
             if( section == null )
@@ -143,9 +145,11 @@ namespace CK.Env.Plugin
                             new XElement( "Authors", "Signature Code" ),
                             new XElement( "Copyright", @"Copyright Signature-Code 2007-$([System.DateTime]::UtcNow.ToString(""yyyy""))" ),
                             new XElement( "RepositoryType", "git" ),
-                            new XElement( "PackageIcon", "PackageIcon.png" ),
                             new XComment( "Removes annoying Pack warning: The package version ... uses SemVer 2.0.0 or components of SemVer 1.0.0 that are not supported on legacy clients..." ),
-                            new XElement( "NoWarn", "NU5105" ) );
+                            new XElement( "NoWarn", "NU5105" ),
+                            new XComment( "Considering .net6 'global using' to be an opt-in (simply reproduce this with 'false' in the csproj if needed)." ),
+                            new XElement( "DisableImplicitNamespaceImports", "true" ),
+                            new XElement( "PackageIcon", "PackageIcon.png" ) );
 
             if( !_solutionSpec.NoStrongNameSigning )
             {
@@ -154,7 +158,6 @@ namespace CK.Env.Plugin
                        new XElement( "PublicSign", new XAttribute( "Condition", " '$(OS)' != 'Windows_NT' " ), true ) );
             }
 
-            p.Add( new XElement( "PackageIcon", "PackageIcon.png" ) );
             var i = new XElement( "ItemGroup",
                         new XElement( "None",
                             new XAttribute( "Include", "$(MSBuildThisFileDirectory)PackageIcon.png" ),

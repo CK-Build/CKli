@@ -21,7 +21,7 @@ namespace CK.Env.Plugin
         readonly SolutionDriver _solutionDriver;
         readonly SecretKeyStore _secretStore;
 
-        public NPMRCFiles( GitFolder f, NPMProjectsDriver driver, SolutionDriver solutionDriver, SecretKeyStore secretStore, SolutionSpec solutionSpec, NormalizedPath branchPath )
+        public NPMRCFiles( GitRepository f, NPMProjectsDriver driver, SolutionDriver solutionDriver, SecretKeyStore secretStore, SolutionSpec solutionSpec, NormalizedPath branchPath )
             : base( f, branchPath )
         {
             _solutionDriver = solutionDriver;

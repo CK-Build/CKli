@@ -7,6 +7,7 @@ using System.Management.Automation.Runspaces;
 using System.Text;
 using Microsoft.PowerShell;
 using System;
+using System.Threading;
 
 namespace CK.Env
 {
@@ -21,7 +22,8 @@ namespace CK.Env
         public static bool IsRunningOnUnix => Environment.OSVersion.Platform == PlatformID.Unix;
 
         /// <summary>
-        /// Runs a .ps1 file by running "Powershell.exe" (or "pwsh") that must be in the path.
+        /// Runs a .ps1 file by running "Powershell.exe" (or "pwsh" if <see cref="IsRunningOnUnix"/>) that
+        /// must be in the path.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="workingDir">The working directory.</param>
@@ -53,7 +55,7 @@ namespace CK.Env
             return Run( monitor,
                         workingDir,
                         IsRunningOnUnix ? "pwsh" : "Powershell.exe",
-                        "-executionpolicy unrestricted "+ fileName,
+                        "-executionpolicy unrestricted " + fileName,
                         timeoutMilliseconds,
                         stdErrorLevel,
                         environmentVariables );
@@ -97,6 +99,8 @@ namespace CK.Env
                 WorkingDirectory = workingDir,
                 UseShellExecute = false,
                 CreateNoWindow = true,
+                // ErrorDialog = false, -- The default is false.
+                // LoadUserProfile = false, -- The default is false.
                 FileName = fileName,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -152,10 +156,10 @@ namespace CK.Env
             using( m.OpenTrace( $"{startInfo.FileName} {startInfo.Arguments}" ) )
             using( Process cmdProcess = new Process() )
             {
-                bool dumpLogs = true;
+                bool hasExited = false;
                 StringBuilder errorCapture = new StringBuilder();
-                DataReceivedEventHandler outputReceived = delegate ( object o, DataReceivedEventArgs e ) { if( dumpLogs && e.Data != null ) m.Info( "<StdOut> " + e.Data ); };
-                DataReceivedEventHandler errorReceived = delegate ( object o, DataReceivedEventArgs e ) { if( dumpLogs && !string.IsNullOrEmpty( e.Data ) ) errorCapture.AppendLine( e.Data ); };
+                DataReceivedEventHandler outputReceived = delegate ( object o, DataReceivedEventArgs e ) { if( e.Data != null && !hasExited ) m.Info( "<StdOut> " + e.Data ); };
+                DataReceivedEventHandler errorReceived = delegate ( object o, DataReceivedEventArgs e ) { if( !string.IsNullOrEmpty( e.Data ) ) errorCapture.AppendLine( e.Data ); };
 
                 cmdProcess.StartInfo = startInfo;
                 cmdProcess.OutputDataReceived += outputReceived;
@@ -163,14 +167,49 @@ namespace CK.Env
                 cmdProcess.Start();
                 cmdProcess.BeginErrorReadLine();
                 cmdProcess.BeginOutputReadLine();
-                // See https://github.com/dotnet/msbuild/issues/2981
-                // and https://stackoverflow.com/questions/8207994/how-to-wait-on-a-process-and-all-its-child-processes-to-exit/37983587#37983587
-                bool hasExited = cmdProcess.WaitForExit( timeoutMilliseconds );
-                // It happens that, even if the process has exited, we may be receiving data here.
-                dumpLogs = false;
+
+                hasExited = cmdProcess.WaitForExit( timeoutMilliseconds );
+                int exitCode = hasExited ? cmdProcess.ExitCode : 0;
                 cmdProcess.OutputDataReceived -= outputReceived;
                 cmdProcess.ErrorDataReceived -= errorReceived;
 
+                if( !hasExited )
+                {
+                    hasExited = true;
+                    Thread.Sleep( 150 );
+                    using( m.OpenError( $"Process ran out of time ({timeoutMilliseconds} ms). Killing it (including its child processes)." ) )
+                    {
+                        try
+                        {
+                            cmdProcess.Kill( entireProcessTree: true );
+                            // This flushes the streams and waits for the message pumps to end.
+                            cmdProcess.Close();
+                        }
+                        catch( Exception ex )
+                        {
+                            m.Error( ex );
+                        }
+                    }
+                    DumpStdErr( m, stdErrorLevel, errorCapture );
+                    return false;
+                }
+
+                // This flushes the streams and SHOULD wait for the message pumps to end.
+                cmdProcess.Close();
+                // However, it seems that this is required...
+                Thread.Sleep( 150 ); //TODO .NET 5: fix this.
+                // Why is this so ugly ? Because: https://github.com/dotnet/runtime/issues/51277
+                DumpStdErr( m, stdErrorLevel, errorCapture );
+                if( exitCode != 0 )
+                {
+                    m.Error( $"Process returned ExitCode {exitCode}." );
+                    return false;
+                }
+                return true;
+            }
+
+            static void DumpStdErr( IActivityMonitor m, LogLevel stdErrorLevel, StringBuilder errorCapture )
+            {
                 if( errorCapture.Length > 0 )
                 {
                     using( m.OpenGroup( stdErrorLevel, "Received errors on <StdErr>:" ) )
@@ -178,29 +217,6 @@ namespace CK.Env
                         m.Log( stdErrorLevel, errorCapture.ToString() );
                     }
                 }
-
-                if( !hasExited )
-                {
-                    using( m.OpenError( $"Process ran out of time ({timeoutMilliseconds} ms). Killing it (including its child processes)." ) )
-                    {
-                        try
-                        {
-                            cmdProcess.Kill( entireProcessTree: true );
-                        }
-                        catch( Exception ex )
-                        {
-                            m.Error( ex );
-                        }
-                    }
-                    return false;
-                }
-
-                if( cmdProcess.ExitCode != 0 )
-                {
-                    m.Error( $"Process returned ExitCode {cmdProcess.ExitCode}." );
-                    return false;
-                }
-                return true;
             }
         }
     }

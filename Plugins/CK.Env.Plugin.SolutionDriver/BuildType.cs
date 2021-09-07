@@ -22,7 +22,7 @@ namespace CK.Env.Plugin
 
         /// <summary>
         /// Whether the build  requires to temporarily alter the working folder:
-        /// a <see cref="GitFolder.ResetHard"/> will be done after the build.
+        /// a <see cref="GitRepository.ResetHard"/> will be done after the build.
         /// </summary>
         IsUsingDirtyFolder = 8,
 

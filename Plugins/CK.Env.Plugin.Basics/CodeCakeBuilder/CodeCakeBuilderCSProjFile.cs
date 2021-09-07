@@ -46,11 +46,11 @@ namespace CK.Env.Plugin
             // This should be modeled in the world xml.
             var framework = MSProject.Savors.FindOrCreate( "netcoreapp3.1" );
             var dependencies = new[] {
-                ("NuGet.Protocol", "5.8.0", false),
-                ("NuGet.Credentials", "5.8.0", false),
-                ("CK.Text", "9.0.0", false),
-                ("SimpleGitVersion.Cake", "5.0.0", false),
-                ("CKSetup.Cake", "11.2.0", false),
+                ("NuGet.Protocol", "5.9.1", false),
+                ("NuGet.Credentials", "5.9.1", false),
+                ("CK.Text", "9.0.1", false),
+                ("SimpleGitVersion.Cake", "5.1.1", false),
+                ("CKSetup.Cake", "14.1.0", false),
                 ("Newtonsoft.Json", "12.0.3", false)
             };
 

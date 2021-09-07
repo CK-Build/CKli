@@ -10,7 +10,7 @@ namespace CK.Env.Plugin
     {
         readonly SolutionSpec _solutionSpec;
 
-        public GitIgnoreFile( GitFolder f, SolutionSpec solutionSpec, NormalizedPath branchPath )
+        public GitIgnoreFile( GitRepository f, SolutionSpec solutionSpec, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( ".gitignore" ), UTF8EncodingNoBOM )
         {
             _solutionSpec = solutionSpec;
@@ -32,6 +32,10 @@ namespace CK.Env.Plugin
             EnsureLine( lines, "[Oo]bj/" );
             EnsureLine( lines, "[Rr]elease/" );
             EnsureLine( lines, "[Rr]eleases/" );
+            RemoveLine( lines, "[Rr]elease/" );
+            RemoveLine( lines, "[Rr]eleases/" );
+            EnsureLine( lines, "CodeCakeBuilder/[Rr]elease/" );
+            EnsureLine( lines, "CodeCakeBuilder/[Rr]eleases/" );
             EnsureLine( lines, ".vs/" );
             EnsureLine( lines, "*.suo" );
             EnsureLine( lines, "*.user" );

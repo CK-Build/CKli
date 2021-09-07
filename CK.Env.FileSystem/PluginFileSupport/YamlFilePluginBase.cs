@@ -7,7 +7,7 @@ namespace CK.Env.Plugin
     {
         readonly GitBranchPluginImpl _pluginImpl;
 
-        public YamlFilePluginBase( GitFolder f, NormalizedPath branchPath, NormalizedPath filePath )
+        public YamlFilePluginBase( GitRepository f, NormalizedPath branchPath, NormalizedPath filePath )
             : base( f.FileSystem, filePath )
         {
             if( !filePath.StartsWith( branchPath ) ) throw new ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
@@ -16,10 +16,10 @@ namespace CK.Env.Plugin
 
         /// <summary>
         /// Gets the Git folder.
-        /// Its <see cref="GitFolder.CurrentBranchName"/> can be different from
+        /// Its <see cref="GitRepository.CurrentBranchName"/> can be different from
         /// the branch of the plugin (see <see cref="BranchPath"/>).
         /// </summary>
-        public GitFolder GitFolder => _pluginImpl.Folder;
+        public GitRepository GitFolder => _pluginImpl.Folder;
 
         /// <summary>
         /// Gets the branch path (relative to the <see cref="FileSystem"/>) into

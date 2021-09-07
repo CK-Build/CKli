@@ -150,7 +150,7 @@ namespace CK.Env.MSBuildSln
         const string PatternParseProject = "^Project\\(\"(?<PROJECTTYPEGUID>.*)\"\\)\\s*=\\s*\"(?<PROJECTNAME>.*)\"\\s*,\\s*\"(?<RELATIVEPATH>.*)\"\\s*,\\s*\"(?<PROJECTGUID>.*)\"$";
         static readonly Regex _rParseProject = new Regex( PatternParseProject, RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture );
 
-        static ProjectBase ReadProject( SolutionFile s, Reader r )
+        static ProjectBase? ReadProject( SolutionFile s, Reader r )
         {
             var match = _rParseProject.Match( r.Line );
             if( !match.Success )
@@ -180,7 +180,12 @@ namespace CK.Env.MSBuildSln
             }
             while( r.Forward() && !r.MatchLineStartingWith( "EndProject" ) )
             {
-                result.AddSection( ReadProjectSection( result, r ) );
+                var section = ReadProjectSection( result, r );
+                if( section != null )
+                {
+                    result.AddSection( section );
+                }
+                else return null;
             }
             return result;
         }
@@ -188,7 +193,7 @@ namespace CK.Env.MSBuildSln
         const string PatternParseProjectSection = @"^ProjectSection\((?<NAME>.*)\) = (?<STEP>.*)$";
         static readonly Regex _rParseProjectSection = new Regex( PatternParseProjectSection, RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture );
 
-        static Section ReadProjectSection( ProjectBase project, Reader r )
+        static Section? ReadProjectSection( ProjectBase project, Reader r )
         {
             var match = _rParseProjectSection.Match( r.Line );
             if( !match.Success )
