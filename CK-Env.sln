@@ -96,9 +96,13 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CKli.XObject", "CKli.XObjec
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CKli.AllCode", "CKli.AllCode\CKli.AllCode.csproj", "{AF78DE02-C63C-4850-A6BE-59F134419CAF}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kuinox.TypedCLI.NPM", "..\Kuinox.TypedCLI\Kuinox.TypedCLI.NPM\Kuinox.TypedCLI.NPM.csproj", "{FE71EC14-C3CC-4C5C-AA15-1918AA541B97}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kuinox.TypedCLI.NPM", "C:\dev\Kuinox.TypedCLI\Kuinox.TypedCLI.NPM\Kuinox.TypedCLI.NPM.csproj", "{FE71EC14-C3CC-4C5C-AA15-1918AA541B97}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kuinox.TypedCLI.Helpers", "..\Kuinox.TypedCLI\Kuinox.TypedCLI.Helpers\Kuinox.TypedCLI.Helpers.csproj", "{4ECA0B14-68EB-4EA4-9296-647235F2A4DD}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kuinox.TypedCLI.Helpers", "C:\dev\Kuinox.TypedCLI\Kuinox.TypedCLI.Helpers\Kuinox.TypedCLI.Helpers.csproj", "{4ECA0B14-68EB-4EA4-9296-647235F2A4DD}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kuinox.TypedCLI.Dotnet", "..\..\Kuinox.TypedCLI\Kuinox.TypedCLI.Dotnet\Kuinox.TypedCLI.Dotnet.csproj", "{318E123E-63C3-41E1-A416-EE7EC37D67C8}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.BuildHelpers", "CK.BuildHelpers\CK.BuildHelpers.csproj", "{A5B3BB4B-A518-4BE3-BAB5-94D70B2C64A2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -420,6 +424,22 @@ Global
 		{4ECA0B14-68EB-4EA4-9296-647235F2A4DD}.Release|Any CPU.Build.0 = Release|Any CPU
 		{4ECA0B14-68EB-4EA4-9296-647235F2A4DD}.Release|x64.ActiveCfg = Release|Any CPU
 		{4ECA0B14-68EB-4EA4-9296-647235F2A4DD}.Release|x64.Build.0 = Release|Any CPU
+		{318E123E-63C3-41E1-A416-EE7EC37D67C8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{318E123E-63C3-41E1-A416-EE7EC37D67C8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{318E123E-63C3-41E1-A416-EE7EC37D67C8}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{318E123E-63C3-41E1-A416-EE7EC37D67C8}.Debug|x64.Build.0 = Debug|Any CPU
+		{318E123E-63C3-41E1-A416-EE7EC37D67C8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{318E123E-63C3-41E1-A416-EE7EC37D67C8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{318E123E-63C3-41E1-A416-EE7EC37D67C8}.Release|x64.ActiveCfg = Release|Any CPU
+		{318E123E-63C3-41E1-A416-EE7EC37D67C8}.Release|x64.Build.0 = Release|Any CPU
+		{A5B3BB4B-A518-4BE3-BAB5-94D70B2C64A2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A5B3BB4B-A518-4BE3-BAB5-94D70B2C64A2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A5B3BB4B-A518-4BE3-BAB5-94D70B2C64A2}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A5B3BB4B-A518-4BE3-BAB5-94D70B2C64A2}.Debug|x64.Build.0 = Debug|Any CPU
+		{A5B3BB4B-A518-4BE3-BAB5-94D70B2C64A2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A5B3BB4B-A518-4BE3-BAB5-94D70B2C64A2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A5B3BB4B-A518-4BE3-BAB5-94D70B2C64A2}.Release|x64.ActiveCfg = Release|Any CPU
+		{A5B3BB4B-A518-4BE3-BAB5-94D70B2C64A2}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

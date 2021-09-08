@@ -123,21 +123,21 @@ namespace CK.Env
             File.SetAttributes( directoryPath, FileAttributes.Normal );
         }
 
-public static void DeleteFiles( IActivityMonitor m, string deletionPattern, string? targetPath = null )
-{
-    targetPath ??= Directory.GetCurrentDirectory();
-    using( m.OpenTrace( $"Deleting file in directory {targetPath} with pattern {targetPath}." ) )
-    {
-        Matcher matcher = new();
-        matcher.AddInclude( deletionPattern );
-        var files = Directory.EnumerateFiles( Directory.GetCurrentDirectory(), "*", SearchOption.AllDirectories );
-        foreach( var item in matcher.Match( files ).Files )
+        public static void DeleteFiles( IActivityMonitor m, string deletionPattern, string? targetPath = null )
         {
-            m.Trace( $"Deleting {Path.GetRelativePath( deletionPattern, item.Path )}." );
-            File.Delete( item.Path );
+            targetPath ??= Directory.GetCurrentDirectory();
+            using( m.OpenTrace( $"Deleting file in directory {targetPath} with pattern {targetPath}." ) )
+            {
+                Matcher matcher = new();
+                matcher.AddInclude( deletionPattern );
+                var files = Directory.EnumerateFiles( Directory.GetCurrentDirectory(), "*", SearchOption.AllDirectories );
+                foreach( var item in matcher.Match( files ).Files )
+                {
+                    m.Trace( $"Deleting {Path.GetRelativePath( deletionPattern, item.Path )}." );
+                    File.Delete( item.Path );
+                }
+            }
         }
-    }
-}
 
         public static void DeleteDirectories( IActivityMonitor m, IEnumerable<NormalizedPath> paths )
             => DeleteDirectories( m, paths.Select( s => s.Path ) );
@@ -148,7 +148,10 @@ public static void DeleteFiles( IActivityMonitor m, string deletionPattern, stri
             {
                 foreach( string item in paths )
                 {
-                    Directory.Delete( item, true );
+                    if( Directory.Exists( item ) )
+                    {
+                        Directory.Delete( item, true );
+                    }
                 }
             }
         }

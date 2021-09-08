@@ -32,21 +32,29 @@ namespace CodeCake
             GrandOutput.EnsureActiveDefault( cfg );
             ArgumentParser parser = new();
             var m = new ActivityMonitor();
-            
-            CCBOptions options = parser.Parse( m, args ) ?? new CCBOptions();
-            string? solutionDirectory = args.Contains( SolutionDirectoryIsCurrentDirectoryParameter, StringComparer.OrdinalIgnoreCase )
-                                        ? Environment.CurrentDirectory
-                                        : null;
-            Build app = new( m, options, solutionDirectory ) ;
-            bool result = await app.RunAsync( m );
-            if( app.GlobalInfo.InteractiveMode == InteractiveMode.Interactive )
+            try
             {
-                System.Console.WriteLine();
-                System.Console.WriteLine( $"Hit any key to exit." );
-                System.Console.WriteLine( $"Use -{Interactive.NoInteractionArgument} or -{Interactive.AutoInteractionArgument} parameter to exit immediately." );
-                System.Console.ReadKey();
+
+                CCBOptions options = parser.Parse( m, args ) ?? new CCBOptions();
+                string? solutionDirectory = args.Contains( SolutionDirectoryIsCurrentDirectoryParameter, StringComparer.OrdinalIgnoreCase )
+                                            ? Environment.CurrentDirectory
+                                            : null;
+                Build app = new( m, options, solutionDirectory );
+                bool result = await app.RunAsync( m );
+                if( app.GlobalInfo.InteractiveMode == InteractiveMode.Interactive )
+                {
+                    System.Console.WriteLine();
+                    System.Console.WriteLine( $"Hit any key to exit." );
+                    System.Console.WriteLine( $"Use -{Interactive.NoInteractionArgument} or -{Interactive.AutoInteractionArgument} parameter to exit immediately." );
+                    System.Console.ReadKey();
+                }
+                return result ? 0 : 1;
             }
-            return result ? 0 : 1;
+            catch( Exception e )
+            {
+                m.Error( e );
+                return 1;
+            }
         }
     }
 }

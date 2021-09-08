@@ -7,11 +7,11 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
-using CK.Env;
 using CodeCake.Abstractions;
 using Kuinox.TypedCLI.Dotnet;
 using System.Threading.Tasks;
 using NuGet.Common;
+using CK.Env;
 
 namespace CodeCake
 {
@@ -44,6 +44,7 @@ namespace CodeCake
             _globalInfo = globalInfo;
             SolutionFileName = solutionFileName;
             ProjectsPath = projects.ToArray();
+            if( ProjectsPath.Count == 0 ) throw new ArgumentException( "There is no project in this solution." );
             ProjectsToPublish = projectsToPublish.ToArray();
         }
 
@@ -63,17 +64,22 @@ namespace CodeCake
             if( files.Length == 0 ) throw new InvalidOperationException( "There is no sln in the root folder." );
             string solutionFileName = files[0];
             IEnumerable<string>? slnProjects = await Dotnet.Sln.List( m, rootFolder, solutionFileName );
-            IEnumerable<NormalizedPath>? projects = slnProjects?.Select( s => new NormalizedPath( s ) );
+            IEnumerable<NormalizedPath>? projects = slnProjects?.Select( s => new NormalizedPath( Path.GetDirectoryName( s ) ) );
             if( projects == null ) throw new InvalidOperationException( "Could not read projects from the sln." );
             int count = projects.Count();
-            projects = projects.Where( s => s != "CodeCakeBuilder.csproj" );
-            if( projects.Count() != count ) throw new InvalidOperationException( "Could not exclude the 'CodeCakeBuilder.csproj' is it correctly named ?" );
+            projects = projects.Where( s => s.LastPart != "CodeCakeBuilder" );
+            if( projects.Count() == count ) throw new InvalidOperationException( "Could not exclude the 'CodeCakeBuilder' is it correctly named ?" );
 
             List<NormalizedPath> projectsToPublish = projects.Where(
-                    p => ((bool?)XDocument.Load( rootFolder.AppendPart( p ) )
-                        .Root
-                        .Elements( "PropertyGroup" )
-                        .Elements( "IsPackable" ).LastOrDefault() ?? true) == true
+                    p =>
+                    {
+                        var fullPath = rootFolder.Combine( p );
+                        fullPath = fullPath.AppendPart( fullPath.LastPart + ".csproj" );
+                        return ((bool?)XDocument.Load( fullPath )
+                                                .Root
+                                                .Elements( "PropertyGroup" )
+                                                .Elements( "IsPackable" ).LastOrDefault() ?? true) == true;
+                    }
                 //TODO: azure functions are not packable but are published. Something like that.
                 // It mean we must add another tag for these case.
                 )
@@ -92,7 +98,7 @@ namespace CodeCake
             {
                 var exclude = new List<string>() { "CodeCakeBuilder" };
                 await tempSln.ExcludeProjectsFromBuild( m, exclude.ToArray() );
-                await Dotnet.Clean( m, Path.GetDirectoryName( tempSln.Path )! );
+                await Dotnet.Clean( m, Path.GetDirectoryName( tempSln.Path )!, tempSln.Path );
                 using( m.OpenTrace( "Deleting bin folders..." ) )
                 {
                     FileHelper.DeleteDirectories( m, ProjectsPath.Select( p => p.RemoveLastPart().Combine( "bin" ) ) );
@@ -147,14 +153,17 @@ namespace CodeCake
 
         public async Task<bool> Test( IActivityMonitor m, IEnumerable<NormalizedPath>? testProjects = null )
         {
-            testProjects ??= ProjectsPath.Where( p => System.IO.Path.GetFileNameWithoutExtension( p ).EndsWith( ".Tests" ) );
+            if( testProjects == null || !testProjects.Any() )
+            {
+                testProjects = ProjectsPath.Where( p => p.EndsWith( ".Tests" ) );
+            }
             using( m.OpenTrace( "Testing projects..." ) )
             {
                 foreach( NormalizedPath projectPath in testProjects )
                 {
                     using( m.OpenTrace( $"Testing project {projectPath}..." ) )
                     {
-                        string projectName = System.IO.Path.GetFileNameWithoutExtension( projectPath );
+                        string projectName = System.IO.Path.GetFileName( projectPath );
                         NormalizedPath binDir = projectPath.AppendPart( "bin" ).AppendPart( _globalInfo.BuildInfo.BuildConfiguration );
                         NormalizedPath objDir = projectPath.AppendPart( "obj" );
                         string assetsJson = File.ReadAllText( objDir.AppendPart( "project.assets.json" ) );
