@@ -13,13 +13,13 @@ namespace CK.Build
 
         public readonly ICKBinaryWriter Writer;
         public readonly CKBinaryWriter.ObjectPool<CKTraitContext> TraitContextPool;
-        public readonly CKBinaryWriter.ObjectPool<CKTrait?> TraitPool;
+        public readonly CKBinaryWriter.ObjectPool<CKTrait> TraitPool;
 
         public SerializerContext( ICKBinaryWriter writer )
         {
             (Writer = writer).WriteNonNegativeSmallInt32( Version );
             TraitContextPool = new CKBinaryWriter.ObjectPool<CKTraitContext>( Writer, PureObjectRefEqualityComparer<CKTraitContext>.Default );
-            TraitPool = new CKBinaryWriter.ObjectPool<CKTrait?>( Writer, PureObjectRefEqualityComparer<CKTrait?>.Default );
+            TraitPool = new CKBinaryWriter.ObjectPool<CKTrait>( Writer, PureObjectRefEqualityComparer<CKTrait>.Default );
         }
 
         public void Write( CKTrait? t )

@@ -13,7 +13,7 @@ namespace CK.Env.Plugin
         readonly IEnvLocalFeedProvider _localFeedProvider;
         readonly SolutionDriver _solutionDriver;
         readonly SecretKeyStore _secretStore;
-        XElement _packageSources;
+        XElement? _packageSources;
 
         public NugetConfigFile( GitRepository f, SolutionDriver driver, IEnvLocalFeedProvider localFeedProvider, SecretKeyStore secretStore, SolutionSpec s, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "NuGet.config" ), null )
@@ -32,7 +32,7 @@ namespace CK.Env.Plugin
             _solutionDriver.OnSolutionConfiguration += OnSolutionConfiguration;
         }
 
-        void OnZeroBuildProject( object sender, ZeroBuildEventArgs e )
+        void OnZeroBuildProject( object? sender, ZeroBuildEventArgs e )
         {
             if( e.IsStarting )
             {
@@ -43,7 +43,7 @@ namespace CK.Env.Plugin
             // else RemoveFeed( e.Monitor, "ZeroBuild-Feed" );
         }
 
-        void OnStartBuild( object sender, BuildStartEventArgs e )
+        void OnStartBuild( object? sender, BuildStartEventArgs e )
         {
             if( !e.IsUsingDirtyFolder ) return;
 
@@ -53,19 +53,19 @@ namespace CK.Env.Plugin
             Save( e.Monitor );
         }
 
-        void OnLocalBranchEntered( object sender, EventMonitoredArgs e )
+        void OnLocalBranchEntered( object? sender, EventMonitoredArgs e )
         {
             EnsureLocalFeeds( e.Monitor, true, true, true );
             Save( e.Monitor );
         }
 
-        void OnLocalBranchLeaving( object sender, EventMonitoredArgs e )
+        void OnLocalBranchLeaving( object? sender, EventMonitoredArgs e )
         {
             RemoveLocalFeeds( e.Monitor );
             Save( e.Monitor );
         }
 
-        void OnSolutionConfiguration( object sender, SolutionConfigurationEventArgs e )
+        void OnSolutionConfiguration( object? sender, SolutionConfigurationEventArgs e )
         {
             // These values are not build secrets. They are required by ApplySettings to configure
             // the NuGet.config file: once done, restore can be made and having these keys available
@@ -154,13 +154,13 @@ namespace CK.Env.Plugin
         /// Ensures that the <see cref="XmlFilePluginBase.Document"/> exists.
         /// </summary>
         /// <returns>The xml document.</returns>
-        public XDocument EnsureDocument() => Document ?? (Document = new XDocument( new XElement( "configuration" ) ));
+        public XDocument EnsureDocument() => Document ??= new XDocument( new XElement( "configuration" ) );
 
         /// <summary>
         /// Ensures that packageSources element is the first element of the non null <see cref="XmlFilePluginBase.Document"/>.
         /// If the Document is null, this is null.
         /// </summary>
-        public XElement PackageSources => _packageSources ?? (_packageSources = Document?.Root.EnsureFirstElement( "packageSources" ));
+        public XElement? PackageSources => _packageSources ??= Document?.Root.EnsureFirstElement( "packageSources" );
 
         /// <summary>
         /// Ensures that packageSources element is the first element of the <see cref="XmlFilePluginBase.Document"/>.
@@ -169,7 +169,7 @@ namespace CK.Env.Plugin
         public XElement EnsurePackageSources()
         {
             EnsureDocument();
-            return PackageSources;
+            return PackageSources; //TODO .NET 5: [MemberNotNull("PackageSources")] on EnsureDocument() 
         }
 
         /// <summary>
@@ -253,7 +253,7 @@ namespace CK.Env.Plugin
         {
             if( PackageSources != null )
             {
-                _packageSources
+                _packageSources //TODO .NET 5: [MemberNotNull("_packageSources")] on PackageSource.
                         .Elements( "add" )
                         .FirstOrDefault( b => (string)b.Attribute( "key" ) == feedName )
                         ?.ClearCommentsBeforeAndNewLineAfter().Remove();

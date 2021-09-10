@@ -4,7 +4,7 @@ namespace CK.Env
 {
     public static class EnvLocalFeedProviderExtension
     {
-        public static IEnvLocalFeed GetFeed( this IEnvLocalFeedProvider @this, BuildResultType type )
+        public static IEnvLocalFeed? GetFeed( this IEnvLocalFeedProvider @this, BuildResultType type )
         {
             switch( type )
             {

@@ -148,7 +148,7 @@ namespace CK.Env
 
         /// <summary>
         /// Gets or sets the <see cref="XDocument"/>.
-        /// Null if it does'nt exist (then the file doesn't exist either).
+        /// Null if it doesn't exist (then the file doesn't exist either).
         /// This document is mutable and any change to it are tracked (<see cref="IsDirty"/>
         /// is dynamically updated).
         /// </summary>

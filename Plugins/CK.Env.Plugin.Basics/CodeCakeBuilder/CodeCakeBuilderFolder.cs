@@ -3,6 +3,7 @@ using CK.Env.DependencyModel;
 using CK.Text;
 using System;
 using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
 
 namespace CK.Env.Plugin
@@ -23,12 +24,9 @@ namespace CK.Env.Plugin
             if( s == null ) return;
 
             bool needDotNetBuild = s.Projects.Any( p => p.Type == ".Net" && p != s.BuildProject );
-
             // Clean old CodeCakeBuilders files
             DeleteFile( m, "RepositoryInfo.xsd" );
-
-            DeleteFile( m, "Build.NuGetHelper.cs" );
-            DeleteFile( m, "Build.StandardCheckRepository.cs" );
+              DeleteFile( m, "Build.NuGetHelper.cs" );
             DeleteFile( m, "Build.StandardCreateNuGetPackages.cs" );
             DeleteFile( m, "Build.StandardPushNuGetPackages.cs" );
             DeleteFile( m, "Build.StandardSolutionBuild.cs" );
@@ -50,7 +48,7 @@ namespace CK.Env.Plugin
             DeleteFile( m, "npm/Build.NpmRepository.cs" );
             DeleteFile( m, "npm/Build.StandardNpmBuild.cs" );
             DeleteFile( m, "npm/Build.StandardNpmUnitTests.cs" );
-            DeleteFile( m, "Abstractions/ISolutionProducingArtifact.cs" );
+          DeleteFile( m, "Abstractions/ISolutionProducingArtifact.cs" );
             DeleteFile( m, "Abstractions/ISolution.cs" );
 
 

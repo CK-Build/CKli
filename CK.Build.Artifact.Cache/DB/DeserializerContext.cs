@@ -22,7 +22,7 @@ namespace CK.Build
 
         public CKTrait ReadCKTrait()
         {
-            var stateT = TraitPool.TryRead( out var t );
+            var stateT = TraitPool.TryRead( out CKTrait? t );
             if( !stateT.Success )
             {
                 var stateC = TraitContextPool.TryRead( out var ctx );

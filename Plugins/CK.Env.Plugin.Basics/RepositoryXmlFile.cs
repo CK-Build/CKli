@@ -47,7 +47,7 @@ namespace CK.Env.Plugin
             }
         }
 
-        void OnStartBuild( object sender, BuildStartEventArgs e )
+        void OnStartBuild( object? sender, BuildStartEventArgs e )
         {
             var o = _simpleGitVersionOption.EnsureObject();
             if( !o.IgnoreDirtyWorkingFolder )
@@ -58,7 +58,7 @@ namespace CK.Env.Plugin
             }
         }
 
-        void OnEndBuild( object sender, BuildEndEventArgs e )
+        void OnEndBuild( object? sender, BuildEndEventArgs e )
         {
             // We must always reset the in-memory option if we have changed it.
             if( e.BuildStartArgs.Memory.ContainsKey( this ) )
@@ -75,13 +75,13 @@ namespace CK.Env.Plugin
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
 
-        void OnLocalBranchEntered( object sender, EventMonitoredArgs e )
+        void OnLocalBranchEntered( object? sender, EventMonitoredArgs e )
         {
             EnsureLocalBranch( e.Monitor );
             _simpleGitVersionOption.UpdateXml( e.Monitor, true );
         }
 
-        void OnLocalBranchLeaving( object sender, EventMonitoredArgs e )
+        void OnLocalBranchLeaving( object? sender, EventMonitoredArgs e )
         {
             RemoveLocalBranch( e.Monitor );
             _simpleGitVersionOption.UpdateXml( e.Monitor, true );
