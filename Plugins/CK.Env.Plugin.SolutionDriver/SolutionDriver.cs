@@ -11,6 +11,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Xml.Linq;
+using CodeCakeBuilder.Helpers;
 
 namespace CK.Env.Plugin
 {

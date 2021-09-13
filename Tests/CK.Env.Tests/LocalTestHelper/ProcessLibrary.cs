@@ -89,7 +89,7 @@ namespace CK.Env.Tests.LocalTestHelper
         public static TestUniverse RunCommands( this TestUniverse universe, IActivityMonitor m, string worldName, string commandFilter, bool throwIfNoCommand, params object[] args )
         {
             universe.EnsureWorldOpened( m, worldName );
-            List<ICommandHandler> commands = universe.UserHost.CommandRegister.GetCommands( commandFilter ).ToList(); ;
+            List<ICommandHandler> commands = universe.UserHost.CommandRegister.GetCommands( commandFilter ).ToList();
             if( throwIfNoCommand && commands.Count == 0 ) throw new KeyNotFoundException( commandFilter );
             return RunCommands( universe, m, worldName, commands, args );
         }

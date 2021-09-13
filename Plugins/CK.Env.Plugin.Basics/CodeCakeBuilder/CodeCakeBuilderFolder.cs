@@ -26,7 +26,7 @@ namespace CK.Env.Plugin
             bool needDotNetBuild = s.Projects.Any( p => p.Type == ".Net" && p != s.BuildProject );
             // Clean old CodeCakeBuilders files
             DeleteFile( m, "RepositoryInfo.xsd" );
-              DeleteFile( m, "Build.NuGetHelper.cs" );
+            DeleteFile( m, "Build.NuGetHelper.cs" );
             DeleteFile( m, "Build.StandardCreateNuGetPackages.cs" );
             DeleteFile( m, "Build.StandardPushNuGetPackages.cs" );
             DeleteFile( m, "Build.StandardSolutionBuild.cs" );
@@ -48,7 +48,7 @@ namespace CK.Env.Plugin
             DeleteFile( m, "npm/Build.NpmRepository.cs" );
             DeleteFile( m, "npm/Build.StandardNpmBuild.cs" );
             DeleteFile( m, "npm/Build.StandardNpmUnitTests.cs" );
-          DeleteFile( m, "Abstractions/ISolutionProducingArtifact.cs" );
+            DeleteFile( m, "Abstractions/ISolutionProducingArtifact.cs" );
             DeleteFile( m, "Abstractions/ISolution.cs" );
 
 
@@ -67,7 +67,15 @@ namespace CK.Env.Plugin
             SetTextResource( m, "Abstractions/ArtifactType.cs" );
             SetTextResource( m, "Abstractions/ILocalArtifact.cs" );
             SetTextResource( m, "Abstractions/ICIPublishWorkflow.cs" );
-            SetTextResource( m, "Abstractions/ICIWorkflow.cs" );
+            SetTextResource( m, "Abstractions/ISolution.cs" );
+            SetTextResource( m, "dotnet/ITemporarySolutionFile.cs" );
+            SetTextResource( m, "dotnet/TemporarySolutionFile.cs" );
+            SetTextResource( m, "Helpers/ArgumentParser.cs" );
+            SetTextResource( m, "Helpers/CCBOptions.cs" );
+            SetTextResource( m, "Helpers/CLIArguments.cs" );
+            SetTextResource( m, "Helpers/FileHelpers.cs" );
+            SetTextResource( m, "Helpers/Interactive.cs" );
+            SetTextResource( m, "Helpers/InteractiveMode.cs" );
 
             if( needDotNetBuild )
             {

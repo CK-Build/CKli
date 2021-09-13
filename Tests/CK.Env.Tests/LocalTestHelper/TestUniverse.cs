@@ -3,6 +3,7 @@ using CK.Env.DependencyModel;
 using CK.SimpleKeyVault;
 using CK.Text;
 using CKli;
+using CodeCakeBuilder.Helpers;
 using CSemVer;
 using LibGit2Sharp;
 using System;

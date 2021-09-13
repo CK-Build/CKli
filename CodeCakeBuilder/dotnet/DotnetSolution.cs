@@ -11,7 +11,7 @@ using CodeCake.Abstractions;
 using Kuinox.TypedCLI.Dotnet;
 using System.Threading.Tasks;
 using NuGet.Common;
-using CK.Env;
+using CodeCakeBuilder.Helpers;
 
 namespace CodeCake
 {
@@ -101,15 +101,15 @@ namespace CodeCake
                 await Dotnet.Clean( m, Path.GetDirectoryName( tempSln.Path )!, tempSln.Path );
                 using( m.OpenTrace( "Deleting bin folders..." ) )
                 {
-                    FileHelper.DeleteDirectories( m, ProjectsPath.Select( p => p.RemoveLastPart().Combine( "bin" ) ) );
+                    FileHelpers.DeleteDirectories( m, ProjectsPath.Select( p => p.RemoveLastPart().Combine( "bin" ) ) );
                 }
                 using( m.OpenTrace( "Deleting obj folders..." ) )
                 {
-                    FileHelper.DeleteDirectories( m, ProjectsPath.Select( p => p.RemoveLastPart().Combine( "obj" ) ) );
+                    FileHelpers.DeleteDirectories( m, ProjectsPath.Select( p => p.RemoveLastPart().Combine( "obj" ) ) );
                 }
                 using( m.OpenTrace( "Deleting TestResult xml files..." ) )
                 {
-                    FileHelper.DeleteFiles( m, "Tests/**/TestResult*.xml" );
+                    FileHelpers.DeleteFiles( m, "Tests/**/TestResult*.xml" );
                 }
             }
             return true;

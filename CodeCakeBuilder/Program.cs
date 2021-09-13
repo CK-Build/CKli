@@ -39,8 +39,8 @@ namespace CodeCake
                 string? solutionDirectory = args.Contains( SolutionDirectoryIsCurrentDirectoryParameter, StringComparer.OrdinalIgnoreCase )
                                             ? Environment.CurrentDirectory
                                             : null;
-                Build app = new( m, options, solutionDirectory );
-                bool result = await app.RunAsync( m );
+                Build app = new();
+                bool result = await app.RunAsync( m, options, solutionDirectory );
                 if( app.GlobalInfo.InteractiveMode == InteractiveMode.Interactive )
                 {
                     System.Console.WriteLine();

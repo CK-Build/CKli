@@ -1,5 +1,6 @@
 using CK.Core;
 using CK.Text;
+using CodeCakeBuilder.Helpers;
 using CSemVer;
 using System;
 using System.Collections.Generic;

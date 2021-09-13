@@ -1,5 +1,6 @@
 using CK.Env.Tests.LocalTestHelper;
 using CK.Text;
+using CodeCakeBuilder.Helpers;
 using FluentAssertions;
 using LibGit2Sharp;
 using NUnit.Framework;

@@ -413,6 +413,12 @@ namespace CK.Env.MSBuildSln
             return true;
         }
 
+        public bool SetNullable( IActivityMonitor m, string nullableMode )
+        {
+            DoSetSimpleProperty( m, "Nullable", nullableMode );
+            return true;
+        }
+
         /// <summary>
         /// Sets the value or removes the OutputType element.
         /// </summary>
@@ -547,11 +553,11 @@ namespace CK.Env.MSBuildSln
                         m.Warn( $"Element {p.Origin} misses Include attribute. It is ignored." );
                         continue;
                     }
-                        if( string.IsNullOrWhiteSpace( p.PackageId ) )
-                        {
-                            m.Error( $"Invalid Include attribute on element {p.Origin}." );
-                            return;
-                        }
+                    if( string.IsNullOrWhiteSpace( p.PackageId ) )
+                    {
+                        m.Error( $"Invalid Include attribute on element {p.Origin}." );
+                        return;
+                    }
 
                     XElement? propertyDef = null;
                     bool isVersionOverride = false;

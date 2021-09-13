@@ -37,6 +37,8 @@ namespace CK.Env.Plugin
 
             var slnFile = solution.Tag<SolutionFile>();
             MSProject ccbProject = slnFile.MSProjects.SingleOrDefault( p => p.ProjectName == "CodeCakeBuilder" );
+            ccbProject.SetLangVersion( m, "9" );
+            ccbProject.SetNullable( m, "enable" );
             if( ccbProject == null )
             {
                 m.Error( $"Missing CodeCakeBuilder project in '{slnFile.FilePath}'." );
@@ -49,10 +51,17 @@ namespace CK.Env.Plugin
                 ("NuGet.Protocol", "5.9.1", false),
                 ("NuGet.Credentials", "5.9.1", false),
                 ("CK.Text", "9.0.1", false),
-                ("SimpleGitVersion.Cake", "5.1.1", false),
+                ("SimpleGitVersion.Core", "5.1.1", true),
                 ("CKSetup.Cake", "14.1.0", false),
-                ("Newtonsoft.Json", "12.0.3", false)
+                ("Newtonsoft.Json", "12.0.3", false),
+                ("CK.ActivityMonitor.SimpleSender", "14.1.0", true),
+                ("Kuinox.TypedCLI.Dotnet", "0.1.10", true),
+                ("Kuinox.TypedCLI.NPM", "0.1.10", true),
+                ("CK.Monitoring", "14.1.1", true),
+                ("Microsoft.Extensions.FileSystemGlobbing" , "3.1.18", true)
             };
+
+            ccbProject.RemoveDependency( m, "SimpleGitVersion.Cake" );
 
             void EnsurePackageReference( string packageId, string v, bool required = false )
             {

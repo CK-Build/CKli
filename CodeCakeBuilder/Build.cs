@@ -6,17 +6,10 @@ namespace CodeCake
 {
     public partial class Build
     {
-        readonly CCBOptions? _cCBOptions;
-
-        public StandardGlobalInfo GlobalInfo { get; }
-        public Build( IActivityMonitor m, CCBOptions cCBOptions, string? solutionDirectory )
+        public StandardGlobalInfo GlobalInfo { get; private set; }
+        public async Task<bool> RunAsync( IActivityMonitor m, CCBOptions cCBOptions, string? solutionDirectory )
         {
             GlobalInfo = CreateStandardGlobalInfo( m, solutionDirectory, cCBOptions );
-            _cCBOptions = cCBOptions;
-        }
-
-        public async Task<bool> RunAsync( IActivityMonitor m )
-        {
             await GlobalInfo.AddDotnet( m );
             GlobalInfo.SetCIBuildTag( m );
             if( GlobalInfo.GetShouldStop( m ) ) return true;

@@ -5,6 +5,7 @@ using CK.Text;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using CodeCakeBuilder.Helpers;
 
 namespace CKli
 {

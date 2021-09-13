@@ -37,6 +37,10 @@ namespace CK.Env.Plugin
             bool useNpm = projects.Any();
             if( useNpm )
             {
+                DeleteFile( m, "CakeExtensions/NpmDistTagRunner.cs" );
+                DeleteFile( m, "CakeExtensions/NpmGetNpmVersion.cs" );
+                DeleteFile( m, "CakeExtensions/NpmView.cs" );
+
                 //CakeExtensions
                 SetTextResource( m, "CakeExtensions/NpmDistTagRunner.cs" );
                 SetTextResource( m, "CakeExtensions/NpmView.cs" );
