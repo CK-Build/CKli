@@ -187,9 +187,12 @@ namespace CK.Env
             var b = _buildResults[(int)type - 1];
             if( b == null ) throw new InvalidOperationException( $"No current BuildResultType '{type}'." );
             var e = GetParentBuildResultElement( type );
-            var xmlBuild = e.Elements().First();
-            _publishedBuildHistory.Add( xmlBuild );
-            xmlBuild.Remove();
+            var xmlBuild = e?.Elements().FirstOrDefault();
+            if( xmlBuild != null )
+            {
+                _publishedBuildHistory.Add( xmlBuild );
+                xmlBuild.Remove();
+            }
         }
 
         /// <summary>
