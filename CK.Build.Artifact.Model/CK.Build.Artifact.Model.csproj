@@ -9,7 +9,14 @@
 
   <ItemGroup>
     <PackageReference Include="CSemVer" Version="9.1.0" />
-    <PackageReference Include="CK.Core" Version="14.1.0" />
+    <PackageReference Include="CK.Core" Version="14.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="NuGetizer" Version="0.7.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
 </Project>
