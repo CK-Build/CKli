@@ -154,8 +154,11 @@ namespace CK.Env
                     monitor.Info( $"Use 'run World/{nameof( SetWorldMapping )}' command to change this default mapping if you want." );
                     _stackRepos.Add( new StackRepo( this, new Uri( "https://github.com/signature-opensource/CK-Stack" ), true ) );
                     _stackRepos.Add( new StackRepo( this, new Uri( "https://github.com/CK-Build/CK-Build-Stack" ), true ) );
-                    WorldLocalMapping.SetMap( monitor, "CK-Build", "/Dev/CK-Build" );
-                    WorldLocalMapping.SetMap( monitor, "CK", "/Dev/CK" );
+                    if( WorldLocalMapping.CanSetMapping )
+                    {
+                        WorldLocalMapping.SetMap( monitor, "CK-Build", "/Dev/CK-Build" );
+                        WorldLocalMapping.SetMap( monitor, "CK", "/Dev/CK" );
+                    }
                     WriteStacksToLocalStacksFilePath( monitor );
                 }
             }
