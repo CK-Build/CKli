@@ -143,11 +143,12 @@ namespace CK.Env
             /// <param name="m">The monitor to use.</param>
             /// <param name="forcePullAndRefresh">True to pull and refresh the <see cref="Worlds"/> list even if <see cref="IsOpen"/> is already true.</param>
             /// <returns>Whether this repository has been successfully opened.</returns>
-            internal bool RefreshMultiple( IActivityMonitor m, bool forcePullAndRefresh )
+            internal (bool LoadSuccess, bool HasChanged) RefreshMultiple( IActivityMonitor m, bool forcePullAndRefresh )
             {
                 Debug.Assert( _store.SingleWorld == null );
-                if( !DoOpen( m, out var opened, out var localDir ) ) return false;
+                if( !DoOpen( m, out var opened, out var localDir ) ) return (false, false);
                 Debug.Assert( _git != null );
+                bool hasChanged = false;
                 if( forcePullAndRefresh || opened )
                 {
                     if( _git.Pull( m, MergeFileFavor.Theirs ).ReloadNeeded || opened )
@@ -156,7 +157,7 @@ namespace CK.Env
                                                   .Select( p => LocalWorldName.TryParse( p, _store.WorldLocalMapping ) )
                                                   .Where( w => w != null )
                                                   .ToDictionary( w => w!.FullName, w => w! );
-
+                        // Ignore parallels that have a StackName that doesn't exist.
                         var invalidParallels = worldNames.Values.Where( p => p!.ParallelName != null && !worldNames.ContainsKey( p.Name ) ).ToList();
                         foreach( var orphan in invalidParallels )
                         {
@@ -173,6 +174,7 @@ namespace CK.Env
                                 {
                                     m.Warn( $"Unable to find World definition file for '{exists.WorldName}'. File '{exists.WorldName.XmlDescriptionFilePath}' not found." );
                                     exists.WorldName.HasDefinitionFile = false;
+                                    hasChanged = true;
                                 }
                             }
                             else
@@ -182,6 +184,7 @@ namespace CK.Env
                                 {
                                     m.Trace( $"Found World definition file for '{exists.WorldName}'." );
                                     exists.WorldName.HasDefinitionFile = true;
+                                    hasChanged = true;
                                 }
                             }
                         }
@@ -198,6 +201,7 @@ namespace CK.Env
                                 m.Info( $"Found a new World definition: creating '{newWorld.FullName}' entry." );
                                 newWorld.HasDefinitionFile = true;
                                 _worlds.Add( new WorldInfo( this, newWorld ) );
+                                hasChanged = true;
                             }
                         }
                         // Finally: ensures that the $Local/FullName directory exists.
@@ -207,7 +211,7 @@ namespace CK.Env
                         }
                     }
                 }
-                return IsOpen;
+                return (IsOpen,hasChanged);
             }
 
             bool DoOpen( IActivityMonitor m, out bool opened, out NormalizedPath localDir )

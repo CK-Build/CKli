@@ -217,7 +217,7 @@ namespace CK.Env
             if( idx < 0 )
             {
                 var r = new StackRepo( this, uri, isPublic );
-                if( r.RefreshMultiple( m, true ) && r.Worlds.Count > 0 )
+                if( r.RefreshMultiple( m, true ).LoadSuccess && r.Worlds.Count > 0 )
                 {
                     idx = _stackRepos.IndexOf( r => r.OriginUrl.Equals( uri ) );
                     if( idx < 0 )
@@ -379,13 +379,23 @@ namespace CK.Env
             {
                 return new[] { _stackRepos[0].Worlds[0].WorldName };
             }
+            bool changes = false;
             foreach( var r in _stackRepos )
             {
-                if( !r.RefreshMultiple( m, withPull ) )
+                var (sucess, hasChanged) = r.RefreshMultiple( m, withPull );
+                if( !sucess )
                 {
                     m.Warn( $"Unable to open repository '{r}'." );
                 }
-                else m.Trace( $"Repository '{r}' opened with {r.Worlds.Count} worlds." );
+                else
+                {
+                    m.Trace( $"Repository '{r}' opened with {r.Worlds.Count} worlds." );
+                    changes |= hasChanged;
+                }
+            }
+            if( changes )
+            {
+                WriteStacksToLocalStacksFilePath( m );
             }
             var list = _stackRepos.SelectMany( r => r.Worlds.Select( w => w.WorldName ) ).ToList();
             Debug.Assert( '[' > 'A', "Unfortunately..." );
