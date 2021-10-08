@@ -54,7 +54,7 @@ namespace CK.Env
 
             /// <summary>
             /// Gets the raw <see cref="XElement"/>.
-            /// Unfortunaltely, there is no read-only view of XElement, this should not be mutated
+            /// Unfortunately, there is no read-only view of XElement, this should not be mutated
             /// otherwise an InvalidOperationException is thrown.
             /// </summary>
             public XElement Element => Reader.Element;

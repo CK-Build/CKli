@@ -14,38 +14,39 @@ namespace CKli
     /// A world is public (ie. Open Source) or not. We decided to consider that mixing public/private repositories 
     /// inside the same world (even if it is technically possible) was not a good idea.
     /// </summary>
-    public class XWorld : XTypedObject, IXTypedObjectProvider<World>
+    public abstract class XWorldBase<T> : XTypedObject, IXTypedObjectProvider<T> where T : World
     {
         readonly FileSystem _fileSystem;
         readonly IEnvLocalFeedProvider _localFeeds;
-        readonly World _world;
-        readonly IActivityMonitorFilteredClient _userMonitorFilter;
+        readonly T _world;
 
-        public XWorld(
-            FileSystem fileSystem,
-            IRootedWorldName worldName,
-            WorldStore worldStore,
-            IEnvLocalFeedProvider localFeeds,
-            SecretKeyStore keyStore,
-            ArtifactCenter artifacts,
-            CommandRegister commandRegister,
-            IReleaseVersionSelector releaseVersionSelector,
-            Initializer initializer )
+        public XWorldBase( FileSystem fileSystem,
+                           IRootedWorldName worldName,
+                           WorldStore worldStore,
+                           IEnvLocalFeedProvider localFeeds,
+                           SecretKeyStore keyStore,
+                           ArtifactCenter artifacts,
+                           CommandRegister commandRegister,
+                           IReleaseVersionSelector releaseVersionSelector,
+                           Initializer initializer )
             : base( initializer )
         {
             _localFeeds = localFeeds;
             _fileSystem = fileSystem;
-
-            _userMonitorFilter = initializer.Monitor.Output.Clients.OfType<IActivityMonitorFilteredClient>().FirstOrDefault();
-            if( _userMonitorFilter == null ) throw new InvalidOperationException();
-
             bool isPublic = initializer.Reader.HandleRequiredAttribute<bool>( "IsPublic" );
-            _world = new World( commandRegister, artifacts, worldStore, worldName, isPublic, _localFeeds, keyStore, _userMonitorFilter )
-            {
-                VersionSelector = releaseVersionSelector
-            };
-            _world.DumpWorldStatus += ( o, e ) => OnDumpWorldStatus( e.Monitor );
-            initializer.Services.Add( _world );
+            var parameters = new World.ConstructorParameters( initializer.Monitor,
+                                                              initializer.Services,
+                                                              fileSystem,
+                                                              commandRegister,
+                                                              artifacts,
+                                                              worldStore,
+                                                              worldName,
+                                                              isPublic,
+                                                              localFeeds,
+                                                              keyStore );
+            _world = (T)Activator.CreateInstance( typeof(T), new object[] { parameters } )!;
+            _world.VersionSelector = releaseVersionSelector;
+            initializer.Services.Add( (World)_world );
             fileSystem.ServiceContainer.Add<ISolutionDriverWorld>( _world );
         }
 
@@ -64,12 +65,17 @@ namespace CKli
         }
 
         /// <summary>
+        /// Gets the world (CKli is definitely an ambitious project).
+        /// </summary>
+        protected T World => _world;
+
+        /// <summary>
         /// Initializes the Git folders: this instantiates the <see cref="GitRepository"/> from the
         /// <see cref="XGitFolder.ProtoGitFolder"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>The world  on success, null on error.</returns>
-        World IXTypedObjectProvider<World>.GetObject( IActivityMonitor m )
+        T? IXTypedObjectProvider<T>.GetObject( IActivityMonitor m )
         {
             var proto = Parent.Descendants<XGitFolder>().Select( g => g.ProtoGitFolder ).ToList();
             List<GitRepository> gitFolders = new List<GitRepository>();
@@ -99,26 +105,17 @@ namespace CKli
             }
         }
 
-        void OnDumpWorldStatus( IActivityMonitor m )
+        /// <summary>
+        /// Dumps the hierarchy of repositories into the monitor, ensuring that all
+        /// plugins are loaded for the current branch.
+        /// This is used at initialization time but can also be used
+        /// by command line interface.
+        /// </summary>
+        /// <param name="m">The target monitor.</param>
+        /// <param name="gitFolders">The set of git repositories.</param>
+        /// <returns>False if at least one plugin failed its initialization. True otherwise.</returns>
+        protected virtual bool DumpGitFolders( IActivityMonitor m, IEnumerable<GitRepository> gitFolders )
         {
-            var worldCtx = _world.SolutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
-            if( worldCtx == null ) return;
-            var gitFolders = worldCtx.Drivers.Select( x => (GitRepository)x.GitRepository );
-            DumpGitFolders( m, gitFolders );
-        }
-
-        bool DumpGitFolders( IActivityMonitor m, IEnumerable<GitRepository> gitFolders )
-        {
-            bool isLogFilterDefault = false;
-            LogFilter final = m.ActualFilter;
-            if( final == LogFilter.Undefined )
-            {
-                final = ActivityMonitor.DefaultFilter;
-                isLogFilterDefault = true;
-            }
-            var msg = $"Monitor filters: User:'{_userMonitorFilter.MinimalFilter}' => Final:'{final}'{(isLogFilterDefault ? "(AppDomain's default)" : "")}.";
-            m.UnfilteredLog( ActivityMonitor.Tags.Empty, LogLevel.Info, msg, m.NextLogTime(), null );
-
             int gitFoldersCount = 0;
             bool hasPluginInitError = false;
             var dirty = new List<string>();
@@ -181,6 +178,5 @@ namespace CKli
             }
             return !hasPluginInitError;
         }
-
     }
 }

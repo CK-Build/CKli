@@ -124,6 +124,7 @@ namespace CK.Env.Tests.LocalTestHelper
             if( _xTypedFactory == null )
             {
                 System.Reflection.Assembly.Load( "CKli.XObject" );
+                System.Reflection.Assembly.Load( "CKli" );
                 _xTypedFactory = new XTypedFactory();
                 _xTypedFactory.AutoRegisterFromLoadedAssemblies( m );
                 _xTypedFactory.SetLocked();

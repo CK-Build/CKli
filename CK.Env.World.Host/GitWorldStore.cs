@@ -93,7 +93,7 @@ namespace CK.Env
         /// their <see cref="WorldInfo"/>: creating the StackRepo declares the required secrets
         /// in the key store.
         /// <para>
-        /// In multiple words mode, when there is no stack or if an error prevented the file to be read,
+        /// In multiple worlds mode, when there is no stack (or if an error prevented the file to be read),
         /// the CK and CK-Build public stacks are automatically created.
         /// </para>
         /// </summary>

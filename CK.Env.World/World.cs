@@ -19,7 +19,10 @@ namespace CK.Env
     /// Primary World object. Handles the solutions, the solution drivers, the local
     /// and shared states and supports numerous commands.
     /// </summary>
-    public partial class World : ISolutionDriverWorld, ICommandMethodsProvider
+    /// <remarks>
+    /// This class is abstract: concrete classes exist in final environments.
+    /// </remarks>
+    public abstract class World : ISolutionDriverWorld, ICommandMethodsProvider
     {
         readonly WorldStore _store;
         readonly IEnvLocalFeedProvider _localFeedProvider;
@@ -28,46 +31,68 @@ namespace CK.Env
 
         readonly DriversCollection _solutionDrivers;
         readonly HashSet<GitRepository> _gitRepositories;
-        readonly IActivityMonitorFilteredClient _userMonitorClient;
 
-        LocalWorldState _localState;
-        SharedWorldState _sharedState;
+        LocalWorldState? _localState;
+        SharedWorldState? _sharedState;
         StandardGitStatus _cachedGlobalGitStatus;
+
+        /// <summary>
+        /// Captures constructor World parameters.
+        /// </summary>
+        public class ConstructorParameters
+        {
+            public IActivityMonitor InitializationMonitor { get; }
+            public IServiceProvider InitialisationServices { get; }
+            public FileSystem FileSystem { get; }
+            public CommandRegister CommandRegister { get; }
+            public ArtifactCenter Artifacts { get; }
+            public WorldStore Store { get; }
+            public IRootedWorldName WorldName { get; }
+            public bool IsPublic { get; }
+            public IEnvLocalFeedProvider LocalFeedProvider { get; }
+            public SecretKeyStore KeyStore { get; }
+
+            public ConstructorParameters( IActivityMonitor initializationMonitor,
+                                          IServiceProvider initialisationServices,
+                                          FileSystem fileSystem,
+                                          CommandRegister commandRegister,
+                                          ArtifactCenter artifacts,
+                                          WorldStore store,
+                                          IRootedWorldName worldName,
+                                          bool isPublic,
+                                          IEnvLocalFeedProvider localFeedProvider,
+                                          SecretKeyStore keyStore )
+            {
+                InitializationMonitor = initializationMonitor ?? throw new ArgumentNullException( nameof( initializationMonitor ) );
+                InitialisationServices = initialisationServices ?? throw new ArgumentNullException( nameof( initialisationServices ) );
+                FileSystem = fileSystem ?? throw new ArgumentNullException( nameof( fileSystem ) );
+                CommandRegister = commandRegister ?? throw new ArgumentNullException( nameof( commandRegister ) );
+                Artifacts = artifacts ?? throw new ArgumentNullException( nameof( artifacts ) );
+                Store = store ?? throw new ArgumentNullException( nameof( store ) );
+                WorldName = worldName ?? throw new ArgumentNullException( nameof( worldName ) );
+                IsPublic = isPublic;
+                LocalFeedProvider = localFeedProvider ?? throw new ArgumentNullException( nameof( localFeedProvider ) );
+                KeyStore = keyStore ?? throw new ArgumentNullException( nameof( keyStore ) );
+            }
+        }
 
         /// <summary>
         /// Initializes a new World.
         /// </summary>
-        /// <param name="commandRegister">The command register.</param>
-        /// <param name="artifacts">The artifact center.</param>
-        /// <param name="store">The world store. Can not be null.</param>
-        /// <param name="worldName">The world name.</param>
-        /// <param name="isPublicWorld">Whether this world is public or private.</param>
-        /// <param name="localFeedProvider">Local feed provider. Can not be null. (Required for the Zero builder.)</param>
-        /// <param name="keyStore">User key store. Must not be null.</param>
-        /// <param name="userMonitorClient">Used to set the log level.</param>
-        /// <param name="appLife">Application lifetime controller.</param>
-        public World(
-            CommandRegister commandRegister,
-            ArtifactCenter artifacts,
-            WorldStore store,
-            IRootedWorldName worldName,
-            bool isPublicWorld,
-            IEnvLocalFeedProvider localFeedProvider,
-            SecretKeyStore keyStore,
-            IActivityMonitorFilteredClient userMonitorClient )
+        /// <param name="parameters">Available parameters.</param>
+        protected World( ConstructorParameters parameters )
         {
-            _artifacts = artifacts ?? throw new ArgumentNullException( nameof( artifacts ) );
-            _store = store ?? throw new ArgumentNullException( nameof( store ) );
-            WorldName = worldName ?? throw new ArgumentNullException( nameof( worldName ) );
-            _localFeedProvider = localFeedProvider ?? throw new ArgumentNullException( nameof( localFeedProvider ) );
-            _keyStore = keyStore ?? throw new ArgumentNullException( nameof( keyStore ) );
-            IsPublicWorld = isPublicWorld;
+            _artifacts = parameters.Artifacts;
+            _store = parameters.Store;
+            WorldName = parameters.WorldName;
+            _localFeedProvider = parameters.LocalFeedProvider;
+            _keyStore = parameters.KeyStore;
+            IsPublicWorld = parameters.IsPublic;
             _solutionDrivers = new DriversCollection();
             _gitRepositories = new HashSet<GitRepository>();
-            _userMonitorClient = userMonitorClient;
 
             CommandProviderName = "World";
-            commandRegister.Register( this );
+            parameters.CommandRegister.Register( this );
         }
 
         public NormalizedPath CommandProviderName { get; }
@@ -87,7 +112,6 @@ namespace CK.Env
         void ISolutionDriverWorld.Unregister( ISolutionDriver driver )
         {
             _solutionDrivers.Unregister( driver );
-
             _gitRepositories.Clear();
             _gitRepositories.AddRange( _solutionDrivers.AllDrivers.Select( d => d.GitRepository ) );
             UpdateGlobalGitStatus();
@@ -115,35 +139,23 @@ namespace CK.Env
             if( !alreadyInitialized )
             {
                 _localState = _store.GetOrCreateLocalState( monitor, WorldName );
-                DoSetLogLevel( monitor, _localState.UserLogFilter, _localState.MonitorLogFilter, false );
                 _sharedState = _store.GetOrCreateSharedState( monitor, WorldName );
+                OnInitialize( monitor );
             }
             return true;
         }
 
-        /// <summary>
-        /// Asks this world state to be dumped (in the monitor or anywhere else) by
-        /// raising <see cref="DumpWorldStatus"/> event.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <returns>True on success, false on error.</returns>
-        [CommandMethod( confirmationRequired: false )]
-        public bool DumpWorldState( IActivityMonitor monitor )
+        protected virtual void OnInitialize( IActivityMonitor monitor )
         {
-            return RunSafe( monitor, "World Status.", ( m, error ) =>
-            {
-                var ev = new EventMonitoredArgs( monitor );
-                DumpWorldStatus?.Invoke( this, ev );
-            } );
         }
 
+        #region Graph generation
         class OpenGraph : IDisposable
         {
             readonly StringBuilder _b;
             public OpenGraph( StringBuilder b ) => _b = b.AppendLine( " {" );
             public void Dispose() => _b.AppendLine( "}" );
         }
-
 
         static StringBuilder AppendGraphName( StringBuilder b, string name ) => b.Append( '"' ).Append( name ).Append( '"' );
 
@@ -153,12 +165,16 @@ namespace CK.Env
             return AppendGraphName( b, dependent );
         }
 
-        [CommandMethod]
-        public bool DumpWorldGraph( IActivityMonitor m )
+        /// <summary>
+        /// Creates a graph of this world.
+        /// </summary>
+        /// <param name="m">The monitor.</param>
+        /// <returns>The graph or null on error.</returns>
+        protected string? CreateWorldGraph( IActivityMonitor m )
         {
             StringBuilder b = new StringBuilder();
             var ctx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
-            if( ctx == null ) return false;
+            if( ctx == null ) return null;
             b.Append( "digraph " );
             AppendGraphName( b, WorldName.Name );
             using( new OpenGraph( b ) )
@@ -193,17 +209,19 @@ namespace CK.Env
                     }
                 }
             }
-            File.WriteAllText( "graph.gv", b.ToString() );
-            m.Info( "Generated graph.gv..." );
-            return true;
+            return b.ToString();
         }
 
-        [CommandMethod]
-        public bool DumpWorldGraphWithProj( IActivityMonitor m )
+        /// <summary>
+        /// Creates a graph of this world.
+        /// </summary>
+        /// <param name="m">The monitor.</param>
+        /// <returns>The graph or null on error.</returns>
+        protected string? CreatWorldGraphWithProjects( IActivityMonitor m )
         {
             StringBuilder b = new StringBuilder();
             var ctx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
-            if( ctx == null ) return false;
+            if( ctx == null ) return null;
             b.Append( "digraph " );
             AppendGraphName( b, WorldName.Name );
             using( new OpenGraph( b ) )
@@ -246,25 +264,25 @@ namespace CK.Env
                     AppendDependency( b, dep.RefererOrigin.Name, dep.TargetProject.Name ).AppendLine( ";" );
                 }
             }
-            File.WriteAllText( "graph.gv", b.ToString() );
-            m.Info( "Generated graph.gv..." );
-            return true;
+            return b.ToString();
         }
+
+        #endregion
 
         /// <summary>
         /// Gets the shared state.
         /// </summary>
-        public SharedWorldState SharedWorldState => _sharedState;
+        public SharedWorldState SharedWorldState => _sharedState!;
 
         /// <summary>
         /// Gets the local state.
         /// </summary>
-        public LocalWorldState LocalWorldState => _localState;
+        public LocalWorldState LocalWorldState => _localState!;
 
         /// <summary>
-        /// Raised by <see cref="DumpWorldState(IActivityMonitor)"/>.
+        /// Gets the <see cref="ArtifactCenter"/>.
         /// </summary>
-        public event EventHandler<EventMonitoredArgs> DumpWorldStatus;
+        protected ArtifactCenter Artifacts => _artifacts;
 
         /// <summary>
         /// Gets the registered solution drivers.
@@ -285,7 +303,7 @@ namespace CK.Env
         /// <param name="message"></param>
         /// <param name="action"></param>
         /// <returns></returns>
-        bool RunSafe( IActivityMonitor m, string message, Action<IActivityMonitor, Func<bool>> action )
+        protected bool RunSafe( IActivityMonitor m, string message, Action<IActivityMonitor, Func<bool>> action )
         {
             bool result = true;
             using( m.OnError( () => result = false ) )
@@ -390,7 +408,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True if the Git status is on 'local' or 'develop' branch.</returns>
-        bool CheckGlobalGitStatusLocalXorDevelop( IActivityMonitor monitor )
+        protected bool CheckGlobalGitStatusLocalXorDevelop( IActivityMonitor monitor )
         {
             var s = UpdateGlobalGitStatus();
             if( s != StandardGitStatus.Local && s != StandardGitStatus.Develop )
@@ -416,31 +434,10 @@ namespace CK.Env
         /// Sets the <see cref="WorkStatus"/>.
         /// </summary>
         /// <param name="s">The work status.</param>
-        bool SetWorkStatusAndSave( IActivityMonitor m, GlobalWorkStatus s )
+        protected bool SetWorkStatusAndSave( IActivityMonitor m, GlobalWorkStatus s )
         {
             if( WorkStatus != s ) _localState.WorkStatus = s;
             return _localState.SaveState( m );
-        }
-
-        [CommandMethod( confirmationRequired: false )]
-        public void SetLogLevel( IActivityMonitor m, LogFilter userLevel, LogFilter monitorLevel ) => DoSetLogLevel( m, userLevel, monitorLevel, true );
-
-        void DoSetLogLevel( IActivityMonitor m, LogFilter userLevel, LogFilter monitorLevel, bool saveOnChange )
-        {
-            if( _userMonitorClient.MinimalFilter != userLevel )
-            {
-                _userMonitorClient.MinimalFilter = userLevel;
-                _localState.UserLogFilter = userLevel;
-            }
-            if( m.MinimalFilter != monitorLevel )
-            {
-                m.MinimalFilter = monitorLevel;
-                _localState.MonitorLogFilter = monitorLevel;
-            }
-            var msg = $"Log levels: UserLevel = '{userLevel}', MonitorLevel = {monitorLevel}.";
-            Console.WriteLine( msg );
-            m.UnfilteredLog( ActivityMonitor.Tags.Empty, LogLevel.Info, msg, m.NextLogTime(), null );
-            if( saveOnChange ) _localState.SaveState( m );
         }
 
         string? GetCleanBranchName( IActivityMonitor monitor )
@@ -554,7 +551,7 @@ namespace CK.Env
             } );
         }
 
-        IReadOnlyList<PackageReference> GetExternalPackageReferences( IActivityMonitor m, IWorldSolutionContext ctx )
+        protected IReadOnlyList<PackageReference> GetExternalPackageReferences( IActivityMonitor m, IWorldSolutionContext ctx )
         {
             var externals = ctx.DependencyContext.Analyzer.ExternalReferences;
             if( externals.Count == 0 )
@@ -572,69 +569,6 @@ namespace CK.Env
                 }
             }
             return externals;
-        }
-
-        [CommandMethod]
-        public void ShowExternalDependencies( IActivityMonitor m, bool compact = true, bool onlyMultipleVersions = false, PackageQuality quality = PackageQuality.None )
-        {
-            var ctx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
-            if( ctx == null ) return;
-            var externals = GetExternalPackageReferences( m, ctx );
-            ConsoleColor stdForeColor = Console.ForegroundColor;
-            ConsoleColor stdBackColor = Console.BackgroundColor;
-            foreach( var byType in externals.GroupBy( g => g.Target.Artifact.Type ).OrderBy( g => g.Key.Name ) )
-            {
-                Console.ForegroundColor = ConsoleColor.DarkRed;
-                Console.BackgroundColor = ConsoleColor.White;
-                Console.WriteLine( $"{byType.Key} external dependencies:" );
-                Console.ForegroundColor = stdForeColor;
-                Console.BackgroundColor = stdBackColor;
-                foreach( var byName in byType.GroupBy( g => g.Target.Artifact ).OrderBy( g => g.Key.Name ) )
-                {
-                    var byVersion = byName.GroupBy( s => s.Target.Version ).ToList();
-                    if( !onlyMultipleVersions || byVersion.Count() > 1 )
-                    {
-                        var maxVersion = byVersion.Select( v => v.Key ).Max();
-                        var externalVersionDisplay = _artifacts.GetExternalVersions( m, byName.Key )
-                                                               .SelectMany( a => a.Versions.Where( v => v.PackageQuality >= quality && v > maxVersion ).Select( v => (v, a.FeedName) ) )
-                                                               .GroupBy( v => v.v )
-                                                               .OrderByDescending( v => v.Key )
-                                                               .Select( g => $"{g.Key} ({g.Select( vn => vn.FeedName ).Concatenate()})" )
-                                                               .Concatenate();
-
-                        if( externalVersionDisplay.Length > 0 ) externalVersionDisplay = " <= " + externalVersionDisplay;
-                        Console.Write( $"    |" );
-                        Console.Write( byName.Key.Name );
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine( externalVersionDisplay );
-                        Console.ForegroundColor = stdForeColor;
-                        if( byVersion.Count() > 1 ) Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        if( compact )
-                        {
-                            foreach( var v in byVersion )
-                            {
-                                Console.WriteLine( $"    |      => {v.Key} ({v.GroupBy( p => p.Referer.Solution ).Select( s => $"{s.Key.Name}" ).Concatenate()})" );
-                            }
-                        }
-                        else
-                        {
-                            foreach( var versionGrouped in byVersion )
-                            {
-                                Console.WriteLine( "    |    |" + versionGrouped.Key );
-                                foreach( var solutionGrouped in versionGrouped.GroupBy( q => q.Referer.Solution ) )
-                                {
-                                    Console.WriteLine( "    |    |    |" + solutionGrouped.Key.Name + ":" );
-                                    foreach( var project in solutionGrouped )
-                                    {
-                                        Console.WriteLine( "    |    |    |    |" + project.Referer.Name );
-                                    }
-                                }
-                            }
-                        }
-                        Console.ForegroundColor = stdForeColor;
-                    }
-                }
-            }
         }
 
         [CommandMethod]
@@ -825,7 +759,7 @@ namespace CK.Env
             } );
         }
 
-        ReleaseRoadmap? LoadRoadmap( IActivityMonitor monitor )
+        protected ReleaseRoadmap? LoadRoadmap( IActivityMonitor monitor )
         {
             var depContext = GetWorldSolutionContext( monitor );
             if( depContext == null ) return null;
@@ -835,36 +769,7 @@ namespace CK.Env
         /// <summary>
         /// Gets or sets the version selector that <see cref="Release"/> will use.
         /// </summary>
-        public IReleaseVersionSelector VersionSelector { get; set; }
-
-        /// <summary>
-        /// Same as <see cref="CanRelease"/>.
-        /// </summary>
-        public bool CanEditRoadmap => CanRelease;
-
-        /// <summary>
-        /// Edits the current roadmap or creates one.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <returns>The roadmap.</returns>
-        [CommandMethod]
-        public bool EditRoadmap( IActivityMonitor monitor, bool pull = true )
-        {
-            if( !CanEditRoadmap ) throw new InvalidOperationException( nameof( CanEditRoadmap ) );
-            if( !CheckBeforeReleaseBuildOrEdit( monitor, pull ) ) return false;
-            return DoEditRoadmap( monitor, false ) != null;
-        }
-
-        ReleaseRoadmap? DoEditRoadmap( IActivityMonitor monitor, bool forgetAllExistingRoadmapVersions )
-        {
-            var roadmap = LoadRoadmap( monitor );
-            if( roadmap == null ) return null;
-            bool editSucceed = roadmap.UpdateRoadmap( monitor, VersionSelector, forgetAllExistingRoadmapVersions );
-            // Always saves state to preserve any change in the roadmap, even on error.
-            _localState.Roadmap = roadmap.ToXml();
-            if( !_localState.SaveState( monitor ) || !editSucceed ) return null;
-            return roadmap;
-        }
+        public IReleaseVersionSelector? VersionSelector { get; set; }
 
         /// <summary>
         /// Gets whether <see cref="WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/>, <see cref="VersionSelector"/>
@@ -898,28 +803,7 @@ namespace CK.Env
             return true;
         }
 
-        /// <summary>
-        /// Starts a release after an optional pull, using the current <see cref="VersionSelector"/>.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="pull">Pull all branches first.</param>
-        /// <param name="resetRoadmap">True to forget the current road-map (it if exists) and ask for each and every version.</param>
-        /// <returns>True on success, false on error.</returns>
-        [CommandMethod]
-        public bool Release( IActivityMonitor monitor, bool pull = true, bool resetRoadmap = false )
-        {
-            if( !CanRelease ) throw new InvalidOperationException( nameof( CanRelease ) );
-            if( !CheckBeforeReleaseBuildOrEdit( monitor, pull ) ) return false;
-
-            var roadmap = DoEditRoadmap( monitor, resetRoadmap );
-            if( roadmap == null ) return false;
-
-            if( !SetWorkStatusAndSave( monitor, GlobalWorkStatus.Releasing ) ) return false;
-
-            return DoReleasing( monitor );
-        }
-
-        bool DoReleasing( IActivityMonitor monitor )
+        protected bool DoReleasing( IActivityMonitor monitor )
         {
             return RunSafe( monitor, $"Starting Release.", ( m, error ) =>
             {

@@ -46,7 +46,7 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="versionSelector">The version selector to use.</param>
         /// <param name="forgetAllExistingRoadmapVersions">
-        /// True to automatically skip any previously reolved versions.
+        /// True to automatically skip any previously resolved versions.
         /// <paramref name="versionSelector"/> will not see them.
         /// </param>
         /// <returns>True on success, false on error or cancellation..</returns>

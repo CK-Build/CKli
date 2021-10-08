@@ -7,13 +7,13 @@ namespace CK.Env
     /// an actual object instance of a given type.
     /// </summary>
     /// <typeparam name="T">The type of the object.</typeparam>
-    public interface IXTypedObjectProvider<T>
+    public interface IXTypedObjectProvider<out T>
     {
         /// <summary>
         /// Must return the instance. Null is a valid value at this level.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The instance (may be null).</returns>
-        T GetObject( IActivityMonitor m );
+        T? GetObject( IActivityMonitor m );
     }
 }
