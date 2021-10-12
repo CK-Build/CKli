@@ -49,7 +49,7 @@ namespace CK.Env.CKSetup
 
         public string UniqueRepositoryName { get; }
 
-        public string ResolveSecret( IActivityMonitor m, bool throwOnEmpty = false )
+        public string? ResolveSecret( IActivityMonitor m, bool throwOnEmpty = false )
         {
             return _keyStore.GetSecretKey( m, SecretKeyName, throwOnEmpty );
         }
@@ -61,7 +61,7 @@ namespace CK.Env.CKSetup
             bool success = true;
             using( m.OnError( () => success = false ) )
             {
-                if( !(artifacts is CKSetupArtifactLocalSet local) )
+                if( artifacts is not CKSetupArtifactLocalSet local )
                 {
                     m.Error( $"Invalid artifact local set for CKSetup store." );
                     success = false;
@@ -76,13 +76,13 @@ namespace CK.Env.CKSetup
                     else
                     {
                         var secret = ResolveSecret( m, true );
-                        using( LocalStore store = LocalStore.OpenOrCreate( m, local.StorePath ) )
+                        using( LocalStore? store = LocalStore.OpenOrCreate( m, local.StorePath ) )
                         {
                             success &= store != null && store.PushComponents( c => all.Remove( c.GetRef() ), Url, secret );
                         }
                         if( all.Count > 0 )
                         {
-                            m.Error( $"Local store '{local.StorePath}' does not contain CKSetup components: ${all.Select( c => c.ToString() ).Concatenate()}." );
+                            m.Error( $"Local store '{local.StorePath}' does not contain CKSetup components: {all.Select( c => c.ToString() ).Concatenate()}." );
                             success = false;
                         }
                     }
