@@ -1036,6 +1036,13 @@ namespace CK.Env
 
             if( !CheckGlobalGitStatus( m, StandardGitStatus.Develop ) ) return false;
 
+            if( _store.IsSingleWorld )
+            {
+                m.Error( $"LTS can only created from multiple world stores, the current store is bound to a single world." );
+                return false;
+            }
+
+
             using( m.OpenInfo( "Checking working folders and pulling remote." ) )
             {
                 foreach( var repo in _gitRepositories )
@@ -1101,21 +1108,36 @@ namespace CK.Env
                         {
                             int currentMajor = p.Current.FinalBuildInfo.Version.Major;
                             // On the parallel develop branch, sets the SingleMajor to the current
-                            // one or sets the OnlyPatch to true if it is the 0 major... and commit.
+                            // one or sets the OnlyPatch to true if it is the 0 major...
+                            // Changes the <Branch Name="<current-develop>" to Name="<new-develop>"
+                            // and clears all other branches configuration (they stay on the original world) and commit.
                             var repoXmlFile = p.Repo.FullPhysicalPath.AppendPart( "RepositoryInfo.xml" );
                             var repoXmlDoc = XDocument.Load( repoXmlFile );
+                            XElement sgvE = repoXmlDoc.Root.EnsureElement( SimpleGitVersion.SGVSchema.SimpleGitVersion );
                             string commitMessage;
                             if( currentMajor == 0 )
                             {
-                                repoXmlDoc.Root.EnsureElement( SimpleGitVersion.SGVSchema.SimpleGitVersion )
-                                                .SetAttributeValue( SimpleGitVersion.SGVSchema.OnlyPatch, true );
+                                sgvE.SetAttributeValue( SimpleGitVersion.SGVSchema.OnlyPatch, true );
                                 commitMessage = $"Creating parallel world '{newWorldName}': Version Major is locked to {currentMajor}.";
                             }
                             else
                             {
-                                repoXmlDoc.Root.EnsureElement( SimpleGitVersion.SGVSchema.SimpleGitVersion )
-                                                .SetAttributeValue( SimpleGitVersion.SGVSchema.SingleMajor, currentMajor );
+                                sgvE.SetAttributeValue( SimpleGitVersion.SGVSchema.SingleMajor, currentMajor );
                                 commitMessage = $"Creating parallel world '{newWorldName}': Only patch versions {currentMajor}.{p.Current.FinalBuildInfo.Version.Minor}.X where X > {p.Current.FinalBuildInfo.Version.Patch} can be produced.";
+                            }
+                            var branches = sgvE.Elements( SimpleGitVersion.SGVSchema.Branches ).Elements( SimpleGitVersion.SGVSchema.Branch ).ToList();
+                            foreach( var branch in branches )
+                            {
+                                var name = branch.Attribute( SimpleGitVersion.SGVSchema.Name )?.Value;
+                                if( name == WorldName.DevelopBranchName )
+                                {
+                                    branch.SetAttributeValue( SimpleGitVersion.SGVSchema.Name, newWorldName.DevelopBranchName );
+                                }
+                                else
+                                {
+                                    m.Info( $"Removing SimpleGitVersion Branch '{branch}' element from {newWorldName.DevelopBranchName} Respository.xml file." );
+                                    branch.Remove();
+                                }
                             }
                             repoXmlDoc.Save( repoXmlFile );
                             if( p.Repo.Commit( m, commitMessage ) == CommittingResult.Error )
@@ -1145,9 +1167,7 @@ namespace CK.Env
                             repoXmlDoc.Root.EnsureElement( SimpleGitVersion.SGVSchema.SimpleGitVersion )
                                             .SetAttributeValue( SimpleGitVersion.SGVSchema.StartingVersion, starting );
                             repoXmlDoc.Save( repoXmlFile );
-                            if( p.Repo.Commit( m, $"Creating parallel world '{newWorldName}': minimal version in this branch is now '{starting}'." )
-                                == CommittingResult.Error
-                                )
+                            if( p.Repo.Commit( m, $"Creating parallel world '{newWorldName}': minimal version in this branch is now '{starting}'." ) == CommittingResult.Error )
                             {
                                 error = true;
                             }

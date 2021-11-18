@@ -77,6 +77,11 @@ namespace CK.Env
         public IWorldLocalMapping WorldLocalMapping { get; }
 
         /// <summary>
+        /// Gets whether this store manages a single world.
+        /// </summary>
+        public bool IsSingleWorld => SingleWorld != null;
+
+        /// <summary>
         /// Gets the single mapping if this is a single world store. Null otherwise.
         /// </summary>
         protected SingleWorldMapping? SingleWorld { get; }
