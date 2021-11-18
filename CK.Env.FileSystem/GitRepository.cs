@@ -157,7 +157,7 @@ namespace CK.Env
                     m.Error( $"Missing required {pathOpt} file." );
                     return null;
                 }
-                var opt = new RepositoryInfoOptions( fOpt.ReadAsXDocument().Root ) { HeadBranchName = branchName };
+                var opt = new RepositoryInfoOptions( fOpt.ReadAsXDocument().Root ) { HeadBranchName = branchName, IgnoreAlreadyExistingVersion = true };
                 var result = new CommitInfo( Git, opt );
                 result.Explain( new AdaptedLogger( m ) );
                 return result.Error == null ? result : null;

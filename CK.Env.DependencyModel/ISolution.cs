@@ -41,11 +41,11 @@ namespace CK.Env.DependencyModel
         IEnumerable<GeneratedArtifact> GeneratedArtifacts { get; }
 
         /// <summary>
-        /// Gets or sets the build project. Can be null.
-        /// When not null, the project must belong to this <see cref="Projects"/> and both <see cref="Project.IsPublished"/>
+        /// Gets the build project. Can be null.
+        /// When not null, the project belongs to this <see cref="Projects"/> and both <see cref="Project.IsPublished"/>
         /// and <see cref="Project.IsTestProject"/> must be false.
         /// </summary>
-        IProject BuildProject { get; }
+        IProject? BuildProject { get; }
 
         /// <summary>
         /// Gets the repositories where produced artifacts must be pushed.
