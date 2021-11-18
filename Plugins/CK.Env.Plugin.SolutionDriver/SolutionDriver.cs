@@ -553,6 +553,78 @@ namespace CK.Env.Plugin
         }
 
 
+        [CommandMethod]
+        public bool ChangeSingleTargetFramework( IActivityMonitor monitor, string oldOne, string newOne )
+        {
+            if( oldOne == null ) throw new ArgumentNullException( nameof( oldOne ) );
+            if( newOne == null ) throw new ArgumentNullException( nameof( newOne ) );
+
+            var solution = GetSolution( monitor, allowInvalidSolution: false );
+            if( solution == null ) return false;
+            var o = MSProject.Savors.FindOnlyExisting( oldOne );
+            if( o == null || o.IsEmpty )
+            {
+                monitor.Info( $"'{oldOne}' is not an existing target framework. There is nothing to replace." );
+                return true;
+            }
+            if( o.AtomicTraits.Count != 1 )
+            {
+                monitor.Error( $"Target framework '{oldOne}' must be a single framework." );
+                return false;
+            }
+            var n = MSProject.Savors.FindOrCreate( newOne );
+            if( n.AtomicTraits.Count != 1 )
+            {
+                monitor.Error( $"Target framework to replace '{newOne}' must be a single framework." );
+                return false;
+            }
+            return ChangeSingleTargetFramework( monitor, o, n );
+        }
+
+        /// <summary>
+        /// Replaces a target framework with another one in all projects that are not the <see cref="IProject.IsBuildProject"/>
+        /// only if it is the single target framework defined: projects that use multi targeting are skipped.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="oldOne">The target framework to replace.</param>
+        /// <param name="newOne">The new target framework.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool ChangeSingleTargetFramework( IActivityMonitor monitor, CKTrait oldOne, CKTrait newOne )
+        {
+            if( oldOne == null ) throw new ArgumentNullException( nameof( oldOne ) );
+            if( newOne == null ) throw new ArgumentNullException( nameof( newOne ) );
+
+            var solution = GetSolution( monitor, allowInvalidSolution: false );
+            if( solution == null ) return false;
+            bool mustSave = false;
+            foreach( var p in solution.Projects )
+            {
+                if( p.IsBuildProject ) continue;
+                MSProject? project = p.Tag<MSProject>();
+                if( project != null && project.TargetFrameworks != null )
+                {
+                    if( project.TargetFrameworks.AtomicTraits.Count == 1 )
+                    {
+                        if( project.TargetFrameworks == oldOne )
+                        {
+                            mustSave |= project.SetTargetFrameworks( monitor, newOne );  
+                        }
+                        else
+                        {
+                            monitor.Debug( $"Project {project.ProjectName} skipped since it targets: {project.TargetFrameworks}." );
+                        }
+                    }
+                    else
+                    {
+                        monitor.Info( $"Project {project.ProjectName} skipped since it has multiple targets: {project.TargetFrameworks}." );
+                    }
+                }
+            }
+            return mustSave ? _sln.Save( monitor ) : true;
+        }
+
+
+
         /// <summary>
         /// Fires before and after <see cref="ZeroBuildProject"/> actually builds a
         /// project in ZeroVersion.

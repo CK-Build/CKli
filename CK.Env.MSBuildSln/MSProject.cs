@@ -96,12 +96,11 @@ namespace CK.Env.MSBuildSln
         MSProjFile? _centralPackagesFile;
         Dependencies _dependencies;
 
-        internal MSProject(
-                    SolutionFile solution,
-                    KnownProjectType type,
-                    string projectGuid,
-                    string projectName,
-                    NormalizedPath relativePath )
+        internal MSProject( SolutionFile solution,
+                            KnownProjectType type,
+                            string projectGuid,
+                            string projectName,
+                            NormalizedPath relativePath )
             : base( solution, projectGuid, type.ToGuid(), projectName, relativePath )
         {
             Debug.Assert( KnownType.IsVSProject() );
@@ -113,10 +112,9 @@ namespace CK.Env.MSBuildSln
         /// </summary>
         public MSProjFile? ProjectFile => _primaryFile;
 
-        internal override bool Initialize(
-            FileSystem fs,
-            IActivityMonitor m,
-            Dictionary<NormalizedPath, MSProjFile> cache )
+        internal override bool Initialize( FileSystem fs,
+                                           IActivityMonitor m,
+                                           Dictionary<NormalizedPath, MSProjFile> cache )
         {
             if( !base.Initialize( fs, m, cache ) ) return false;
             return ReloadProjectFile( fs, m, cache ) != null;
@@ -204,7 +202,7 @@ namespace CK.Env.MSBuildSln
         public string? OutputType { get; private set; }
 
         /// <summary>
-        /// Gets the target frameforks (from the <see cref="Savors"/> context).
+        /// Gets the target frameworks (from the <see cref="Savors"/> context).
         /// Null if the project can not be read.
         /// </summary>
         public CKTrait? TargetFrameworks { get; private set; }
@@ -252,7 +250,7 @@ namespace CK.Env.MSBuildSln
 
         /// <summary>
         /// Sets the TargetFramework(s) element in the project file (from <see cref="MSProject.Savors"/> context).
-        /// The dependencies are analysed and new <see cref="Dependencies.UselessDependencies"/> may appear.
+        /// The dependencies are analyzed and new <see cref="Dependencies.UselessDependencies"/> may appear.
         /// </summary>
         /// <param name="m">The activity monitor to use.</param>
         /// <param name="frameworks">The framework(s) to set.</param>
@@ -287,16 +285,15 @@ namespace CK.Env.MSBuildSln
         /// <param name="version">The new version to set.</param>
         /// <param name="addIfNotExists">True to add the reference. By default, it is only updated.</param>
         /// <param name="preserveExisting">True to keep any existing version.</param>
-        /// <param name="throwProjectDependendencies">False to not challenge ProjectReferences.</param>
+        /// <param name="throwOnProjectDependendencies">False to not challenge ProjectReferences.</param>
         /// <returns>The number of changes.</returns>
-        public int SetPackageReferenceVersion(
-            IActivityMonitor m,
-            CKTrait frameworks,
-            string packageId,
-            SVersion version,
-            bool addIfNotExists = false,
-            bool preserveExisting = false,
-            bool throwProjectDependendencies = true )
+        public int SetPackageReferenceVersion( IActivityMonitor m,
+                                               CKTrait frameworks,
+                                               string packageId,
+                                               SVersion version,
+                                               bool addIfNotExists = false,
+                                               bool preserveExisting = false,
+                                               bool throwOnProjectDependendencies = true )
         {
             if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
             if( frameworks.IsEmpty ) throw new ArgumentException( "Must not be empty.", nameof( frameworks ) );
@@ -304,7 +301,7 @@ namespace CK.Env.MSBuildSln
             Debug.Assert( TargetFrameworks != null && ProjectFile != null );
             var actualFrameworks = TargetFrameworks.Intersect( frameworks );
             if( actualFrameworks.IsEmpty ) throw new ArgumentException( $"No {frameworks} in {TargetFrameworks}.", nameof( frameworks ) );
-            if( throwProjectDependendencies && _dependencies.Projects.Any( p => p.TargetProject.ProjectName == packageId ) )
+            if( throwOnProjectDependendencies && _dependencies.Projects.Any( p => p.TargetProject.ProjectName == packageId ) )
             {
                 throw new ArgumentException( $"Package {packageId} is already a ProjectReference.", nameof( packageId ) );
             }
@@ -487,7 +484,7 @@ namespace CK.Env.MSBuildSln
         /// <summary>
         /// Removes a set of dependencies.
         /// </summary>
-        /// <param name="toRemove">Set of dependenies to remove.</param>
+        /// <param name="toRemove">Set of dependencies to remove.</param>
         /// <returns>The number of changes.</returns>
         public int RemoveDependencies( IActivityMonitor m, IReadOnlyList<DeclaredPackageDependency> toRemove )
         {
