@@ -1,5 +1,5 @@
 using CK.Build;
-using CK.Text;
+using CK.Core;
 using CSemVer;
 using System.IO;
 

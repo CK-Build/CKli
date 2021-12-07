@@ -1,5 +1,5 @@
 using CK.Core;
-using CK.Text;
+
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
@@ -119,7 +119,7 @@ namespace System.Xml.Linq
         /// being <see cref="Handle(XObject)">handled</see>.
         /// </summary>
         /// <param name="name">The name of child element.</param>
-        /// <returns>A vaild reader.</returns>
+        /// <returns>A valid reader.</returns>
         public XElementReader WithRequiredChild( XName name )
         {
             var c = Element.Element( name );
@@ -132,7 +132,7 @@ namespace System.Xml.Linq
         /// being <see cref="Handle(XObject)">handled</see>.
         /// </summary>
         /// <param name="name">The name of child element.</param>
-        /// <param name="r">The reader. <see cref="IsValid"/> is false and should not be used if this methid returned false.</param>
+        /// <param name="r">The reader. <see cref="IsValid"/> is false and should not be used if this method returned false.</param>
         /// <returns>True if a child has been found, false otherwise.</returns>
         public bool WithOptionalChild( XName name, out XElementReader r )
         {
@@ -152,7 +152,7 @@ namespace System.Xml.Linq
         /// </summary>
         /// <param name="handleElements">
         /// By default, the returned readers have not handled their respective element.
-        /// When <see langword="true"/> <see cref="Handle(XObject)"/> is called with each of the chldren: all of them are handled.
+        /// When <see langword="true"/> <see cref="Handle(XObject)"/> is called with each of the children: all of them are handled.
         /// </param>
         /// <returns>A the set of valid readers for children.</returns>
         public IEnumerable<XElementReader> WithChildren( bool handleElements = false )
@@ -167,7 +167,7 @@ namespace System.Xml.Linq
         /// </summary>
         /// <param name="handleElements">
         /// By default, the returned readers have not handled their respective element.
-        /// When <see langword="true"/> <see cref="Handle(XObject)"/> is called with each of the chldren: all of them are handled.
+        /// When <see langword="true"/> <see cref="Handle(XObject)"/> is called with each of the children: all of them are handled.
         /// </param>
         /// <returns>A the set of valid readers for children.</returns>
         public IEnumerable<XElementReader> WithChildren( XName name, bool handleElements = false )
@@ -203,17 +203,17 @@ namespace System.Xml.Linq
         public bool HasBeenHandled( XObject o ) => _handled.Contains( o );
 
         /// <summary>
-        /// Registers an object as beeing handled.
+        /// Registers an object as being handled.
         /// </summary>
         /// <param name="o">The object to register.</param>
-        /// <returns>True if it is the first time thios object is handled, false if it has already been handled.</returns>
+        /// <returns>True if it is the first time this object is handled, false if it has already been handled.</returns>
         public bool Handle( XObject o )
         {
             return _handled.Add( o );
         }
 
         /// <summary>
-        /// Registers a set of object as beeing handled.
+        /// Registers a set of object as being handled.
         /// </summary>
         /// <param name="o">The objects to register.</param>
         public void Handle( IEnumerable<XObject> o )
@@ -307,11 +307,11 @@ namespace System.Xml.Linq
         /// </summary>
         /// <typeparam name="T">Set item type.</typeparam>
         /// <param name="elementName">
-        /// The name of the collection element. Usually in the plural form (ie. "Things").
+        /// The name of the collection element. Usually in the plural form (i.e. "Things").
         /// </param>
         /// <param name="set">Current object set with a <see cref="HashSet{T}.Comparer"/> correctly configured.</param>
         /// <param name="builder">
-        /// The builder that knows how to instanciate a <typeparamref name="T"/>
+        /// The builder that knows how to instantiate a <typeparamref name="T"/>
         /// from a &lt;add ... or a &lt;remove ... element.
         /// </param>
         /// <returns>The updated item <paramref name="set"/>.</returns>
@@ -335,7 +335,7 @@ namespace System.Xml.Linq
         /// <typeparam name="T">Set item type.</typeparam>
         /// <param name="set">Current object set with a <see cref="HashSet{T}.Comparer"/> correctly configured.</param>
         /// <param name="builder">
-        /// The builder that knows how to instanciate a <typeparamref name="T"/>
+        /// The builder that knows how to instantiate a <typeparamref name="T"/>
         /// from a &lt;add ... or a &lt;remove ... element.
         /// </param>
         /// <returns>The updated item <paramref name="set"/>.</returns>

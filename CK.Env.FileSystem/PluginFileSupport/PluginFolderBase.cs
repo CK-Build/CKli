@@ -1,5 +1,5 @@
 using CK.Core;
-using CK.Text;
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -50,7 +50,7 @@ namespace CK.Env.Plugin
             }
             else
             {
-                NormalizedPath p = resourceHolder.Namespace.Replace( '.', '/' );
+                NormalizedPath p = resourceHolder.Namespace!.Replace( '.', '/' );
                 _resourcePrefix = p.Combine( resourcePrefix.Value ).ResolveDots().Path.Replace( '/', '.' ) + '.';
             }
             _csResourcePrefix = _csProtocol + _resourcePrefix;
@@ -96,19 +96,19 @@ namespace CK.Env.Plugin
 
         /// <summary>
         /// Must <see cref="SetBinaryResource"/>, <see cref="SetTextResource"/>, <see cref="UpdateTextResource"/>
-        /// or <see cref="DeleteFile"/> as needed.
+        /// or <see cref="DeleteFileOrFolder"/> as needed.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         protected abstract void DoApplySettings( IActivityMonitor m );
 
         /// <summary>
-        /// Deletes a file in this folder.
-        /// The path must be relative to this folder and can not resolve to a file above this folder.
+        /// Deletes a file or a folder in this folder.
+        /// The path must be relative to this folder and can not resolve to a file or folder above this folder.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="filePath">File path relative to this folder.</param>
         /// <returns>True on success, false on error.</returns>
-        protected bool DeleteFile( IActivityMonitor m, NormalizedPath filePath )
+        protected bool DeleteFileOrFolder( IActivityMonitor m, NormalizedPath filePath )
         {
             return GitFolder.FileSystem.Delete( m, FolderPath.Combine( filePath ).ResolveDots( FolderPath.Parts.Count ) );
         }
@@ -121,7 +121,7 @@ namespace CK.Env.Plugin
         /// <param name="name">The name of the text file (without ".txt" suffix).</param>
         /// <param name="transformer">Optional transformer.</param>
         /// <returns>True on success, false on error.</returns>
-        protected bool UpdateTextResource( IActivityMonitor m, NormalizedPath path, Func<string, string> transformer = null )
+        protected bool UpdateTextResource( IActivityMonitor m, NormalizedPath path, Func<string, string>? transformer = null )
         {
             var fs = GitFolder.FileSystem;
             var target = FolderPath.Combine( path );
@@ -132,7 +132,7 @@ namespace CK.Env.Plugin
 
         /// <summary>
         /// Ensures that a text file exists and that its content is the one of the embedded resource.
-        /// This does not preserve exisiting content.
+        /// This does not preserve existing content.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="name">The path of the text file (without ".txt" suffix).</param>

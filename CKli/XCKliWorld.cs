@@ -1,7 +1,7 @@
 using CK.Core;
 using CK.Env;
 using CK.SimpleKeyVault;
-using CK.Text;
+
 using SimpleGitVersion;
 using System;
 using System.Collections.Generic;
@@ -20,14 +20,14 @@ namespace CKli
         readonly IActivityMonitorFilteredClient _userMonitorFilter;
 
         public XCKliWorld( FileSystem fileSystem,
-                       IRootedWorldName worldName,
-                       WorldStore worldStore,
-                       IEnvLocalFeedProvider localFeeds,
-                       SecretKeyStore keyStore,
-                       ArtifactCenter artifacts,
-                       CommandRegister commandRegister,
-                       IReleaseVersionSelector releaseVersionSelector,
-                       Initializer initializer )
+                           IRootedWorldName worldName,
+                           WorldStore worldStore,
+                           IEnvLocalFeedProvider localFeeds,
+                           SecretKeyStore keyStore,
+                           ArtifactCenter artifacts,
+                           CommandRegister commandRegister,
+                           IReleaseVersionSelector releaseVersionSelector,
+                           Initializer initializer )
         : base( fileSystem, worldName, worldStore, localFeeds, keyStore, artifacts, commandRegister, releaseVersionSelector, initializer )
         {
             _userMonitorFilter = initializer.Monitor.Output.Clients.OfType<IActivityMonitorFilteredClient>().FirstOrDefault();
@@ -53,7 +53,7 @@ namespace CKli
                 isLogFilterDefault = true;
             }
             var msg = $"Monitor filters: User:'{_userMonitorFilter.MinimalFilter}' => Final:'{final}'{(isLogFilterDefault ? "(AppDomain's default)" : "")}.";
-            m.UnfilteredLog( ActivityMonitor.Tags.Empty, LogLevel.Info, msg, m.NextLogTime(), null );
+            m.UnfilteredLog( LogLevel.Info, ActivityMonitor.Tags.Empty, msg, null );
             return base.DumpGitFolders( m, gitFolders );
         }
     }

@@ -1,5 +1,5 @@
 using CK.Core;
-using CK.Text;
+
 using CSemVer;
 using LibGit2Sharp;
 using Microsoft.Extensions.FileProviders;

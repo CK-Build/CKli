@@ -1,9 +1,10 @@
-using CK.Text;
+
 using FluentAssertions;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using CK.Core;
 using static CK.Testing.MonitorTestHelper;
 
 namespace CK.SimpleKeyVault.Tests

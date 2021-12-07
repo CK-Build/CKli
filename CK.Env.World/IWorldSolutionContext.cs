@@ -39,7 +39,7 @@ namespace CK.Env
         IReadOnlyList<(DependentSolution Solution, ISolutionDriver Driver)> Solutions { get; }
 
         /// <summary>
-        /// Ensures that this context is up to date, optionnally fully reloading the solutions.
+        /// Ensures that this context is up to date, optionally fully reloading the solutions.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="forceReload">True to force the reload of all the solutions.</param>
@@ -53,7 +53,7 @@ namespace CK.Env
         /// <summary>
         /// Finds the driver that handles a project or returns null if not found.
         /// </summary>
-        /// <param name="p">The project for which the dirver must be obtained.</param>
+        /// <param name="p">The project for which the driver must be obtained.</param>
         /// <returns>The driver of null if not found.</returns>
         public static ISolutionDriver? FindDriver( this IWorldSolutionContext @this, IProject p )
         {

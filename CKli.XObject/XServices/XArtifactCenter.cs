@@ -6,11 +6,10 @@ namespace CKli
 {
     public class XArtifactCenter : XTypedObject
     {
-        public XArtifactCenter(
-            Initializer initializer,
-            IRootedWorldName worldName,
-            WorldStore worldStore,
-            FileSystem fs )
+        public XArtifactCenter( Initializer initializer,
+                                IRootedWorldName worldName,
+                                WorldStore worldStore,
+                                FileSystem fs )
             : base( initializer )
         {
             ArtifactCenter = new ArtifactCenter( worldStore.GetWorkingLocalFolder( worldName ) );

@@ -1,7 +1,7 @@
 using CK.Core;
 using CK.Build;
 using CK.Setup;
-using CK.Text;
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

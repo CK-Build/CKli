@@ -1,6 +1,7 @@
 using CK.Core;
-using CK.Text;
+
 using System;
+using System.Diagnostics;
 using System.Text;
 using System.Xml.Linq;
 
@@ -104,6 +105,7 @@ namespace CK.Env
             : base( fs, filePath, encoding )
         {
             RootName = rootName;
+            MustHaveXmlDeclaration = false;
         }
 
         /// <summary>
@@ -112,6 +114,16 @@ namespace CK.Env
         /// it can be changed and it's not challenged as long as a document exists.
         /// </summary>
         public XName? RootName { get;}
+
+        /// <summary>
+        /// Gets or sets whether the documents's <see cref="XDeclaration"/> should be present (or left as-is when set to null).
+        /// Defaults to false.
+        /// <para>
+        /// We check this only while saving only if the document is already loaded.
+        /// If the content has not been read at all, it is let as-is to avoid loading it only for this check.
+        /// </para>
+        /// </summary>
+        public bool? MustHaveXmlDeclaration { get; set; }
 
         XDocument? GetDocument()
         {
@@ -141,7 +153,7 @@ namespace CK.Env
         {
             if( _currentText == null && GetDocument() != null )
             {
-                _currentText = _doc!.Beautify().ToString();
+                _currentText = _doc!.Beautify().ToString().TrimStart();
             }
             return _currentText;
         }
@@ -200,7 +212,18 @@ namespace CK.Env
         /// <returns>True on success, false on error.</returns>
         public bool Save( IActivityMonitor m, bool forceSave = false )
         {
+            // We check the MustHaveXmlDeclaration only if the document is already loaded.
+            // If the content has not been read, it is let as-is to avoid loading it only for this check.
+            bool declNeedUpdate = _doc != null && MustHaveXmlDeclaration.HasValue && MustHaveXmlDeclaration != (_doc.Declaration != null);
+            forceSave |= declNeedUpdate;
             if( !IsDirty && !forceSave ) return true;
+            if( declNeedUpdate )
+            {
+                Debug.Assert( _doc != null && MustHaveXmlDeclaration.HasValue );
+                if( MustHaveXmlDeclaration.Value ) _doc.Declaration = new XDeclaration( "1.0", "utf-8", null );
+                else _doc.Declaration = null;
+                _currentText = null;
+            }
             return CreateOrUpdate( m, GetCurrentText(), forceSave );
         }
 

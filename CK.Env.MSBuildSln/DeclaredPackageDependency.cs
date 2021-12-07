@@ -51,6 +51,7 @@ namespace CK.Env.MSBuildSln
 
         /// <summary>
         /// Gets the frameworks to which this dependency applies.
+        /// When no Condition apply, this is the full <see cref="MSProject.TargetFrameworks"/>.
         /// </summary>
         public CKTrait Frameworks { get; }
 

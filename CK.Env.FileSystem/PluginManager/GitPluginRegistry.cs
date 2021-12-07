@@ -1,4 +1,4 @@
-using CK.Text;
+using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -10,7 +10,7 @@ namespace CK.Env
     /// <summary>
     /// Registry of <see cref="IGitPlugin"/> and <see cref="IGitBranchPlugin"/> that apply
     /// to a <see cref="FolderPath"/>.
-    /// The <see cref="GitPluginManager"/> of a <see cref="GitRepository"/> uses this registry to instanciate
+    /// The <see cref="GitPluginManager"/> of a <see cref="GitRepository"/> uses this registry to instantiate
     /// the plugins.
     /// </summary>
     public class GitPluginRegistry
@@ -20,9 +20,9 @@ namespace CK.Env
         readonly struct EntryKey : IEquatable<EntryKey>
         {
             public readonly Type Type;
-            public readonly string BranchName;
+            public readonly string? BranchName;
 
-            public EntryKey( Type t, string b )
+            public EntryKey( Type t, string? b )
             {
                 Type = t;
                 BranchName = b;
@@ -30,7 +30,7 @@ namespace CK.Env
 
             public bool Equals( EntryKey other ) => Type == other.Type && BranchName == other.BranchName;
 
-            public override bool Equals( object obj ) => obj is EntryKey k && Equals( k );
+            public override bool Equals( object? obj ) => obj is EntryKey k && Equals( k );
 
             public override int GetHashCode() => Type.GetHashCode() ^ (BranchName?.GetHashCode() ?? 0);
 
@@ -231,8 +231,8 @@ namespace CK.Env
             Dictionary<Type, object> mappings,
             IServiceProvider baseProvider,
             CommandRegister commandRegister,
-            string branchName,
-            string defaultBranchName )
+            string? branchName,
+            string? defaultBranchName )
         {
             Debug.Assert( (branchName != null) == (defaultBranchName != null) );
             Debug.Assert( !mappings.Keys.Any( k => IsGitFolderPlugin( k ) ), "There must not be any plugin. Only settings." );

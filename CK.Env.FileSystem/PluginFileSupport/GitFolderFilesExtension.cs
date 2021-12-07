@@ -1,5 +1,5 @@
 using CK.Core;
-using CK.Text;
+
 using Microsoft.Extensions.FileProviders;
 using System.Xml.Linq;
 

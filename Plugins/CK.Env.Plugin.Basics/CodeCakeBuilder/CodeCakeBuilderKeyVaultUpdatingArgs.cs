@@ -17,7 +17,10 @@ namespace CK.Env.Plugin
         /// <param name="spec">Specification of the current solution.</param>
         /// <param name="solution">Current solution.</param>
         /// <param name="secrets">The secrets ready to be written.</param>
-        public CodeCakeBuilderKeyVaultUpdatingArgs( IActivityMonitor m, SolutionSpec spec, ISolution solution, IDictionary<string, string> secrets )
+        public CodeCakeBuilderKeyVaultUpdatingArgs( IActivityMonitor m,
+                                                    SolutionSpec spec,
+                                                    ISolution solution,
+                                                    IDictionary<string, string> secrets )
             : base( m )
         {
             SolutionSpec = spec;
@@ -31,7 +34,7 @@ namespace CK.Env.Plugin
         public IDictionary<string, string> Secrets { get; }
 
         /// <summary>
-        /// Gets the specfication of the solution being updated.
+        /// Gets the specification of the solution being updated.
         /// </summary>
         public ISolution Solution { get; }
 

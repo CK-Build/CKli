@@ -1,6 +1,6 @@
 using CK.Core;
 using CK.Env.DependencyModel;
-using CK.Text;
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -57,7 +57,7 @@ namespace CK.Env
             mustReloadSolutions = false;
             try
             {
-                using( m.OpenTrace( "Analysing dependencies." ) )
+                using( m.OpenTrace( "Analyzing dependencies." ) )
                 {
                     foreach( var p in ZeroBuildProjects )
                     {
@@ -180,7 +180,7 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Encapsulates creation, initalization and run of the builds.
+        /// Encapsulates creation, initialization and run of the builds.
         /// Solutions are soon as version updates have been made.
         /// </summary>
         /// <param name="m">The monitor to use.</param>

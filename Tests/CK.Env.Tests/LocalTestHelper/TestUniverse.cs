@@ -1,7 +1,7 @@
 using CK.Core;
 using CK.Env.DependencyModel;
 using CK.SimpleKeyVault;
-using CK.Text;
+
 using CKli;
 using CSemVer;
 using LibGit2Sharp;

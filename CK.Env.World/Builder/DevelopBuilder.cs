@@ -1,6 +1,6 @@
 using CK.Core;
 using CK.Env.DependencyModel;
-using CK.Text;
+
 using CSemVer;
 using System;
 using System.Collections.Generic;
@@ -13,7 +13,7 @@ namespace CK.Env
     /// Versions are based on the number of commits from head to the last actual release.
     /// Builds may be retried whenever an update of the build chain is required and the commit
     /// cannot be amended (fresh checkout or right after a push).
-    /// This is a edge case that does'nt happen often.
+    /// This is a edge case that doesn't happen often.
     /// </summary>
     class DevelopBuilder : Builder
     {
@@ -32,7 +32,10 @@ namespace CK.Env
             _withUnitTest = withUnitTest;
         }
 
-        protected override (SVersion? Version, bool MustBuild) PrepareBuild( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades )
+        protected override (SVersion? Version, bool MustBuild) PrepareBuild( IActivityMonitor m,
+                                                                             DependentSolution s,
+                                                                             ISolutionDriver driver,
+                                                                             IReadOnlyList<UpdatePackageInfo> upgrades )
         {
             if( !driver.UpdatePackageDependencies( m, upgrades ) ) return (null, false);
 
@@ -45,7 +48,12 @@ namespace CK.Env
             return (driver.GitRepository.ReadVersionInfo( m )?.FinalBuildInfo.Version, true);
         }
 
-        protected override BuildState Build( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade )
+        protected override BuildState Build( IActivityMonitor m,
+                                             DependentSolution s,
+                                             ISolutionDriver driver,
+                                             IReadOnlyList<UpdatePackageInfo> upgrades,
+                                             SVersion sVersion,
+                                             IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade )
         {
             if( _commits[s.Index] != driver.GitRepository.Head.CommitSha )
             {

@@ -8,6 +8,7 @@ using System.Text;
 using Microsoft.PowerShell;
 using System;
 using System.Threading;
+using System.Reflection;
 
 namespace CK.Env
 {
@@ -33,14 +34,13 @@ namespace CK.Env
         /// <param name="stdErrorLevel">Trace level of Standard Error stream.</param>
         /// <param name="environmentVariables">Optional environment variables for the child process.</param>
         /// <returns>True on success, false on error.</returns>
-        public static bool RunPowerShell(
-                IActivityMonitor monitor,
-                string workingDir,
-                string scriptFileName,
-                IEnumerable<string> arguments,
-                int timeoutMilliseconds,
-                LogLevel stdErrorLevel = LogLevel.Warn,
-                IEnumerable<(string, string)>? environmentVariables = null )
+        public static bool RunPowerShell( IActivityMonitor monitor,
+                                          string workingDir,
+                                          string scriptFileName,
+                                          IEnumerable<string> arguments,
+                                          int timeoutMilliseconds,
+                                          LogLevel stdErrorLevel = LogLevel.Warn,
+                                          IEnumerable<(string, string)>? environmentVariables = null )
         {
             if( !Path.IsPathRooted( scriptFileName ) && scriptFileName[0] != '.' )
             {
@@ -92,7 +92,10 @@ namespace CK.Env
         /// <param name="arguments">Command arguments.</param>
         /// <param name="environmentVariables">Optional environment variables for the child process.</param>
         /// <returns>A configured start info.</returns>
-        public static ProcessStartInfo ConfigureProcessInfo( string workingDir, string fileName, string arguments, IEnumerable<(string, string)>? environmentVariables = null )
+        public static ProcessStartInfo ConfigureProcessInfo( string workingDir,
+                                                             string fileName,
+                                                             string arguments,
+                                                             IEnumerable<(string, string)>? environmentVariables = null )
         {
             ProcessStartInfo cmdStartInfo = new ProcessStartInfo
             {
@@ -172,6 +175,16 @@ namespace CK.Env
                 int exitCode = hasExited ? cmdProcess.ExitCode : 0;
                 cmdProcess.OutputDataReceived -= outputReceived;
                 cmdProcess.ErrorDataReceived -= errorReceived;
+
+                //static void ReflectionHack( Process process )
+                //{
+                //    const BindingFlags bindingFlags = BindingFlags.NonPublic | BindingFlags.Instance;
+                //    FieldInfo? outputField = typeof( Process ).GetField( "_output", bindingFlags );
+                //    FieldInfo? errorField = typeof( Process ).GetField( "_error", bindingFlags );
+                //    ((IDisposable)outputField!.GetValue( process )!).Dispose();
+                //    ((IDisposable)errorField!.GetValue( process )!).Dispose();
+                //}
+                //ReflectionHack( cmdProcess );
 
                 if( !hasExited )
                 {

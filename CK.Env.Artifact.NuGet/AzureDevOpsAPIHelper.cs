@@ -1,5 +1,5 @@
 using CK.Core;
-using CK.Text;
+
 using CK.Build;
 using CSemVer;
 using System;
@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using System.Text.Json;
 
 namespace CK.Env
 {
@@ -88,8 +89,9 @@ namespace CK.Env
                         using( HttpRequestMessage req = new HttpRequestMessage( HttpMethod.Post, apiUrl ) )
                         {
                             req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue( "Basic", basicAuth );
-                            var body = GetPromotionJSONBody( b, viewName, isNPM );
-                            req.Content = new StringContent( body, Encoding.UTF8, "application/json" );
+                            req.Content = new ByteArrayContent( GetPromotionJSONBody( b, viewName, isNPM ) );
+                            req.Content.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse( "application/json" );
+                            req.Content.Headers.ContentEncoding.Add( Encoding.UTF8.WebName );
                             using( var msg = await httpClient.SendAsync( req ) )
                             {
                                 if( !msg.IsSuccessStatusCode )
@@ -104,23 +106,32 @@ namespace CK.Env
             }
         }
 
-        static string GetPromotionJSONBody( IEnumerable<ArtifactInstance> packages, string viewName, bool npm )
+        static byte[] GetPromotionJSONBody( IEnumerable<ArtifactInstance> packages, string viewName, bool npm )
         {
-            var b = new StringBuilder();
-            b.Append( @"{""data"":{""viewId"": """ ).AppendJSONEscaped( viewName ).Append( @"""},""operation"": 0,""packages"": [" );
-            int count = 0;
-            foreach( var p in packages )
+            var a = new ByteArrayWriter();
+            using( var w = new Utf8JsonWriter( a ) )
             {
-                if( count++ != 0 ) b.Append( ',' );
-                b.Append( @"{""id"": """ )
-                    .AppendJSONEscaped( p.Artifact.Name )
-                    .Append( @""",""version"": """ )
-                    .AppendJSONEscaped( p.Version.ToNormalizedString() )
-                    .Append( @""",""protocolType"": """ )
-                    .Append( npm ? "Npm" : "NuGet" ).Append( @"""}" );
+                w.WriteStartObject();
+                w.WritePropertyName( "data" );
+                w.WriteStartObject();
+                w.WriteString( "viewId", viewName );
+                w.WriteEndObject();
+                w.WriteNumber( "operation", 0 );
+                w.WritePropertyName( "packages" );
+                w.WriteStartArray();
+                foreach( var p in packages )
+                {
+                    w.WriteStartObject();
+                    w.WriteString( "id", p.Artifact.Name );
+                    w.WriteString( "version", p.Version.ToNormalizedString() );
+                    w.WriteString( "protocolType", npm ? "Npm" : "NuGet" );
+                    w.WriteEndObject();
+                }
+                w.WriteEndArray();
+                w.WriteEndObject();
+                w.Flush();
+                return a.WrittenSpan.ToArray();
             }
-            b.Append( "]}" );
-            return b.ToString();
         }
 
     }

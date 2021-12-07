@@ -2,7 +2,7 @@ using CK.Core;
 using CK.Build;
 using CK.Env;
 using CK.Env.DependencyModel;
-using CK.Text;
+
 using CSemVer;
 using System;
 using System.Collections.Generic;

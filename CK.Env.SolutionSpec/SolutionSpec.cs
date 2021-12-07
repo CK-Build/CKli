@@ -1,4 +1,4 @@
-using CK.Text;
+using CK.Core;
 using System.Collections.Generic;
 using System.Xml.Linq;
 
@@ -12,7 +12,6 @@ namespace CK.Env
         public SolutionSpec( SharedSolutionSpec shared, in XElementReader r )
             : base( shared, r )
         {
-
             UseCKSetup = r.HandleOptionalAttribute( nameof( UseCKSetup ), false );
             SqlServer = r.HandleOptionalAttribute<string>( nameof( SqlServer ), null );
             TestProjectsArePublished = r.HandleOptionalAttribute( nameof( TestProjectsArePublished ), false );

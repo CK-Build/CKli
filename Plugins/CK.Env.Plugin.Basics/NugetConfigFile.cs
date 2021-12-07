@@ -1,6 +1,5 @@
 using CK.Core;
 using CK.SimpleKeyVault;
-using CK.Text;
 using System;
 using System.Linq;
 using System.Xml.Linq;
@@ -69,7 +68,7 @@ namespace CK.Env.Plugin
         {
             // These values are not build secrets. They are required by ApplySettings to configure
             // the NuGet.config file: once done, restore can be made and having these keys available
-            // as environement variables will not help.
+            // as environment variables will not help.
             var creds = e.Solution.ArtifactSources.OfType<INuGetFeed>()
                             .Where( s => s.Credentials != null && s.Credentials.IsSecretKeyName )
                             .Select( s => s.Credentials.PasswordOrSecretKeyName );

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using NUnit.Framework;
+using System.Diagnostics;
 using System.Linq;
 using static CK.Testing.MonitorTestHelper;
 
@@ -25,12 +26,12 @@ namespace CK.Env.MSBuildSln.Tests
             MSBuildConditionParser.TryParse( TestHelper.Monitor, c, out BaseNode node ).Should().BeTrue();
             if( d != null )
             {
-                node.Should().NotBeNull();
+                Debug.Assert( node != null );
                 node.ToString().Should().Be( d );
             }
             else
             {
-                node.Should().BeNull();
+                Debug.Assert( node == null );
             }
         }
 

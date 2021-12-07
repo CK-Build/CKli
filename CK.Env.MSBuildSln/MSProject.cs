@@ -1,6 +1,6 @@
 using CK.Core;
 using CK.Build;
-using CK.Text;
+
 using CSemVer;
 using System;
 using System.Collections.Generic;
@@ -49,7 +49,7 @@ namespace CK.Env.MSBuildSln
             public readonly IReadOnlyList<XElement> UselessDependencies;
 
             /// <summary>
-            /// Gets whether this structure hass been initialized.
+            /// Gets whether this structure has been initialized.
             /// </summary>
             public bool IsInitialized => Packages != null;
 
@@ -276,10 +276,10 @@ namespace CK.Env.MSBuildSln
         /// <summary>
         /// Sets a package reference and returns the number of changes.
         /// </summary>
-        /// <param name="m">The monitor.</param>
+        /// <param name="monitor">The monitor.</param>
         /// <param name="frameworks">
         /// Frameworks that applies to the reference. Must not be empty.
-        /// Can be this project's <see cref="TargetFrameworks"/> to update the package reference regardless of the framework.
+        /// Can be this project's <see cref="TargetFrameworks"/> to update all the package reference regardless of the framework.
         /// </param>
         /// <param name="packageId">The package identifier.</param>
         /// <param name="version">The new version to set.</param>
@@ -287,7 +287,7 @@ namespace CK.Env.MSBuildSln
         /// <param name="preserveExisting">True to keep any existing version.</param>
         /// <param name="throwOnProjectDependendencies">False to not challenge ProjectReferences.</param>
         /// <returns>The number of changes.</returns>
-        public int SetPackageReferenceVersion( IActivityMonitor m,
+        public int SetPackageReferenceVersion( IActivityMonitor monitor,
                                                CKTrait frameworks,
                                                string packageId,
                                                SVersion version,
@@ -296,36 +296,46 @@ namespace CK.Env.MSBuildSln
                                                bool throwOnProjectDependendencies = true )
         {
             if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
-            if( frameworks.IsEmpty ) throw new ArgumentException( "Must not be empty.", nameof( frameworks ) );
-
+            if( frameworks == null || frameworks.IsEmpty )
+            {
+                throw new ArgumentException( "Must not be empty.", nameof( frameworks ) );
+            }
             Debug.Assert( TargetFrameworks != null && ProjectFile != null );
-            var actualFrameworks = TargetFrameworks.Intersect( frameworks );
-            if( actualFrameworks.IsEmpty ) throw new ArgumentException( $"No {frameworks} in {TargetFrameworks}.", nameof( frameworks ) );
             if( throwOnProjectDependendencies && _dependencies.Projects.Any( p => p.TargetProject.ProjectName == packageId ) )
             {
                 throw new ArgumentException( $"Package {packageId} is already a ProjectReference.", nameof( packageId ) );
             }
+            var restrictedFrameworks = TargetFrameworks.Intersect( frameworks );
+            if( restrictedFrameworks.IsEmpty )
+            {
+                monitor.Info( $"The applied frameworks '{frameworks}' don't appear in project's TargetFrameworks '{TargetFrameworks}'." );
+                return 0;
+            }
             var sV = version.ToString();
             int changeCount = 0;
-            CKTrait? pFrameworks = null;
-            foreach( var p in _dependencies.Packages.Where( p => p.PackageId == packageId
-                                                                 && !(pFrameworks = p.Frameworks.Intersect( actualFrameworks )).IsEmpty ) )
+
+            var depsToUpdate = _dependencies.Packages.Where( p => p.PackageId == packageId )
+                                                     .Select( p => (P: p, F: p.Frameworks.Intersect( restrictedFrameworks )) )
+                                                     .Where( p => !p.F.IsEmpty );
+            CKTrait remainingFrameworksToUpdate = restrictedFrameworks;
+            foreach( var dep in depsToUpdate )
             {
-                if( !p.Version.Satisfy( version ) )
+                if( !dep.P.Version.Satisfy( version ) )
                 {
-                    m.Info( $"The new version '{version}' is not compatible with the {packageId} previous version range that is '{p.Version}'." );
+                    monitor.Info( $"The new version '{version}' is not compatible with the {packageId} previous version range '{dep.P.Version}': '{dep.P.OriginElement}'." );
                 }
-                actualFrameworks = actualFrameworks.Except( pFrameworks );
-                var currentVersion = p.Version.Base;
+
+                remainingFrameworksToUpdate = restrictedFrameworks.Except( dep.F );
+                var currentVersion = dep.P.Version.Base;
                 if( currentVersion != version )
                 {
                     if( !preserveExisting )
                     {
-                        var e = p.FinalVersionElement;
+                        var e = dep.P.FinalVersionElement;
                         if( e != null )
                         {
-                            // <PackageReference Update="CK.Core" Version="13.0.1" /> centrally managed
-                            // package or <CKCoreVersion>13.0.1</CKCoreVersion>.
+                            // <PackageReference Update="CK.Core" Version="13.0.1" /> centrally managed package or
+                            // <CKCoreVersion>13.0.1</CKCoreVersion>.
                             if( e.Name == "PackageReference" )
                             {
                                 e.SetAttributeValue( "Version", sV );
@@ -337,45 +347,45 @@ namespace CK.Env.MSBuildSln
                         }
                         else
                         {
-                            e = p.OriginElement;
-                            e.Attribute( p.IsVersionOverride ? "VersionOverride" : "Version" ).SetValue( sV );
+                            e = dep.P.OriginElement;
+                            e.Attribute( dep.P.IsVersionOverride ? "VersionOverride" : "Version" ).SetValue( sV );
                         }
                         ++changeCount;
-                        m.Trace( $"Update in {ToString()}: {packageId} from {currentVersion} to {sV}." );
+                        monitor.Trace( $"Update in {ToString()}: {packageId} from {currentVersion} to {sV}." );
                     }
                     else
                     {
-                        m.Trace( $"Preserving existing version {currentVersion} for {packageId} in {ToString()} (skipped version is {sV})." );
+                        monitor.Trace( $"Preserving existing version {currentVersion} for {packageId} in {ToString()} (skipped version is {sV})." );
                     }
                 }
             }
             // Handle creation if needed.
-            if( !actualFrameworks.IsEmpty && addIfNotExists )
+            if( !remainingFrameworksToUpdate.IsEmpty && addIfNotExists )
             {
                 var firstPropertyGroup = ProjectFile.Document.Root.Element( "PropertyGroup" );
                 var pRef = new XElement( "ItemGroup",
                                 new XElement( "PackageReference",
                                     new XAttribute( "Include", packageId ),
                                     new XAttribute( "Version", sV ) ) );
-                if( TargetFrameworks == actualFrameworks )
+                if( TargetFrameworks == remainingFrameworksToUpdate )
                 {
                     ++changeCount;
                     firstPropertyGroup.AddAfterSelf( pRef );
-                    m.Trace( $"Added unconditional package reference {packageId} -> {sV} for {ToString()}." );
+                    monitor.Trace( $"Added unconditional package reference {packageId} -> {sV} for {ToString()}." );
                 }
                 else
                 {
-                    foreach( var f in actualFrameworks.AtomicTraits )
+                    foreach( var f in remainingFrameworksToUpdate.AtomicTraits )
                     {
                         ++changeCount;
                         var withCond = new XElement( pRef );
                         withCond.SetAttributeValue( "Condition", $"'(TargetFrameWork)' == '{f}' " );
                         firstPropertyGroup.AddAfterSelf( withCond );
-                        m.Trace( $"Added conditional {f} package reference {packageId} -> {sV} for {ToString()}." );
+                        monitor.Trace( $"Added conditional {f} package reference {packageId} -> {sV} for {ToString()}." );
                     }
                 }
             }
-            if( changeCount > 0 ) OnChange( m );
+            if( changeCount > 0 ) OnChange( monitor );
             return changeCount;
         }
 
@@ -400,13 +410,25 @@ namespace CK.Env.MSBuildSln
         /// <param name="m">The monitor to use.</param>
         /// <param name="langVersion">The new LangVersion or null to remove it.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool SetLangVersion( IActivityMonitor m, string langVersion )
+        public bool SetLangVersion( IActivityMonitor m, string? langVersion )
         {
             if( LangVersion != langVersion )
             {
                 DoSetSimpleProperty( m, "LangVersion", langVersion );
                 LangVersion = langVersion;
             }
+            return true;
+        }
+
+        /// <summary>
+        /// Sets or removes the Nullable element.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="nullable">The new Nullable (enable, disable, warnings or annotations) or null to remove it.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool SetNullable( IActivityMonitor m, string? nullable )
+        {
+            DoSetSimpleProperty( m, "Nullable", nullable );
             return true;
         }
 
@@ -705,8 +727,8 @@ namespace CK.Env.MSBuildSln
             foreach( var framework in TargetFrameworks.AtomicTraits )
             {
                 foreach( var (E, C) in e.AncestorsAndSelf()
-                                       .Select( x => (E: x, C: (string)x.Attribute( "Condition" )) )
-                                       .Where( x => x.C != null ) )
+                                        .Select( x => (E: x, C: (string)x.Attribute( "Condition" )) )
+                                        .Where( x => x.C != null ) )
                 {
                     bool? include = evaluator.EvalFinalResult( m, C, f => f == "$(TargetFramework)" ? framework.ToString() : null );
                     if( include == null )

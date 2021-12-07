@@ -1,6 +1,6 @@
 using CK.Core;
 using CK.SimpleKeyVault;
-using CK.Text;
+
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Primitives;
 using System;

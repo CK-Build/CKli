@@ -66,12 +66,19 @@ new CKSetupComponent( "ProjectFolder", "TargetFramework" )
         /// </summary>
         /// <param name="globalInfo">The configured <see cref="CheckRepositoryInfo"/>.</param>
         /// <param name="components">The set of component to push. When null (the default), <see cref="GetCKSetupComponents"/> is used.</param>
-        void StandardPushCKSetupComponents( StandardGlobalInfo globalInfo, IEnumerable<CKSetupComponent> components = null )
+        void StandardPushCKSetupComponents( StandardGlobalInfo globalInfo, IEnumerable<CKSetupComponent>? components = null )
         {
             var storeConf = Cake.CKSetupCreateDefaultConfiguration();
             if( globalInfo.IsLocalCIRelease )
             {
-                storeConf.TargetStoreUrl = Path.Combine( globalInfo.LocalFeedPath, "CKSetupStore" );
+                if( globalInfo.LocalFeedPath == null )
+                {
+                    Cake.Warning( "LocalFeedPath is null. Skipped push to local store." );
+                }
+                else
+                {
+                    storeConf.TargetStoreUrl = Path.Combine( globalInfo.LocalFeedPath, "CKSetupStore" );
+                }
             }
             if( !storeConf.IsValid )
             {

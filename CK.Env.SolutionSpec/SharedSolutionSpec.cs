@@ -6,7 +6,8 @@ using System.Xml.Linq;
 namespace CK.Env
 {
     /// <summary>
-    /// Immutable implementation of <see cref="ISharedSolutionSpec"/>.
+    /// Base class of <see cref="SolutionSpec"/> that can be used independently to define a common
+    /// configuration: subordinated SolutionSpec overrides it.
     /// </summary>
     public class SharedSolutionSpec
     {
@@ -16,6 +17,7 @@ namespace CK.Env
         /// <param name="r">The element reader.</param>
         public SharedSolutionSpec( in XElementReader r )
         {
+            PrimaryTargetFramework = r.HandleOptionalAttribute<string>( nameof( PrimaryTargetFramework ), null );
             NoDotNetUnitTests = r.HandleOptionalAttribute( nameof( NoDotNetUnitTests ), false );
             NoStrongNameSigning = r.HandleOptionalAttribute( nameof( NoStrongNameSigning ), false );
             NoSharedPropsFile = r.HandleOptionalAttribute( nameof( NoSharedPropsFile ), false );
@@ -56,6 +58,7 @@ namespace CK.Env
         /// <param name="r">The element reader.</param>
         public SharedSolutionSpec( SharedSolutionSpec other, in XElementReader r )
         {
+            PrimaryTargetFramework = r.HandleOptionalAttribute( nameof( PrimaryTargetFramework ), other.PrimaryTargetFramework );
             DisableSourceLink = r.HandleOptionalAttribute( nameof( DisableSourceLink ), other.DisableSourceLink );
             NoDotNetUnitTests = r.HandleOptionalAttribute( nameof( NoDotNetUnitTests ), other.NoDotNetUnitTests );
             NoStrongNameSigning = r.HandleOptionalAttribute( nameof( NoStrongNameSigning ), other.NoStrongNameSigning );
@@ -82,7 +85,7 @@ namespace CK.Env
             ExcludedPlugins = r.HandleCollection(
                                     nameof( ExcludedPlugins ),
                                     new HashSet<Type>( other.ExcludedPlugins ),
-                                    eR => SimpleTypeFinder.WeakResolver( eR.HandleRequiredAttribute<string>( "Type" ), true ) );
+                                    eR => SimpleTypeFinder.WeakResolver( eR.HandleRequiredAttribute<string>( "Type" ), true )! );
 
             var e = r.Element;
 
@@ -98,6 +101,14 @@ namespace CK.Env
         /// Defaults to null: no global.json file appear at the root and the latest installed SDK is used. 
         /// </summary>
         public string? GlobalJsonSdkVersion { get; }
+
+        /// <summary>
+        /// Gets the TargetFramework that must be considered ("netcorapp3.1", "net6.0", etc.) or
+        /// frameworks (comma separated like "netstandard2.1, netcoreapp3.1").
+        /// When set, dependencies upgrades of projects are restricted to this or these frameworks.
+        /// When not set, all target frameworks of each projects are updated/upgraded by CKli.
+        /// </summary>
+        public string? PrimaryTargetFramework { get; }
 
         /// <summary>
         /// Gets the license: it must be a https://spdx.org/licenses/ or null if no license applies.

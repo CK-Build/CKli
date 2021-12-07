@@ -2,7 +2,7 @@ using CK.Core;
 using CK.Build;
 using CK.Env.DependencyModel;
 using CK.SimpleKeyVault;
-using CK.Text;
+
 using CSemVer;
 using System;
 using System.Collections.Generic;
@@ -572,7 +572,10 @@ namespace CK.Env
         }
 
         [CommandMethod]
-        public void UpgradeDependency( IActivityMonitor m, string packageName, string? versionToUpgrade = null )
+        public void UpgradeDependency( IActivityMonitor m,
+                                       string packageName,
+                                       string targetFramework = ISolutionDriver.UsePrimaryTargetFramework,
+                                       string? versionToUpgrade = null )
         {
             var worldCtx = _solutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
             if( worldCtx == null ) return;
@@ -614,15 +617,15 @@ namespace CK.Env
                 m.Info( $"No package to upgrade: {artifactUses.Count} references to {packageName} already use version {version}." );
                 return;
             }
-            using( m.OpenInfo( $"{artifactToUpgrade.Count} packages to upgrade (out of {artifactUses.Count} package references)." ) )
+            using( m.OpenInfo( $"{artifactToUpgrade.Count} packages to upgrade (out of {artifactUses.Count} package references) for TargetFramework '{targetFramework}'." ) )
             {
                 foreach( var slnGroupedPackage in artifactToUpgrade.GroupBy( s => s.Referer.Solution ) )
                 {
                     var sln = worldCtx.Solutions.First( s => s.Solution.Solution == slnGroupedPackage.Key );
                     sln.Driver.UpdatePackageDependencies( m,
-                        slnGroupedPackage.Select(
-                            p => new UpdatePackageInfo( p.Referer, new ArtifactInstance( p.Target.Artifact, version ) )
-                        ).ToList()
+                                                          slnGroupedPackage.Select(
+                                                              p => new UpdatePackageInfo( p.Referer, new ArtifactInstance( p.Target.Artifact, version ) )
+                                                         ).ToList()
                     );
                 }
             }
@@ -674,7 +677,7 @@ namespace CK.Env
                 var ctx = GetWorldSolutionContext( m );
                 if( ctx == null ) return;
 
-                ZeroBuilder zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, ctx );
+                ZeroBuilder? zBuilder = ZeroBuilder.EnsureZeroBuildProjects( m, _localFeedProvider, ctx );
                 if( zBuilder == null ) return;
 
                 ctx = GetWorldSolutionContext( m );
@@ -1029,7 +1032,7 @@ namespace CK.Env
                                     && CachedGlobalGitStatus == StandardGitStatus.Develop;
 
         [CommandMethod( confirmationRequired: true )]
-        public bool CreateLTS( IActivityMonitor m, string parallelName )
+        public bool CreateLTS( IActivityMonitor m, string parallelName, bool pushLTSBranches = false, bool pushBaseBranches = false )
         {
             if( !CanCreateLTS ) throw new InvalidOperationException( nameof( CanCreateLTS ) );
             if( String.IsNullOrWhiteSpace( parallelName ) ) throw new ArgumentException( "Must not be null or white space.", nameof( parallelName ) );
@@ -1090,7 +1093,7 @@ namespace CK.Env
                     }
                     else
                     {
-                        m.Error( $"Branch for '{uri}': Name is '{oldBranchName}', it should be '{WorldName.MasterBranchName}' nor '{newWorldName.DevelopBranchName}'. Aborting" );
+                        m.Error( $"Branch for '{uri}': Name is '{oldBranchName}', it should be '{WorldName.MasterBranchName}' or '{WorldName.DevelopBranchName}'. Aborting" );
                         return false;
                     }
                 }
@@ -1118,12 +1121,12 @@ namespace CK.Env
                             if( currentMajor == 0 )
                             {
                                 sgvE.SetAttributeValue( SimpleGitVersion.SGVSchema.OnlyPatch, true );
-                                commitMessage = $"Creating parallel world '{newWorldName}': Version Major is locked to {currentMajor}.";
+                                commitMessage = $"Creating parallel world '{newWorldName}': Only patch versions {currentMajor}.{p.Current.FinalBuildInfo.Version.Minor}.X where X > {p.Current.FinalBuildInfo.Version.Patch} can be produced.";
                             }
                             else
                             {
                                 sgvE.SetAttributeValue( SimpleGitVersion.SGVSchema.SingleMajor, currentMajor );
-                                commitMessage = $"Creating parallel world '{newWorldName}': Only patch versions {currentMajor}.{p.Current.FinalBuildInfo.Version.Minor}.X where X > {p.Current.FinalBuildInfo.Version.Patch} can be produced.";
+                                commitMessage = $"Creating parallel world '{newWorldName}': Version Major is locked to {currentMajor}.";
                             }
                             var branches = sgvE.Elements( SimpleGitVersion.SGVSchema.Branches ).Elements( SimpleGitVersion.SGVSchema.Branch ).ToList();
                             foreach( var branch in branches )
@@ -1199,12 +1202,26 @@ namespace CK.Env
             }
             else
             {
-                using( m.OpenInfo( $"Parallel world created. Pushing '{newWorldName.DevelopBranchName}' and '{WorldName.DevelopBranchName}' branches to remote." ) )
+                m.Info( $"Parallel world created: '{newWorldName.DevelopBranchName}' and '{WorldName.DevelopBranchName}' are ready." );
+                if( pushLTSBranches )
                 {
-                    foreach( var p in toProcess )
+                    using( m.OpenInfo( $"Pushing '{newWorldName.DevelopBranchName}' to remote." ) )
                     {
-                        p.Repo.Push( m, newWorldName.DevelopBranchName );
-                        p.Repo.Push( m, WorldName.DevelopBranchName );
+                        foreach( var p in toProcess )
+                        {
+                            p.Repo.Push( m, newWorldName.DevelopBranchName );
+                        }
+                    }
+
+                }
+                if( pushBaseBranches )
+                {
+                    using( m.OpenInfo( $"Pushing '{WorldName.DevelopBranchName}' branches to remote." ) )
+                    {
+                        foreach( var p in toProcess )
+                        {
+                            p.Repo.Push( m, WorldName.DevelopBranchName );
+                        }
                     }
                 }
             }

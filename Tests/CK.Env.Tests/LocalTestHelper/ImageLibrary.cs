@@ -1,5 +1,5 @@
 using CK.Core;
-using CK.Text;
+
 using FluentAssertions;
 using System;
 using System.Runtime.CompilerServices;

@@ -1,5 +1,5 @@
 using CK.Core;
-using CK.Text;
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -83,7 +83,7 @@ namespace CK.Env.MSBuildSln
         /// </summary>
         /// <param name="key">The name or relative path.</param>
         /// <returns>The project or null if not found.</returns>
-        public ProjectBase FindProject( string key ) => _projectIndex.GetValueWithDefault( key, null );
+        public ProjectBase? FindProject( string key ) => _projectIndex.GetValueOrDefault( key, null );
 
         internal void AddProject( ProjectBase p )
         {
@@ -115,12 +115,12 @@ namespace CK.Env.MSBuildSln
         /// </summary>
         /// <param name="name">Name of the section.</param>
         /// <returns>The section or null if not found.</returns>
-        public Section FindGlobalSection( string name ) => _sections.GetValueWithDefault( name, null );
+        public Section? FindGlobalSection( string name ) => _sections.GetValueOrDefault( name, null );
 
         /// <summary>
         /// Gets the <see cref="DotnetToolConfigFile"/> that is the ".config/dotnet-tools.json" file
         /// relatively to this solution file.
-        /// It may not exist.
+        /// It may not exist but this is never null (just empty).
         /// </summary>
         public DotnetToolConfigFile StandardDotnetToolConfigFile { get; }
 
@@ -142,7 +142,7 @@ namespace CK.Env.MSBuildSln
             }
         }
 
-        internal ProjectBase FindProjectByGuid( IActivityMonitor m, string guid, int lineNumber = 0 )
+        internal ProjectBase? FindProjectByGuid( IActivityMonitor m, string guid, int lineNumber = 0 )
         {
             var project = FindProject( guid );
             if( project == null )
@@ -154,7 +154,7 @@ namespace CK.Env.MSBuildSln
             return project;
         }
 
-        internal T FindProjectByGuid<T>( IActivityMonitor m, string guid, int lineNumber = 0 ) where T : ProjectBase
+        internal T? FindProjectByGuid<T>( IActivityMonitor m, string guid, int lineNumber = 0 ) where T : ProjectBase
         {
             var project = FindProjectByGuid( m, guid );
             if( project == null ) return null;
@@ -166,7 +166,7 @@ namespace CK.Env.MSBuildSln
         }
 
         /// <summary>
-        /// Gets whether any of the the projects this solution contains need to be saved or the <see cref="StandardDotnetToolConfigFile"/>
+        /// Gets whether any of the projects this solution contains need to be saved or the <see cref="StandardDotnetToolConfigFile"/>
         /// or the solution itself needs to be saved.
         /// </summary>
         public bool IsDirty => _isDirtyProjectFiles || _isDirtyStructure || StandardDotnetToolConfigFile.IsDirty;

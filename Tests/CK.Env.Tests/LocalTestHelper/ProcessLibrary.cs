@@ -1,6 +1,6 @@
 using CK.Core;
 using CK.Env.MSBuildSln;
-using CK.Text;
+
 using FluentAssertions;
 using LibGit2Sharp;
 using NUnit.Framework.Internal;

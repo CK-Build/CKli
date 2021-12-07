@@ -11,6 +11,7 @@ namespace CK.Xml.Linq.Extension.Tests
         [TestCase( "<A><B> X </B></A>", "<A>¤  <B> X </B>¤</A>" )]
         [TestCase( "<A><B> ¤ </B></A>", "<A>¤  <B></B>¤</A>" )]
         [TestCase( "<A><B> ¤ ¤ </B></A>", "<A>¤  <B></B>¤</A>" )]
+        [TestCase( "¤ ¤ ¤ <A></A>¤ ¤ ¤ ", "<A></A>" )]
         public void beautify_on_elements( string input, string result )
         {
             input = input.Replace( "¤", Environment.NewLine );

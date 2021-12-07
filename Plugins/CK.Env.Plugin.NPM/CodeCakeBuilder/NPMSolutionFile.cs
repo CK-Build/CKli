@@ -1,5 +1,5 @@
 using CK.Core;
-using CK.Text;
+
 using System.Linq;
 using System.Xml.Linq;
 

@@ -96,14 +96,14 @@ namespace CK.Env.DependencyModel
         /// </summary>
         /// <param name="name">The solution name.</param>
         /// <returns>The dependent solution or null.</returns>
-        public DependentSolution this[string name] => _index.GetValueWithDefault( name, null );
+        public DependentSolution? this[string name] => _index.GetValueOrDefault( name, null );
 
         /// <summary>
         /// Gets the dependent solution associated to a <see cref="Solution"/>.
         /// </summary>
         /// <param name="s">The solution.</param>
         /// <returns>The dependent solution or null.</returns>
-        public DependentSolution this[ISolution s] => _index.GetValueWithDefault( s, null );
+        public DependentSolution? this[ISolution s] => _index.GetValueOrDefault( s, null );
 
         /// <summary>
         /// Gets the <see cref="IDependencySorterResult"/> of the Solution/Project graph.

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <Nullable>enable</Nullable>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
@@ -24,7 +24,7 @@
     <ProjectReference Include="..\CKli.XObject\CKli.XObject.csproj" />
     <PackageReference Include="ReadLine" Version="2.0.1" />
     <!-- Fix run: cannot find git2-8e0b172.dll-->
-    <PackageReference Include="LibGit2Sharp" Version="0.26.2" />
+    <PackageReference Include="LibGit2Sharp" Version="0.27.0-preview-0158" />
   </ItemGroup>
   
 </Project>

@@ -1,5 +1,5 @@
 using CK.Core;
-using CK.Text;
+
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.IO;

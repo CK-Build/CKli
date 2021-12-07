@@ -10,6 +10,11 @@ namespace CK.Env
     public interface ISolutionDriver
     {
         /// <summary>
+        /// Specifies that target frameworks must use the configured Solution Specification PrimaryTargetFramework.
+        /// </summary>
+        const string UsePrimaryTargetFramework = "UsePrimaryTargetFramework";
+
+        /// <summary>
         /// Gets the Git repository.
         /// This can never be null.
         /// </summary>
@@ -34,7 +39,7 @@ namespace CK.Env
         /// <param name="reloadSolution">The solution names or null on error.</param>
         /// <param name="allowInvalidSolution">
         /// True to allow <see cref="IsSolutionValid"/> to be false: the instance is returned as long as the <see cref="ISolution"/> instance has
-        /// successfully been built even if some required cheks have failed.
+        /// successfully been built even if some required checks have failed.
         /// </param>
         /// <returns>The updated sol</returns>
         ISolution GetSolution( IActivityMonitor monitor, bool allowInvalidSolution, bool reloadSolution );
@@ -49,9 +54,14 @@ namespace CK.Env
         /// Updates projects dependencies and saves the solution and its updated projects.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="packageInfos">The updates.</param>
+        /// <param name="packageInfos">The packages to update.</param>
+        /// <param name="frameworkFilter">
+        /// Optional target frameworks for which packages must be updated.
+        /// When null, each project's TargetFramework is considered (all dependencies are updated).
+        /// Defaults to the PrimaryTargetFramework defined in the SolutionSpec.
+        /// </param>
         /// <returns>True on success, false on error.</returns>
-        bool UpdatePackageDependencies( IActivityMonitor monitor, IReadOnlyCollection<UpdatePackageInfo> packageInfos );
+        bool UpdatePackageDependencies( IActivityMonitor monitor, IReadOnlyCollection<UpdatePackageInfo> packageInfos, string? frameworkFilter = UsePrimaryTargetFramework );
 
         /// <summary>
         /// Builds the solution from its file state.

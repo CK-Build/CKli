@@ -1,6 +1,6 @@
 using CK.Core;
 using CK.Env.DependencyModel;
-using CK.Text;
+
 using System;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -25,33 +25,33 @@ namespace CK.Env.Plugin
             bool needDotNetBuild = s.Projects.Any( p => p.Type == ".Net" && p != s.BuildProject );
 
             // Clean old CodeCakeBuilders files
-            DeleteFile( m, "RepositoryInfo.xsd" );
+            DeleteFileOrFolder( m, "RepositoryInfo.xsd" );
 
-            DeleteFile( m, "Build.NuGetHelper.cs" );
-            DeleteFile( m, "Build.StandardCheckRepository.cs" );
-            DeleteFile( m, "Build.StandardCreateNuGetPackages.cs" );
-            DeleteFile( m, "Build.StandardPushNuGetPackages.cs" );
-            DeleteFile( m, "Build.StandardSolutionBuild.cs" );
-            DeleteFile( m, "Build.StandardUnitTests.cs" );
-            DeleteFile( m, "Build.StandardCheckRepositoryWithoutNuGet.cs" );
-            DeleteFile( m, "CakeExtensions/NpmGetPackagesToPublish.cs" );
-            DeleteFile( m, "Build.SetCIVersionOnRunner.cs" );
-            DeleteFile( m, "npm/Build.NpmHelper.cs" );
-            DeleteFile( m, "Abstractions/ArtifactRepository.cs" );
+            DeleteFileOrFolder( m, "Build.NuGetHelper.cs" );
+            DeleteFileOrFolder( m, "Build.StandardCheckRepository.cs" );
+            DeleteFileOrFolder( m, "Build.StandardCreateNuGetPackages.cs" );
+            DeleteFileOrFolder( m, "Build.StandardPushNuGetPackages.cs" );
+            DeleteFileOrFolder( m, "Build.StandardSolutionBuild.cs" );
+            DeleteFileOrFolder( m, "Build.StandardUnitTests.cs" );
+            DeleteFileOrFolder( m, "Build.StandardCheckRepositoryWithoutNuGet.cs" );
+            DeleteFileOrFolder( m, "CakeExtensions/NpmGetPackagesToPublish.cs" );
+            DeleteFileOrFolder( m, "Build.SetCIVersionOnRunner.cs" );
+            DeleteFileOrFolder( m, "npm/Build.NpmHelper.cs" );
+            DeleteFileOrFolder( m, "Abstractions/ArtifactRepository.cs" );
 
-            DeleteFile( m, "dotnet/Build.NugetRepository.cs" );
-            DeleteFile( m, "dotnet/Build.StandardUnitTests.cs" );
-            DeleteFile( m, "dotnet/Build.StandardCheckRepository.cs" );
-            DeleteFile( m, "dotnet/Build.StandardSolutionBuild.cs" );
-            DeleteFile( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
-            DeleteFile( m, "dotnet/Build.StandardPushNuGetPackages.cs" );
+            DeleteFileOrFolder( m, "dotnet/Build.NugetRepository.cs" );
+            DeleteFileOrFolder( m, "dotnet/Build.StandardUnitTests.cs" );
+            DeleteFileOrFolder( m, "dotnet/Build.StandardCheckRepository.cs" );
+            DeleteFileOrFolder( m, "dotnet/Build.StandardSolutionBuild.cs" );
+            DeleteFileOrFolder( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
+            DeleteFileOrFolder( m, "dotnet/Build.StandardPushNuGetPackages.cs" );
 
-            DeleteFile( m, "CakeExtensions/NpmGet.cs" );
-            DeleteFile( m, "npm/Build.NpmRepository.cs" );
-            DeleteFile( m, "npm/Build.StandardNpmBuild.cs" );
-            DeleteFile( m, "npm/Build.StandardNpmUnitTests.cs" );
-            DeleteFile( m, "Abstractions/ISolutionProducingArtifact.cs" );
-            DeleteFile( m, "Abstractions/ISolution.cs" );
+            DeleteFileOrFolder( m, "CakeExtensions/NpmGet.cs" );
+            DeleteFileOrFolder( m, "npm/Build.NpmRepository.cs" );
+            DeleteFileOrFolder( m, "npm/Build.StandardNpmBuild.cs" );
+            DeleteFileOrFolder( m, "npm/Build.StandardNpmUnitTests.cs" );
+            DeleteFileOrFolder( m, "Abstractions/ISolutionProducingArtifact.cs" );
+            DeleteFileOrFolder( m, "Abstractions/ISolution.cs" );
 
 
             // Root files
@@ -79,12 +79,12 @@ namespace CK.Env.Plugin
             {
                 m.Info( "Removing all files for .Net projects." );
 
-                DeleteFile( m, "dotnet/DotnetSolution.cs" );
-                DeleteFile( m, "dotnet/Build.StandardSolutionBuild.cs" );
-                DeleteFile( m, "dotnet/Build.NuGetArtifactType.cs" );
-                DeleteFile( m, "dotnet/Build.NuGetHelper.cs" );
-                DeleteFile( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
-                DeleteFile( m, "dotnet/Build.StandardUnitTests.cs" );
+                DeleteFileOrFolder( m, "dotnet/DotnetSolution.cs" );
+                DeleteFileOrFolder( m, "dotnet/Build.StandardSolutionBuild.cs" );
+                DeleteFileOrFolder( m, "dotnet/Build.NuGetArtifactType.cs" );
+                DeleteFileOrFolder( m, "dotnet/Build.NuGetHelper.cs" );
+                DeleteFileOrFolder( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
+                DeleteFileOrFolder( m, "dotnet/Build.StandardUnitTests.cs" );
             }
 
         }
@@ -104,6 +104,20 @@ namespace CK.Env.Plugin
                 m.Info( $"Auto upgrading Build.cs file." );
                 text = text.Remove( mOld.Index, mOld.Length ).Replace( "gitInfo.IsValid", "globalInfo.IsValid" );
                 text = Regex.Replace( text, @"CreateStandardGlobalInfo\(\s*gitInfo\s*\)", "CreateStandardGlobalInfo()" );
+            }
+            // v10.0.0
+            text = text.Replace( "globalInfo.PushArtifacts();", "/* Please add async on the Does: .Does( async() => ...) above.*/await globalInfo.PushArtifactsAsync();" );
+            text = text.Replace( "CleanDirectories( globalInfo.ReleasesFolder )", "CleanDirectories( globalInfo.ReleasesFolder.ToString() )" );
+
+            mOld = Regex.Match( text, @"\[AddPath\(.*$", RegexOptions.Multiline );
+            if( mOld.Success )
+            {
+                text = text.Remove( mOld.Index, mOld.Length );
+            }
+            mOld = Regex.Match( text, @".*$", RegexOptions.Multiline );
+            if( mOld.Success )
+            {
+                text = text.Remove( mOld.Index, mOld.Length );
             }
             return text;
         }

@@ -1,5 +1,5 @@
 using CK.Core;
-using CK.Text;
+
 using System;
 using System.Collections.Generic;
 
@@ -11,9 +11,9 @@ namespace CK.Env.MSBuildSln
     public abstract class ProjectBase : ISolutionItem
     {
         readonly Dictionary<string, Section> _sections;
-        string _parentFolderGuid;
+        string? _parentFolderGuid;
         string _projectName;
-        SolutionFolder _parentFolder;
+        SolutionFolder? _parentFolder;
 
         internal ProjectBase(
             SolutionFile solution,
@@ -106,17 +106,23 @@ namespace CK.Env.MSBuildSln
         /// </summary>
         /// <param name="name">Name of the section.</param>
         /// <returns>Section or null.</returns>
-        internal protected Section FindSection( string name ) => _sections.GetValueWithDefault( name, null );
+        internal protected Section? FindSection( string name ) => _sections.GetValueOrDefault( name, null! );
 
-        internal string ParentFolderGuid
+        internal string? ParentFolderGuid
         {
             get => _parentFolderGuid;
             set
             {
                 if( _parentFolderGuid != value )
                 {
-                    _parentFolderGuid = value;
-                    ParentFolder = Solution.FindProject( _parentFolderGuid ) as SolutionFolder;
+                    if( (_parentFolderGuid = value) != null )
+                    {
+                        ParentFolder = Solution.FindProject( _parentFolderGuid ) as SolutionFolder;
+                    }
+                    else
+                    {
+                        ParentFolder = null;
+                    }
                     Solution.SetDirtyStructure( true );
                 }
             }
@@ -125,7 +131,7 @@ namespace CK.Env.MSBuildSln
         /// <summary>
         /// Gets or sets the parent folder.
         /// </summary>
-        public SolutionFolder ParentFolder
+        public SolutionFolder? ParentFolder
         {
             get => _parentFolder;
             set

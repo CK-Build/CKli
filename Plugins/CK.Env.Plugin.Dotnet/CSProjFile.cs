@@ -1,7 +1,7 @@
 using CK.Core;
 using CK.Env.DependencyModel;
 using CK.Env.MSBuildSln;
-using CK.Text;
+
 using System.Linq;
 
 namespace CK.Env.Plugin
@@ -38,7 +38,7 @@ namespace CK.Env.Plugin
                 if( project.IsPublished )
                 {
                     // For test projects we want the IsPackable element to be explicit.
-                    msproject.SetIsPackable( m, project.IsTestProject ? true : (bool?)null );
+                    msproject.SetIsPackable( m, project.IsTestProject ? true : null );
                 }
                 else
                 {

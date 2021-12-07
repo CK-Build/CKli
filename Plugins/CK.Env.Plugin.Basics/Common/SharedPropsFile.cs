@@ -1,6 +1,6 @@
 using CK.Core;
 using CK.Env.DependencyModel;
-using CK.Text;
+
 using System.Diagnostics;
 using System.Linq;
 using System.Xml.Linq;
@@ -170,18 +170,6 @@ namespace CK.Env.Plugin
             section.SetContent( p, i );
         }
 
-        void HandleSourceLinkDebuggingWorkaround( IActivityMonitor m )
-        {
-            const string sectionName = "SourceLinkDebuggingWorkaround";
-            var section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
-            section.StartComment = ": See  https://github.com/dotnet/sdk/issues/1458#issuecomment-695119194 ";
-            section.SetContent(
-                XElement.Parse(
-@"<PropertyGroup Condition="" '$(GenerateDocumentationFile)' == '' And '$(IsInTestsFolder)' != 'true' And ('$(ContinuousIntegrationBuild)' == 'true' Or '$(Configuration)' == 'Release') "">
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-  </PropertyGroup>" ) );
-        }
-
         void HandleSPDXLicense( IActivityMonitor m )
         {
             const string sectionName = "SPDXLicense";
@@ -202,6 +190,25 @@ $@"<PropertyGroup>
             }
         }
 
+        void HandleSourceLinkDebuggingWorkaround( IActivityMonitor m )
+        {
+            const string sectionName = "SourceLinkDebuggingWorkaround";
+            var section = XCommentSection.FindOrCreate( Document.Root, sectionName, true );
+            section.StartComment = ": See  https://github.com/dotnet/sdk/issues/1458#issuecomment-695119194 ";
+            section.SetContent(
+                XElement.Parse( @"
+  <Target Name=""_ResolveCopyLocalNuGetPackagePdbsAndXml"" Condition=""$(CopyLocalLockFileAssemblies) == true"" AfterTargets=""ResolveReferences"">
+    <ItemGroup>
+      <ReferenceCopyLocalPaths
+        Include=""@(ReferenceCopyLocalPaths->'%(RootDir)%(Directory)%(Filename).pdb')""
+        Condition=""'%(ReferenceCopyLocalPaths.NuGetPackageId)' != '' and Exists('%(RootDir)%(Directory)%(Filename).pdb')"" />
+      <ReferenceCopyLocalPaths
+        Include=""@(ReferenceCopyLocalPaths->'%(RootDir)%(Directory)%(Filename).xml')""
+        Condition=""'%(ReferenceCopyLocalPaths.NuGetPackageId)' != '' and Exists('%(RootDir)%(Directory)%(Filename).xml')"" />
+    </ItemGroup>
+  </Target>" ) );
+        }
+
 
         void HandleGenerateDocumentation( IActivityMonitor m )
         {
@@ -218,17 +225,10 @@ $@"<PropertyGroup>
             }
             section.StartComment = ": When in IsInTestsFolder and in Release or during ContinuousIntegrationBuild builds. Each project can override GenerateDocumentationFile property. ";
             section.SetContent(
-                XElement.Parse( @"
-  <Target Name=""_ResolveCopyLocalNuGetPackagePdbsAndXml"" Condition=""$(CopyLocalLockFileAssemblies) == true"" AfterTargets=""ResolveReferences"">
-    <ItemGroup>
-      <ReferenceCopyLocalPaths
-        Include=""@(ReferenceCopyLocalPaths->'%(RootDir)%(Directory)%(Filename).pdb')""
-        Condition=""'%(ReferenceCopyLocalPaths.NuGetPackageId)' != '' and Exists('%(RootDir)%(Directory)%(Filename).pdb')"" />
-      <ReferenceCopyLocalPaths
-        Include=""@(ReferenceCopyLocalPaths->'%(RootDir)%(Directory)%(Filename).xml')""
-        Condition=""'%(ReferenceCopyLocalPaths.NuGetPackageId)' != '' and Exists('%(RootDir)%(Directory)%(Filename).xml')"" />
-    </ItemGroup>
-  </Target>" ) );
+                XElement.Parse( 
+@"<PropertyGroup Condition="" '$(GenerateDocumentationFile)' == '' And '$(IsInTestsFolder)' != 'true' And ('$(ContinuousIntegrationBuild)' == 'true' Or '$(Configuration)' == 'Release') "">
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>" ) );
 
         }
 
@@ -255,7 +255,7 @@ $@"<PropertyGroup>
         void HandleAnalyzers( IActivityMonitor m, bool useCentralPackages )
         {
             var section = XCommentSection.FindOrCreate( Document.Root, "Analyzers", true );
-            const string currentVersion = "16.9.60";
+            const string currentVersion = "17.0.64";
             const string packageName = "Microsoft.VisualStudio.Threading.Analyzers";
 
             section.SetContent(

@@ -1,4 +1,4 @@
-using CK.Text;
+using CK.Core;
 using System.Xml.Linq;
 
 namespace CK.Env

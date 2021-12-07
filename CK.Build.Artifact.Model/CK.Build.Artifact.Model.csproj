@@ -3,17 +3,17 @@
   <Import Project="..\Common\NotPackaged.props" />
   
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CSemVer" Version="9.1.0" />
-    <PackageReference Include="CK.Core" Version="14.2.0" />
+    <PackageReference Include="CSemVer" Version="10.0.0" />
+    <PackageReference Include="CK.Core" Version="15.0.0-r" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Update="NuGetizer" Version="0.7.4">
+    <PackageReference Update="NuGetizer" Version="0.7.5">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>

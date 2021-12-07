@@ -1,4 +1,4 @@
-using CK.Text;
+using CK.Core;
 using Microsoft.Extensions.FileProviders;
 
 namespace CK.Env

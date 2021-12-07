@@ -1,8 +1,9 @@
 using CK.Core;
 using CK.Env.MSBuildSln;
-using CK.Text;
+
 using CSemVer;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
@@ -16,12 +17,17 @@ namespace CK.Env.Plugin
     {
         readonly CodeCakeBuilderFolder _f;
         readonly SolutionDriver _solutionDriver;
+        readonly BuildProjectSpec _buildSpec;
 
-        public CodeCakeBuilderCSProjFile( CodeCakeBuilderFolder f, NormalizedPath branchPath, SolutionDriver solutionDriver )
+        public CodeCakeBuilderCSProjFile( CodeCakeBuilderFolder f,
+                                          NormalizedPath branchPath,
+                                          SolutionDriver solutionDriver,
+                                          BuildProjectSpec buildSpec )
             : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" ), System.Xml.Linq.XNamespace.None + "Project", Encoding.UTF8 )
         {
             _f = f;
             _solutionDriver = solutionDriver;
+            _buildSpec = buildSpec;
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
@@ -36,7 +42,8 @@ namespace CK.Env.Plugin
             if( solution == null ) return;
 
             var slnFile = solution.Tag<SolutionFile>();
-            MSProject ccbProject = slnFile.MSProjects.SingleOrDefault( p => p.ProjectName == "CodeCakeBuilder" );
+            Debug.Assert( slnFile != null );
+            MSProject? ccbProject = slnFile.MSProjects.SingleOrDefault( p => p.ProjectName == "CodeCakeBuilder" );
             if( ccbProject == null )
             {
                 m.Error( $"Missing CodeCakeBuilder project in '{slnFile.FilePath}'." );
@@ -44,16 +51,16 @@ namespace CK.Env.Plugin
             }
             // This is the baseline of CCB.
             // This should be modeled in the world xml.
-            var framework = MSProject.Savors.FindOrCreate( "netcoreapp3.1" );
+            var framework = MSProject.Savors.FindOrCreate( _buildSpec.TargetFramework );
             var dependencies = new[] {
-                ("NuGet.Protocol", "5.9.1", false),
-                ("NuGet.Credentials", "5.9.1", false),
-                ("CK.Text", "9.0.1", false),
-                ("SimpleGitVersion.Cake", "5.1.1", false),
+                ("NuGet.Credentials", "6.0.0", false),
+                ("CK.Core", "15.0.0-a01", true),
+                ("SimpleGitVersion.Cake", "6.0.0", false),
                 ("CKSetup.Cake", "14.1.0", false),
-                ("Newtonsoft.Json", "12.0.3", false)
+                ("Newtonsoft.Json", "13.0.1", false)
             };
-
+            ccbProject.SetLangVersion( m, null );
+            ccbProject.SetNullable( m, "annotations" );
             void EnsurePackageReference( string packageId, string v, bool required = false )
             {
                 var version = SVersion.Parse( v );
@@ -66,6 +73,17 @@ namespace CK.Env.Plugin
                 {
                     ccbProject.SetPackageReferenceVersion( m, framework, packageId, version );
                 }
+            }
+            // NuGet.Credentials references NuGet.Protocol. Removing the useless dependency.
+            if( ccbProject.Deps.Packages.Any( d => d.PackageId == "NuGet.Credentials" ) )
+            {
+                ccbProject.RemoveDependency( m, "NuGet.Protocol" );
+            }
+
+            // CK.Text is dead.
+            if( ccbProject.Deps.Packages.Any( d => d.PackageId == "CK.Text" ) )
+            {
+                ccbProject.RemoveDependency( m, "CK.Text" );
             }
 
             // Applying CCB Dependency baseline.

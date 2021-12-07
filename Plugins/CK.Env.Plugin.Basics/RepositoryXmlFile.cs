@@ -1,5 +1,5 @@
 using CK.Core;
-using CK.Text;
+
 using SimpleGitVersion;
 using System;
 using System.Linq;

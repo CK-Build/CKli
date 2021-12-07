@@ -34,7 +34,7 @@ namespace System.Xml.Linq
                 return p == null ? (bool?)null : p == "preserve";
             }
 
-            string indent = "  ";
+            const string indent = "  ";
 
             void Process( XElement e, bool preserve, string outerStartLine, int depth )
             {
@@ -94,12 +94,11 @@ namespace System.Xml.Linq
             return @this;
         }
 
-        static void HandleCollectedXText(
-            Func<string, StringBuilder, bool>? actualTextProcessor,
-            string startLine,
-            List<XText> currentXText,
-            StringBuilder currentText,
-            bool removeDefaultStartLine )
+        static void HandleCollectedXText( Func<string, StringBuilder, bool>? actualTextProcessor,
+                                          string startLine,
+                                          List<XText> currentXText,
+                                          StringBuilder currentText,
+                                          bool removeDefaultStartLine )
         {
             bool hasActualText = false;
             Debug.Assert( currentXText.Count != 0 );
@@ -226,7 +225,7 @@ namespace System.Xml.Linq
         /// </summary>
         /// <param name="this">This parent element.</param>
         /// <param name="name">The name of the element to find or create.</param>
-        /// <returns>The element fonud or created.</returns>
+        /// <returns>The element found or created.</returns>
         public static XElement EnsureElement( this XElement @this, XName name )
         {
             XElement e = @this.Element( name );
@@ -257,7 +256,7 @@ namespace System.Xml.Linq
         /// Replaces the first element with the same name or adds a new element.
         /// </summary>
         /// <param name="this">This parent element.</param>
-        /// <param name="e">The element wthat will replace its first homonym or be added.</param>
+        /// <param name="e">The element what will replace its first homonym or be added.</param>
         /// <returns>This element.</returns>
         public static XElement ReplaceElementByName( this XElement @this, XElement e )
         {
@@ -287,8 +286,8 @@ namespace System.Xml.Linq
         }
 
         /// <summary>
-        /// Handles following <see cref="XText"/> elements anc ompacts them into one XText
-        /// from wich any leading empty lines are removed.
+        /// Handles following <see cref="XText"/> elements and compacts them into one XText
+        /// from which any leading empty lines are removed.
         /// </summary>
         /// <param name="this">This element.</param>
         /// <returns>This element (fluent syntax).</returns>

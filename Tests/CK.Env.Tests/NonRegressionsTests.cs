@@ -1,5 +1,6 @@
+using CK.Core;
 using CK.Env.Tests.LocalTestHelper;
-using CK.Text;
+
 using FluentAssertions;
 using LibGit2Sharp;
 using NUnit.Framework;

@@ -1,4 +1,4 @@
-using CK.Text;
+using CK.Core;
 using System;
 
 namespace CK.Env.MSBuildSln

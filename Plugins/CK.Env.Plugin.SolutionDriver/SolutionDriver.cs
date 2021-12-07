@@ -3,7 +3,7 @@ using CK.Build;
 using CK.Env.DependencyModel;
 using CK.Env.Diff;
 using CK.Env.MSBuildSln;
-using CK.Text;
+
 using CSemVer;
 using System;
 using System.Collections.Generic;
@@ -94,15 +94,15 @@ namespace CK.Env.Plugin
         public ISolutionDriver GetCurrentBranchDriver()
         {
             return GitFolder.StandardGitStatus == StandardPluginBranch
-                ? this
-                : GitFolder.PluginManager.BranchPlugins[GitFolder.CurrentBranchName].GetPlugin<SolutionDriver>();
+                    ? this
+                    : GitFolder.PluginManager.BranchPlugins[GitFolder.CurrentBranchName].GetPlugin<SolutionDriver>();
         }
 
         /// <summary>
         /// Fires whenever a solution has been loaded so that any other
         /// plugins can participate to its configuration.
         /// </summary>
-        public event EventHandler<SolutionConfigurationEventArgs> OnSolutionConfiguration;
+        public event EventHandler<SolutionConfigurationEventArgs>? OnSolutionConfiguration;
 
         /// <summary>
         /// Gets whether the solution has been correctly read and configured.
@@ -112,7 +112,7 @@ namespace CK.Env.Plugin
 
         /// <summary>
         /// Gets the secrets required to build the solution.
-        /// This not null as soon as the solution has been successfuly read (this is available even
+        /// This not null as soon as the solution has been successfully read (this is available even
         /// if <see cref="IsSolutionValid"/> is false).
         /// </summary>
         public IReadOnlyList<(string SecretKeyName, string Secret)> BuildRequiredSecrets => _buildSecrets;
@@ -505,18 +505,38 @@ namespace CK.Env.Plugin
         /// <summary>
         /// Fires whenever a package reference version must be upgraded.
         /// </summary>
-        public event EventHandler<UpdatePackageDependencyEventArgs> OnUpdatePackageDependency;
+        public event EventHandler<UpdatePackageDependencyEventArgs>? OnUpdatePackageDependency;
 
         /// <summary>
-        /// Updates projects dependencies and saves the solution and its updated projects.
+        /// A build project always update all its (single!) TargetFramework.
         /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="packageInfos">The packages to update.</param>
-        /// <returns>True on success, false on error.</returns>
-        public bool UpdatePackageDependencies( IActivityMonitor monitor, IReadOnlyCollection<UpdatePackageInfo> packageInfos )
+        /// <param name="monitor"></param>
+        /// <param name="packageInfos"></param>
+        /// <param name="frameworkFilter"></param>
+        /// <returns></returns>
+        public bool UpdatePackageDependencies( IActivityMonitor monitor,
+                                               IReadOnlyCollection<UpdatePackageInfo> packageInfos,
+                                               string? frameworkFilter = ISolutionDriver.UsePrimaryTargetFramework )
         {
             var solution = GetSolution( monitor, allowInvalidSolution: false );
             if( solution == null ) return false;
+
+            // Resolves frameworks after the load: MSProject.Savors is initialized.
+            CKTrait? frameworks = null;
+            if( frameworkFilter == ISolutionDriver.UsePrimaryTargetFramework )
+            {
+                frameworkFilter = _solutionSpec.PrimaryTargetFramework;
+            }
+            if( frameworkFilter != null )
+            {
+                frameworks = MSProject.Savors.FindOnlyExisting( frameworkFilter );
+                if( frameworks == null )
+                {
+                    monitor.Error( $"Unable to resolve target frameworks '{frameworkFilter}'. Update canceled." );
+                    return false;
+                }
+            }
+
             Debug.Assert( packageInfos.All( p => p.Referer.Solution == solution ) );
             bool mustSave = false;
             foreach( var update in packageInfos )
@@ -526,7 +546,10 @@ namespace CK.Env.Plugin
                     var p = project.Tag<MSProject>();
                     if( p != null )
                     {
-                        int changes = p.SetPackageReferenceVersion( monitor, p.TargetFrameworks, update.PackageUpdate.Artifact.Name, update.PackageUpdate.Version );
+                        Debug.Assert( p.TargetFrameworks != null );
+                        // Build project always update all its (single!) TargetFramework.
+                        CKTrait? f = project.IsBuildProject ? p.TargetFrameworks : frameworks ?? p.TargetFrameworks;
+                        int changes = p.SetPackageReferenceVersion( monitor, f, update.PackageUpdate.Artifact.Name, update.PackageUpdate.Version );
                         mustSave |= changes != 0;
                     }
                 }
@@ -662,7 +685,13 @@ namespace CK.Env.Plugin
             }
             foreach( var z in msUpgrade )
             {
-                msP.SetPackageReferenceVersion( monitor, msP.TargetFrameworks, z.ProjectName, SVersion.ZeroVersion, true, false, false );
+                msP.SetPackageReferenceVersion( monitor,
+                                                msP.TargetFrameworks,
+                                                z.ProjectName,
+                                                SVersion.ZeroVersion,
+                                                addIfNotExists: true,
+                                                preserveExisting: false,
+                                                throwOnProjectDependendencies: false );
             }
             if( !msP.Solution.Save( monitor ) ) return false;
 
@@ -716,7 +745,8 @@ namespace CK.Env.Plugin
                         .Select( pv => new UpdatePackageInfo( pv.Dep.Owner, new ArtifactInstance( NuGetType, pv.Dep.Target.Artifact.Name, pv.LocalVersion ) ) )
                         .ToList();
 
-            if( !UpdatePackageDependencies( monitor, toUpgrade ) ) return false;
+            if( !UpdatePackageDependencies( monitor, toUpgrade, ISolutionDriver.UsePrimaryTargetFramework ) ) return false;
+
             return LocalCommit( monitor );
         }
 

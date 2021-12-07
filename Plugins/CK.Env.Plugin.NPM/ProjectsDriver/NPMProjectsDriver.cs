@@ -2,7 +2,7 @@ using CK.Core;
 using CK.Build;
 using CK.Env.DependencyModel;
 using CK.Env.NPM;
-using CK.Text;
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -18,6 +18,7 @@ namespace CK.Env.Plugin
         AngularWorkspace[] _angularWorkspaces;
 
         IEnumerable<NPMProject> AllNpmProjects => _npmProjects.Concat( _angularWorkspaces.SelectMany( p => p.Projects ) );
+
         public NPMProjectsDriver( GitRepository f, NormalizedPath branchPath, SolutionDriver driver, SolutionSpec spec )
             : base( f, branchPath )
         {
@@ -35,7 +36,7 @@ namespace CK.Env.Plugin
         /// <param name="m">The monitor to use.</param>
         public void SetSolutionDirty( IActivityMonitor m ) => _driver.SetSolutionDirty( m );
 
-        void OnSolutionConfiguration( object sender, SolutionConfigurationEventArgs e )
+        void OnSolutionConfiguration( object? sender, SolutionConfigurationEventArgs e )
         {
             if( !ReadNPMProjects( e.Monitor ) )
             {

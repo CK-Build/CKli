@@ -187,13 +187,13 @@ namespace CK.Env
 
             public IEnumerator<T> GetEnumerator() => _mappings.Values.OfType<T>().GetEnumerator();
 
-            public T GetPlugin( Type t ) => _mappings.GetValueWithDefault( t, null ) as T;
+            public T? GetPlugin( Type t ) => _mappings.GetValueOrDefault( t, null ) as T;
 
-            public P GetPlugin<P>() where P : T => (P)_mappings.GetValueWithDefault( typeof( P ), null );
+            public P? GetPlugin<P>() where P : T => (P?)_mappings.GetValueOrDefault( typeof( P ), null );
 
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-            object IServiceProvider.GetService( Type serviceType )
+            object? IServiceProvider.GetService( Type serviceType )
             {
                 return _mappings.TryGetValue( serviceType, out var o ) ? o : ServiceContainer.GetService( serviceType );
             }

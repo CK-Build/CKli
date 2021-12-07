@@ -1,5 +1,5 @@
 using CK.Core;
-using CK.Text;
+
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
@@ -266,7 +266,7 @@ namespace CK.Env
                 }
                 if( p.Length > 50 )
                 {
-                    p = SHA1Value.ComputeSHA1( System.Text.Encoding.ASCII.GetBytes( p ) ).ToString();
+                    p = SHA1Value.ComputeHash( p ).ToString();
                 }
                 return p;
             }

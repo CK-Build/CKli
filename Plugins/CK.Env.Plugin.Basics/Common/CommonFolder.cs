@@ -1,5 +1,5 @@
 using CK.Core;
-using CK.Text;
+
 using System.Linq;
 
 namespace CK.Env.Plugin
@@ -24,7 +24,7 @@ namespace CK.Env.Plugin
             bool dotNet = s.Projects.Any( p => !p.IsBuildProject && p.Type == ".Net" );
             if( _settings.NoStrongNameSigning || !dotNet )
             {
-                DeleteFile( m, "SharedKey.snk" );
+                DeleteFileOrFolder( m, "SharedKey.snk" );
             }
             else
             {

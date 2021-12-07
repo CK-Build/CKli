@@ -1,6 +1,6 @@
 using CK.Core;
 using CK.Build;
-using CK.Text;
+
 using CSemVer;
 using NuGet.Configuration;
 using NuGet.Packaging.Core;

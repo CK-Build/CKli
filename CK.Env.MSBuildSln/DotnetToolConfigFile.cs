@@ -1,6 +1,6 @@
 using CK.Core;
 using CK.Build;
-using CK.Text;
+
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;

@@ -1,7 +1,7 @@
 using CK.Core;
 using CK.Env.DependencyModel;
 using CK.Env.NPM;
-using CK.Text;
+
 using System;
 using System.Linq;
 using System.Text;
@@ -34,6 +34,10 @@ namespace CK.Env.Plugin
 
             var projects = _npmDriver.GetAllNPMProjects( m );
             if( projects == null ) return;
+
+            // Delete all "yarn".
+            DeleteFileOrFolder( m, "yarn" );
+
             bool useNpm = projects.Any();
             if( useNpm )
             {
@@ -54,14 +58,11 @@ namespace CK.Env.Plugin
             }
             else
             {
-                DeleteFile( m, "CakeExtensions/NpmDistTagRunner.cs" );
-                DeleteFile( m, "CakeExtensions/NpmView.cs" );
-                DeleteFile( m, "CakeExtensions/NpmGetNpmVersion.cs" );
-                DeleteFile( m, "npm/Build.NPMArtifactType.cs" );
-                DeleteFile( m, "npm/Build.NPMFeed.cs" );
-                DeleteFile( m, "npm/NPMProject.cs" );
-                DeleteFile( m, "npm/NPMPublishedProject.cs" );
-                DeleteFile( m, "npm/NPMSolution.cs" );
+                
+                DeleteFileOrFolder( m, "CakeExtensions/NpmDistTagRunner.cs" );
+                DeleteFileOrFolder( m, "CakeExtensions/NpmView.cs" );
+                DeleteFileOrFolder( m, "CakeExtensions/NpmGetNpmVersion.cs" );
+                DeleteFileOrFolder( m, "npm" );
             }
 
         }

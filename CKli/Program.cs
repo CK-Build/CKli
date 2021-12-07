@@ -2,7 +2,7 @@ using CK.Core;
 using CK.Env;
 using CK.Monitoring;
 using CK.SimpleKeyVault;
-using CK.Text;
+
 using NuGet.Protocol.Plugins;
 using System;
 using System.Collections.Generic;
@@ -73,6 +73,7 @@ namespace CKli
                 Console.WriteLine( "Hit a key." );
                 Console.ReadKey();
             }
+            GrandOutput.Default?.Dispose();
         }
 
         static bool InteractiveRun( IActivityMonitor monitor, FileKeyVault vault, MultipleWorldHome? multiHome, SingleWorldHome? home )

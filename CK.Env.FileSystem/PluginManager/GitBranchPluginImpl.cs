@@ -1,11 +1,11 @@
-using CK.Text;
+using CK.Core;
 
 namespace CK.Env
 {
     struct GitBranchPluginImpl
     {
         /// <summary>
-        /// Initializes a new plugin kernel implemntation for a branch.
+        /// Initializes a new plugin kernel implementation for a branch.
         /// </summary>
         /// <param name="f">The folder.</param>
         /// <param name="branchPath">The actual branch.</param>

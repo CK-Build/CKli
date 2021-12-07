@@ -1,7 +1,7 @@
 using CK.Core;
 using CK.Env.CKSetup;
 using CK.Env.DependencyModel;
-using CK.Text;
+
 using System;
 using System.Diagnostics;
 using System.Linq;
@@ -79,7 +79,7 @@ namespace CK.Env.Plugin
             }
             else
             {
-                DeleteFile( m, "Build.StandardPushCKSetupComponents.cs" );
+                DeleteFileOrFolder( m, "Build.StandardPushCKSetupComponents.cs" );
             }
         }
 

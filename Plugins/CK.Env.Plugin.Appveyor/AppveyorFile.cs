@@ -1,6 +1,6 @@
 using CK.Core;
 using CK.SimpleKeyVault;
-using CK.Text;
+
 using SharpYaml.Model;
 using System.Linq;
 
@@ -108,7 +108,7 @@ namespace CK.Env.Plugin
             }
 
             firstMapping["version"] = new YamlValue( "build{build}" );
-            firstMapping["image"] = new YamlValue( "Visual Studio 2019" );
+            firstMapping["image"] = new YamlValue( "Visual Studio 2022" );
             firstMapping["clone_folder"] = new YamlValue( "C:\\CKli-World\\" + GitFolder.SubPath.Path.Replace( '/', '\\' ) );
             var onFinish = new YamlSequence();
             onFinish.Add( CreateKeyValue( "ps", "'Get-ChildItem -Recurse *.log | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''Log files'' }'" ) );

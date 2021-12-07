@@ -2,7 +2,7 @@ using CK.Core;
 using CK.Build;
 using CK.Env.DependencyModel;
 using CK.SimpleKeyVault;
-using CK.Text;
+
 using CSemVer;
 using System;
 using System.Collections.Generic;
@@ -146,7 +146,7 @@ namespace CKli
             }
             var msg = $"Log levels: UserLevel = '{userLevel}', MonitorLevel = {monitorLevel}.";
             Console.WriteLine( msg );
-            m.UnfilteredLog( ActivityMonitor.Tags.Empty, LogLevel.Info, msg, m.NextLogTime(), null );
+            m.UnfilteredLog( LogLevel.Info, ActivityMonitor.Tags.Empty,  msg, null );
             if( saveOnChange ) LocalWorldState.SaveState( m );
         }
         #endregion

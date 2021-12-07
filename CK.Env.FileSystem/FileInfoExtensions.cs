@@ -1,4 +1,5 @@
-using CK.Text;
+
+using CK.Core;
 using Microsoft.Extensions.FileProviders;
 using Newtonsoft.Json.Linq;
 using System;
@@ -91,7 +92,7 @@ namespace CK.Env
         class Origin : ITextFileInfo
         {
             readonly IFileInfo _source;
-            string _text;
+            string? _text;
 
             public Origin( IFileInfo source )
             {

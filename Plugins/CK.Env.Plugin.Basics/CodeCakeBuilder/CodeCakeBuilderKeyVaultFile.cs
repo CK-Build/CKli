@@ -1,6 +1,6 @@
 using CK.Core;
 using CK.SimpleKeyVault;
-using CK.Text;
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,13 +15,12 @@ namespace CK.Env.Plugin
         readonly SecretKeyStore _secretStore;
         readonly SharedWorldState _sharedState;
 
-        public CodeCakeBuilderKeyVaultFile(
-            CodeCakeBuilderFolder f,
-            SolutionDriver driver,
-            SolutionSpec solutionSpec,
-            SecretKeyStore secretStore,
-            SharedWorldState sharedState,
-            NormalizedPath branchPath )
+        public CodeCakeBuilderKeyVaultFile( CodeCakeBuilderFolder f,
+                                            SolutionDriver driver,
+                                            SolutionSpec solutionSpec,
+                                            SecretKeyStore secretStore,
+                                            SharedWorldState sharedState,
+                                            NormalizedPath branchPath )
             : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilderKeyVault.txt" ) )
         {
             _f = f;
@@ -38,7 +37,7 @@ namespace CK.Env.Plugin
         /// <summary>
         /// Raised before writing the build secrets to the CodeCakeBuyilder key vault.
         /// </summary>
-        public event EventHandler<CodeCakeBuilderKeyVaultUpdatingArgs> Updating;
+        public event EventHandler<CodeCakeBuilderKeyVaultUpdatingArgs>? Updating;
 
         public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart
                                         && _secretStore.IsSecretKeyAvailable( SolutionDriver.CODECAKEBUILDER_SECRET_KEY ) == true;

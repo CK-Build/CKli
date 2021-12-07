@@ -1,6 +1,6 @@
 using CK.Core;
 using CK.SimpleKeyVault;
-using CK.Text;
+
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;

@@ -1,4 +1,5 @@
-using CK.Text;
+
+using CK.Core;
 
 namespace CK.Env
 {

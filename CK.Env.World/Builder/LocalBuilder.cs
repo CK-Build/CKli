@@ -15,12 +15,11 @@ namespace CK.Env
         readonly DateTimeOffset[] _commitTimes;
         readonly bool _withUnitTest;
 
-        public LocalBuilder(
-                ZeroBuilder zeroBuilder,
-                ArtifactCenter artifacts,
-                IEnvLocalFeedProvider localFeedProvider,
-                IWorldSolutionContext ctx,
-                bool withUnitTest )
+        public LocalBuilder( ZeroBuilder zeroBuilder,
+                             ArtifactCenter artifacts,
+                             IEnvLocalFeedProvider localFeedProvider,
+                             IWorldSolutionContext ctx,
+                             bool withUnitTest )
             : base( zeroBuilder, BuildResultType.Local, artifacts, localFeedProvider, ctx )
         {
             _withUnitTest = withUnitTest;

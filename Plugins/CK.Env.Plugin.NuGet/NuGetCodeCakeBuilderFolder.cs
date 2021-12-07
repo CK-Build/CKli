@@ -1,7 +1,7 @@
 using CK.Core;
 using CK.Env.DependencyModel;
 using CK.Env.NuGet;
-using CK.Text;
+
 using System;
 using System.Linq;
 using System.Text;
@@ -40,9 +40,9 @@ namespace CK.Env.Plugin
             else
             {
                 m.Info( "Removing build files related to NuGet packaging." );
-                DeleteFile( m, "dotnet/Build.NuGetArtifactType.cs" );
-                DeleteFile( m, "dotnet/Build.NuGetHelper.cs" );
-                DeleteFile( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
+                DeleteFileOrFolder( m, "dotnet/Build.NuGetArtifactType.cs" );
+                DeleteFileOrFolder( m, "dotnet/Build.NuGetHelper.cs" );
+                DeleteFileOrFolder( m, "dotnet/Build.StandardCreateNuGetPackages.cs" );
             }
 
         }

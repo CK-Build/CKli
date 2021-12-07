@@ -1,7 +1,7 @@
 using CK.Core;
 using CK.Build;
 using CK.SimpleKeyVault;
-using CK.Text;
+
 using CSemVer;
 using NuGet.Common;
 using NuGet.Configuration;
