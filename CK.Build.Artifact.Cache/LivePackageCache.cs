@@ -152,7 +152,7 @@ namespace CK.Build
 
         async Task<bool> ReadMissingDependencies( IActivityMonitor monitor, FullPackageInfo info, List<FullPackageInfo> allDeps, IPackageFeed[] feeds )
         {
-            // From a starting FullPackageInfo (necessarily not null), recusively crawls the dependencies and always
+            // From a starting FullPackageInfo (necessarily not null), recursively crawls the dependencies and always
             // append the starting FullPackageInfo to the allDeps list.
             // On error (a dependency failed to be read, either not found - null - or an exception is being thrown), we use
             // the FullPackageInfo.FeedNames by clearing it: this invalidates the starting FullPackageInfo but we

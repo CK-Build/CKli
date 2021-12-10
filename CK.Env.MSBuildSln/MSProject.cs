@@ -320,6 +320,11 @@ namespace CK.Env.MSBuildSln
             CKTrait remainingFrameworksToUpdate = restrictedFrameworks;
             foreach( var dep in depsToUpdate )
             {
+                if( dep.P.Version.Lock == SVersionLock.Lock )
+                {
+                    monitor.Warn( $"The version '{dep.P.Version}' of {packageId} is locked in '{dep.P.OriginElement}'. Skipping update to '{version}'." );
+                    continue;
+                }
                 if( !dep.P.Version.Satisfy( version ) )
                 {
                     monitor.Info( $"The new version '{version}' is not compatible with the {packageId} previous version range '{dep.P.Version}': '{dep.P.OriginElement}'." );
