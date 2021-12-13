@@ -91,13 +91,6 @@ namespace CK.Env.Plugin
 
         string AdaptBuild( IActivityMonitor m, ISolution s, string text )
         {
-            string jsSupport = "using Cake.Npm;" + Environment.NewLine + "using Cake.Npm.RunScript;" + Environment.NewLine;
-
-            text = text.Replace( jsSupport, String.Empty );
-            if( s.Projects.Any( p => p.Type == "js" ) )
-            {
-                text = jsSupport + text;
-            }
             var mOld = Regex.Match( text, @"SimpleRepositoryInfo\s+gitInfo\s+=\s+Cake\.GetSimpleRepositoryInfo\(\);\s*", RegexOptions.Singleline );
             if( mOld.Success )
             {
@@ -110,11 +103,6 @@ namespace CK.Env.Plugin
             text = text.Replace( "CleanDirectories( globalInfo.ReleasesFolder )", "CleanDirectories( globalInfo.ReleasesFolder.ToString() )" );
 
             mOld = Regex.Match( text, @"\[AddPath\(.*$", RegexOptions.Multiline );
-            if( mOld.Success )
-            {
-                text = text.Remove( mOld.Index, mOld.Length );
-            }
-            mOld = Regex.Match( text, @".*$", RegexOptions.Multiline );
             if( mOld.Success )
             {
                 text = text.Remove( mOld.Index, mOld.Length );

@@ -258,6 +258,7 @@ $@"<PropertyGroup>
             const string currentVersion = "17.0.64";
             const string packageName = "Microsoft.VisualStudio.Threading.Analyzers";
 
+            section.StartComment = ": This analyzer provides very welcome guidelines about async and threading issues.";
             section.SetContent(
                     new XElement( "ItemGroup",
                         new XElement( "PackageReference",
