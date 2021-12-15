@@ -139,7 +139,7 @@ namespace CK.Env
                     if( badChars.IsMatch( key ) ) throw new InvalidOperationException( "TODO better PAT Name autogeneration." );
                     key = key.ToUpperInvariant();
                     if( !key.EndsWith( "_GIT" ) ) key += "_GIT";
-                    return key;
+                    return key + suffix;
                 case KnownGitProvider.AzureDevOps:
                     var regex = Regex.Match( OriginUrl.PathAndQuery, @"/([^\/]*)" );
                     string organization = regex.Groups[1].Value;
