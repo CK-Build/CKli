@@ -3,20 +3,21 @@ using System;
 
 namespace CK.Env.MSBuildSln
 {
-    internal sealed class Tokenizer
+    internal ref struct Tokenizer
     {
-        readonly StringMatcher _m;
+        ROSpanCharMatcher _m;
         Token _curToken;
 
-        public Tokenizer( StringMatcher m )
+        public Tokenizer( ref ROSpanCharMatcher matcher )
         {
-            if( m == null ) throw new ArgumentNullException( nameof( m ) );
-            if( m.IsError ) throw new ArgumentException( "StringMatcher is on error.", nameof( m ) );
-            _m = m;
-            _m.MatchWhiteSpaces( 0 );
+            Throw.CheckArgument( matcher.HasError is false );
+            _m = matcher;
+            _m.SkipWhiteSpaces();
+            _curToken = null!;
+            DoForward();
         }
 
-        public StringMatcher StringMatcher => _m;
+        public ROSpanCharMatcher Matcher => _m;
 
         public Token CurrentToken => _curToken;
 
@@ -29,46 +30,51 @@ namespace CK.Env.MSBuildSln
 
         public bool Forward()
         {
-            if( _curToken != null )
-            {
-                if( _m.IsError ) return false;
-                if( _curToken == Token.EndOfInput ) return true;
-                if( !_m.IsEnd && !_m.MatchWhiteSpaces( 0 ) ) _m.Forward( 1 );
-            }
-            if( _m.IsEnd )
+            if( _m.HasError ) return false;
+            if( _curToken == Token.EndOfInput ) return true;
+            _m.SkipWhiteSpaces();
+            return DoForward();
+        }
+
+        private bool DoForward()
+        {
+            if( _m.Head.IsEmpty )
             {
                 _curToken = Token.EndOfInput;
                 return true;
             }
-            switch( _m.Head )
+            switch( _m.Head[0] )
             {
                 case '\'':
-                    _m.UncheckedMove( 1 );
                     return ParseQuotedString();
+                case '$':
+                    return ParseProperty();
                 case ',':
                     _curToken = Token.Comma;
-                    return _m.UncheckedMove( 1 );
+                    _m.SafeForward( 1 );
+                    return true;
                 case '(':
                     _curToken = Token.LeftParenthesis;
-                    return _m.UncheckedMove( 1 );
+                    _m.SafeForward( 1 );
+                    return true;
                 case ')':
                     _curToken = Token.RightParenthesis;
-                    return _m.UncheckedMove( 1 );
-                case '$': return ParseProperty();
+                    _m.SafeForward( 1 );
+                    return true;
                 case '!':
-                    _m.UncheckedMove( 1 );
-                    if( _m.TryMatchChar( '=' ) )
+                    _m.SafeForward( 1 );
+                    if( _m.Head.TryMatch( '=' ) )
                     {
                         _curToken = Token.NotEqualTo;
                         return true;
                     }
                     _curToken = Token.Not;
                     return true;
-                case '%': return _m.SetError( "BuiltIn or Custom %(metadata) are not supported.", "Tokenizer" );
-                case '@': return _m.SetError( "Item @(lists) are not supported.", "Tokenizer" );
+                case '%': return _m.AddExpectation( "BuiltIn or Custom %(metadata) are not supported" );
+                case '@': return _m.AddExpectation( "Item @(lists) are not supported" );
                 case '>':
-                    _m.UncheckedMove( 1 );
-                    if( _m.TryMatchChar( '=' ) )
+                    _m.SafeForward( 1 );
+                    if( _m.Head.TryMatch( '=' ) )
                     {
                         _curToken = Token.GreaterThanOrEqualTo;
                         return true;
@@ -76,8 +82,8 @@ namespace CK.Env.MSBuildSln
                     _curToken = Token.GreaterThan;
                     return true;
                 case '<':
-                    _m.UncheckedMove( 1 );
-                    if( _m.TryMatchChar( '=' ) )
+                    _m.SafeForward( 1 );
+                    if( _m.Head.TryMatch( '=' ) )
                     {
                         _curToken = Token.LessThanOrEqualTo;
                         return true;
@@ -85,15 +91,15 @@ namespace CK.Env.MSBuildSln
                     _curToken = Token.LessThan;
                     return true;
                 case '=':
-                    _m.UncheckedMove( 1 );
-                    if( !_m.MatchChar( '=' ) ) return false;
+                    _m.SafeForward( 1 );
+                    if( !_m.Head.TryMatch( '=' ) ) return false;
                     _curToken = Token.EqualTo;
                     return true;
                 default:
                     if( !TryParseNumeric()
                         && !TryParseIdentifierOrLogicalConnector() )
                     {
-                        return _m.SetError( "Unrecognized token.", "Tokenizer" );
+                        return _m.AddExpectation( "Token" );
                     }
                     break;
             }
@@ -105,16 +111,16 @@ namespace CK.Env.MSBuildSln
         /// </summary>
         bool ParseProperty()
         {
-            int start = _m.StartIndex;
-            _m.Forward( 1 );
-            if( !_m.MatchChar( '(' ) ) return false;
-            if( !_m.TryMatchTo( ')' ) )
+            var savedHead = _m.Head;
+            _m.SafeForward( 1 );
+            if( !_m.TryMatch( '(' ) ) return false;
+            if( !_m.Head.TryMatchTo( ')' ) )
             {
-                return _m.SetError( "Missing closing parenthesis.", "Tokenizer" );
+                return _m.AddExpectation( "Closing parenthesis" );
             }
-            int len = _m.StartIndex - start;
+            var len = savedHead.Length - _m.Head.Length;
             if( len == 3 ) _curToken = Token.EmptyString;
-            else _curToken = new Token( TokenType.Property, _m.Text.Substring( start, len ) );
+            else _curToken = new Token( TokenType.Property, savedHead.Slice( 0, len ).ToString() );
             return true;
         }
 
@@ -124,19 +130,20 @@ namespace CK.Env.MSBuildSln
         /// </summary>
         bool ParseQuotedString()
         {
-            int start = _m.StartIndex;
-            if( !_m.TryMatchTo( '\'' ) )
+            _m.SafeForward( 1 );
+            var savedHead = _m.Head;
+            if( !_m.Head.TryMatchTo( '\'' ) )
             {
-                return _m.SetError( "Unterminated quoted string.", "Tokenizer" );
+                return _m.AddExpectation( "Closing quote" );
             }
-            string s = _m.Text.Substring( start, _m.StartIndex - start - 1 );
-            if( s.IndexOf( "%(" ) >= 0 )
+            string s = savedHead.Slice( 0, savedHead.Length - _m.Head.Length - 1 ).ToString();
+            if( s.Contains( "%(", StringComparison.Ordinal ) )
             {
-                return _m.SetError( "Item %(metadata) references are not supported.", "Tokenizer" );
+                return _m.AddExpectation( "Item %(metadata) references are not supported." );
             }
-            if( s.IndexOf( "@(" ) >= 0 )
+            if( s.Contains( "@(", StringComparison.Ordinal ) )
             {
-                return _m.SetError( "Item @(lists) are not supported.", "Tokenizer" );
+                return _m.AddExpectation( "Item @(lists) are not supported." );
             }
             _curToken = new Token( TokenType.String, s.Replace( "$()", String.Empty ) );
             return true;
@@ -144,7 +151,7 @@ namespace CK.Env.MSBuildSln
 
         bool TryParseNumeric()
         {
-            var t = TryParseNumeric( _m );
+            var t = TryParseNumeric( ref _m );
             if( t != null )
             {
                 _curToken = t;
@@ -153,67 +160,67 @@ namespace CK.Env.MSBuildSln
             return false;
         }
 
-        internal static Token TryParseNumeric( StringMatcher m )
+        internal static Token? TryParseNumeric( ref ROSpanCharMatcher m )
         {
-            int start = m.StartIndex;
+            var savedHead = m.Head;
             ulong uL = 0UL;
             long lV = 0L;
             double dV = 0.0;
-            bool hasPlus = m.TryMatchChar( '+' );
-            bool hasMinus = !hasPlus && m.TryMatchChar( '-' );
-            bool isHex = m.TryMatchText( "0x" ) && m.TryMatchHexNumber( out uL );
+            bool hasPlus = m.Head.TryMatch( '+' );
+            bool hasMinus = !hasPlus && m.Head.TryMatch( '-' );
+            bool isHex = m.TryMatch( "0x" ) && m.TryMatchHexNumber( out uL );
             if( isHex )
             {
                 lV = (long)uL;
                 if( hasMinus ) lV = -lV;
                 dV = lV;
             }
-            else if( m.TryMatchDoubleValue( out dV ) )
+            else if( m.TryMatchDouble( out dV ) )
             {
                 if( hasMinus ) dV = -dV;
             }
             else
             {
-                if( hasMinus || hasPlus ) m.UncheckedMove( -1 );
+                m.Head = savedHead;
                 return null;
             }
-            return new Token( TokenType.Numeric, m.Text.Substring( start, m.StartIndex - start ), lV, dV );
+            m.ClearExpectations();
+            return new Token( TokenType.Numeric, savedHead.Slice( 0, savedHead.Length - m.Head.Length ).ToString(), lV, dV );
         }
 
         bool TryParseIdentifierOrLogicalConnector()
         {
-            int start = _m.StartIndex;
-            if( _m.Head == '_' || Char.IsLetter( _m.Head ) )
+            var savedHead = _m.Head;
+            if( _m.Head[0] == '_' || Char.IsLetter( _m.Head[0] ) )
             {
                 do
                 {
-                    _m.Forward( 1 );
+                    _m.Head = _m.Head.Slice( 1 );
                 }
-                while( !_m.IsEnd && (_m.Head == '_' || Char.IsLetter( _m.Head ) || Char.IsDigit( _m.Head )) );
-                int end = _m.StartIndex;
-                if( !_m.IsEnd )
+                while( !_m.Head.IsEmpty && (_m.Head[0] == '_' || Char.IsLetter( _m.Head[0] ) || Char.IsDigit( _m.Head[0] )) );
+                string id = savedHead.Slice( 0, savedHead.Length - _m.Head.Length ).ToString();
+                if( !_m.Head.IsEmpty )
                 {
-                    _m.MatchWhiteSpaces( 0 );
-                    if( !_m.IsEnd && _m.Head == '(' )
+                    _m.SkipWhiteSpaces();
+                    if( !_m.Head.IsEmpty && _m.Head[0] == '(' )
                     {
-                        _curToken = new Token( TokenType.Function, _m.Text.Substring( start, end - start ) );
-                        return true;
+                        _curToken = new Token( TokenType.Function, id );
+                        return _m.ClearExpectations();
                     }
                 }
-                string s = _m.Text.Substring( start, end - start );
-                if( s.Equals( "or", StringComparison.OrdinalIgnoreCase ) )
+                if( id.Equals( "or", StringComparison.OrdinalIgnoreCase ) )
                 {
                     _curToken = Token.Or;
                 }
-                else if( s.Equals( "and", StringComparison.OrdinalIgnoreCase ) )
+                else if( id.Equals( "and", StringComparison.OrdinalIgnoreCase ) )
                 {
                     _curToken = Token.And;
                 }
                 else
                 {
-                    _curToken = new Token( TokenType.String, s );
+                    _curToken = new Token( TokenType.String, id );
                 }
-
+                _m.ClearExpectations();
                 return true;
             }
             return false;

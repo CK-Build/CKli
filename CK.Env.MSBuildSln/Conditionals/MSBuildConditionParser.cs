@@ -5,37 +5,45 @@ using CK.Core;
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CK.Env.MSBuildSln
 {
     public static class MSBuildConditionParser
     {
-        public static bool TryParse( IActivityMonitor m, string text, out BaseNode b )
+        /// <summary>
+        /// Tries to parse the text. The out BaseNode can be null even on success: null is the empty node
+        /// and is always true.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="text">The text to parse.</param>
+        /// <param name="b">The resulting node.</param>
+        /// <returns>True on success, false otherwise.</returns>
+        public static bool TryParse( IActivityMonitor m, string text, out BaseNode? b )
         {
-            if( text == null ) throw new ArgumentNullException( nameof( text ) );
-            var matcher = new StringMatcher( text );
-            b = Parse( matcher );
-            if( matcher.IsError )
+            Throw.CheckNotNullArgument( text );
+            var matcher = new ROSpanCharMatcher( text );
+            b = Parse( ref matcher );
+            if( matcher.HasError )
             {
-                m.Error( $"Error while parsing condition @{matcher.StartIndex} '{text}': {matcher.ErrorMessage}." );
+                using( m.OpenError( $"Error while parsing condition: '{text}'" ) )
+                {
+                    m.Error( matcher.GetErrorMessage() );
+                };
                 return false;
             }
             return true;
         }
 
-        public static BaseNode Parse( StringMatcher m )
+        public static BaseNode? Parse( ref ROSpanCharMatcher m )
         {
-            var t = new Tokenizer( m );
-            if( !t.Forward() )
-            {
-                m.SetError( "Valid token.", "Parser" );
-                return null;
-            }
+            var t = new Tokenizer( ref m );
             if( t.CurrentToken.TokenType == TokenType.EndOfInput ) return null;
-            BaseNode node = Expr( t );
+            BaseNode? node = Expr( ref t );
             if( t.CurrentToken.TokenType != TokenType.EndOfInput )
             {
-                m.SetError( "EndOfInput.", "Parser" );
+                m.AddExpectation( "EndOfInput" );
             }
             return node;
         }
@@ -45,12 +53,13 @@ namespace CK.Env.MSBuildSln
         /// </summary>
         /// <param name="t"></param>
         /// <returns></returns>
-        static BaseNode Expr( Tokenizer t )
+        static BaseNode? Expr( ref Tokenizer t )
         {
-            BaseNode node = HandleTerm( t );
+            BaseNode? node = HandleTerm( ref t );
+            if( node == null ) return null;
             while( t.Match( TokenType.Or ) )
             {
-                BaseNode right = HandleTerm( t );
+                BaseNode? right = HandleTerm( ref t );
                 if( right == null ) return null;
                 node = new BinaryOperatorNode( node, TokenType.Or, right );
             }
@@ -62,13 +71,13 @@ namespace CK.Env.MSBuildSln
         /// </summary>
         /// <param name="t"></param>
         /// <returns></returns>
-        static BaseNode HandleTerm( Tokenizer t )
+        static BaseNode? HandleTerm( ref Tokenizer t )
         {
-            BaseNode node = HandleComparison( t );
+            BaseNode? node = HandleComparison( ref t );
             if( node == null ) return null;
             while( t.Match( TokenType.And ) )
             {
-                BaseNode right = HandleComparison( t );
+                BaseNode? right = HandleComparison( ref t );
                 if( right == null ) return null;
                 node = new BinaryOperatorNode( node, TokenType.And, right );
             }
@@ -80,18 +89,18 @@ namespace CK.Env.MSBuildSln
         /// </summary>
         /// <param name="t"></param>
         /// <returns></returns>
-        static BaseNode HandleComparison( Tokenizer t )
+        static BaseNode? HandleComparison( ref Tokenizer t )
         {
-            BaseNode left = HandleTerminal( t );
+            BaseNode? left = HandleTerminal( ref t );
             if( left == null ) return null;
             TokenType op = t.CurrentToken.TokenType;
             if( op.IsComparisonOperator() )
             {
                 t.Forward();
-                BaseNode right = HandleTerminal( t );
+                BaseNode? right = HandleTerminal( ref t );
                 if( right == null )
                 {
-                    t.StringMatcher.SetError( "Expected Terminal", "Parser" );
+                    t.Matcher.AddExpectation( "Terminal" );
                     return left;
                 }
                 return new BinaryOperatorNode( left, op, right );
@@ -104,9 +113,9 @@ namespace CK.Env.MSBuildSln
         /// </summary>
         /// <param name="t"></param>
         /// <returns></returns>
-        static BaseNode HandleTerminal( Tokenizer t )
+        static BaseNode? HandleTerminal( ref Tokenizer t )
         {
-            BaseNode arg = HandleValueTerminal( t );
+            BaseNode? arg = HandleValueTerminal( ref t );
             if( arg != null ) return arg;
 
             Token current = t.CurrentToken;
@@ -114,7 +123,7 @@ namespace CK.Env.MSBuildSln
             {
                 if( !t.Match( TokenType.OpenPar ) )
                 {
-                    t.StringMatcher.SetError( "Expected opening parenthesis." );
+                    t.Matcher.AddExpectation( "Opening parenthesis" );
                     return null;
                 }
                 var arglist = new List<BaseNode>();
@@ -122,12 +131,14 @@ namespace CK.Env.MSBuildSln
                 {
                     do
                     {
-                        arglist.Add( HandleValueTerminal( t ) );
+                        var a = HandleValueTerminal( ref t );
+                        if( a == null ) return null;
+                        arglist.Add( a );
                     }
                     while( t.Match( TokenType.Comma ) );
                     if( !t.Match( TokenType.ClosePar ) )
                     {
-                        t.StringMatcher.SetError( "Expected closing parenthesis." );
+                        t.Matcher.AddExpectation( "Closing parenthesis" );
                         return null;
                     }
                 }
@@ -135,21 +146,22 @@ namespace CK.Env.MSBuildSln
             }
             if( t.Match( TokenType.OpenPar ) )
             {
-                BaseNode child = Expr( t );
+                BaseNode? child = Expr( ref t );
+                if( child == null ) return null;
                 if( !t.Match( TokenType.ClosePar ) )
                 {
-                    t.StringMatcher.SetError( "Expected closing parenthesis." );
+                    t.Matcher.AddExpectation( "Closing parenthesis" );
                     return null;
                 }
                 return child;
             }
             if( t.Match( TokenType.Not ) )
             {
-                BaseNode expr = HandleTerminal( t );
+                BaseNode? expr = HandleTerminal( ref t );
                 if( expr == null ) return null;
                 return new NotNode( expr );
             }
-            t.StringMatcher.SetError( "Unexpected token." );
+            t.Matcher.AddExpectation( "Token" );
             return null;
         }
 
@@ -158,11 +170,12 @@ namespace CK.Env.MSBuildSln
         /// </summary>
         /// <param name="t"></param>
         /// <returns></returns>
-        static BaseNode HandleValueTerminal( Tokenizer t )
+        static BaseNode? HandleValueTerminal( ref Tokenizer t )
         {
             Token current = t.CurrentToken;
             if( t.Match( TokenType.String ) || t.Match( TokenType.Property ) )
             {
+                Debug.Assert( current.Value != null );
                 return new StringNode( current.Value );
             }
             if( t.Match( TokenType.Numeric ) )

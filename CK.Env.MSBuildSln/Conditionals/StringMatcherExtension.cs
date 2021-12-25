@@ -1,14 +1,15 @@
 using CK.Core;
+using System;
 
 namespace CK.Env.MSBuildSln
 {
     static class StringMatcherExtension
     {
-        public static bool TryMatchTo( this StringMatcher @this, char last )
+        public static bool TryMatchTo( this ref ReadOnlySpan<char> head, char last )
         {
-            int idx = @this.Text.IndexOf( last, @this.StartIndex, @this.Length );
+            int idx = head.IndexOf( last );
             if( idx < 0 ) return false;
-            @this.UncheckedMove( idx - @this.StartIndex + 1 );
+            head = head.Slice( idx + 1 );
             return true;
         }
     }

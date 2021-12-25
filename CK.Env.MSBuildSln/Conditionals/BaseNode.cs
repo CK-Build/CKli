@@ -7,11 +7,11 @@ namespace CK.Env.MSBuildSln
     /// </summary>
     public abstract class BaseNode
     {
-        public virtual NumericNode AsNumeric => null;
+        public virtual NumericNode? AsNumeric => null;
 
         public virtual bool? AsBoolean => null;
 
-        public virtual string StringValue => null;
+        public virtual string? StringValue => null;
 
         public virtual bool RequiresExpansion => false;
 

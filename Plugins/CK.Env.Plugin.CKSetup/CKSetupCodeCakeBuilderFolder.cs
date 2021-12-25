@@ -31,9 +31,9 @@ namespace CK.Env.Plugin
             _keyVaultFile.Updating += KeyVaultFileUpdating;
         }
 
-        void KeyVaultFileUpdating( object sender, CodeCakeBuilderKeyVaultUpdatingArgs e )
+        void KeyVaultFileUpdating( object? sender, CodeCakeBuilderKeyVaultUpdatingArgs e )
         {
-            CKSetupStore store = e.SolutionSpec.UseCKSetup
+            CKSetupStore? store = e.SolutionSpec.UseCKSetup
                                     ? e.Solution.ArtifactTargets.OfType<CKSetupStore>().SingleOrDefault()
                                     : null;
             if( store != null )
@@ -48,7 +48,7 @@ namespace CK.Env.Plugin
             }
         }
 
-        void OnSolutionConfiguration( object sender, SolutionConfigurationEventArgs e )
+        void OnSolutionConfiguration( object? sender, SolutionConfigurationEventArgs e )
         {
             bool targetCKSetup = e.Solution.GeneratedArtifacts.Any( a => a.Artifact.Type == CKSetupClient.CKSetupType );
             var stores = e.Solution.ArtifactTargets.OfType<CKSetupStore>().ToList();

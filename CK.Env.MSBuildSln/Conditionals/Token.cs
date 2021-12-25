@@ -16,8 +16,10 @@ namespace CK.Env.MSBuildSln
         internal static readonly Token EqualTo = new Token( TokenType.EqualTo, "==" );
         internal static readonly Token NotEqualTo = new Token( TokenType.NotEqualTo, "!=" );
         internal static readonly Token Not = new Token( TokenType.Not, "!" );
-        internal static readonly Token EndOfInput = new Token( TokenType.EndOfInput, null );
+        internal static readonly Token EndOfInput = new Token();
         internal static readonly Token EmptyString = new Token( TokenType.String, String.Empty );
+
+        Token() => TokenType = TokenType.EndOfInput;
 
         public Token( TokenType type, string value )
             : this( type, value, 0L, 0.0 )
@@ -34,7 +36,10 @@ namespace CK.Env.MSBuildSln
 
         public TokenType TokenType { get; }
 
-        public string Value { get; }
+        /// <summary>
+        /// Gets the token string. Null for <see cref="TokenType.EndOfInput"/>.
+        /// </summary>
+        public string? Value { get; }
 
         public double DoubleValue { get; }
 

@@ -79,9 +79,10 @@ namespace CK.Env.MSBuildSln
         public IReadOnlyList<MSProject> MSProjects => _projectMSList;
 
         /// <summary>
-        /// Finds a project by its <see cref="Project.ProjectName"/> or <see cref="Project.SolutionRelativePath"/>.
+        /// Finds a project by its <see cref="Project.ProjectName"/>, <see cref="ProjectBase.ProjectGuid"/>
+        /// or <see cref="Project.SolutionRelativePath"/>.
         /// </summary>
-        /// <param name="key">The name or relative path.</param>
+        /// <param name="key">The name, Guid or relative path.</param>
         /// <returns>The project or null if not found.</returns>
         public ProjectBase? FindProject( string key ) => _projectIndex.GetValueOrDefault( key, null );
 

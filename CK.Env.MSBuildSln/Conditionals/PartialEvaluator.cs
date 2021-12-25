@@ -16,9 +16,9 @@ namespace CK.Env.MSBuildSln
         /// <param name="condition">The condition to parse. Can be null or empty.</param>
         /// <param name="properties">Optional known $(property) mappings.</param>
         /// <returns>True or false when no error. Null on error.</returns>
-        public bool? EvalFinalResult( IActivityMonitor m, string condition, Func<string, string> properties = null )
+        public bool? EvalFinalResult( IActivityMonitor m, string condition, Func<string, string>? properties = null )
         {
-            if( !MSBuildConditionParser.TryParse( m, condition, out BaseNode node ) ) return null;
+            if( !MSBuildConditionParser.TryParse( m, condition, out BaseNode? node ) ) return null;
             try
             {
                 return PartialEvaluation( node, properties ) ?? true;
@@ -34,10 +34,10 @@ namespace CK.Env.MSBuildSln
         /// Evaluates the MSBuild condition string and returns null if one can not
         /// conclude between true and false (because of unavailable $(property) values.
         /// </summary>
-        /// <param name="node">The root node to evaluate.</param>
+        /// <param name="node">The root node to evaluate. The empty node is null and always evaluates to true.</param>
         /// <param name="properties">Optional known $(property) mappings.</param>
         /// <returns>True, False or null if one can not conclude.</returns>
-        public bool? PartialEvaluation( BaseNode node, Func<string, string> properties = null )
+        public bool? PartialEvaluation( BaseNode? node, Func<string, string>? properties = null )
         {
             if( node == null ) return true;
             if( properties != null )

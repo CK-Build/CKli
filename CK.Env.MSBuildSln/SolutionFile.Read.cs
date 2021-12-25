@@ -20,7 +20,7 @@ namespace CK.Env.MSBuildSln
         /// <returns>
         /// The solution file or null on error (for example when not found and <paramref name="mustExist"/> is true).
         /// </returns>
-        public static SolutionFile Read( FileSystem fs, IActivityMonitor m, NormalizedPath solutionPath, bool mustExist = true )
+        public static SolutionFile? Read( FileSystem fs, IActivityMonitor m, NormalizedPath solutionPath, bool mustExist = true )
         {
             using( m.OpenInfo( $"Reading '{solutionPath}'." ) )
             {
@@ -260,11 +260,10 @@ namespace CK.Env.MSBuildSln
             return true;
         }
 
-        static Section HandleNestedProjects(
-            SolutionFile s,
-            Reader r,
-            string step,
-            IEnumerable<PropertyLine> propertyLines )
+        static Section? HandleNestedProjects( SolutionFile s,
+                                             Reader r,
+                                             string step,
+                                             IEnumerable<PropertyLine> propertyLines )
         {
             foreach( var propertyLine in propertyLines )
             {
@@ -278,7 +277,7 @@ namespace CK.Env.MSBuildSln
         const string PatternParseProjectConfigurationPlatformsName = @"^(?<GUID>\{[-0-9a-zA-Z]+\})\.(?<DESCRIPTION>.*)$";
         static readonly Regex _rParseProjectConfigurationPlatformsName = new Regex( PatternParseProjectConfigurationPlatformsName, RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture );
 
-        static Section HandleProjectConfigurationPlatforms( SolutionFile s, Reader r, string step, IEnumerable<PropertyLine> propertyLines )
+        static Section? HandleProjectConfigurationPlatforms( SolutionFile s, Reader r, string step, IEnumerable<PropertyLine> propertyLines )
         {
             foreach( var propertyLine in propertyLines )
             {
@@ -307,7 +306,11 @@ namespace CK.Env.MSBuildSln
         private static readonly Regex _rParseVersionControlName = new Regex( @"^(?<NAME_WITHOUT_INDEX>[a-zA-Z]*)(?<INDEX>[0-9]+)$", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture );
         private static readonly Regex _rConvertEscapedValues = new Regex( @"\\u(?<HEXACODE>[0-9a-fA-F]{4})", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture );
 
-        static Section HandleVersionControlLines( SolutionFile s, Reader r, string name, string step, Dictionary<string, PropertyLine> propertyLines )
+        static Section? HandleVersionControlLines( SolutionFile s,
+                                                   Reader r,
+                                                   string name,
+                                                   string step,
+                                                   Dictionary<string, PropertyLine> propertyLines )
         {
             var propertyLinesByIndex = new Dictionary<int, List<PropertyLine>>();
             foreach( var prop in propertyLines.Values )
@@ -356,7 +359,7 @@ namespace CK.Env.MSBuildSln
                                  } );
                     uniqueName = uniqueName.Replace( @"\\", @"\" );
 
-                    Project relatedProject = null;
+                    Project? relatedProject = null;
                     foreach( var project in s.Projects )
                     {
                         if( string.Compare( project.SolutionRelativePath, uniqueName, StringComparison.OrdinalIgnoreCase ) == 0 )
@@ -382,9 +385,9 @@ namespace CK.Env.MSBuildSln
         const string PatternParsePropertyLine = @"^(?<PROPERTYNAME>[^=]*)\s*=\s*(?<PROPERTYVALUE>[^=]*)$";
         static readonly Regex _rParsePropertyLine = new Regex( PatternParsePropertyLine, RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture );
 
-        static Dictionary<string, PropertyLine> ReadPropertyLines( Reader r, string endOfSectionToken )
+        static Dictionary<string, PropertyLine>? ReadPropertyLines( Reader r, string endOfSectionToken )
         {
-            PropertyLine ReadPropertyLine()
+            PropertyLine? ReadPropertyLine()
             {
                 var match = _rParsePropertyLine.Match( r.Line );
                 if( !match.Success )
@@ -396,7 +399,6 @@ namespace CK.Env.MSBuildSln
             }
 
             var lines = new Dictionary<string, PropertyLine>( StringComparer.OrdinalIgnoreCase );
-            var startLineNumber = r.LineNumber;
             while( r.Forward() && !r.Line.StartsWith( endOfSectionToken, StringComparison.OrdinalIgnoreCase ) )
             {
                 var l = ReadPropertyLine();

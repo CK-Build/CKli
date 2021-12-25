@@ -147,10 +147,9 @@ namespace CK.Env.DependencyModel
         /// <param name="type">The project type.</param>
         /// <param name="simpleProjecName">The project name.</param>
         /// <returns>The project and whether it has been created or not.</returns>
-        public (Project Project, bool Created) AddOrFindProject(
-            NormalizedPath solutionRelativeFolderPath,
-            string type,
-            string simpleProjecName )
+        public (Project Project, bool Created) AddOrFindProject( NormalizedPath solutionRelativeFolderPath,
+                                                                 string type,
+                                                                 string simpleProjecName )
         {
             if( string.IsNullOrWhiteSpace( type ) ) throw new ArgumentNullException( nameof( type ) );
             if( string.IsNullOrWhiteSpace( simpleProjecName ) ) throw new ArgumentNullException( nameof( simpleProjecName ) );
@@ -173,7 +172,7 @@ namespace CK.Env.DependencyModel
         public void RemoveProject( Project project )
         {
             project.CheckSolution();
-            if( project.Solution != this ) throw new ArgumentException( "Solution mismatch.", nameof( project ) );
+            if( project.Solution != this ) Throw.ArgumentException( nameof( project ), "Solution mismatch." );
             Debug.Assert( _projects.Contains( project ) );
             project.IsBuildProject = false;
             _projects.Remove( project );

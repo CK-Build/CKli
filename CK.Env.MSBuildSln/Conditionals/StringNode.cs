@@ -9,7 +9,7 @@ namespace CK.Env.MSBuildSln
         public StringNode( string value )
         {
             StringValue = value ?? throw new ArgumentNullException( nameof( value ) );
-            RequiresExpansion = value.IndexOf( "$(", StringComparison.Ordinal ) >= 0;
+            RequiresExpansion = value.Contains( "$(" );
         }
 
         public override string StringValue { get; }
@@ -36,12 +36,13 @@ namespace CK.Env.MSBuildSln
                                                   ? (bool?)false
                                                   : null;
 
-        public override NumericNode AsNumeric
+        public override NumericNode? AsNumeric
         {
             get
             {
                 if( StringValue.Length == 0 || RequiresExpansion || AsBoolean.HasValue ) return null;
-                var t = Tokenizer.TryParseNumeric( new StringMatcher( StringValue ) );
+                var m = new ROSpanCharMatcher( StringValue );
+                var t = Tokenizer.TryParseNumeric( ref m );
                 return t != null ? new NumericNode( t ) : null;
             }
         }
