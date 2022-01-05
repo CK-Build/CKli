@@ -184,7 +184,7 @@ namespace CK.Env.MSBuildSln
                 m.Head = savedHead;
                 return null;
             }
-            m.ClearExpectations();
+            m.SetSuccess();
             return new Token( TokenType.Numeric, savedHead.Slice( 0, savedHead.Length - m.Head.Length ).ToString(), lV, dV );
         }
 
@@ -205,7 +205,7 @@ namespace CK.Env.MSBuildSln
                     if( !_m.Head.IsEmpty && _m.Head[0] == '(' )
                     {
                         _curToken = new Token( TokenType.Function, id );
-                        return _m.ClearExpectations();
+                        return _m.SetSuccess();
                     }
                 }
                 if( id.Equals( "or", StringComparison.OrdinalIgnoreCase ) )
@@ -220,7 +220,7 @@ namespace CK.Env.MSBuildSln
                 {
                     _curToken = new Token( TokenType.String, id );
                 }
-                _m.ClearExpectations();
+                _m.SetSuccess();
                 return true;
             }
             return false;

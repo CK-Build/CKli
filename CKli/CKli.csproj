@@ -24,7 +24,7 @@
     <ProjectReference Include="..\CKli.XObject\CKli.XObject.csproj" />
     <PackageReference Include="ReadLine" Version="2.0.1" />
     <!-- Fix run: cannot find git2-8e0b172.dll-->
-    <PackageReference Include="LibGit2Sharp" Version="0.27.0-preview-0158" />
+    <PackageReference Include="LibGit2Sharp" Version="0.26.2" />
   </ItemGroup>
   
 </Project>
