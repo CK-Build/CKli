@@ -444,7 +444,7 @@ namespace CKli
                 // we let the commands be executed.
                 var tasks = handlers.Select( h =>
                 {
-                    var token = m.DependentActivity().CreateToken();
+                    var token = m.CreateDependentToken();
                     return Task.Run( () =>
                     {
                         ActivityMonitor monitor = new ActivityMonitor();
