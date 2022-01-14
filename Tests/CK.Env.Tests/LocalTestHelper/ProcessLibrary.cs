@@ -53,7 +53,7 @@ namespace CK.Env.Tests.LocalTestHelper
                 Commands.Stage( repo, "*" );
                 Signature testSignature = new Signature( "CKlitestProcess", "nobody@test.com", DateTimeOffset.Now );
                 repo.Commit( "Placeholder swap.", testSignature, testSignature );
-                repo.Network.Push( repo.Branches["master"] );
+                repo.Network.Push( repo.Branches[IWorldName.MasterName] );
             }
             return universe;
         }

@@ -8,6 +8,16 @@ namespace CK.Env
     public interface IWorldName
     {
         /// <summary>
+        /// Currently "master". Will be renamed "main" once.
+        /// </summary>
+        public const string MasterName = "master";
+
+        /// <summary>
+        /// Always "develop".
+        /// </summary>
+        public const string DevelopName = "develop";
+
+        /// <summary>
         /// Gets the base name of this world: this is the name of the "Stack" and
         /// the name of the default world of this Stack.
         /// </summary>

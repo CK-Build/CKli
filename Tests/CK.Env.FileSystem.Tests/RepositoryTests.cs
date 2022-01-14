@@ -148,7 +148,7 @@ namespace CK.Env.FS.Tests
                 c.Exists.Should().BeTrue();
                 c.Should().OnlyContain( d => d.IsDirectory );
                 c.Select( d => d.Name )
-                    .Should().Contain( "master" );
+                    .Should().Contain( IWorldName.MasterName );
             }
         }
 
@@ -163,9 +163,9 @@ namespace CK.Env.FS.Tests
                 var proto = fs.FindOrCreateProtoGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
                 var git = fs.EnsureGitFolder( TestHelper.Monitor, proto );
                 git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
-                git.CurrentBranchName.Should().Be( "master" );
+                git.CurrentBranchName.Should().Be( IWorldName.MasterName );
 
-                var gitRoot = git.SubPath.AppendPart( "branches" ).AppendPart( "master" );
+                var gitRoot = git.SubPath.AppendPart( "branches" ).AppendPart( IWorldName.MasterName );
 
                 // Detecting New file.
                 fs.CopyTo( TestHelper.Monitor, "newFile", gitRoot.AppendPart( "new.txt" ) );
@@ -223,7 +223,7 @@ namespace CK.Env.FS.Tests
                 cO.Exists.Should().BeTrue();
                 cO.Should().OnlyContain( d => d.IsDirectory );
                 cO.Select( d => d.Name )
-                    .Should().Contain( new[] { "master" } );
+                    .Should().Contain( new[] { IWorldName.MasterName } );
             }
         }
 
@@ -256,15 +256,15 @@ namespace CK.Env.FS.Tests
             {
                 var proto = fs.FindOrCreateProtoGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
                 var git = fs.EnsureGitFolder( TestHelper.Monitor, proto );
-                fs.GitFolders[0].CurrentBranchName.Should().Be( "master", "The TestRepository must be on 'master'." );
+                fs.GitFolders[0].CurrentBranchName.Should().Be( IWorldName.MasterName, "The TestRepository must be on IWorldName.MasterName." );
 
-                var fA = fs.GetFileInfo( "TestGitRepository/branches/master/a" );
+                var fA = fs.GetFileInfo( $"TestGitRepository/branches/{IWorldName.MasterName}/a" );
                 fA.IsDirectory.Should().BeTrue();
                 fA.Name.Should().Be( "a" );
                 fA.PhysicalPath.Should().NotBeNull();
                 new NormalizedPath( fA.PhysicalPath ).Should().Be( LocalTestHelper.WorldFolder.Combine( "TestGitRepository/a" ) );
 
-                var fMaster = fs.GetFileInfo( "TestGitRepository/branches/master/master.txt" );
+                var fMaster = fs.GetFileInfo( $"TestGitRepository/branches/{IWorldName.MasterName}/master.txt" );
                 fMaster.IsDirectory.Should().BeFalse();
                 fMaster.Name.Should().Be( "master.txt" );
                 fMaster.PhysicalPath.Should().NotBeNull();
@@ -272,7 +272,7 @@ namespace CK.Env.FS.Tests
                 using( var content = fMaster.CreateReadStream() )
                 using( var textR = new StreamReader( content ) )
                 {
-                    textR.ReadToEnd().NormalizeEOLToLF().Should().Be( "On master\nOn master\n" );
+                    textR.ReadToEnd().NormalizeEOLToLF().Should().Be( $"On {IWorldName.MasterName}\nOn {IWorldName.MasterName}\n" );
                 }
             }
 
@@ -284,11 +284,11 @@ namespace CK.Env.FS.Tests
 
             public string ParallelName => null;
 
-            public string DevelopBranchName => "develop";
+            public string DevelopBranchName => IWorldName.DevelopName;
 
-            public string MasterBranchName => "master";
+            public string MasterBranchName => IWorldName.MasterName;
 
-            public string LocalBranchName => "develop-local";
+            public string LocalBranchName => $"{IWorldName.DevelopName}-local";
 
             public string FullName => "World";
         }
@@ -321,15 +321,15 @@ namespace CK.Env.FS.Tests
                     }
                 }
 
-                fs.GitFolders[0].Checkout( TestHelper.Monitor, "master" ).Success.Should().BeTrue( "Back to master." );
+                fs.GitFolders[0].Checkout( TestHelper.Monitor, IWorldName.MasterName ).Success.Should().BeTrue( "Back to IWorldName.MasterName." );
 
-                var cAW = fs.GetDirectoryContents( "TestGitRepository/branches/master/a" );
+                var cAW = fs.GetDirectoryContents( $"TestGitRepository/branches/{IWorldName.MasterName}/a" );
                 cAW.Exists.Should().BeTrue();
                 cAW.All( f => f.Exists ).Should().BeTrue();
                 cAW.Select( f => f.Name ).Should().BeEquivalentTo( "a1", "a1.txt", "a2.txt" );
 
                 {
-                    var fA2 = fs.GetFileInfo( "TestGitRepository/branches/master/a/a2.txt" );
+                    var fA2 = fs.GetFileInfo( $"TestGitRepository/branches/{IWorldName.MasterName}/a/a2.txt" );
                     fA2.IsDirectory.Should().BeFalse();
                     fA2.Name.Should().Be( "a2.txt" );
                     fA2.PhysicalPath.Should().NotBeNull( "Since we have checked out master." );

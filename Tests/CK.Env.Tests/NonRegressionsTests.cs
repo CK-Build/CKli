@@ -70,7 +70,7 @@
 //                        string testFileName = "testFile";
 //                        using( Repository concurrentUser = new Repository( tempDir ) )
 //                        {
-//                            Branch master = concurrentUser.Branches["master"];
+//                            Branch master = concurrentUser.Branches[IWorldName.MasterName];
 //                            Commands.Checkout( concurrentUser, master );
 //                            NormalizedPath testFile = tempDir.AppendPart( testFileName );
 //                            File.AppendAllText( testFile, "test" );
@@ -89,7 +89,7 @@
 //                        NormalizedPath repoPath = universe.DevDirectory.AppendPart( "CKTest-Build" ).AppendPart( cktestCodeCake );
 //                        using( Repository repo = new Repository( repoPath ) )
 //                        {
-//                            Commands.Checkout( repo, repo.Branches["master"] );
+//                            Commands.Checkout( repo, repo.Branches[IWorldName.MasterName] );
 //                        }
 //                        File.Exists( Path.GetFullPath( repoPath.AppendPart( testFileName ) ) ).Should().BeTrue();
 //                    }

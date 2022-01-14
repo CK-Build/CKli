@@ -5,7 +5,8 @@ using System.Collections.Generic;
 namespace CK.Env
 {
     /// <summary>
-    /// Handles the local feeds for ci builds (from 'develop' branch), releases (from 'master' and 'develop' branches),
+    /// Handles the local feeds for ci builds (from '<see cref="IWorldName.MasterName"/>' branch), releases (from '<see cref="IWorldName.MasterName"/>'
+    /// and '<see cref="IWorldName.DevelopName"/>' branches),
     /// local builds (from 'local' branch) and Zero version builds.
     /// </summary>
     public interface IEnvLocalFeedProvider

@@ -19,12 +19,12 @@ namespace CK.Env
         public string? ParallelName { get; }
 
         /// <summary>
-        /// Gets the develop branch name.
+        /// Gets the <see cref="IWorldName.DevelopBranchName"/> branch name.
         /// </summary>
         public string DevelopBranchName { get; }
 
         /// <summary>
-        /// Gets the master branch name.
+        /// Gets the <see cref="IWorldName.MasterBranchName"/> branch name.
         /// </summary>
         public string MasterBranchName { get; }
 
@@ -58,14 +58,14 @@ namespace CK.Env
             if( !String.IsNullOrWhiteSpace( parallelName ) )
             {
                 ParallelName = parallelName;
-                MasterBranchName = $"master-{parallelName}";
-                DevelopBranchName = $"develop-{parallelName}";
+                MasterBranchName = $"{IWorldName.MasterName}-{parallelName}";
+                DevelopBranchName = $"{IWorldName.DevelopName}-{parallelName}";
                 FullName = Name + '[' + parallelName + ']';
             }
             else
             {
-                MasterBranchName = "master";
-                DevelopBranchName = "develop";
+                MasterBranchName = IWorldName.MasterName;
+                DevelopBranchName = IWorldName.DevelopName;
                 FullName = Name;
             }
             LocalBranchName = DevelopBranchName + "-local";

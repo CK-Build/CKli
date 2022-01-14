@@ -27,7 +27,7 @@ namespace CK.Env
                 : base( store.SecretKeyStore, uri, isPublic )
             {
                 _store = store;
-                BranchName = branchName ?? "master";
+                BranchName = branchName ?? IWorldName.MasterName;
                 var cleanPath = CleanPathDirName( uri.AbsolutePath );
                 Root = store._rootStorePath.AppendPart( cleanPath );
                 _worlds = new List<WorldInfo>();
@@ -69,7 +69,7 @@ namespace CK.Env
             public new bool IsPublic { get => base.IsPublic; set => base.IsPublic = value; }
 
             /// <summary>
-            /// Gets the branch name: Should always be "master" but this may be changed.
+            /// Gets the branch name: Should always be <see cref="IWorldName.MasterName"/> but this may be changed.
             /// </summary>
             public string BranchName { get; }
 
