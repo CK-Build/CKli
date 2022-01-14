@@ -165,7 +165,7 @@ namespace CKli
         [CommandMethod]
         public bool EditRoadmap( IActivityMonitor monitor, bool pull = true )
         {
-            if( !CanEditRoadmap ) throw new InvalidOperationException( nameof( CanEditRoadmap ) );
+            Throw.CheckState( CanEditRoadmap );
             if( !CheckBeforeReleaseBuildOrEdit( monitor, pull ) ) return false;
             return DoEditRoadmap( monitor, false ) != null;
         }
@@ -196,7 +196,7 @@ namespace CKli
         [CommandMethod]
         public bool Release( IActivityMonitor monitor, bool pull = true, bool resetRoadmap = false )
         {
-            if( !CanRelease ) throw new InvalidOperationException( nameof( CanRelease ) );
+            Throw.CheckState( CanRelease );
             if( !CheckBeforeReleaseBuildOrEdit( monitor, pull ) ) return false;
 
             var roadmap = DoEditRoadmap( monitor, resetRoadmap );

@@ -22,11 +22,10 @@ namespace CK.Env
         /// <param name="libRepository">The actual LibGit2Sharp repository instance.</param>
         /// <param name="fullPath">The working folder.</param>
         /// <param name="subPath">See <see cref="SubPath"/>. Can not be empty.</param>
-        protected GitHelper(
-            GitRepositoryKey repositoryKey,
-            Repository libRepository,
-            NormalizedPath fullPath,
-            NormalizedPath subPath )
+        protected GitHelper( GitRepositoryKey repositoryKey,
+                             Repository libRepository,
+                             NormalizedPath fullPath,
+                             NormalizedPath subPath )
         {
             RepositoryKey = repositoryKey ?? throw new ArgumentNullException( nameof( repositoryKey ) );
             Git = libRepository ?? throw new ArgumentNullException( nameof( libRepository ) );
@@ -139,19 +138,19 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">The branch name. Must not be null or empty.</param>
         /// <returns>The Sha or null.</returns>
-        public string GetBranchSha( IActivityMonitor m, string branchName )
+        public string? GetBranchSha( IActivityMonitor m, string branchName )
         {
             if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
             var b = GetBranch( m, branchName, false );
             return b?.Tip.Sha;
         }
 
-        Branch GetBranch( IActivityMonitor m, string branchName, bool logErrorMissingLocalAndRemote )
+        Branch? GetBranch( IActivityMonitor m, string branchName, bool logErrorMissingLocalAndRemote )
         {
             return DoGetBranch( m, Git, branchName, logErrorMissingLocalAndRemote, SubPath );
         }
 
-        static Branch DoGetBranch( IActivityMonitor m, Repository r, string branchName, bool logErrorMissingLocalAndRemote, string repoDisplayName )
+        static Branch? DoGetBranch( IActivityMonitor m, Repository r, string branchName, bool logErrorMissingLocalAndRemote, string repoDisplayName )
         {
             var b = r.Branches[branchName];
             if( b == null )
@@ -339,13 +338,20 @@ namespace CK.Env
         (bool Success, bool ReloadNeeded) DoPull( IActivityMonitor m, MergeFileFavor mergeFileFavor )
         {
             var merger = Git.Config.BuildSignature( DateTimeOffset.Now ) ?? new Signature( "CKli", "none", DateTimeOffset.Now );
-            if( Git.Branches.Count() == 1 && Git.Branches.Single().TrackedBranch?.Tip == null )
+            if( Git.Branches.Count() == 1 )
             {
-                //The remote repository is not initialized and have 0 commits.
-                //We can't pull since there is only 1 branch, and this branch is local.
-                Debug.Assert( !Git.Branches.Single().IsRemote );
-                Debug.Assert( Git.Branches.Single().FriendlyName == "master" );
-                return (true, false);
+                // There's only one branch.
+                var unique = Git.Branches.Single();
+                if( unique.TrackedBranch?.Tip == null )
+                {
+                    Debug.Assert( !Git.Branches.Single().IsRemote );
+                    m.Warn( $"The remote repository is not initialized and have 0 commits. We can't pull since there is only 1 local branch '{unique.FriendlyName}'." );
+                    if( unique.FriendlyName != IWorldName.MasterName )
+                    {
+                        m.Warn( $"The single (main) branch should be '{IWorldName.MasterName}', not '{unique.FriendlyName}'." );
+                    }
+                    return (true, false);
+                }
             }
             var result = Commands.Pull( Git, merger, new PullOptions
             {

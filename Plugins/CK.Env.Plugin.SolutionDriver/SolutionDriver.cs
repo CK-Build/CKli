@@ -63,7 +63,7 @@ namespace CK.Env.Plugin
             }
         }
 
-        private void OnReset( IActivityMonitor m )
+        void OnReset( IActivityMonitor m )
         {
             SetSolutionDirty( m );
         }

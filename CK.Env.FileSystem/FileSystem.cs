@@ -376,6 +376,10 @@ namespace CK.Env
                     return false;
                 }
             }
+            else
+            {
+                m.Debug( $"Logical path '{subPath}' doesn't exist in FileSystem's Root '{Root}'." );
+            }
             return true;
         }
 
