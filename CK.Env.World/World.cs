@@ -795,6 +795,8 @@ namespace CK.Env
                     // Ensuring a successful CheckOut of Master is a welcome security.
                     g.EnsureBranch( m, WorldName.MasterBranchName );
                     if( !g.Checkout( m, WorldName.MasterBranchName ).Success ) return false;
+                    // Removing any files coming from develop (including untracked files that may not yet appear in the master's .gitignore).
+                    if( !g.ResetHard( m ) ) return false;
                     // Checking out the Develop branch back.
                     var (Success, ReloadNeeded) = g.Checkout( m, WorldName.DevelopBranchName, skipFetchBranches: true );
                     if( !Success ) return false;

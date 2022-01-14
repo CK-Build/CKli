@@ -140,27 +140,30 @@ namespace CK.Env
             if( branchName == null ) branchName = CurrentBranchName;
             try
             {
-                Branch b = Git.Branches[branchName];
-                if( b == null )
+                using( m.OpenInfo( $"Reading version info of '{SubPath}/{branchName}'." ) )
                 {
-                    m.Error( $"Unknown branch {branchName}." );
-                    return null;
-                }
-                var pathOpt = b.IsRemote
-                                ? SubPath.AppendPart( "remotes" ).Combine( b.FriendlyName )
-                                : SubPath.AppendPart( "branches" ).AppendPart( branchName );
+                    Branch b = Git.Branches[branchName];
+                    if( b == null )
+                    {
+                        m.Error( $"Unknown branch {branchName}." );
+                        return null;
+                    }
+                    var pathOpt = b.IsRemote
+                                    ? SubPath.AppendPart( "remotes" ).Combine( b.FriendlyName )
+                                    : SubPath.AppendPart( "branches" ).AppendPart( branchName );
 
-                pathOpt = pathOpt.AppendPart( "RepositoryInfo.xml" );
-                var fOpt = FileSystem.GetFileInfo( pathOpt );
-                if( !fOpt.Exists )
-                {
-                    m.Error( $"Missing required {pathOpt} file." );
-                    return null;
+                    pathOpt = pathOpt.AppendPart( "RepositoryInfo.xml" );
+                    var fOpt = FileSystem.GetFileInfo( pathOpt );
+                    if( !fOpt.Exists )
+                    {
+                        m.Error( $"Missing required {pathOpt} file." );
+                        return null;
+                    }
+                    var opt = new RepositoryInfoOptions( fOpt.ReadAsXDocument().Root ) { HeadBranchName = branchName, IgnoreAlreadyExistingVersion = true };
+                    var result = new CommitInfo( Git, opt );
+                        result.Explain( new AdaptedLogger( m ) );
+                    return result.Error == null ? result : null;
                 }
-                var opt = new RepositoryInfoOptions( fOpt.ReadAsXDocument().Root ) { HeadBranchName = branchName, IgnoreAlreadyExistingVersion = true };
-                var result = new CommitInfo( Git, opt );
-                result.Explain( new AdaptedLogger( m ) );
-                return result.Error == null ? result : null;
             }
             catch( Exception ex )
             {
@@ -292,7 +295,23 @@ namespace CK.Env
                 try
                 {
                     Git.Reset( ResetMode.Hard );
-                    return true;
+                    var status = Git.RetrieveStatus();
+                    int untrackedCount = status.Untracked.Count();
+                    bool success = true;
+                    if( untrackedCount > 0 )
+                    {
+                        using( m.OpenWarn( $"Attempting to delete {untrackedCount} untracked files." ) )
+                        {
+                            foreach( var e in status.Untracked )
+                            {
+                                if( !FileSystem.Delete( m, SubPath.AppendPart( "branches" ).AppendPart( CurrentBranchName ).Combine( e.FilePath ) ) )
+                                {
+                                    success = false;
+                                }
+                            }
+                        }
+                    }
+                    return success;
                 }
                 catch( Exception ex )
                 {
@@ -497,10 +516,10 @@ namespace CK.Env
 
         /// <summary>
         /// Checkouts the <see cref="IWorldName.MasterBranchName"/>, always merging <see cref="IWorldName.DevelopBranchName"/> into it.
-        /// If the repository is not already on the 'master' branch, it must be on 'develop' and on a clean commit.
-        /// The 'master' branch is created if needed and checked out.
+        /// If the repository is not already on the <see cref="IWorldName.MasterBranchName"/> branch, it must be on 'develop' and on a clean commit.
+        /// The <see cref="WorldName.MasterBranchName"/> branch is created if needed and checked out.
         /// 'develop' branch is always merged into it.
-        /// If the the merge fails, a manual operation is required.
+        /// If the merge fails, a manual operation is required.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
