@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="CSemVer" Version="10.0.0" />
-    <PackageReference Include="CK.Core" Version="15.0.0-r03" />
+    <PackageReference Include="CK.Core" Version="15.0.0-r03-00-0001-develop" />
   </ItemGroup>
 
   <ItemGroup>
