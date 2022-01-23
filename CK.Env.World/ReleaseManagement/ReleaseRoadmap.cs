@@ -97,10 +97,9 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="ctx">The context.</param>
         /// <returns>Null on error.</returns>
-        public static ReleaseRoadmap? Create(
-            IActivityMonitor m,
-            IWorldSolutionContext ctx,
-            XElement? previous = null )
+        public static ReleaseRoadmap? Create( IActivityMonitor m,
+                                              IWorldSolutionContext ctx,
+                                              XElement? previous = null )
         {
             if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
             ReleaseSolutionInfo[] infos = new ReleaseSolutionInfo[ctx.Solutions.Count];
@@ -114,7 +113,7 @@ namespace CK.Env
                 }
                 infos[s.Index] = new ReleaseSolutionInfo( d.GitRepository,
                                                           s,
-                                                          v,
+                                                          v.Value,
                                                           previous?
                                                             .Elements()
                                                             .FirstOrDefault( e => (string)e.Attribute( "Name" ) == s.Solution.Name ) );

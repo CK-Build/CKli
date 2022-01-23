@@ -320,17 +320,18 @@ namespace CK.Env.MSBuildSln
             CKTrait remainingFrameworksToUpdate = restrictedFrameworks;
             foreach( var dep in depsToUpdate )
             {
+                remainingFrameworksToUpdate = restrictedFrameworks.Except( dep.F );
+
                 if( dep.P.Version.Lock == SVersionLock.Lock )
                 {
-                    monitor.Warn( $"The version '{dep.P.Version}' of {packageId} is locked in '{dep.P.OriginElement}'. Skipping update to '{version}'." );
+                    monitor.Warn( $"The version '{dep.P.Version}' of {packageId} is locked in '{dep.P.OriginElement}' for frameworks '{dep.F}'. Skipping update to '{version}'." );
                     continue;
                 }
                 if( !dep.P.Version.Satisfy( version ) )
                 {
-                    monitor.Info( $"The new version '{version}' is not compatible with the {packageId} previous version range '{dep.P.Version}': '{dep.P.OriginElement}'." );
+                    monitor.Info( $"Updating new version '{version}' for frameworks '{dep.F}' that is not compatible with the {packageId} previous version range '{dep.P.Version}': '{dep.P.OriginElement}'." );
                 }
 
-                remainingFrameworksToUpdate = restrictedFrameworks.Except( dep.F );
                 var currentVersion = dep.P.Version.Base;
                 if( currentVersion != version )
                 {
@@ -356,11 +357,11 @@ namespace CK.Env.MSBuildSln
                             e.Attribute( dep.P.IsVersionOverride ? "VersionOverride" : "Version" ).SetValue( sV );
                         }
                         ++changeCount;
-                        monitor.Trace( $"Update in {ToString()}: {packageId} from {currentVersion} to {sV}." );
+                        monitor.Trace( $"Update in {ToString()}: '{packageId}' from '{currentVersion}' to '{sV}' for frameworks '{dep.F}'." );
                     }
                     else
                     {
-                        monitor.Trace( $"Preserving existing version {currentVersion} for {packageId} in {ToString()} (skipped version is {sV})." );
+                        monitor.Trace( $"Preserving existing version '{currentVersion}' for '{packageId}' in {ToString()} for frameworks '{dep.F}' (skipped version is '{sV}')." );
                     }
                 }
             }
@@ -386,7 +387,7 @@ namespace CK.Env.MSBuildSln
                         var withCond = new XElement( pRef );
                         withCond.SetAttributeValue( "Condition", $"'(TargetFrameWork)' == '{f}' " );
                         firstPropertyGroup.AddAfterSelf( withCond );
-                        monitor.Trace( $"Added conditional {f} package reference {packageId} -> {sV} for {ToString()}." );
+                        monitor.Trace( $"Added conditional '{f}' package reference '{packageId}' -> '{sV}' for {ToString()}." );
                     }
                 }
             }

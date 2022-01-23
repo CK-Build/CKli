@@ -46,6 +46,12 @@ namespace CK.Env.MSBuildSln
 
         /// <summary>
         /// Gets the version.
+        /// This version can be <see cref="SVersionLock.Lock"/>:
+        /// <list type="bullet">
+        ///     <item>For NuGet, this is an "Exact version match" denoted by brackets: "[1.2.3]".</item>
+        ///     <item>For npm, this is the naked version: the '=' prefix is implied ("1.2.3" is like "=1.2.3").</item>
+        /// </list>
+        /// Locked versions are generally NOT updated by CKli.
         /// </summary>
         public SVersionBound Version { get; }
 

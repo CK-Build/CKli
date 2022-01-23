@@ -13,7 +13,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the set of <see cref="DiffRootResult"/> for packages from the current head.
         /// </summary>
-        /// <param name="m">The minitor to use.</param>
+        /// <param name="m">The monitor to use.</param>
         /// <param name="previousVersionCommitSha">Previous commit.</param>
         /// <param name="roots">Generated packages of a solution.</param>
         /// <returns>The set of diff or null on error.</returns>

@@ -134,8 +134,8 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">Defaults to <see cref="CurrentBranchName"/>.</param>
-        /// <returns>The RepositoryInfo or null if it cannot be obtained.</returns>
-        public ICommitInfo? ReadVersionInfo( IActivityMonitor m, string? branchName = null )
+        /// <returns>The RepositoryInfo with the SingleMajor and OnlyPatch configured options or null if it cannot be obtained.</returns>
+        public (ICommitInfo Commit, int? SingleMajor, bool OnlyPatch)? ReadVersionInfo( IActivityMonitor m, string? branchName = null )
         {
             if( branchName == null ) branchName = CurrentBranchName;
             try
@@ -161,8 +161,8 @@ namespace CK.Env
                     }
                     var opt = new RepositoryInfoOptions( fOpt.ReadAsXDocument().Root ) { HeadBranchName = branchName, IgnoreAlreadyExistingVersion = true };
                     var result = new CommitInfo( Git, opt );
-                        result.Explain( new AdaptedLogger( m ) );
-                    return result.Error == null ? result : null;
+                    result.Explain( new AdaptedLogger( m ) );
+                    return result.Error == null ? (result,opt.SingleMajor,opt.OnlyPatch) : null;
                 }
             }
             catch( Exception ex )

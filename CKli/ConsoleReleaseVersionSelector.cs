@@ -93,7 +93,17 @@ namespace CKli
                 }
                 Console.ForegroundColor = prev;
             }
-
+            if( c.Requirements.Level != c.ActualRequirements.Level || c.Requirements.Constraint != c.ActualRequirements.Constraint )
+            {
+                if( c.OnlyPatchConfigured )
+                {
+                    Console.WriteLine( $"Requirements have been downgraded from '{c.Requirements}' to '{c.ActualRequirements}' since the repository is configured with OnlyPatch=\"true\"." );
+                }
+                else if( c.SingleMajorConfigured.HasValue )
+                {
+                    Console.WriteLine( $"Requirements have been downgraded from '{c.Requirements}' to '{c.ActualRequirements}' since the repository is configured with SingleMajor=\"{c.SingleMajorConfigured.Value}\"." );
+                }
+            }
             foreach( var kv in c.PossibleVersions )
             {
                 Console.Write( $"= {(int)kv.Key} - {kv.Key} => " );
@@ -123,7 +133,7 @@ namespace CKli
                 if( a == 'X' ) c.Cancel();
                 if( a == 'A' )
                 {
-                    c.SetChoice( c.PreviouslyResolvedInfo.Level, c.PreviouslyResolvedInfo.Version );
+                    c.SetPreviouslyResolved();
                 }
                 else
                 {

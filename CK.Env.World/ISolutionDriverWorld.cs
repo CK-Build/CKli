@@ -8,6 +8,11 @@ namespace CK.Env
     public interface ISolutionDriverWorld
     {
         /// <summary>
+        /// Gets the world name.
+        /// </summary>
+        IRootedWorldName WorldName { get; }
+
+        /// <summary>
         /// Gets the global work status.
         /// Null when the world is not initialized.
         /// </summary>

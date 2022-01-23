@@ -45,7 +45,7 @@ namespace CK.Env
             var msg = $"CI build: Upgrading dependencies:{Environment.NewLine}{Environment.NewLine}{upText}.";
             if( driver.GitRepository.Commit( m, msg ) == CommittingResult.Error ) return (null, false);
             _commits[s.Index] = driver.GitRepository.Head.CommitSha;
-            return (driver.GitRepository.ReadVersionInfo( m )?.FinalBuildInfo.Version, true);
+            return (driver.GitRepository.ReadVersionInfo( m )?.Commit.FinalBuildInfo.Version, true);
         }
 
         protected override BuildState Build( IActivityMonitor m,

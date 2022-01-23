@@ -26,14 +26,14 @@ namespace CK.Env
         /// Gets the final version to use.
         /// Can be null if this <see cref="IsValid"/> is (still) false. 
         /// </summary>
-        public CSVersion Version { get; }
+        public CSVersion? Version { get; }
 
         /// <summary>
         /// Gets whether this ReleaseInfo is valid: it has a <see cref="Version"/>.
         /// </summary>
         public bool IsValid => Version != null;
 
-        ReleaseInfo( ReleaseLevel l, ReleaseConstraint c, CSVersion v )
+        ReleaseInfo( ReleaseLevel l, ReleaseConstraint c, CSVersion? v )
         {
             Level = l;
             Constraint = c;
@@ -46,7 +46,7 @@ namespace CK.Env
         /// <param name="e">The Xml element.</param>
         public ReleaseInfo( XElement e )
         {
-            var sV = (string)e.Attribute( "Version" );
+            var sV = (string?)e.Attribute( "Version" );
             Version = sV == null || sV.Length == 0 ? null : CSVersion.Parse( sV );
             Level = e.AttributeEnum( "Level", ReleaseLevel.None );
             Constraint = e.AttributeEnum( "Constraint", ReleaseConstraint.None );
@@ -99,7 +99,7 @@ namespace CK.Env
         /// <returns>A valid ReleaseInfo.</returns>
         public ReleaseInfo WithVersion( CSVersion v )
         {
-            if( v == null ) throw new ArgumentNullException( nameof( v ) );
+            Throw.CheckNotNullArgument( v );
             var c = v.IsPrerelease && v.Major != 0
                         ? Constraint | ReleaseConstraint.MustBePreRelease
                         : Constraint;
@@ -120,9 +120,44 @@ namespace CK.Env
             return new ReleaseInfo( level, c, Version );
         }
 
+        /// <summary>
+        /// Returns a requirement that cannot be <see cref="ReleaseLevel.BreakingChange"/> and <see cref="ReleaseConstraint.HasBreakingChanges"/>.
+        /// If the <see cref="Version"/> is already resolved, this throws an <see cref="InvalidOperationException"/>.
+        /// </summary>
+        /// <returns>A at most "feature level" release info.</returns>
+        public ReleaseInfo LowerForSingleMajor()
+        {
+            Throw.CheckState( Version == null );
+            var newLevel = Level;
+            if( newLevel == ReleaseLevel.BreakingChange )
+            {
+                newLevel = ReleaseLevel.Feature;
+            }
+            var newConstraint = Constraint & ~ReleaseConstraint.HasBreakingChanges;
+            if( newConstraint != Constraint ) newConstraint |= ReleaseConstraint.HasFeatures;
+            return new ReleaseInfo( newLevel, newConstraint, null );
+        }
 
         /// <summary>
-        /// Overridden to return a sitring with <see cref="Constraint"/>, <see cref="Level"/>
+        /// Returns a requirement that cannot be more than <see cref="ReleaseLevel.Fix"/> and has no
+        /// <see cref="ReleaseConstraint.HasFeatures"/> or <see cref="ReleaseConstraint.HasBreakingChanges"/> constraints.
+        /// If the <see cref="Version"/> is already resolved, this throws an <see cref="InvalidOperationException"/>.
+        /// </summary>
+        /// <returns>A at most "fix level" release info.</returns>
+        public ReleaseInfo LowerForOnlyPatch()
+        {
+            Throw.CheckState( Version == null );
+            var newLevel = Level;
+            if( newLevel >= ReleaseLevel.Feature )
+            {
+                newLevel = ReleaseLevel.Fix;
+            }
+            var newConstraint = Constraint & ~(ReleaseConstraint.HasFeatures|ReleaseConstraint.HasBreakingChanges);
+            return new ReleaseInfo( newLevel, newConstraint, null );
+        }
+
+        /// <summary>
+        /// Overridden to return a string with <see cref="Constraint"/>, <see cref="Level"/>
         /// and <see cref="Version"/> if this ReleaseInfo is valid.
         /// </summary>
         /// <returns>A readable string.</returns>

@@ -241,7 +241,7 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Pulls current branch by merging changes from remote 'orgin' branch into this repository.
+        /// Pulls current branch by merging changes from remote 'origin' branch into this repository.
         /// The current head must be clean.
         /// Note that this is not a [CommandMethod]: Pull command is implemented by Solution driver
         /// so that potential reloading solution is handled.
@@ -298,7 +298,7 @@ namespace CK.Env
                 try
                 {
                     bool reloadNeeded = false;
-                    Branch b = GetBranch( m, branchName, logErrorMissingLocalAndRemote: true );
+                    Branch? b = GetBranch( m, branchName, logErrorMissingLocalAndRemote: true );
                     if( b == null ) return (false, false);
                     if( b.IsCurrentRepositoryHead )
                     {
@@ -352,6 +352,11 @@ namespace CK.Env
                     }
                     return (true, false);
                 }
+            }
+            if( Git.Head.TrackedBranch == null )
+            {
+                m.Warn( $"There is no tracking branch for the current branch. Skip pulling from the remote." );
+                return (true, false);
             }
             var result = Commands.Pull( Git, merger, new PullOptions
             {

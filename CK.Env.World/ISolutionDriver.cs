@@ -57,11 +57,12 @@ namespace CK.Env
         /// <param name="packageInfos">The packages to update.</param>
         /// <param name="frameworkFilter">
         /// Optional target frameworks for which packages must be updated.
-        /// When null, each project's TargetFramework is considered (all dependencies are updated).
+        /// When null, each project's TargetFramework is considered (all dependencies are updated) except the ones that are [Locked].
+        /// For NuGet, a locked reference is like "[14.2.1]". For NPM packages, a package is considered locked if it uses.
         /// Defaults to the PrimaryTargetFramework defined in the SolutionSpec.
         /// </param>
         /// <returns>True on success, false on error.</returns>
-        bool UpdatePackageDependencies( IActivityMonitor monitor, IReadOnlyCollection<UpdatePackageInfo> packageInfos, string? frameworkFilter = UsePrimaryTargetFramework );
+        bool UpdatePackageDependencies( IActivityMonitor monitor, IReadOnlyCollection<UpdatePackageInfo> packageInfos, string? frameworkFilter = null );
 
         /// <summary>
         /// Builds the solution from its file state.

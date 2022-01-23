@@ -49,7 +49,7 @@ namespace CK.Env
         /// we map the parallel world next to the default one.
         /// </summary>
         /// <param name="w">The world name.</param>
-        /// <returns>The path to the root directory or null if it is not mapped.</returns>
+        /// <returns>The path to the root directory or a <see cref="NormalizedPath.IsEmptyPath"/> if it is not mapped.</returns>
         public NormalizedPath GetRootPath( IWorldName w )
         {
             if( !_map.TryGetValue( w.FullName, out NormalizedPath p ) )
@@ -80,14 +80,15 @@ namespace CK.Env
         /// <returns>True if the path has been set, false if nothing changed.</returns>
         public bool SetMap( IActivityMonitor m, string worldFullName, in NormalizedPath mappedPath )
         {
-            if( String.IsNullOrWhiteSpace( worldFullName ) ) throw new ArgumentNullException( nameof( worldFullName ) ); 
+            Throw.CheckNotNullOrWhiteSpaceArgument( worldFullName );
+            Throw.CheckArgument( mappedPath.IsRooted );
+
             if( _map.TryGetValue( worldFullName, out var exists )
                 && (exists == mappedPath || mappedPath.IsEmptyPath) )
             {
                 m.Trace( $"Mapping not changed: '{worldFullName}' -> '{exists}'." );
                 return false;
             }
-            if( !mappedPath.IsRooted ) throw new ArgumentException( "Path must be rooted.", nameof( mappedPath ) );
             _map[worldFullName] = mappedPath;
             m.Info( $"Mapping updated: '{worldFullName}' -> '{mappedPath}'." );
             Save();
@@ -107,18 +108,22 @@ namespace CK.Env
         /// <returns>The rooted world name.</returns>
         public IRootedWorldName? ReverseMap( in NormalizedPath path )
         {
-            if( path.IsEmptyPath ) throw new ArgumentException( nameof( path.IsEmptyPath ) ); 
-            foreach( var e in _map )
+            Throw.CheckArgument( !path.IsEmptyPath );
+            // We lookup the path and use GetRootPath to also find "virtual" mapping for parallel worlds.
+            // This is safe since we check that the GetRootPath of the candidate is exactly the current path.
+            var p = path;
+            do
             {
-                if( path.StartsWith( e.Value, strict: false ) )
+                if( WorldName.TryParse( p.LastPart, out var candidate ) )
                 {
-                    if( !WorldName.TryParse( e.Key, out var n ) )
+                    if( GetRootPath( candidate ) == p )
                     {
-                        throw new Exception( $"Invalid world name {e.Key} in {_filePath}." );
+                        return new RootedWorldName( candidate.Name, candidate.ParallelName, p );
                     }
-                    return new RootedWorldName( n.Name, n.ParallelName, e.Value );
+                    p = p.RemoveLastPart();
                 }
             }
+            while( !p.IsEmptyPath );
             return null;
         }
 

@@ -1066,7 +1066,7 @@ namespace CK.Env
             }
 
             var worldData = _store.ReadWorldDescription( m, WorldName );
-            var worldRoot = worldData.Root;
+            var worldRoot = worldData.Root!;
             var newWorldName = new WorldName( WorldName.Name, parallelName );
 
             var toProcess = new List<(GitRepository Repo, SimpleGitVersion.ICommitInfo Current)>();
@@ -1074,7 +1074,7 @@ namespace CK.Env
             worldRoot.Name = $"{newWorldName.Name}-{newWorldName.ParallelName}.World";
             using( m.OpenInfo( $"Changing the xml world definition: root element name becomes '{worldRoot.Name}'. Changing Branch elements Name from '{WorldName.DevelopBranchName}' to '{newWorldName.DevelopBranchName}' (or '{WorldName.MasterBranchName}' to '{newWorldName.MasterBranchName}')." ) )
             {
-                foreach( XElement xBranch in worldData.Root.Descendants( "Branch" ) )
+                foreach( XElement xBranch in worldRoot.Descendants( "Branch" ) )
                 {
                     var oldBranch = xBranch.AttributeRequired( "Name" );
                     string oldBranchName = (string)oldBranch;
@@ -1090,7 +1090,7 @@ namespace CK.Env
                             m.Error( $"Unable to read version on '{repo.SubPath}'. Aborting." );
                             return false;
                         }
-                        toProcess.Add( (repo, commitInfo) );
+                        toProcess.Add( (repo, commitInfo.Value.Commit) );
                         oldBranch.Value = branchName;
                     }
                     else

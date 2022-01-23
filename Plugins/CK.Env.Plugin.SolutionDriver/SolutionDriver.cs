@@ -510,13 +510,26 @@ namespace CK.Env.Plugin
         /// <summary>
         /// A build project always update all its (single!) TargetFramework.
         /// </summary>
-        /// <param name="monitor"></param>
-        /// <param name="packageInfos"></param>
-        /// <param name="frameworkFilter"></param>
-        /// <returns></returns>
+        /// <remarks>
+        /// By default (null <paramref name="frameworkFilter"/>) all package references will be updated
+        /// regardless of any framework conditions that are not "locked" (see <see cref="SVersionLock"/>:
+        /// NuGet like "[14.2.1]" and Npm references like "=1.2.3" or simply "1.2.3" are locked).
+        /// <para>
+        /// Filter can be a ';' separated list of target frameworks that are eventually resolved into <see cref="MSProject.Savors"/>
+        /// context.
+        /// </para>
+        /// <para>
+        /// Use the special <see cref="ISolutionDriver.UsePrimaryTargetFramework"/> string to restrict the update to
+        /// conditions that satisfy <see cref="SharedSolutionSpec.PrimaryTargetFramework"/>.
+        /// </para>
+        /// </remarks>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="packageInfos">The update infos.</param>
+        /// <param name="frameworkFilter"> See remarks.</param>
+        /// <returns>True on success, false otherwise.</returns>
         public bool UpdatePackageDependencies( IActivityMonitor monitor,
                                                IReadOnlyCollection<UpdatePackageInfo> packageInfos,
-                                               string? frameworkFilter = ISolutionDriver.UsePrimaryTargetFramework )
+                                               string? frameworkFilter = null )
         {
             var solution = GetSolution( monitor, allowInvalidSolution: false );
             if( solution == null ) return false;
@@ -676,25 +689,30 @@ namespace CK.Env.Plugin
                 _localFeedProvider.RemoveFromNuGetCache( monitor, packageName, SVersion.ZeroVersion );
             }
             var msP = info.Project.Tag<MSProject>();
-            var msUpgrade = info.UpgradeZeroProjects.Select( p => p.Tag<MSProject>() ).ToList();
-            var p2pRefToRemove = msP.Deps.Projects.Where( p2p => msUpgrade.Contains( p2p.TargetProject ) ).ToList();
-            if( p2pRefToRemove.Count > 0 )
+            if( _world.WorldName.ParallelName == null )
             {
-                monitor.Info( $"Removing Project references: {p2pRefToRemove.Select( p2p => p2p.Element.ToString() ).Concatenate()}" );
-                p2pRefToRemove.Select( p2p => p2p.Element ).Remove();
+                using( monitor.OpenInfo( $"Analyzing dependencies and updates them if needed since we are on the default stack '{_world.WorldName.FullName}'." ) )
+                {
+                    var msUpgrade = info.UpgradeZeroProjects.Select( p => p.Tag<MSProject>() ).ToList();
+                    var p2pRefToRemove = msP.Deps.Projects.Where( p2p => msUpgrade.Contains( p2p.TargetProject ) ).ToList();
+                    if( p2pRefToRemove.Count > 0 )
+                    {
+                        monitor.Info( $"Removing Project references: {p2pRefToRemove.Select( p2p => p2p.Element.ToString() ).Concatenate()}" );
+                        p2pRefToRemove.Select( p2p => p2p.Element ).Remove();
+                    }
+                    foreach( var z in msUpgrade )
+                    {
+                        msP.SetPackageReferenceVersion( monitor,
+                                                        msP.TargetFrameworks,
+                                                        z.ProjectName,
+                                                        SVersion.ZeroVersion,
+                                                        addIfNotExists: true,
+                                                        preserveExisting: false,
+                                                        throwOnProjectDependendencies: false );
+                    }
+                    if( !msP.Solution.Save( monitor ) ) return false;
+                }
             }
-            foreach( var z in msUpgrade )
-            {
-                msP.SetPackageReferenceVersion( monitor,
-                                                msP.TargetFrameworks,
-                                                z.ProjectName,
-                                                SVersion.ZeroVersion,
-                                                addIfNotExists: true,
-                                                preserveExisting: false,
-                                                throwOnProjectDependendencies: false );
-            }
-            if( !msP.Solution.Save( monitor ) ) return false;
-
             string commonArgs = $@" --no-dependencies";
             string versionArgs = $@" --configuration Release /p:Version=""{SVersion.ZeroVersion}"" /p:AssemblyVersion=""{InformationalVersion.ZeroAssemblyVersion}"" /p:FileVersion=""{InformationalVersion.ZeroFileVersion}"" /p:InformationalVersion=""{InformationalVersion.ZeroInformationalVersion}"" ";
             var args = info.MustPack
@@ -817,7 +835,7 @@ namespace CK.Env.Plugin
             if( solution == null ) return false;
 
             // Version is always provided by the current commit point.
-            var v = GitFolder.ReadVersionInfo( monitor )?.FinalBuildInfo.Version;
+            var v = GitFolder.ReadVersionInfo( monitor )?.Commit.FinalBuildInfo.Version;
             if( v == null ) return false;
 
             BuildType buildType;

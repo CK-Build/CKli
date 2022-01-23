@@ -35,6 +35,16 @@ namespace CK.Env
         ITagCommit? CurrentReleasedVersion { get; }
 
         /// <summary>
+        /// Gets the SingleMajor repository configuration if any.
+        /// </summary>
+        int? SingleMajorConfigured { get; }
+
+        /// <summary>
+        /// Gets the OnlyPatch repository configuration if any.
+        /// </summary>
+        bool OnlyPatchConfigured { get; }
+
+        /// <summary>
         /// Gets the previous version of this solution if there has been a previous version:
         /// when this is not null, <see cref="GetProjectsDiff(IActivityMonitor)"/> can be called.
         /// </summary>
@@ -67,8 +77,16 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the current requirements that results from solution dependencies.
+        /// Note that the actual requirements used to filer possible versions may have been lowered
+        /// by <see cref="SingleMajorConfigured"/> or <see cref="OnlyPatchConfigured"/>: see <see cref="ActualRequirements"/>.
         /// </summary>
         ReleaseInfo Requirements { get; }
+
+        /// <summary>
+        /// Gets the <see cref="Requirements"/> or may be a lowered requirements if <see cref="SingleMajorConfigured"/>
+        /// or <see cref="OnlyPatchConfigured"/> are set.
+        /// </summary>
+        ReleaseInfo ActualRequirements { get; }
 
         /// <summary>
         /// Gets the possible versions for each release level.
@@ -98,9 +116,18 @@ namespace CK.Env
         bool IsAnswered { get; }
 
         /// <summary>
+        /// Preserves the previous choice. Can be called only if <see cref="CanUsePreviouslyResolvedInfo"/> is true.
+        /// <para>
+        /// <see cref="IsAnswered"/> must be false otherwise an <see cref="System.InvalidOperationException"/> is thrown.
+        /// </para>
+        /// </summary>
+        void SetPreviouslyResolved();
+
+        /// <summary>
         /// Sets the choice.
-        /// It must be called once and only once and <see cref="Cancel"/> must not be called
-        /// (neither before or after).
+        /// <para>
+        /// <see cref="IsAnswered"/> must be false otherwise an <see cref="System.InvalidOperationException"/> is thrown.
+        /// </para>
         /// </summary>
         /// <param name="level">The chosen level.</param>
         /// <param name="version">The version among the ones of the level.</param>

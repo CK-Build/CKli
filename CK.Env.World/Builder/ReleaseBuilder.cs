@@ -29,11 +29,10 @@ namespace CK.Env
         }
 
 
-        protected override (SVersion? Version, bool MustBuild) PrepareBuild(
-            IActivityMonitor m,
-            DependentSolution s,
-            ISolutionDriver driver,
-            IReadOnlyList<UpdatePackageInfo> upgrades )
+        protected override (SVersion? Version, bool MustBuild) PrepareBuild( IActivityMonitor m,
+                                                                             DependentSolution s,
+                                                                             ISolutionDriver driver,
+                                                                             IReadOnlyList<UpdatePackageInfo> upgrades )
         {
             IReleaseSolutionInfo info = _roadmap.ReleaseInfos[s.Index];
             var targetVersion = info.CurrentReleaseInfo.Version;
