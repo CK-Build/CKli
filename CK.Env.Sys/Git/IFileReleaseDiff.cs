@@ -11,6 +11,6 @@ namespace CK.Env
         /// <summary>
         /// Gets the change type.
         /// </summary>
-        FileReleaseDiffType DiffType { get; }
+        FileChangeKind DiffType { get; }
     }
 }

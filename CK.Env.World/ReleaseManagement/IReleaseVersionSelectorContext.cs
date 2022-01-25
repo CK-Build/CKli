@@ -29,12 +29,6 @@ namespace CK.Env
         bool CanUsePreviouslyResolvedInfo { get; }
 
         /// <summary>
-        /// Gets the current released version of this solution.
-        /// Null if there is no current release.
-        /// </summary>
-        ITagCommit? CurrentReleasedVersion { get; }
-
-        /// <summary>
         /// Gets the SingleMajor repository configuration if any.
         /// </summary>
         int? SingleMajorConfigured { get; }
@@ -45,8 +39,14 @@ namespace CK.Env
         bool OnlyPatchConfigured { get; }
 
         /// <summary>
-        /// Gets the previous version of this solution if there has been a previous version:
-        /// when this is not null, <see cref="GetProjectsDiff(IActivityMonitor)"/> can be called.
+        /// Gets the current commit Sha.
+        /// </summary>
+        string CommitSha { get; }
+
+        /// <summary>
+        /// Gets the previous version of this solution if there has been a previous version (note that
+        /// this can be the current commit: its <see cref="ITagCommit.CommitSha"/> can be the same as this <see cref="CommitSha"/>).
+        /// When this is not null, <see cref="GetProjectsDiff(IActivityMonitor)"/> can be called.
         /// </summary>
         ITagCommit? PreviousVersion { get; }
 
@@ -56,7 +56,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The set of diff or null on error.</returns>
-        IDiffResult? GetProjectsDiff( IActivityMonitor m );
+        DiffResult? GetProjectsDiff( IActivityMonitor m );
 
         /// <summary>
         /// Gets the list of the packages that must be updated in non published projects (typically in Tests projects).

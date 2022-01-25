@@ -1,11 +1,11 @@
 namespace CK.Env
 {
     /// <summary>
-    /// Direct definition of Git ChangeKind with all its possibilities.
+    /// Direct projection of Git ChangeKind with all its possibilities.
     /// This is intended to show all kind of changes, and to take no risk, even the ones that should
-    /// not appear in <see cref="IDiffRootResult"/>. 
+    /// not appear in <see cref="DiffRootResult"/>. 
     /// </summary>
-    public enum FileReleaseDiffType
+    public enum FileChangeKind
     {
         /// <summary>
         /// No changes detected.

@@ -5,11 +5,11 @@ namespace CK.Env.Diff
 {
     abstract class DiffRootResultBuilderBase
     {
-        protected IDiffRoot DiffRoot { get; }
+        protected Env.DiffRoot DiffRoot { get; }
         protected List<AddedDiff> AddedDiffs { get; } = new List<AddedDiff>();
         protected List<DeletedDiff> DeletedDiffs { get; } = new List<DeletedDiff>();
         protected List<ModifiedDiff> ModifiedDiffs { get; } = new List<ModifiedDiff>();
-        public DiffRootResultBuilderBase( IDiffRoot diffRoot )
+        public DiffRootResultBuilderBase( Env.DiffRoot diffRoot )
         {
             DiffRoot = diffRoot;
         }

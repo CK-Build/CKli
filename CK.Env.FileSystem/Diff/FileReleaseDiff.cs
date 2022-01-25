@@ -2,7 +2,7 @@ namespace CK.Env.Diff
 {
     public class FileReleaseDiff : IFileReleaseDiff
     {
-        internal FileReleaseDiff( string path, FileReleaseDiffType c )
+        internal FileReleaseDiff( string path, FileChangeKind c )
         {
             FilePath = path;
             DiffType = c;
@@ -16,6 +16,6 @@ namespace CK.Env.Diff
         /// <summary>
         /// Gets the change type.
         /// </summary>
-        public FileReleaseDiffType DiffType { get; }
+        public FileChangeKind DiffType { get; }
     }
 }

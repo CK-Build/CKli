@@ -159,10 +159,10 @@ namespace CK.Env
         {
             readonly ReleaseSolutionInfo _info;
             readonly PossibleVersions _possible;
-            IDiffResult? _diffResult;
+            DiffResult? _diffResult;
 
             SelectorContext( ReleaseSolutionInfo info,
-                             ITagCommit? currentReleasedVersion,
+                             ITagCommit? lastRelease,
                              ReleaseInfo requirements,
                              ReleaseInfo actualRequirements,
                              PossibleVersions possibles,
@@ -170,7 +170,7 @@ namespace CK.Env
                              IReadOnlyList<(ImportedLocalPackage, SVersion)>? nonPublishedUpdates )
             {
                 _info = info;
-                CurrentReleasedVersion = currentReleasedVersion;
+                PreviousVersion = lastRelease;
                 Requirements = requirements;
                 ActualRequirements = actualRequirements;
                 _possible = possibles;
@@ -205,9 +205,18 @@ namespace CK.Env
                         monitor.Info( $"Repository configuration uses OnlyPatch=\"true\". Using downgraded requirements from '{requirements}' to '{actualRequirements}' in order to select possible versions." );
                     }
                 }
-                ITagCommit? currentReleasedVersion = info._commitVersionInfo.AlreadyExistingVersion ?? info._commitVersionInfo.BestCommitBelow;
-                var possible = new PossibleVersions( actualRequirements, currentReleasedVersion?.ThisTag, possibles );
-                return new SelectorContext( info, currentReleasedVersion, requirements, actualRequirements, possible, publishedUpdates, nonPublishedUpdates );
+                // If Level is None - there's no special requirement on the version - the user can choose to not release
+                // the version by using the last released one:
+                //  - If a tag exists on the commit, this is the last one (it's necessarily valid, appears in the PossibleVersions and greater than
+                //    the potentials BestCommitBelow and AlreadyExistingVersion.
+                //  - Else we consider the best between BestCommitBelow and AlreadyExistingVersion.
+                ITagCommit? lastRelease = info._commitVersionInfo.ThisReleaseTag
+                                                ?? (info._commitVersionInfo.BestCommitBelow?.ThisTag > info._commitVersionInfo.AlreadyExistingVersion?.ThisTag
+                                                    ? info._commitVersionInfo.BestCommitBelow
+                                                    : info._commitVersionInfo.AlreadyExistingVersion);
+                var possible = new PossibleVersions( actualRequirements, lastRelease?.ThisTag, possibles );
+
+                return new SelectorContext( info, lastRelease, requirements, actualRequirements, possible, publishedUpdates, nonPublishedUpdates );
             }
 
             public DependentSolution Solution => _info.Solution;
@@ -232,23 +241,19 @@ namespace CK.Env
 
             public bool OnlyPatchConfigured => _info._onlyPatchConfig;
 
-            public ITagCommit? CurrentReleasedVersion { get; }
+            public string CommitSha => _info._commitVersionInfo.FinalBuildInfo.CommitSha;
 
-            public ITagCommit? PreviousVersion => _info._commitVersionInfo.BestCommitBelow;
+            public ITagCommit? PreviousVersion { get; }
 
             public string? ReleaseNote { get => _info.ReleaseNote; set => _info.ReleaseNote = value; }
 
-            public IDiffResult? GetProjectsDiff( IActivityMonitor m )
+            public DiffResult? GetProjectsDiff( IActivityMonitor m )
             {
+                Throw.CheckState( PreviousVersion != null );
                 if( _diffResult == null )
                 {
-                    if( _info._commitVersionInfo.BestCommitBelow == null ) throw new InvalidOperationException( nameof( PreviousVersion ) );
-                    m.Debug( $"Computing diff for {Solution.Solution.Name}." );
                     var diffRoots = Solution.Solution.GeneratedArtifacts.Select( g => new DiffRoot( g.Artifact.TypedName, g.Project.ProjectSources ) );
-                    if( _info._commitVersionInfo.BestCommitBelow != null )
-                    {
-                        _diffResult = _info._repository.GetDiff( m, _info._commitVersionInfo.BestCommitBelow.CommitSha, diffRoots );
-                    }
+                    _diffResult = _info._repository.GetDiff( m, PreviousVersion.CommitSha, diffRoots );
                 }
                 return _diffResult;
             }
@@ -346,18 +351,17 @@ namespace CK.Env
                 // In both cases, we must keep the ReleaseLevel.None, however, the requirements may
                 // not be None if we are processing an existing roadmap and updates have been
                 // already applied to the files.
-                if( _commitVersionInfo.ReleaseTag != null )
+                if( _commitVersionInfo.ThisReleaseTag != null )
                 {
-                    monitor.Warn( $"This commit has already a version tag: {_commitVersionInfo.ReleaseTag}." );
-                    if( !versionSelector.OnAlreadyReleased( monitor, Solution, _commitVersionInfo.ReleaseTag, false ) )
+                    monitor.Warn( $"This commit has already a version tag: {_commitVersionInfo.ThisReleaseTag.ThisTag}. We use it." );
+                    if( !versionSelector.OnAlreadyReleased( monitor, Solution, _commitVersionInfo.ThisReleaseTag.ThisTag, false ) )
                     {
                         return new ReleaseInfo();
                     }
-                    return new ReleaseInfo().WithVersion( _commitVersionInfo.ReleaseTag );
+                    return new ReleaseInfo().WithVersion( _commitVersionInfo.ThisReleaseTag.ThisTag );
                 }
                 if( _commitVersionInfo.AlreadyExistingVersion != null )
                 {
-                    // TODO: ensure that this is the tag of the commit point merged into master branch.
                     monitor.Info( $"This commit has a content version tag: {_commitVersionInfo.AlreadyExistingVersion.ThisTag}. We use it." );
                     if( !versionSelector.OnAlreadyReleased( monitor, Solution, _commitVersionInfo.AlreadyExistingVersion.ThisTag, true ) )
                     {

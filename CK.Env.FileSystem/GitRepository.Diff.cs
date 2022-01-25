@@ -11,56 +11,29 @@ namespace CK.Env
     public partial class GitRepository : IGitHeadInfo, ICommandMethodsProvider
     {
         /// <summary>
-        /// Gets the set of <see cref="DiffRootResult"/> for packages from the current head.
+        /// Gets the <see cref="DiffResult"/> for a set of roots from the provided commit up to current head.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="previousVersionCommitSha">Previous commit.</param>
-        /// <param name="roots">Generated packages of a solution.</param>
-        /// <returns>The set of diff or null on error.</returns>
-        public IDiffResult GetDiff( IActivityMonitor m, string previousVersionCommitSha, IEnumerable<IDiffRoot> roots )
+        /// <param name="roots">Roots of interest. Typically projects of the solution.</param>
+        /// <returns>The set of differences or null on error.</returns>
+        public DiffResult? GetDiff( IActivityMonitor m, string previousVersionCommitSha, IEnumerable<DiffRoot> roots )
         {
-            Commit commit = Git.Lookup<Commit>( previousVersionCommitSha );
-            var commits = Git.Commits.QueryBy( new CommitFilter()
+            Commit? commit = Git.Lookup<Commit>( previousVersionCommitSha );
+            if( commit == null )
             {
-                IncludeReachableFrom = Git.Head.Tip,
-                ExcludeReachableFrom = commit
-            } );
-            return GetReleaseDiff( m, roots, commits.ToList() );
-        }
-
-        DiffResult GetReleaseDiff( IActivityMonitor m, IEnumerable<IDiffRoot> roots, List<Commit> commits )
-        {
-            DiffResultBuilder builder = new DiffResultBuilder(
-                Git,
-                roots.Select(
-                    r => new DiffRootResultBuilder( r ) ).ToList(),
-                    new DiffRootResultBuilderOther( new DiffRoot( "Others", Array.Empty<NormalizedPath>() ) )
-            );
-            return builder.BuildDiffResult( m, commits );
-        }
-
-        IEnumerable<Commit> GetCommitsBetweenDates( DateTimeOffset beginning, DateTimeOffset ending )
-        {
-            if( ending < beginning ) throw new ArgumentException( $"{nameof( ending )}<{nameof( beginning )}" );
-            return Git.Head.Commits.SkipWhile( p => p.Committer.When > ending ).TakeWhile( p => p.Committer.When > beginning );
-        }
-
-        public void ShowLogsBetweenDates(
-            IActivityMonitor m,
-            DateTimeOffset beginning,
-            DateTimeOffset ending,
-            IEnumerable<DiffRoot> diffRoot )
-        {
-            List<Commit> commits = GetCommitsBetweenDates( beginning, ending ).ToList();
-            if( commits.Count == 0 )
-            {
-                m.Info( "No commits between the given dates." );
+                m.Error( $"Unable to find previousVersionCommitSha:{previousVersionCommitSha}." );
+                return null;
             }
-            else
+            var alienRoot = new DiffRoot( "Others", Array.Empty<NormalizedPath>() );
+            if( commit.Id == Git.Head.Tip.Id )
             {
-                IDiffResult diffResult = GetReleaseDiff( m, diffRoot, commits );
-                Console.WriteLine( diffResult.ToString() );
+                return new DiffResult( roots.Select( r => new DiffRootResult( r ) ).ToArray(), new DiffRootResult( alienRoot ) );
             }
+            var alien = new DiffRootResultBuilderOther( alienRoot );
+            DiffResultBuilder builder = new DiffResultBuilder( Git,
+                                                               roots.Select( r => new DiffRootResultBuilder( r ) ).ToList(), alien );
+            return builder.BuildDiffResult( m, commit, Git.Head.Tip );
         }
     }
 }

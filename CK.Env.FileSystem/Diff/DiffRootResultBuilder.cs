@@ -5,7 +5,8 @@ namespace CK.Env.Diff
 {
     class DiffRootResultBuilder : DiffRootResultBuilderBase
     {
-        public DiffRootResultBuilder( IDiffRoot diffRoot ) : base( diffRoot )
+        public DiffRootResultBuilder( Env.DiffRoot diffRoot )
+            : base( diffRoot )
         {
         }
 

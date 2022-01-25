@@ -29,47 +29,36 @@ namespace CK.Env.Diff
             if( !accepted ) diff.SendToBuilder( m, _others );
         }
 
-        public DiffResult BuildDiffResult( IActivityMonitor m, List<Commit> commits )
+        public DiffResult BuildDiffResult( IActivityMonitor monitor, Commit from, Commit to )
         {
-            var commitsAndParents = commits.Select( s => (s, s.Parents.FirstOrDefault()) );
-            var commitWithDiff = commitsAndParents.Select( c => (c.s, _git.Diff.Compare<TreeChanges>( c.s.Tree, c.Item2.Tree )) ).ToList();
-            Commit firstCommit = commits.First();
-            Commit lastCommit = commits.Last();
-            if( firstCommit.Committer.When < lastCommit.Committer.When )
+            var fullDiff = _git.Diff.Compare<TreeChanges>( from.Tree, to.Tree );
+            using( monitor.OpenDebug( $"Diffing between '{from.Id.ToString( 7 )} {from.MessageShort}' and '{to.Id.ToString( 7 )} {to.MessageShort}'." ) )
             {
-                throw new ArgumentException( "Unchronological commits order." );
-            }
-            m.Debug( $"Diffing between {firstCommit.Sha} and {lastCommit.Sha}" );
-            var fullDiff = _git.Diff.Compare<TreeChanges>( lastCommit.Tree, firstCommit.Tree );
-
-            using( m.OpenDebug( "Finding commits that impacted changes." ) )
-            {
-                using( m.OpenDebug( "Caching changes" ) )
+                using( monitor.OpenDebug( "Caching changes" ) )
                 {
                     foreach( TreeEntryChanges change in fullDiff )
                     {
                         switch( change.Status )
                         {
                             case ChangeKind.Unmodified:
-                                m.Debug( $"Skipping {change.Path} because: {change.Status}." );
                                 continue;
                             case ChangeKind.Added:
-                                RunOnBuilders( m, new AddedDiff( change.Path ) );
+                                RunOnBuilders( monitor, new AddedDiff( change.Path ) );
                                 break;
                             case ChangeKind.Deleted:
-                                RunOnBuilders( m, new DeletedDiff( change.Path ) );
+                                RunOnBuilders( monitor, new DeletedDiff( change.Path ) );
                                 break;
                             case ChangeKind.Renamed:
                             case ChangeKind.Modified:
-                                RunOnBuilders( m, new ModifiedDiff( change.OldPath, change.Path ) );
+                                RunOnBuilders( monitor, new ModifiedDiff( change.OldPath, change.Path ) );
                                 break;
                             default:
-                                throw new NotImplementedException();//So it's actually used... i tought it would not.
+                                monitor.Warn( $"Unhandled diff change: Path = {(!string.IsNullOrEmpty( change.Path ) ? change.Path : change.OldPath)}, Status {change.Status}." );
+                                break;
                         }
                     }
                 }
             }
-            // all the commits are now cached.
             return new DiffResult( _diffRootResultBuilders.Select( p => p.Result ).ToList(), _others.Result );
         }
     }

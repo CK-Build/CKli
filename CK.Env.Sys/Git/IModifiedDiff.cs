@@ -2,6 +2,9 @@ using CK.Core;
 
 namespace CK.Env
 {
+    /// <summary>
+    /// Models a modified file in <see cref="DiffResult"/>.
+    /// </summary>
     public interface IModifiedDiff
     {
         /// <summary>

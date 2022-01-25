@@ -409,26 +409,6 @@ namespace CK.Env.Plugin
         }
 
         [CommandMethod]
-        public bool DumpLogsBetweenDates( IActivityMonitor m, string beginning, string ending )
-        {
-            var solution = GetSolution( m, allowInvalidSolution: true );
-            if( solution == null ) return false;
-            if( !DateTimeOffset.TryParse( beginning, out DateTimeOffset beginningDate ) )
-            {
-                m.Error( $"{beginning} is not a valid date" );
-                return false;
-            }
-            if( !DateTimeOffset.TryParse( ending, out DateTimeOffset endingDate ) )
-            {
-                m.Error( $"{ending} is not a valid date" );
-                return false;
-            }
-            m.Info( $"Parsed date range: {beginningDate} => {endingDate}" );
-            GitFolder.ShowLogsBetweenDates( m, beginningDate, endingDate, solution.Projects.Select( proj => new DiffRoot( solution.Name, proj.ProjectSources ) ) );
-            return true;
-        }
-
-        [CommandMethod]
         public void ShowDetail( IActivityMonitor monitor )
         {
             var solution = GetSolution( monitor, allowInvalidSolution: false );

@@ -20,35 +20,32 @@ namespace CKli
         public void ChooseFinalVersion( IActivityMonitor m, IReleaseVersionSelectorContext c )
         {
             Console.WriteLine( "=========" );
-            Console.WriteLine( $"======== {c.Solution.Solution.Name} {(c.CurrentReleasedVersion != null ? $"last release: {c.CurrentReleasedVersion.ThisTag}" : "(No previous released version)")} " );
-
+            Console.WriteLine( $"======== {c.Solution.Solution.Name} {(c.PreviousVersion != null ? $"last release: {c.PreviousVersion.ThisTag}" : "(No previous released version)")} " );
             if( c.PublishedUpdates.Count > 0 )
             {
                 Console.WriteLine( $"         --> {c.PublishedUpdates.Count} packages to update in published projects: {GetUpdatesAsText( c.PublishedUpdates )}." );
             }
             if( c.NonPublishedUpdates.Count > 0 )
             {
-                Console.WriteLine( $"         --> {c.NonPublishedUpdates.Count} packages to update in {(c.PublishedUpdates.Count > 0 ? "other" : "non published")} projects: {GetUpdatesAsText( c.NonPublishedUpdates )}." );
+                Console.WriteLine( $"         --> {c.NonPublishedUpdates.Count} packages to update in non published projects: {GetUpdatesAsText( c.NonPublishedUpdates )}." );
             }
             if( c.PreviousVersion != null )
             {
-                var diffResult = c.GetProjectsDiff( m );
-                if( diffResult == null )
+                if( c.CommitSha == c.PreviousVersion.CommitSha )
                 {
-                    c.Cancel();
-                    return;
-                }
-                Console.Write( "Diff: " );
-                if( diffResult.Diffs.All( d => d.DiffType == DiffRootResultType.None ) && diffResult.Others.DiffType == DiffRootResultType.None )
-                {
-                    Console.WriteLine( $"No change in {c.Solution.Solution.GeneratedArtifacts.Select( p => p.Artifact.Name ).Concatenate()}" );
+                    Console.WriteLine( $"Diff: The current commit is the previous version (no change in repository)." );
                 }
                 else
                 {
-                    Console.WriteLine( "Changes:" );
+                    var diffResult = c.GetProjectsDiff( m );
+                    if( diffResult == null )
+                    {
+                        c.Cancel();
+                        return;
+                    }
+                    Console.Write( "Diff: " );
+                    Console.Write( diffResult.ToString() );
                 }
-
-                Console.WriteLine( diffResult.ToString() );
             }
 
             var projExRefNotRelease = c.Solution.Solution.Projects

@@ -54,9 +54,9 @@ namespace CK.Env.Plugin
             var framework = MSProject.Savors.FindOrCreate( _buildSpec.TargetFramework );
             var dependencies = new[] {
                 ("NuGet.Credentials", "6.0.0", false),
-                ("CK.Core", "15.0.0-r03", false),
-                ("SimpleGitVersion.Cake", "6.0.0", false),
-                ("CKSetup.Cake", "15.0.0-r02", false),
+                ("CK.Core", "15.0.0-r04-01", false),
+                ("SimpleGitVersion.Cake", "7.0.0", false),
+                ("CKSetup.Cake", "15.0.0-r06-01", false),
                 ("Newtonsoft.Json", "13.0.1", false)
             };
             ccbProject.SetLangVersion( m, null );
