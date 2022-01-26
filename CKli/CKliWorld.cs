@@ -64,11 +64,14 @@ namespace CKli
         public event EventHandler<EventMonitoredArgs>? DumpWorldStatus;
 
         [CommandMethod]
-        public void ShowExternalDependencies( IActivityMonitor m, bool compact = true, bool onlyMultipleVersions = false, PackageQuality quality = PackageQuality.None )
+        public void ShowExternalDependencies( IActivityMonitor m,
+                                              bool refreshExternalVersions = false,
+                                              bool onlyMultipleVersions = false,
+                                              PackageQuality quality = PackageQuality.None )
         {
             var ctx = SolutionDrivers.GetSolutionDependencyContextOnCurrentBranches( m );
             if( ctx == null ) return;
-            var externals = GetExternalPackageReferences( m, ctx );
+            var externals = GetExternalPackageReferences( m, ctx, refreshExternalVersions );
             ConsoleColor stdForeColor = Console.ForegroundColor;
             ConsoleColor stdBackColor = Console.BackgroundColor;
             foreach( var byType in externals.GroupBy( g => g.Target.Artifact.Type ).OrderBy( g => g.Key.Name ) )
@@ -84,7 +87,7 @@ namespace CKli
                     if( !onlyMultipleVersions || byVersion.Count() > 1 )
                     {
                         var maxVersion = byVersion.Select( v => v.Key ).Max();
-                        var externalVersionDisplay = Artifacts.GetExternalVersions( m, byName.Key )
+                        var externalVersionDisplay = Artifacts.GetExternalVersions( m, byName.Key, false )
                                                               .SelectMany( a => a.Versions.Where( v => v.PackageQuality >= quality && v > maxVersion ).Select( v => (v, a.FeedName) ) )
                                                               .GroupBy( v => v.v )
                                                               .OrderByDescending( v => v.Key )
@@ -98,30 +101,108 @@ namespace CKli
                         Console.WriteLine( externalVersionDisplay );
                         Console.ForegroundColor = stdForeColor;
                         if( byVersion.Count() > 1 ) Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        if( compact )
+                        foreach( var v in byVersion )
                         {
-                            foreach( var v in byVersion )
-                            {
-                                Console.WriteLine( $"    |      => {v.Key} ({v.GroupBy( p => p.Referer.Solution ).Select( s => $"{s.Key.Name}" ).Concatenate()})" );
-                            }
-                        }
-                        else
-                        {
-                            foreach( var versionGrouped in byVersion )
-                            {
-                                Console.WriteLine( "    |    |" + versionGrouped.Key );
-                                foreach( var solutionGrouped in versionGrouped.GroupBy( q => q.Referer.Solution ) )
-                                {
-                                    Console.WriteLine( "    |    |    |" + solutionGrouped.Key.Name + ":" );
-                                    foreach( var project in solutionGrouped )
-                                    {
-                                        Console.WriteLine( "    |    |    |    |" + project.Referer.Name );
-                                    }
-                                }
-                            }
+                            Console.WriteLine( $"    |      => {v.Key} ({v.GroupBy( p => p.Referer.Solution ).Select( s => $"{s.Key.Name}" ).Concatenate()})" );
                         }
                         Console.ForegroundColor = stdForeColor;
                     }
+                }
+            }
+        }
+
+        [CommandMethod]
+        public void UpgradeExternalDependencies( IActivityMonitor monitor,
+                                                 bool refreshExternalVersions = false,
+                                                 PackageQuality quality = PackageQuality.None )
+        {
+            var ctx = SolutionDrivers.GetSolutionDependencyContextOnCurrentBranches( monitor );
+            if( ctx == null ) return;
+            // Only NuGet is supported.
+            var externals = GetExternalPackageReferences( monitor, ctx, refreshExternalVersions ).Where( p => p.Target.Artifact.Type?.Name == "NuGet" );
+            ConsoleColor stdForeColor = Console.ForegroundColor;
+            ConsoleColor stdBackColor = Console.BackgroundColor;
+            foreach( var byName in externals.GroupBy( g => g.Target.Artifact ).OrderBy( g => g.Key.Name ) )
+            {
+                var byVersion = byName.GroupBy( s => s.Target.Version ).ToList();
+                var maxVersion = byVersion.Select( v => v.Key ).Max();
+                Debug.Assert( maxVersion != null );
+                // We consider greater versions or lower versions with a better quality than the current max version used.
+                var versionAndFeedNames = Artifacts.GetExternalVersions( monitor, byName.Key, false )
+                                                    .SelectMany( a => a.Versions.Where( v => v.PackageQuality >= quality && (v > maxVersion || v.PackageQuality > maxVersion.PackageQuality) )
+                                                        .Select( v => (v, a.FeedName) ) )
+                                                    .GroupBy( v => v.v )
+                                                    .OrderByDescending( v => v.Key )
+                                                    .Select( g => ( Version: g.Key, FeedNames: g.Select( vn => vn.FeedName ).ToArray() ) )
+                                                    .ToList();
+
+                var externalVersionDisplay = versionAndFeedNames.Select( g => $"{g.Version} ({g.FeedNames.Concatenate()})" ).Concatenate();
+
+                Console.Write( $" - " );
+                Console.Write( byName.Key.Name );
+                if( externalVersionDisplay.Length > 0 )
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    externalVersionDisplay = " <= " + externalVersionDisplay;
+                    Console.WriteLine( externalVersionDisplay );
+                    Console.ForegroundColor = stdForeColor;
+                }
+                if( byVersion.Count() > 1 ) Console.ForegroundColor = ConsoleColor.DarkYellow;
+                foreach( var v in byVersion )
+                {
+                    Console.WriteLine( $"          => {v.Key} ({v.GroupBy( p => p.Referer.Solution ).Select( s => $"{s.Key.Name}" ).Concatenate()})" );
+                }
+                Console.ForegroundColor = stdForeColor;
+
+                // Ask to choose or pass.
+                // Uses the versionAndFeedNames that is a list to capture the choices.
+                if( byVersion.Count > 1 )
+                {
+                    // The solutions references more than one version.
+                    // The maxVersion used is not in external available versions (the filter
+                    // above restricts them to version strictly greater than maxVersion).
+                    versionAndFeedNames.Insert( 0, (maxVersion, new[] { "*current greatest version used*" } ) );
+                }
+                if( versionAndFeedNames.Count == 0 )
+                {
+                    Console.WriteLine( "=> No available upgrades." );
+                }
+                else
+                {
+                    Console.Write( "Please choose a version: N - Skip, " );
+                    Console.WriteLine( versionAndFeedNames.Select( ( x, i ) => $"{i+1} - {x.Version} ({x.FeedNames.Concatenate()})" ).Concatenate() );
+                    int idx = -1;
+                    for( ; ; )
+                    {
+                        char a = Console.ReadKey().KeyChar;
+                        if( a == 'N' ) break;
+                        int n = a - '0';
+                        if( n < 1 || n > versionAndFeedNames.Count ) continue;
+                        idx = n - 1;
+                        break;
+                    }
+                    Console.Write( "\r\x1b[K\r\x1b[K" );
+                    if( idx >= 0 )
+                    {
+                        var vTarget = versionAndFeedNames[idx].Version;
+                        using( monitor.TemporarilySetMinimalFilter( LogFilter.Terse ) )
+                        {
+                            foreach( var bySolution in byName.GroupBy( s => s.Referer.Solution ) )
+                            {
+                                var sln = ctx.Solutions.First( s => s.Solution.Solution == bySolution.Key );
+                                var updatePackageInfos = bySolution.Select( p => new UpdatePackageInfo( p.Referer,
+                                                                                        new ArtifactInstance( p.Target.Artifact, versionAndFeedNames[idx].Version ) ) )
+                                                                            .ToList();
+                                sln.Driver.UpdatePackageDependencies( monitor, updatePackageInfos, null );
+                            }
+                        }
+                        Console.WriteLine( $"=> {vTarget}" );
+                    }
+                    else
+                    {
+                        Console.WriteLine( "=> Skipped." );
+                    }
+
                 }
             }
         }

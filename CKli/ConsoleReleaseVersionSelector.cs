@@ -137,7 +137,6 @@ namespace CKli
                     level = (ReleaseLevel)(a - '0');
                 }
             }
-
             while( !c.IsAnswered && c.PossibleVersions[level].Count == 0 );
             if( !c.IsAnswered )
             {

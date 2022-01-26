@@ -100,19 +100,5 @@ namespace CK.Build
             DBChanged?.Invoke( this, new PackageDBChangedArgs( newDb ) );
             return newDb;
         }
-
-        /// <summary>
-        /// Gets the available instances in all the feeds.
-        /// </summary>
-        /// <param name="artifactName">The artifact name.</param>
-        /// <returns>The available instances per feeds.</returns>
-        public IReadOnlyCollection<ArtifactAvailableInstances> GetAvailableVersions( Artifact artifact )
-        {
-            return _db.Feeds.Where( f => f.ArtifactType == artifact.Type )
-                         .Select( f => f.GetAvailableInstances( artifact.Name ) )
-                         .Where( a => a.IsValid )
-                         .ToList();
-        }
-
     }
 }

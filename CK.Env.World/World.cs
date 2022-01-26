@@ -551,7 +551,7 @@ namespace CK.Env
             } );
         }
 
-        protected IReadOnlyList<PackageReference> GetExternalPackageReferences( IActivityMonitor m, IWorldSolutionContext ctx )
+        protected IReadOnlyList<PackageReference> GetExternalPackageReferences( IActivityMonitor m, IWorldSolutionContext ctx, bool refreshExternalVersions )
         {
             var externals = ctx.DependencyContext.Analyzer.ExternalReferences;
             if( externals.Count == 0 )
@@ -560,11 +560,13 @@ namespace CK.Env
             }
             else
             {
-                using( m.OpenInfo( $"Refreshing external versions for {externals.Count} packages." ) )
+                using( m.OpenInfo( refreshExternalVersions
+                                    ? $"Refreshing external versions for {externals.Count} packages."
+                                    : $"Obtaining external versions for {externals.Count} packages, requesting the feeds only for not yet cached versions." ) )
                 {
                     foreach( var e in externals )
                     {
-                        _artifacts.GetExternalVersions( m, e.Target.Artifact );
+                        _artifacts.GetExternalVersions( m, e.Target.Artifact, refreshExternalVersions );
                     }
                 }
             }
@@ -619,14 +621,13 @@ namespace CK.Env
             }
             using( m.OpenInfo( $"{artifactToUpgrade.Count} packages to upgrade (out of {artifactUses.Count} package references) for TargetFramework '{targetFramework}'." ) )
             {
-                foreach( var slnGroupedPackage in artifactToUpgrade.GroupBy( s => s.Referer.Solution ) )
+                foreach( var bySolution in artifactToUpgrade.GroupBy( s => s.Referer.Solution ) )
                 {
-                    var sln = worldCtx.Solutions.First( s => s.Solution.Solution == slnGroupedPackage.Key );
-                    sln.Driver.UpdatePackageDependencies( m,
-                                                          slnGroupedPackage.Select(
-                                                              p => new UpdatePackageInfo( p.Referer, new ArtifactInstance( p.Target.Artifact, version ) )
-                                                         ).ToList()
-                    );
+                    var sln = worldCtx.Solutions.First( s => s.Solution.Solution == bySolution.Key );
+                    var updatePackageInfos = bySolution.Select( p => new UpdatePackageInfo( p.Referer,
+                                                                         new ArtifactInstance( p.Target.Artifact, version ) ) )
+                                                              .ToList();
+                    sln.Driver.UpdatePackageDependencies( m, updatePackageInfos, targetFramework );
                 }
             }
         }

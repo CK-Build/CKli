@@ -24,7 +24,7 @@ namespace CK.Build
             get => _savors;
             set
             {
-                if( value != null && value.IsEmpty ) throw new ArgumentException( "PackageInfo Savors cannot be empty.", "value" );
+                Throw.CheckArgument( "PackageInfo Savors cannot be empty.", value == null || !value.IsEmpty );
                 _savors = value;
             }
         }

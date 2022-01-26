@@ -103,12 +103,20 @@ namespace CK.Env.NuGet
                 return _checkedSecret ?? false;
             }
 
-            public Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, string artifactName )
+            public async Task<ArtifactAvailableInstances?> GetVersionsAsync( IActivityMonitor m, string artifactName )
             {
-                return _baseFeed.SafeCall<MetadataResource,ArtifactAvailableInstances>( m, ( sources, meta, logger ) => GetAvailable( meta, logger, artifactName ) );
+                try
+                {
+                    return await _baseFeed.SafeCallAsync<MetadataResource, ArtifactAvailableInstances?>( m, ( sources, meta, logger ) => GetAvailableAsync( meta, logger, artifactName ) );
+                }
+                catch( Exception ex )
+                {
+                    m.Error( $"Unable to retrieve available versions for '{artifactName}'.", ex );
+                    return null;
+                }
             }
 
-            async Task<ArtifactAvailableInstances> GetAvailable( MetadataResource meta, NuGetLoggerAdapter logger, string name )
+            async Task<ArtifactAvailableInstances?> GetAvailableAsync( MetadataResource meta, NuGetLoggerAdapter logger, string name )
             {
                 var v = new ArtifactAvailableInstances( this, name );
                 var latest = await meta.GetVersions( name, true, false, _baseFeed.Client.SourceCache, logger, CancellationToken.None );
@@ -127,7 +135,7 @@ namespace CK.Env.NuGet
 
             public Task<IPackageInfo?> GetPackageInfoAsync( IActivityMonitor m, ArtifactInstance instance )
             {
-                return _baseFeed.SafeCall<DependencyInfoResource, IPackageInfo?>( m, ( sources, meta, logger ) => GetPackageInfo( meta, logger, instance, default ) );
+                return _baseFeed.SafeCallAsync<DependencyInfoResource, IPackageInfo?>( m, ( sources, meta, logger ) => GetPackageInfo( meta, logger, instance, default ) );
             }
 
             class PackageInfoReader
@@ -316,16 +324,17 @@ namespace CK.Env.NuGet
             return _feed = new ReadFeed( this, name, creds );
         }
 
-        protected async Task<T> SafeCall<TResource,T>( IActivityMonitor m, Func<SourceRepository, TResource, NuGetLoggerAdapter, Task<T>> f ) where TResource : class, INuGetResource
+        protected async Task<T> SafeCallAsync<TResource,T>( IActivityMonitor monitor,
+                                                       Func<SourceRepository, TResource, NuGetLoggerAdapter, Task<T>> f ) where TResource : class, INuGetResource
         {
             bool retry = false;
-            var logger = new NuGetLoggerAdapter( m );
+            var logger = new NuGetLoggerAdapter( monitor );
             if( _sourceRepository == null )
             {
                 _sourceRepository = new SourceRepository( PackageSource, NuGetClient.StaticProviders );
             }
         again:
-            TResource meta = null;
+            TResource? meta = null;
             try
             {
                 meta = await _sourceRepository.GetResourceAsync<TResource>();

@@ -26,8 +26,8 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="artifactName">The artifact name.</param>
-        /// <returns>The set of instances.</returns>
-        Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, string artifactName );
+        /// <returns>The set of instances or null on error.</returns>
+        Task<ArtifactAvailableInstances?> GetVersionsAsync( IActivityMonitor m, string artifactName );
 
     }
 }

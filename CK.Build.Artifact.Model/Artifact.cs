@@ -1,3 +1,4 @@
+using CK.Core;
 using CSemVer;
 using System;
 using System.Diagnostics;
@@ -38,10 +39,10 @@ namespace CK.Build
         /// Initializes a new <see cref="Artifact"/>.
         /// </summary>
         /// <param name="type">Artifact type. <see cref="ArtifactType.IsValid"/> must be true.</param>
-        /// <param name="name">Artifact name. Must not be empty.</param>
+        /// <param name="name">Artifact name. Must not be null or whitespace.</param>
         public Artifact( in ArtifactType type, string name )
         {
-            if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
+            Throw.CheckNotNullOrWhiteSpaceArgument( name );
             Type = type ?? throw new ArgumentNullException( nameof( type ) );
             Name = name;
         }

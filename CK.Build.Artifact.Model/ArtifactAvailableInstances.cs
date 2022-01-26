@@ -1,3 +1,4 @@
+using CK.Core;
 using CSemVer;
 using System;
 using System.Collections;
@@ -7,8 +8,8 @@ using System.Linq;
 namespace CK.Build
 {
     /// <summary>
-    /// Immutable that defines an Artifact associated to a set of available versions (a <see cref="PackageQualityVector"/>)
-    /// in a specific <see cref="Feed"/>.
+    /// Immutable that defines an Artifact associated to a set of "top available versions" for the
+    /// 5 package qualities (a <see cref="PackageQualityVector"/>) in a specific <see cref="Feed"/>.
     /// </summary>
     public class ArtifactAvailableInstances : IEnumerable<ArtifactInstance>
     {
@@ -20,7 +21,7 @@ namespace CK.Build
         /// <param name="v">The quality versions.</param>
         public ArtifactAvailableInstances( IArtifactFeedIdentity feed, string artifactName, in PackageQualityVector v = default )
         {
-            if( feed == null ) throw new ArgumentNullException( nameof( feed ) );
+            Throw.CheckNotNullArgument( feed );
             Artifact = new Artifact( feed.ArtifactType, artifactName );
             FeedName = feed.Name;
             Versions = v;
@@ -34,11 +35,18 @@ namespace CK.Build
         /// <param name="v">The quality versions.</param>
         public ArtifactAvailableInstances( string feedName, Artifact artifact, in PackageQualityVector v = default )
         {
-            if( feedName == null ) throw new ArgumentNullException( nameof( feedName ) );
+            Throw.CheckNotNullArgument( feedName );
             Artifact = artifact;
             FeedName = feedName;
             Versions = v;
         }
+
+        /// <summary>
+        /// Gets whether the <see cref="Artifact"/> is valid.
+        /// This artifact type and name may be valid but there may be no available
+        /// versions (<see cref="PackageQualityVersions.IsValid"/> may be false).
+        /// </summary>
+        public bool IsValid => Artifact.IsValid;
 
         /// <summary>
         /// Gets the <see cref="IArtifactFeedIdentity.Name"/> or "*" when multiple available versions
@@ -94,13 +102,6 @@ namespace CK.Build
             var name = FeedName == other.FeedName ? FeedName : "*";
             return new ArtifactAvailableInstances( name, Artifact, other.Versions );
         }
-
-        /// <summary>
-        /// Gets whether the <see cref="Artifact"/> is valid.
-        /// This artifact type and nam may be valid but there may be no available
-        /// versions (<see cref="PackageQualityVersions.IsValid"/> may be false).
-        /// </summary>
-        public bool IsValid => Artifact.IsValid;
 
         /// <summary>
         /// Gets the best stable version or an invalid instance (<see cref="ArtifactInstance.IsValid"/> is false) if

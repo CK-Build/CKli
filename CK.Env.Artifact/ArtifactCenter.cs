@@ -22,7 +22,6 @@ namespace CK.Env
         readonly NormalizedPath _packageCacheFilePath;
 
         LivePackageCache? _packageCache;
-        readonly Dictionary<Artifact, IReadOnlyCollection<ArtifactAvailableInstances>> _cachedArtifacts;
 
         public ArtifactCenter( NormalizedPath localWorldFolder )
         {
@@ -30,7 +29,6 @@ namespace CK.Env
             _feeds = new List<IArtifactFeed>();
             _repositories = new List<IArtifactRepository>();
             _packageCacheFilePath = localWorldFolder.AppendPart( "PackageCache.bin" );
-            _cachedArtifacts = new Dictionary<Artifact, IReadOnlyCollection<ArtifactAvailableInstances>>();
         }
 
         /// <summary>
@@ -140,12 +138,14 @@ namespace CK.Env
         /// The list of resolved secrets: a null secret means that the secret has not been successfully obtained
         /// for the corresponding <see cref="IArtifactRepositoryInfo.SecretKeyName"/>.
         /// </returns>
-        public List<(string SecretKeyName, string? Secret)>? ResolveSecrets( IActivityMonitor m, IEnumerable<IArtifactRepository> repositories, bool allMustBeResolved )
+        public List<(string SecretKeyName, string? Secret)>? ResolveSecrets( IActivityMonitor m,
+                                                                             IEnumerable<IArtifactRepository> repositories,
+                                                                             bool allMustBeResolved )
         {
             List<(string Key, string? Secret)>? r = repositories.Where( feed => !String.IsNullOrWhiteSpace( feed.SecretKeyName ) )
-                                                               .GroupBy( feed => feed.SecretKeyName )
-                                                               .Select( g => (g.Key, Secret: g.First().ResolveSecret( m )) )
-                                                               .ToList();
+                                                                .GroupBy( feed => feed.SecretKeyName )
+                                                                .Select( g => (g.Key!, Secret: g.First().ResolveSecret( m )) )
+                                                                .ToList();
             if( allMustBeResolved )
             {
                 bool missing = false;
@@ -189,35 +189,42 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Returns a collection of <see cref="ArtifactAvailableInstances"/> for an <see cref="Artifact"/> accross all feeds.
+        /// Returns a collection of <see cref="ArtifactAvailableInstances"/> for an <see cref="Artifact"/> across all feeds.
+        /// Each ArtifactAvailableInstances can contain up to 5 versions that are the best for each of the 5 <see cref="CSemVer.PackageQuality"/>.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="artifact">The artifact to lookup.</param>
-        /// <returns>The collection of available instances accross all feeds.</returns>
-        public IReadOnlyCollection<ArtifactAvailableInstances> GetExternalVersions( IActivityMonitor m, Artifact artifact )
+        /// <param name="requestFeeds">True to request the <see cref="LivePackageCache.Feeds"/>.</param>
+        /// <returns>The collection of available instances across all feeds.</returns>
+        public IReadOnlyCollection<ArtifactAvailableInstances> GetExternalVersions( IActivityMonitor m, Artifact artifact, bool requestFeeds )
         {
-            if( !_cachedArtifacts.TryGetValue( artifact, out var instances ) )
+            var result = new List<ArtifactAvailableInstances>();
+            var cache = EnsurePackageCache( m );
+            var db = cache.Cache.DB;
+            if( !requestFeeds )
             {
-                // Don't use parallel resolution here because of the monitor (and parallel here is quite useless).
-                var result = new List<ArtifactAvailableInstances>();
-                var cache = EnsurePackageCache( m );
-                var db = cache.Cache.DB;
-                foreach( var f in _feeds.Where( f => f.ArtifactType == artifact.Type ) )
+                var gotThem = db.GetAvailableVersions( artifact );
+                if( gotThem.Count > 0 )
                 {
-                    ArtifactAvailableInstances available = GetVersionsAsync( m, artifact, cache, f ).GetAwaiter().GetResult();
-                    result.Add( available );
+                    return gotThem;
                 }
-                _cachedArtifacts.Add( artifact, instances = result );
-                if( db != cache.Cache.DB )
+                m.Trace( $"Artifact available versions for '{artifact}' not found in local cache. Soliciting feeds." );
+            }
+            foreach( var f in _feeds.Where( f => f.ArtifactType == artifact.Type ) )
+            {
+                // This where we sync to async... This is bad.
+                ArtifactAvailableInstances? available = GetVersionsAsync( m, artifact, cache, f ).GetAwaiter().GetResult();
+                if( available != null ) result.Add( available );
+            }
+            if( db != cache.Cache.DB )
+            {
+                m.Info( $"Saving Package database: {cache.Cache.DB}." );
+                using( var output = File.OpenWrite( _packageCacheFilePath ) )
                 {
-                    m.Info( $"Saving Package database: {cache.Cache.DB}." );
-                    using( var output = File.OpenWrite( _packageCacheFilePath ) )
-                    {
-                        cache.Cache.Write( new CKBinaryWriter( output ) );
-                    }
+                    cache.Cache.Write( new CKBinaryWriter( output ) );
                 }
             }
-            return instances;
+            return result;
         }
 
         static async Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, Artifact artifact, LivePackageCache cache, IArtifactFeed f )

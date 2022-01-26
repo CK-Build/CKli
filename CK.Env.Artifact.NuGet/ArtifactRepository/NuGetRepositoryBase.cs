@@ -124,7 +124,7 @@ namespace CK.Env.NuGet
             if( packageId == null ) throw new ArgumentNullException( nameof( packageId ) );
             if( version == null ) throw new ArgumentNullException( nameof( version ) );
             var p = new PackageIdentity( packageId, NuGetVersion.Parse( version.ToString() ) );
-            return await SafeCall<MetadataResource,bool>( m, ( sources, meta, logger ) => meta.Exists( p, Client.SourceCache, logger, CancellationToken.None ) );
+            return await SafeCallAsync<MetadataResource,bool>( m, ( sources, meta, logger ) => meta.Exists( p, Client.SourceCache, logger, CancellationToken.None ) );
         }
 
 
@@ -140,7 +140,7 @@ namespace CK.Env.NuGet
             string apiKey = ResolvePushAPIKey( m );
             try
             {
-                await SafeCall<MetadataResource,int>( m, async ( sources, meta, logger ) =>
+                await SafeCallAsync<MetadataResource,int>( m, async ( sources, meta, logger ) =>
                 {
                     var exist = files.Select( file => (file, id: new PackageIdentity( file.PackageId, NuGetVersion.Parse( file.Version.ToNormalizedString() ) )) )
                                      .Select( fId => (fId.file, exists: meta.Exists( fId.id, Client.SourceCache, logger, CancellationToken.None )) )

@@ -4,25 +4,26 @@ using CSemVer;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Threading.Tasks;
+using System.Diagnostics;
+using System.Text.Json;
 
 namespace CK.Env.NPM
 {
-    class NPMFeed : INPMFeed
+    class NPMFeed : INPMFeed, IPackageFeed
     {
         readonly Func<Registry> _registryFactory;
         Registry _registry;
 
-        internal NPMFeed(
-            string scope,
-            string url,
-            SimpleCredentials creds,
-            Func<Registry> registryFactory )
+        internal NPMFeed( string scope,
+                          string url,
+                          SimpleCredentials creds,
+                          Func<Registry> registryFactory )
         {
             Scope = scope;
             Url = url;
             Credentials = creds;
             TypedName = $"{NPMClient.NPMType.Name}:{scope}";
-            _registryFactory = registryFactory ?? throw new ArgumentNullException();
+            _registryFactory = registryFactory;
         }
 
         string IArtifactFeedIdentity.Name => Scope;
@@ -39,31 +40,119 @@ namespace CK.Env.NPM
 
         public bool CheckSecret( IActivityMonitor m, bool throwOnMissing = false ) => true;
 
-        public async Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, string artifactName )
+        public async Task<IPackageInfo?> GetPackageInfoAsync( IActivityMonitor monitor, ArtifactInstance instance )
         {
             if( _registry == null ) _registry = _registryFactory();
-            var v = new ArtifactAvailableInstances( this, artifactName );
-
-            var result = await _registry.View( m, artifactName );
-            if( result.exist )
+            using( monitor.OpenTrace( $"Getting package information for '{instance}'." ) )
             {
-                JObject body = JObject.Parse( result.viewJson );
-                var versions = (JObject)body["versions"];
-                foreach( var vK in versions )
+                var (doc, versions) = await _registry.CreateViewDocumentAndVersionsElementAsync( monitor, instance.Artifact.Name, abbreviatedResponse: true );
+                if( doc == null )
                 {
-                    var sV = SVersion.TryParse( vK.Key );
-                    if( !sV.IsValid )
+                    monitor.CloseGroup( "Failed." );
+                    return null;
+                }
+                try
+                {
+                    if( !versions.TryGetProperty( instance.Version.ToNormalizedString(), out var jPackage ) )
                     {
-                        m.Warn( $"Unable to parse version '{vK.Key}' for '{artifactName}': {sV.ErrorMessage}" );
+                        monitor.Warn( $"Version {instance.Version} not found for {instance.Artifact.Name}." );
+                        return null;
                     }
-                    else
+                    var result = new PackageInfo();
+                    result.Key = instance;
+                    if( !AddDependencies( monitor, result, jPackage, "dependencies", ArtifactDependencyKind.Private )
+                        || !AddDependencies( monitor, result, jPackage, "peerDependencies", ArtifactDependencyKind.Transitive ) )
                     {
-                        v = v.WithVersion( sV );
+                        return null;
                     }
+                    return result;
+                }
+                finally
+                {
+                    doc.Dispose();
                 }
             }
-            return v;
+
+            static bool AddDependencies( IActivityMonitor monitor, PackageInfo result, in JsonElement jPackage, string name, ArtifactDependencyKind kind )
+            {
+                if( jPackage.TryGetProperty( name, out var deps ) )
+                {
+                    if( deps.ValueKind != JsonValueKind.Object )
+                    {
+                        monitor.Error( $"Json \"versions/{result.Key.Version}/dependencies\" should be an object in '{result.Key.Artifact.Name}' package." );
+                        return false;
+                    }
+                    foreach( var d in deps.EnumerateObject() )
+                    {
+                        var depName = d.Name;
+                        if( string.IsNullOrWhiteSpace( depName ) )
+                        {
+                            monitor.Warn( $"Invalid dependency name '{depName}' for '{result.Key}' found. Skipped" );
+                            continue;
+                        }
+                        var sV = d.Value.GetString();
+                        if( sV == null )
+                        {
+                            monitor.Warn( $"Null dependency found for '{depName}'. Skipped." );
+                            continue;
+                        }
+                        var vR = SVersionBound.NpmTryParse( sV );
+                        if( vR.FourthPartLost )
+                        {
+                            monitor.Warn( $"Version '{sV}' of '{depName}' has four parts. This dependency is skipped since this is currently not supported." );
+                            continue;
+                        }
+                        if( !vR.IsValid )
+                        {
+                            monitor.Warn( $"Unable to parse version '{sV}' (Error: {vR.Error}) of '{depName}'. Skipped." );
+                            continue;
+                        }
+                        if( vR.IsApproximated )
+                        {
+                            monitor.Warn( $"Version '{sV}' of '{depName}' has been approximated to '{vR.Result}'." );
+                        }
+                        var target = new ArtifactInstance( NPMClient.NPMType, depName, vR.Result.Base );
+                        result.Dependencies.Add( (target, vR.Result.Lock, vR.Result.MinQuality, kind, null) );
+                    }
+                }
+                return true;
+            }
         }
 
+        public async Task<ArtifactAvailableInstances?> GetVersionsAsync( IActivityMonitor monitor, string artifactName )
+        {
+            if( _registry == null ) _registry = _registryFactory();
+
+            using( monitor.OpenDebug( $"Getting all the versions of '{artifactName}'." ) )
+            {
+                var (doc, versions) = await _registry.CreateViewDocumentAndVersionsElementAsync( monitor, artifactName, abbreviatedResponse: true );
+                if( doc == null )
+                {
+                    monitor.CloseGroup( "Failed." );
+                    return null;
+                }
+                try
+                {
+                    var v = new ArtifactAvailableInstances( this, artifactName );
+                    foreach( var eV in versions.EnumerateObject() )
+                    {
+                        var sV = SVersion.TryParse( eV.Name );
+                        if( !sV.IsValid )
+                        {
+                            monitor.Warn( $"Unable to parse version '{eV.Name}' for '{artifactName}': {sV.ErrorMessage}" );
+                        }
+                        else
+                        {
+                            v = v.WithVersion( sV );
+                        }
+                    }
+                    return v;
+                }
+                finally
+                {
+                    doc.Dispose();
+                }
+            }
+        }
     }
 }

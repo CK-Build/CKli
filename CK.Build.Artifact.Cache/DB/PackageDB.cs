@@ -259,7 +259,7 @@ namespace CK.Build
         }
 
         /// <summary>
-        /// Gets the update serial number number.
+        /// Gets the update serial number.
         /// It is an always increasing number (that may roll to negative... in years).
         /// </summary>
         public int UpdateSerialNumber => _updateSerialNumber;
@@ -268,6 +268,20 @@ namespace CK.Build
         /// Gets all the feeds.
         /// </summary>
         public IReadOnlyCollection<PackageFeed> Feeds => _feeds.Values;
+
+        /// <summary>
+        /// Gets the available instances in all the feeds.
+        /// Use <see cref="PackageFeed.GetAvailableInstances(string)"/> to retrieve the packages from one feed.
+        /// </summary>
+        /// <param name="artifactName">The artifact name.</param>
+        /// <returns>The available instances per feeds.</returns>
+        public IReadOnlyCollection<ArtifactAvailableInstances> GetAvailableVersions( Artifact artifact )
+        {
+            return _feeds.Values.Where( f => f.ArtifactType == artifact.Type )
+                                .Select( f => f.GetAvailableInstances( artifact.Name ) )
+                                .Where( a => a.IsValid )
+                                .ToList();
+        }
 
         /// <summary>
         /// Finds a feed by its <see cref="IArtifactFeedIdentity.TypedName"/>.

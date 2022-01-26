@@ -63,7 +63,7 @@ namespace CK.Build
         /// that were unable to resolve the package instance. 
         /// </summary>
         /// <param name="forgetErrors">True to clear all existing request errors.</param>
-        /// <param name="forgetUnresolved">True to clear previsously unresolved package instance lookup.</param>
+        /// <param name="forgetUnresolved">True to clear previously unresolved package instance lookup.</param>
         public void ClearFeedRequestCache( bool forgetErrors, bool forgetUnresolved )
         {
             if( forgetErrors || forgetUnresolved )
@@ -91,10 +91,8 @@ namespace CK.Build
         /// <returns>Null if the package cannot be found in any of the <see cref="Feeds"/>.</returns>
         public async Task<PackageInstance?> EnsureAsync( IActivityMonitor monitor, ArtifactInstance instance )
         {
-            PackageInstance? p = null;
-
             // First, consider this cache (fast path).
-            p = _cache.DB.Find( instance );
+            PackageInstance? p = _cache.DB.Find( instance );
             if( p != null ) return p;
 
             // Second, ask our feeds to locate the package.
@@ -119,7 +117,7 @@ namespace CK.Build
                 {
                     if( _cache.Add( monitor, allDeps ) == null || (p = _cache.DB.Find( instance )) == null )
                     {
-                        throw new Exception( $"Error while updating the package cache." );
+                        throw new Exception( $"Error while updating the package cache for '{instance}', ." );
                     }
                 }
                 return p;
@@ -266,7 +264,7 @@ namespace CK.Build
                 // We have at least one feed that has the package...
                 if( invalidSameError != null )
                 {
-                    // If data is not consistent accross feeds, this is serious!
+                    // If data is not consistent across feeds, this is serious!
                     result.SetException( invalidSameError );
                 }
                 else

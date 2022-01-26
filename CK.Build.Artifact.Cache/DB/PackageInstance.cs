@@ -81,10 +81,9 @@ namespace CK.Build
             }
         }
 
-        internal PackageInstance(
-            in ArtifactInstance instance,
-            CKTrait? savors,
-            IReadOnlyList<Reference> deps )
+        internal PackageInstance( in ArtifactInstance instance,
+                                  CKTrait? savors,
+                                  IReadOnlyList<Reference> deps )
         {
             Key = instance;
             Savors = savors;
@@ -123,20 +122,20 @@ namespace CK.Build
         /// </summary>
         /// <param name="other">The other instance to compare to. Can be null.</param>
         /// <returns>The negative/zero/positive standard value.</returns>
-        public int CompareTo( PackageInstance other ) => other == null ? 1 : Key.CompareTo( other.Key );
+        public int CompareTo( PackageInstance? other ) => other == null ? 1 : Key.CompareTo( other.Key );
 
         /// <summary>
         /// Implements equality based on <see cref="Key"/>.
         /// </summary>
         /// <param name="other">The other instance.</param>
         /// <returns>Returns <see cref="Key"/> equality.</returns>
-        public bool Equals( PackageInstance other ) => other == null ? false : Key.Equals( other.Key );
+        public bool Equals( PackageInstance? other ) => other == null ? false : Key.Equals( other.Key );
 
         /// <summary>
         /// Relays to <see cref="Key"/>'s equality.
         /// </summary>
         /// <param name="obj">The other object to compare to.</param>
-        /// <returns>True if equal, fals otherwise.</returns>
+        /// <returns>True if equal, false otherwise.</returns>
         public override bool Equals( object? obj ) => obj is PackageInstance p ? Equals( p ) : false;
 
         /// <summary>

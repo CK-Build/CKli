@@ -7,12 +7,12 @@ namespace CK.Env.NPM
     public interface INPMFeed : IArtifactFeed
     {
         /// <summary>
-        /// Gets the scope name. Can not be null and must start with @.
+        /// Gets the scope name. Cannot be null and must start with @.
         /// </summary>
         string Scope { get; }
 
         /// <summary>
-        /// Gets the feed url. Can not be null.
+        /// Gets the feed url. Cannot be null.
         /// </summary>
         string Url { get; }
 

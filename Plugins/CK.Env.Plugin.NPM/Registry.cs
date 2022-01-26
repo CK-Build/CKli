@@ -12,6 +12,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -58,7 +59,7 @@ namespace CK.Env.NPM
         /// <param name="httpClient">The http client to use.</param>
         /// <param name="token">The token to use.</param>
         /// <param name="uri">Defaults to https://registry.npmjs.org/ </param>
-        public Registry( HttpClient httpClient, string token, Uri uri = null )
+        public Registry( HttpClient httpClient, string token, Uri? uri = null )
             : this( httpClient, uri ?? NPMJSOrgUri )
         {
             _authHeader = new AuthenticationHeaderValue( "Bearer", token );
@@ -87,13 +88,13 @@ namespace CK.Env.NPM
 
         /// <summary>
         /// Gets or Sets whether we are running in CI or not.
-        /// The fields is automatically setted based on the environement variables with the same bahavior of npm.
+        /// The fields is automatically set based on the environment variables with the same behavior as npm.
         /// </summary>
         public bool NpmInCi { get; set; } = Environment.GetEnvironmentVariable( "CI" ) == "true" ||
-            Environment.GetEnvironmentVariable( "TDDIUM" ) != null ||
-            Environment.GetEnvironmentVariable( "JENKINS_URL" ) != null ||
-            Environment.GetEnvironmentVariable( "bamboo.buildKey" ) != null ||
-            Environment.GetEnvironmentVariable( "GO_PIPELINE_NAME" ) != null;
+                                            Environment.GetEnvironmentVariable( "TDDIUM" ) != null ||
+                                            Environment.GetEnvironmentVariable( "JENKINS_URL" ) != null ||
+                                            Environment.GetEnvironmentVariable( "bamboo.buildKey" ) != null ||
+                                            Environment.GetEnvironmentVariable( "GO_PIPELINE_NAME" ) != null;
 
         /// <summary>
         /// Gets the dist tags for the package.
@@ -101,7 +102,7 @@ namespace CK.Env.NPM
         /// <param name="m">The monitor.</param>
         /// <param name="packageName">The package name.</param>
         /// <returns>The raw JSON object.</returns>
-        public async Task<string> GetDistTags( IActivityMonitor m, string packageName )
+        public async Task<string?> GetDistTags( IActivityMonitor m, string packageName )
         {
             using( HttpRequestMessage req = NpmRequestMessage( m, $"/-/package/{packageName}/dist-tags", HttpMethod.Get ) )
             using( HttpResponseMessage response = await _httpClient.SendAsync( req ) )
@@ -228,37 +229,6 @@ namespace CK.Env.NPM
             }
         }
 
-        async Task<(string body, HttpStatusCode statusCode)> ViewRequest( IActivityMonitor m, string endpoint, bool abreviated )
-        {
-            using( HttpRequestMessage req = NpmRequestMessage( m, endpoint, HttpMethod.Get ) )
-            {
-                if( abreviated )
-                {
-                    req.Headers.Accept.Add( new MediaTypeWithQualityHeaderValue( "application/vnd.npm.install-v1+json", 1.0 ) );
-                    req.Headers.Accept.Add( new MediaTypeWithQualityHeaderValue( "application/json", 0.8 ) );
-                    req.Headers.Accept.Add( new MediaTypeWithQualityHeaderValue( "*/*", 0.8 ) );
-                }
-                using( var response = await _httpClient.SendAsync( req ) )
-                {
-                    await HandleResponse( m, response );
-                    var body = await response.Content.ReadAsStringAsync();
-                    return (body, response.StatusCode);
-                }
-            }
-        }
-
-        async Task<(string, bool)> LegacyViewWithVersion( IActivityMonitor m, string packageName, SVersion version, bool abreviated )
-        {
-            (string body, HttpStatusCode statusCode) = await ViewRequest( m, packageName, abreviated );
-            if( !IsSuccessStatusCode( statusCode ) )
-            {
-                return (body, false);
-            }
-            // Here the request is successful so we should have valid json.
-            JObject fullData = JObject.Parse( body );
-            var v = fullData["versions"][version.ToNormalizedString()];
-            return (v?.ToString() ?? "", v != null);
-        }
 
         public async Task<bool> ExistAsync( IActivityMonitor m, string packageName, SVersion version )
         {
@@ -266,40 +236,11 @@ namespace CK.Env.NPM
             {
                 return File.Exists( Path.Combine( RegistryUri.AbsolutePath, +'-' + version.ToNormalizedString() + ".tgz" ) );
             }
-            (_, bool exist) = await View( m, packageName, version );
-            return exist;
-        }
-
-        /// <summary>
-        /// Gets infos on a package.
-        /// The json format is available here: https://github.com/npm/registry/blob/master/docs/responses/package-metadata.md
-        /// </summary>
-        /// <param name="m"></param>
-        /// <param name="packageName">The package name</param>
-        /// <param name="version">The info on the package on a specified versions, return a json containing the info of all the version if it's not specified</param>
-        /// <param name="abbreviatedResponse">Ask the server to abreviate the info
-        /// </param>
-        /// <returns>The JSON response body and a success flag.</returns>
-        public async Task<(string viewJson, bool exist)> View( IActivityMonitor m, string packageName, SVersion version = null, bool abbreviatedResponse = true )
-        {
-            if( version == null )
-            {
-                // We can't optimise it unless we know the fallback feed, and we can't know with azure because the api ask for a version.
-                m.Debug( "Getting all the versions of the package." );
-                (string body, HttpStatusCode statusCode) = await ViewRequest( m, packageName, abbreviatedResponse );
-
-                bool success = IsSuccessStatusCode( statusCode );
-                if( !success ) m.Warn( $"Failed status code {statusCode} for '{RegistryUri}'." );
-
-                return (body, success);
-            }
-            // Here we know that the user specified the version
-            return await LegacyViewWithVersion( m, packageName, version, abbreviatedResponse );
-        }
-
-        static bool IsSuccessStatusCode( HttpStatusCode statusCode )
-        {
-            return ((int)statusCode >= 200) && ((int)statusCode <= 299);
+            var (doc,versions) = await CreateViewDocumentAndVersionsElementAsync( m, packageName, true );
+            if( doc == null ) return false;
+            bool exists = versions.TryGetProperty( version.ToNormalizedString(), out _ );
+            doc.Dispose();
+            return exists;
         }
 
         /// <summary>
@@ -307,8 +248,6 @@ namespace CK.Env.NPM
         /// </summary>
         /// <param name="m"></param>
         /// <param name="endpoint"></param>
-        /// <param name="commandName"></param>
-        /// <param name="projectScope"></param>
         /// <returns></returns>
         HttpRequestMessage NpmRequestMessage( IActivityMonitor m, string endpoint, HttpMethod method ) => NpmRequestMessage( m, new Uri( RegistryUri + endpoint ), method );
 
@@ -339,6 +278,67 @@ namespace CK.Env.NPM
             }
         }
 
+        /// <summary>
+        /// Creates a JsonDocument with the package infos that MUST be disposed once done.
+        /// The json format is available here: https://github.com/npm/registry/blob/master/docs/responses/package-metadata.md
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="endpoint">The uri to call.</param>
+        /// <param name="abbreviatedResponse">Ask the server to abbreviate the returned info.</param>
+        /// <returns>The JsonDocument or null on error.</returns>
+        public async Task<JsonDocument?> CreateViewDocumentAsync( IActivityMonitor monitor, string endpoint, bool abbreviatedResponse )
+        {
+            using( HttpRequestMessage req = NpmRequestMessage( monitor, endpoint, HttpMethod.Get ) )
+            {
+                if( abbreviatedResponse )
+                {
+                    req.Headers.Accept.Add( new MediaTypeWithQualityHeaderValue( "application/vnd.npm.install-v1+json", 1.0 ) );
+                    req.Headers.Accept.Add( new MediaTypeWithQualityHeaderValue( "application/json", 0.8 ) );
+                    req.Headers.Accept.Add( new MediaTypeWithQualityHeaderValue( "*/*", 0.8 ) );
+                }
+                try
+                {
+                    using( var response = await _httpClient.SendAsync( req ) )
+                    {
+                        if( !await HandleResponse( monitor, response ) ) return null;
+                        return await JsonDocument.ParseAsync( await response.Content.ReadAsStreamAsync() );
+                    }
+                }
+                catch( Exception ex )
+                {
+                    monitor.Error( ex );
+                    return null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Creates a JsonDocument with the package infos that MUST be disposed once done.
+        /// Before returning a non null document, the "versions" element is found.
+        /// The json format is available here: https://github.com/npm/registry/blob/master/docs/responses/package-metadata.md
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="endpoint">The uri to call.</param>
+        /// <param name="abbreviatedResponse">Ask the server to abbreviate the returned info.</param>
+        /// <returns>The JsonDocument and versions element or null on error.</returns>
+        public async Task<(JsonDocument?,JsonElement)> CreateViewDocumentAndVersionsElementAsync( IActivityMonitor monitor,
+                                                                                                  string endpoint,
+                                                                                                  bool abbreviatedResponse )
+        {
+            var d = await CreateViewDocumentAsync( monitor, endpoint, abbreviatedResponse );
+            if( d != null )
+            {
+                var versions = d.RootElement.GetProperty( "versions" );
+                if( versions.ValueKind == JsonValueKind.Object )
+                {
+                    return (d, versions);
+                }
+                monitor.Error( $"Unable to find a \"versions\" object in response body." );
+                d.Dispose();
+            }
+            return (null, default);
+        }
+
         async Task<bool> HandleResponse( IActivityMonitor m, HttpResponseMessage res )
         {
             HttpResponseHeaders headers = res.Headers;
@@ -347,17 +347,17 @@ namespace CK.Env.NPM
                 m.Info( $"npm-notice headers: {headers.GetValues( "npm-notice" ).Concatenate()}" );
             }
             DumpWarnings( m, headers );
-            return await LogErrors( m, res );
+            return await LogErrorsAsync( m, res );
         }
 
 
         /// <summary>
-        /// Logs potential errors. Returns true if no error occured, false on error.
+        /// Logs potential errors. Returns true if no error occurred, false on error.
         /// </summary>
         /// <param name="m"></param>
         /// <param name="res"></param>
         /// <returns>True on success, false on error.</returns>
-        async Task<bool> LogErrors( IActivityMonitor m, HttpResponseMessage res )
+        async Task<bool> LogErrorsAsync( IActivityMonitor m, HttpResponseMessage res )
         {
             if( res.StatusCode == HttpStatusCode.Unauthorized )
             {
@@ -429,7 +429,7 @@ namespace CK.Env.NPM
                     {
                         if( message.Contains( "ENOTFOUND" ) )
                         {
-                            m.Warn( $"registry: Using stale data from {RegistryUri} because the host is inaccessible -- are you offline?" );
+                            m.Warn( $"registry: Using stale data from {RegistryUri} because the host is inaccessible -- are you off-line?" );
                             m.Error( "Npm.Net is not using any caches, so you should not see the previous warning." );
                         }
                         else
