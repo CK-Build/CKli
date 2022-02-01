@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="15.0.0-r06-01" />    
+    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="15.0.0-r06-02" />    
   </ItemGroup>
 
   <ItemGroup>
