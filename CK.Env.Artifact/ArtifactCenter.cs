@@ -229,12 +229,15 @@ namespace CK.Env
             return result;
         }
 
-        static async Task<ArtifactAvailableInstances> GetVersionsAsync( IActivityMonitor m, Artifact artifact, LivePackageCache cache, IArtifactFeed f )
+        static async Task<ArtifactAvailableInstances?> GetVersionsAsync( IActivityMonitor m, Artifact artifact, LivePackageCache cache, IArtifactFeed f )
         {
             var available = await f.GetVersionsAsync( m, artifact.Name );
-            foreach( var a in available )
+            if( available != null )
             {
-                await cache.EnsureAsync( m, a );
+                foreach( var a in available )
+                {
+                    await cache.EnsureAsync( m, a );
+                }
             }
             return available;
         }
