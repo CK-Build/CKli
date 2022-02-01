@@ -55,7 +55,7 @@ namespace CK.Env.DependencyModel
                 Debug.Assert( _allProjects[idx].SimpleProjectName == newOne.SimpleProjectName );
                 Debug.Assert( _allProjects[idx].Type == newOne.Type );
                 Debug.Assert( _allProjects[idx].SolutionRelativeFolderPath == newOne.SolutionRelativeFolderPath );
-                Debug.Assert( newOne.Name == null, "Name (unambiguous) has not been computed." );
+                Debug.Assert( newOne.Name.Length == 0, "Name (unambiguous) has not been computed." );
                 return _allProjects[idx];
             }
             idx = ~idx;

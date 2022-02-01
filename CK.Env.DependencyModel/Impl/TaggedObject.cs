@@ -7,7 +7,7 @@ namespace CK.Env.DependencyModel
     /// </summary>
     public class TaggedObject : ITaggedObject
     {
-        object _tag;
+        object? _tag;
 
         /// <summary>
         /// Gets or sets a non null tag object of the specified type.
@@ -15,10 +15,10 @@ namespace CK.Env.DependencyModel
         /// <param name="type">The type of the tag to retrieve or sets.</param>
         /// <param name="newValue">Non null value of type <paramref name="type"/> to be set as the new tag value.</param>
         /// <returns>
-        /// When <paramref name="newValue"/> is null, fhe first tag of the type, or null if no tag is the specified type.
+        /// When <paramref name="newValue"/> is null, the first tag of the type, or null if no tag is the specified type.
         /// Otherwise, newValue is always returned.
         /// </returns>
-        public object Tag( Type type, object newValue = null )
+        public object? Tag( Type type, object? newValue = null )
         {
             if( type == null ) throw new ArgumentNullException( "type" );
             if( newValue != null && !type.IsInstanceOfType( newValue ) ) throw new ArgumentException( "Invalid type/new object value." );
@@ -32,7 +32,7 @@ namespace CK.Env.DependencyModel
             }
             else
             {
-                object[] a = _tag as object[];
+                object[]? a = _tag as object[];
                 if( a == null )
                 {
                     if( type.IsInstanceOfType( _tag ) )
@@ -77,10 +77,10 @@ namespace CK.Env.DependencyModel
         /// <typeparam name="T">The type of the tag to retrieve or set.</typeparam>
         /// <param name="newValue">Non null value to be set as the new tag value.</param>
         /// <returns>
-        /// When <paramref name="newValue"/> is null, fhe first tag of the type, or null if no tag is the specified type.
+        /// When <paramref name="newValue"/> is null, the first tag of the type, or null if no tag is the specified type.
         /// Otherwise, newValue is always returned.
         /// </returns>
-        public T Tag<T>( T newValue = null ) where T : class => (T)Tag( typeof( T ), newValue );
+        public T? Tag<T>( T? newValue = null ) where T : class => (T?)Tag( typeof( T ), newValue );
 
         /// <summary>
         /// Removes the tags of the specified type from this <see cref="TaggedObject"/>.
@@ -91,7 +91,7 @@ namespace CK.Env.DependencyModel
             if( type == null ) throw new ArgumentNullException( "type" );
             if( _tag != null )
             {
-                object[] a = _tag as object[];
+                object?[]? a = _tag as object?[];
                 if( a == null )
                 {
                     if( type.IsInstanceOfType( _tag ) ) _tag = null;
@@ -101,7 +101,7 @@ namespace CK.Env.DependencyModel
                     int i = 0, j = 0;
                     while( i < a.Length )
                     {
-                        object obj = a[i];
+                        object? obj = a[i];
                         if( obj == null ) break;
                         if( !type.IsInstanceOfType( obj ) ) a[j++] = obj;
                         i++;

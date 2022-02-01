@@ -20,17 +20,19 @@ namespace CK.Env.Plugin
         /// <param name="isNew">Whether the solution to be configured is a brand new one or is an existing one that is reconfigured.</param>
         /// <param name="spec">The solution specification.</param>
         /// <param name="buildSecrets">See <see cref="BuildRequiredSecrets"/>.</param>
-        public SolutionConfigurationEventArgs(
-            IActivityMonitor m,
-            Solution solution,
-            bool isNew,
-            SolutionSpec spec,
-            IList<(string SecretKeyName, string Secret)> buildSecrets )
+        public SolutionConfigurationEventArgs( IActivityMonitor m,
+                                               Solution solution,
+                                               bool isNew,
+                                               SolutionSpec spec,
+                                               IList<(string SecretKeyName, string? Secret)> buildSecrets )
             : base( m )
         {
-            Solution = solution ?? throw new ArgumentNullException( nameof( solution ) );
-            SolutionSpec = spec ?? throw new ArgumentNullException( nameof( spec ) );
-            BuildRequiredSecrets = buildSecrets ?? throw new ArgumentNullException( nameof( SolutionSpec ) );
+            Throw.CheckNotNullArgument( solution );
+            Throw.CheckNotNullArgument( spec );
+            Throw.CheckNotNullArgument( buildSecrets );
+            Solution = solution;
+            SolutionSpec = spec;
+            BuildRequiredSecrets = buildSecrets;
             IsNewSolution = isNew;
         }
 
@@ -39,7 +41,7 @@ namespace CK.Env.Plugin
         /// injected into the CodeCakeBuilderKeyVault.txt file.
         /// There is no guaranty that all secrets here are not null: missing secrets can exist (only the SecretKeyName is non null).
         /// </summary>
-        public IList<(string SecretKeyName, string Secret)> BuildRequiredSecrets { get; }
+        public IList<(string SecretKeyName, string? Secret)> BuildRequiredSecrets { get; }
 
         /// <summary>
         /// Gets the solution that must be configured.
@@ -59,7 +61,7 @@ namespace CK.Env.Plugin
         /// <summary>
         /// Gets the failure messages.
         /// </summary>
-        public string FailureMessage { get; private set; }
+        public string? FailureMessage { get; private set; }
 
 
         /// <summary>

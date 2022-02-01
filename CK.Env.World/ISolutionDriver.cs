@@ -36,32 +36,40 @@ namespace CK.Env
         /// Gets the Solution that this driver handles.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="reloadSolution">The solution names or null on error.</param>
+        /// <param name="reloadSolution">True to force a reload of the solution.</param>
         /// <param name="allowInvalidSolution">
         /// True to allow <see cref="IsSolutionValid"/> to be false: the instance is returned as long as the <see cref="ISolution"/> instance has
         /// successfully been built even if some required checks have failed.
         /// </param>
-        /// <returns>The updated sol</returns>
+        /// <returns>The solution or null if unable to load the solution.</returns>
         ISolution GetSolution( IActivityMonitor monitor, bool allowInvalidSolution, bool reloadSolution );
 
         /// <summary>
         /// Gets whether the Solution that this driver handles is valid or not.
         /// </summary>
-        /// <returns></returns>
         bool IsSolutionValid { get; }
 
         /// <summary>
         /// Updates projects dependencies and saves the solution and its updated projects.
+        /// A build project always update all its (single!) TargetFramework.
         /// </summary>
+        /// <remarks>
+        /// By default (null <paramref name="frameworkFilter"/>) all package references will be updated
+        /// regardless of any framework conditions that are not "locked" (see <see cref="SVersionLock"/>:
+        /// NuGet like "[14.2.1]" and Npm references like "=1.2.3" or simply "1.2.3" are locked).
+        /// <para>
+        /// Filter can be a ';' separated list of target frameworks that are eventually resolved into <see cref="MSProject.Savors"/>
+        /// context.
+        /// </para>
+        /// <para>
+        /// Use the special <see cref="UsePrimaryTargetFramework"/> string to restrict the update to
+        /// conditions that satisfy <see cref="SharedSolutionSpec.PrimaryTargetFramework"/>.
+        /// </para>
+        /// </remarks>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="packageInfos">The packages to update.</param>
-        /// <param name="frameworkFilter">
-        /// Optional target frameworks for which packages must be updated.
-        /// When null, each project's TargetFramework is considered (all dependencies are updated) except the ones that are [Locked].
-        /// For NuGet, a locked reference is like "[14.2.1]". For NPM packages, a package is considered locked if it uses.
-        /// Defaults to the PrimaryTargetFramework defined in the SolutionSpec.
-        /// </param>
-        /// <returns>True on success, false on error.</returns>
+        /// <param name="packageInfos">The update infos.</param>
+        /// <param name="frameworkFilter"> See remarks.</param>
+        /// <returns>True on success, false otherwise.</returns>
         bool UpdatePackageDependencies( IActivityMonitor monitor, IReadOnlyCollection<UpdatePackageInfo> packageInfos, string? frameworkFilter = null );
 
         /// <summary>

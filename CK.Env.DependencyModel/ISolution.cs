@@ -6,7 +6,7 @@ namespace CK.Env.DependencyModel
     /// <summary>
     /// Generic solution: contains a list of <see cref="IProject"/> of any type.
     /// </summary>
-    public interface ISolution : IPackageReferer, ITaggedObject
+    public interface ISolution : IPackageReferrer, ITaggedObject
     {
         /// <summary>
         /// Gets the solution context.

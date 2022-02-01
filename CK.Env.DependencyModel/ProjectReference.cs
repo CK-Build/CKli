@@ -29,26 +29,28 @@ namespace CK.Env.DependencyModel
         /// Gets the savors that, when not null, is a subset of the <see cref="IProject.Savors"/> (or all the
         /// project's savors) and cannot be empty.
         /// </summary>
-        public CKTrait ApplicableSavors { get; }
+        public CKTrait? ApplicableSavors { get; }
 
         /// <summary>
         /// Gets whether this dependency is applicable only to a subset of the <see cref="IProject.Savors"/>.
         /// </summary>
-        public bool IsSavored => ApplicableSavors != null && ApplicableSavors.AtomicTraits.Count < Owner.Savors.AtomicTraits.Count;
+        public bool IsSavored => ApplicableSavors != null && ApplicableSavors.AtomicTraits.Count < Owner.Savors!.AtomicTraits.Count;
 
-        internal ProjectReference( IProject o, IProject t, ArtifactDependencyKind kind, CKTrait applicableSavors )
+        internal ProjectReference( IProject o, IProject t, ArtifactDependencyKind kind, CKTrait? applicableSavors )
         {
-            Debug.Assert( o != null && o.Savors == null && applicableSavors == null
-                            || (o.Savors.Context == applicableSavors.Context
-                                && !applicableSavors.IsEmpty
-                                && o.Savors.IsSupersetOf( applicableSavors )) );
+            Debug.Assert( o != null
+                          && (o.Savors == null && applicableSavors == null
+                              || (o.Savors != null && applicableSavors != null
+                                  && o.Savors.Context == applicableSavors.Context
+                                  && !applicableSavors.IsEmpty
+                                  && o.Savors.IsSupersetOf( applicableSavors ))) );
             Owner = o;
             Target = t;
             Kind = kind;
             ApplicableSavors = applicableSavors;
         }
 
-        internal ProjectReference( in ProjectReference o, Func<CKTrait, CKTrait> f )
+        internal ProjectReference( in ProjectReference o, Func<CKTrait?, CKTrait?> f )
         {
             Owner = o.Owner;
             Target = o.Target;
@@ -66,7 +68,7 @@ namespace CK.Env.DependencyModel
                                                     : $"{Target} [{ApplicableSavors}]"
                                                 : (Kind != ArtifactDependencyKind.Transitive
                                                     ? $"{Target} (RefKind:{Kind})"
-                                                    : Target.ToString());
+                                                    : Target.ToString()!);
 
 
         /// <summary>

@@ -5,7 +5,7 @@ using System.Diagnostics;
 namespace CK.Env.DependencyModel
 {
     /// <summary>
-    /// Defines a dependency to a package from a generic <see cref="IPackageReferer"/>.
+    /// Defines a dependency to a package from a generic <see cref="IPackageReferrer"/>.
     /// </summary>
     public readonly struct PackageReference
     {
@@ -13,7 +13,7 @@ namespace CK.Env.DependencyModel
         /// Gets the referer of this <see cref="Target"/>.
         /// This is never null and is either a <see cref="ISolution"/> or a <see cref="IProject"/>.
         /// </summary>
-        public IPackageReferer Referer { get; }
+        public IPackageReferrer Referer { get; }
 
         /// <summary>
         /// Gets the referenced artifact instance.
@@ -27,7 +27,7 @@ namespace CK.Env.DependencyModel
         /// </summary>
         /// <param name="referer">The referer.</param>
         /// <param name="target">Valid target.</param>
-        public PackageReference( IPackageReferer referer, ArtifactInstance target )
+        public PackageReference( IPackageReferrer referer, ArtifactInstance target )
         {
             Referer = referer ?? throw new ArgumentNullException(nameof(referer));
             if( !target.IsValid ) throw new ArgumentException( nameof( target ) );

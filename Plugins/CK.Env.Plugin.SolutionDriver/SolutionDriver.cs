@@ -29,18 +29,17 @@ namespace CK.Env.Plugin
         readonly SolutionSpec _solutionSpec;
         readonly SolutionContext _solutionContext;
 
-        Solution _solution;
-        SolutionFile _sln;
-        IReadOnlyList<(string SecretKeyName, string Secret)> _buildSecrets;
+        Solution? _solution;
+        SolutionFile? _sln;
+        IReadOnlyList<(string SecretKeyName, string? Secret)>? _buildSecrets;
         bool _isSolutionValid;
 
-        public SolutionDriver(
-                ISolutionDriverWorld w,
-                GitRepository f,
-                ArtifactCenter artifactCenter,
-                NormalizedPath branchPath,
-                SolutionSpec spec,
-                IEnvLocalFeedProvider localFeedProvider )
+        public SolutionDriver( ISolutionDriverWorld w,
+                               GitRepository f,
+                               ArtifactCenter artifactCenter,
+                               NormalizedPath branchPath,
+                               SolutionSpec spec,
+                               IEnvLocalFeedProvider localFeedProvider )
             : base( f, branchPath )
         {
             _solutionContext = w.Register( this );
@@ -52,11 +51,11 @@ namespace CK.Env.Plugin
             f.RunProcessStarting += OnRunProcessStarting;
         }
 
-        void OnRunProcessStarting( object sender, RunCommandEventArgs e )
+        void OnRunProcessStarting( object? sender, RunCommandEventArgs e )
         {
             e.StartInfo.EnvironmentVariables.Add( "CKLI_CURRENT_WORLD_FULLNAME", GitFolder.World.FullName );
             e.StartInfo.EnvironmentVariables.Add( "CKLI_CURRENT_WORLD_NAME", GitFolder.World.Name );
-            ISolution s = GetSolution( e.Monitor, true );
+            ISolution? s = GetSolution( e.Monitor, true );
             if( s != null )
             {
                 e.StartInfo.EnvironmentVariables.Add( "CKLI_CURRENT_SOLUTION_NAME", s.Name );
@@ -115,7 +114,7 @@ namespace CK.Env.Plugin
         /// This not null as soon as the solution has been successfully read (this is available even
         /// if <see cref="IsSolutionValid"/> is false).
         /// </summary>
-        public IReadOnlyList<(string SecretKeyName, string Secret)> BuildRequiredSecrets => _buildSecrets;
+        public IReadOnlyList<(string SecretKeyName, string? Secret)>? BuildRequiredSecrets => _buildSecrets;
 
         /// <summary>
         /// Forces the solution to be reloaded next time <see cref="GetSolution"/> is called.
@@ -132,17 +131,8 @@ namespace CK.Env.Plugin
             }
         }
 
-        /// <summary>
-        /// Gets the Solution that this driver handles.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="reloadSolution">True to force a lod (like having called <see cref="SetSolutionDirty(IActivityMonitor)"/>).</param>
-        /// <param name="allowInvalidSolution">
-        /// True to allow <see cref="IsSolutionValid"/> to be false: the instance is returned as long as the <see cref="ISolution"/> instance has
-        /// successfully been built even if some required cheks have failed.
-        /// </param>
-        /// <returns>The solution or null if unable to load the solution.</returns>
-        public ISolution GetSolution( IActivityMonitor monitor, bool allowInvalidSolution, bool reloadSolution = false )
+        /// <inheritdoc />
+        public ISolution? GetSolution( IActivityMonitor monitor, bool allowInvalidSolution, bool reloadSolution = false )
         {
             if( !_isSolutionValid || reloadSolution )
             {
@@ -266,7 +256,7 @@ namespace CK.Env.Plugin
             }
             foreach( var noMore in projectsToRemove ) _solution.RemoveProject( noMore );
 
-            var buildSecrets = new List<(string SecretKeyName, string Secret)>();
+            var buildSecrets = new List<(string SecretKeyName, string? Secret)>();
             _isSolutionValid = !badPack;
             var h = OnSolutionConfiguration;
             if( h != null )
@@ -279,7 +269,9 @@ namespace CK.Env.Plugin
                     _isSolutionValid = false;
                 }
             }
-            foreach( var sc in _artifactCenter.ResolveSecrets( m, _solution.ArtifactTargets, false ) )
+            var l = _artifactCenter.ResolveSecrets( m, _solution.ArtifactTargets, allMustBeResolved: false );
+            Debug.Assert( l != null, "We allow unresolved secrets." );
+            foreach( var sc in l )
             {
                 if( buildSecrets.IndexOf( s => s.SecretKeyName == sc.SecretKeyName ) < 0 )
                 {
@@ -289,7 +281,7 @@ namespace CK.Env.Plugin
             _buildSecrets = buildSecrets;
         }
 
-        void OnSolutionSaved( object sender, EventMonitoredArgs e )
+        void OnSolutionSaved( object? sender, EventMonitoredArgs e )
         {
             SetSolutionDirty( e.Monitor );
         }
@@ -317,7 +309,7 @@ namespace CK.Env.Plugin
 
 
                     bool ignoreNotRoot = spec.PublishProjectInDirectories && !project.IsTestProject;
-                    // We bindly follow the <IsPackable> element. Only if it's not defined (ie. it's null) we must "think".
+                    // We blindly follow the <IsPackable> element. Only if it's not defined (ie. it's null) we must "think".
                     mustPublish = msProject.IsPackable
                                     ?? (notPublished &&
                                             (notRootDirectory || ignoreNotRoot || (project.IsTestProject && spec.TestProjectsArePublished)));
@@ -513,6 +505,7 @@ namespace CK.Env.Plugin
         {
             var solution = GetSolution( monitor, allowInvalidSolution: false );
             if( solution == null ) return false;
+            Debug.Assert( _sln != null );
 
             // Resolves frameworks after the load: MSProject.Savors is initialized.
             CKTrait? frameworks = null;
@@ -612,6 +605,8 @@ namespace CK.Env.Plugin
 
             var solution = GetSolution( monitor, allowInvalidSolution: false );
             if( solution == null ) return false;
+            Debug.Assert( _sln != null );
+
             bool mustSave = false;
             foreach( var p in solution.Projects )
             {
@@ -752,11 +747,9 @@ namespace CK.Env.Plugin
         {
             Debug.Assert( IsActive );
             bool amend = StandardPluginBranch == StandardGitStatus.Local || GitFolder.Head.Message == "Local build auto commit.";
-            return GitFolder.Commit(
-                m,
-                "Local build auto commit.",
-                amend ? CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage : CommitBehavior.CreateNewCommit
-            ) != CommittingResult.Error;
+            return GitFolder.Commit( m,
+                                     "Local build auto commit.",
+                                     amend ? CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage : CommitBehavior.CreateNewCommit ) != CommittingResult.Error;
         }
 
         /// <summary>
@@ -776,6 +769,7 @@ namespace CK.Env.Plugin
         public bool IsBuildEnabled => _world.WorkStatus == GlobalWorkStatus.Idle
                                         && IsActive
                                         && _isSolutionValid
+                                        && _buildSecrets != null
                                         && _buildSecrets.All( s => s.Secret != null );
 
         /// <summary>

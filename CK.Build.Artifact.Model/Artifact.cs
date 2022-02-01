@@ -2,6 +2,7 @@ using CK.Core;
 using CSemVer;
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CK.Build
 {
@@ -33,6 +34,7 @@ namespace CK.Build
         /// Gets whether this Artifact is valid: its type is not null and its
         /// name is not empty.
         /// </summary>
+        [MemberNotNullWhen(true,nameof(Type))]
         public bool IsValid => Type != null;
 
         /// <summary>
@@ -129,10 +131,10 @@ namespace CK.Build
         /// </summary>
         /// <param name="obj">An object.</param>
         /// <returns>True the object is an Artifact that is equal to this one, false otherwise.</returns>
-        public override bool Equals( object obj ) => obj is Artifact a ? Equals( a ) : false;
+        public override bool Equals( object? obj ) => obj is Artifact a && Equals( a );
 
         /// <summary>
-        /// Overrsidden to combine <see cref="Type"/> and <see cref="Name"/>.
+        /// Overridden to combine <see cref="Type"/> and <see cref="Name"/>.
         /// </summary>
         /// <returns>The hash code.</returns>
         public override int GetHashCode() => (Type?.GetHashCode() ??0) ^ StringComparer.OrdinalIgnoreCase.GetHashCode( Name );

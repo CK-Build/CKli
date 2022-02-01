@@ -75,17 +75,17 @@ namespace CK.Env
         /// <summary>
         /// Fires whenever we switched to the local branch.
         /// </summary>
-        public event EventHandler<EventMonitoredArgs> OnLocalBranchEntered;
+        public event EventHandler<EventMonitoredArgs>? OnLocalBranchEntered;
 
         /// <summary>
         /// Fires whenever we are up to leave the local branch back to the develop one.
         /// </summary>
-        public event EventHandler<EventMonitoredArgs> OnLocalBranchLeaving;
+        public event EventHandler<EventMonitoredArgs>? OnLocalBranchLeaving;
 
         /// <summary>
-        /// Fires whenever the repo is reset.
+        /// Fires whenever the repository is reset.
         /// </summary>
-        public event Action<IActivityMonitor> Reset;
+        public event Action<IActivityMonitor>? Reset;
 
 
         /// <summary>
@@ -101,7 +101,7 @@ namespace CK.Env
         /// <summary>
         /// Event raised when <see cref="RunProcess(IActivityMonitor, string, string)"/> is called.
         /// </summary>
-        public event EventHandler<RunCommandEventArgs> RunProcessStarting;
+        public event EventHandler<RunCommandEventArgs>? RunProcessStarting;
 
         /// <summary>
         /// Runs a command at the root of this repository.
@@ -159,7 +159,13 @@ namespace CK.Env
                         m.Error( $"Missing required {pathOpt} file." );
                         return null;
                     }
-                    var opt = new RepositoryInfoOptions( fOpt.ReadAsXDocument().Root ) { HeadBranchName = branchName, IgnoreAlreadyExistingVersion = true };
+                    var oRoot = fOpt.ReadAsXDocument().Root;
+                    if( oRoot == null )
+                    {
+                        m.Error( $"Missing Xml Root element in '{pathOpt}' file." );
+                        return null;
+                    }
+                    var opt = new RepositoryInfoOptions( oRoot ) { HeadBranchName = branchName, IgnoreAlreadyExistingVersion = true };
                     var result = new CommitInfo( Git, opt );
                     result.Explain( new AdaptedLogger( m ) );
                     return result.Error == null ? (result,opt.SingleMajor,opt.OnlyPatch) : null;
@@ -723,7 +729,7 @@ namespace CK.Env
 
             long IFileInfo.Length => -1;
 
-            public virtual string PhysicalPath => null;
+            public virtual string? PhysicalPath => null;
 
             Stream IFileInfo.CreateReadStream()
             {
@@ -757,7 +763,7 @@ namespace CK.Env
         class HeadFolder : BaseDirFileInfo, IDirectoryContents
         {
             readonly GitRepository _f;
-            IDirectoryContents _physical;
+            IDirectoryContents? _physical;
 
             public HeadFolder( GitRepository f )
                 : base( "head" )
@@ -767,7 +773,7 @@ namespace CK.Env
 
             public override DateTimeOffset LastModified => _f.Git.Head.Tip.Committer.When;
 
-            public override string PhysicalPath => _f.FullPhysicalPath.Path;
+            public override string? PhysicalPath => _f.FullPhysicalPath.Path;
 
             public IEnumerator<IFileInfo> GetEnumerator()
             {
@@ -791,7 +797,7 @@ namespace CK.Env
 
             public override DateTimeOffset LastModified => Commit.Committer.When;
 
-            public IFileInfo GetFileInfo( NormalizedPath sub )
+            public IFileInfo? GetFileInfo( NormalizedPath sub )
             {
                 var e = Commit.Tree[sub.ToString( '/' )];
                 if( e != null && e.TargetType != TreeEntryTargetType.GitLink )
@@ -842,7 +848,7 @@ namespace CK.Env
                 exists.Add( b );
             }
 
-            public IFileInfo GetFileInfo( NormalizedPath sub )
+            public IFileInfo? GetFileInfo( NormalizedPath sub )
             {
                 if( sub.Parts.Count == 1 ) return this;
                 if( _origins.TryGetValue( sub.Parts[1], out var origin ) )
@@ -914,7 +920,7 @@ namespace CK.Env
                 return _branches.Values.GetEnumerator();
             }
 
-            public IFileInfo GetFileInfo( NormalizedPath sub )
+            public IFileInfo? GetFileInfo( NormalizedPath sub )
             {
                 if( sub.Parts.Count == 1 ) return this;
                 if( _branches.TryGetValue( sub.Parts[1], out var b ) )
@@ -950,13 +956,13 @@ namespace CK.Env
                 _c = c;
             }
 
-            Blob Blob => _e.Target as Blob;
+            Blob? Blob => _e.Target as Blob;
 
             public bool Exists => true;
 
             public long Length => Blob?.Size ?? -1;
 
-            public string PhysicalPath => null;
+            public string? PhysicalPath => null;
 
             public string Name => _e.Name;
 
@@ -966,13 +972,14 @@ namespace CK.Env
 
             public Stream CreateReadStream()
             {
-                if( IsDirectory ) throw new InvalidOperationException();
+                Throw.CheckState( !IsDirectory );
+                Debug.Assert( Blob != null );
                 return Blob.GetContentStream();
             }
 
             public IEnumerator<IFileInfo> GetEnumerator()
             {
-                if( !IsDirectory ) throw new InvalidOperationException();
+                Throw.CheckState( IsDirectory );
                 return ((Tree)_e.Target).Select( t => new TreeEntryWrapper( t, _c ) ).GetEnumerator();
             }
 
@@ -992,7 +999,7 @@ namespace CK.Env
             }
         }
 
-        internal IFileInfo GetFileInfo( NormalizedPath sub )
+        internal IFileInfo? GetFileInfo( NormalizedPath sub )
         {
             if( sub.IsEmptyPath ) return _thisDir;
             if( IsInWorkingFolder( ref sub ) )

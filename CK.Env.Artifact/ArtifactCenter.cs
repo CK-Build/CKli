@@ -7,6 +7,7 @@ using System.Xml.Linq;
 
 using System.IO;
 using System.Threading.Tasks;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CK.Env
 {
@@ -136,7 +137,8 @@ namespace CK.Env
         /// </param>
         /// <returns>
         /// The list of resolved secrets: a null secret means that the secret has not been successfully obtained
-        /// for the corresponding <see cref="IArtifactRepositoryInfo.SecretKeyName"/>.
+        /// for the corresponding <see cref="IArtifactRepositoryInfo.SecretKeyName"/>. If <paramref name="allMustBeResolved"/>
+        /// is true and one secret is missing, this returned list is null.
         /// </returns>
         public List<(string SecretKeyName, string? Secret)>? ResolveSecrets( IActivityMonitor m,
                                                                              IEnumerable<IArtifactRepository> repositories,

@@ -29,7 +29,7 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets the project or solution that generates this package.
         /// </summary>
-        public IPackageReferer Exporter => _dep.TargetProject;
+        public IPackageReferrer Exporter => _dep.TargetProject;
 
         /// <summary>
         /// Gets the package name and version.

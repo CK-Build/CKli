@@ -29,7 +29,7 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets the <see cref="IProject"/> or <see cref="ISolution"/> that references the <see cref="TargetProject"/>'s artifact.
         /// </summary>
-        public IPackageReferer RefererOrigin => _row.Origin;
+        public IPackageReferrer RefererOrigin => _row.Origin;
 
         /// <summary>
         /// Gets whether the <see cref="RefererOrigin"/> is a <see cref="IProject"/> that has a true <see cref="IProject.IsPublished"/>.

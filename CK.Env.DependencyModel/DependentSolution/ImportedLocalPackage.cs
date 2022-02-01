@@ -28,7 +28,7 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets the project or solution that imports this package.
         /// </summary>
-        public IPackageReferer Importer => _dep.RefererOrigin;
+        public IPackageReferrer Importer => _dep.RefererOrigin;
 
         /// <summary>
         /// Gets the package name and version.

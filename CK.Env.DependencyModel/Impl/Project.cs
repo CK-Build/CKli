@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CK.Env.DependencyModel
 {
@@ -19,19 +20,18 @@ namespace CK.Env.DependencyModel
         readonly List<ProjectReference> _projectReferences;
         readonly List<ProjectPackageReference> _packageReferences;
         readonly List<NormalizedPath> _projectSources;
-        Solution _solution;
+        Solution? _solution;
         string _name;
-        CKTrait _savors;
+        CKTrait? _savors;
         bool _isPublished;
         bool _isTestProject;
 
-        internal Project(
-            Solution s,
-            NormalizedPath primarySolutionRelativeFolderPath,
-            NormalizedPath fullFolderPath,
-            string type,
-            string simpleProjecName,
-            CKTrait savors )
+        internal Project( Solution s,
+                          NormalizedPath primarySolutionRelativeFolderPath,
+                          NormalizedPath fullFolderPath,
+                          string type,
+                          string simpleProjecName,
+                          CKTrait? savors )
         {
             Debug.Assert( savors == null || !savors.IsEmpty );
             _solution = s;
@@ -39,21 +39,21 @@ namespace CK.Env.DependencyModel
             SolutionRelativeFolderPath = primarySolutionRelativeFolderPath;
             FullFolderPath = fullFolderPath;
             SimpleProjectName = simpleProjecName;
+            // _name will be computed by NormalizeName below.
+            _name = String.Empty;
             _savors = savors;
             _generatedArtifacts = new List<GeneratedArtifact>();
             _projectReferences = new List<ProjectReference>();
             _packageReferences = new List<ProjectPackageReference>();
-            _projectSources = new List<NormalizedPath>();
-
-            _projectSources.Add( SolutionRelativeFolderPath );
+            _projectSources = new List<NormalizedPath>{ SolutionRelativeFolderPath };
         }
 
         internal void NormalizeName( IReadOnlyList<Project> homonyms )
         {
-            Debug.Assert( homonyms.Contains( this ) );
+            Debug.Assert( homonyms.Contains( this ) && _solution != null );
             var sameSolutions = homonyms.Where( h => h != this && h._solution == _solution ).ToList();
 
-            // If another project with the same SimpleName appear in (at least) another solutions we
+            // If another project with the same SimpleName appear in (at least) another solution we
             // need to use the Solution name.
             bool needSolutionName = homonyms.Count != sameSolutions.Count + 1;
             // Homonyms in the same solution need to be differentiated.
@@ -90,24 +90,25 @@ namespace CK.Env.DependencyModel
             _solution = null;
         }
 
+        [MemberNotNull(nameof(_solution))]
         internal void CheckSolution()
         {
-            if( _solution == null ) throw new InvalidOperationException( $"Project '{_name}' has been removed from its Solution." );
+            Throw.CheckState( $"Project '{_name}' has been removed from its Solution.", _solution != null );
         }
 
         void CheckNotBuildProject( string something )
         {
-            if( _solution.BuildProject == this ) throw new InvalidOperationException( $"Project {ToString()} cannot {something} since it's the Solution's BuildProject." );
+            Throw.CheckState( $"Project {ToString()} cannot {something} since it's the Solution's BuildProject.", _solution?.BuildProject != this );
         }
 
         /// <summary>
         /// Gets the solution to which this project belongs.
         /// This is null if this project has been removed from its Solution.
         /// </summary>
-        public Solution Solution => _solution;
+        public Solution? Solution => _solution;
 
-        ISolution IProject.Solution => _solution;
-        ISolution IPackageReferer.Solution => _solution;
+        ISolution? IProject.Solution => _solution;
+        ISolution IPackageReferrer.Solution => _solution;
 
         /// <summary>
         /// Gets the path to this project relative to the <see cref="Solution"/>.
@@ -115,7 +116,7 @@ namespace CK.Env.DependencyModel
         public NormalizedPath SolutionRelativeFolderPath { get; }
 
         /// <summary>
-        /// Gets the full path to this project folder that starts wiith the <see cref="Solution.FullPath"/>.
+        /// Gets the full path to this project folder that starts with the <see cref="Solution.FullPath"/>.
         /// </summary>
         public NormalizedPath FullFolderPath { get; }
 
@@ -148,7 +149,7 @@ namespace CK.Env.DependencyModel
                 {
                     if( value ) CheckNotBuildProject( "be published" );
                     _isPublished = value;
-                    _solution.OnIsPublishedChange( this );
+                    _solution?.OnIsPublishedChange( this );
                 }
             }
         }
@@ -166,7 +167,7 @@ namespace CK.Env.DependencyModel
                 {
                     if( value ) CheckNotBuildProject( "be a Test project" );
                     _isTestProject = value;
-                    _solution.OnIsTestProjectChanged( this );
+                    _solution?.OnIsTestProjectChanged( this );
                 }
             }
         }
@@ -176,7 +177,7 @@ namespace CK.Env.DependencyModel
         /// </summary>
         public bool IsBuildProject
         {
-            get => Solution.BuildProject == this;
+            get => Solution?.BuildProject == this;
             set
             {
                 CheckSolution();
@@ -192,14 +193,14 @@ namespace CK.Env.DependencyModel
         /// the <see cref="ArtifactType.ContextSavors"/> of the "primary" artifact produced by this project).
         /// </para>
         /// </summary>
-        public CKTrait Savors => _savors;
+        public CKTrait? Savors => _savors;
 
         /// <summary>
         /// Applies a transformation to all the savors in this project: this <see cref="Savors"/>
         /// first and then all <see cref="ProjectPackageReference.ApplicableSavors"/> and <see cref="ProjectReference.ApplicableSavors"/>.
         /// </summary>
         /// <param name="f"></param>
-        public void TransformSavors( Func<CKTrait,CKTrait> f )
+        public void TransformSavors( Func<CKTrait?,CKTrait?> f )
         {
             _savors = f( _savors );
             for( int i = 0; i < _packageReferences.Count; ++i )
@@ -210,7 +211,7 @@ namespace CK.Env.DependencyModel
             {
                 _projectReferences[i] = new ProjectReference( _projectReferences[i], f );
             }
-            Solution.OnProjectSavorsTransformed( this );
+            Solution?.OnProjectSavorsTransformed( this );
         }
 
         /// <summary>
@@ -220,16 +221,17 @@ namespace CK.Env.DependencyModel
 
         /// <summary>
         /// Adds a new generated artifact.
-        /// Throws a <see cref="InvalidOperationException"/> if the artifact already appears in generated artifatcs
-        /// of all the projetcs of this <see cref="Solution"/> (same <see cref="Artifact.TypedName"/>).
+        /// Throws a <see cref="InvalidOperationException"/> if the artifact already appears in generated artifacts
+        /// of all the projects of this <see cref="Solution"/> (same <see cref="Artifact.TypedName"/>).
         /// </summary>
         /// <param name="a">The artifact to add.</param>
         public void AddGeneratedArtifacts( Artifact a )
         {
+            Throw.CheckArgument( a.IsValid );
             CheckSolution();
             _solution.CheckNewArtifact( a );
             _generatedArtifacts.Add( new GeneratedArtifact( a, this ) );
-            Solution.OnArtifactAdded( a, this );
+            _solution.OnArtifactAdded( a, this );
             IsPublished |= a.Type.IsInstallable;
         }
 
@@ -237,16 +239,17 @@ namespace CK.Env.DependencyModel
         /// Removes an artifact from <see cref="GeneratedArtifact"/>.
         /// </summary>
         /// <param name="a">The artifact to remove.</param>
-        /// <returns>True on succes, false if the artifact doen't exist.</returns>
+        /// <returns>True on success, false if the artifact doesn't exist.</returns>
         public bool RemoveGeneratedArtifact( Artifact a )
         {
+            Throw.CheckArgument( a.IsValid );
             CheckSolution();
             int idx = _generatedArtifacts.IndexOf( g => g.Artifact == a );
             if( idx >= 0 )
             {
                 _generatedArtifacts.RemoveAt( idx );
                 _solution.OnArtifactRemoved( a, this );
-                IsPublished = _generatedArtifacts.Any( g => g.Artifact.Type.IsInstallable );
+                IsPublished = _generatedArtifacts.Any( g => g.Artifact.Type!.IsInstallable );
                 return true;
             }
             return false;
@@ -261,7 +264,7 @@ namespace CK.Env.DependencyModel
         /// Gets a set of full paths (folder or files) that are "sources" for this project.
         /// By default, <see cref="FullFolderPath"/> is systematically added to this set.
         /// Any file and or folder that are outside the project folder should be added to this
-        /// set (typically files or folders shared accross multiple projects).
+        /// set (typically files or folders shared across multiple projects).
         /// This is used as the default for <see cref="GeneratedArtifact.ArtifactSources"/>
         /// in <see cref="GeneratedArtifacts"/>.
         /// </summary>
@@ -278,11 +281,11 @@ namespace CK.Env.DependencyModel
         /// <param name="target">The referenced project.</param>
         /// <param name="kind">Optional non standard dependency kind if needed.</param>
         /// <param name="applicableSavors">Optional savors that, when defined, must be a subset of this <see cref="Savors"/>.</param>
-        public void AddProjectReference( Project target, ArtifactDependencyKind kind = ArtifactDependencyKind.Transitive, CKTrait applicableSavors = null )
+        public void AddProjectReference( Project target, ArtifactDependencyKind kind = ArtifactDependencyKind.Transitive, CKTrait? applicableSavors = null )
         {
             CheckSolution();
-            if( _projectReferences.Any( p => p.Target == target ) ) throw new InvalidOperationException( $"Project '{target}' is already referenced by '{ToString()}'." );
-            if( target._solution != _solution ) throw new InvalidOperationException( $"Project '{target}' belongs to '{target._solution}' whereas {ToString()} belons to '{_solution}'." );
+            Throw.CheckState( $"Project '{target}' is already referenced by '{ToString()}'.", !_projectReferences.Any( p => p.Target == target ) );
+            Throw.CheckState( $"Project '{target}' belongs to '{target._solution}' whereas {ToString()} belongs to '{_solution}'.", target._solution != _solution );
             DoAddProjectReference( target, kind, applicableSavors ?? Savors );
         }
 
@@ -293,7 +296,7 @@ namespace CK.Env.DependencyModel
         /// <param name="target">The referenced project.</param>
         /// <param name="kind">The dependency kind.</param>
         /// <param name="applicableSavors">Optional savors that, when defined, must be a subset of this <see cref="Savors"/>.</param>
-        public void EnsureProjectReference( Project target, ArtifactDependencyKind kind = ArtifactDependencyKind.Transitive, CKTrait applicableSavors = null )
+        public void EnsureProjectReference( Project target, ArtifactDependencyKind kind = ArtifactDependencyKind.Transitive, CKTrait? applicableSavors = null )
         {
             CheckSolution();
             var savors = applicableSavors ?? Savors;
@@ -324,8 +327,9 @@ namespace CK.Env.DependencyModel
             return false;
         }
 
-        void DoAddProjectReference( Project target, ArtifactDependencyKind kind, CKTrait applicableSavors )
+        void DoAddProjectReference( Project target, ArtifactDependencyKind kind, CKTrait? applicableSavors )
         {
+            Debug.Assert( _solution != null );
             var r = new ProjectReference( this, target, kind, CheckSavors( applicableSavors ) );
             _projectReferences.Add( r );
             _solution.OnProjectReferenceAdded( r );
@@ -333,6 +337,7 @@ namespace CK.Env.DependencyModel
 
         void DoRemoveProjectReferenceAt( int idx )
         {
+            Debug.Assert( _solution != null );
             var r = _projectReferences[idx];
             _projectReferences.RemoveAt( idx );
             _solution.OnProjectReferenceRemoved( r );
@@ -349,10 +354,10 @@ namespace CK.Env.DependencyModel
         /// <param name="target">The referenced package.</param>
         /// <param name="kind">The dependency kind.</param>
         /// <param name="applicableSavors">Optional savors that, when defined, must be a subset of this <see cref="Savors"/>.</param>
-        public void AddPackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait applicableSavors = null )
+        public void AddPackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait? applicableSavors = null )
         {
             CheckSolution();
-            if( _packageReferences.Any( p => p.Target.Artifact == target.Artifact ) ) throw new InvalidOperationException( $"Package '{target.Artifact}' is already referenced by '{ToString()}'." );
+            Throw.CheckState( $"Package '{target.Artifact}' is already referenced by '{ToString()}'.", !_packageReferences.Any( p => p.Target.Artifact == target.Artifact ) );
             DoAddPackageReference( target, kind, applicableSavors ?? Savors );
         }
 
@@ -362,7 +367,7 @@ namespace CK.Env.DependencyModel
         /// <param name="target">The referenced package.</param>
         /// <param name="kind">The dependency kind.</param>
         /// <param name="applicableSavors">Optional savors that, when defined, must be a subset of this <see cref="Savors"/>.</param>
-        public void EnsurePackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait applicableSavors = null )
+        public void EnsurePackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait? applicableSavors = null )
         {
             CheckSolution();
             var savors = applicableSavors ?? Savors;
@@ -391,27 +396,28 @@ namespace CK.Env.DependencyModel
             return false;
         }
 
-        void DoAddPackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait applicableSavors )
+        void DoAddPackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait? applicableSavors )
         {
+            Debug.Assert( _solution != null );
             var r = new ProjectPackageReference( this, target, kind, CheckSavors( applicableSavors ) );
             _packageReferences.Add( r );
             _solution.OnPackageReferenceAdded( r );
         }
 
-        CKTrait CheckSavors( CKTrait applicableSavors )
+        CKTrait? CheckSavors( CKTrait? applicableSavors )
         {
-            Debug.Assert( applicableSavors == null && Savors == null
-                       || applicableSavors != null && Savors != null );
+            Debug.Assert( (applicableSavors == null && Savors == null) || (applicableSavors != null && Savors != null) );
             if( applicableSavors != null
-                && (Savors.Context != applicableSavors.Context || !Savors.IsSupersetOf( applicableSavors )) )
+                && (Savors!.Context != applicableSavors.Context || !Savors.IsSupersetOf( applicableSavors )) )
             {
-                throw new ArgumentException( $"Savors '{applicableSavors}' must be a subset of '{Savors}' (and belong to the same context).", nameof( applicableSavors ) );
+                Throw.ArgumentException( $"Savors '{applicableSavors}' must be a subset of '{Savors}' (and belong to the same context).", nameof( applicableSavors ) );
             }
             return applicableSavors;
         }
 
         void DoRemovePackageReferenceAt( int idx )
         {
+            Debug.Assert( _solution != null );
             var r = _packageReferences[idx];
             _packageReferences.RemoveAt( idx );
             _solution.OnPackageReferenceRemoved( r );

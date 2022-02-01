@@ -16,7 +16,7 @@ namespace CK.Env.MSBuildSln
     {
         /// <summary>
         /// Definition of NuGet artifact type: its name is "NuGet", it is installable and its savors
-        /// use ';' as a seprator to match the one used by csproj.
+        /// use ';' as a separator to match the one used by csproj.
         /// <see cref="Savors"/> exposes them directly.
         /// </summary>
         public static readonly ArtifactType NuGetArtifactType = ArtifactType.Register( "NuGet", true, ';' );
@@ -77,10 +77,9 @@ namespace CK.Env.MSBuildSln
                         : Projects.Where( p => p.Frameworks.Intersect( frameworks ) == frameworks );
             }
 
-            internal Dependencies(
-                IReadOnlyList<DeclaredPackageDependency> packages,
-                IReadOnlyList<ProjectToProjectDependency> projects,
-                IReadOnlyList<XElement> uselessDeps )
+            internal Dependencies( IReadOnlyList<DeclaredPackageDependency> packages,
+                                   IReadOnlyList<ProjectToProjectDependency> projects,
+                                   IReadOnlyList<XElement> uselessDeps )
             {
                 Packages = packages;
                 Projects = projects;
@@ -104,6 +103,7 @@ namespace CK.Env.MSBuildSln
             : base( solution, projectGuid, type.ToGuid(), projectName, relativePath )
         {
             Debug.Assert( KnownType.IsVSProject() );
+            TargetFrameworks = Savors.EmptyTrait;
         }
 
         /// <summary>
@@ -125,7 +125,7 @@ namespace CK.Env.MSBuildSln
             _primaryFile = MSProjFile.FindOrLoadProjectFile( fs, m, Path, cache );
             if( _primaryFile != null )
             {
-                XElement f = _primaryFile.Document.Root
+                XElement? f = _primaryFile.Document.Root?
                                 .Elements( "PropertyGroup" )
                                 .Elements()
                                 .Where( x => x.Name.LocalName == "TargetFramework" || x.Name.LocalName == "TargetFrameworks" )
@@ -137,6 +137,7 @@ namespace CK.Env.MSBuildSln
                 }
                 else
                 {
+                    Debug.Assert( _primaryFile.Document.Root != null );
                     TargetFrameworks = Savors.FindOrCreate( f.Value );
 
                     LangVersion = _primaryFile.Document.Root.Elements( "PropertyGroup" ).Elements( "LangVersion" ).LastOrDefault()?.Value;
@@ -151,7 +152,7 @@ namespace CK.Env.MSBuildSln
                         m.Debug( "Microsoft.Build.CentralPackageVersions is used." );
                         NormalizedPath packageFile;
                         var definer = _primaryFile.AllFiles.Select( file => file.Document.Root )
-                                             .SelectMany( root => root.Elements( "PropertyGroup" ) )
+                                             .SelectMany( root => root?.Elements( "PropertyGroup" ) ?? XElement.EmptySequence )
                                              .Elements()
                                              .FirstOrDefault( e => e.Name.LocalName == "CentralPackagesFile" );
                         if( definer != null )
@@ -203,9 +204,9 @@ namespace CK.Env.MSBuildSln
 
         /// <summary>
         /// Gets the target frameworks (from the <see cref="Savors"/> context).
-        /// Null if the project can not be read.
+        /// Empty if the project can not be read.
         /// </summary>
-        public CKTrait? TargetFrameworks { get; private set; }
+        public CKTrait TargetFrameworks { get; private set; }
 
         /// <summary>
         /// Gets whether Microsoft.Build.CentralPackageVersions is used thanks to:
@@ -257,15 +258,16 @@ namespace CK.Env.MSBuildSln
         /// <returns>True if the change has been made. False if the frameworks are the same as the current one.</returns>
         public bool SetTargetFrameworks( IActivityMonitor m, CKTrait frameworks )
         {
-            if( frameworks?.IsEmpty ?? true ) throw new ArgumentException( "Must not be null or empty.", nameof( frameworks ) );
-            if( frameworks.Context != Savors ) throw new ArgumentException( "Must be from MSProject.Savors context.", nameof( frameworks ) );
-            if( _primaryFile == null ) throw new InvalidOperationException( "Invalid project file." );
+            Throw.CheckNotNullOrEmptyArgument( frameworks );
+            Throw.CheckArgument( "Must be from MSProject.Savors context.", frameworks.Context == Savors );
+            Throw.CheckState( "Invalid project file.", _primaryFile != null );
             if( TargetFrameworks == frameworks ) return false;
-            XElement f = _primaryFile.Document.Root
+            XElement? f = _primaryFile.Document.Root?
                             .Elements( "PropertyGroup" )
                             .Elements()
                             .Where( x => x.Name.LocalName == "TargetFramework" || x.Name.LocalName == "TargetFrameworks" )
                             .SingleOrDefault();
+            Debug.Assert( f != null, "Otherwise we wouldn't have a _primaryFile." );
             f.ReplaceWith( new XElement( frameworks.IsAtomic ? "TargetFramework" : "TargetFrameworks", frameworks.ToString() ) );
             m.Trace( $"Replacing TargetFrameworks='{TargetFrameworks}' with '{frameworks}' in {ToString()}." );
             TargetFrameworks = frameworks;
@@ -354,7 +356,7 @@ namespace CK.Env.MSBuildSln
                         else
                         {
                             e = dep.P.OriginElement;
-                            e.Attribute( dep.P.IsVersionOverride ? "VersionOverride" : "Version" ).SetValue( sV );
+                            e.Attribute( dep.P.IsVersionOverride ? "VersionOverride" : "Version" )!.SetValue( sV );
                         }
                         ++changeCount;
                         monitor.Trace( $"Update in {ToString()}: '{packageId}' from '{currentVersion}' to '{sV}' for frameworks '{dep.F}'." );
@@ -368,7 +370,9 @@ namespace CK.Env.MSBuildSln
             // Handle creation if needed.
             if( !remainingFrameworksToUpdate.IsEmpty && addIfNotExists )
             {
+                Debug.Assert( ProjectFile.Document.Root != null );
                 var firstPropertyGroup = ProjectFile.Document.Root.Element( "PropertyGroup" );
+                Debug.Assert( firstPropertyGroup != null, "There's necessarily at least one PropertyGroup." );
                 var pRef = new XElement( "ItemGroup",
                                 new XElement( "PackageReference",
                                     new XAttribute( "Include", packageId ),
@@ -397,7 +401,7 @@ namespace CK.Env.MSBuildSln
 
         void DoSetSimpleProperty( IActivityMonitor m, string elementName, string? value )
         {
-            Debug.Assert( _primaryFile != null );
+            Debug.Assert( _primaryFile != null && _primaryFile.Document.Root != null );
             _primaryFile.Document.Root
                     .Elements( "PropertyGroup" )
                     .Elements( elementName ).Remove();

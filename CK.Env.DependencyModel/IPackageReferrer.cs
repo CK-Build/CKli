@@ -7,10 +7,10 @@ namespace CK.Env.DependencyModel
     /// <summary>
     /// Generalizes <see cref="ISolution"/> and <see cref="IProject"/>.
     /// </summary>
-    public interface IPackageReferer
+    public interface IPackageReferrer
     {
         /// <summary>
-        /// Gets the solution that is either this referer or the project's solution.
+        /// Gets the solution that is either this referrer or the project's solution.
         /// </summary>
         ISolution Solution { get; }
 

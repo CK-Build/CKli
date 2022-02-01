@@ -371,8 +371,8 @@ namespace CK.Env.DependencyModel
                                                             .SelectMany( c => c.SProject.DirectRequires
                                                                             .Select( r => r.Item )
                                                                             .OfType<LocalPackageItem>()
-                                                                            .Select( package => (Origin: (IPackageReferer)c.Project, Target: package) ) )
-                                                        .Concat( sorted.DirectRequires.Select( r => (Origin:(IPackageReferer)sorted.StartValue, Target:(LocalPackageItem)r.Item ) ))
+                                                                            .Select( package => (Origin: (IPackageReferrer)c.Project, Target: package) ) )
+                                                        .Concat( sorted.DirectRequires.Select( r => (Origin:(IPackageReferrer)sorted.StartValue, Target:(LocalPackageItem)r.Item ) ))
                                         ))
                            // 3 - Second Map: Expands the LocalRefs.
                            .SelectMany( s => s.LocalRefs.Any()

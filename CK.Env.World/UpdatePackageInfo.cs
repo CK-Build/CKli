@@ -25,7 +25,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="referer">The referer.</param>
         /// <param name="target">Valid target.</param>
-        public UpdatePackageInfo( IPackageReferer referer, ArtifactInstance target )
+        public UpdatePackageInfo( IPackageReferrer referer, ArtifactInstance target )
             : this( new PackageReference( referer, target ) )
         {
         }
@@ -33,7 +33,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the project or solution that must be updated.
         /// </summary>
-        public IPackageReferer Referer => _ref.Referer;
+        public IPackageReferrer Referer => _ref.Referer;
 
         /// <summary>
         /// Gets the package to update and its target version.

@@ -23,7 +23,7 @@ namespace CK.Env.DependencyModel
             /// It references the package produced by the <see cref="Target"/> project.
             /// Target is null if this origin is a ISolution without any dependency to other solutions.
             /// </summary>
-            public IPackageReferer Origin { get; }
+            public IPackageReferrer Origin { get; }
 
             /// <summary>
             /// Gets the targeted project by <see cref="Origin"/>.
@@ -50,7 +50,7 @@ namespace CK.Env.DependencyModel
                         .Select( d => d.Target );
             }
 
-            internal Row( IPackageReferer o, IProject t )
+            internal Row( IPackageReferrer o, IProject t )
             {
                 Origin = o;
                 Target = t;

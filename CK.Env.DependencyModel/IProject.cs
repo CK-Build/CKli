@@ -9,13 +9,13 @@ namespace CK.Env.DependencyModel
     /// <see cref="ProjectReferences"/> and whether it is a <see cref="IsTestProject"/>, <see cref="IsPublished"/> or whether it is
     /// the <see cref="Solution.BuildProject"/> or not.
     /// </summary>
-    public interface IProject : IPackageReferer, ITaggedObject
+    public interface IProject : IPackageReferrer, ITaggedObject
     {
         /// <summary>
         /// Gets the solution to which this project belongs.
         /// This is null if this project has been removed from its Solution.
         /// </summary>
-        new ISolution Solution { get; }
+        new ISolution? Solution { get; }
 
         /// <summary>
         /// Gets the full path to this project folder that starts with the <see cref="Solution.FullPath"/>.
@@ -31,7 +31,7 @@ namespace CK.Env.DependencyModel
         /// Gets a set of full paths (folder or files) that are "sources" for this project.
         /// By default, <see cref="SolutionRelativeFolderPath"/> is systematically added to this set.
         /// Any file and or folder that are outside the project folder should be added to this
-        /// set (typically files or folders shared accross multiple projects).
+        /// set (typically files or folders shared across multiple projects).
         /// This is used to detect changes for project (typically thanks to Git history).
         /// </summary>
         IReadOnlyCollection<NormalizedPath> ProjectSources { get; }
@@ -58,10 +58,10 @@ namespace CK.Env.DependencyModel
         /// </para>
         /// <para>
         /// <see cref="ProjectPackageReference.ApplicableSavors"/> and <see cref="ProjectReference.ApplicableSavors"/> share
-        /// the same context and are either equal to these savors or are a nn-empty subset of them.
+        /// the same context and are either equal to these savors or are a non-empty subset of them.
         /// </para>
         /// </summary>
-        CKTrait Savors { get; }
+        CKTrait? Savors { get; }
 
         /// <summary>
         /// Gets all artifacts that this project generates. 

@@ -59,13 +59,13 @@ namespace CK.Env
                                 .Select( v => SVersion.Parse( v ) );
         }
 
-        internal static SVersion GetMaxVersionFromFeed( string path, string packageId )
+        internal static SVersion? GetMaxVersionFromFeed( string path, string packageId )
         {
             // Note: Max on reference type returns null on empty source.
             return GetAllVersionsFromFeed( path, packageId ).Max( v => v );
         }
 
-        static SVersion GetBestVersionFromNuGetCache( IActivityMonitor m, string packageId )
+        static SVersion? GetBestVersionFromNuGetCache( IActivityMonitor m, string packageId )
         {
             // Max on reference type returns null on empty source.
             return System.IO.Directory.GetDirectories( _localNuGetCache.AppendPart( packageId ) )
@@ -74,9 +74,9 @@ namespace CK.Env
                 .Max( v => v );
         }
 
-        static SVersion SafeParse( IActivityMonitor m, string path )
+        static SVersion? SafeParse( IActivityMonitor m, string path )
         {
-            SVersion v = null;
+            SVersion? v = null;
             int idx = path.LastIndexOf( System.IO.Path.DirectorySeparatorChar );
             if( idx < 0 )
             {
