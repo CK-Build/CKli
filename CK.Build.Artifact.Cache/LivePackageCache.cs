@@ -164,6 +164,7 @@ namespace CK.Build
                     if( !await DoAddAsync( monitor, d.Target, allDeps, feeds ) )
                     {
                         monitor.Error( $"Unable to satisfy dependency '{d.Target}' of package '{info.Key}'." );
+                        success = false;
                     }
                 }
             }

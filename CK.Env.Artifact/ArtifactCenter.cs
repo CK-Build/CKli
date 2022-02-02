@@ -236,7 +236,14 @@ namespace CK.Env
             {
                 foreach( var a in available )
                 {
-                    await cache.EnsureAsync( m, a );
+                    try
+                    {
+                        await cache.EnsureAsync( m, a );
+                    }
+                    catch( Exception ex )
+                    {
+                        m.Error( $"Error while caching '{a}'. Ignoring the error, the instance is not cached.", ex );
+                    }
                 }
             }
             return available;
