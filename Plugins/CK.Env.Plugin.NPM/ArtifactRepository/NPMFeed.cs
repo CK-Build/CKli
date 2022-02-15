@@ -9,7 +9,15 @@ using System.Text.Json;
 
 namespace CK.Env.NPM
 {
-    class NPMFeed : INPMFeed, IPackageFeed
+    // Remove support of feed crawling for NPM packages.
+    // It ~works~ but:
+    // - There's a lot of dependencies that has a base version that doesn't exist (like "^0.7.0-0") and currently
+    //   the lookup is made only on the base version, not on the version range :(.
+    // - We currently don't have the capabilities to upgrade the NPM dependencies
+    //
+    // ...so we don't care: for the moment these feeds are NOT providers of IPackageInfo... 
+    //
+    class NPMFeed : INPMFeed //, IPackageFeed
     {
         readonly Func<Registry> _registryFactory;
         Registry _registry;
