@@ -272,7 +272,7 @@ namespace CK.Env.FS.Tests
                 using( var content = fMaster.CreateReadStream() )
                 using( var textR = new StreamReader( content ) )
                 {
-                    textR.ReadToEnd().NormalizeEOLToLF().Should().Be( $"On {IWorldName.MasterName}\nOn {IWorldName.MasterName}\n" );
+                    textR.ReadToEnd().ReplaceLineEndings( "\n" ).Should().Be( $"On {IWorldName.MasterName}\nOn {IWorldName.MasterName}\n" );
                 }
             }
 
@@ -317,7 +317,7 @@ namespace CK.Env.FS.Tests
                     using( var content = fA2.CreateReadStream() )
                     using( var textR = new StreamReader( content ) )
                     {
-                        textR.ReadToEnd().NormalizeEOLToLF().Should().Be( "a2\na2\n" );
+                        textR.ReadToEnd().ReplaceLineEndings( "\n" ).Should().Be( "a2\na2\n" );
                     }
                 }
 
@@ -336,7 +336,7 @@ namespace CK.Env.FS.Tests
                     using( var content = fA2.CreateReadStream() )
                     using( var textR = new StreamReader( content ) )
                     {
-                        textR.ReadToEnd().NormalizeEOLToLF().Should().Be( "a2\na2\n" );
+                        textR.ReadToEnd().ReplaceLineEndings( "\n" ).Should().Be( "a2\na2\n" );
                     }
                 }
 

@@ -46,9 +46,9 @@ namespace CK.Env.Tests
             p.Descendants().Select( e => e.Name.ToString() ).Concatenate()
                 .Should().Be( "Thing1, Thing1, Thing2, Below, Thing1Override, Thing1, Thing2, Thing1, Thing2, Thing1Override, Thing1, Thing2, Thing1Override, Thing1, Thing2, Thing2Override, Thing1, Thing1, Thing2" );
 
-            var rCDATA = new Regex( Regex.Escape( cdata.NormalizeEOL() ), RegexOptions.CultureInvariant );
-            rCDATA.Matches( original.ToString().NormalizeEOL() ).Count.Should().Be( 1 );
-            rCDATA.Matches( p.ToString().NormalizeEOL() ).Count.Should().Be( 8, "There is 8 Thing1 reuse!" );
+            var rCDATA = new Regex( Regex.Escape( cdata.ReplaceLineEndings() ), RegexOptions.CultureInvariant );
+            rCDATA.Matches( original.ToString().ReplaceLineEndings() ).Count.Should().Be( 1 );
+            rCDATA.Matches( p.ToString().ReplaceLineEndings() ).Count.Should().Be( 8, "There is 8 Thing1 reuse!" );
         }
 
         [Explicit]

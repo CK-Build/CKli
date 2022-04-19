@@ -25,7 +25,7 @@ namespace CK.Env
             using( var s = CheckFileInfoExists( @this ).CreateReadStream() )
             using( var t = new StreamReader( s ) )
             {
-                return t.ReadToEnd().NormalizeEOL();
+                return t.ReadToEnd().ReplaceLineEndings();
             }
         }
 
