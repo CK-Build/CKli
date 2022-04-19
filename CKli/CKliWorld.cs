@@ -22,8 +22,6 @@ namespace CKli
     /// </summary>
     public class CKliWorld : World
     {
-        readonly IActivityMonitorFilteredClient _userMonitorClient;
-
         /// <summary>
         /// Initializes a new World.
         /// </summary>
@@ -31,8 +29,6 @@ namespace CKli
         public CKliWorld( ConstructorParameters parameters )
             : base( parameters )
         {
-            _userMonitorClient = parameters.InitializationMonitor.Output.Clients.OfType<IActivityMonitorFilteredClient>().FirstOrDefault();
-            if( _userMonitorClient == null ) throw new InvalidOperationException();
         }
 
         protected override void OnInitialize( IActivityMonitor monitor )
@@ -215,11 +211,7 @@ namespace CKli
 
         void DoSetLogLevel( IActivityMonitor m, LogFilter userLevel, LogFilter monitorLevel, bool saveOnChange )
         {
-            if( _userMonitorClient.MinimalFilter != userLevel )
-            {
-                _userMonitorClient.MinimalFilter = userLevel;
-                LocalWorldState.UserLogFilter = userLevel;
-            }
+            m.SetInteractiveUserFilter( new LogClamper( userLevel, true ) );
             if( m.MinimalFilter != monitorLevel )
             {
                 m.MinimalFilter = monitorLevel;

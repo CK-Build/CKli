@@ -253,7 +253,7 @@ namespace CK.Env
                 if( _diffResult == null )
                 {
                     var diffRoots = Solution.Solution.GeneratedArtifacts.Select( g => new DiffRoot( g.Artifact.TypedName, g.Project.ProjectSources ) );
-                    _diffResult = _info._repository.GetDiff( m, PreviousVersion.CommitSha, diffRoots );
+                    _diffResult = _info._repository.GetDiff( m, PreviousVersion.CommitSha, diffRoots, withCommitMessages: true );
                 }
                 return _diffResult;
             }
@@ -299,7 +299,7 @@ namespace CK.Env
             // package upgrade.
             List<(ImportedLocalPackage, SVersion)>? nonPublishedUpdates = null;
             List<(ImportedLocalPackage, SVersion)>? publishedUpdates = null;
-            foreach( var s in Solution.Requirements )
+            foreach( var s in Solution.DirectRequirements )
             {
                 var sInfo = _releaser.GetReleaseInfo( s.Index ).EnsureReleaseInfo( monitor, versionSelector );
                 if( !sInfo.IsValid ) return new ReleaseInfo();

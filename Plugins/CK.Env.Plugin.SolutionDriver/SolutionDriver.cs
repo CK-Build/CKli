@@ -443,18 +443,24 @@ namespace CK.Env.Plugin
                 b.Append( "| Packages: " ).AppendJoin( ", ", solution.SolutionPackageReferences.Select( p => p.Target.ToString() ) ).AppendLine();
             }
             var min = depSolution.MinimalRequirements;
-            var req = depSolution.Requirements;
+            var req = depSolution.DirectRequirements;
             b.Append( "| MinimalRequirements: " ).AppendJoin( ", ", min.OrderBy( s => s.Index ).Select( s => s.Solution.Name ) ).AppendLine();
             if( req.Count != min.Count )
             {
                 b.Append( "|        Requirements: " ).AppendJoin( ", ", req.OrderBy( s => s.Index ).Select( s => s.Solution.Name ) ).AppendLine();
             }
+
             var iMin = depSolution.MinimalImpacts;
-            var iReq = depSolution.Impacts;
-            b.Append( "| MinimalImpacts: " ).AppendJoin( ", ", iMin.OrderBy( s => s.Index ).Select( s => s.Solution.Name ) ).AppendLine();
+            b.Append( "|    Minimal impacts: " ).AppendJoin( ", ", iMin.OrderBy( s => s.Index ).Select( s => s.Solution.Name ) ).AppendLine();
+            var iReq = depSolution.DirectImpacts;
             if( iReq.Count != iMin.Count )
             {
-                b.Append( "|        Impacts: " ).AppendJoin( ", ", iReq.OrderBy( s => s.Index ).Select( s => s.Solution.Name ) ).AppendLine();
+                b.Append( "|     Direct impacts: " ).AppendJoin( ", ", iReq.OrderBy( s => s.Index ).Select( s => s.Solution.Name ) ).AppendLine();
+            }
+            var iTransReq = depSolution.TransitiveImpacts;
+            if( iTransReq.Count != iReq.Count )
+            {
+                b.Append( "| Transitive impacts: " ).AppendJoin( ", ", iTransReq.OrderBy( s => s.Index ).Select( s => s.Solution.Name ) ).AppendLine();
             }
 
             Console.Write( b.ToString() );
@@ -497,7 +503,7 @@ namespace CK.Env.Plugin
         /// </remarks>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="packageInfos">The update infos.</param>
-        /// <param name="frameworkFilter"> See remarks.</param>
+        /// <param name="frameworkFilter">See remarks.</param>
         /// <returns>True on success, false otherwise.</returns>
         public bool UpdatePackageDependencies( IActivityMonitor monitor,
                                                IReadOnlyCollection<UpdatePackageInfo> packageInfos,
@@ -588,6 +594,57 @@ namespace CK.Env.Plugin
                 return false;
             }
             return ChangeSingleTargetFramework( monitor, o, n );
+        }
+
+        // This should not be here: only CKli (the console) is concerned here.
+        [CommandMethod]
+        public bool DumpLogsBetweenDates( IActivityMonitor m, string beginning = "01-01-2021", string ending = "31-12-2021" )
+        {
+            using var auto = m.TemporarilySetInteractiveUserFilter( new LogClamper( LogFilter.Off, true ) );
+            var solution = GetSolution( m, allowInvalidSolution: true );
+            if( solution == null ) return false;
+            if( !ParseDates( m, beginning, ending, out var beginningDate, out var endingDate ) ) return false;
+            StringBuilder b = new StringBuilder();
+            foreach( var message in GitFolder.GetCommitMessagesBetween( m, beginningDate, endingDate ) )
+            {
+                message.ToString( b );
+            }
+            Console.WriteLine( b.ToString() );
+            return true;
+        }
+
+        private static bool ParseDates( IActivityMonitor m, string beginning, string ending, out DateTimeOffset beginningDate, out DateTimeOffset endingDate )
+        {
+            endingDate = default;
+            if( !DateTimeOffset.TryParse( beginning, out beginningDate ) )
+            {
+                m.Error( $"'{beginning}' is not a valid date" );
+                return false;
+            }
+            if( !DateTimeOffset.TryParse( ending, out endingDate ) )
+            {
+                m.Error( $"'{ending}' is not a valid date" );
+                return false;
+            }
+            m.Info( $"Parsed date range: {beginningDate} => {endingDate}" );
+            return true;
+        }
+
+        // This should not be here: only CKli (the console) is concerned here.
+        [CommandMethod]
+        public bool DiffBetweenDates( IActivityMonitor m, string beginning = "01-01-2021", string ending = "31-12-2021", bool showDiffs = false )
+        {
+            using var auto = m.TemporarilySetInteractiveUserFilter( new LogClamper( LogFilter.Off, true ) );
+            var solution = GetSolution( m, allowInvalidSolution: true );
+            if( solution == null ) return false;
+            if( !ParseDates( m, beginning, ending, out var beginningDate, out var endingDate ) ) return false;
+            m.Info( $"Parsed date range: {beginningDate} => {endingDate}" );
+            var diff = GitFolder.GetDiff( m, beginningDate, endingDate, solution.Projects.Select( proj => new DiffRoot( proj.Name, proj.ProjectSources ) ), true );
+            if( diff != null )
+            {
+                Console.WriteLine( diff.ToString( true, showDiffs ) );
+            }
+            return true;
         }
 
         /// <summary>

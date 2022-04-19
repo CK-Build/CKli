@@ -504,7 +504,12 @@ namespace CKli
                 Console.Write( $"{f.RequirementAndName}: " );
                 if( f.Type == typeof( String ) )
                 {
-                    f.SetValue( f.IsPassword ? ReadLine.ReadPassword() : ReadNullableString() );
+                    if( f.IsPassword ) f.SetValue( ReadLine.ReadPassword() );
+                    else
+                    {
+                        var s = ReadNullableString();
+                        if( !f.HasDefaultValue || s != null ) f.SetValue( s );
+                    }
                 }
                 else if( f.Type == typeof( bool ) || f.Type == typeof( bool? ) )
                 {

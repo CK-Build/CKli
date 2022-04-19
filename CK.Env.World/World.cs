@@ -200,7 +200,7 @@ namespace CK.Env
                                 b.AppendLine( ";" );
                             }
 
-                            foreach( var slnBuildDep in sln.Solution.Requirements.Except( sln.Solution.PublishedRequirements ) )
+                            foreach( var slnBuildDep in sln.Solution.DirectRequirements.Except( sln.Solution.PublishedRequirements ) )
                             {
                                 AppendDependency( b, sln.Solution.Solution.Name, slnBuildDep.Solution.Name );
                                 b.AppendLine( @" [style=""dotted""];" );
