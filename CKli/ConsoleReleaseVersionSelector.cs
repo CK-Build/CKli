@@ -44,7 +44,7 @@ namespace CKli
                         return;
                     }
                     Console.Write( "Diff: " );
-                    Console.Write( diffResult.ToString() );
+                    Console.Write( diffResult.ToString( true, true ) );
                 }
             }
 

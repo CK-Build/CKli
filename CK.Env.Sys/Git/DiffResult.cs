@@ -1,3 +1,4 @@
+using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,10 +16,11 @@ namespace CK.Env
         /// </summary>
         /// <param name="diffs">The list of defined rooted results.</param>
         /// <param name="others">Other changes.</param>
-        public DiffResult( IReadOnlyList<DiffRootResult> diffs, DiffRootResult others )
+        public DiffResult( IReadOnlyList<DiffRootResult> diffs, DiffRootResult others, IReadOnlyList<CommitMessage>? messages )
         {
             Diffs = diffs;
             Others = others;
+            Messages = messages;
             ChangeCount = diffs.Sum( d => d.ChangeCount ) + others.ChangeCount;
         }
 
@@ -40,24 +42,55 @@ namespace CK.Env
         public DiffRootResult Others { get; }
 
         /// <summary>
+        /// Gets the list of commit messages if it has been computed.
+        /// </summary>
+        public IReadOnlyList<CommitMessage>? Messages { get; }
+
+        /// <summary>
         /// Overridden to return the details of the changes or "(no change)".
         /// Always ends with a new line.
         /// </summary>
+        /// <param name="withMessages">True to return the messages.</param>
+        /// <param name="withDetails">True to returns the <see cref="Diffs"/> results.</param>
         /// <returns>A readable string with a trailing new line.</returns>
-        public override string ToString()
+        public string ToString( bool withMessages, bool withDetails )
         {
             if( ChangeCount == 0 )
             {
                 return "(no change)" + Environment.NewLine;
             }
             var sb = new StringBuilder();
-            sb.AppendLine( $"{ChangeCount} changes:" );
-            foreach( var r in Diffs )
+            if( withMessages && Messages != null )
             {
-                r.ToString( sb );
+                sb.AppendLine( $"{Messages.Count} Messages:" );
+                foreach( var message in Messages )
+                {
+                    sb.Append( $"  > {message.CommitDate} " )
+                      .AppendMultiLine( "                             | ", message.Message, false )
+                      .AppendLine();
+                }
             }
-            Others.ToString( sb );
+            if( withDetails )
+            {
+                sb.AppendLine( $"{ChangeCount} changes:" );
+                foreach( var r in Diffs )
+                {
+                    r.ToString( sb );
+                }
+                Others.ToString( sb );
+            }
+            else
+            {
+                sb.AppendLine( $"({ChangeCount} file changes.)" );
+            }
             return sb.ToString();
         }
+
+        /// <summary>
+        /// Overridden to return the details of the changes or "(no change)" without <see cref="Messages"/>.
+        /// Always ends with a new line.
+        /// </summary>
+        /// <returns>A readable string with a trailing new line.</returns>
+        public override string ToString() => ToString( false, true );
     }
 }

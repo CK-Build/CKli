@@ -29,9 +29,10 @@ namespace CK.Env.Diff
             if( !accepted ) diff.SendToBuilder( m, _others );
         }
 
-        public DiffResult BuildDiffResult( IActivityMonitor monitor, Commit from, Commit to )
+        public DiffResult BuildDiffResult( IActivityMonitor monitor, Commit from, Commit to, bool withCommitMessages )
         {
             var fullDiff = _git.Diff.Compare<TreeChanges>( from.Tree, to.Tree );
+            IReadOnlyList<CommitMessage>? messages = null;
             using( monitor.OpenDebug( $"Diffing between '{from.Id.ToString( 7 )} {from.MessageShort}' and '{to.Id.ToString( 7 )} {to.MessageShort}'." ) )
             {
                 using( monitor.OpenDebug( "Caching changes" ) )
@@ -58,8 +59,13 @@ namespace CK.Env.Diff
                         }
                     }
                 }
+                if( withCommitMessages )
+                {
+                    var logs = _git.Commits.QueryBy( new CommitFilter() { IncludeReachableFrom = to, ExcludeReachableFrom = from.Parents, SortBy = CommitSortStrategies.Time|CommitSortStrategies.Reverse } );
+                    messages = logs.Where( c => c.Committer.Name != "CKli" ).Select( c => new CommitMessage(c.Sha, c.Committer.When, c.Committer.Name, c.Message ) ).ToArray();
+                }
             }
-            return new DiffResult( _diffRootResultBuilders.Select( p => p.Result ).ToList(), _others.Result );
+            return new DiffResult( _diffRootResultBuilders.Select( p => p.Result ).ToList(), _others.Result, messages );
         }
     }
 }

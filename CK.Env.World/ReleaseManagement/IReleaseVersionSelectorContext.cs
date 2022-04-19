@@ -51,11 +51,11 @@ namespace CK.Env
         ITagCommit? PreviousVersion { get; }
 
         /// <summary>
-        /// Gets the set of <see cref="DirectoryDiff"/> for the project folders between the current head
+        /// Gets the <see cref="DiffResult"/> for the project folders between the current head
         /// and <see cref="PreviousVersion"/> that must be not null.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <returns>The set of diff or null on error.</returns>
+        /// <returns>The result or null on error.</returns>
         DiffResult? GetProjectsDiff( IActivityMonitor m );
 
         /// <summary>

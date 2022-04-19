@@ -16,24 +16,106 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <param name="previousVersionCommitSha">Previous commit.</param>
         /// <param name="roots">Roots of interest. Typically projects of the solution.</param>
+        /// <param name="withCommitMessages">True to get <see cref="DiffResult.Messages"/>.</param>
         /// <returns>The set of differences or null on error.</returns>
-        public DiffResult? GetDiff( IActivityMonitor m, string previousVersionCommitSha, IEnumerable<DiffRoot> roots )
+        public DiffResult? GetDiff( IActivityMonitor m, string previousVersionCommitSha, IEnumerable<DiffRoot> roots, bool withCommitMessages )
         {
-            Commit? commit = Git.Lookup<Commit>( previousVersionCommitSha );
-            if( commit == null )
+            return GetDiff( m, previousVersionCommitSha, Head.GetSha(), roots, withCommitMessages );
+        }
+
+        /// <summary>
+        /// Gets the <see cref="DiffResult"/> between two dates in the parent commits of the current head.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="from">Starting date.</param>
+        /// <param name="to">Ending date.</param>
+        /// <param name="roots">Roots of interest. Typically projects of the solution.</param>
+        /// <param name="withCommitMessages">True to get <see cref="DiffResult.Messages"/>.</param>
+        /// <returns>The set of differences or null on error.</returns>
+        public DiffResult? GetDiff( IActivityMonitor m, DateTimeOffset from, DateTimeOffset to, IEnumerable<DiffRoot> roots, bool withCommitMessages )
+        {
+            Throw.CheckArgument( from < to );
+            Commit? fromC = null;
+            Commit? toC = null;
+            foreach( var c in Git.Head.Commits.SkipWhile( p => p.Committer.When > to ) )
             {
-                m.Error( $"Unable to find previousVersionCommitSha:{previousVersionCommitSha}." );
-                return null;
+                if( c.Committer.When < from ) break;
+                if( toC == null ) toC = c;
+                fromC = c;
+            }
+            return fromC == null || fromC == toC
+                    ? CreateEmptyDiffResult( roots )
+                    : GetDiff( m, roots, fromC, toC!, withCommitMessages );
+        }
+
+        /// <summary>
+        /// Gets all the commit messages between two dates.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="from">Starting date.</param>
+        /// <param name="to">Ending date.</param>
+        /// <returns>The messages.</returns>
+        public IReadOnlyList<CommitMessage> GetCommitMessagesBetween( IActivityMonitor m, DateTimeOffset from, DateTimeOffset to )
+        {
+            Throw.CheckArgument( from < to );
+            var all = Git.Commits.Where( p => p.Committer.Name != "CKli" && p.Committer.When >= from && p.Committer.When <= to )
+                                 .OrderBy( p => p.Committer.When )
+                                 .Select( p => new CommitMessage( p.Id.Sha, p.Committer.When, p.Committer.Name, p.Message ) );
+            return all.ToArray();
+        }
+
+        /// <summary>
+        /// Gets the <see cref="DiffResult"/> for a set of roots between two commits.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="fromCommitSha">Starting commit.</param>
+        /// <param name="toCommitSha">Target commit.</param>
+        /// <param name="roots">Roots of interest. Typically projects of the solution.</param>
+        /// <param name="withCommitMessages">True to get <see cref="DiffResult.Messages"/>.</param>
+        /// <returns>The set of differences or null on error.</returns>
+        public DiffResult? GetDiff( IActivityMonitor m, string fromCommitSha, string toCommitSha, IEnumerable<DiffRoot> roots, bool withCommitMessages )
+        {
+            Commit? from = Find( m, fromCommitSha, nameof( fromCommitSha ) );
+            Commit? to = Find( m, toCommitSha, nameof( toCommitSha ) );
+            if( from == null || to == null ) return null;
+            return GetDiff( m, roots, from, to, withCommitMessages );
+        }
+
+        /// <summary>
+        /// Gets the <see cref="DiffResult"/> for a set of roots between two commits.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="from">Starting commit.</param>
+        /// <param name="to">Target commit.</param>
+        /// <param name="roots">Roots of interest. Typically projects of the solution.</param>
+        /// <param name="withCommitMessages">True to get <see cref="DiffResult.Messages"/>.</param>
+        /// <returns>The set of differences or null on error.</returns>
+        public DiffResult GetDiff( IActivityMonitor monitor, IEnumerable<DiffRoot> roots, Commit from, Commit to, bool withCommitMessages )
+        {
+            Throw.CheckNotNullArgument( from );
+            Throw.CheckNotNullArgument( to );
+
+            if( from.Id == to.Id )
+            {
+                return CreateEmptyDiffResult( roots );
             }
             var alienRoot = new DiffRoot( "Others", Array.Empty<NormalizedPath>() );
-            if( commit.Id == Git.Head.Tip.Id )
-            {
-                return new DiffResult( roots.Select( r => new DiffRootResult( r ) ).ToArray(), new DiffRootResult( alienRoot ) );
-            }
             var alien = new DiffRootResultBuilderOther( alienRoot );
             DiffResultBuilder builder = new DiffResultBuilder( Git,
                                                                roots.Select( r => new DiffRootResultBuilder( r ) ).ToList(), alien );
-            return builder.BuildDiffResult( m, commit, Git.Head.Tip );
+            return builder.BuildDiffResult( monitor, from, to, withCommitMessages );
+        }
+
+        Commit? Find( IActivityMonitor monitor, string sha, string parameterName )
+        {
+            Commit? commit = Git.Lookup<Commit>( sha );
+            if( commit == null ) monitor.Error( $"Unable to find {parameterName}: {sha}." );
+            return commit;
+        }
+
+        static DiffResult CreateEmptyDiffResult( IEnumerable<DiffRoot> roots )
+        {
+            return new DiffResult( roots.Select( r => new DiffRootResult( r ) ).ToArray(), new DiffRootResult( new DiffRoot( "Others", Array.Empty<NormalizedPath>() ) ), null );
         }
     }
 }
