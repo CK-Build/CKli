@@ -120,8 +120,8 @@ namespace CK.Env
                     {
                         return new RootedWorldName( candidate.Name, candidate.ParallelName, p );
                     }
-                    p = p.RemoveLastPart();
                 }
+                p = p.RemoveLastPart();
             }
             while( !p.IsEmptyPath );
             return null;

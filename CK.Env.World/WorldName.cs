@@ -1,3 +1,4 @@
+using CK.Core;
 using System;
 using System.Diagnostics.CodeAnalysis;
 
@@ -52,8 +53,8 @@ namespace CK.Env
         /// <param name="parallelName">The parallel world. Can be null or empty.</param>
         public WorldName( string stackName, string? parallelName )
         {
-            if( String.IsNullOrWhiteSpace( stackName ) ) throw new ArgumentNullException( nameof( stackName ) );
-            if( stackName.IndexOf( '.' ) >= 0 ) throw new ArgumentException( nameof( stackName ) + " can't contain a '.' character" );
+            Throw.CheckNotNullOrWhiteSpaceArgument( stackName );
+            Throw.CheckArgument( !stackName.Contains( '.' ) );
             Name = stackName;
             if( !String.IsNullOrWhiteSpace( parallelName ) )
             {
@@ -80,7 +81,7 @@ namespace CK.Env
         public static bool TryParse( string fullName, [NotNullWhen( returnValue: true )]out WorldName? name )
         {
             name = null;
-            if( !String.IsNullOrWhiteSpace( fullName ) )
+            if( !String.IsNullOrWhiteSpace( fullName ) && !fullName.Contains( '.' ) )
             {
                 int idx = fullName.IndexOf( '[' );
                 if( idx < 0 )
