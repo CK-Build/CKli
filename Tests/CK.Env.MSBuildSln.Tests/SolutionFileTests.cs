@@ -25,7 +25,7 @@ namespace CK.Env.MSBuildSln.Tests
                 var s = SolutionFile.Read( fs, TestHelper.Monitor, "CK-Env.sln", true );
 
                 var folders = s.Children.OfType<SolutionFolder>();
-                folders.Select( p => p.ProjectName ).Should().BeEquivalentTo( "Solution Items", "Tests", "Plugins" );
+                folders.Select( p => p.ProjectName ).Should().BeEquivalentTo( "Solution Items", "CKStack" );
                 folders.Single( p => p.ProjectName == "Solution Items" ).Items.Select( item => item.Path )
                     .Should().BeEquivalentTo(
                         ".editorconfig",
