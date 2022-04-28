@@ -10,7 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CK.Build.Artifact.Model\CK.Build.Artifact.Model.csproj" />
     
-    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="15.0.0-r07" />
+    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="15.0.0-r08" />
     <PackageReference Include="System.Threading.Channels" Version="6.0.0" />
 
   </ItemGroup>
