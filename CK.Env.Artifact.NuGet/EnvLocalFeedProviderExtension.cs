@@ -15,31 +15,31 @@ namespace CK.Env
         /// Removes a specific version of a package from the local
         /// NuGet cache.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
         /// <param name="packageId">The package identifier.</param>
         /// <param name="version">The package's version.</param>
-        public static void RemoveFromNuGetCache( this IEnvLocalFeedProvider @this, IActivityMonitor m, string packageId, SVersion version )
+        public static void RemoveFromNuGetCache( this IEnvLocalFeedProvider @this, IActivityMonitor monitor, string packageId, SVersion version )
         {
-            DoRemoveFromNuGetCache( m, packageId, version );
+            DoRemoveFromNuGetCache( monitor, packageId, version );
         }
 
-        internal static void DoRemoveFromNuGetCache( IActivityMonitor m, string packageId, SVersion version )
+        internal static void DoRemoveFromNuGetCache( IActivityMonitor monitor, string packageId, SVersion version )
         {
             var dirPath = _localNuGetCache.AppendPart( packageId ).AppendPart( version.ToNormalizedString() );
-            if( FileHelper.RawDeleteLocalDirectory( m, dirPath ) )
+            if( FileHelper.RawDeleteLocalDirectory( monitor, dirPath ) )
             {
-                m.Info( $"Removed {packageId} package in version {version} from local NuGet cache." );
+                monitor.Info( $"Removed {packageId} package in version {version} from local NuGet cache." );
             }
         }
 
         /// <summary>
         /// Checks whether a package exists in the NuGet cache folder.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
         /// <param name="packageId">The package identifier.</param>
         /// <param name="version">The package's version.</param>
         /// <returns>True if found, false otherwise.</returns>
-        public static bool ExistsInNuGetCache( this IEnvLocalFeedProvider @this, IActivityMonitor m, string packageId, SVersion version )
+        public static bool ExistsInNuGetCache( this IEnvLocalFeedProvider @this, IActivityMonitor monitor, string packageId, SVersion version )
         {
             var dirPath = _localNuGetCache.AppendPart( packageId ).AppendPart( version.ToNormalizedString() );
             return System.IO.Directory.Exists( dirPath );
@@ -65,26 +65,26 @@ namespace CK.Env
             return GetAllVersionsFromFeed( path, packageId ).Max( v => v );
         }
 
-        static SVersion? GetBestVersionFromNuGetCache( IActivityMonitor m, string packageId )
+        static SVersion? GetBestVersionFromNuGetCache( IActivityMonitor monitor, string packageId )
         {
             // Max on reference type returns null on empty source.
             return System.IO.Directory.GetDirectories( _localNuGetCache.AppendPart( packageId ) )
-                .Select( p => SafeParse( m, p ) )
+                .Select( p => SafeParse( monitor, p ) )
                 .Where( v => v != null )
                 .Max( v => v );
         }
 
-        static SVersion? SafeParse( IActivityMonitor m, string path )
+        static SVersion? SafeParse( IActivityMonitor monitor, string path )
         {
             SVersion? v = null;
             int idx = path.LastIndexOf( System.IO.Path.DirectorySeparatorChar );
             if( idx < 0 )
             {
-                m.Error( $"Invalid path '{path}' for package." );
+                monitor.Error( $"Invalid path '{path}' for package." );
             }
             else if( !(v = SVersion.TryParse( path.Substring( idx ) )).IsValid )
             {
-                m.Error( $"Invalid SemVer in '{path}' for package." );
+                monitor.Error( $"Invalid SemVer in '{path}' for package." );
             }
             return v;
         }

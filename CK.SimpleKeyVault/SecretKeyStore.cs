@@ -308,11 +308,11 @@ namespace CK.SimpleKeyVault
         /// <returns>The secret or null if it's not available (and <paramref name="throwOnUnavailable"/> is false).</returns>
         public string? GetSecretKey( IActivityMonitor m, string name, [DoesNotReturnIf(true)]bool throwOnUnavailable )
         {
-            if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentException( nameof( name ) );
+            Throw.CheckNotNullOrWhiteSpaceArgument( name );
             using var l = AcquireLock();
             if( !_keyInfos.TryGetValue( name, out SecretKeyInfo? keyInfo ) )
             {
-                throw new InvalidOperationException( $"Secret '{name}' must be declared before any use of it." );
+                Throw.InvalidOperationException( $"Secret '{name}' must be declared before any use of it." );
             }
             if( !keyInfo.IsSecretAvailable && throwOnUnavailable )
             {

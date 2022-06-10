@@ -35,9 +35,9 @@ namespace CK.Env
         /// <summary>
         /// Removes all possible occurrences of a set of artifact instances.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
         /// <param name="instance">The artifacts to remove.</param>
-        void RemoveFromAllCaches( IActivityMonitor m, IEnumerable<ArtifactInstance> instances );
+        void RemoveFromAllCaches( IActivityMonitor monitor, IEnumerable<ArtifactInstance> instances );
 
         /// <summary>
         /// Registers a new local artifact handler.

@@ -2,6 +2,7 @@ using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CK.SimpleKeyVault
 {
@@ -33,20 +34,21 @@ namespace CK.SimpleKeyVault
                                 string? sourceProviderName )
             : this( store, name, descriptionBuilder, sourceProviderName )
         {
-            SubKey = subKey ?? throw new ArgumentNullException( nameof( subKey ) );
+            Throw.CheckNotNullArgument( subKey );
             if( subKey.SuperKey != null )
             {
-                throw new ArgumentException( $"SubKey '{subKey.Name}' is already bound to SuperKey '{subKey.SuperKey.Name}'." );
+                Throw.ArgumentException( $"SubKey '{subKey.Name}' is already bound to SuperKey '{subKey.SuperKey.Name}'." );
             }
             if( !keyInfos.TryGetValue( subKey.Name, out var exists ) || exists != subKey )
             {
-                throw new ArgumentException( $"SubKey '{subKey.Name}' is not found in store." );
+                Throw.ArgumentException( $"SubKey '{subKey.Name}' is not found in store." );
             }
+            SubKey = subKey;
             subKey.SuperKey = this;
         }
 
         /// <summary>
-        /// Deserializatiuon constructor.
+        /// Deserialization constructor.
         /// </summary>
         /// <param name="data">Data captured by <see cref="GetData"/>.</param>
         /// <param name="keyInfos">Current set of secrets being restored.</param>
@@ -54,6 +56,7 @@ namespace CK.SimpleKeyVault
                                 (string name, string description, string? secret, bool isRequired, string? subKey, string? sourceProviderName) data,
                                 IReadOnlyDictionary<string, SecretKeyInfo> keyInfos )
         {
+            _store = store;
             SourceProviderName = data.sourceProviderName;
             Name = data.name;
             _description = data.description;
@@ -77,9 +80,10 @@ namespace CK.SimpleKeyVault
 
         SecretKeyInfo( SecretKeyStore store, string name, Func<SecretKeyInfo?, string> descriptionBuilder, string? sourceProviderName )
         {
+            Throw.CheckNotNullOrEmptyArgument( name );
             _store = store;
             SourceProviderName = sourceProviderName;
-            Name = name ?? throw new ArgumentNullException( nameof( name ) );
+            Name = name;
             _description = String.Empty;
             SetDescription( descriptionBuilder );
         }
@@ -96,19 +100,16 @@ namespace CK.SimpleKeyVault
             SetDescription( descriptionBuilder );
             if( subKey != SubKey )
             {
-                throw new InvalidOperationException( $"Invalid SubKey specification '{subKey?.Name ?? "null"}': Key '{Name}' is bound to '{SubKey?.Name ?? "null"}'." );
+                Throw.InvalidOperationException( $"Invalid SubKey specification '{subKey?.Name ?? "null"}': Key '{Name}' is bound to '{SubKey?.Name ?? "null"}'." );
             }
             CheckSecretPropagation();
         }
 
         void SetDescription( Func<SecretKeyInfo?, string> descriptionBuilder )
         {
-            if( descriptionBuilder == null ) throw new ArgumentNullException( nameof( descriptionBuilder ) );
+            Throw.CheckNotNullArgument( descriptionBuilder );
             _description = descriptionBuilder( String.IsNullOrWhiteSpace( _description ) ? null : this );
-            if( String.IsNullOrWhiteSpace( _description ) )
-            {
-                throw new InvalidOperationException( $"Description must not be null or empty." );
-            }
+            Throw.CheckState( !String.IsNullOrWhiteSpace( _description ), "Description must not be null or empty." );
         }
 
         /// <summary>
@@ -135,10 +136,11 @@ namespace CK.SimpleKeyVault
         /// <summary>
         /// Gets whether this key has its associated secret available.
         /// </summary>
+        [MemberNotNullWhen(true,nameof(Secret))]
         public bool IsSecretAvailable => _secret != null;
 
         /// <summary>
-        /// Gets the secret or null if <see cref="IsSecretAvailable"/> is false).
+        /// Gets a non empty secret or null if <see cref="IsSecretAvailable"/> is false.
         /// (Note that this secret may be defined by the <see cref="SuperKey"/>.)
         /// </summary>
         public string? Secret => _secret;
@@ -159,13 +161,13 @@ namespace CK.SimpleKeyVault
         /// <returns>True if the secret has been updated, false if nothing has changed.</returns>
         internal bool ImportSecret( IActivityMonitor m, string secret )
         {
-            if( String.IsNullOrEmpty( secret ) ) throw new ArgumentNullException( nameof( secret ) );
-            if( !string.IsNullOrWhiteSpace( SourceProviderName ) ) throw new InvalidOperationException( $"This secret is provided by '{SourceProviderName}' you cannot import a transient secret." );
+            Throw.CheckNotNullOrEmptyArgument( secret );
+            if( !string.IsNullOrWhiteSpace( SourceProviderName ) ) Throw.InvalidOperationException( $"This secret is provided by '{SourceProviderName}' you cannot import a transient secret." );
             if( IsSecretAvailable )
             {
                 if( SuperKey != null && SuperKey.IsSecretAvailable )
                 {
-                    m.Info( $"Secret '{Name}' already set by it SuperKey ('{SuperKey.Name}')." );
+                    m.Warn( $"Secret '{Name}' already set by it SuperKey ('{SuperKey.Name}')." );
                 }
                 else if( SetSecret( secret ) )
                 {
@@ -186,7 +188,7 @@ namespace CK.SimpleKeyVault
         /// If the current secret is provided by the <see cref="SuperKey"/>, this
         /// raises an <see cref="InvalidOperationException"/>.
         /// </summary>
-        /// <param name="secret">The secret to set. Can be null to clear it.</param>
+        /// <param name="secret">The secret to set. Null or empty to clear it.</param>
         /// <returns>True if a secret has been updated, false if nothing has changed.</returns>
         public bool SetSecret( string? secret )
         {

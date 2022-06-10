@@ -1,4 +1,6 @@
+using CK.Core;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Xml.Linq;
 
 namespace CK.Env
@@ -8,7 +10,7 @@ namespace CK.Env
     /// <see cref="Password"/> can be the raw password or be the name of the actual password in
     /// an external vault.
     /// </summary>
-    public class SimpleCredentials
+    public sealed class SimpleCredentials
     {
         /// <summary>
         /// Initializes a new simple credential.
@@ -20,6 +22,7 @@ namespace CK.Env
         /// </param>
         public SimpleCredentials( string userName, string passwordOrSecretKeyName, bool isSecretKeyName )
         {
+            Throw.CheckNotNullArgument( userName );
             UserName = userName;
             PasswordOrSecretKeyName = passwordOrSecretKeyName;
             IsSecretKeyName = isSecretKeyName;
@@ -37,7 +40,7 @@ namespace CK.Env
             var k = r.HandleOptionalAttribute<string?>( "PasswordSecretKeyName", null );
             bool hasP = !String.IsNullOrEmpty( p );
             bool hasK = !String.IsNullOrEmpty( k );
-            if( hasP && hasK ) throw new ArgumentException( $"Credential element '{r.Element}' can not specify both Password and PasswordSecretKeyName attributes." );
+            if( hasP && hasK ) r.ThrowXmlException( $"Credential can not specify both Password and PasswordSecretKeyName attributes." );
             if( hasP || hasK )
             {
                 PasswordOrSecretKeyName = hasP ? p : k;
@@ -56,7 +59,7 @@ namespace CK.Env
                                                 : new XAttribute( IsSecretKeyName ? "PasswordSecretKeyName" : "Password", PasswordOrSecretKeyName ) );
 
         /// <summary>
-        /// User name.
+        /// Gets the user name.
         /// </summary>
         public string UserName { get; }
 
@@ -70,6 +73,7 @@ namespace CK.Env
         /// Whether <see cref="PasswordOrSecretKeyName"/> is actually the name of the password and
         /// not the password itself.
         /// </summary>
+        [MemberNotNullWhen( true, nameof( PasswordOrSecretKeyName ) )]
         public bool IsSecretKeyName { get; }
     }
 }

@@ -9,19 +9,18 @@ namespace CK.Env.NuGet
     /// </summary>
     class NuGetStandardRepository : NuGetRepositoryBase, INuGetStandardRepository
     {
-        internal NuGetStandardRepository(
-            NuGetClient c,
-            string url,
-            string name,
-            PackageQualityFilter qualityFilter,
-            string secretKeyName )
+        internal NuGetStandardRepository( NuGetClient c,
+                                          string url,
+                                          string name,
+                                          PackageQualityFilter qualityFilter,
+                                          string secretKeyName )
             : base( c, new PackageSource( url, name ), qualityFilter )
         {
             SecretKeyName = secretKeyName;
         }
 
-        public override string SecretKeyName { get; }
+        public override string? SecretKeyName { get; }
 
-        protected override string ResolvePushAPIKey( IActivityMonitor m ) => ResolveSecret( m );
+        protected override string? ResolvePushAPIKey( IActivityMonitor monitor ) => ResolveSecret( monitor );
     }
 }

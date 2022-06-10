@@ -21,19 +21,23 @@ namespace CK.Env.NuGet
     abstract class NuGetFeedBase
     {
         private protected readonly NuGetClient Client;
-        SourceRepository _sourceRepository;
-        INuGetFeed _feed;
+
+        // Instantiated at first need by SafeCall helper.
+        object _lock;
+        SourceRepository? _sourceRepository;
+
+        // Null when this is a INuGetRepository and no feed definition is associated to this repository.
+        INuGetFeed? _feed;
 
         /// <summary>
-        /// Implements a feed (a package source) on the basis of an already existing one (typically an artefact target).
+        /// Implements a feed (a package source) on the basis of an already existing one (typically a INuGetRepository).
         /// The credentials can be null or may differ from the base feed ones.
         /// </summary>
         class ReadFeed : INuGetFeed, IPackageFeed
         {
             readonly NuGetFeedBase _baseFeed;
-            bool? _checkedSecret;
 
-            public ReadFeed( NuGetFeedBase f, string name, SimpleCredentials creds )
+            public ReadFeed( NuGetFeedBase f, string name, SimpleCredentials? creds )
             {
                 Debug.Assert( f != null );
                 _baseFeed = f;
@@ -46,61 +50,61 @@ namespace CK.Env.NuGet
 
             public string Url => _baseFeed.Url;
 
-            public SimpleCredentials Credentials { get; }
+            public SimpleCredentials? Credentials { get; }
 
             public string TypedName { get; }
 
             public ArtifactType ArtifactType => NuGetClient.NuGetType;
 
-            public bool CheckSecret( IActivityMonitor m, bool throwOnMissing )
+            public void ConfigureCredentials( IActivityMonitor m )
             {
-                if( _checkedSecret.HasValue ) return _checkedSecret.Value;
+                string? secret = null;
                 // If we are bound to a repository that has a secret, its configuration, if available, is the one to use!
                 INuGetRepository? repo = _baseFeed as INuGetRepository;
                 bool isBoundToProtectedRepository = repo != null && !String.IsNullOrEmpty( repo.SecretKeyName );
                 if( isBoundToProtectedRepository )
                 {
+                    Debug.Assert( repo != null );
                     var fromRepo = !String.IsNullOrEmpty( repo.ResolveSecret( m, false ) );
                     if( fromRepo )
                     {
                         m.Trace( $"Feed '{Name}' uses secret from repository '{repo.Name}'." );
-                        _checkedSecret = true;
-                        return true;
+                        if( Credentials != null )
+                        {
+                            m.Warn( $"Feed '{Name}' won't use the provided Credentials since it uses the secret from repository '{repo.Name}'." );
+                        }
+                        return;
                     }
                 }
                 if( Credentials != null )
                 {
-                    string secret;
-                    if( Credentials.IsSecretKeyName == true )
+                    if( Credentials.IsSecretKeyName )
                     {
-                        secret = _baseFeed.Client.SecretKeyStore.GetSecretKey( m, Credentials.PasswordOrSecretKeyName, throwOnMissing );
-                        _checkedSecret = secret != null;
-                        if( _checkedSecret == true )
-                        {
-                            m.Trace( $"Feed '{Name}' uses its configured credential '{Credentials.PasswordOrSecretKeyName}'." );
-                        }
+                        secret = _baseFeed.Client.SecretKeyStore.GetSecretKey( m, Credentials.PasswordOrSecretKeyName, true );
+                        m.Trace( $"Feed '{Name}' uses its configured credential '{Credentials.PasswordOrSecretKeyName}'." );
                     }
                     else
                     {
                         secret = Credentials.PasswordOrSecretKeyName;
-                        _checkedSecret = true;
-                        m.Trace( $"Feed '{Name}' uses its configured password." );
+                        if( secret != null )
+                        {
+                            m.Trace( $"Feed '{Name}' uses its configured password." );
+                        }
+                        else
+                        {
+                            m.Warn( $"Feed '{Name}' provided Credentials with UserName '{Credentials.UserName}' has no password or secret key name." );
+                        }
                     }
-                    if( _checkedSecret == true )
-                    {
-                        NuGetClient.EnsureVSSFeedEndPointCredentials( m, Url, secret );
-                    }
-                    else
-                    {
-                        m.Error( $"Feed '{Name}': unable to resolve the credentials." );
-                    }
+                }
+                if( secret != null )
+                {
+                    NuGetClient.EnsureVSSFeedEndPointCredentials( m, Url, secret );
                 }
                 else
                 {
                     // There is no credential: let it be and hope it works.
                     m.Trace( $"Feed '{Name}' has no available secret. It must be a public feed." );
                 }
-                return _checkedSecret ?? false;
             }
 
             public async Task<ArtifactAvailableInstances?> GetVersionsAsync( IActivityMonitor m, string artifactName )
@@ -283,7 +287,7 @@ namespace CK.Env.NuGet
         /// Constructor for internal <see cref="NuGetClient.PureFeed"/>: a pure feed carries only
         /// a <see cref="Feed"/>, it is not a <see cref="NuGetRepositoryBase"/>.
         /// </summary>
-        internal NuGetFeedBase( IActivityMonitor m, NuGetClient c, string url, string name, SimpleCredentials creds )
+        internal NuGetFeedBase( IActivityMonitor monitor, NuGetClient c, string url, string name, SimpleCredentials? creds )
             : this( c, new PackageSource( url, name ) )
         {
             HandleFeed( c.SecretKeyStore, url, name, creds );
@@ -291,6 +295,7 @@ namespace CK.Env.NuGet
 
         private protected NuGetFeedBase( NuGetClient c, PackageSource packageSource )
         {
+            _lock = new object();
             Client = c;
             PackageSource = packageSource;
         }
@@ -298,9 +303,9 @@ namespace CK.Env.NuGet
         internal readonly PackageSource PackageSource;
 
         /// <summary>
-        /// Associated source feed. Null when this is a Repository and no feed definition is associated to this repository.
+        /// Associated source feed. Null when this is a INuGetRepository and no feed definition is associated to this repository.
         /// </summary>
-        internal INuGetFeed Feed
+        internal INuGetFeed? Feed
         {
             get
             {
@@ -313,7 +318,7 @@ namespace CK.Env.NuGet
 
         public string Name => PackageSource.Name;
 
-        internal INuGetFeed HandleFeed( SecretKeyStore keyStore, string url, string name, SimpleCredentials creds )
+        internal INuGetFeed HandleFeed( SecretKeyStore keyStore, string url, string name, SimpleCredentials? creds )
         {
             Debug.Assert( _feed == null && url.Equals( Url, StringComparison.OrdinalIgnoreCase ) );
             if( creds?.IsSecretKeyName == true )
@@ -325,13 +330,19 @@ namespace CK.Env.NuGet
         }
 
         protected async Task<T> SafeCallAsync<TResource,T>( IActivityMonitor monitor,
-                                                       Func<SourceRepository, TResource, NuGetLoggerAdapter, Task<T>> f ) where TResource : class, INuGetResource
+                                                            Func<SourceRepository, TResource, NuGetLoggerAdapter, Task<T>> f ) where TResource : class, INuGetResource
         {
             bool retry = false;
             var logger = new NuGetLoggerAdapter( monitor );
             if( _sourceRepository == null )
             {
-                _sourceRepository = new SourceRepository( PackageSource, NuGetClient.StaticProviders );
+                lock( _lock )
+                {
+                    if( _sourceRepository == null )
+                    {
+                        _sourceRepository = new SourceRepository( PackageSource, NuGetClient.StaticProviders );
+                    }
+                }
             }
         again:
             TResource? meta = null;

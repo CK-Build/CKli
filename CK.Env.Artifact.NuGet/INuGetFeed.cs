@@ -12,9 +12,9 @@ namespace CK.Env
         string Url { get; }
 
         /// <summary>
-        /// Gets optional credentials for the source. Can be null.
+        /// Gets optional credentials for the source.
         /// </summary>
-        SimpleCredentials Credentials { get; }
+        SimpleCredentials? Credentials { get; }
 
     }
 }

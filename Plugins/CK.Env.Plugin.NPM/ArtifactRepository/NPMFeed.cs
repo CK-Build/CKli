@@ -46,7 +46,7 @@ namespace CK.Env.NPM
 
         public ArtifactType ArtifactType => NPMClient.NPMType;
 
-        public bool CheckSecret( IActivityMonitor m, bool throwOnMissing = false ) => true;
+        public void ConfigureCredentials( IActivityMonitor m ) { }
 
         public async Task<IPackageInfo?> GetPackageInfoAsync( IActivityMonitor monitor, ArtifactInstance instance )
         {

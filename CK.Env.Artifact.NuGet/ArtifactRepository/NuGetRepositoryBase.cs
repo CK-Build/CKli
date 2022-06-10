@@ -19,7 +19,7 @@ namespace CK.Env.NuGet
     /// </summary>
     abstract class NuGetRepositoryBase : NuGetFeedBase, INuGetRepository
     {
-        string _secret;
+        string? _secret;
 
         internal NuGetRepositoryBase(
             NuGetClient c,
@@ -53,9 +53,9 @@ namespace CK.Env.NuGet
         /// Must resolve the push API key.
         /// The push API key is not necessarily the secret behind <see cref="SecretKeyName"/>.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
         /// <returns>The API key or null.</returns>
-        protected abstract string ResolvePushAPIKey( IActivityMonitor m );
+        protected abstract string? ResolvePushAPIKey( IActivityMonitor monitor );
 
         /// <summary>
         /// Gets the range of package quality that is accepted by this feed.
@@ -66,32 +66,32 @@ namespace CK.Env.NuGet
         /// Must provide the secret key name.
         /// A null or empty SecretKeyName means that the repository does not require any protection.
         /// </summary>
-        public abstract string SecretKeyName { get; }
+        public abstract string? SecretKeyName { get; }
 
         /// <summary>
         /// Ensures that the secret behind the <see cref="SecretKeyName"/> is available.
         /// This always returns null if <see cref="SecretKeyName"/> is null.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
         /// <param name="throwOnEmpty">
         /// True to throw if SecretKeyName is not null or empty and the secret can not be resolved.
         /// </param>
         /// <returns>The non empty secret or null.</returns>
-        public virtual string ResolveSecret( IActivityMonitor m, bool throwOnEmpty = false )
+        public virtual string? ResolveSecret( IActivityMonitor monitor, bool throwOnEmpty = false )
         {
             if( _secret == null )
             {
                 var s = SecretKeyName;
                 if( !String.IsNullOrWhiteSpace( s ) )
                 {
-                    _secret = Client.SecretKeyStore.GetSecretKey( m, s, throwOnEmpty );
-                    if( _secret != null ) OnSecretResolved( m, _secret );
+                    _secret = Client.SecretKeyStore.GetSecretKey( monitor, s, throwOnEmpty );
+                    if( _secret != null ) OnSecretResolved( monitor, _secret );
                 }
             }
             return String.IsNullOrWhiteSpace( _secret ) ? null : _secret;
         }
 
-        protected virtual void OnSecretResolved( IActivityMonitor m, string secret )
+        protected virtual void OnSecretResolved( IActivityMonitor monitor, string secret )
         {
         }
 
@@ -115,16 +115,16 @@ namespace CK.Env.NuGet
         /// <summary>
         /// Cheks whether a versioned package exists in this feed.
         /// </summary>
-        /// <param name="m">The activity monitor.</param>
+        /// <param name="monitor">The activity monitor.</param>
         /// <param name="packageId">The package identifier.</param>
         /// <param name="version">The version.</param>
         /// <returns>True if found, false otherwise.</returns>
-        public virtual async Task<bool> ExistsAsync( IActivityMonitor m, string packageId, SVersion version )
+        public virtual async Task<bool> ExistsAsync( IActivityMonitor monitor, string packageId, SVersion version )
         {
             if( packageId == null ) throw new ArgumentNullException( nameof( packageId ) );
             if( version == null ) throw new ArgumentNullException( nameof( version ) );
             var p = new PackageIdentity( packageId, NuGetVersion.Parse( version.ToString() ) );
-            return await SafeCallAsync<MetadataResource,bool>( m, ( sources, meta, logger ) => meta.Exists( p, Client.SourceCache, logger, CancellationToken.None ) );
+            return await SafeCallAsync<MetadataResource,bool>( monitor, ( sources, meta, logger ) => meta.Exists( p, Client.SourceCache, logger, CancellationToken.None ) );
         }
 
 
@@ -135,12 +135,12 @@ namespace CK.Env.NuGet
         /// <param name="files">The set of packages to push.</param>
         /// <param name="timeoutSeconds">Timeout in seconds.</param>
         /// <returns>The awaitable.</returns>
-        public async Task PushPackagesAsync( IActivityMonitor m, IEnumerable<LocalNuGetPackageFile> files, int timeoutSeconds = 2*60 )
+        public async Task PushPackagesAsync( IActivityMonitor monitor, IEnumerable<LocalNuGetPackageFile> files, int timeoutSeconds = 2*60 )
         {
-            string apiKey = ResolvePushAPIKey( m );
+            string? apiKey = ResolvePushAPIKey( monitor );
             try
             {
-                await SafeCallAsync<MetadataResource,int>( m, async ( sources, meta, logger ) =>
+                await SafeCallAsync<MetadataResource,int>( monitor, async ( sources, meta, logger ) =>
                 {
                     var exist = files.Select( file => (file, id: new PackageIdentity( file.PackageId, NuGetVersion.Parse( file.Version.ToNormalizedString() ) )) )
                                      .Select( fId => (fId.file, exists: meta.Exists( fId.id, Client.SourceCache, logger, CancellationToken.None )) )
@@ -151,7 +151,7 @@ namespace CK.Env.NuGet
                     if( toSkip.Length > 0 )
                     {
                         var existing = toSkip.Select( f => f.ToString() ).Concatenate();
-                        m.Info( $"Already existing packages, push skipped for: " + existing );
+                        monitor.Info( $"Already existing packages, push skipped for: " + existing );
                     }
                     var toPush = exist.Where( e => !e.exists.Result ).Select( e => e.file ).ToArray();
 
@@ -178,7 +178,7 @@ namespace CK.Env.NuGet
             }
             catch( Exception ex )
             {
-                m.Error( ex );
+                monitor.Error( ex );
             }
         }
 
@@ -199,24 +199,24 @@ namespace CK.Env.NuGet
             return Task.CompletedTask;
         }
 
-        public async Task<bool> PushAsync( IActivityMonitor m, IArtifactLocalSet artifacts )
+        public async Task<bool> PushAsync( IActivityMonitor monitor, IArtifactLocalSet artifacts )
         {
             bool success = true;
-            using( m.OnError( () => success = false ) )
+            using( monitor.OnError( () => success = false ) )
             {
                 if( !(artifacts is IEnumerable<LocalNuGetPackageFile> locals) )
                 {
-                    m.Error( $"Invalid artifact local set for NuGet feed." );
+                    monitor.Error( $"Invalid artifact local set for NuGet feed." );
                     return false;
                 }
                 var accepted = locals.Where( l => QualityFilter.Accepts( l.Version.PackageQuality ) ).ToList();
                 if( accepted.Count == 0 )
                 {
-                    m.Info( $"No packages accepted by {QualityFilter} filter for {UniqueRepositoryName}." );
+                    monitor.Info( $"No packages accepted by {QualityFilter} filter for {UniqueRepositoryName}." );
                 }
                 else
                 {
-                    await PushPackagesAsync( m, accepted );
+                    await PushPackagesAsync( monitor, accepted );
                 }
             }
             return success;

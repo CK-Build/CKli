@@ -41,7 +41,7 @@ namespace CK.Env
         /// <param name="point">The API point (after the /npm/ or /nuget/). Can contain multiple/segments/if/needed.</param>
         /// <param name="version">The API version.</param>
         /// <returns>The url.</returns>
-        public static string GetUrl( string publicProjectName, string organization, string feedName, bool isNPM, string point = "packagesBatch", string version = "api-version=5.0-preview.1" )
+        public static string GetUrl( string? publicProjectName, string organization, string feedName, bool isNPM, string point = "packagesBatch", string version = "api-version=5.0-preview.1" )
         {
             if( publicProjectName == null )
             {
@@ -54,25 +54,25 @@ namespace CK.Env
         /// <summary>
         /// Implements Package promotion in @CI, @Exploratory, @Preview, @Latest and @Stable views.
         /// </summary>
-        /// <param name="m">The monitor.</param>
+        /// <param name="monitor">The monitor.</param>
         /// <param name="httpClient">The http client.</param>
+        /// <param name="publicProjectName">Public project name or null.</param>
         /// <param name="organization">The organization name.</param>
         /// <param name="feedName">The name of the feed.</param>
         /// <param name="isNPM">True for NPM, false for NuGet.</param>
-        /// <param name="personalAccessToken">The ersonal access token.</param>
+        /// <param name="personalAccessToken">The personal access token.</param>
         /// <param name="packages">The set of packages to promote.</param>
         /// <returns></returns>
-        public static async Task PromotePackagesAync(
-            IActivityMonitor m,
-            HttpClient httpClient,
-            string projectName,
-            string organization,
-            string feedName,
-            string personalAccessToken,
-            IEnumerable<ArtifactInstance> packages,
-            bool isNPM )
+        public static async Task PromotePackagesAync( IActivityMonitor monitor,
+                                                      HttpClient httpClient,
+                                                      string? publicProjectName,
+                                                      string organization,
+                                                      string feedName,
+                                                      string personalAccessToken,
+                                                      IEnumerable<ArtifactInstance> packages,
+                                                      bool isNPM )
         {
-            string apiUrl = AzureDevOpsAPIHelper.GetUrl( projectName, organization, feedName, isNPM, "packagesBatch", "api-version=5.0-preview.1" );
+            string apiUrl = AzureDevOpsAPIHelper.GetUrl( publicProjectName, organization, feedName, isNPM, "packagesBatch", "api-version=5.0-preview.1" );
             var basicAuth = Convert.ToBase64String( Encoding.ASCII.GetBytes( ":" + personalAccessToken ) );
             var byLabels = packages
                                 .SelectMany( p => p.Version.PackageQuality.GetAllQualities().Select( label => (label, p) ) )
@@ -80,7 +80,7 @@ namespace CK.Env
             foreach( var set in byLabels )
             {
                 var viewName = set.Key.ToString();
-                using( m.OpenInfo( $"Promoting into view '@{viewName}'." ) )
+                using( monitor.OpenInfo( $"Promoting into view '@{viewName}'." ) )
                 {
                     //  Batches must not exceed 100 items.
                     var batches = set.Select( ( f, i ) => (i / 100, f) ).GroupBy( gF => gF.Item1, g => g.f );
@@ -96,7 +96,7 @@ namespace CK.Env
                             {
                                 if( !msg.IsSuccessStatusCode )
                                 {
-                                    m.Error( $"Failed." );
+                                    monitor.Error( $"Failed." );
                                     msg.EnsureSuccessStatusCode();
                                 }
                             }

@@ -39,10 +39,10 @@ namespace CK.Env
         /// The implementation must ensure that the secret only depends from the <see cref="SecretKeyName"/>:
         /// if two repositories share the same SecretKeyName, the resolved secret must be the same.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
         /// <param name="throwOnEmpty">True to throw an exception instead of returning a null or empty string.</param>
         /// <returns>The non empty secret or null.</returns>
-        string? ResolveSecret( IActivityMonitor m, bool throwOnEmpty = false );
+        string? ResolveSecret( IActivityMonitor monitor, bool throwOnEmpty = false );
 
         /// <summary>
         /// Checks whether this artifact repository handles the artifact type.
@@ -56,9 +56,9 @@ namespace CK.Env
         /// The concrete artifact set must be understandable by this repository otherwise an error must be logged
         /// and false must be returned.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
         /// <param name="artifacts">The artifacts to push.</param>
         /// <returns>True on success, false on error.</returns>
-        Task<bool> PushAsync( IActivityMonitor m, IArtifactLocalSet artifacts );
+        Task<bool> PushAsync( IActivityMonitor monitor, IArtifactLocalSet artifacts );
     }
 }

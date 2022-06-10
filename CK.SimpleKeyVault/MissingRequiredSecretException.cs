@@ -3,7 +3,7 @@ using System;
 namespace CK.SimpleKeyVault
 {
     /// <summary>
-    /// Specific exception that ease scecret error handling.
+    /// Specific exception that ease secret error handling.
     /// </summary>
     public class MissingRequiredSecretException : Exception
     {

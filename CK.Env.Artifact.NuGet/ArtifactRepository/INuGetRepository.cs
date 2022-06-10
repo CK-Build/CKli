@@ -1,7 +1,8 @@
 namespace CK.Env.NuGet
 {
     /// <summary>
-    /// NuGet repository.
+    /// A NuGet repository has a name. The <see cref="IArtifactRepository.UniqueRepositoryName"/>
+    /// is derived from it.
     /// </summary>
     public interface INuGetRepository : IArtifactRepository
     {

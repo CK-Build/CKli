@@ -79,7 +79,7 @@ namespace CK.Env.NuGet
 
         class Creds : ICredentialProvider
         {
-            public string Id { get; }
+            public string? Id { get; }
 
             public Task<CredentialResponse> GetAsync(
                 Uri uri,
@@ -109,11 +109,11 @@ namespace CK.Env.NuGet
                 _packageSources = new List<PackageSource>();
             }
 
-            string IPackageSourceProvider.ActivePackageSourceName => _packageSources.FirstOrDefault()?.Name;
+            string IPackageSourceProvider.ActivePackageSourceName => _packageSources.FirstOrDefault()?.Name!;
 
-            string IPackageSourceProvider.DefaultPushSource => null;
+            string IPackageSourceProvider.DefaultPushSource => null!;
 
-            public event EventHandler PackageSourcesChanged;
+            public event EventHandler? PackageSourcesChanged;
 
             internal void SetPackageSources( IEnumerable<NuGetFeedBase> feeds )
             {
@@ -210,9 +210,9 @@ namespace CK.Env.NuGet
             SourceCache.Dispose();
         }
 
-        public IArtifactRepository CreateRepository( in XElementReader r )
+        IArtifactRepository? IArtifactTypeHandler.CreateRepository( in XElementReader r )
         {
-            IArtifactRepository result = null;
+            IArtifactRepository? result = null;
             PackageQualityFilter.TryParse( r.HandleOptionalAttribute<string>( "QualityFilter", String.Empty ), out var qualityFilter );
             switch( r.HandleOptionalAttribute<string>( "Type", null ) )
             {
@@ -241,9 +241,9 @@ namespace CK.Env.NuGet
             {
                 if( !String.IsNullOrEmpty( result.SecretKeyName ) )
                 {
-                    string DescriptionBuilder( SecretKeyInfo key )
+                    string DescriptionBuilder( SecretKeyInfo? key )
                     {
-                        string desc = key?.Description;
+                        string? desc = key?.Description;
                         string ourDesc = $"Required to push NuGet packages to repository '{result.UniqueRepositoryName}'.";
                         return desc != null ? $"{desc}\n{ourDesc}" : ourDesc;
                     }
@@ -254,7 +254,7 @@ namespace CK.Env.NuGet
             return result;
         }
 
-        public IArtifactFeed CreateFeedFromXML( IActivityMonitor m, in XElementReader r, IReadOnlyList<IArtifactRepository> repositories, IReadOnlyList<IArtifactFeed> feeds )
+        public IArtifactFeed? CreateFeedFromXML( IActivityMonitor monitor, in XElementReader r, IReadOnlyList<IArtifactRepository> repositories, IReadOnlyList<IArtifactFeed> feeds )
         {
             if( r.HandleOptionalAttribute<string>( "Type", null ) != NuGetType.Name ) return null;
             var url = r.HandleRequiredAttribute<string>( "Url" );
@@ -271,7 +271,7 @@ namespace CK.Env.NuGet
                     return i.HandleFeed( SecretKeyStore, url, name, creds );
                 }
             }
-            var feed = new PureFeed( m, this, url, name, creds );
+            var feed = new PureFeed( monitor, this, url, name, creds );
             _sourcePackageProvider.SetPackageSources( internals.Append( feed ) );
             return feed.Feed;
         }
@@ -282,7 +282,7 @@ namespace CK.Env.NuGet
         /// </summary>
         class PureFeed : NuGetFeedBase
         {
-            public PureFeed( IActivityMonitor m, NuGetClient c, string url, string name, SimpleCredentials creds )
+            public PureFeed( IActivityMonitor m, NuGetClient c, string url, string name, SimpleCredentials? creds )
                 : base( m, c, url, name, creds )
             {
             }

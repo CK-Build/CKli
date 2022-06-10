@@ -83,7 +83,7 @@ namespace CK.Env.Plugin
                         b.Append( "yield return new SignatureVSTSFeed( this, \"" )
                             .Append( a.Organization ).Append( "\"," )
                             .Append( $"\"{a.FeedName}\"" ).Append( ", " )
-                            .Append( a.ProjectName != null ? $"\"{a.ProjectName}\"" : "null" )
+                            .Append( a.PublicProjectName != null ? $"\"{a.PublicProjectName}\"" : "null" )
                             .AppendLine( ");" );
                         break;
                     case INuGetStandardRepository n:

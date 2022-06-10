@@ -15,8 +15,8 @@ namespace CK.Env.NPM
     abstract class NPMRepositoryBase
     {
         protected readonly NPMClient Client;
-        string _secret;
-        Registry _registry;
+        string? _secret;
+        Registry? _registry;
 
         internal NPMRepositoryBase(
             NPMClient c,
@@ -91,7 +91,7 @@ namespace CK.Env.NPM
         /// True to throw if SecretKeyName is not null or empty and the secret can not be resolved.
         /// </param>
         /// <returns>The non empty secret or null.</returns>
-        public virtual string ResolveSecret( IActivityMonitor m, bool throwOnEmpty = false )
+        public virtual string? ResolveSecret( IActivityMonitor m, bool throwOnEmpty = false )
         {
             if( _secret == null )
             {
@@ -105,7 +105,7 @@ namespace CK.Env.NPM
         }
 
         /// <summary>
-        /// Cheks whether a versioned package exists in this feed.
+        /// Checks whether a versioned package exists in this feed.
         /// </summary>
         /// <param name="m">The activity monitor.</param>
         /// <param name="packageId">The package identifier.</param>

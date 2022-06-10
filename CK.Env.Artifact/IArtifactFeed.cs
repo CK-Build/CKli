@@ -14,20 +14,19 @@ namespace CK.Env
     public interface IArtifactFeed : IArtifactFeedIdentity
     {
         /// <summary>
-        /// Ensures that any secret required to retrieve packages is available.
+        /// Must configure any required credentials (or does nothing if no credentials are needed).
+        /// This must throw if credentials cannot be settled.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="throwOnMissing">True to throw an exception instead of returning false.</param>
-        /// <returns>True on success, false if any required secret or configuration is missing.</returns>
-        bool CheckSecret( IActivityMonitor m, bool throwOnMissing = false );
+        /// <param name="monitor">The monitor to use.</param>
+        void ConfigureCredentials( IActivityMonitor monitor );
 
         /// <summary>
         /// Gets the best set of versions of an artifact in this feed.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
         /// <param name="artifactName">The artifact name.</param>
         /// <returns>The set of instances or null on error.</returns>
-        Task<ArtifactAvailableInstances?> GetVersionsAsync( IActivityMonitor m, string artifactName );
+        Task<ArtifactAvailableInstances?> GetVersionsAsync( IActivityMonitor monitor, string artifactName );
 
     }
 }

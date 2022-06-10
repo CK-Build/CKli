@@ -1,7 +1,7 @@
 namespace CK.Env.NuGet
 {
     /// <summary>
-    /// NuGet standard repository.
+    /// A NuGet standard repository adds an Url to the repository name.
     /// </summary>
     public interface INuGetStandardRepository : INuGetRepository
     {
