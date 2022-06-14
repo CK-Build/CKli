@@ -3,6 +3,7 @@ using CK.Core;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -21,6 +22,7 @@ namespace CK.Build
         IPackageFeed[] _feeds;
         readonly Dictionary<ArtifactInstance, TaskCompletionSource<FullPackageInstanceInfo?>> _currentRequests;
         readonly object _addLock;
+        readonly Queue<IActivityMonitor> _requestMonitors;
 
         /// <summary>
         /// Initializes a new <see cref="LivePackageCache"/>.
@@ -33,6 +35,7 @@ namespace CK.Build
             _feeds = feeds?.ToArray() ?? Array.Empty<IPackageFeed>();
             _currentRequests = new Dictionary<ArtifactInstance, TaskCompletionSource<FullPackageInstanceInfo?>>();
             _addLock = new object();
+            _requestMonitors = new Queue<IActivityMonitor>();
         }
 
         /// <summary>
@@ -109,7 +112,7 @@ namespace CK.Build
                 // The info object will be appended to the allDeps list even if an exception is raised here.
                 if( !await ReadMissingDependencies( monitor, info, allDeps, feeds ) )
                 {
-                    throw new Exception( $"Unable to resolve a dependency for package '{info.Key}'. See logs for details." );
+                    Throw.Exception( $"Unable to resolve a dependency for package '{info.Key}'. See logs for details." );
                 }
                 // Even if the Add is thread safe (it uses an Interlocked set), I prefer here
                 // to serialize the call to Add to avoid intermediate allocations.
@@ -117,7 +120,7 @@ namespace CK.Build
                 {
                     if( _cache.Add( monitor, allDeps ) == null || (p = _cache.DB.Find( instance )) == null )
                     {
-                        throw new Exception( $"Error while updating the package cache for '{instance}', ." );
+                        Throw.Exception( $"Error while updating the package cache for '{instance}', ." );
                     }
                 }
                 return p;
@@ -187,6 +190,7 @@ namespace CK.Build
             // Here we lookup the list for a pending TaskCompletionSource.
             // If we don't find it, we add a new one and launch the work.
             // The cleanup of this list is done at the end of the root EnsureAsync call.
+            IActivityMonitor? requestMonitor;
             TaskCompletionSource<FullPackageInstanceInfo?>? tcs = null;
             lock( _currentRequests )
             {
@@ -196,9 +200,23 @@ namespace CK.Build
                 }
                 tcs = new TaskCompletionSource<FullPackageInstanceInfo?>();
                 _currentRequests.Add( instance, tcs );
+                requestMonitor = ObtainRequestMonitor( instance );
             }
-            _ = DoReadFullInfoAsync( monitor, instance, tcs, feeds );
+            _ = DoReadFullInfoAsync( requestMonitor, instance, tcs, feeds );
             return tcs.Task;
+        }
+
+        IActivityMonitor ObtainRequestMonitor( ArtifactInstance instance )
+        {
+            // Obtain the request monitor in the _currentRequests lock.
+            Debug.Assert( Monitor.IsEntered( _currentRequests ) );
+            var topic = $"Getting package info for '{instance.Artifact.Name}/{instance.Version}'.";
+            if( _requestMonitors.TryDequeue( out var monitor ) )
+            {
+                monitor.SetTopic( topic );
+            }
+            else monitor = new ActivityMonitor( topic );
+            return monitor;
         }
 
         // This never throws. The TCS is resolved.
@@ -274,6 +292,11 @@ namespace CK.Build
                     // description and that's the most important.
                     result.SetResult( p );
                 }
+            }
+            // Release the request monitor in the _currentRequests lock.
+            lock( _currentRequests )
+            {
+                _requestMonitors.Enqueue( monitor );
             }
         }
     }

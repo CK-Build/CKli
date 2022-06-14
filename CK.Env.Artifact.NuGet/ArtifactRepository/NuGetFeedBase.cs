@@ -222,6 +222,7 @@ namespace CK.Env.NuGet
                         return null;
                     }
                     var result = new PackageInstanceInfo();
+                    result.State = deps.Listed ? PackageState.None : PackageState.Unlisted;
                     result.Key = instance;
                     var savors = NuGetClient.Savors.EmptyTrait;
                     foreach( var d in deps.DependencyGroups )
