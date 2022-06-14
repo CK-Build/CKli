@@ -63,7 +63,7 @@ namespace CK.Build
                             deferred.Add( (dependencies,j,idx,vL,vQ,kind,applicableSavors) );
                         }
                     }
-                    _instances[i] = new PackageInstance( instance, savors, dependencies );
+                    _instances[i] = new PackageInstance( instance, savors, PackageState.None, dependencies );
                 }
                 foreach( var d in deferred )
                 {

@@ -137,9 +137,9 @@ namespace CK.Env.NuGet
                 return v;
             }
 
-            public Task<IPackageInfo?> GetPackageInfoAsync( IActivityMonitor m, ArtifactInstance instance )
+            public Task<IPackageInstanceInfo?> GetPackageInfoAsync( IActivityMonitor m, ArtifactInstance instance )
             {
-                return _baseFeed.SafeCallAsync<DependencyInfoResource, IPackageInfo?>( m, ( sources, meta, logger ) => GetPackageInfo( meta, logger, instance, default ) );
+                return _baseFeed.SafeCallAsync<DependencyInfoResource, IPackageInstanceInfo?>( m, ( sources, meta, logger ) => GetPackageInfo( meta, logger, instance, default ) );
             }
 
             class PackageInfoReader
@@ -195,7 +195,7 @@ namespace CK.Env.NuGet
                     _client = (HttpSource)_fClient.GetValue( meta )!;
                 }
 
-                public async Task<IPackageInfo?> GetPackageInfoAsync( NuGetLoggerAdapter logger, ArtifactInstance instance, CancellationToken token )
+                public async Task<IPackageInstanceInfo?> GetPackageInfoAsync( NuGetLoggerAdapter logger, ArtifactInstance instance, CancellationToken token )
                 { 
                     var packageId = instance.Artifact.Name;
                     var version = NuGetVersion.Parse( instance.Version.ParsedText );
@@ -221,7 +221,7 @@ namespace CK.Env.NuGet
                         } );
                         return null;
                     }
-                    var result = new PackageInfo();
+                    var result = new PackageInstanceInfo();
                     result.Key = instance;
                     var savors = NuGetClient.Savors.EmptyTrait;
                     foreach( var d in deps.DependencyGroups )
@@ -271,7 +271,7 @@ namespace CK.Env.NuGet
 
             PackageInfoReader? _packageReader;
 
-            Task<IPackageInfo?> GetPackageInfo( DependencyInfoResource meta, NuGetLoggerAdapter logger, ArtifactInstance instance, CancellationToken token )
+            Task<IPackageInstanceInfo?> GetPackageInfo( DependencyInfoResource meta, NuGetLoggerAdapter logger, ArtifactInstance instance, CancellationToken token )
             {
                 if( _packageReader == null || _packageReader.CurrentInfoResource != meta )
                 {

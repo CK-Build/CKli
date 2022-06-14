@@ -20,11 +20,11 @@ namespace CK.Env.Tests
         static readonly ArtifactType T1;
         static readonly ArtifactType T2;
 
-        static readonly FullPackageInfo[] PLevel0V1;
-        static readonly FullPackageInfo[] PLevel0V2;
-        static readonly FullPackageInfo[] PLevel0V3;
-        static readonly FullPackageInfo[] PLevel0V4;
-        static readonly FullPackageInfo[][] PLevel0;
+        static readonly FullPackageInstanceInfo[] PLevel0V1;
+        static readonly FullPackageInstanceInfo[] PLevel0V2;
+        static readonly FullPackageInstanceInfo[] PLevel0V3;
+        static readonly FullPackageInstanceInfo[] PLevel0V4;
+        static readonly FullPackageInstanceInfo[][] PLevel0;
 
         static PackageDBTests()
         {
@@ -36,11 +36,11 @@ namespace CK.Env.Tests
             PLevel0V2 = Create( SVersion.Parse( "2.0.0" ) );
             PLevel0V3 = Create( SVersion.Parse( "3.0.0" ) );
             PLevel0V4 = Create( SVersion.Parse( "4.0.0" ) );
-            PLevel0 = new FullPackageInfo[][] { PLevel0V1, PLevel0V2, PLevel0V3, PLevel0V4 };
+            PLevel0 = new FullPackageInstanceInfo[][] { PLevel0V1, PLevel0V2, PLevel0V3, PLevel0V4 };
 
-            static FullPackageInfo[] Create( SVersion v )
+            static FullPackageInstanceInfo[] Create( SVersion v )
             {
-                var result = new FullPackageInfo[60];
+                var result = new FullPackageInstanceInfo[60];
                 for( int i = 0; i < result.Length; ++i )
                 {
                     var type = i < (result.Length / 3)
@@ -48,7 +48,7 @@ namespace CK.Env.Tests
                                 : i < (2 * result.Length / 3)
                                     ? T1
                                     : T2;
-                    var p = new FullPackageInfo
+                    var p = new FullPackageInstanceInfo
                     {
                         Key = new ArtifactInstance( type, $"P{i}", v ),
                         FeedNames = { $"F{i / (result.Length / 10)}" }
@@ -62,9 +62,9 @@ namespace CK.Env.Tests
         [Test]
         public void basic_add_package()
         {
-            FullPackageInfo pInfo0 = PLevel0V1[0];
-            FullPackageInfo pInfo1 = PLevel0V1[1];
-            FullPackageInfo pInfo2 = PLevel0V1[2];
+            FullPackageInstanceInfo pInfo0 = PLevel0V1[0];
+            FullPackageInstanceInfo pInfo1 = PLevel0V1[1];
+            FullPackageInstanceInfo pInfo2 = PLevel0V1[2];
 
             var db = new PackageDB();
             db.Instances.Should().BeEmpty();
@@ -105,7 +105,7 @@ namespace CK.Env.Tests
 
         static PackageDB AddPackageLevel0( PackageDB db, int idxPackageVersion, bool atOnce, bool? revert )
         {
-            IEnumerable<FullPackageInfo> packages = PLevel0[idxPackageVersion];
+            IEnumerable<FullPackageInstanceInfo> packages = PLevel0[idxPackageVersion];
             if( !revert.HasValue )
             {
                 packages = packages.Select( p => (p, Guid.NewGuid()) ).OrderBy( t => t.Item2 ).Select( t => t.p );
@@ -196,7 +196,7 @@ namespace CK.Env.Tests
         public void feeds_can_only_contain_packages_from_their_own_type()
         {
             var db = new PackageDB();
-            var pA = new FullPackageInfo()
+            var pA = new FullPackageInstanceInfo()
             {
                 Key = new ArtifactInstance( T0, "A", CSVersion.Parse( "1.0.0" ) ),
                 FeedNames = { "T1:NuGet" }
@@ -209,7 +209,7 @@ namespace CK.Env.Tests
         {
             var db = new PackageDB();
 
-            var pA = new FullPackageInfo()
+            var pA = new FullPackageInstanceInfo()
             {
                 Key = new ArtifactInstance( T0, "A", CSVersion.Parse( "1.0.0" ) ),
                 FeedNames = { "NuGet" }

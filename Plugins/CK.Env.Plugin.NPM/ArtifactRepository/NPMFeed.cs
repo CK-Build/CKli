@@ -48,7 +48,7 @@ namespace CK.Env.NPM
 
         public void ConfigureCredentials( IActivityMonitor m ) { }
 
-        public async Task<IPackageInfo?> GetPackageInfoAsync( IActivityMonitor monitor, ArtifactInstance instance )
+        public async Task<IPackageInstanceInfo?> GetPackageInfoAsync( IActivityMonitor monitor, ArtifactInstance instance )
         {
             if( _registry == null ) _registry = _registryFactory();
             using( monitor.OpenTrace( $"Getting package information for '{instance}'." ) )
@@ -66,7 +66,7 @@ namespace CK.Env.NPM
                         monitor.Warn( $"Version {instance.Version} not found for {instance.Artifact.Name}." );
                         return null;
                     }
-                    var result = new PackageInfo();
+                    var result = new PackageInstanceInfo();
                     result.Key = instance;
                     if( !AddDependencies( monitor, result, jPackage, "dependencies", ArtifactDependencyKind.Private )
                         || !AddDependencies( monitor, result, jPackage, "peerDependencies", ArtifactDependencyKind.Transitive ) )
@@ -81,7 +81,7 @@ namespace CK.Env.NPM
                 }
             }
 
-            static bool AddDependencies( IActivityMonitor monitor, PackageInfo result, in JsonElement jPackage, string name, ArtifactDependencyKind kind )
+            static bool AddDependencies( IActivityMonitor monitor, PackageInstanceInfo result, in JsonElement jPackage, string name, ArtifactDependencyKind kind )
             {
                 if( jPackage.TryGetProperty( name, out var deps ) )
                 {

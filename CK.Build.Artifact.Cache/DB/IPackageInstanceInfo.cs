@@ -12,12 +12,14 @@ namespace CK.Build
     /// in an independent manner. This is used to import package information in the database.
     /// Once added, <see cref="PackageInstance"/> immutable objects are exposed.
     /// </summary>
-    public interface IPackageInfo
+    public interface IPackageInstanceInfo
     {
         /// <summary>
         /// Gets the key of this package (its type, name and version).
         /// </summary>
         ArtifactInstance Key { get; }
+
+        PackageState State { get; }
 
         /// <summary>
         /// Gets the savors.
@@ -34,24 +36,24 @@ namespace CK.Build
     }
 
     /// <summary>
-    /// Extends the <see cref="IPackageInfo"/>.
+    /// Extends the <see cref="IPackageInstanceInfo"/>.
     /// </summary>
     public static class PackageInfoExtension
     {
         /// <summary>
         /// Checks whether the other information is the same as this one.
         /// Either logs an error and returns false if <paramref name="m"/> is available or throws an <see cref="ArgumentException"/>.
-        /// Note that if the <see cref="IPackageInfo.Key"/> differ, an <see cref="ArgumentException"/> is always thrown since this is
+        /// Note that if the <see cref="IPackageInstanceInfo.Key"/> differ, an <see cref="ArgumentException"/> is always thrown since this is
         /// clearly a developer's bug.
         /// </summary>
         /// <param name="this">This package info.</param>
         /// <param name="m">Monitor to use instead of throwing an exception.</param>
         /// <returns>true if they are the same, false when they differ and a monitor is provided.</returns>
-        public static bool CheckSame( this IPackageInfo @this, IPackageInfo other, IActivityMonitor? m = null )
+        public static bool CheckSame( this IPackageInstanceInfo @this, IPackageInstanceInfo other, IActivityMonitor? m = null )
         {
             static bool Error( string message, IActivityMonitor? m )
             {
-                if( m == null ) throw new ArgumentException( message, nameof( FullPackageInfo ) );
+                if( m == null ) throw new ArgumentException( message, nameof( FullPackageInstanceInfo ) );
                 m.Error( message );
                 return false;
             }

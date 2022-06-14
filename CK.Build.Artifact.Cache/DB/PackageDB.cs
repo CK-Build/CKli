@@ -81,7 +81,7 @@ namespace CK.Build
         }
 
         /// <summary>
-        /// Registers one package. Any <see cref="IPackageInfo.Dependencies"/> must
+        /// Registers one package. Any <see cref="IPackageInstanceInfo.Dependencies"/> must
         /// be already registered.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -96,7 +96,7 @@ namespace CK.Build
         }
 
         /// <summary>
-        /// Registers multiple packages at once. Any <see cref="IPackageInfo.Dependencies"/> must
+        /// Registers multiple packages at once. Any <see cref="IPackageInstanceInfo.Dependencies"/> must
         /// be already registered (the <see cref="PackageInstance.Reference.BaseTargetKey"/> of the reference exists in the DB)
         /// or appear before the dependent package.
         /// </summary>
@@ -170,7 +170,7 @@ namespace CK.Build
                     var allSavors = candidate.info.Savors;
                     var deps = candidate.info.Dependencies.Zip( targets, ( d, t ) => new PackageInstance.Reference( t.Item2!, d.Lock, d.MinQuality, d.Kind, d.Savors == allSavors ? null : d.Savors ) )
                                    .ToArray();                   
-                    initialization[i].p = p = new PackageInstance( candidate.info.Key, candidate.info.Savors, deps );
+                    initialization[i].p = p = new PackageInstance( candidate.info.Key, candidate.info.Savors, PackageState.None, deps );
                     ++newCount;
                 }
 

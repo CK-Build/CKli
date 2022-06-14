@@ -19,7 +19,7 @@ namespace CK.Build
     {
         readonly PackageCache _cache;
         IPackageFeed[] _feeds;
-        readonly Dictionary<ArtifactInstance, TaskCompletionSource<FullPackageInfo?>> _currentRequests;
+        readonly Dictionary<ArtifactInstance, TaskCompletionSource<FullPackageInstanceInfo?>> _currentRequests;
         readonly object _addLock;
 
         /// <summary>
@@ -31,7 +31,7 @@ namespace CK.Build
         {
             _cache = cache;
             _feeds = feeds?.ToArray() ?? Array.Empty<IPackageFeed>();
-            _currentRequests = new Dictionary<ArtifactInstance, TaskCompletionSource<FullPackageInfo?>>();
+            _currentRequests = new Dictionary<ArtifactInstance, TaskCompletionSource<FullPackageInstanceInfo?>>();
             _addLock = new object();
         }
 
@@ -70,7 +70,7 @@ namespace CK.Build
             {
                 lock( _currentRequests )
                 {
-                    IEnumerable<KeyValuePair<ArtifactInstance, TaskCompletionSource<FullPackageInfo?>>> all = _currentRequests;
+                    IEnumerable<KeyValuePair<ArtifactInstance, TaskCompletionSource<FullPackageInstanceInfo?>>> all = _currentRequests;
                     if( forgetErrors ) all = all.Where( kv => kv.Value.Task.IsFaulted );
                     if( forgetUnresolved ) all = all.Where( kv => kv.Value.Task.IsCompletedSuccessfully && kv.Value.Task.Result == null );
                     foreach( var k in all.Select( kv => kv.Key ).ToList() )
@@ -100,10 +100,10 @@ namespace CK.Build
 
             // Captures the _feeds array.
             var feeds = _feeds;
-            FullPackageInfo? info = await ReadFullInfoAsync( monitor, instance, feeds );
+            FullPackageInstanceInfo? info = await ReadFullInfoAsync( monitor, instance, feeds );
             if( info == null ) return null;
 
-            var allDeps = new List<FullPackageInfo>();
+            var allDeps = new List<FullPackageInstanceInfo>();
             try
             {
                 // The info object will be appended to the allDeps list even if an exception is raised here.
@@ -136,10 +136,10 @@ namespace CK.Build
             }
         }
 
-        async Task<bool> DoAddAsync( IActivityMonitor monitor, ArtifactInstance instance, List<FullPackageInfo> allDeps, IPackageFeed[] feeds )
+        async Task<bool> DoAddAsync( IActivityMonitor monitor, ArtifactInstance instance, List<FullPackageInstanceInfo> allDeps, IPackageFeed[] feeds )
         {
             if( _cache.DB.Find( instance ) != null || allDeps.Any( p => p.Key == instance ) ) return true;
-            FullPackageInfo? info = await ReadFullInfoAsync( monitor, instance, feeds );
+            FullPackageInstanceInfo? info = await ReadFullInfoAsync( monitor, instance, feeds );
             if( info == null )
             {
                 monitor.Error( $"Unable to find package '{instance}' in feeds {feeds.Where( f => f.ArtifactType == instance.Artifact.Type ).Select( f => f.Name ).Concatenate()}." );
@@ -148,7 +148,7 @@ namespace CK.Build
             return await ReadMissingDependencies( monitor, info, allDeps, feeds );
         }
 
-        async Task<bool> ReadMissingDependencies( IActivityMonitor monitor, FullPackageInfo info, List<FullPackageInfo> allDeps, IPackageFeed[] feeds )
+        async Task<bool> ReadMissingDependencies( IActivityMonitor monitor, FullPackageInstanceInfo info, List<FullPackageInstanceInfo> allDeps, IPackageFeed[] feeds )
         {
             // From a starting FullPackageInfo (necessarily not null), recursively crawls the dependencies and always
             // append the starting FullPackageInfo to the allDeps list.
@@ -181,20 +181,20 @@ namespace CK.Build
             return success;
         }
 
-        Task<FullPackageInfo?> ReadFullInfoAsync( IActivityMonitor monitor, ArtifactInstance instance, IPackageFeed[] feeds )
+        Task<FullPackageInstanceInfo?> ReadFullInfoAsync( IActivityMonitor monitor, ArtifactInstance instance, IPackageFeed[] feeds )
         {
             // We use a simple dictionary to handle request duplicates.
             // Here we lookup the list for a pending TaskCompletionSource.
             // If we don't find it, we add a new one and launch the work.
             // The cleanup of this list is done at the end of the root EnsureAsync call.
-            TaskCompletionSource<FullPackageInfo?>? tcs = null;
+            TaskCompletionSource<FullPackageInstanceInfo?>? tcs = null;
             lock( _currentRequests )
             {
                 if( _currentRequests.TryGetValue( instance, out tcs ) )
                 {
                     return tcs.Task;
                 }
-                tcs = new TaskCompletionSource<FullPackageInfo?>();
+                tcs = new TaskCompletionSource<FullPackageInstanceInfo?>();
                 _currentRequests.Add( instance, tcs );
             }
             _ = DoReadFullInfoAsync( monitor, instance, tcs, feeds );
@@ -202,16 +202,16 @@ namespace CK.Build
         }
 
         // This never throws. The TCS is resolved.
-        async Task DoReadFullInfoAsync( IActivityMonitor monitor, ArtifactInstance instance, TaskCompletionSource<FullPackageInfo?> result, IPackageFeed[] feeds )
+        async Task DoReadFullInfoAsync( IActivityMonitor monitor, ArtifactInstance instance, TaskCompletionSource<FullPackageInstanceInfo?> result, IPackageFeed[] feeds )
         {
-            FullPackageInfo p = new FullPackageInfo();
+            FullPackageInstanceInfo p = new FullPackageInstanceInfo();
             List<Exception>? feedExceptions = null;
             Exception? invalidSameError = null;
             foreach( var f in feeds )
             {
                 if( f.ArtifactType == instance.Artifact.Type )
                 {
-                    IPackageInfo? info = null;
+                    IPackageInstanceInfo? info = null;
                     using( monitor.OpenInfo( $"Reading package info of '{instance.Artifact.Name}/{instance.Version}' from feed '{f.TypedName}'." ) )
                     {
                         try

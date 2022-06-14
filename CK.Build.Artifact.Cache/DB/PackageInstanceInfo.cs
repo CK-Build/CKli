@@ -6,9 +6,9 @@ using System.Collections.Generic;
 namespace CK.Build
 {
     /// <summary>
-    /// Simple mutable implementation of <see cref="IPackageInfo"/>.
+    /// Simple mutable implementation of <see cref="IPackageInstanceInfo"/>.
     /// </summary>
-    public class PackageInfo : IPackageInfo
+    public class PackageInstanceInfo : IPackageInstanceInfo
     {
         CKTrait? _savors;
 
@@ -29,13 +29,16 @@ namespace CK.Build
             }
         }
 
+
+        public PackageState State { get; set; }
+
         /// <summary>
         /// Gets the mutable list of dependencies.
         /// This will be transformed into <see cref="PackageInstance.Dependencies"/> that is a set of <see cref="PackageInstance.Reference"/>.
         /// </summary>
         public List<(ArtifactInstance Target, SVersionLock Lock, PackageQuality MinQuality, ArtifactDependencyKind Kind, CKTrait? Savors)> Dependencies { get; } = new List<(ArtifactInstance, SVersionLock, PackageQuality, ArtifactDependencyKind, CKTrait?)>();
 
-        IEnumerable<(ArtifactInstance Target, SVersionLock Lock, PackageQuality MinQuality, ArtifactDependencyKind Kind, CKTrait? Savors)> IPackageInfo.Dependencies => Dependencies;
+        IEnumerable<(ArtifactInstance Target, SVersionLock Lock, PackageQuality MinQuality, ArtifactDependencyKind Kind, CKTrait? Savors)> IPackageInstanceInfo.Dependencies => Dependencies;
 
     }
 }

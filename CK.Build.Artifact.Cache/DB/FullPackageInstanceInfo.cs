@@ -10,7 +10,7 @@ namespace CK.Build
     /// <summary>
     /// Basic mutable POCO used to describe a new package in a <see cref="PackageDB"/>.
     /// </summary>
-    public class FullPackageInfo : PackageInfo, IFullPackageInfo
+    public class FullPackageInstanceInfo : PackageInstanceInfo, IFullPackageInfo
     {
         /// <inheritdoc />
         public bool AllFeedNamesAreKnown { get; set; }

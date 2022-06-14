@@ -66,7 +66,7 @@ namespace CK.Build
         public event EventHandler<PackageDBChangedArgs>? DBChanged;
 
         /// <summary>
-        /// Registers one package. Any <see cref="FullPackageInfo.Dependencies"/> must
+        /// Registers one package. Any <see cref="FullPackageInstanceInfo.Dependencies"/> must
         /// be already registered.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -78,7 +78,7 @@ namespace CK.Build
         public PackageDB? Add( IActivityMonitor m, IFullPackageInfo info, bool skipExisting = true ) => Add( m, new[] { info }, skipExisting );
 
         /// <summary>
-        /// Registers multiple packages at once. Any <see cref="FullPackageInfo.Dependencies"/> must
+        /// Registers multiple packages at once. Any <see cref="FullPackageInstanceInfo.Dependencies"/> must
         /// be already registered or appear before the dependent package in the <paramref name="infos"/> enumerable.
         /// </summary>
         /// <param name="m">The monitor to use.</param>

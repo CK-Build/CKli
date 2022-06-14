@@ -10,7 +10,7 @@ namespace CK.Build
     /// <summary>
     /// Pure readonly interface used to describe a new package in a <see cref="PackageDB"/>.
     /// </summary>
-    public interface IFullPackageInfo : IPackageInfo
+    public interface IFullPackageInfo : IPackageInstanceInfo
     {
         /// <summary>
         /// Gets or sets whether the <see cref="FeedNames"/> are all the feeds that contain this package.
@@ -45,7 +45,7 @@ namespace CK.Build
         {
             static Artifact[]? Error( string message, IActivityMonitor? m )
             {
-                if( m == null ) throw new ArgumentException( message, nameof( FullPackageInfo ) );
+                if( m == null ) throw new ArgumentException( message, nameof( FullPackageInstanceInfo ) );
                 m.Error( message );
                 return null;
             }
