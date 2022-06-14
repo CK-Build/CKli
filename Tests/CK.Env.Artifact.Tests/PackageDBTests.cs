@@ -338,7 +338,7 @@ namespace CK.Env.Tests
 
 
         [Test]
-        public async Task test()
+        public async Task package_instance_dependency_should_be_ghost()
         {
             var pC= new PackageCache();
             var testFeed = new TestFeed( "Test" );
