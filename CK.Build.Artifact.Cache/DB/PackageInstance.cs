@@ -41,6 +41,9 @@ namespace CK.Build
         /// </summary>
         public CKTrait? Savors { get; }
 
+        /// <summary>
+        /// Gets the state of this instance.
+        /// </summary>
         public PackageState State { get; }
 
         /// <summary>

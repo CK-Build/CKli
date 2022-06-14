@@ -19,6 +19,9 @@ namespace CK.Build
         /// </summary>
         ArtifactInstance Key { get; }
 
+        /// <summary>
+        /// Gets the state of this instance.
+        /// </summary>
         PackageState State { get; }
 
         /// <summary>

@@ -29,7 +29,9 @@ namespace CK.Build
             }
         }
 
-
+        /// <summary>
+        /// Gets or sets the state of this instance.
+        /// </summary>
         public PackageState State { get; set; }
 
         /// <summary>

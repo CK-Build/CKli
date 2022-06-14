@@ -1,4 +1,4 @@
-﻿using CK.Core;
+using CK.Core;
 using CSemVer;
 
 namespace CK.Build
@@ -14,6 +14,8 @@ namespace CK.Build
             /// <summary>
             /// This target corresponds to the lower bound of this <see cref="VersionBound"/> for this <see cref="Target"/>.
             /// This is used to optimize storage and memory: this value type weights 2 object references and 3 bytes.
+            /// This reference can be a <see cref="PackageState.Ghost"/>: it has not been found in any feed, but since it is referenced
+            /// we create such a ghost package to capture the (bad) information.
             /// </summary>
             readonly PackageInstance _baseTarget;
             readonly CKTrait? _applicableSavors;
