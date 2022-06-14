@@ -170,7 +170,7 @@ namespace CK.Build
                     var allSavors = candidate.info.Savors;
                     var deps = candidate.info.Dependencies.Zip( targets, ( d, t ) => new PackageInstance.Reference( t.Item2!, d.Lock, d.MinQuality, d.Kind, d.Savors == allSavors ? null : d.Savors ) )
                                    .ToArray();                   
-                    initialization[i].p = p = new PackageInstance( candidate.info.Key, candidate.info.Savors, PackageState.None, deps );
+                    initialization[i].p = p = new PackageInstance( candidate.info.Key, candidate.info.Savors, candidate.info.State, deps );
                     ++newCount;
                 }
 

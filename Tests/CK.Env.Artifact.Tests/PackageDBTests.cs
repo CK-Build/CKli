@@ -11,6 +11,8 @@ using System.Text;
 using static CK.Testing.MonitorTestHelper;
 using System.Diagnostics;
 using NuGet.Frameworks;
+using System.Threading.Tasks;
+using CK.Env.Artifact.Tests;
 
 namespace CK.Env.Tests
 {
@@ -230,7 +232,7 @@ namespace CK.Env.Tests
         [Test]
         public void instance_management_algorithm()
         {
-            var origin = new [] { "a0", "a1", "a2", "a3", "a4", "a5" };
+            var origin = new[] { "a0", "a1", "a2", "a3", "a4", "a5" };
 
             {
                 var p = Combine( origin, new[] { (1, (string?)"a00") }, 0 );
@@ -305,7 +307,7 @@ namespace CK.Env.Tests
                                 : i1.p.CompareTo( i2.p )));
             }
             Array.Sort( indices, CompareIndex );
-            var instances = new T[prev.Length + indices.Length - 2*nbToRemove];
+            var instances = new T[prev.Length + indices.Length - 2 * nbToRemove];
             int prevIdx = 0;
             int originOffset = 0, targetOffset = 0;
             foreach( var (idx, p) in indices )
@@ -334,6 +336,28 @@ namespace CK.Env.Tests
             return instances;
         }
 
+
+        [Test]
+        public async Task test()
+        {
+            var pC= new PackageCache();
+            var testFeed = new TestFeed( "Test" );
+
+            var artifactInstance = new ArtifactInstance( TestFeed.TestType, "A", CSVersion.Parse( "1.0.0" ) );
+            var fPII = new FullPackageInstanceInfo()
+            {
+                Key = artifactInstance,
+            };
+
+            fPII.Dependencies.Add( (new ArtifactInstance( TestFeed.TestType, "Tata", SVersion.ZeroVersion ), SVersionLock.None, PackageQuality.CI, ArtifactDependencyKind.Transitive, null) );
+            testFeed.Content.Add( fPII );
+
+            var lPC = new LivePackageCache( pC, new List<IPackageFeed>() { testFeed } );
+            var pI = await lPC.EnsureAsync( new ActivityMonitor(), fPII.Key );
+
+            pI.Should().NotBeNull();
+            pI!.Dependencies[0].State.Should().Be( PackageState.Ghost );
+        }
 
     }
 }

@@ -68,6 +68,11 @@ namespace CK.Build
             /// </summary>
             public CKTrait? ApplicableSavors => _applicableSavors;
 
+            /// <summary>
+            /// Gets the state of this instance.
+            /// </summary>
+            public PackageState State => _baseTarget.State;
+
             internal Reference( PackageInstance baseTarget, SVersionLock vL, PackageQuality vQ, ArtifactDependencyKind kind, CKTrait? applicableSavors )
             {
                 _baseTarget = baseTarget;

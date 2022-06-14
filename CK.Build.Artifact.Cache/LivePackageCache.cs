@@ -145,8 +145,12 @@ namespace CK.Build
             FullPackageInstanceInfo? info = await ReadFullInfoAsync( monitor, instance, feeds );
             if( info == null )
             {
-                monitor.Error( $"Unable to find package '{instance}' in feeds {feeds.Where( f => f.ArtifactType == instance.Artifact.Type ).Select( f => f.Name ).Concatenate()}." );
-                return false;
+                info = new FullPackageInstanceInfo();
+                info.State = PackageState.Ghost;
+                info.Key = instance;
+                info.FeedNames.AddRange( feeds.Select( x => x.TypedName ) );
+                //monitor.Error( $"Unable to find package '{instance}' in feeds {feeds.Where( f => f.ArtifactType == instance.Artifact.Type ).Select( f => f.Name ).Concatenate()}." );
+                //return false;
             }
             return await ReadMissingDependencies( monitor, info, allDeps, feeds );
         }
