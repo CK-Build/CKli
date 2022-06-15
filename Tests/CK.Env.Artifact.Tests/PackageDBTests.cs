@@ -340,23 +340,23 @@ namespace CK.Env.Tests
         [Test]
         public async Task package_instance_dependency_should_be_ghost()
         {
-            var pC= new PackageCache();
+            var pC = new PackageCache();
             var testFeed = new TestFeed( "Test" );
 
             var artifactInstance = new ArtifactInstance( TestFeed.TestType, "A", CSVersion.Parse( "1.0.0" ) );
-            var fPII = new FullPackageInstanceInfo()
-            {
-                Key = artifactInstance,
-            };
+            var notFound = new ArtifactInstance( TestFeed.TestType, "NotFound", SVersion.ZeroVersion );
 
-            fPII.Dependencies.Add( (new ArtifactInstance( TestFeed.TestType, "Tata", SVersion.ZeroVersion ), SVersionLock.None, PackageQuality.CI, ArtifactDependencyKind.Transitive, null) );
-            testFeed.Content.Add( fPII );
+            var packageA = new FullPackageInstanceInfo() { Key = artifactInstance };
+            packageA.Dependencies.Add( (notFound, SVersionLock.None, PackageQuality.CI, ArtifactDependencyKind.Transitive, null) );
+            testFeed.Content.Add( packageA );
 
-            var lPC = new LivePackageCache( pC, new List<IPackageFeed>() { testFeed } );
-            var pI = await lPC.EnsureAsync( new ActivityMonitor(), fPII.Key );
+            var lPC = new LivePackageCache( pC, new []{ testFeed } );
+            var pI = await lPC.EnsureAsync( new ActivityMonitor(), packageA.Key );
 
-            pI.Should().NotBeNull();
-            pI!.Dependencies[0].State.Should().Be( PackageState.Ghost );
+            pI.Should().NotBeNull( "A has been added." );
+            pI!.Dependencies[0].State.Should().Be( PackageState.Ghost, "But its dependency is a Ghost." );
+
+            pC.DB.Find( notFound ).Should().BeNull( "A Ghost package must not be found by default." );
         }
 
     }

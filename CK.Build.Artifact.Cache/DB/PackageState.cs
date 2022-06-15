@@ -30,4 +30,10 @@ namespace CK.Build
         /// </summary>
         Ghost = 4
     }
+
+    public static class PackageStateExtensions
+    {
+        public static bool IsGhost( this PackageState @this ) => (@this & PackageState.Ghost) != 0;
+    }
+
 }

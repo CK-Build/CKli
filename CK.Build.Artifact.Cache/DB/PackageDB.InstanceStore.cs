@@ -161,6 +161,7 @@ namespace CK.Build
                 var instances = new PackageInstance[prev.Length + indices.Length - 2 * nbToRemove];
                 int prevIdx = 0;
                 int originOffset = 0, targetOffset = 0;
+
                 foreach( var (idx, p) in indices )
                 {
                     var len = idx - prevIdx;

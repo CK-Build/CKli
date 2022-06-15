@@ -86,13 +86,21 @@ namespace CK.Build
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="info">The package to register.</param>
-        /// <param name="skipExisting">
-        /// False to log an error and return null if info is already registered.
-        /// </param>
         /// <returns>The new database or null on error.</returns>
-        public PackageDB? Add( IActivityMonitor m, IFullPackageInfo info, bool skipExisting = true )
+        public PackageDB? Add( IActivityMonitor m, IFullPackageInfo info )
         {
-            return Add( m, new[] { info }, skipExisting );
+            return Add( m, new[] { info } );
+        }
+
+
+        [Flags]
+        enum PackageEventStatus
+        {
+            None = 0,
+            Content = 1,
+            State = 2,
+            Feeds = 4,
+            NewPackage = 8
         }
 
         /// <summary>
@@ -100,25 +108,23 @@ namespace CK.Build
         /// be already registered (the <see cref="PackageInstance.Reference.BaseTargetKey"/> of the reference exists in the DB)
         /// or appear before the dependent package.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
         /// <param name="infos">The package informations.</param>
-        /// <param name="skipExisting">
-        /// False to log an error and return null if infos contains already registered packages.
-        /// By default, existing packages are silently ignored.
-        /// </param>
         /// <returns>The new database (or this one if nothing changed), or null on error.</returns>
-        public PackageDB? Add( IActivityMonitor m, IEnumerable<IFullPackageInfo> infos, bool skipExisting = true )
+        public PackageDB? Add( IActivityMonitor monitor, IEnumerable<IFullPackageInfo> infos )
         {
             DateTime regDate = DateTime.UtcNow;
-            (IFullPackageInfo info, Artifact[]? feedNames, int idx, PackageInstance? p)[] initialization;
-            initialization = infos.Select( i => (i, i.CheckValidAndParseFeedNames( m ), ~_instances.IndexOf( i.Key ), (PackageInstance?)null) )
+            (IFullPackageInfo info, Artifact[]? feedNames, int idx, PackageEventStatus status, PackageInstance? p)[] initialization;
+            initialization = infos.Select( i => (i, i.CheckValidAndParseFeedNames( monitor ), ~_instances.IndexOf( i.Key ), PackageEventStatus.None, (PackageInstance?)null) )
                                   .ToArray();
             var removeFeedList = new List<(PackageFeed,int)>( _feeds.Count );
             int newCount = 0;
+            int changedCount = 0;
             // The new feeds (if needed, it will be initially a copy of the current _feeds).
             Dictionary<string, PackageFeed>? newFeeds = null;
             // The packages to add to an existing or new feed or to remove from an existing feed.
             List<PackageFeed.Diff>? feedDiff = null;
+
             for( int i = 0; i < initialization.Length; ++i )
             {
                 var candidate = initialization[i];
@@ -127,17 +133,28 @@ namespace CK.Build
                 Debug.Assert( candidate.info.Key.IsValid && candidate.feedNames.All( f => f.IsValid ) );
 
                 removeFeedList.Clear();
-                PackageInstance p;
+
+                PackageEventStatus cs = PackageEventStatus.None;
+                PackageInstance? p = null;
                 if( candidate.idx < 0 )
                 {
-                    if( !skipExisting )
-                    {
-                        m.Error( $"Package {candidate.info.Key} is already registered." );
-                        return null;
-                    }
                     // The package is already known.
                     p = _instances[~candidate.idx];
+                    if( !candidate.info.CheckSameContent( p, monitor ) )
+                    {
+                        monitor.Warn( "Package content changed! Updating it anyway (but this should be investigated)." );
+                        cs |= PackageEventStatus.Content;
+                    }
+                    if( candidate.info.State != p.State )
+                    {
+                        cs |= PackageEventStatus.State;
+                    }
                     // We populate the removeFeedList.
+                    // This adds in the removeFeedList all the existing feeds of p.
+                    // Below the candidate.info.Feeds will be removed from this removedList
+                    // (this is a diff).
+                    // We cannot say here whether the feeds of the package have been modified
+                    // or not.
                     if( candidate.info.AllFeedNamesAreKnown )
                     {
                         foreach( var f in _feeds.Values )
@@ -153,24 +170,10 @@ namespace CK.Build
                 }
                 else
                 {
-                    var targets = candidate.info.Dependencies
-                                           .Select( d => (d.Target,
-                                                           _instances.Find( d.Target )
-                                                           ?? initialization
-                                                                .Take( i )
-                                                                .Select( t => t.p )
-                                                                .FirstOrDefault( p => p != null
-                                                                                      && p.Key == d.Target )) )
-                                           .ToArray();
-                    if( targets.Any( t => t.Item2 == null ) )
-                    {
-                        m.Error( $"Dependency Target(s) of {candidate.info.Key} not registered: {targets.Where( t => t.Item2 == null ).Select( t => t.Target.ToString() ).Concatenate()}" );
-                        return null;
-                    }
-                    var allSavors = candidate.info.Savors;
-                    var deps = candidate.info.Dependencies.Zip( targets, ( d, t ) => new PackageInstance.Reference( t.Item2!, d.Lock, d.MinQuality, d.Kind, d.Savors == allSavors ? null : d.Savors ) )
-                                   .ToArray();                   
-                    initialization[i].p = p = new PackageInstance( candidate.info.Key, candidate.info.Savors, candidate.info.State, deps );
+                    // This is a brand new package instance.
+                    cs = PackageEventStatus.NewPackage;
+                    p = CreatePackageInstance( monitor, initialization, i, _instances );
+                    if( p == null ) return null;
                     ++newCount;
                 }
 
@@ -179,16 +182,19 @@ namespace CK.Build
                 {
                     foreach( var name in candidate.feedNames )
                     {
-                        if( name.Type != p.Key.Artifact.Type )
+                        if( name.Type != candidate.info.Key.Artifact.Type )
                         {
-                            m.Error( $"Package {p.Key} cannot appear in feed {name}: Artifact's type differ." );
+                            monitor.Error( $"Package {candidate.info.Key} cannot appear in feed {name}: Artifact's type differ." );
                             return null;
                         }
                         var keyName = name.TypedName;
                         if( !_feeds.TryGetValue( keyName, out var feed )
                             && (newFeeds == null || !newFeeds.TryGetValue( keyName, out feed )) )
                         {
+                            cs |= PackageEventStatus.Feeds;
                             if( newFeeds == null ) newFeeds = new Dictionary<string, PackageFeed>( _feeds );
+                            p ??= CreatePackageInstance( monitor, initialization, i, _instances );
+                            if( p == null ) return null;
                             newFeeds.Add( keyName, new PackageFeed( name, new InstanceStore( p ) ) );
                         }
                         else
@@ -205,12 +211,15 @@ namespace CK.Build
                             }
                             if( !isFeedFound )
                             {
-                                var idxInFeed = feed.IndexOf( p.Key );
+                                var idxInFeed = feed.IndexOf( candidate.info.Key );
                                 if( idxInFeed < 0 )
                                 {
                                     if( feedDiff == null ) feedDiff = new List<PackageFeed.Diff>();
                                     int idx = feedDiff.IndexOf( t => t.Feed == feed );
-                                    if( idx < 0 ) feedDiff.Add( new PackageFeed.Diff(feed, (~idxInFeed, p) ));
+                                    cs |= PackageEventStatus.Feeds;
+                                    p ??= CreatePackageInstance( monitor, initialization, i, _instances );
+                                    if( p == null ) return null;
+                                    if( idx < 0 ) feedDiff.Add( new PackageFeed.Diff( feed, (~idxInFeed, p) ) );
                                     else feedDiff[idx].AddNew( ~idxInFeed, p );
                                 }
                             }
@@ -220,6 +229,7 @@ namespace CK.Build
                 // Handle feed cleaning.
                 if( removeFeedList.Count > 0 )
                 {
+                    cs |= PackageEventStatus.Feeds;
                     if( feedDiff == null ) feedDiff = new List<PackageFeed.Diff>();
                     foreach( var (feed,idxPackage) in removeFeedList )
                     {
@@ -227,10 +237,15 @@ namespace CK.Build
                         if( idx < 0 ) feedDiff.Add( new PackageFeed.Diff(feed, idxPackage));
                         else feedDiff[idx].AddOld( idxPackage );
                     }
-
+                }
+                if( cs != PackageEventStatus.None )
+                {
+                    initialization[i].status = cs;
+                    if( cs != PackageEventStatus.NewPackage ) ++changedCount;
                 }
             }
-            if( newCount == 0 && newFeeds == null && removeFeedList.Count == 0 ) return this;
+
+            if( changedCount == 0 && newCount == 0 && newFeeds == null && removeFeedList.Count == 0 ) return this;
             if( feedDiff != null )
             {
                 if( newFeeds == null ) newFeeds = new Dictionary<string, PackageFeed>( _feeds );
@@ -241,6 +256,34 @@ namespace CK.Build
             }
             var indices = initialization.Where( x => x.p != null ).Select( x => (x.idx, x.p!) ).ToArray();
             return new PackageDB( this, _instances.Add( indices ), newFeeds, regDate );
+
+
+            static PackageInstance? CreatePackageInstance( IActivityMonitor monitor,
+                                                           (IFullPackageInfo info, Artifact[]? feedNames, int idx, PackageEventStatus status, PackageInstance? p)[] initialization,
+                                                           int i,
+                                                           InstanceStore instances )
+            {
+                ref var candidate = ref initialization[i];
+                var targets = candidate.info.Dependencies
+                                        .Select( d => (d.Target,
+                                                        instances.Find( d.Target )
+                                                        ?? initialization
+                                                            .Take( i )
+                                                            .Select( t => t.p )
+                                                            .FirstOrDefault( p => p != null
+                                                                                    && p.Key == d.Target )) )
+                                        .ToArray();
+                if( targets.Any( t => t.Item2 == null ) )
+                {
+                    monitor.Error( $"Dependency Target(s) of {candidate.info.Key} not registered: {targets.Where( t => t.Item2 == null ).Select( t => t.Target.ToString() ).Concatenate()}" );
+                    return null;
+                }
+                var allSavors = candidate.info.Savors;
+                var deps = candidate.info.Dependencies.Zip( targets, ( d, t ) => new PackageInstance.Reference( t.Item2!, d.Lock, d.MinQuality, d.Kind, d.Savors == allSavors ? null : d.Savors ) )
+                                .ToArray();
+                return candidate.p = new PackageInstance( candidate.info.Key, candidate.info.Savors, candidate.info.State, deps );
+            }
+
         }
 
         /// <summary>
@@ -299,8 +342,13 @@ namespace CK.Build
         /// Gets the instance or null if not found.
         /// </summary>
         /// <param name="key">The package identifier.</param>
+        /// <param name="allowGhost">True to allow returning Ghost instance.</param>
         /// <returns>The instance or null if not found.</returns>
-        public PackageInstance? Find( in ArtifactInstance key ) => _instances.Find( key );
+        public PackageInstance? Find( in ArtifactInstance key, bool allowGhost = false )
+        {
+            var a = _instances.Find( key );
+            return allowGhost || (a != null && !a.State.IsGhost()) ? a : null;
+        }
 
         /// <summary>
         /// Gets all the instances of a given type.

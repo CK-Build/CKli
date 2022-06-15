@@ -1,13 +1,15 @@
 using CK.Core;
+using CSemVer;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace CK.Build
 {
     /// <summary>
     /// Immutable model of a package (packages are installable artifacts).
     /// </summary>
-    public partial class PackageInstance : IEquatable<PackageInstance>, IComparable<PackageInstance>
+    public partial class PackageInstance : IEquatable<PackageInstance>, IComparable<PackageInstance>, IPackageInstanceInfo
     {
         internal PackageInstance( in ArtifactInstance instance,
                                   CKTrait? savors,
@@ -50,6 +52,9 @@ namespace CK.Build
         /// Gets the list of the dependencies.
         /// </summary>
         public IReadOnlyList<Reference> Dependencies { get; }
+
+        IEnumerable<(ArtifactInstance Target, SVersionLock Lock, PackageQuality MinQuality, ArtifactDependencyKind Kind, CKTrait? Savors)> IPackageInstanceInfo.Dependencies
+            => Dependencies.Select( d => (d.BaseTargetKey, d.Lock, d.MinQuality, d.DependencyKind, d.ApplicableSavors) );
 
         /// <summary>
         /// Compares this instance to another: <see cref="Key"/> is the key:
