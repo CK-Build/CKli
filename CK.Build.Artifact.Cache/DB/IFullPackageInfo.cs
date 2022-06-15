@@ -50,7 +50,7 @@ namespace CK.Build
                 return null;
             }
 
-            // Cheking name.
+            // Checking name.
             if( !@this.Key.IsValid )
             {
                 return Error( $"Invalid ArtifactInstance.", m );
