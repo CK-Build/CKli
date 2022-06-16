@@ -7,9 +7,9 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
-namespace CK.Build
+namespace CK.Build.PackageDB
 {
-    public partial class PackageDB
+    public partial class PackageDatabase
     {
         /// <summary>
         /// Fundamental core of all the package cache system: this encapsulates a single compact
@@ -20,7 +20,12 @@ namespace CK.Build
         {
             readonly PackageInstance[] _instances;
 
-            public InstanceStore()
+            /// <summary>
+            /// Gets the empty store.
+            /// </summary>
+            public static readonly InstanceStore Empty = new InstanceStore();
+
+            InstanceStore()
             {
                 _instances = Array.Empty<PackageInstance>();
             }
@@ -44,6 +49,7 @@ namespace CK.Build
                     Debug.Assert( type != null && name != null );
                     ArtifactInstance instance = new ArtifactInstance( type, name, SVersion.Parse( ctx.Reader.ReadString() ) );
                     var savors = ctx.ReadCKTrait();
+                    var state = ctx.Version == 0 ? PackageState.None : (PackageState)ctx.Reader.ReadByte();
                     int dependenciesCount = ctx.Reader.ReadNonNegativeSmallInt32();
                     var dependencies = new PackageInstance.Reference[dependenciesCount];
                     for( int j = 0; j < dependencies.Length; j++ )
@@ -63,7 +69,7 @@ namespace CK.Build
                             deferred.Add( (dependencies,j,idx,vL,vQ,kind,applicableSavors) );
                         }
                     }
-                    _instances[i] = new PackageInstance( instance, savors, PackageState.None, dependencies );
+                    _instances[i] = new PackageInstance( instance, savors, state, dependencies );
                 }
                 foreach( var d in deferred )
                 {
@@ -79,7 +85,7 @@ namespace CK.Build
                 for( int i = 0; i < _instances.Length; ++i )
                 {
                     var p = _instances[i];
-                    if( p.Key.Artifact.Type.Name != type )
+                    if( p.Key.Artifact.Type!.Name != type )
                     {
                         ctx.Writer.Write( (byte)2 );
                         ctx.Writer.Write( type = p.Key.Artifact.Type.Name );
@@ -91,8 +97,9 @@ namespace CK.Build
                         ctx.Writer.Write( name = p.Key.Artifact.Name );
                     }
                     else ctx.Writer.Write( (byte)0 );
-                    ctx.Writer.Write( p.Key.Version.NormalizedText );
+                    ctx.Writer.Write( p.Key.Version.NormalizedText! );
                     ctx.Write( p.Savors );
+                    ctx.Writer.Write( (byte)p.State );
                     ctx.Writer.WriteNonNegativeSmallInt32( p.Dependencies.Count );
                     foreach( var dep in p.Dependencies )
                     {
@@ -133,13 +140,27 @@ namespace CK.Build
                 _instances = new[] { first };
             }
 
-            InstanceStore( PackageInstance[] prev, PackageInstance newOne, int idxNewOne )
+            public InstanceStore( List<PackageInstance> packages )
+            {
+                _instances = packages.ToArray();
+                Array.Sort( _instances );
+            }
+
+            InstanceStore( PackageInstance[] prev, PackageInstance p, int idx )
             {
                 int pLen = prev.Length;
-                _instances = new PackageInstance[pLen + 1];
-                Array.Copy( prev, 0, _instances, 0, idxNewOne );
-                _instances[idxNewOne] = newOne;
-                Array.Copy( prev, idxNewOne, _instances, idxNewOne + 1, pLen - idxNewOne );
+                if( idx >= 0 )
+                {
+                    _instances = new PackageInstance[pLen + 1];
+                    Array.Copy( prev, 0, _instances, 0, idx );
+                    _instances[idx] = p;
+                    Array.Copy( prev, idx, _instances, idx + 1, pLen - idx );
+                }
+                else
+                {
+                    _instances = (PackageInstance[])prev.Clone();
+                    _instances[idx] = p;
+                }
             }
 
             InstanceStore( PackageInstance[] prev, (int idx, PackageInstance? p)[] indices, int nbToRemove )
@@ -188,41 +209,45 @@ namespace CK.Build
                 _instances = instances;
             }
 
-
-
-            public InstanceStore Add( PackageInstance newOne )
-            {
-                int idx = IndexOf( newOne.Key );
-                Debug.Assert( idx < 0 );
-                return new InstanceStore( _instances, newOne, ~idx );
-            }
+            public InstanceStore AddOrUpdate( PackageInstance p ) => new InstanceStore( _instances, p, ~IndexOf( p.Key ) );
 
             public InstanceStore Add( List<PackageInstance> newPackages )
             {
                 Debug.Assert( newPackages != null && newPackages.Count > 0 );
-                if( newPackages.Count == 1 ) return Add( newPackages[0] );
+                if( newPackages.Count == 1 ) return AddOrUpdate( newPackages[0] );
                 var indices = newPackages.Select( p => (~IndexOf( p.Key ), p) ).ToArray();
-                return Add( indices );
+                return AddOrUpdate( indices );
             }
 
-            public InstanceStore Add( List<(int idx, PackageInstance p)>? newPackages, List<int>? oldPackages )
+            public InstanceStore Add( List<(int idx, PackageInstance p)>? newOrUpdatedPackages, List<int>? oldPackages )
             {
-                Debug.Assert( (newPackages != null && newPackages.Count > 0) || (oldPackages != null && oldPackages.Count > 0) );
-                if( oldPackages == null ) return Add( newPackages!.ToArray() );
+                Debug.Assert( (newOrUpdatedPackages != null && newOrUpdatedPackages.Count > 0) || (oldPackages != null && oldPackages.Count > 0) );
+                if( oldPackages == null ) return AddOrUpdate( newOrUpdatedPackages!.ToArray() );
 
                 IEnumerable<(int idx, PackageInstance? p)>? indices = oldPackages.Select( idx => (idx, (PackageInstance?)null ) );
-                if( newPackages != null ) indices = indices.Concat( newPackages.Select( p => (p.idx, (PackageInstance?)p.p) ) );
-                return Add( indices.ToArray(), oldPackages.Count );
+                if( newOrUpdatedPackages != null ) indices = indices.Concat( newOrUpdatedPackages.Select( p => (p.idx, (PackageInstance?)p.p) ) );
+                return AddOrUpdateOrRemove( indices.ToArray(), oldPackages.Count );
             }
 
-            public InstanceStore Add( (int idx, PackageInstance? p)[] indices, int nbToRemove ) => new InstanceStore( _instances, indices, nbToRemove );
-#pragma warning disable CS8620 // Argument cannot be used for parameter due to differences in the nullability of reference types.
-            public InstanceStore Add( (int idx, PackageInstance p)[] indices ) => new InstanceStore( _instances, indices, 0 );
-#pragma warning restore CS8620 // Argument cannot be used for parameter due to differences in the nullability of reference types.
+            /// <summary>
+            /// Adding, updating or removing.
+            /// </summary>
+            /// <param name="indices">
+            /// The idx is negative (bitwise complement) for update and positive for insert or remove, with a null package instance for remove.
+            /// </param>
+            /// <param name="nbToRemove">
+            /// The number of remove in indices (the number of null package instances).
+            /// </param>
+            public InstanceStore AddOrUpdateOrRemove( (int idx, PackageInstance? p)[] indices, int nbToRemove ) => new InstanceStore( _instances, indices, nbToRemove );
+
+            /// <summary>
+            /// Adding or updating: no null package instance allowed here.
+            /// </summary>
+            public InstanceStore AddOrUpdate( (int idx, PackageInstance p)[] indices ) => new InstanceStore( _instances, indices!, 0 );
 
             public ArraySegment<PackageInstance> GetInstances( ArtifactType type )
             {
-                return Range( _instances, p => type.CompareTo( p.Key.Artifact.Type ) );
+                return Range( _instances, p => type.CompareTo( p.Key.Artifact.Type! ) );
             }
 
             public ArraySegment<PackageInstance> GetInstances( Artifact artifact )

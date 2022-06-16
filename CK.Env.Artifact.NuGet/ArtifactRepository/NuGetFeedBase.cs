@@ -15,6 +15,7 @@ using NuGet.Packaging.Core;
 using NuGet.Versioning;
 using NuGet.Frameworks;
 using System.Linq;
+using CK.Build.PackageDB;
 
 namespace CK.Env.NuGet
 {

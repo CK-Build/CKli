@@ -5,10 +5,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 
-namespace CK.Build
+namespace CK.Build.PackageDB
 {
     /// <summary>
-    /// Pure readonly interface used to describe a new package in a <see cref="PackageDB"/>.
+    /// Pure readonly interface used to describe a new package in a <see cref="PackageDatabase"/>.
     /// </summary>
     public interface IFullPackageInfo : IPackageInstanceInfo
     {
@@ -20,14 +20,14 @@ namespace CK.Build
 
         /// <summary>
         /// Gets the name of the feeds that are known to contain this package.
-        /// This can be empty: a package can exist in a <see cref="PackageDB"/> without being in any <see cref="PackageFeed"/>.
+        /// This can be empty: a package can exist in a <see cref="PackageDatabase"/> without being in any <see cref="PackageFeed"/>.
         /// </summary>
         IEnumerable<string> FeedNames { get; }
     }
 
     /// <summary>
     /// Provides the validation function to any <see cref="IFullPackageInfo"/> before adding them
-    /// to a <see cref="PackageDB"/>.
+    /// to a <see cref="PackageDatabase"/>.
     /// </summary>
     public static class FullPackageInfoExtension
     {

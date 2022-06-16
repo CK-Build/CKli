@@ -5,10 +5,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace CK.Build
+namespace CK.Build.PackageDB
 {
     /// <summary>
-    /// Pure readonly interface that describes the basic information of a package handled by the <see cref="PackageDB"/>
+    /// Pure readonly interface that describes the basic information of a package handled by the <see cref="PackageDatabase"/>
     /// in an independent manner. This is used to import package information in the database.
     /// Once added, <see cref="PackageInstance"/> immutable objects are exposed.
     /// </summary>

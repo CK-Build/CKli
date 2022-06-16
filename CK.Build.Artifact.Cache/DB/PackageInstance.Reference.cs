@@ -1,7 +1,7 @@
 using CK.Core;
 using CSemVer;
 
-namespace CK.Build
+namespace CK.Build.PackageDB
 {
     public partial class PackageInstance
     {

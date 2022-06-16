@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace CK.Build
+namespace CK.Build.PackageDB
 {
     /// <summary>
     /// Immutable model of a package (packages are installable artifacts).

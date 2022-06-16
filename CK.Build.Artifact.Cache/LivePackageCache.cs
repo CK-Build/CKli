@@ -1,3 +1,4 @@
+using CK.Build.PackageDB;
 using CK.Core;
 
 using System;
@@ -10,7 +11,7 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 
-namespace CK.Build
+namespace CK.Build.PackageDB
 {
 
     /// <summary>
@@ -21,7 +22,6 @@ namespace CK.Build
         readonly PackageCache _cache;
         IPackageFeed[] _feeds;
         readonly Dictionary<ArtifactInstance, TaskCompletionSource<FullPackageInstanceInfo?>> _currentRequests;
-        readonly object _addLock;
         readonly Queue<IActivityMonitor> _requestMonitors;
 
         /// <summary>
@@ -34,7 +34,6 @@ namespace CK.Build
             _cache = cache;
             _feeds = feeds?.ToArray() ?? Array.Empty<IPackageFeed>();
             _currentRequests = new Dictionary<ArtifactInstance, TaskCompletionSource<FullPackageInstanceInfo?>>();
-            _addLock = new object();
             _requestMonitors = new Queue<IActivityMonitor>();
         }
 
@@ -112,15 +111,11 @@ namespace CK.Build
             {
                 // The info object will be appended to the allDeps list even if an exception is raised here.
                 await ReadMissingDependenciesAsync( monitor, info, allDeps, feeds );
-                // Even if the Add is thread safe (it uses an Interlocked set), I prefer here
-                // to serialize the call to Add to avoid intermediate allocations.
-                lock( _addLock )
+                var db = _cache.Add( monitor, allDeps );
+                p = db?.Find( instance, allowGhost: false );
+                if( p == null )
                 {
-                    if( _cache.Add( monitor, allDeps ) == null
-                        || (p = _cache.DB.Find( instance, allowGhost: false )) == null )
-                    {
-                        Throw.Exception( $"Error while updating the package cache for '{instance}', ." );
-                    }
+                    Throw.Exception( $"Error while updating the package cache for '{instance}', ." );
                 }
                 return p;
             }

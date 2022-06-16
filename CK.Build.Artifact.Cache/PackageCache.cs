@@ -4,23 +4,26 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics;
 using System.Threading;
+using CK.Build.PackageDB;
 
-namespace CK.Build
+namespace CK.Build.PackageDB
 {
 
     /// <summary>
-    /// Wraps the immutable <see cref="PackageDB"/> object.
+    /// Wraps the immutable <see cref="PackageDatabase"/> object.
     /// </summary>
     public class PackageCache
     {
-        PackageDB _db;
+        PackageDatabase _db;
+        readonly object _lock;
 
         /// <summary>
         /// Initializes a new empty cache.
         /// </summary>
         public PackageCache()
         {
-            _db = new PackageDB();
+            _db = PackageDatabase.Empty;
+            _lock = new object();
         }
 
         /// <summary>
@@ -31,11 +34,14 @@ namespace CK.Build
         /// <returns>True on success, false on error.</returns>
         public bool Read( IActivityMonitor monitor, ICKBinaryReader reader )
         {
-            if( reader == null ) throw new ArgumentNullException( nameof( reader ) );
+            Throw.CheckNotNullArgument( reader );
             try
             {
                 DeserializerContext ctx = new DeserializerContext( reader );
-                _db = new PackageDB( ctx );
+                lock( _lock )
+                {
+                    _db = new PackageDatabase( ctx );
+                }
                 return true;
             }
             catch( Exception ex )
@@ -58,12 +64,12 @@ namespace CK.Build
         /// <summary>
         /// Gets the package database.
         /// </summary>
-        public PackageDB DB => _db;
+        public PackageDatabase DB => _db;
 
         /// <summary>
         /// Fires whenever <see cref="DB"/> has changed.
         /// </summary>
-        public event EventHandler<PackageDBChangedArgs>? DBChanged;
+        public event EventHandler<ChangedInfo>? DBChanged;
 
         /// <summary>
         /// Registers one package. Any <see cref="FullPackageInstanceInfo.Dependencies"/> must
@@ -75,7 +81,7 @@ namespace CK.Build
         /// False to log an error and return null if info is already registered.
         /// </param>
         /// <returns>The new database or null on error.</returns>
-        public PackageDB? Add( IActivityMonitor m, IFullPackageInfo info, bool skipExisting = true ) => Add( m, new[] { info }, skipExisting );
+        public PackageDatabase? Add( IActivityMonitor m, IFullPackageInfo info ) => Add( m, new[] { info } );
 
         /// <summary>
         /// Registers multiple packages at once. Any <see cref="FullPackageInstanceInfo.Dependencies"/> must
@@ -83,22 +89,20 @@ namespace CK.Build
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="infos">The package informations.</param>
-        /// <param name="skipExisting">
-        /// False to log an error and return null if infos contains already registered packages.
-        /// By default, existing packages are silently ignored.
-        /// </param>
         /// <returns>The new database or null on error.</returns>
-        public PackageDB? Add( IActivityMonitor m, IEnumerable<IFullPackageInfo> infos, bool skipExisting = true )
+        public PackageDatabase? Add( IActivityMonitor m, IEnumerable<IFullPackageInfo> infos )
         {
-            bool success = false;
-            var newDb = Util.InterlockedSet( ref _db, origin =>
+            ChangedInfo? info;
+            lock( _lock )
             {
-                var newOne = origin.Add( m, infos, skipExisting );
-                return (success = (newOne != null)) ? newOne! : origin;
-            } );
-            if( !success ) return null;
-            DBChanged?.Invoke( this, new PackageDBChangedArgs( newDb ) );
-            return newDb;
+                info = _db.Add( m, infos );
+                if( info == null ) return null;
+                Debug.Assert( info.HasChanged == (_db != info.DB) );
+                if( !info.HasChanged ) return _db;
+                _db = info.DB;
+            }
+            DBChanged?.Invoke( this, info );
+            return info.DB;
         }
     }
 }

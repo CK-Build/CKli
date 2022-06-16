@@ -1,6 +1,6 @@
 using System;
 
-namespace CK.Build
+namespace CK.Build.PackageDB
 {
     /// <summary>
     /// Captures the <see cref="PackageInstance.State"/> and <see cref="IPackageInstanceInfo.State"/>.
