@@ -5,10 +5,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 
-namespace CK.Build
+namespace CK.Build.PackageDB
 {
     /// <summary>
-    /// Basic mutable POCO used to describe a new package in a <see cref="PackageDB"/>.
+    /// Basic mutable POCO used to describe a new package in a <see cref="PackageDatabase"/>.
     /// </summary>
     public class FullPackageInstanceInfo : PackageInstanceInfo, IFullPackageInfo
     {

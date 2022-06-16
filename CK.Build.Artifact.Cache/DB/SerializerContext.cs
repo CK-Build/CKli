@@ -2,14 +2,14 @@ using CK.Core;
 using System.Diagnostics;
 using System.Diagnostics.Contracts;
 
-namespace CK.Build
+namespace CK.Build.PackageDB
 {
     /// <summary>
     /// Internal struct.
     /// </summary>
     readonly ref struct SerializerContext
     {
-        public const int Version = 0;
+        public const int Version = 1;
 
         public readonly ICKBinaryWriter Writer;
         public readonly CKBinaryWriter.ObjectPool<CKTraitContext> TraitContextPool;

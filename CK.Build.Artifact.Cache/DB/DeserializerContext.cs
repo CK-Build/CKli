@@ -1,6 +1,6 @@
 using CK.Core;
 
-namespace CK.Build
+namespace CK.Build.PackageDB
 {
     /// <summary>
     /// Internal struct.

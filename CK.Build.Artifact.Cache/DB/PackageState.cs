@@ -1,6 +1,6 @@
 using System;
 
-namespace CK.Build
+namespace CK.Build.PackageDB
 {
     /// <summary>
     /// Captures the <see cref="PackageInstance.State"/> and <see cref="IPackageInstanceInfo.State"/>.
@@ -30,4 +30,10 @@ namespace CK.Build
         /// </summary>
         Ghost = 4
     }
+
+    public static class PackageStateExtensions
+    {
+        public static bool IsGhost( this PackageState @this ) => (@this & PackageState.Ghost) != 0;
+    }
+
 }

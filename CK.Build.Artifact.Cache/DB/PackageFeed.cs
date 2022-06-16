@@ -1,29 +1,30 @@
 using CK.Core;
 using CSemVer;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 
-namespace CK.Build
+namespace CK.Build.PackageDB
 {
     /// <summary>
-    /// Models a source of packages (packages are installable artifacts) inside a <see cref="PackageDB"/>.
+    /// Models a source of packages (packages are installable artifacts) inside a <see cref="PackageDatabase"/>.
     /// </summary>
     public class PackageFeed : IArtifactFeedIdentity
     {
         // We need a name that is a Artifact type and a name: Artifact does the job.
         readonly Artifact _name;
-        readonly PackageDB.InstanceStore _instances;
+        readonly PackageDatabase.InstanceStore _instances;
 
-        internal class Diff
+        internal class Diff 
         {
-            List<(int idx, PackageInstance p)>? _new;
+            List<(int idx, PackageInstance p)>? _newOrUpdate;
             List<int>? _old;
 
-            internal Diff( PackageFeed f, (int idx, PackageInstance p) newOne )
+            internal Diff( PackageFeed f, (int idx, PackageInstance p) newOrUpdated )
             {
                 Feed = f;
-                _new = new List<(int idx, PackageInstance p)>() { newOne };
+                _newOrUpdate = new List<(int idx, PackageInstance p)>() { newOrUpdated };
             }
 
             internal Diff( PackageFeed f, int oldIdx )
@@ -34,28 +35,79 @@ namespace CK.Build
 
             public readonly PackageFeed Feed;
 
-            public void AddNew( int idx, PackageInstance p )
+            public void AddOrUpdate( int idx, PackageInstance p )
             {
-                Debug.Assert( _new != null && _new.Count > 0, "We have already allocated it (with its very first package)." );
+                Debug.Assert( _newOrUpdate != null && _newOrUpdate.Count > 0, "We have already allocated it (with its very first package)." );
                 Debug.Assert( _old == null, "All AddNew must be called before AddOld." );
-                Debug.Assert( idx >= 0 );
-                _new.Add( (idx, p) );
+                _newOrUpdate.Add( (idx, p) );
             }
 
-            public void AddOld( int oldIdx )
+            public void Remove( int oldIdx )
             {
                 if( _old == null ) _old = new List<int>();
                 _old.Add( oldIdx );
             }
 
-            public PackageFeed Create()
+            public FeedChangedInfo Create()
             {
-                Debug.Assert( _old != null || _new != null );
-                return new PackageFeed( Feed, _new, _old );
+                Debug.Assert( _old != null || _newOrUpdate != null );
+                var instances = Feed._instances.Add( _newOrUpdate, _old );
+                var f = new PackageFeed( Feed._name, instances );
+
+                // Keeps only the new ones, we don't care of the updated ones.
+                PackageInstance[] added;
+                if( _newOrUpdate == null ) added = Array.Empty<PackageInstance>();
+                else
+                {
+                    added = _newOrUpdate.Where( e => e.idx >= 0 ).Select( e => e.p ).ToArray();
+                }
+
+                // Uses the old Feed._instances.
+                PackageInstance[] removed;
+                if( _old == null ) removed = Array.Empty<PackageInstance>();
+                else
+                {
+                    removed = new PackageInstance[_old.Count];
+                    int i = 0;
+                    foreach( var oI in _old )
+                    {
+                        removed[i++] = Feed._instances[oI];
+                    }
+                }
+
+                return new FeedChangedInfo( f, added, removed );
+            }
+
+            // For the changed events.
+            public IReadOnlyList<PackageInstance> AddedPackages
+            {
+                get
+                {
+                    if( _newOrUpdate == null ) return Array.Empty<PackageInstance>();
+                    // Returns only the new ones, we don't care of the updated ones.
+                    return _newOrUpdate.Where( e => e.idx >= 0 ).Select( e => e.p ).ToArray();
+                }
+            }
+
+            // For the changed events.
+            public IReadOnlyList<PackageInstance> RemovedPackages
+            {
+                get
+                {
+                    if( _old == null ) return Array.Empty<PackageInstance>();
+                    // Uses the old Feed._instances.
+                    var old = new PackageInstance[_old.Count];
+                    int i = 0;
+                    foreach( var oI in _old )
+                    {
+                        old[i++] = Feed._instances[oI];
+                    }
+                    return old;
+                }
             }
         }
 
-        internal PackageFeed( in Artifact name, PackageDB.InstanceStore instances )
+        internal PackageFeed( in Artifact name, PackageDatabase.InstanceStore instances )
         {
             _name = name;
             _instances = instances;
@@ -69,24 +121,25 @@ namespace CK.Build
             Debug.Assert( _instances.All( p => p.Key.Artifact.Type == _name.Type ) );
         }
 
-        internal PackageFeed( PackageFeed other, List<(int idx, PackageInstance p)>? newPackages, List<int>? oldPackages )
+        PackageFeed( PackageFeed other, List<(int idx, PackageInstance p)>? newPackages, List<int>? oldPackages )
         {
             _name = other._name;
             _instances = other._instances.Add( newPackages, oldPackages );
             Debug.Assert( _instances.All( p => p.Key.Artifact.Type == _name.Type ) );
         }
 
-        internal PackageFeed( PackageDB.InstanceStore allInstances, DeserializerContext ctx )
+        internal PackageFeed( PackageDatabase.InstanceStore allInstances, DeserializerContext ctx )
         {
             var type = ArtifactType.Single( ctx.Reader.ReadSharedString() );
             var name = ctx.Reader.ReadString();
             _name = new Artifact( type, name );
-            _instances = new PackageDB.InstanceStore( ctx, allInstances );
+            _instances = new PackageDatabase.InstanceStore( ctx, allInstances );
             Debug.Assert( _instances.All( p => p.Key.Artifact.Type == _name.Type ) );
         }
 
-        internal void Write( PackageDB.InstanceStore allInstances, SerializerContext ctx )
+        internal void Write( PackageDatabase.InstanceStore allInstances, SerializerContext ctx )
         {
+            Debug.Assert( _name.IsValid );
             ctx.Writer.WriteSharedString( _name.Type.Name );
             ctx.Writer.Write( _name.Name );
             _instances.WriteIndices( ctx, allInstances );
@@ -120,7 +173,7 @@ namespace CK.Build
         /// <returns>The list of the known instances.</returns>
         public IReadOnlyList<PackageInstance> GetInstances( string name )
         {
-            var a = new Artifact( _name.Type, name );
+            var a = new Artifact( ArtifactType, name );
             return _instances.GetInstances( a );
         }
 

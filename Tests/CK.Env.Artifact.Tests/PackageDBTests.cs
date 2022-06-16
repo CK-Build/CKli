@@ -13,6 +13,7 @@ using System.Diagnostics;
 using NuGet.Frameworks;
 using System.Threading.Tasks;
 using CK.Env.Artifact.Tests;
+using CK.Build.PackageDB;
 
 namespace CK.Env.Tests
 {
@@ -68,12 +69,14 @@ namespace CK.Env.Tests
             FullPackageInstanceInfo pInfo1 = PLevel0V1[1];
             FullPackageInstanceInfo pInfo2 = PLevel0V1[2];
 
-            var db = new PackageDB();
+            var db = PackageDatabase.Empty;
             db.Instances.Should().BeEmpty();
             db.GetInstances( T0 ).Should().BeEmpty();
 
-            db = db.Add( TestHelper.Monitor, pInfo0 )!;
-            db.Add( TestHelper.Monitor, pInfo0 ).Should().BeSameAs( db );
+            db = db.Add( TestHelper.Monitor, pInfo0 )!.DB;
+            db.Add( TestHelper.Monitor, pInfo0 )!.HasChanged.Should().BeFalse();
+            db.Add( TestHelper.Monitor, pInfo0 )!.DB.Should().BeSameAs( db );
+
             db.Instances.Should().HaveCount( 1 );
             var p0 = db.Instances[0];
             db.Find( pInfo0.Key ).Should().BeSameAs( p0 );
@@ -81,7 +84,7 @@ namespace CK.Env.Tests
             db.Find( pInfo2.Key ).Should().BeNull();
             db.GetInstances( T0 ).SequenceEqual( new[] { p0 } ).Should().BeTrue();
 
-            db = db.Add( TestHelper.Monitor, pInfo2 )!;
+            db = db.Add( TestHelper.Monitor, pInfo2 )!.DB;
             db!.Instances.Should().HaveCount( 2 );
             var p2 = db.Instances[1];
             db.Find( pInfo0.Key ).Should().BeSameAs( p0 );
@@ -89,7 +92,7 @@ namespace CK.Env.Tests
             db.Find( pInfo2.Key ).Should().BeSameAs( p2 );
             db.GetInstances( T0 ).SequenceEqual( new[] { p0, p2 } ).Should().BeTrue();
 
-            db = db.Add( TestHelper.Monitor, pInfo1 )!;
+            db = db.Add( TestHelper.Monitor, pInfo1 )!.DB;
             db.Instances.Should().HaveCount( 3 );
             var p1 = db.Instances[1];
             db.Find( pInfo0.Key ).Should().BeSameAs( p0 );
@@ -105,7 +108,7 @@ namespace CK.Env.Tests
             db.FindFeed( "T0:F1" ).Should().BeNull();
         }
 
-        static PackageDB AddPackageLevel0( PackageDB db, int idxPackageVersion, bool atOnce, bool? revert )
+        static PackageDatabase AddPackageLevel0( PackageDatabase db, int idxPackageVersion, bool atOnce, bool? revert )
         {
             IEnumerable<FullPackageInstanceInfo> packages = PLevel0[idxPackageVersion];
             if( !revert.HasValue )
@@ -116,16 +119,16 @@ namespace CK.Env.Tests
 
             if( atOnce )
             {
-                return db.Add( TestHelper.Monitor, packages, false )!;
+                return db.Add( TestHelper.Monitor, packages )!.DB;
             }
             foreach( var p in packages )
-                db = db.Add( TestHelper.Monitor, p, false )!;
+                db = db.Add( TestHelper.Monitor, p )!.DB;
             return db;
         }
 
-        static PackageDB CreatePackageLevel0DB( bool atOnce, bool? revert )
+        static PackageDatabase CreatePackageLevel0DB( bool atOnce, bool? revert )
         {
-            var db = new PackageDB();
+            var db = PackageDatabase.Empty;
             db = AddPackageLevel0( db, 0, atOnce, revert );
             db = AddPackageLevel0( db, 1, atOnce, revert );
             db = AddPackageLevel0( db, 2, atOnce, revert );
@@ -133,7 +136,7 @@ namespace CK.Env.Tests
             return db;
         }
 
-        static PackageDB CloneBySerialization( PackageDB db )
+        static PackageDatabase CloneBySerialization( PackageDatabase db )
         {
             using( var m = new MemoryStream() )
             {
@@ -144,7 +147,7 @@ namespace CK.Env.Tests
                 m.Position = 0;
                 using( var r = new CKBinaryReader( m, Encoding.UTF8, true ) )
                 {
-                    return new PackageDB( r );
+                    return new PackageDatabase( r );
                 }
             }
         }
@@ -197,7 +200,7 @@ namespace CK.Env.Tests
         [Test]
         public void feeds_can_only_contain_packages_from_their_own_type()
         {
-            var db = new PackageDB();
+            var db = PackageDatabase.Empty;
             var pA = new FullPackageInstanceInfo()
             {
                 Key = new ArtifactInstance( T0, "A", CSVersion.Parse( "1.0.0" ) ),
@@ -209,20 +212,20 @@ namespace CK.Env.Tests
         [Test]
         public void playing_with_feeds()
         {
-            var db = new PackageDB();
+            var db = PackageDatabase.Empty;
 
             var pA = new FullPackageInstanceInfo()
             {
                 Key = new ArtifactInstance( T0, "A", CSVersion.Parse( "1.0.0" ) ),
                 FeedNames = { "NuGet" }
             };
-            db = db.Add( TestHelper.Monitor, pA )!;
+            db = db.Add( TestHelper.Monitor, pA )!.DB;
             db.Feeds.Should().HaveCount( 1 );
             db.FindFeed( "T0:NuGet" )!.Instances.Should().BeEquivalentTo( db.Instances );
 
             pA.FeedNames.Clear();
             pA.FeedNames.Add( "AnotherNuGet" );
-            db = db.Add( TestHelper.Monitor, pA )!;
+            db = db.Add( TestHelper.Monitor, pA )!.DB;
             db.Feeds.Should().HaveCount( 2 );
             db.FindFeed( "T0:NuGet" )!.Instances.Should().BeEquivalentTo( db.Instances );
             db.FindFeed( "T0:AnotherNuGet" )!.Instances.Should().BeEquivalentTo( db.Instances );
@@ -340,24 +343,49 @@ namespace CK.Env.Tests
         [Test]
         public async Task package_instance_dependency_should_be_ghost()
         {
-            var pC= new PackageCache();
+            var pC = new PackageCache();
             var testFeed = new TestFeed( "Test" );
 
             var artifactInstance = new ArtifactInstance( TestFeed.TestType, "A", CSVersion.Parse( "1.0.0" ) );
-            var fPII = new FullPackageInstanceInfo()
-            {
-                Key = artifactInstance,
-            };
+            var notFound = new ArtifactInstance( TestFeed.TestType, "NotFound", SVersion.ZeroVersion );
 
-            fPII.Dependencies.Add( (new ArtifactInstance( TestFeed.TestType, "Tata", SVersion.ZeroVersion ), SVersionLock.None, PackageQuality.CI, ArtifactDependencyKind.Transitive, null) );
-            testFeed.Content.Add( fPII );
+            var packageA = new FullPackageInstanceInfo() { Key = artifactInstance };
+            packageA.Dependencies.Add( (notFound, SVersionLock.None, PackageQuality.CI, ArtifactDependencyKind.Transitive, null) );
+            testFeed.Content.Add( packageA );
 
-            var lPC = new LivePackageCache( pC, new List<IPackageFeed>() { testFeed } );
-            var pI = await lPC.EnsureAsync( new ActivityMonitor(), fPII.Key );
+            var lPC = new LivePackageCache( pC, new []{ testFeed } );
+            var pI = await lPC.EnsureAsync( new ActivityMonitor(), packageA.Key );
 
-            pI.Should().NotBeNull();
-            pI!.Dependencies[0].State.Should().Be( PackageState.Ghost );
+            pI.Should().NotBeNull( "A has been added." );
+            pI!.Dependencies[0].State.Should().Be( PackageState.Ghost, "But its dependency is a Ghost." );
+
+            pC.DB.Find( notFound ).Should().BeNull( "A Ghost package must not be found by default." );
         }
 
+        [Test]
+        public void how_udates_and_inserts_are_handled()
+        {
+            // Inserting or suppressing: 0, 5, 7, 8 and 10.
+            // Updating: 1, 2 4 and 6
+            var v = new[] { 7, ~1, 5, ~4, 10, ~6, 8, ~2, 0 };
+
+            Array.Sort( v );
+            v.Should().BeEquivalentTo( new[] { -7, -5, -3, -2, 0, 5, 7, 8, 10 }, "This is not what we want." );
+
+            Array.Sort( v, (a,b) => Math.Abs(a) - Math.Abs(b) );
+
+            v.Should().BeEquivalentTo( new[] { 0, -2, -3, -5, 5, -7, 7, 8, 10 }, "This is it!" );
+
+            v.Select( idx => idx < 0 ? ('U', ~idx) : ('I', idx) ).Should().BeEquivalentTo( new[] {
+                ('I', 0),
+                ('U', 1),
+                ('U', 2),
+                ('U', 4),
+                ('I', 5),
+                ('U', 6),
+                ('I', 7),
+                ('I', 8),
+                ('I', 10) }, "This is perfectly ordered: the array to setup can be handled in one pass." );
+        }
     }
 }
