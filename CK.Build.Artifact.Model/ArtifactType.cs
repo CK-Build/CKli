@@ -52,7 +52,7 @@ namespace CK.Build
             if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
             var types = _types;
             foreach( var t in types ) if( t.Name == name ) return t;
-            Throw.ArgumentException( $"Unregistered Artifact type: '{name}'." );
+            throw new ArgumentException( $"Unregistered Artifact type: '{name}'." );
         }
 
         /// <summary>
