@@ -10,10 +10,9 @@ namespace CK.Env.Plugin
     {
         private readonly SolutionDriver _solutionDriver;
 
-        public CSProjFile(
-             GitRepository f,
-             NormalizedPath branchPath,
-            SolutionDriver solutionDriver )
+        public CSProjFile( GitRepository f,
+                           NormalizedPath branchPath,
+                           SolutionDriver solutionDriver )
              : base( f, branchPath )
         {
             _solutionDriver = solutionDriver;
@@ -31,10 +30,13 @@ namespace CK.Env.Plugin
             var solution = _solutionDriver.GetSolution( m, allowInvalidSolution: true );
             if( solution == null ) return;
 
-            var csprojs = solution.Projects.Select<IProject, (IProject project, MSProject msproject)>( p => (p, p.Tag<MSProject>()) ).Where( p => p.Item2 != null );
+            var csprojs = solution.Projects.Select<IProject, (IProject project, MSProject msproject)>( p => (p, p.Tag<MSProject>()!) ).Where( p => p.Item2 != null );
 
             foreach( (IProject project, MSProject msproject) in csprojs )
             {
+                // Removing the old <Import Project="..\Common\Shared.props" />.
+                msproject.ProjectFile?.Imports.FirstOrDefault( i => i.ImportedFile?.Path.LastPart == "Shared.props" ).ImportElement?.Remove();
+
                 if( project.IsPublished )
                 {
                     // For test projects we want the IsPackable element to be explicit.

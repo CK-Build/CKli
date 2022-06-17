@@ -141,7 +141,7 @@ namespace CK.Env.MSBuildSln
             }
             foreach( var i in Imports )
             {
-                if( !i.ImportedFile.Save( m, fs ) ) return false;
+                if( i.ImportedFile?.Save( m, fs ) == false ) return false;
             }
             return true;
         }

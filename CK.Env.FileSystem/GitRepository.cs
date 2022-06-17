@@ -25,6 +25,7 @@ namespace CK.Env
         readonly BranchesFolder _branchesFolder;
         readonly RemotesFolder _remoteBranchesFolder;
         bool _branchRefreshed;
+
         /// <summary>
         /// Gets the <see cref="ProtoGitFolder"/>.
         /// </summary>
@@ -403,8 +404,8 @@ namespace CK.Env
         /// Checkouts the <see cref="IWorldName.LocalBranchName"/>, always merging <see cref="IWorldName.DevelopBranchName"/> into it.
         /// If the repository is not on the 'local' branch, it must be on 'develop' (a <see cref="Commit"/> is done to save any
         /// current work if <paramref name="autoCommit"/> is true), the 'local' branch is created if needed and checked out.
-        /// 'develop' branch is always merged into it, privilegiating file modifications from the 'develop' branch.
-        /// If the the merge fails, a manual operation is required.
+        /// 'develop' branch is always merged into it, preferring file modifications from the 'develop' branch.
+        /// If the merge fails, a manual operation is required.
         /// On success, the solution inside should be purely local: there should not be any possible remote interactions (except
         /// possibly importing fully external packages).
         /// </summary>
@@ -423,7 +424,7 @@ namespace CK.Env
                         m.Error( $"Unable to find branch '{World.DevelopBranchName}'." );
                         return false;
                     }
-                    // Auto merge from Ours or Theirs: we privilegiate the current branch.
+                    // Auto merge from Ours or Theirs: we favor the current branch.
                     MergeFileFavor mergeFileFavor = MergeFileFavor.Normal;
                     Branch local = Git.Branches[World.LocalBranchName];
                     if( local == null || !local.IsCurrentRepositoryHead )
@@ -448,7 +449,7 @@ namespace CK.Env
                         }
                         else
                         {
-                            m.Info( "Coming from develop: privilegiates 'develop' file changes during merge." );
+                            m.Info( "Coming from develop: favors 'develop' file changes during merge." );
                             mergeFileFavor = MergeFileFavor.Theirs;
                         }
                         Commands.Checkout( Git, local );
@@ -456,7 +457,7 @@ namespace CK.Env
                     }
                     else
                     {
-                        m.Info( $"Already on {World.LocalBranchName}: privilegiates 'local' file changes during merge." );
+                        m.Info( $"Already on {World.LocalBranchName}: favors 'local' file changes during merge." );
                         mergeFileFavor = MergeFileFavor.Ours;
                         EnsureCurrentBranchPlugins( m );
                     }
@@ -527,18 +528,18 @@ namespace CK.Env
         /// 'develop' branch is always merged into it.
         /// If the merge fails, a manual operation is required.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool SwitchDevelopToMaster( IActivityMonitor m )
+        public bool SwitchDevelopToMaster( IActivityMonitor monitor )
         {
-            using( m.OpenInfo( $"Switching '{SubPath}' to branch '{World.MasterBranchName}')." ) )
+            using( monitor.OpenInfo( $"Switching '{SubPath}' to branch '{World.MasterBranchName}')." ) )
             {
                 try
                 {
                     Branch bDevelop = Git.Branches[World.DevelopBranchName];
                     if( bDevelop == null )
                     {
-                        m.Error( $"Unable to find branch '{World.DevelopBranchName}'." );
+                        monitor.Error( $"Unable to find branch '{World.DevelopBranchName}'." );
                         return false;
                     }
                     Branch master = Git.Branches[World.MasterBranchName];
@@ -546,21 +547,21 @@ namespace CK.Env
                     {
                         if( !bDevelop.IsCurrentRepositoryHead )
                         {
-                            m.Error( $"Expected current branch to be '{World.DevelopBranchName}' or '{World.MasterBranchName}'." );
+                            monitor.Error( $"Expected current branch to be '{World.DevelopBranchName}' or '{World.MasterBranchName}'." );
                             return false;
                         }
-                        if( !CheckCleanCommit( m ) ) return false;
+                        if( !CheckCleanCommit( monitor ) ) return false;
                         if( master == null )
                         {
-                            m.Info( $"Creating the {World.MasterBranchName }." );
+                            monitor.Info( $"Creating the {World.MasterBranchName }." );
                             master = Git.CreateBranch( World.MasterBranchName );
                         }
                         Commands.Checkout( Git, master );
-                        OnNewCurrentBranch( m );
+                        OnNewCurrentBranch( monitor );
                     }
                     else
                     {
-                        m.Trace( $"Already on {World.MasterBranchName}." );
+                        monitor.Trace( $"Already on {World.MasterBranchName}." );
                     }
 
                     var merger = Git.Config.BuildSignature( DateTimeOffset.Now );
@@ -572,18 +573,18 @@ namespace CK.Env
                     } );
                     if( r.Status == MergeStatus.Conflicts )
                     {
-                        m.Error( $"Merge failed from '{World.DevelopBranchName}' to '{World.MasterBranchName}': conflicts must be manually resolved." );
+                        monitor.Error( $"Merge failed from '{World.DevelopBranchName}' to '{World.MasterBranchName}': conflicts must be manually resolved." );
                         return false;
                     }
                     if( r.Status != MergeStatus.UpToDate )
                     {
-                        m.CloseGroup( $"Success (with merge from '{World.DevelopBranchName}')." );
+                        monitor.CloseGroup( $"Success (with merge from '{World.DevelopBranchName}')." );
                     }
                     return true;
                 }
                 catch( Exception ex )
                 {
-                    m.Error( ex );
+                    monitor.Error( ex );
                     return false;
                 }
             }
@@ -593,29 +594,29 @@ namespace CK.Env
         /// Checkouts '<see cref="IWorldName.DevelopBranchName"/>' branch (that must be clean)
         /// and merges current 'local' in it.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool SwitchLocalToDevelop( IActivityMonitor m )
+        public bool SwitchLocalToDevelop( IActivityMonitor monitor )
         {
-            using( m.OpenInfo( $"Switching '{SubPath}' to branch '{World.DevelopBranchName}'." ) )
+            using( monitor.OpenInfo( $"Switching '{SubPath}' to branch '{World.DevelopBranchName}'." ) )
             {
                 try
                 {
                     Branch bDevelop = Git.Branches[World.DevelopBranchName];
                     if( bDevelop == null )
                     {
-                        m.Error( $"Unable to find '{World.DevelopBranchName}' branch." );
+                        monitor.Error( $"Unable to find '{World.DevelopBranchName}' branch." );
                         return false;
                     }
                     Branch bLocal = Git.Branches[World.LocalBranchName];
                     if( bLocal == null )
                     {
-                        m.Error( $"Unable to find '{World.LocalBranchName}' branch." );
+                        monitor.Error( $"Unable to find '{World.LocalBranchName}' branch." );
                         return false;
                     }
                     if( !bDevelop.IsCurrentRepositoryHead && !bLocal.IsCurrentRepositoryHead )
                     {
-                        m.Error( $"Must be on '{World.LocalBranchName}' or '{World.DevelopBranchName}' branch." );
+                        monitor.Error( $"Must be on '{World.LocalBranchName}' or '{World.DevelopBranchName}' branch." );
                         return false;
                     }
 
@@ -623,18 +624,18 @@ namespace CK.Env
                     MergeFileFavor mergeFileFavor = MergeFileFavor.Normal;
                     if( bLocal.IsCurrentRepositoryHead )
                     {
-                        if( !RaiseEnteredLocalBranch( m, false ) ) return false;
-                        if( AmendCommit( m ) == CommittingResult.Error ) return false;
+                        if( !RaiseEnteredLocalBranch( monitor, false ) ) return false;
+                        if( AmendCommit( monitor ) == CommittingResult.Error ) return false;
                         Commands.Checkout( Git, bDevelop );
-                        OnNewCurrentBranch( m );
-                        m.Info( $"Coming from {World.LocalBranchName}: privilegiates 'local' file changes during merge." );
+                        OnNewCurrentBranch( monitor );
+                        monitor.Info( $"Coming from {World.LocalBranchName}: privilegiates 'local' file changes during merge." );
                         mergeFileFavor = MergeFileFavor.Theirs;
                     }
                     else
                     {
-                        if( !CheckCleanCommit( m ) ) return false;
-                        EnsureCurrentBranchPlugins( m );
-                        m.Info( $"Already on {World.DevelopBranchName}: privilegiates 'develop' file changes during merge." );
+                        if( !CheckCleanCommit( monitor ) ) return false;
+                        EnsureCurrentBranchPlugins( monitor );
+                        monitor.Info( $"Already on {World.DevelopBranchName}: privilegiates 'develop' file changes during merge." );
                         mergeFileFavor = MergeFileFavor.Ours;
                     }
 
@@ -648,18 +649,18 @@ namespace CK.Env
                     } );
                     if( r.Status == MergeStatus.Conflicts )
                     {
-                        m.Error( $"Merge failed from '{World.LocalBranchName}' into '{World.DevelopBranchName}': conflicts must be manually resolved." );
+                        monitor.Error( $"Merge failed from '{World.LocalBranchName}' into '{World.DevelopBranchName}': conflicts must be manually resolved." );
                         return false;
                     }
                     if( r.Status != MergeStatus.UpToDate )
                     {
-                        m.CloseGroup( $"Success (with merge from '{World.LocalBranchName}')." );
+                        monitor.CloseGroup( $"Success (with merge from '{World.LocalBranchName}')." );
                     }
                     return true;
                 }
                 catch( Exception ex )
                 {
-                    m.Error( ex );
+                    monitor.Error( ex );
                     return false;
                 }
             }
