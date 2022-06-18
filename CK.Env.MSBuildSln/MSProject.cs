@@ -8,8 +8,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Xml.Linq;
 
-#nullable enable
-
 namespace CK.Env.MSBuildSln
 {
     public class MSProject : Project

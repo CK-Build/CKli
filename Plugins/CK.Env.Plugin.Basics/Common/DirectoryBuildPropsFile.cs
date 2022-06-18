@@ -1,18 +1,18 @@
 using CK.Core;
 using CK.Env.DependencyModel;
-
+using CK.Env.MSBuildSln;
 using System.Diagnostics;
 using System.Linq;
 using System.Xml.Linq;
 
 namespace CK.Env.Plugin
 {
-    public class SharedPropsFile : XmlFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
+    public class DirectoryBuildPropsFile : XmlFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly SolutionDriver _driver;
         readonly SolutionSpec _solutionSpec;
 
-        public SharedPropsFile( GitRepository f, SolutionDriver driver, SolutionSpec solutionSpec, NormalizedPath branchPath )
+        public DirectoryBuildPropsFile( GitRepository f, SolutionDriver driver, SolutionSpec solutionSpec, NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "Directory.Build.props" ), rootName: "Project" )
         {
             _driver = driver;
@@ -31,15 +31,24 @@ namespace CK.Env.Plugin
                 Delete( monitor );
                 return;
             }
+            var s = _driver.GetSolution( monitor, false );
+            if( s == null ) return;
+
+            // Moves the old Shared.props if any.
             var pathOld = FilePath.RemoveLastPart().Combine( "Common/Shared.props" );
             var existingOld = FileSystem.GetFileInfo( pathOld );
             if( existingOld.Exists )
             {
                 Document = existingOld.ReadAsXDocument();
                 FileSystem.Delete( monitor, pathOld );
+                var sln = s.Tag<SolutionFile>();
+                if( sln != null )
+                {
+                    sln.EnsureSolutionItemFile( monitor, FilePath.RemovePrefix( BranchPath ), saveFile: false );
+                    sln.RemoveSolutionItemFile( monitor, "Common\\Shared.props", saveFile: false );
+                }
             }
-            var s = _driver.GetSolution( monitor, false );
-            if( s == null ) return;
+
             bool useCentralPackage = s.Projects.Select( p => p.Tag<MSBuildSln.MSProject>() )
                                                .Where( p => p != null )
                                                .Any( p => p.UseMicrosoftBuildCentralPackageVersions );
@@ -50,7 +59,7 @@ namespace CK.Env.Plugin
 
             HandleBasicDefinitions( monitor, useCentralPackage );
             HandleStandardProperties( monitor );
-            XCommentSection.Find( Document.Root, "ReproducibleBuilds" )?.Remove();
+            HandleReproducibleBuilds( monitor );
             HandleZeroVersion( monitor );
             HandleAnalyzers( monitor, useCentralPackage );
             HandleGenerateDocumentation( monitor );
@@ -101,14 +110,11 @@ namespace CK.Env.Plugin
   -->
   <ContinuousIntegrationBuild Condition="" '$(CakeBuild)' == 'true' "">true</ContinuousIntegrationBuild>
 
-  <!-- Enable Deterministic build. https://github.com/dotnet/reproducible-builds -->
-  <PackageReference Include=""DotNet.ReproducibleBuilds"" Version=""1.1.1"" PrivateAssets=""All""/>
 
   <!-- InformationalVersion is either the Zero version or provided by the CodeCakeBuilder when in CI build). -->
   <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
 
-</PropertyGroup>
-" );
+</PropertyGroup>" );
             if( useCentralPackages )
             {
                 propertyGroup.Add(
@@ -116,13 +122,31 @@ namespace CK.Env.Plugin
                     new XElement( "CentralPackagesFile", "$(MSBuildThisFileDirectory)CentralPackages.props" ) );
             }
 
-            var itemGroup = XElement.Parse(
+            var sourceRoot = XElement.Parse(
 @"<!-- This is always good to define the SourceRoot, even if DeterministicSourcePaths is off. -->
 <ItemGroup>
   <SourceRoot Include=""$(SolutionDir)"" />
 </ItemGroup>" );
 
-            section.SetContent( propertyGroup, itemGroup );
+            section.SetContent( propertyGroup, sourceRoot );
+        }
+
+        void HandleReproducibleBuilds( IActivityMonitor monitor )
+        {
+            Debug.Assert( Document != null && Document.Root != null );
+
+            const string sectionName = "ReproducibleBuilds";
+            var section = XCommentSection.FindOrCreate( Document.Root, sectionName );
+
+            var isolatedBuildsComments = new XComment( @"Guaranty that the build is isolated. https://github.com/dotnet/reproducible-builds#dotnetreproduciblebuildsisolated-documentation-and-nuget-package" );
+            var isolatedBuilds = XElement.Parse( @"<Sdk Name=""DotNet.ReproducibleBuilds.Isolated"" Version=""1.1.1"" />" );
+            var reproBuildsComments = new XComment( @"Enable Deterministic build. https://github.com/dotnet/reproducible-builds. SourceLink is automatically managed by this package." );
+            var reproBuilds = XElement.Parse(
+@"<ItemGroup>
+  <PackageReference Include=""DotNet.ReproducibleBuilds"" Version=""1.1.1"" PrivateAssets=""All""/>
+</ItemGroup>" );
+
+            section.SetContent( reproBuildsComments, reproBuilds, isolatedBuildsComments, isolatedBuilds );
         }
 
         void HandleStandardProperties( IActivityMonitor m )
@@ -149,18 +173,18 @@ namespace CK.Env.Plugin
                             new XElement( "NoWarn", "NU5105" ),
                             new XComment( "Considering .net6 'global using' to be an opt-in (simply reproduce this with 'false' in the csproj if needed)." ),
                             new XElement( "DisableImplicitNamespaceImports", "true" ),
-                            new XElement( "PackageIcon", "$(SolutionDir)/Common/PackageIcon.png" ) );
+                            new XElement( "PackageIcon", "PackageIcon.png" ) );
 
             if( !_solutionSpec.NoStrongNameSigning )
             {
-                p.Add( new XElement( "AssemblyOriginatorKeyFile", "$(SolutionDir)/Common/SharedKey.snk" ),
+                p.Add( new XElement( "AssemblyOriginatorKeyFile", "$(SolutionDir)Common/SharedKey.snk" ),
                        new XElement( "SignAssembly", true ),
                        new XElement( "PublicSign", new XAttribute( "Condition", " '$(OS)' != 'Windows_NT' " ), true ) );
             }
 
             var i = new XElement( "ItemGroup",
                         new XElement( "None",
-                            new XAttribute( "Include", "$(PackageIcon)" ),
+                            new XAttribute( "Include", "$(SolutionDir)Common/PackageIcon.png" ),
                             new XAttribute( "Pack", "true" ),
                             new XAttribute( "PackagePath", "\\" ),
                             new XAttribute( "Visible", "false" ) ) );

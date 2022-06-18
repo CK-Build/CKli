@@ -1,4 +1,5 @@
 using CK.Core;
+using CK.Env.MSBuildSln;
 using CK.SimpleKeyVault;
 
 using SharpYaml.Model;
@@ -33,12 +34,12 @@ namespace CK.Env.Plugin
         public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
 
         [CommandMethod]
-        public void ApplySettings( IActivityMonitor m )
+        public void ApplySettings( IActivityMonitor monitor )
         {
-            if( !this.CheckCurrentBranch( m ) ) return;
-            YamlMapping firstMapping = GetFirstMapping( m, true );
+            if( !this.CheckCurrentBranch( monitor ) ) return;
+            YamlMapping firstMapping = GetFirstMapping( monitor, true );
             if( firstMapping == null ) return;
-            var solution = _driver.GetSolution( m, allowInvalidSolution: true );
+            var solution = _driver.GetSolution( monitor, allowInvalidSolution: true );
             if( solution == null ) return;
 
             // We don't use AppVeyor for private repositories.
@@ -46,16 +47,20 @@ namespace CK.Env.Plugin
             {
                 if( TextContent != null )
                 {
-                    m.Log( LogLevel.Info, "The project is private, so we don't use Appveyor and the Appveyor.yml is not needed." );
-                    Delete( m );
+                    monitor.Log( LogLevel.Info, "The project is private, so we don't use Appveyor and the Appveyor.yml is not needed." );
+                    solution.Tag<SolutionFile>()?.RemoveSolutionItemFile( monitor, FilePath.RemovePrefix( BranchPath ) );
+                    Delete( monitor );
                 }
                 return;
             }
+            // Ensure the Appveyor.yml appears in the "Solution Items".
+            solution.Tag<SolutionFile>()?.EnsureSolutionItemFile( monitor, FilePath.RemovePrefix( BranchPath ) );
+
             // We currently always use AppVeyor when the repository is public.
-            YamlMapping env = FindOrCreateYamlElement( m, firstMapping, "environment" );
+            YamlMapping env = FindOrCreateYamlElement( monitor, firstMapping, "environment" );
             if( env == null ) return;
 
-            var passphrase = _keyStore.GetSecretKey( m, SolutionDriver.CODECAKEBUILDER_SECRET_KEY, false );
+            var passphrase = _keyStore.GetSecretKey( monitor, SolutionDriver.CODECAKEBUILDER_SECRET_KEY, false );
             if( passphrase != null )
             {
                 var central = KeyVault.DecryptValues( _sharedState.CICDKeyVault, passphrase );
@@ -65,12 +70,12 @@ namespace CK.Env.Plugin
                 }
                 else
                 {
-                    m.Warn( $"Update of {SolutionDriver.CODECAKEBUILDER_SECRET_KEY} encrypted secure key has been skipped: {APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY} key should be defined in CICDKeyVault." );
+                    monitor.Warn( $"Update of {SolutionDriver.CODECAKEBUILDER_SECRET_KEY} encrypted secure key has been skipped: {APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY} key should be defined in CICDKeyVault." );
                 }
             }
             else
             {
-                m.Info( $"Update of {SolutionDriver.CODECAKEBUILDER_SECRET_KEY} encrypted secure skipped." );
+                monitor.Info( $"Update of {SolutionDriver.CODECAKEBUILDER_SECRET_KEY} encrypted secure skipped." );
             }
             // Remove obsolete environment variables definitions.
             env.Remove( "NUGET_API_KEY" );
@@ -99,7 +104,7 @@ namespace CK.Env.Plugin
                                                             && m["cmd"] is YamlValue v
                                                             && v.Value.StartsWith( "npm install -g npm@" ) ).Count() > 0 )
                 {
-                    m.Info( "Removed npm install with a specific version (using the Appveyor's installed one)." );
+                    monitor.Info( "Removed npm install with a specific version (using the Appveyor's installed one)." );
                 }
                 if( inst.Count == 0 )
                 {
@@ -118,7 +123,7 @@ namespace CK.Env.Plugin
             EnsureDefaultBranches( firstMapping );
             SetSequence( firstMapping, "build_script", new YamlValue( "dotnet run --project CodeCakeBuilder -nointeraction" ) );
             firstMapping["test"] = new YamlValue( "off" );
-            CreateOrUpdate( m, YamlMappingToString( m ) );
+            CreateOrUpdate( monitor, YamlMappingToString( monitor ) );
         }
 
         void EnsureDefaultBranches( YamlMapping firstMapping )

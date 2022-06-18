@@ -2,6 +2,7 @@ using CK.Core;
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Xml.Linq;
 
@@ -24,13 +25,19 @@ namespace CK.Env.MSBuildSln
             public readonly XElement ImportElement;
 
             /// <summary>
+            /// The file path.
+            /// </summary>
+            public readonly NormalizedPath Path;
+
+            /// <summary>
             /// The imported file. Can be null if the file has not been found.
             /// </summary>
-            public readonly MSProjFile ImportedFile;
+            public readonly MSProjFile? ImportedFile;
 
-            internal Import( XElement e, MSProjFile f )
+            internal Import( XElement e, NormalizedPath path, MSProjFile? f )
             {
                 ImportElement = e;
+                Path = path;
                 ImportedFile = f;
             }
 
@@ -38,13 +45,14 @@ namespace CK.Env.MSBuildSln
         }
 
         IReadOnlyList<MSProjFile> _allFiles;
+        List<Import> _imports;
         bool _hasChanged;
 
         MSProjFile( NormalizedPath p, XDocument d, List<Import> imports )
         {
             Path = p;
             Document = d;
-            Imports = imports;
+            _imports = imports;
             Document.Changed += OnDocumentChanged;
         }
 
@@ -55,13 +63,12 @@ namespace CK.Env.MSBuildSln
         /// <param name="path">The file path relative to the <see cref="FileSystem"/>.</param>
         /// <param name="cache">Cache by path.</param>
         /// <returns>The file or null if unable to load it.</returns>
-        public static MSProjFile FindOrLoadProjectFile(
-            FileSystem fs,
-            IActivityMonitor m,
-            NormalizedPath path,
-            Dictionary<NormalizedPath, MSProjFile> cache )
+        public static MSProjFile FindOrLoadProjectFile( FileSystem fs,
+                                                        IActivityMonitor m,
+                                                        NormalizedPath path,
+                                                        Dictionary<NormalizedPath, MSProjFile> cache )
         {
-            if( cache.TryGetValue( path, out MSProjFile f ) )
+            if( cache.TryGetValue( path, out MSProjFile? f ) )
             {
                 return f;
             }
@@ -72,7 +79,7 @@ namespace CK.Env.MSBuildSln
                     var fP = fs.GetFileInfo( path );
                     if( !fP.Exists )
                     {
-                        m.Warn( $"Unable to find project file '{path}'. This project is ignored. This may be a case sensivity issue!" );
+                        m.Warn( $"Unable to find project file '{path}'. This project is ignored. This may be a case sensitivity issue!" );
                         return null;
                     }
                     XDocument content = fP.ReadAsXDocument();
@@ -84,7 +91,8 @@ namespace CK.Env.MSBuildSln
                                         .Where( i => i.Attribute( "Sdk" ) == null )
                                         .Select( i => (E: i, P: (string)i.Attribute( "Project" )) )
                                         .Where( i => i.P != null )
-                                        .Select( i => new Import( i.E, FindOrLoadProjectFile( fs, m, folder.Combine( i.P ).ResolveDots(), cache ) ) ) );
+                                        .Select( i => (E: i.E, P: folder.Combine( i.P ).ResolveDots()) )
+                                        .Select( i => new Import( i.E, i.P, FindOrLoadProjectFile( fs, m, i.P, cache ) ) ) );
 
                     f.Initialize();
                     return f;
@@ -109,14 +117,44 @@ namespace CK.Env.MSBuildSln
         /// <summary>
         /// Gets all the imports in this file.
         /// </summary>
-        public IReadOnlyList<Import> Imports { get; }
+        public IReadOnlyList<Import> Imports => _imports;
+
+        public bool RemoveImport( Import import ) => RemoveImport( import.ImportElement );
+
+        public bool RemoveImport( XElement importElement ) => DoRemoveAt( _imports.IndexOf( i => i.ImportElement == importElement ) );
+
+        public void RemoveImports( Func<Import, bool> filter )
+        {
+            int i = 0;
+            while( i < _imports.Count )
+            {
+                if( filter( _imports[i] ) )
+                {
+                    DoRemoveAt( i );
+                }
+                else
+                {
+                    ++i;
+                }
+            }
+        }
+
+        private bool DoRemoveAt( int idx )
+        {
+            if( idx < 0 ) return false;
+            var i = _imports[idx];
+            i.ImportElement.Remove();
+            Debug.Assert( _hasChanged, "The OnDocumentChanged did its job." );
+            _imports.RemoveAt( idx );
+            return true;
+        }
 
         /// <summary>
         /// Gets a list starting with this one and all the imported files without duplicate.
         /// </summary>
         public IReadOnlyList<MSProjFile> AllFiles => _allFiles;
 
-        void OnDocumentChanged( object sender, XObjectChangeEventArgs e )
+        void OnDocumentChanged( object? sender, XObjectChangeEventArgs e )
         {
             _hasChanged = true;
         }

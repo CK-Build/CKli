@@ -1,7 +1,7 @@
 using CK.Core;
 using CK.Env.DependencyModel;
 using CK.Env.MSBuildSln;
-
+using System.Diagnostics;
 using System.Linq;
 
 namespace CK.Env.Plugin
@@ -34,8 +34,13 @@ namespace CK.Env.Plugin
 
             foreach( (IProject project, MSProject msproject) in csprojs )
             {
+                if( msproject.ProjectFile == null )
+                {
+                    m.Warn( $"Project {project.Name} has no project file. It is skipped." );
+                    continue;
+                }
                 // Removing the old <Import Project="..\Common\Shared.props" />.
-                msproject.ProjectFile?.Imports.FirstOrDefault( i => i.ImportedFile?.Path.LastPart == "Shared.props" ).ImportElement?.Remove();
+                msproject.ProjectFile.RemoveImports( i => i.Path.LastPart == "Shared.props" );
 
                 if( project.IsPublished )
                 {

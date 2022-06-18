@@ -1,6 +1,8 @@
 using CK.Core;
+using CK.Env.MSBuildSln;
 using CK.SimpleKeyVault;
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Xml.Linq;
 
@@ -14,7 +16,12 @@ namespace CK.Env.Plugin
         readonly SecretKeyStore _secretStore;
         XElement _packageSources;
 
-        public NugetConfigFile( GitRepository f, SolutionDriver driver, IEnvLocalFeedProvider localFeedProvider, SecretKeyStore secretStore, SolutionSpec s, NormalizedPath branchPath )
+        public NugetConfigFile( GitRepository f,
+                                SolutionDriver driver,
+                                IEnvLocalFeedProvider localFeedProvider,
+                                SecretKeyStore secretStore,
+                                SolutionSpec s,
+                                NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "NuGet.config" ), null )
         {
             _localFeedProvider = localFeedProvider;
@@ -31,7 +38,7 @@ namespace CK.Env.Plugin
             _solutionDriver.OnSolutionConfiguration += OnSolutionConfiguration;
         }
 
-        void OnZeroBuildProject( object sender, ZeroBuildEventArgs e )
+        void OnZeroBuildProject( object? sender, ZeroBuildEventArgs e )
         {
             if( e.IsStarting )
             {
@@ -42,7 +49,7 @@ namespace CK.Env.Plugin
             // else RemoveFeed( e.Monitor, "ZeroBuild-Feed" );
         }
 
-        void OnStartBuild( object sender, BuildStartEventArgs e )
+        void OnStartBuild( object? sender, BuildStartEventArgs e )
         {
             if( !e.IsUsingDirtyFolder ) return;
 
@@ -52,29 +59,29 @@ namespace CK.Env.Plugin
             Save( e.Monitor );
         }
 
-        void OnLocalBranchEntered( object sender, EventMonitoredArgs e )
+        void OnLocalBranchEntered( object? sender, EventMonitoredArgs e )
         {
             EnsureLocalFeeds( e.Monitor, true, true, true );
             Save( e.Monitor );
         }
 
-        void OnLocalBranchLeaving( object sender, EventMonitoredArgs e )
+        void OnLocalBranchLeaving( object? sender, EventMonitoredArgs e )
         {
             RemoveLocalFeeds( e.Monitor );
             Save( e.Monitor );
         }
 
-        void OnSolutionConfiguration( object sender, SolutionConfigurationEventArgs e )
+        void OnSolutionConfiguration( object? sender, SolutionConfigurationEventArgs e )
         {
             // These values are not build secrets. They are required by ApplySettings to configure
             // the NuGet.config file: once done, restore can be made and having these keys available
             // as environment variables will not help.
             var creds = e.Solution.ArtifactSources.OfType<INuGetFeed>()
                             .Where( s => s.Credentials != null && s.Credentials.IsSecretKeyName )
-                            .Select( s => s.Credentials.PasswordOrSecretKeyName );
+                            .Select( s => s.Credentials!.PasswordOrSecretKeyName );
             foreach( var c in creds )
             {
-                _secretStore.DeclareSecretKey( c, current => current?.Description ?? "Needed to configure NuGet.config file." );
+                _secretStore.DeclareSecretKey( c!, current => current?.Description ?? "Needed to configure NuGet.config file." );
             }
         }
 
@@ -94,59 +101,62 @@ namespace CK.Env.Plugin
         public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
 
         [CommandMethod]
-        public void ApplySettings( IActivityMonitor m )
+        public void ApplySettings( IActivityMonitor monitor )
         {
-            if( !this.CheckCurrentBranch( m ) ) return;
+            if( !this.CheckCurrentBranch( monitor ) ) return;
 
-            var solution = _solutionDriver.GetSolution( m, allowInvalidSolution: true );
+            var solution = _solutionDriver.GetSolution( monitor, allowInvalidSolution: true );
             if( solution == null ) return;
+
+            // Update the "Solution Items" folder.
+            solution.Tag<SolutionFile>()?.EnsureSolutionItemFile( monitor, FilePath.RemovePrefix( BranchPath ) );
 
             EnsureDocument();
             PackageSources.EnsureFirstElement( "clear" );
             foreach( var s in solution.ArtifactSources.OfType<INuGetFeed>() )
             {
-                EnsureFeed( m, s.Name, s.Url );
+                EnsureFeed( monitor, s.Name, s.Url );
                 if( s.Credentials != null )
                 {
-                    string password = s.Credentials.IsSecretKeyName
-                                        ? _secretStore.GetSecretKey( m, s.Credentials.PasswordOrSecretKeyName, throwOnUnavailable: false )
+                    string? password = s.Credentials.IsSecretKeyName
+                                        ? _secretStore.GetSecretKey( monitor, s.Credentials.PasswordOrSecretKeyName, throwOnUnavailable: false )
                                         : s.Credentials.PasswordOrSecretKeyName;
                     if( password != null )
                     {
-                        EnsureFeedCredentials( m, s.Name, s.Credentials.UserName, password );
+                        EnsureFeedCredentials( monitor, s.Name, s.Credentials.UserName, password );
                     }
                     else
                     {
                         if( s.Credentials.IsSecretKeyName )
-                            m.Warn( $"Secret '{s.Credentials.PasswordOrSecretKeyName}' is not known. Configuration for feed '{s.Name}' skipped." );
-                        else m.Warn( $"Empty feed password. Configuration for feed '{s.Name}' skipped." );
+                            monitor.Warn( $"Secret '{s.Credentials.PasswordOrSecretKeyName}' is not known. Configuration for feed '{s.Name}' skipped." );
+                        else monitor.Warn( $"Empty feed password. Configuration for feed '{s.Name}' skipped." );
                     }
                 }
                 else
                 {
-                    DeleteFeedCredentials( m, s.Name );
+                    DeleteFeedCredentials( monitor, s.Name );
                 }
             }
-            var packages = EnsureDocument().Root.Element( "packageSourceCredentials" );
-            if( !packages?.Nodes().Any() ?? false )
+            var packages = EnsureDocument().Root!.Element( "packageSourceCredentials" );
+            if( packages != null && !packages.Nodes().Any() )
             {
                 packages.Remove();
             }
             foreach( var name in _solutionSpec.RemoveNuGetSourceNames )
             {
-                RemoveFeed( m, name, withCredentials: true );
+                RemoveFeed( monitor, name, withCredentials: true );
             }
             // Cleanup if ever needed.
-            RemoveFeed( m, "ZeroBuild-Feed" );
+            RemoveFeed( monitor, "ZeroBuild-Feed" );
             if( IsOnLocalBranch )
             {
-                EnsureLocalFeeds( m );
+                EnsureLocalFeeds( monitor );
             }
             else
             {
-                RemoveLocalFeeds( m );
+                RemoveLocalFeeds( monitor );
             }
-            Save( m );
+            Save( monitor );
         }
 
         /// <summary>

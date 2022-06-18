@@ -45,8 +45,8 @@ namespace CK.Env
         /// <returns>True on success, false on name conflict.</returns>
         public bool RegisterName( IActivityMonitor monitor, XName n, Type t, bool throwOnConflict = true )
         {
-            if( n == null ) throw new ArgumentNullException( nameof( n ) );
-            if( t == null ) throw new ArgumentNullException( nameof( t ) );
+            Throw.CheckNotNullArgument( n );
+            Throw.CheckNotNullArgument( t );
             return DoRegister( monitor, n, t, throwOnConflict );
         }
 
@@ -61,8 +61,8 @@ namespace CK.Env
         /// <param name="throwOnConflict">False to ignore name conflicts.</param>
         public void RegisterNames( IActivityMonitor monitor, IEnumerable<Type> types, Func<Type, IEnumerable<XName>> namer, bool throwOnConflict = true )
         {
-            if( types == null ) throw new ArgumentNullException( nameof( types ) );
-            if( namer == null ) throw new ArgumentNullException( nameof( namer ) );
+            Throw.CheckNotNullArgument( types );
+            Throw.CheckNotNullArgument( namer );
             foreach( var t in types )
             {
                 var n = namer( t );

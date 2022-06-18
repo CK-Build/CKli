@@ -13,12 +13,11 @@ namespace CK.Env.MSBuildSln
         readonly Dictionary<string, PropertyLine> _versionControlProperties;
         readonly Dictionary<string, PropertyLine> _platformConfigurationProperties;
 
-        internal Project(
-                    SolutionFile solution,
-                    string projectGuid,
-                    string projectTypeGuid,
-                    string projectName,
-                    NormalizedPath relativePath )
+        internal Project( SolutionFile solution,
+                          string projectGuid,
+                          string projectTypeGuid,
+                          string projectName,
+                          NormalizedPath relativePath )
             : base( solution, projectGuid, projectTypeGuid, projectName, relativePath )
         {
             _versionControlProperties = new Dictionary<string, PropertyLine>( StringComparer.OrdinalIgnoreCase );
