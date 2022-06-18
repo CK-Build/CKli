@@ -1,7 +1,7 @@
 using CK.Core;
 using CK.Env.DependencyModel;
 using CK.Env.MSBuildSln;
-
+using System.Diagnostics;
 using System.Linq;
 
 namespace CK.Env.Plugin
@@ -10,10 +10,9 @@ namespace CK.Env.Plugin
     {
         private readonly SolutionDriver _solutionDriver;
 
-        public CSProjFile(
-             GitRepository f,
-             NormalizedPath branchPath,
-            SolutionDriver solutionDriver )
+        public CSProjFile( GitRepository f,
+                           NormalizedPath branchPath,
+                           SolutionDriver solutionDriver )
              : base( f, branchPath )
         {
             _solutionDriver = solutionDriver;
@@ -31,10 +30,18 @@ namespace CK.Env.Plugin
             var solution = _solutionDriver.GetSolution( m, allowInvalidSolution: true );
             if( solution == null ) return;
 
-            var csprojs = solution.Projects.Select<IProject, (IProject project, MSProject msproject)>( p => (p, p.Tag<MSProject>()) ).Where( p => p.Item2 != null );
+            var csprojs = solution.Projects.Select<IProject, (IProject project, MSProject msproject)>( p => (p, p.Tag<MSProject>()!) ).Where( p => p.Item2 != null );
 
             foreach( (IProject project, MSProject msproject) in csprojs )
             {
+                if( msproject.ProjectFile == null )
+                {
+                    m.Warn( $"Project {project.Name} has no project file. It is skipped." );
+                    continue;
+                }
+                // Removing the old <Import Project="..\Common\Shared.props" />.
+                msproject.ProjectFile.RemoveImports( i => i.Path.LastPart == "Shared.props" );
+
                 if( project.IsPublished )
                 {
                     // For test projects we want the IsPackable element to be explicit.

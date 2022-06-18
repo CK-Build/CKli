@@ -219,9 +219,9 @@ namespace CK.Env
         /// <param name="content">The content text.</param>
         /// <param name="destination">The target path in this file system.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool CopyTo( IActivityMonitor m, string content, NormalizedPath destination, Encoding encoding = null )
+        public bool CopyTo( IActivityMonitor m, string content, NormalizedPath destination, Encoding? encoding = null )
         {
-            if( content == null ) throw new ArgumentNullException( nameof( content ) );
+            Throw.CheckNotNullArgument( content );
             var fDest = GetWritableDestination( m, ref destination );
             if( fDest == null ) return false;
             using( m.OpenInfo( $"{(fDest.Exists ? "Replacing" : "Creating")} {destination}." ) )

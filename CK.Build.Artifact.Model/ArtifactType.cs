@@ -62,7 +62,7 @@ namespace CK.Build
         /// <returns>The single registered type or null.</returns>
         public static ArtifactType? SingleOrDefault( string name )
         {
-            if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
+            Throw.CheckNotNullOrWhiteSpaceArgument( name );
             var types = _types;
             foreach( var t in types ) if( t.Name == name ) return t;
             return null;
@@ -87,7 +87,7 @@ namespace CK.Build
                     if( t.IsInstallable != isInstallable
                         || (t.ContextSavors?.Separator ?? '\0') != savorSeparator )
                     {
-                        throw new InvalidOperationException( $"Type {name} is already defined with IsInstallable/Savors=({t.IsInstallable},{(t.ContextSavors != null ? t.ContextSavors.Separator.ToString() : "(none)")}). It cannot be redefined with {isInstallable},{(savorSeparator != '\0' ? savorSeparator.ToString() : "(none)")}" );
+                        Throw.InvalidOperationException( $"Type {name} is already defined with IsInstallable/Savors=({t.IsInstallable},{(t.ContextSavors != null ? t.ContextSavors.Separator.ToString() : "(none)")}). It cannot be redefined with {isInstallable},{(savorSeparator != '\0' ? savorSeparator.ToString() : "(none)")}" );
                     }
                 }
                 return t;
@@ -114,7 +114,7 @@ namespace CK.Build
         /// </summary>
         /// <param name="other">The other type to compare to. Can be null.</param>
         /// <returns>The negative/zero/positive standard value.</returns>
-        public int CompareTo( ArtifactType other ) => other != null ? Name.CompareTo( other.Name ) : 1;
+        public int CompareTo( ArtifactType? other ) => other != null ? Name.CompareTo( other.Name ) : 1;
 
         /// <summary>
         /// Returns the <see cref="Name"/>.

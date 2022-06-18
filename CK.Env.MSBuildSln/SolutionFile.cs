@@ -62,6 +62,45 @@ namespace CK.Env.MSBuildSln
             SetDirtyStructure( true );
         }
 
+        const string SolutionFolderName = "Solution Items";
+
+        /// <summary>
+        /// Ensures that a <see cref="SolutionFolder"/> named "Solution Items" exists.
+        /// </summary>
+        /// <returns>The "Solution Items" folder.</returns>
+        public SolutionFolder FindOrCreateSolutionItemsFolder()
+        {
+            SolutionFolder? f = _projectBaseList.OfType<SolutionFolder>().FirstOrDefault( s => s.ProjectName == SolutionFolderName );
+            if( f == null )
+            {
+                f = _projectBaseList.OfType<SolutionFolder>().FirstOrDefault( s => s.ProjectName == "SolutionItems" || s.ProjectName == "Items" );
+                if( f != null )
+                {
+                    f.ProjectName = SolutionFolderName;
+                }
+                else
+                {
+                    f = new SolutionFolder( this, Guid.NewGuid().ToString( "B" ), SolutionFolderName );
+                    AddProject( f );
+                }
+            }
+            return f;
+        }
+
+        public void EnsureSolutionItemFile( IActivityMonitor monitor, NormalizedPath item, bool saveFile = true )
+        {
+            FindOrCreateSolutionItemsFolder().EnsureItem( item );
+            // Always save if we're asked to save (ignore the fact that this has an impact or not).
+            if( saveFile ) Save( monitor );
+        }
+
+        public void RemoveSolutionItemFile( IActivityMonitor monitor, NormalizedPath item, bool saveFile = true )
+        {
+            FindOrCreateSolutionItemsFolder().RemoveItem( item );
+            // Always save if we're asked to save (ignore the fact that this has an impact or not).
+            if( saveFile ) Save( monitor );
+        }
+
         /// <summary>
         /// Gets all the projects, including <see cref="SolutionFolder"/> projects.
         /// </summary>
@@ -194,16 +233,16 @@ namespace CK.Env.MSBuildSln
         /// <summary>
         /// Saves all files that have been modified.
         /// </summary>
-        /// <param name="m">The monitor.</param>
+        /// <param name="monitor">The monitor.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool Save( IActivityMonitor m )
+        public bool Save( IActivityMonitor monitor )
         {
             bool saved = false;
             if( _isDirtyProjectFiles )
             {
                 foreach( var p in MSProjects )
                 {
-                    if( !p.Save( m ) ) return false;
+                    if( !p.Save( monitor ) ) return false;
                 }
                 CheckDirtyProjectFiles( false );
                 saved = true;
@@ -213,16 +252,16 @@ namespace CK.Env.MSBuildSln
                 using( var w = new System.IO.StringWriter() )
                 {
                     Write( w );
-                    FileSystem.CopyTo( m, w.ToString(), FilePath );
+                    FileSystem.CopyTo( monitor, w.ToString(), FilePath );
                 }
                 saved = true;
             }
             if( StandardDotnetToolConfigFile.IsDirty )
             {
-                StandardDotnetToolConfigFile.Save( m );
+                StandardDotnetToolConfigFile.Save( monitor );
                 saved = true;
             }
-            if( saved ) Saved?.Invoke( this, new EventMonitoredArgs( m ) );
+            if( saved ) Saved?.Invoke( this, new EventMonitoredArgs( monitor ) );
             return true;
         }
 

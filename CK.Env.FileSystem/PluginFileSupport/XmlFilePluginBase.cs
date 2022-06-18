@@ -25,7 +25,7 @@ namespace CK.Env.Plugin
         public XmlFilePluginBase( GitRepository f, NormalizedPath branchPath, NormalizedPath filePath, XName? rootName, Encoding? encoding = null )
             : base( f.FileSystem, filePath, rootName, encoding )
         {
-            if( !filePath.StartsWith( branchPath ) ) throw new ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
+            if( !filePath.StartsWith( branchPath ) ) Throw.ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
             _pluginImpl = new GitBranchPluginImpl( f, branchPath );
         }
 

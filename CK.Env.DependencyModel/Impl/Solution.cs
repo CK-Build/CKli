@@ -19,7 +19,7 @@ namespace CK.Env.DependencyModel
         readonly List<IArtifactFeed> _artifactSources;
         readonly List<SolutionPackageReference> _solutionPackageReferences;
         readonly SolutionContext _ctx;
-        Project _buildProject;
+        Project? _buildProject;
         int _version;
 
         internal Solution( SolutionContext ctx, NormalizedPath fullPath, string name )
@@ -92,7 +92,7 @@ namespace CK.Env.DependencyModel
         /// When not null, the project must belong to this <see cref="Projects"/> and both <see cref="Project.IsPublished"/>
         /// and <see cref="Project.IsTestProject"/> must be false.
         /// </summary>
-        public Project BuildProject
+        public Project? BuildProject
         {
             get => _buildProject;
             set
@@ -101,7 +101,7 @@ namespace CK.Env.DependencyModel
                 {
                     if( value != null )
                     {
-                        if( value.Solution != this ) throw new ArgumentException( "Solution mismatch.", nameof( value ) );
+                        Throw.CheckArgument( "Solution mismatch.", value.Solution == this );
                         if( value.IsPublished || value.IsTestProject )
                         {
                             throw new InvalidOperationException( $"Project {ToString()} must not be Published nor be a Test project to be the Solution's BuildProject." );
@@ -113,7 +113,7 @@ namespace CK.Env.DependencyModel
             }
         }
 
-        IProject ISolution.BuildProject => _buildProject;
+        IProject? ISolution.BuildProject => _buildProject;
 
         /// <summary>
         /// Appends a new project to the <see cref="Projects"/> list if no project with the
@@ -248,7 +248,7 @@ namespace CK.Env.DependencyModel
         /// <param name="target">Referenced package.</param>
         public void EnsureSolutionPackageReference( ArtifactInstance target )
         {
-            if( target == null ) throw new ArgumentNullException( nameof( target ) );
+            Throw.CheckArgument( target.IsValid  );
 
             int idx = _solutionPackageReferences.IndexOf( p => p.Target.Artifact == target.Artifact );
             if( idx >= 0 && _solutionPackageReferences[idx].Target.Version == target.Version ) return;

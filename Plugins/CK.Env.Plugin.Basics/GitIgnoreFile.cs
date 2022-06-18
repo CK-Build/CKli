@@ -1,7 +1,8 @@
 using CK.Core;
-
+using CK.Env.MSBuildSln;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace CK.Env.Plugin
@@ -9,11 +10,13 @@ namespace CK.Env.Plugin
     public class GitIgnoreFile : TextFilePluginBase, IGitBranchPlugin, ICommandMethodsProvider
     {
         readonly SolutionSpec _solutionSpec;
+        readonly SolutionDriver _driver;
 
-        public GitIgnoreFile( GitRepository f, SolutionSpec solutionSpec, NormalizedPath branchPath )
-            : base( f, branchPath, branchPath.AppendPart( ".gitignore" ), UTF8EncodingNoBOM )
+        public GitIgnoreFile( GitRepository f, SolutionDriver driver, SolutionSpec solutionSpec, NormalizedPath branchPath )
+            : base( f, branchPath, branchPath.AppendPart( ".gitignore" ) )
         {
             _solutionSpec = solutionSpec;
+            _driver = driver;
         }
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => FilePath;
@@ -21,8 +24,15 @@ namespace CK.Env.Plugin
         public bool CanApplySettings => GitFolder.CurrentBranchName == BranchPath.LastPart;
 
         [CommandMethod]
-        public void ApplySettings( IActivityMonitor m )
+        public void ApplySettings( IActivityMonitor monitor )
         {
+            var solution = _driver.GetSolution( monitor, allowInvalidSolution: true );
+            if( solution != null )
+            {
+                // Update the "Solution Items" folder.
+                solution.Tag<SolutionFile>()?.EnsureSolutionItemFile( monitor, FilePath.RemovePrefix( BranchPath ) );
+            }
+
             List<string> lines = TextContent != null
                                     ? TextContent
                                         .Split( new[] { "\r\n" }, StringSplitOptions.None )
@@ -58,7 +68,7 @@ namespace CK.Env.Plugin
             }
             if( lines != null )
             {
-                CreateOrUpdate( m, lines.Concatenate( "\r\n" ) );
+                CreateOrUpdate( monitor, lines.Concatenate( "\r\n" ) );
             }
         }
 

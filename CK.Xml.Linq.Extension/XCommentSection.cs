@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text.RegularExpressions;
 
@@ -20,7 +21,11 @@ namespace System.Xml.Linq
             _end = end;
         }
 
-        public static XCommentSection? FindOrCreate( XElement parent, string name, bool createIfNotExists = false )
+        public static XCommentSection FindOrCreate( XElement parent, string name ) => DoFindOrCreate( parent, name, true )!;
+
+        public static XCommentSection? Find( XElement parent, string name ) => DoFindOrCreate( parent, name, false );
+
+        static XCommentSection? DoFindOrCreate( XElement parent, string name, bool createIfNotExists = false )
         {
             var startMarker = "<" + name + ">";
             var endMarker = "</" + name + ">";

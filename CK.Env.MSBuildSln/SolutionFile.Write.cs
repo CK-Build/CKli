@@ -42,12 +42,13 @@ namespace CK.Env.MSBuildSln
                 w.WriteLine( "Project(\"{0}\") = \"{1}\", \"{2}\", \"{3}\"",
                                 project.ProjectTypeGuid,
                                 project.ProjectName,
-                                project.SolutionRelativePath,
+                                project.SolutionRelativePath.ToString( '\\' ),
                                 project.ProjectGuid );
                 if( project is SolutionFolder f )
                 {
                     WriteSection( w, "ProjectSection", "SolutionItems", "preProject",
-                                        f.Items.Select( item => new PropertyLine( item, item ) ) );
+                                        f.Items.Select( i => i.ToString( '\\' ) )
+                                               .Select( v => new PropertyLine( v, v ) ) );
                 }
                 foreach( var projectSection in project.ProjectSections )
                 {

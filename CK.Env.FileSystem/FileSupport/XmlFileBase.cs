@@ -100,7 +100,7 @@ namespace CK.Env
         /// <param name="fs">The file system.</param>
         /// <param name="filePath">The file path (relative to the <see cref="FileSystem"/>).</param>
         /// <param name="rootName">The document's root element name. See <see cref="RootName"/>.</param>
-        /// <param name="encoding">Optional encoding that defaults to UTF-8.</param>
+        /// <param name="encoding">The encoding that defaults to UTF-8 (without Byte Order Mask).</param>
         public XmlFileBase( FileSystem fs, NormalizedPath filePath, XName? rootName, Encoding? encoding = null )
             : base( fs, filePath, encoding )
         {
@@ -111,9 +111,9 @@ namespace CK.Env
         /// <summary>
         /// Gets the document's root element name.
         /// This is used to initialize the document (via <see cref="EnsureDocument"/>) but this is not enforced:
-        /// it can be changed and it's not challenged as long as a document exists.
+        /// the actual document root element can be changed and it's not challenged as long as a document exists.
         /// </summary>
-        public XName? RootName { get;}
+        public XName? RootName { get; }
 
         /// <summary>
         /// Gets or sets whether the documents's <see cref="XDeclaration"/> should be present (or left as-is when set to null).
@@ -160,7 +160,7 @@ namespace CK.Env
 
         /// <summary>
         /// Gets or sets the <see cref="XDocument"/>.
-        /// Null if it does'nt exist (then the file doesn't exist either).
+        /// Null if it doesn't exist (then the file doesn't exist either).
         /// This document is mutable and any change to it are tracked (<see cref="IsDirty"/>
         /// is dynamically updated).
         /// </summary>
@@ -178,16 +178,20 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Ensures that the <see cref="Document"/> exists and that its root is <see cref="RootName"/>.
+        /// Ensures that the <see cref="Document"/> exists and that its root is <see cref="RootName"/> (must be not null
+        /// otherwise an InvalidOperationException is thrown).
         /// </summary>
         /// <param name="updateRootName">True to update the element's root name if it differs from <see cref="RootName"/>.</param>
+        /// <param name="removeAllNamespaces">True to call <see cref="XLinqExtension.RemoveAllNamespaces(XElement)"/> on an existing root.</param>
         /// <returns>The xml document with the root named <see cref="RootName"/>.</returns>
-        public XDocument EnsureDocument( bool updateRootName = false )
+        public XDocument EnsureDocument( bool updateRootName = false, bool removeAllNamespaces = false )
         {
+            Throw.CheckState( RootName != null );
             var d = GetDocument();
-            if( d != null )
+            if( d != null && d.Root != null )
             {
-                if( updateRootName ) d.Root.Name = RootName;
+                if( updateRootName && d.Root.Name != RootName ) d.Root.Name = RootName;
+                if( removeAllNamespaces ) d.Root.RemoveAllNamespaces();
                 return d;
             }
             return Document = new XDocument( new XElement( RootName ) );

@@ -16,22 +16,24 @@ namespace CK.Env
         readonly Encoding _encoding;
 
         /// <summary>
-        /// Gets the UTF-8 encoding without BOM.
+        /// Gets the UTF-8 encoding with BOM: the <see cref="Encoding.UTF8"/>
+        /// rather than the <see cref="Encoding.Default"/> that is (on NetCore)
+        /// UTF8 without BOM.
         /// </summary>
-        public readonly static Encoding UTF8EncodingNoBOM = new UTF8Encoding( false );
+        public readonly static Encoding UTF8EncodingWithBOM = Encoding.UTF8;
 
         /// <summary>
         /// Initializes a new <see cref="TextFileBase"/>.
-        /// You can use <see cref="UTF8EncodingNoBOM"/> to specify that no BOM should be emitted.
+        /// You can use <see cref="UTF8EncodingWithBOM"/> to specify that BOM should be emitted.
         /// </summary>
         /// <param name="fs">The file system.</param>
         /// <param name="filePath">The path to the file relative to the file system root.</param>
-        /// <param name="encoding">The encoding that defaults to UTF-8.</param>
+        /// <param name="encoding">The encoding that defaults to UTF-8 (without Byte Order Mask).</param>
         protected TextFileBase( FileSystem fs, NormalizedPath filePath, Encoding? encoding = null )
         {
             FileSystem = fs;
             FilePath = filePath;
-            _encoding = encoding ?? Encoding.UTF8;
+            _encoding = encoding ?? Encoding.Default;
         }
 
         /// <summary>
@@ -39,7 +41,7 @@ namespace CK.Env
         /// </summary>
         public event EventHandler<EventMonitoredArgs>? OnSavedOrDeleted;
 
-        ITextFileInfo GetFile() => _file ?? (_file = FileSystem.GetFileInfo( FilePath ).AsTextFileInfo( ignoreExtension: true ));
+        ITextFileInfo? GetFile() => _file ?? (_file = FileSystem.GetFileInfo( FilePath ).AsTextFileInfo( ignoreExtension: true ));
 
         /// <summary>
         /// Gets the path in the <see cref="FileSystem"/>.

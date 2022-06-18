@@ -28,17 +28,17 @@ namespace CK.Env.Plugin
         /// </summary>
         /// <param name="f">The folder.</param>
         /// <param name="branchPath">The actual branch path (relative to the <see cref="FileSystem"/>).</param>
-        /// <param name="folderPath">
+        /// <param name="subFolderPath">
         /// The actual sub folder path (ie. 'CodeCakeBuilder') where resources must be updated.</param>
         /// <param name="resourcePrefix">
-        /// Optional resource prfix that defaults to <paramref name="resourceHolder"/>.Namespace + ".Res.".
-        /// When not null, this path prefix is combined withe the namespace of the resourceHolder.
+        /// Optional resource prefix that defaults to <paramref name="resourceHolder"/>.Namespace + ".Res.".
+        /// When not null, this path prefix is combined with the namespace of the resourceHolder.
         /// </param>
         /// <param name="resourceHolder">
         /// Optional type used to locate resources.
         /// By default it is the actual type of this folder object: the defining assembly and namespace are used.
         /// </param>
-        public PluginFolderBase( GitRepository f, NormalizedPath branchPath, NormalizedPath subFolderPath, NormalizedPath? resourcePrefix = null, Type resourceHolder = null )
+        public PluginFolderBase( GitRepository f, NormalizedPath branchPath, NormalizedPath subFolderPath, NormalizedPath? resourcePrefix = null, Type? resourceHolder = null )
             : base( f, branchPath )
         {
             FolderPath = branchPath.Combine( subFolderPath ).ResolveDots( branchPath.Parts.Count );
