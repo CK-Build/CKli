@@ -200,13 +200,16 @@ namespace CK.Env.MSBuildSln
 
         MSProjFile? FindMSProjFileAbove( FileSystem fs, IActivityMonitor m, string fName, Dictionary<NormalizedPath, MSProjFile> cache )
         {
-            var p = SolutionRelativeFolderPath.RemoveLastPart();
-            for( ; ; )
+            if( !SolutionRelativeFolderPath.IsEmptyPath )
             {
-                var f = MSProjFile.FindOrLoadProjectFile( fs, m, Solution.SolutionFolderPath.Combine( p ).AppendPart( fName ), cache, false );
-                if( f != null ) return f;
-                if( p.IsEmptyPath ) break;
-                p = p.RemoveLastPart();
+                var p = SolutionRelativeFolderPath.RemoveLastPart();
+                for(; ; )
+                {
+                    var f = MSProjFile.FindOrLoadProjectFile( fs, m, Solution.SolutionFolderPath.Combine( p ).AppendPart( fName ), cache, false );
+                    if( f != null ) return f;
+                    if( p.IsEmptyPath ) break;
+                    p = p.RemoveLastPart();
+                }
             }
             return null;
         }
