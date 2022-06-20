@@ -3,7 +3,7 @@ using CSemVer;
 using System;
 using System.Collections.Generic;
 
-namespace CK.Build
+namespace CK.Build.PackageDB
 {
     /// <summary>
     /// Simple mutable implementation of <see cref="IPackageInstanceInfo"/>.

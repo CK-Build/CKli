@@ -8,6 +8,7 @@ using System.Xml.Linq;
 using System.IO;
 using System.Threading.Tasks;
 using System.Diagnostics.CodeAnalysis;
+using CK.Build.PackageDB;
 
 namespace CK.Env
 {

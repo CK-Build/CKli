@@ -1,3 +1,4 @@
+using CK.Build.PackageDB;
 using CK.Core;
 using CSemVer;
 using System;
@@ -10,7 +11,7 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 
-namespace CK.Build
+namespace CK.Build.PackageDB
 {
 
     /// <summary>
@@ -21,7 +22,6 @@ namespace CK.Build
         readonly PackageCache _cache;
         IPackageFeed[] _feeds;
         readonly Dictionary<ArtifactInstance, TaskCompletionSource<FullPackageInstanceInfo?>> _currentRequests;
-        readonly object _addLock;
         readonly Queue<IActivityMonitor> _requestMonitors;
 
         /// <summary>
@@ -34,7 +34,6 @@ namespace CK.Build
             _cache = cache;
             _feeds = feeds?.ToArray() ?? Array.Empty<IPackageFeed>();
             _currentRequests = new Dictionary<ArtifactInstance, TaskCompletionSource<FullPackageInstanceInfo?>>();
-            _addLock = new object();
             _requestMonitors = new Queue<IActivityMonitor>();
         }
 
@@ -95,7 +94,8 @@ namespace CK.Build
         public async Task<PackageInstance?> EnsureAsync( IActivityMonitor monitor, ArtifactInstance instance )
         {
             // First, consider this cache (fast path).
-            PackageInstance? p = _cache.DB.Find( instance );
+            // If the instance is currently known as a Ghost, do as if it was not yet present.
+            PackageInstance? p = _cache.DB.Find( instance, allowGhost: false );
             if( p != null ) return p;
 
             // Second, ask our feeds to locate the package.
@@ -110,18 +110,12 @@ namespace CK.Build
             try
             {
                 // The info object will be appended to the allDeps list even if an exception is raised here.
-                if( !await ReadMissingDependencies( monitor, info, allDeps, feeds ) )
+                await ReadMissingDependenciesAsync( monitor, info, allDeps, feeds );
+                var db = _cache.Add( monitor, allDeps );
+                p = db?.Find( instance, allowGhost: false );
+                if( p == null )
                 {
-                    Throw.Exception( $"Unable to resolve a dependency for package '{info.Key}'. See logs for details." );
-                }
-                // Even if the Add is thread safe (it uses an Interlocked set), I prefer here
-                // to serialize the call to Add to avoid intermediate allocations.
-                lock( _addLock )
-                {
-                    if( _cache.Add( monitor, allDeps ) == null || (p = _cache.DB.Find( instance )) == null )
-                    {
-                        Throw.Exception( $"Error while updating the package cache for '{instance}', ." );
-                    }
+                    Throw.Exception( $"Error while updating the package cache for '{instance}', ." );
                 }
                 return p;
             }
@@ -139,19 +133,24 @@ namespace CK.Build
             }
         }
 
-        async Task<bool> DoAddAsync( IActivityMonitor monitor, ArtifactInstance instance, List<FullPackageInstanceInfo> allDeps, IPackageFeed[] feeds )
+        async Task DoAddAsync( IActivityMonitor monitor, ArtifactInstance instance, List<FullPackageInstanceInfo> allDeps, IPackageFeed[] feeds )
         {
-            if( _cache.DB.Find( instance ) != null || allDeps.Any( p => p.Key == instance ) ) return true;
+            if( _cache.DB.Find( instance, allowGhost: false ) != null || allDeps.Any( p => p.Key == instance ) ) return;
             FullPackageInstanceInfo? info = await ReadFullInfoAsync( monitor, instance, feeds );
             if( info == null )
             {
-                monitor.Error( $"Unable to find package '{instance}' in feeds {feeds.Where( f => f.ArtifactType == instance.Artifact.Type ).Select( f => f.Name ).Concatenate()}." );
-                return false;
+                // Unable to get a package info for this instance.
+                // Instantiating a Ghost package info.
+                monitor.Warn( $"Unable to find package '{instance}' in feeds {feeds.Where( f => f.ArtifactType == instance.Artifact.Type ).Select( f => f.Name ).Concatenate()}. A (hopefully) temporary Ghost package is created." );
+                info = new FullPackageInstanceInfo();
+                info.State = PackageState.Ghost;
+                info.Key = instance;
+                info.FeedNames.AddRange( feeds.Select( x => x.TypedName ) );
             }
-            return await ReadMissingDependencies( monitor, info, allDeps, feeds );
+            await ReadMissingDependenciesAsync( monitor, info, allDeps, feeds );
         }
 
-        async Task<bool> ReadMissingDependencies( IActivityMonitor monitor, FullPackageInstanceInfo info, List<FullPackageInstanceInfo> allDeps, IPackageFeed[] feeds )
+        async Task ReadMissingDependenciesAsync( IActivityMonitor monitor, FullPackageInstanceInfo info, List<FullPackageInstanceInfo> allDeps, IPackageFeed[] feeds )
         {
             // From a starting FullPackageInfo (necessarily not null), recursively crawls the dependencies and always
             // append the starting FullPackageInfo to the allDeps list.
@@ -159,29 +158,22 @@ namespace CK.Build
             // the FullPackageInfo.FeedNames by clearing it: this invalidates the starting FullPackageInfo but we
             // nevertheless add it to the allDeps list so that we can skip it when clearing the request cache (failed resolution
             // only must be kept in cache).
-            bool success = true;
             try
             {
                 foreach( var d in info.Dependencies )
                 {
-                    if( !await DoAddAsync( monitor, d.Target, allDeps, feeds ) )
-                    {
-                        monitor.Error( $"Unable to satisfy dependency '{d.Target}' of package '{info.Key}'." );
-                        success = false;
-                    }
+                    await DoAddAsync( monitor, d.Target, allDeps, feeds );
                 }
             }
             catch
             {
-                success = false;
+                info.FeedNames.Clear();
                 throw;
             }
             finally
             {
-                if( !success ) info.FeedNames.Clear();
                 allDeps.Add( info );
             }
-            return success;
         }
 
         Task<FullPackageInstanceInfo?> ReadFullInfoAsync( IActivityMonitor monitor, ArtifactInstance instance, IPackageFeed[] feeds )
@@ -254,7 +246,7 @@ namespace CK.Build
                         }
                         else
                         {
-                            if( !p.CheckSame( info, monitor ) )
+                            if( !p.CheckSameContent( info, monitor ) )
                             {
                                 invalidSameError = new Exception( $"Package info for {p.Key} from feed '{p.FeedNames[0]}' differ from the one of '{f.TypedName}'. See previous log error for details." );
                                 break;

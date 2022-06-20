@@ -39,19 +39,33 @@ namespace CK.Env.Plugin
             var existingOld = FileSystem.GetFileInfo( pathOld );
             if( existingOld.Exists )
             {
-                Document = existingOld.ReadAsXDocument();
+                var oldDoc = existingOld.ReadAsXDocument();
+                if( Document?.Root != null )
+                {
+                    Document.Root.Add( oldDoc.Root?.Nodes() );
+                }
+                else Document = oldDoc;
                 FileSystem.Delete( monitor, pathOld );
                 var sln = s.Tag<SolutionFile>();
                 if( sln != null )
                 {
                     sln.EnsureSolutionItemFile( monitor, FilePath.RemovePrefix( BranchPath ), saveFile: false );
-                    sln.RemoveSolutionItemFile( monitor, "Common\\Shared.props", saveFile: false );
+                    sln.RemoveSolutionItemFile( monitor, "Common/Shared.props", saveFile: false );
                 }
             }
 
-            bool useCentralPackage = s.Projects.Select( p => p.Tag<MSBuildSln.MSProject>() )
+            // Stop using "${XXXVersion}" properties and old central package management (MicrosoftBuildCentralPackageVersions).
+            _driver.StopUsingPropertyVersionAndOldCentralPackageManagement( monitor );
+            s = _driver.GetSolution( monitor, false );
+            if( s == null ) return;
+
+            bool useCentralPackage = s.Projects.Select( p => p.Tag<MSProject>() )
                                                .Where( p => p != null )
                                                .Any( p => p.UseMicrosoftBuildCentralPackageVersions );
+            Debug.Assert( !useCentralPackage, "No more project uses MicrosoftBuildCentralPackageVersions." );
+            pathOld = FilePath.RemoveLastPart().Combine( "Common/CentralPackages.props" );
+            FileSystem.Delete( monitor, pathOld );
+            s.Tag<SolutionFile>()!.RemoveSolutionItemFile( monitor, "Common/CentralPackages.props", saveFile: false );
 
             // If Directory.Build.props exists, we make sure there is no xml namespace defined.
             EnsureDocument( updateRootName: true, removeAllNamespaces: true );
@@ -119,7 +133,7 @@ namespace CK.Env.Plugin
             {
                 propertyGroup.Add(
                     new XComment( " Using Microsoft.Build.CentralPackageVersions: this avoids the Packages.props at the root of the repository. " ),
-                    new XElement( "CentralPackagesFile", "$(MSBuildThisFileDirectory)CentralPackages.props" ) );
+                    new XElement( "CentralPackagesFile", "$(MSBuildThisFileDirectory)Common/CentralPackages.props" ) );
             }
 
             var sourceRoot = XElement.Parse(
@@ -172,7 +186,7 @@ namespace CK.Env.Plugin
                             new XComment( "Removes annoying Pack warning: The package version ... uses SemVer 2.0.0 or components of SemVer 1.0.0 that are not supported on legacy clients..." ),
                             new XElement( "NoWarn", "NU5105" ),
                             new XComment( "Considering .net6 'global using' to be an opt-in (simply reproduce this with 'false' in the csproj if needed)." ),
-                            new XElement( "DisableImplicitNamespaceImports", "true" ),
+                            new XElement( "ImplicitUsings", "disable" ),
                             new XElement( "PackageIcon", "PackageIcon.png" ) );
 
             if( !_solutionSpec.NoStrongNameSigning )
@@ -291,7 +305,7 @@ $@"<PropertyGroup>
 
             section.StartComment = ": This analyzer provides very welcome guidelines about async and threading issues.";
             section.SetContent(
-                    new XElement( "ItemGroup",
+                    new XElement( "ItemGroup", new XAttribute("Condition", @" '$(MSBuildProjectName)' != 'CodeCakeBuilder' " ),
                         new XElement( "PackageReference",
                             new XAttribute( "Include", packageName ),
                             useCentralPackages ? null : new XAttribute( "Version", currentVersion ),
@@ -314,10 +328,11 @@ $@"<PropertyGroup>
             if( f != null )
             {
                 var d = XDocument.Parse( f.ReadAsText() );
+                Debug.Assert( d.Root != null );
                 bool hasChanged = d.Root.RemoveAllNamespaces();
 
                 var link = d.Root.Elements( "ItemGroup" )
-                                    .Elements( "PackageReference" ).FirstOrDefault( e => (string)e.Attribute( "Update" ) == packageName );
+                                    .Elements( "PackageReference" ).FirstOrDefault( e => (string?)e.Attribute( "Update" ) == packageName );
                 if( link == null )
                 {
                     hasChanged = true;
@@ -326,7 +341,7 @@ $@"<PropertyGroup>
                                 new XAttribute( "Version", currentVersion ) );
                     d.Root.EnsureElement( "ItemGroup" ).Add( link );
                 }
-                else if( (hasChanged = (string)link.Attribute( "Version" ) != currentVersion) )
+                else if( (hasChanged = (string?)link.Attribute( "Version" ) != currentVersion) )
                 {
                     link.SetAttributeValue( "Version", currentVersion );
                 }
@@ -357,6 +372,7 @@ $@"<PropertyGroup>
                     {
                         string packageName = $"Microsoft.SourceLink.{linkName}";
                         var d = XDocument.Parse( f.ReadAsText() );
+                        Debug.Assert( d.Root != null );
                         bool hasChanged = d.Root.RemoveAllNamespaces();
                         var link = d.Root.Elements( "ItemGroup" )
                                          .Elements( "PackageReference" )

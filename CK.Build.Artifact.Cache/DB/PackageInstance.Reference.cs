@@ -1,7 +1,7 @@
 using CK.Core;
 using CSemVer;
 
-namespace CK.Build
+namespace CK.Build.PackageDB
 {
     public partial class PackageInstance
     {
@@ -67,6 +67,11 @@ namespace CK.Build
             /// owner's savors) and cannot be empty.
             /// </summary>
             public CKTrait? ApplicableSavors => _applicableSavors;
+
+            /// <summary>
+            /// Gets the state of this instance.
+            /// </summary>
+            public PackageState State => _baseTarget.State;
 
             internal Reference( PackageInstance baseTarget, SVersionLock vL, PackageQuality vQ, ArtifactDependencyKind kind, CKTrait? applicableSavors )
             {

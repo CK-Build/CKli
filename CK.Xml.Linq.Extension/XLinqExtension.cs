@@ -228,7 +228,7 @@ namespace System.Xml.Linq
         /// <returns>The element found or created.</returns>
         public static XElement EnsureElement( this XElement @this, XName name )
         {
-            XElement e = @this.Element( name );
+            XElement? e = @this.Element( name );
             if( e == null )
             {
                 e = new XElement( name );
@@ -245,7 +245,7 @@ namespace System.Xml.Linq
         /// <returns>The first element that may have been moved or inserted.</returns>
         public static XElement EnsureFirstElement( this XElement @this, XName name )
         {
-            XElement e = @this.Element( name );
+            XElement? e = @this.Element( name );
             if( e != null ) e.Remove();
             else e = new XElement( name );
             @this.AddFirst( e );
@@ -260,7 +260,7 @@ namespace System.Xml.Linq
         /// <returns>This element.</returns>
         public static XElement ReplaceElementByName( this XElement @this, XElement e )
         {
-            XElement c = @this.Element( e.Name );
+            XElement? c = @this.Element( e.Name );
             if( c == null ) @this.Add( e );
             else c.ReplaceWith( e );
             return e;
@@ -342,24 +342,23 @@ namespace System.Xml.Linq
         {
             if( String.IsNullOrWhiteSpace( key ) ) throw new ArgumentNullException( nameof( key ) );
             if( value == null ) throw new ArgumentNullException( nameof( value ) );
-            var f = @this.Elements( "add" ).FirstOrDefault( x => (string)x.Attribute( "key" ) == key );
+            var f = @this.Elements( "add" ).FirstOrDefault( x => (string?)x.Attribute( "key" ) == key );
             if( f == null )
             {
                 @this.Add( new XElement( "add",
                                     new XAttribute( "key", key ),
                                     new XAttribute( "value", value ) ) );
             }
-            else if( (string)f.Attribute( "value" ) != value )
+            else if( (string?)f.Attribute( "value" ) != value )
             {
                 f.SetAttributeValue( "value", value );
             }
         }
 
-        internal static Dictionary<string, T> ApplyAddRemoveClear<T>(
-            this XElement @this,
-            Dictionary<string, T> map,
-            Func<XElement, string> keyReader,
-            Func<XElement, T> builder )
+        internal static Dictionary<string, T> ApplyAddRemoveClear<T>( this XElement @this,
+                                                                      Dictionary<string, T> map,
+                                                                      Func<XElement, string> keyReader,
+                                                                      Func<XElement, T> builder )
         {
             string ReadKey( XElement e )
             {
@@ -381,10 +380,9 @@ namespace System.Xml.Linq
             return map;
         }
 
-        internal static HashSet<T> ApplyAddRemoveClear<T>(
-            this XElement @this,
-            HashSet<T> set,
-            Func<XElement, T> builder )
+        internal static HashSet<T> ApplyAddRemoveClear<T>( this XElement @this,
+                                                           HashSet<T> set,
+                                                           Func<XElement, T> builder )
         {
             foreach( var e in @this.Elements() )
             {
