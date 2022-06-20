@@ -91,6 +91,8 @@ namespace CK.Env.MSBuildSln
         // successfully read from <CentralPackagesFile> property.
         // See https://github.com/microsoft/MSBuildSdks/tree/master/src/CentralPackageVersions#extensibility
         MSProjFile? _centralPackagesFile;
+        MSProjFile? _directoryBuildPropsFile;
+        MSProjFile? _directoryPackagesPropsFile;
         Dependencies _dependencies;
 
         internal MSProject( SolutionFile solution,
@@ -118,9 +120,9 @@ namespace CK.Env.MSBuildSln
             return ReloadProjectFile( fs, m, cache ) != null;
         }
 
-        MSProjFile? ReloadProjectFile( FileSystem fs, IActivityMonitor m, Dictionary<NormalizedPath, MSProjFile> cache )
+        MSProjFile? ReloadProjectFile( FileSystem fs, IActivityMonitor monitor, Dictionary<NormalizedPath, MSProjFile> cache )
         {
-            _primaryFile = MSProjFile.FindOrLoadProjectFile( fs, m, Path, cache );
+            _primaryFile = MSProjFile.FindOrLoadProjectFile( fs, monitor, Path, cache );
             if( _primaryFile != null )
             {
                 XElement? f = _primaryFile.Document.Root?
@@ -130,7 +132,7 @@ namespace CK.Env.MSBuildSln
                                 .SingleOrDefault();
                 if( f == null )
                 {
-                    m.Error( $"There must be one and only one TargetFramework or TargetFrameworks element in {Path}." );
+                    monitor.Error( $"There must be one and only one TargetFramework or TargetFrameworks element in {Path}." );
                     _primaryFile = null;
                 }
                 else
@@ -142,12 +144,26 @@ namespace CK.Env.MSBuildSln
                     OutputType = _primaryFile.Document.Root.Elements( "PropertyGroup" ).Elements( "OutputType" ).LastOrDefault()?.Value;
                     IsPackable = (bool?)_primaryFile.Document.Root.Elements( "PropertyGroup" ).Elements( "IsPackable" ).LastOrDefault();
 
+                    _directoryBuildPropsFile = FindMSProjFileAbove( fs, monitor, "Directory.Build.props", cache );
+                    if( _directoryBuildPropsFile != null )
+                    {
+                        _primaryFile.AddImplicitImport( _directoryBuildPropsFile );
+                        monitor.Trace( $"Implicitly importing '{_directoryBuildPropsFile.Path.RemovePrefix( Solution.SolutionFolderPath)}'." );
+                    }
+                    _directoryPackagesPropsFile = FindMSProjFileAbove( fs, monitor, "Directory.Packages.props", cache );
+                    if( _directoryPackagesPropsFile != null )
+                    {
+                        _primaryFile.AddImplicitImport( _directoryPackagesPropsFile );
+                        monitor.Trace( $"Implicitly importing '{_directoryPackagesPropsFile.Path.RemovePrefix( Solution.SolutionFolderPath )}'." );
+                    }
+
                     UseMicrosoftBuildCentralPackageVersions = _primaryFile.Document.Root.Elements( "Sdk" )
                                                                                     .Attributes( "Name" )
                                                                                     .Any( a => a.Value == "Microsoft.Build.CentralPackageVersions" );
+
                     if( UseMicrosoftBuildCentralPackageVersions )
                     {
-                        m.Debug( "Microsoft.Build.CentralPackageVersions is used." );
+                        monitor.Debug( "Microsoft.Build.CentralPackageVersions is used." );
                         NormalizedPath packageFile;
                         var definer = _primaryFile.AllFiles.Select( file => file.Document.Root )
                                              .SelectMany( root => root?.Elements( "PropertyGroup" ) ?? XElement.EmptySequence )
@@ -155,23 +171,23 @@ namespace CK.Env.MSBuildSln
                                              .FirstOrDefault( e => e.Name.LocalName == "CentralPackagesFile" );
                         if( definer != null )
                         {
-                            m.Info( $"Found Property '{definer}' that defines CentralPackagesFile." );
+                            monitor.Info( $"Found Property '{definer}' that defines CentralPackagesFile." );
                             var fileDefiner = _primaryFile.AllFiles.Single( file => file.Document == definer.Document );
                             packageFile = definer.Value.Replace( "$(MSBuildThisFileDirectory)", fileDefiner.Path.RemoveLastPart() + '/' );
                         }
                         else
                         {
-                            m.Info( $"No CentralPackagesFile property found: looking for Packages.props in the Solution folder." );
+                            monitor.Info( $"No CentralPackagesFile property found: looking for Packages.props in the Solution folder." );
                             packageFile = Solution.SolutionFolderPath.AppendPart( "Packages.props" );
                         }
-                        _centralPackagesFile = MSProjFile.FindOrLoadProjectFile( fs, m, packageFile, cache );
+                        _centralPackagesFile = MSProjFile.FindOrLoadProjectFile( fs, monitor, packageFile, cache );
                         if( _centralPackagesFile == null )
                         {
                             // Emits an error: reading the missing Version attribute will fail.
-                            m.Error( $"Failed to read '{packageFile}' central package file." );
+                            monitor.Error( $"Failed to read '{packageFile}' central package file." );
                         }
                     }
-                    DoInitializeDependencies( m );
+                    DoInitializeDependencies( monitor );
                     if( !_dependencies.IsInitialized ) _primaryFile = null;
                 }
             }
@@ -180,6 +196,19 @@ namespace CK.Env.MSBuildSln
                 TargetFrameworks = Savors.EmptyTrait;
             }
             return _primaryFile;
+        }
+
+        MSProjFile? FindMSProjFileAbove( FileSystem fs, IActivityMonitor m, string fName, Dictionary<NormalizedPath, MSProjFile> cache )
+        {
+            var p = SolutionRelativeFolderPath.RemoveLastPart();
+            for( ; ; )
+            {
+                var f = MSProjFile.FindOrLoadProjectFile( fs, m, Solution.SolutionFolderPath.Combine( p ).AppendPart( fName ), cache, false );
+                if( f != null ) return f;
+                if( p.IsEmptyPath ) break;
+                p = p.RemoveLastPart();
+            }
+            return null;
         }
 
         /// <summary>
@@ -230,7 +259,7 @@ namespace CK.Env.MSBuildSln
         public int MSProjIndex => Solution.MSProjects.IndexOf( x => x == this );
 
         /// <summary>
-        /// Gets whether this csproj file or one of its depdendencies have changed.
+        /// Gets whether this csproj file or one of its dependencies have changed.
         /// </summary>
         public bool IsDirty => _primaryFile != null && (_primaryFile.IsDirty || (_centralPackagesFile?.IsDirty ?? false));
 
@@ -502,7 +531,7 @@ namespace CK.Env.MSBuildSln
         /// <returns>The number of changes.</returns>
         public int RemoveDependency( IActivityMonitor m, string packageId )
         {
-            if( String.IsNullOrWhiteSpace( packageId ) ) throw new ArgumentNullException( nameof( packageId ) );
+            Throw.CheckNotNullOrWhiteSpaceArgument( packageId );
             var toRemove = _dependencies.Packages.Where( d => d.PackageId == packageId ).ToList();
             if( toRemove.Count > 0 )
             {
@@ -518,11 +547,11 @@ namespace CK.Env.MSBuildSln
         /// <returns>The number of changes.</returns>
         public int RemoveDependencies( IActivityMonitor m, IReadOnlyList<DeclaredPackageDependency> toRemove )
         {
-            if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
-            if( toRemove == null ) throw new ArgumentException( "Empty dependency to remove.", nameof( toRemove ) );
+            Throw.CheckState( _dependencies.IsInitialized );
+            Throw.CheckNotNullArgument( toRemove );
             if( toRemove.Count == 0 ) return 0;
             var extra = toRemove.FirstOrDefault( r => !_dependencies.Packages.Contains( r ) );
-            if( extra != null ) throw new ArgumentException( $"Dependency not contained: {extra}.", nameof( toRemove ) );
+            if( extra != null ) Throw.ArgumentException( nameof( toRemove ), $"Dependency not contained: {extra}." );
             int changeCount = toRemove.Count;
             var parents = toRemove.Select( p => p.OriginElement.Parent ).Distinct().ToList();
             changeCount += parents.Count;
@@ -535,6 +564,55 @@ namespace CK.Env.MSBuildSln
             parents.Where( p => !p.HasElements ).Remove();
             OnChange( m );
             return changeCount;
+        }
+
+        public void StopUsingPropertyVersionAndOldCentralPackageManagement( IActivityMonitor monitor )
+        {
+            bool hasChanged = false;
+            HashSet<XElement> oldProperties = new HashSet<XElement>();
+            foreach( var d in _dependencies.Packages )
+            {
+                if( d.FinalVersionElement != null )
+                {
+                    hasChanged = true;
+                    if( d.FinalVersionElement.Name.LocalName != "PackageReference" )
+                    {
+                        // This forgets the "$(XXXVersion)".
+                        d.OriginElement.SetAttributeValue( "Version", d.FinalVersionElement.Value );
+                        // Crappy! Here we remove the element and this should be done above (at the solution level).
+                        // The first project to reference the version with detach the element. The other ones must not try to remove it.
+                        // This works only because apply this on all the projects at the same time.
+                        // Keep this as-is since this is temporary code.
+                        if( d.FinalVersionElement.Parent != null ) oldProperties.Add( d.FinalVersionElement );
+                    }
+                    else
+                    {
+                        // Central Package Management.
+                        if( d.IsVersionOverride )
+                        {
+                            d.OriginElement.SetAttributeValue( "Version", d.OriginElement.Attribute( "VersionOverride" )?.Value );
+                            d.OriginElement.Attribute( "VersionOverride" )?.Remove();
+                        }
+                        else
+                        {
+                            d.OriginElement.SetAttributeValue( "Version", d.FinalVersionElement.Attribute( "Version" )?.Value );
+                        }
+                    }
+                }
+            }
+            if( hasChanged )
+            {
+                // Removing "$(XXXVersion)" properties.
+                monitor.Info( $"Removing now useless {oldProperties.Select( e => e.ToString() ).Concatenate()} elements." );
+                var parents = oldProperties.Select( e => e.Parent ).Distinct().ToList();
+                System.Xml.Linq.Extensions.Remove( oldProperties );
+                parents.Where( p => !p.HasElements ).Remove();
+                // Removes the Sdk import.
+                _primaryFile.Document.Root.Elements( "Sdk" ).Where( e => e.Attribute( "Name" )?.Value == "Microsoft.Build.CentralPackageVersions" ).Remove();
+                UseMicrosoftBuildCentralPackageVersions = false;
+                _centralPackagesFile = null;
+                OnChange( monitor );
+            }
         }
 
         void OnChange( IActivityMonitor m )
@@ -601,7 +679,7 @@ namespace CK.Env.MSBuildSln
                             continue;
                         }
                         // We are using CentralPackageVersions: VersionOverride may be used!
-                        var vO = (string)p.Origin.Attribute( "VersionOverride" );
+                        var vO = (string?)p.Origin.Attribute( "VersionOverride" );
                         if( vO != null )
                         {
                             isVersionOverride = true;

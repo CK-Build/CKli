@@ -70,10 +70,14 @@ namespace CK.Env.MSBuildSln
         /// <returns>The "Solution Items" folder.</returns>
         public SolutionFolder FindOrCreateSolutionItemsFolder()
         {
-            SolutionFolder? f = _projectBaseList.OfType<SolutionFolder>().FirstOrDefault( s => s.ProjectName == SolutionFolderName );
+            SolutionFolder? f = _projectBaseList.OfType<SolutionFolder>()
+                                                .FirstOrDefault( s => s.ProjectName == SolutionFolderName );
             if( f == null )
             {
-                f = _projectBaseList.OfType<SolutionFolder>().FirstOrDefault( s => s.ProjectName == "SolutionItems" || s.ProjectName == "Items" );
+                f = _projectBaseList.OfType<SolutionFolder>()
+                                    .FirstOrDefault( s => String.Compare( s.ProjectName, SolutionFolderName, StringComparison.OrdinalIgnoreCase ) == 0
+                                                          || String.Compare( s.ProjectName, "SolutionItems", StringComparison.OrdinalIgnoreCase ) == 0
+                                                          || String.Compare( s.ProjectName, "Items", StringComparison.OrdinalIgnoreCase ) == 0 );
                 if( f != null )
                 {
                     f.ProjectName = SolutionFolderName;

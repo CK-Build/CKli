@@ -647,6 +647,21 @@ namespace CK.Env.Plugin
             return true;
         }
 
+        public bool StopUsingPropertyVersionAndOldCentralPackageManagement( IActivityMonitor monitor )
+        {
+            var solution = GetSolution( monitor, allowInvalidSolution: false );
+            if( solution == null ) return false;
+            Debug.Assert( _sln != null );
+
+            var msProjects = _sln.MSProjects;
+            foreach( var p in msProjects )
+            {
+                p.StopUsingPropertyVersionAndOldCentralPackageManagement( monitor );
+            }
+            _sln.Save( monitor );
+            return true;
+        }
+
         /// <summary>
         /// Replaces a target framework with another one in all projects that are not the <see cref="IProject.IsBuildProject"/>
         /// only if it is the single target framework defined: projects that use multi targeting are skipped.

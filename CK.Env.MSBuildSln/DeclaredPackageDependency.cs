@@ -70,7 +70,7 @@ namespace CK.Env.MSBuildSln
         /// Gets the element that defines the $(Version) if a property version is used (The element is like &lt;CKCoreVersion&gt;13.0.1&lt;/CKCoreVersion&gt;)
         /// or is the &lt;PackageReference Update="PackageName" Version="..." /&lt; centrally managed package
         /// (see https://github.com/microsoft/MSBuildSdks/tree/master/src/CentralPackageVersions).
-        /// When null, the <see cref="OriginElement"/> must be used (and the version is either in Version or OverrideVersion attribute).
+        /// When null, the <see cref="OriginElement"/> must be used (and the version is either in Version or VersionOverride attribute).
         /// </summary>
         public XElement FinalVersionElement { get; }
 

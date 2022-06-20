@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Xml.Linq;
 
 namespace CK.Env.Plugin
 {
@@ -49,11 +50,20 @@ namespace CK.Env.Plugin
                 m.Error( $"Missing CodeCakeBuilder project in '{slnFile.FilePath}'." );
                 return;
             }
+
+            Debug.Assert( ccbProject.ProjectFile != null && ccbProject.ProjectFile.Document.Root != null );
+            var props = ccbProject.ProjectFile.Document.Root.EnsureElement( "PropertyGroup" );
+            props.EnsureElement( "IsPackable" ).Value = "false";
+            props.EnsureElement( "SignAssembly" ).Value = "false";
+            props.EnsureElement( "Nullable" ).Value = "annotations";
+            props.EnsureElement( "GenerateDocumentationFile" ).Value = "false";
+            props.EnsureElement( "ManagePackageVersionsCentrally" ).Value = "false";
+
             // This is the baseline of CCB.
             // This should be modeled in the world xml.
             var framework = MSProject.Savors.FindOrCreate( _buildSpec.TargetFramework );
             var dependencies = new[] {
-                ("NuGet.Credentials", "6.1.0", false),
+                ("NuGet.Credentials", "6.2.1", false),
                 ("CK.Core", "15.0.0-r06", false),
                 ("Cake.Yarn", "0.4.8", false),
                 ("SimpleGitVersion.Cake", "7.2.0", false),

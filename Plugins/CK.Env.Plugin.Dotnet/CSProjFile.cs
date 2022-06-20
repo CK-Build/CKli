@@ -40,8 +40,10 @@ namespace CK.Env.Plugin
                     continue;
                 }
                 // Removing the old <Import Project="..\Common\Shared.props" />.
-                msproject.ProjectFile.RemoveImports( i => i.Path.LastPart == "Shared.props" );
-
+                foreach( var pFile in  msproject.ProjectFile.AllFiles )
+                {
+                    pFile.RemoveImports( i => string.Compare( i.Path.LastPart, "Shared.props", true ) == 0 );
+                }
                 if( project.IsPublished )
                 {
                     // For test projects we want the IsPackable element to be explicit.
