@@ -111,7 +111,9 @@ namespace CK.Env.Plugin
             section.StartComment = ": provides simple and useful definitions.";
             var propertyGroup = XElement.Parse(
 @"<PropertyGroup>
+  <!-- See https://www.meziantou.net/csharp-compiler-strict-mode.htm -->
   <Features>strict</Features>
+
   <!-- Simple IsTestProject and IsInTestsFolder variables. -->
   <IsTestProject Condition="" '$(IsTestProject)' == '' And $(MSBuildProjectName.EndsWith('.Tests'))"">true</IsTestProject>
   <IsInTestsFolder Condition=""$(MSBuildProjectDirectory.Contains('\Tests\')) Or $(MSBuildProjectDirectory.Contains('/Tests/'))"">true</IsInTestsFolder>
@@ -119,16 +121,15 @@ namespace CK.Env.Plugin
   <!-- SolutionDir is defined by Visual Studio, we unify the behavior here. -->
   <SolutionDir Condition="" '$(SolutionDir)' == '' "">$([System.IO.Path]::GetDirectoryName($(MSBuildThisFileDirectory)))/</SolutionDir>
 
-  <!-- CakeBuild drives the standard ContinuousIntegrationBuild that should be used.
-
-  -->
+  <!-- CakeBuild drives the standard ContinuousIntegrationBuild that is used. -->
   <ContinuousIntegrationBuild Condition="" '$(CakeBuild)' == 'true' "">true</ContinuousIntegrationBuild>
-
 
   <!-- InformationalVersion is either the Zero version or provided by the CodeCakeBuilder when in CI build). -->
   <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
 
 </PropertyGroup>" );
+
+            // This is obsolete. Soon the Directory.Packages.props will be used.
             if( useCentralPackages )
             {
                 propertyGroup.Add(
@@ -319,6 +320,7 @@ $@"<PropertyGroup>
                 SetCentralePackageVersion( m, currentVersion, packageName );
         }
 
+        // This is obsolete. Will be replaced by Directory.Packages.props.
         private void SetCentralePackageVersion( IActivityMonitor m, string currentVersion, string packageName )
         {
             Debug.Assert( Document != null && Document.Root != null );

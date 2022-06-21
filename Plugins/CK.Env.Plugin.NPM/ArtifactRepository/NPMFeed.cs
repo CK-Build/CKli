@@ -106,11 +106,6 @@ namespace CK.Env.NPM
                             continue;
                         }
                         var vR = SVersionBound.NpmTryParse( sV );
-                        if( vR.FourthPartLost )
-                        {
-                            monitor.Warn( $"Version '{sV}' of '{depName}' has four parts. This dependency is skipped since this is currently not supported." );
-                            continue;
-                        }
                         if( !vR.IsValid )
                         {
                             monitor.Warn( $"Unable to parse version '{sV}' (Error: {vR.Error}) of '{depName}'. Skipped." );

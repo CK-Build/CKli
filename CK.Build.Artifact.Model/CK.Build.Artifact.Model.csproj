@@ -8,12 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CSemVer" Version="10.1.0" />
-    <PackageReference Include="CK.Core" Version="15.0.0-r06" />
+    <PackageReference Include="CSemVer" Version="11.0.1--0000-develop" />
+    <PackageReference Include="CK.Core" Version="15.0.0-r06-00-0007-develop" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Update="NuGetizer" Version="0.7.5">
+    <PackageReference Update="NuGetizer" Version="0.8.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>

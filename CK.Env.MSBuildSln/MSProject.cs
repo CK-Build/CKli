@@ -801,10 +801,9 @@ namespace CK.Env.MSBuildSln
         static SVersionBound.ParseResult ParseNugetBound( IActivityMonitor m, string r )
         {
             SVersionBound.ParseResult v = SVersionBound.NugetTryParse( r );
-            if( v.IsValid )
+            if( v.IsValid && v.IsApproximated )
             {
-                if( v.FourthPartLost ) m.Warn( $"4th part (or more) ingored in version range: '{r}'." );
-                if( v.IsApproximated ) m.Warn( $"Version range '{r}' has been approximated to version bound '{v.Result}'." );
+                m.Warn( $"Version range '{r}' has been approximated to version bound '{v.Result}'." );
             }
             return v;
         }

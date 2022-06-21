@@ -234,11 +234,6 @@ namespace CK.Env.NuGet
                         {
                             var range = p.VersionRange.ToString();
                             SVersionBound.ParseResult v = SVersionBound.NugetTryParse( range );
-                            if( v.FourthPartLost )
-                            {
-                                logger.SafeLog( m => m.Warn( $"Version '{range}' dependency group '{tf}' of {instance} has four parts. This dependency is skipped since this is currently not supported." ) );
-                                continue;
-                            }
                             if( !v.IsValid )
                             {
                                 logger.SafeLog( m => m.Warn( $"Unable to parse version '{range}' (Error: {v.Error}) from dependency group '{tf}' of {instance}. Skipped dependency." ) );
