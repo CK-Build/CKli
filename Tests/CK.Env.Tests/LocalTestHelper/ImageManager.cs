@@ -21,6 +21,8 @@ namespace CK.Env.Tests.LocalTestHelper
         /// </summary>
         public static NormalizedPath CacheUniverseFolder => TestHelper.TestProjectFolder.AppendPart( "UniverseZips" );
 
+        public static NormalizedPath WorkFolder = Path.Combine( Path.GetTempPath(), "CKliTest" );
+
         /// <summary>
         /// Path to the folder storing the Seed Zips.
         /// </summary>
@@ -36,20 +38,23 @@ namespace CK.Env.Tests.LocalTestHelper
         {
             if( !File.Exists( imagePath ) ) throw new FileNotFoundException( nameof( imagePath ) );
 
-            NormalizedPath workFolder = Path.Combine( Path.GetTempPath(), "CKliTest" );
-            m.Info( $"Deleting '{workFolder}' content.'" );
-            if( Directory.Exists( workFolder ) )
+            m.Info( $"Deleting '{WorkFolder}' content.'" );
+            if( Directory.Exists( WorkFolder ) )
             {
-                FileHelper.RawDeleteLocalDirectory( TestHelper.Monitor, workFolder );
+                FileHelper.RawDeleteLocalDirectory( TestHelper.Monitor, WorkFolder );
             }
-            m.Info( $"Creating temp directory '{workFolder}' and unzipping '{imagePath}' into." );
-            Directory.CreateDirectory( workFolder );
-            ZipFile.ExtractToDirectory( imagePath, workFolder );
-            return TestUniverse.Create( m, workFolder );
+            m.Info( $"Creating temp directory '{WorkFolder}' and unzipping '{imagePath}' into." );
+            Directory.CreateDirectory( WorkFolder );
+            ZipFile.ExtractToDirectory( imagePath, WorkFolder );
+            if( Directory.Exists( Path.Combine( WorkFolder, Path.GetFileNameWithoutExtension( imagePath ) ) ) )
+            {
+                throw new InvalidDataException( "Archive content is embedded in a directory. The content should be directly at the root." );
+            }
+            return TestUniverse.Create( m, WorkFolder );
         }
 
         public static NormalizedPath EnsureImage<T>(
-            Func<T, bool, NormalizedPath> imageGenerator,
+            Func<T?, bool, NormalizedPath> imageGenerator,
             bool refreshCache )
         {
             NormalizedPath generatedBaseImagePath = CacheUniverseFolder.AppendPart( imageGenerator.Method.Name + ".zip" );
@@ -60,7 +65,7 @@ namespace CK.Env.Tests.LocalTestHelper
 
         public static TestUniverse InstantiateImage<T>(
             IActivityMonitor m,
-            Func<T, bool, NormalizedPath> parentImageGenerator,
+            Func<T?, bool, NormalizedPath> parentImageGenerator,
             bool refreshCache )
         {
             if( parentImageGenerator == null ) throw new ArgumentNullException();
@@ -75,9 +80,9 @@ namespace CK.Env.Tests.LocalTestHelper
             static readonly ZipEntryComparer _comparer = new ZipEntryComparer();
             class ZipEntryComparer : IEqualityComparer<ZipArchiveEntry>
             {
-                public bool Equals( ZipArchiveEntry x, ZipArchiveEntry y )
+                public bool Equals( ZipArchiveEntry? x, ZipArchiveEntry? y )
                 {
-                    return x.Crc32 == y.Crc32 && x.FullName == y.FullName;
+                    return x?.Crc32 == y?.Crc32 && x?.FullName == y?.FullName;
                 }
 
                 public int GetHashCode( ZipArchiveEntry obj )

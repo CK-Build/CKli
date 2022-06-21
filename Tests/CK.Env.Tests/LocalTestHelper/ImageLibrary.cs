@@ -57,7 +57,7 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <returns>The path of the new image.</returns>
         static NormalizedPath ImageBuilderHelper<T>(
         string worldName,
-        Action<TestUniverse, World> testCallback,
+        Action<TestUniverse, World>? testCallback,
         bool refreshCache,
         Func<T, bool, NormalizedPath> parentBuilder,
         Func<TestUniverse, TestUniverse> buildAction,
@@ -81,7 +81,7 @@ namespace CK.Env.Tests.LocalTestHelper
         /// <returns>The path of the new image.</returns>
         static NormalizedPath ImageBuilderHelper<T>(
             string worldName,
-            Action<TestUniverse, World> testCallback,
+            Action<TestUniverse, World>? testCallback,
             bool refreshCache,
             Func<T, bool, NormalizedPath> parentBuilder,
             Func<TestUniverse, World, TestUniverse> buildAction,
@@ -94,7 +94,7 @@ namespace CK.Env.Tests.LocalTestHelper
                         universe.EnsureWorldOpened( TestHelper.Monitor, worldName );
                         var w = universe.UserHost.WorldSelector.CurrentWorld;
                         w.Should().NotBeNull();
-                        return buildAction( universe, w );
+                        return buildAction( universe, w! );
                     },
                     newImageName );
 
@@ -162,7 +162,7 @@ namespace CK.Env.Tests.LocalTestHelper
             ImageBuilderHelper<Action<TestUniverse, World>>( testCallback, refreshCache, another_minimal_solution_second_ci_build,
                 ( universe ) => universe.ApplySettingsAndCommitRandomly( TestHelper.Monitor, CKTestBuildStackName, seed ) );
 
-        public static NormalizedPath full_apply_settings( Action<TestUniverse, World> testCallback, bool refreshCache ) =>
+        public static NormalizedPath full_apply_settings( Action<TestUniverse, World>? testCallback, bool refreshCache ) =>
             ImageBuilderHelper<Action<TestUniverse, World>>( CKTestBuildStackName, testCallback, refreshCache, another_minimal_solution_second_ci_build,
                 ( universe ) => universe.ApplySettings( TestHelper.Monitor, CKTestBuildStackName ) );
 
