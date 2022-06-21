@@ -316,7 +316,7 @@ namespace CK.Build.PackageDB
             FeedChangedInfo[]? feedChanges = null;
             PackageFeed[]? newFeeds = null;
             Dictionary<string, PackageFeed>? feeds = null;
-            var excludeFeed = new Dictionary<string, PackageFeed>( _feeds );
+            var excludeFeeds = new Dictionary<string, PackageFeed>( _feeds );
 
             if( feedDiff != null || brandNewFeeds != null )
             {
@@ -327,8 +327,8 @@ namespace CK.Build.PackageDB
                     int i = 0;
                     foreach( var d in feedDiff )
                     {
-                        var itemToExclude = excludeFeed.First( x => x.Value == d.Feed );
-                        excludeFeed.Remove( itemToExclude.Key );
+                        var itemToExclude = excludeFeeds.First( x => x.Value == d.Feed );
+                        excludeFeeds.Remove( itemToExclude.Key );
 
                         FeedChangedInfo c = d.Create();
                         feeds[d.Feed.TypedName] = c.Feed;
@@ -348,9 +348,9 @@ namespace CK.Build.PackageDB
                 }
             }
 
-            foreach( var item in excludeFeed )
+            foreach( var item in excludeFeeds )
             {
-                var test = initialization.Where( entry => item.Value.Instances.Contains( entry.p ) && (entry.status == PackageEventType.StateOnlyChanged ||
+                var entries = initialization.Where( entry => item.Value.Instances.Contains( entry.p ) && (entry.status == PackageEventType.StateOnlyChanged ||
                          entry.status == PackageEventType.ContentOnlyChanged ||
                          entry.status == PackageEventType.ContentOnlyChanged) &&
                          !entry.info.AllFeedNamesAreKnown &&
@@ -358,10 +358,10 @@ namespace CK.Build.PackageDB
 
                 if( feeds == null ) feeds = new Dictionary<string, PackageFeed>( _feeds );
 
-                if( test.Any() )
+                if( entries.Any() )
                 {
-                    var list = test.Select( x => (x.idx, x.p) ).ToArray();
-                    var packageDiff = new PackageFeed.Diff( feeds[item.Value.TypedName], list );
+                    var newOrUpdatedList = entries.Select( x => (x.idx, x.p) ).ToArray();
+                    var packageDiff = new PackageFeed.Diff( feeds[item.Value.TypedName], newOrUpdatedList );
                     var diffCreate = packageDiff.Create();
                     feeds[item.Value.TypedName] = diffCreate.Feed;
                 }
