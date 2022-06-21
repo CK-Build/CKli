@@ -355,7 +355,7 @@ namespace CK.Build.PackageDB
                 }
             }
             Debug.Assert( indices.All( e => e.p != null ) );
-            var db = new PackageDatabase( this, _instances.AddOrUpdate( indices ), feeds, regDate );
+            var db = new PackageDatabase( this, _instances.AddOrUpdate( indices, updateCount ), feeds, regDate );
 
             return new ChangedInfo( db, true, packageChanges, newFeeds ?? Array.Empty<PackageFeed>(), feedChanges ?? Array.Empty<FeedChangedInfo>() );
         }

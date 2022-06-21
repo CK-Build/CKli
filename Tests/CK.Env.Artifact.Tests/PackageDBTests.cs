@@ -231,108 +231,275 @@ namespace CK.Env.Tests
             db.FindFeed( "T0:AnotherNuGet" )!.Instances.Should().BeEquivalentTo( db.Instances );
         }
 
+        static void Check( string[] p, params string[] expectation )
+        {
+            p.SequenceEqual( expectation ).Should().BeTrue( p.Concatenate() + " not the expected " + expectation.Concatenate() );
+        }
+
 
         [Test]
-        public void instance_management_algorithm()
+        public void instance_management_algorithm_add_and_delete()
         {
             var origin = new[] { "a0", "a1", "a2", "a3", "a4", "a5" };
 
             {
-                var p = Combine( origin, new[] { (1, (string?)"a00") }, 0 );
-                p.Should().BeEquivalentTo( "a0", "a00", "a1", "a2", "a3", "a4", "a5" );
+                var p = Combine( origin, new[] { (1, "a00") }!, 0, 0 );
+                Check( p, "a0", "a00", "a1", "a2", "a3", "a4", "a5" );
             }
             {
-                // Caution: Inserted indices can be wrong.
-                var p = Combine( origin, new[] { (0, (string?)"a00") }, 0 );
-                p.Should().BeEquivalentTo( "a00", "a0", "a1", "a2", "a3", "a4", "a5" );
+                // Caution: if inserted indices are wrong, the Combine doesn't fix it!
+                var p = Combine( origin, new[] { (0, "a0Z") }!, 0, 0 );
+                Check( p, "a0Z", "a0", "a1", "a2", "a3", "a4", "a5" );
             }
             {
                 // Same insertion points are sorted.
-                var p = Combine( origin, new[] { (1, (string?)"a02"), (1, (string?)"a01"), (1, (string?)"a00"), (1, (string?)"a03") }, 0 );
-                p.Should().BeEquivalentTo( "a0", "a00", "a01", "a02", "a03", "a1", "a2", "a3", "a4", "a5" );
+                var p = Combine( origin, new[] { (1, "a02"), (1, "a01"), (1, "a00"), (1, "a03") }!, 0, 0 );
+                Check( p, "a0", "a00", "a01", "a02", "a03", "a1", "a2", "a3", "a4", "a5" );
             }
             {
-                var p = Combine( origin, new[] { (0, (string?)"a"), (6, (string?)"AFTER") }, 0 );
-                p.Should().BeEquivalentTo( "a", "a0", "a1", "a2", "a3", "a4", "a5", "AFTER" );
+                var p = Combine( origin, new[] { (0, (string?)"a"), (6, (string?)"AFTER") }, 0, 0 );
+                Check( p, "a", "a0", "a1", "a2", "a3", "a4", "a5", "AFTER" );
             }
             {
-                var p = Combine( origin, new[] { (1, (string?)null) }, 1 );
-                p.Should().BeEquivalentTo( "a0", "a2", "a3", "a4", "a5" );
+                var p = Combine( origin, new[] { (1, (string?)null) }, 1, 0 );
+                Check( p, "a0", "a2", "a3", "a4", "a5" );
             }
             {
-                var p = Combine( origin, new[] { (0, (string?)null) }, 1 );
-                p.Should().BeEquivalentTo( "a1", "a2", "a3", "a4", "a5" );
+                var p = Combine( origin, new[] { (0, (string?)null) }, 1, 0 );
+                Check( p, "a1", "a2", "a3", "a4", "a5" );
             }
             {
-                var p = Combine( origin, new[] { (0, (string?)null), (5, (string?)null) }, 2 );
-                p.Should().BeEquivalentTo( "a1", "a2", "a3", "a4" );
+                var p = Combine( origin, new[] { (0, (string?)null), (5, (string?)null) }, 2, 0 );
+                Check( p, "a1", "a2", "a3", "a4" );
             }
             {
-                var p = Combine( origin, new[] { (0, (string?)null), (4, (string?)null) }, 2 );
-                p.Should().BeEquivalentTo( "a1", "a2", "a3", "a5" );
+                var p = Combine( origin, new[] { (0, (string?)null), (4, (string?)null) }, 2, 0 );
+                Check( p, "a1", "a2", "a3", "a5" );
             }
             {
                 // Replacing the first element.
-                var p = Combine( origin, new[] { (0, (string?)null), (0, "Hop") }, 1 );
-                p.Should().BeEquivalentTo( "Hop", "a1", "a2", "a3", "a4", "a5" );
+                var p = Combine( origin, new[] { (0, (string?)null), (0, "Hop") }, 1, 0 );
+                Check( p, "Hop", "a1", "a2", "a3", "a4", "a5" );
             }
             {
-                var p = Combine( origin, new[] { (2, (string?)null), (2, "Hop(2)") }, 1 );
-                p.Should().BeEquivalentTo( "a0", "a1", "Hop(2)", "a3", "a4", "a5" );
+                // Replacing the first element (removing it and adding one right after).
+                var p = Combine( origin, new[] { (0, (string?)null), (1, "Hop") }, 1, 0 );
+                Check( p, "Hop", "a1", "a2", "a3", "a4", "a5" );
             }
             {
-                var p = Combine( origin, new[] { (5, (string?)null), (5, "Hop(last)") }, 1 );
-                p.Should().BeEquivalentTo( "a0", "a1", "a2", "a3", "a4", "Hop(last)" );
+                var p = Combine( origin, new[] { (2, (string?)null), (2, "Hop(2)") }, 1, 0 );
+                Check( p, "a0", "a1", "Hop(2)", "a3", "a4", "a5" );
             }
             {
-                var p = Combine( origin, new[] { (5, (string?)null), (6, "Hop(after)") }, 1 );
-                p.Should().BeEquivalentTo( "a0", "a1", "a2", "a3", "a4", "Hop(after)" );
+                var p = Combine( origin, new[] { (5, (string?)null), (5, "Hop(last)") }, 1, 0 );
+                Check( p, "a0", "a1", "a2", "a3", "a4", "Hop(last)" );
             }
             {
-                var p = Combine( origin, new[] { (0, (string?)null), (5, (string?)null), (6, (string?)"AFTER"), (4, (string?)null) }, 3 );
-                p.Should().BeEquivalentTo( "a1", "a2", "a3", "AFTER" );
+                var p = Combine( origin, new[] { (5, (string?)null), (6, "Hop(after)") }, 1, 0 );
+                Check( p, "a0", "a1", "a2", "a3", "a4", "Hop(after)" );
+            }
+            {
+                var p = Combine( origin, new[] { (0, (string?)null), (5, (string?)null), (6, (string?)"AFTER++"), (6, (string?)"AFTER+"), (6, (string?)"AFTER"), (4, (string?)null) }, 3, 0 );
+                Check( p, "a1", "a2", "a3", "AFTER", "AFTER+", "AFTER++" );
             }
         }
 
-        static T[] Combine<T>( T[] prev, (int idx, T? p)[] indices, int nbToRemove ) where T : class, IComparable<T>
+        [Test]
+        public void instance_management_algorithm_update_only()
+        {
+            var origin = new[] { "a0", "a1", "a2", "a3", "a4", "a5" };
+            {
+                var p = Combine( origin, new[] { (~0, "r0") }!, 0, 1 );
+                Check( p, "r0", "a1", "a2", "a3", "a4", "a5" );
+            }
+            {
+                var p = Combine( origin, new[] { (~0, "r0"), (~1, "r1") }!, 0, 2 );
+                Check( p, "r0", "r1", "a2", "a3", "a4", "a5" );
+            }
+            {
+                var p = Combine( origin, new[] { (~0, "r0"), (~1, "r1"), (~2, "r2") }!, 0, 3 );
+                Check( p, "r0", "r1", "r2", "a3", "a4", "a5" );
+            }
+            {
+                var p = Combine( origin, new[] { (~0, "r0"), (~1, "r1"), (~2, "r2"), (~3, "r3") }!, 0, 4 );
+                Check( p, "r0", "r1", "r2", "r3", "a4", "a5" );
+            }
+            {
+                var p = Combine( origin, new[] { (~0, "r0"), (~1, "r1"), (~2, "r2"), (~3, "r3"), (~4, "r4") }!, 0, 5 );
+                Check( p, "r0", "r1", "r2", "r3", "r4", "a5" );
+            }
+            {
+                var p = Combine( origin, new[] { (~0, "r0"), (~1, "r1"), (~2, "r2"), (~3, "r3"), (~4, "r4"), (~5, "r5") }!, 0, 6 );
+                Check( p, "r0", "r1", "r2", "r3", "r4", "r5" );
+            }
+
+            {
+                var p = Combine( origin, new[] { (~1, "r1"), (~2, "r2"), (~3, "r3"), (~4, "r4"), (~5, "r5") }!, 0, 5 );
+                Check( p, "a0", "r1", "r2", "r3", "r4", "r5" );
+            }
+            {
+                var p = Combine( origin, new[] { (~2, "r2"), (~3, "r3"), (~4, "r4"), (~5, "r5") }!, 0, 4 );
+                Check( p, "a0", "a1", "r2", "r3", "r4", "r5" );
+            }
+            {
+                var p = Combine( origin, new[] { (~3, "r3"), (~4, "r4"), (~5, "r5") }!, 0, 3 );
+                Check( p, "a0", "a1", "a2", "r3", "r4", "r5" );
+            }
+            {
+                var p = Combine( origin, new[] { (~4, "r4"), (~5, "r5") }!, 0, 2 );
+                Check( p, "a0", "a1", "a2", "a3", "r4", "r5" );
+            }
+            {
+                var p = Combine( origin, new[] { (~5, "r5") }!, 0, 1 );
+                Check( p, "a0", "a1", "a2", "a3", "a4", "r5" );
+            }
+        }
+
+        [Test]
+        public void instance_management_algorithm_update_delete_insert_at_the_same_place()
+        {
+            var origin = new[] { "a0", "a1", "a2", "a3", "a4", "a5" };
+
+            TestAllPermutations( origin, 0 );
+            TestAllPermutations( origin, 1 );
+            TestAllPermutations( origin, 2 );
+            TestAllPermutations( origin, 3 );
+            TestAllPermutations( origin, 4 );
+            TestAllPermutations( origin, 5 );
+
+            static void TestAllPermutations( string[] origin, int idx )
+            {
+                string[] expectation = new[] { idx == 0 ? "Inserted" : "a0",
+                                               idx == 1 ? "Inserted" : "a1",
+                                               idx == 2 ? "Inserted" : "a2",
+                                               idx == 3 ? "Inserted" : "a3",
+                                               idx == 4 ? "Inserted" : "a4",
+                                               idx == 5 ? "Inserted" : "a5" };  
+                // Tests all initial ordering of the entries.
+                var p = Combine( origin, new[] { (idx, (string?)null), (~idx, "Updated"), (idx, "Inserted") }, 1, 1 );
+                Check( p, expectation );
+
+                p = Combine( origin, new[] { (idx, (string?)null), (idx, "Inserted"), (~idx, "Updated") }, 1, 1 );
+                Check( p, expectation );
+
+                p = Combine( origin, new[] { (~idx, "Updated"), (idx, "Inserted"), (idx, (string?)null) }, 1, 1 );
+                Check( p, expectation );
+
+                p = Combine( origin, new[] { (~idx, "Updated"), (idx, (string?)null), (idx, "Inserted") }, 1, 1 );
+                Check( p, expectation );
+
+                p = Combine( origin, new[] { (idx, "Inserted"), (idx, (string?)null), (~idx, "Updated") }, 1, 1 );
+                Check( p, expectation );
+
+                p = Combine( origin, new[] { (idx, "Inserted"), (~idx, "Updated"), (idx, (string?)null) }, 1, 1 );
+                Check( p, expectation );
+            }
+        }
+
+        [Test]
+        public void instance_management_algorithm_update_and_insert()
+        {
+            var origin = new[] { "a0", "a1", "a2", "a3", "a4", "a5" };
+            {
+                var p = Combine( origin, new[] { (~0, "r0"), (0, "Inserted") }!, 0, 1 );
+                Check( p, "Inserted", "r0", "a1", "a2", "a3", "a4", "a5" );
+            }
+            {
+                var p = Combine( origin, new[] { (~0, "r0"), (1, "Inserted") }!, 0, 1 );
+                Check( p, "r0", "Inserted", "a1", "a2", "a3", "a4", "a5" );
+            }
+            {
+                var p = Combine( origin, new[] { (~0, "r0"), (1, "Inserted"), (~1, "Updated (U comes after I)") }!, 0, 2 );
+                Check( p, "r0", "Inserted", "Updated (U comes after I)", "a2", "a3", "a4", "a5" );
+            }
+        }
+
+        static T[] Combine<T>( T[] prev, (int idx, T? p)[] indices, int nbToRemove, int nbToUpdate ) where T : class, IComparable<T>
         {
             Debug.Assert( indices.Count( x => x.p == null ) == nbToRemove );
+            Debug.Assert( indices.Count( x => x.idx < 0 ) == nbToUpdate );
 
             static int CompareIndex( (int idx, T? p) i1, (int idx, T? p) i2 )
             {
-                int cmp = i1.idx - i2.idx;
-                return cmp != 0
-                        ? cmp
-                        : (i1.p == null
-                            ? -1
-                            : (i2.p == null
-                                ? 1
-                                : i1.p.CompareTo( i2.p )));
+                int a1 = i1.idx < 0 ? ~i1.idx : i1.idx;
+                int a2 = i2.idx < 0 ? ~i2.idx : i2.idx;
+                int cmp = a1 - a2;
+                if( cmp != 0 ) return cmp;
+                // Delete comes first.
+                if( i1.p == null ) return -1;
+                if( i2.p == null ) return 1;
+                // Then comes the Insert.
+                if( i1.idx >= 0 )
+                {
+                    if( i2.idx < 0 ) return -1;
+                }
+                else if( i2.idx >= 0 )
+                {
+                    return 1;
+                }
+                // Ultimately ordered by package instance.
+                return i1.p.CompareTo( i2.p );
             }
             Array.Sort( indices, CompareIndex );
-            var instances = new T[prev.Length + indices.Length - 2 * nbToRemove];
-            int prevIdx = 0;
+            var instances = new T[prev.Length + indices.Length - 2 * nbToRemove - nbToUpdate];
+            // This is required because of the Delete-Insert-Update order.
+            // When a Delete occurs at a position, any Update at the same position is simply ignored.
+            int lastIdxDeleteA = -1;
+            int prevIdxA = 0;
             int originOffset = 0, targetOffset = 0;
             foreach( var (idx, p) in indices )
             {
-                var len = idx - prevIdx;
-                prevIdx = idx;
+                var idxA = idx < 0 ? ~idx : idx;
+                var len = idxA - prevIdxA;
+                prevIdxA = idxA;
                 if( len < 0 )
                 {
-                    Debug.Assert( len == -1 && p != null, "Setting a removed slot." );
-                    instances[targetOffset++] = p;
+                    Debug.Assert( len == -1 && p != null, "Inserting or Updating a removed slot." );
+                    // Delete-Update case: If this is an update (idx < 0) we have nothing to do on the array (the slot has been removed).
+                    // Delete-Insert case: simply updates the array cell and forwards targetOffset.
+                    if( idx >= 0 )
+                    {
+                        instances[targetOffset++] = p;
+                    }
+                    // If this is a Delete-Insert-Update, the following Update will be skipped
+                    // thanks to lastIdxDeleteA.
                 }
                 else
                 {
-                    Array.Copy( prev, originOffset, instances, targetOffset, len );
-                    targetOffset += len;
-                    originOffset += len;
+                    if( len != 0 )
+                    {
+                        Array.Copy( prev, originOffset, instances, targetOffset, len );
+                        targetOffset += len;
+                        originOffset += len;
+                    }
                     if( p == null )
                     {
-                        prevIdx++;
+                        // Delete: remember the position and forward prevIdxA and originOffset.
+                        lastIdxDeleteA = idxA;
+                        prevIdxA++;
                         originOffset++;
                     }
-                    else instances[targetOffset++] = p;
+                    else
+                    {
+                        if( idx < 0 )
+                        {
+                            // Updating.
+                            // Handling the Deletion-Update case: skip the entry totally if
+                            // this position has been deleted.
+                            if( lastIdxDeleteA != idxA )
+                            {
+                                // Otherwise, updates the array and forwards the 3 cursors.
+                                instances[targetOffset++] = p;
+                                originOffset++;
+                                prevIdxA++;
+                            }
+                        }
+                        else
+                        {
+                            // Inserting.
+                            instances[targetOffset++] = p;
+                        }
+                    }
                 }
             }
             Array.Copy( prev, originOffset, instances, targetOffset, instances.Length - targetOffset );
@@ -374,7 +541,7 @@ namespace CK.Env.Tests
 
             Array.Sort( v, (a,b) => Math.Abs(a) - Math.Abs(b) );
 
-            v.Should().BeEquivalentTo( new[] { 0, -2, -3, -5, 5, -7, 7, 8, 10 }, "This is it!" );
+            v.Should().BeEquivalentTo( new[] { 0, -2, -3, -5, 5, -7, 7, 8, 10 }, "This is (nearly) it." );
 
             v.Select( idx => idx < 0 ? ('U', ~idx) : ('I', idx) ).Should().BeEquivalentTo( new[] {
                 ('I', 0),
@@ -385,7 +552,69 @@ namespace CK.Env.Tests
                 ('U', 6),
                 ('I', 7),
                 ('I', 8),
-                ('I', 10) }, "This is perfectly ordered: the array to setup can be handled in one pass." );
+                ('I', 10) }, "This seems perfectly ordered: the array to setup can be handled in one pass." );
+
+            // But if we have an insert and an update at the same place (7 is updated and a new
+            // item must be inserted at 7 because it is lower than the 7).
+            // And the same happens to the 6.
+            v = new[] { 7, ~7, 6, ~6 };
+            Array.Sort( v, (a,b) => Math.Abs(a) - Math.Abs(b) );
+            v.Select( idx => idx < 0 ? ('U', ~idx) : ('I', idx) ).Should().BeEquivalentTo( new[] {
+                ('I', 6),
+                ('I', 7),
+                ('U', 6),
+                ('U', 7) }, "This is NOT right!" );
+
+            // We must use the one's complement, not the two's complement that is hidden behind the Abs function.
+            Array.Sort( v, ( a, b ) =>
+            {
+                int aO = a < 0 ? ~a : a;
+                int bO = b < 0 ? ~b : b;
+                return aO - bO;
+            } );
+
+            v.Select( idx => idx < 0 ? ('U', ~idx) : ('I', idx) ).Should().BeEquivalentTo( new[] {
+                ('I', 6),
+                ('U', 6),
+                ('I', 7),
+                ('U', 7) }, "This is better! And it is far easier to first have the inserts and then updates for the same position!" );
+            v = new[] { ~7, 7, ~6, 6 };
+            Array.Sort( v, ( a, b ) =>
+            {
+                int aO = a < 0 ? ~a : a;
+                int bO = b < 0 ? ~b : b;
+                return aO - bO;
+            } );
+            v.Select( idx => idx < 0 ? ('U', ~idx) : ('I', idx) ).Should().BeEquivalentTo( new[] {
+                ('U', 6),
+                ('I', 6),
+                ('U', 7),
+                ('I', 7) }, "The sort above does not guaranty a reproducible order. We must handle the Insert-Update ordering explicitly..." );
+            Array.Sort( v, ( a, b ) =>
+            {
+                int aO = a < 0 ? ~a : a;
+                int bO = b < 0 ? ~b : b;
+                int cmp = aO - bO;
+                // If the positions differ, we're done.
+                if( cmp != 0 ) return cmp;
+                // Inserts must come first!
+                if( a >= 0 )
+                {
+                    if( b < 0 ) return -1;
+                }
+                else if( b >= 0 )
+                {
+                    return -1;
+                }
+                return 0;
+            } );
+            v.Select( idx => idx < 0 ? ('U', ~idx) : ('I', idx) ).Should().BeEquivalentTo( new[] {
+                ('I', 6),
+                ('U', 6),
+                ('I', 7),
+                ('U', 7) }, "Now we have the right order, whatever the input is." );
+
+            // Last note: the real Combine uses the Delete-Insert-Update order for the same positions.
         }
     }
 }

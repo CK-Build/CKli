@@ -51,6 +51,7 @@ namespace CK.Build.PackageDB
             public FeedChangedInfo Create()
             {
                 Debug.Assert( _old != null || _newOrUpdate != null );
+                // Computes the new instances of the feed (the number of updates is computed).
                 var instances = Feed._instances.Add( _newOrUpdate, _old );
                 var f = new PackageFeed( Feed._name, instances );
 
