@@ -35,10 +35,10 @@ namespace CK.Build.PackageDB
         public IReadOnlyList<FeedChangedInfo> FeedChanges { get; }
 
         internal ChangedInfo( PackageDatabase newDB,
-                               bool hasChanged,
-                               IReadOnlyList<PackageChangedInfo> packageChanged,
-                               IReadOnlyList<PackageFeed> newFeeds,
-                               IReadOnlyList<FeedChangedInfo> feedChanges )
+                              bool hasChanged,
+                              IReadOnlyList<PackageChangedInfo> packageChanged,
+                              IReadOnlyList<PackageFeed> newFeeds,
+                              IReadOnlyList<FeedChangedInfo> feedChanges )
         {
             Throw.CheckNotNullArgument( newDB );
             Throw.CheckNotNullArgument( packageChanged );

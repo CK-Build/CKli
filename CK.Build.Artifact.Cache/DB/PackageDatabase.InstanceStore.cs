@@ -163,7 +163,7 @@ namespace CK.Build.PackageDB
                 }
             }
 
-            InstanceStore( PackageInstance[] prev, (int idx, PackageInstance? p)[] indices, int nbToRemove )
+            InstanceStore( PackageInstance[] prev, (int idx, PackageInstance? p)[] indices, int nbToUpdate, int nbToRemove )
             {
                 Debug.Assert( indices.Count( x => x.p == null ) == nbToRemove );
 
@@ -216,17 +216,23 @@ namespace CK.Build.PackageDB
                 Debug.Assert( newPackages != null && newPackages.Count > 0 );
                 if( newPackages.Count == 1 ) return AddOrUpdate( newPackages[0] );
                 var indices = newPackages.Select( p => (~IndexOf( p.Key ), p) ).ToArray();
-                return AddOrUpdate( indices );
+                return AddOrUpdate( indices, 0 );
             }
 
             public InstanceStore Add( List<(int idx, PackageInstance p)>? newOrUpdatedPackages, List<int>? oldPackages )
             {
+                int nbToUpdate = newOrUpdatedPackages != null ? newOrUpdatedPackages.Count( e => e.idx < 0 ) : 0;
+                return Add( newOrUpdatedPackages, nbToUpdate, oldPackages );
+            }
+
+            public InstanceStore Add( List<(int idx, PackageInstance p)>? newOrUpdatedPackages, int nbToUpdate, List<int>? oldPackages )
+            {
                 Debug.Assert( (newOrUpdatedPackages != null && newOrUpdatedPackages.Count > 0) || (oldPackages != null && oldPackages.Count > 0) );
-                if( oldPackages == null ) return AddOrUpdate( newOrUpdatedPackages!.ToArray() );
+                if( oldPackages == null ) return AddOrUpdate( newOrUpdatedPackages!.ToArray(), nbToUpdate );
 
                 IEnumerable<(int idx, PackageInstance? p)>? indices = oldPackages.Select( idx => (idx, (PackageInstance?)null ) );
                 if( newOrUpdatedPackages != null ) indices = indices.Concat( newOrUpdatedPackages.Select( p => (p.idx, (PackageInstance?)p.p) ) );
-                return AddOrUpdateOrRemove( indices.ToArray(), oldPackages.Count );
+                return AddOrUpdateOrRemove( indices.ToArray(), nbToUpdate, oldPackages.Count );
             }
 
             /// <summary>
@@ -235,15 +241,18 @@ namespace CK.Build.PackageDB
             /// <param name="indices">
             /// The idx is negative (bitwise complement) for update and positive for insert or remove, with a null package instance for remove.
             /// </param>
+            /// <param name="nbToUpdate">
+            /// The number of updates in indices (the number of negative idx).
+            /// </param>
             /// <param name="nbToRemove">
             /// The number of remove in indices (the number of null package instances).
             /// </param>
-            public InstanceStore AddOrUpdateOrRemove( (int idx, PackageInstance? p)[] indices, int nbToRemove ) => new InstanceStore( _instances, indices, nbToRemove );
+            public InstanceStore AddOrUpdateOrRemove( (int idx, PackageInstance? p)[] indices, int nbToUpdate, int nbToRemove ) => new InstanceStore( _instances, indices, nbToUpdate, nbToRemove );
 
             /// <summary>
             /// Adding or updating: no null package instance allowed here.
             /// </summary>
-            public InstanceStore AddOrUpdate( (int idx, PackageInstance p)[] indices ) => new InstanceStore( _instances, indices!, 0 );
+            public InstanceStore AddOrUpdate( (int idx, PackageInstance p)[] indices, int nbToUpdate ) => new InstanceStore( _instances, indices!, nbToUpdate, 0 );
 
             public ArraySegment<PackageInstance> GetInstances( ArtifactType type )
             {
