@@ -111,14 +111,7 @@ namespace CK.Env.Plugin
             section.StartComment = ": provides simple and useful definitions.";
             var propertyGroup = XElement.Parse(
 @"<PropertyGroup>
-  <-- The fact that a project must generate a package (IsPackable for a library) must be opt-in.
-      Publishing defaults to true.
-      Publishing a library is generating its output files in the publish folder (and, by the way, this is used by CKSetup).
-  -->
-  <IsPackable>false</IsPackable>
-  <IsPublishable>true</IsPublishable>
-
-  <-- Welcome flag. See https://www.meziantou.net/csharp-compiler-strict-mode.htm -->
+  <!-- See https://www.meziantou.net/csharp-compiler-strict-mode.htm -->
   <Features>strict</Features>
 
   <!-- Simple IsTestProject and IsInTestsFolder variables. -->
