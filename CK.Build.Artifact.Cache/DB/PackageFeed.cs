@@ -32,6 +32,11 @@ namespace CK.Build.PackageDB
                 Feed = f;
                 _old = new List<int>() { oldIdx };
             }
+            internal Diff( PackageFeed f, (int idx, PackageInstance p)[] newOrUpdated )
+            {
+                Feed = f;
+                _newOrUpdate =  newOrUpdated.ToList();
+            }
 
             public readonly PackageFeed Feed;
 

@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Threading;
 
@@ -111,7 +112,7 @@ namespace CK.Build.PackageDB
             initialization = infos.Select( i => (i, i.CheckValidAndParseFeedNames( monitor ), ~_instances.IndexOf( i.Key ), PackageEventType.None, (PackageInstance?)null) )
                                   .ToArray();
             // Reusable buffer.
-            var removeFeedList = new List<(PackageFeed,int)>( _feeds.Count );
+            var removeFeedList = new List<(PackageFeed, int)>( _feeds.Count );
             int newCount = 0;
             int updateCount = 0;
             // The new feeds contains an unordered package list.
@@ -253,10 +254,10 @@ namespace CK.Build.PackageDB
                 if( removeFeedList.Count > 0 )
                 {
                     if( feedDiff == null ) feedDiff = new List<PackageFeed.Diff>();
-                    foreach( var (feed,idxPackage) in removeFeedList )
+                    foreach( var (feed, idxPackage) in removeFeedList )
                     {
                         int idx = feedDiff.IndexOf( t => t.Feed == feed );
-                        if( idx < 0 ) feedDiff.Add( new PackageFeed.Diff(feed, idxPackage));
+                        if( idx < 0 ) feedDiff.Add( new PackageFeed.Diff( feed, idxPackage ) );
                         else feedDiff[idx].Remove( idxPackage );
                     }
                 }
@@ -279,7 +280,7 @@ namespace CK.Build.PackageDB
                                                             .Take( i )
                                                             .Select( t => t.p )
                                                             .FirstOrDefault( p => p != null && p.Key == d.Target )
-                                                         ?? instances.Find( d.Target ) ) )
+                                                         ?? instances.Find( d.Target )) )
                                         .ToArray();
                 if( targets.Any( t => t.Item2 == null ) )
                 {
@@ -315,15 +316,20 @@ namespace CK.Build.PackageDB
             FeedChangedInfo[]? feedChanges = null;
             PackageFeed[]? newFeeds = null;
             Dictionary<string, PackageFeed>? feeds = null;
+            var excludeFeed = new Dictionary<string, PackageFeed>( _feeds );
+
             if( feedDiff != null || brandNewFeeds != null )
             {
                 feeds = new Dictionary<string, PackageFeed>( _feeds );
                 if( feedDiff != null )
                 {
-                    feedChanges = new FeedChangedInfo[ feedDiff.Count ];
+                    feedChanges = new FeedChangedInfo[feedDiff.Count];
                     int i = 0;
                     foreach( var d in feedDiff )
                     {
+                        var itemToExclude = excludeFeed.First( x => x.Value == d.Feed );
+                        excludeFeed.Remove( itemToExclude.Key );
+
                         FeedChangedInfo c = d.Create();
                         feeds[d.Feed.TypedName] = c.Feed;
                         feedChanges[i++] = c;
@@ -331,7 +337,7 @@ namespace CK.Build.PackageDB
                 }
                 if( brandNewFeeds != null )
                 {
-                    newFeeds = new PackageFeed[ brandNewFeeds.Count ];
+                    newFeeds = new PackageFeed[brandNewFeeds.Count];
                     int i = 0;
                     foreach( var fContent in brandNewFeeds )
                     {
@@ -340,6 +346,27 @@ namespace CK.Build.PackageDB
                         newFeeds[i++] = f;
                     }
                 }
+            }
+
+            foreach( var item in excludeFeed )
+            {
+                var test = initialization.Where( entry => item.Value.Instances.Contains( entry.p ) && (entry.status == PackageEventType.StateOnlyChanged ||
+                         entry.status == PackageEventType.ContentOnlyChanged ||
+                         entry.status == PackageEventType.ContentOnlyChanged) &&
+                         !entry.info.AllFeedNamesAreKnown &&
+                         entry.p != null );
+
+                if( feeds == null ) feeds = new Dictionary<string, PackageFeed>( _feeds );
+
+                if( test.Any() )
+                {
+                    var list = test.Select( x => (x.idx, x.p) ).ToArray();
+                    var packageDiff = new PackageFeed.Diff( feeds[item.Value.TypedName], list );
+                    var diffCreate = packageDiff.Create();
+                    feeds[item.Value.TypedName] = diffCreate.Feed;
+                }
+
+
             }
 
             var packageChanges = new PackageChangedInfo[updateCount + newCount];
@@ -352,6 +379,23 @@ namespace CK.Build.PackageDB
                     Debug.Assert( entry.status != PackageEventType.None && entry.status != PackageEventType.Destroyed );
                     packageChanges[iP] = new PackageChangedInfo( entry.status, entry.p );
                     indices[iP++] = (entry.idx, entry.p);
+
+                    //if( (entry.status == PackageEventType.StateOnlyChanged ||
+                    //    entry.status == PackageEventType.ContentOnlyChanged ||
+                    //    entry.status == PackageEventType.ContentOnlyChanged) &&
+                    //    !entry.info.AllFeedNamesAreKnown &&
+                    //    excludeFeed != null
+                    //)
+                    //{
+                    //    foreach( var item in excludeFeed.Values.Where( x => x.Instances.Contains( entry.p ) ) )
+                    //    {
+                    //        if( feeds == null ) feeds = new Dictionary<string, PackageFeed>( _feeds );
+                    //        var a = new PackageFeed.Diff( feeds[item.TypedName], (entry.idx, entry.p) );
+                    //        var test = a.Create();
+                    //        feeds[item.TypedName] = test.Feed;
+                    //    }
+                    //}
+
                 }
             }
             Debug.Assert( indices.All( e => e.p != null ) );

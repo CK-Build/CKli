@@ -166,47 +166,93 @@ namespace CK.Build.PackageDB
             InstanceStore( PackageInstance[] prev, (int idx, PackageInstance? p)[] indices, int nbToUpdate, int nbToRemove )
             {
                 Debug.Assert( indices.Count( x => x.p == null ) == nbToRemove );
+                Debug.Assert( indices.Count( x => x.idx < 0 ) == nbToUpdate );
 
                 static int CompareIndex( (int idx, PackageInstance? p) i1, (int idx, PackageInstance? p) i2 )
                 {
-                    int cmp = i1.idx - i2.idx;
-                    return cmp != 0
-                            ? cmp
-                            : (i1.p == null
-                                ? -1
-                                : (i2.p == null
-                                    ? 1
-                                    : i1.p.CompareTo( i2.p )));
+                    int a1 = i1.idx < 0 ? ~i1.idx : i1.idx;
+                    int a2 = i2.idx < 0 ? ~i2.idx : i2.idx;
+                    int cmp = a1 - a2;
+                    if( cmp != 0 ) return cmp;
+                    // Delete comes first.
+                    if( i1.p == null ) return -1;
+                    if( i2.p == null ) return 1;
+                    // Then comes the Insert.
+                    if( i1.idx >= 0 )
+                    {
+                        if( i2.idx < 0 ) return -1;
+                    }
+                    else if( i2.idx >= 0 )
+                    {
+                        return 1;
+                    }
+                    // Ultimately ordered by package instance.
+                    return i1.p.CompareTo( i2.p );
                 }
                 Array.Sort( indices, CompareIndex );
-                var instances = new PackageInstance[prev.Length + indices.Length - 2 * nbToRemove];
-                int prevIdx = 0;
+                var instances = new PackageInstance[prev.Length + indices.Length - 2 * nbToRemove - nbToUpdate];
+                // This is required because of the Delete-Insert-Update order.
+                // When a Delete occurs at a position, any Update at the same position is simply ignored.
+                int lastIdxDeleteA = -1;
+                int prevIdxA = 0;
                 int originOffset = 0, targetOffset = 0;
-
                 foreach( var (idx, p) in indices )
                 {
-                    var len = idx - prevIdx;
-                    prevIdx = idx;
+                    var idxA = idx < 0 ? ~idx : idx;
+                    var len = idxA - prevIdxA;
+                    prevIdxA = idxA;
                     if( len < 0 )
                     {
-                        Debug.Assert( len == -1 && p != null, "Setting a removed slot." );
-                        instances[targetOffset++] = p;
+                        Debug.Assert( len == -1 && p != null, "Inserting or Updating a removed slot." );
+                        // Delete-Update case: If this is an update (idx < 0) we have nothing to do on the array (the slot has been removed).
+                        // Delete-Insert case: simply updates the array cell and forwards targetOffset.
+                        if( idx >= 0 )
+                        {
+                            instances[targetOffset++] = p;
+                        }
+                        // If this is a Delete-Insert-Update, the following Update will be skipped
+                        // thanks to lastIdxDeleteA.
                     }
                     else
                     {
-                        Array.Copy( prev, originOffset, instances, targetOffset, len );
-                        targetOffset += len;
-                        originOffset += len;
+                        if( len != 0 )
+                        {
+                            Array.Copy( prev, originOffset, instances, targetOffset, len );
+                            targetOffset += len;
+                            originOffset += len;
+                        }
                         if( p == null )
                         {
-                            prevIdx++;
+                            // Delete: remember the position and forward prevIdxA and originOffset.
+                            lastIdxDeleteA = idxA;
+                            prevIdxA++;
                             originOffset++;
                         }
-                        else instances[targetOffset++] = p;
+                        else
+                        {
+                            if( idx < 0 )
+                            {
+                                // Updating.
+                                // Handling the Deletion-Update case: skip the entry totally if
+                                // this position has been deleted.
+                                if( lastIdxDeleteA != idxA )
+                                {
+                                    // Otherwise, updates the array and forwards the 3 cursors.
+                                    instances[targetOffset++] = p;
+                                    originOffset++;
+                                    prevIdxA++;
+                                }
+                            }
+                            else
+                            {
+                                // Inserting.
+                                instances[targetOffset++] = p;
+                            }
+                        }
                     }
                 }
                 Array.Copy( prev, originOffset, instances, targetOffset, instances.Length - targetOffset );
-                _instances = instances;
+                _instances =  instances;
             }
 
             public InstanceStore AddOrUpdate( PackageInstance p ) => new InstanceStore( _instances, p, ~IndexOf( p.Key ) );

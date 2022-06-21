@@ -374,7 +374,7 @@ namespace CK.Env.Tests
                                                idx == 2 ? "Inserted" : "a2",
                                                idx == 3 ? "Inserted" : "a3",
                                                idx == 4 ? "Inserted" : "a4",
-                                               idx == 5 ? "Inserted" : "a5" };  
+                                               idx == 5 ? "Inserted" : "a5" };
                 // Tests all initial ordering of the entries.
                 var p = Combine( origin, new[] { (idx, (string?)null), (~idx, "Updated"), (idx, "Inserted") }, 1, 1 );
                 Check( p, expectation );
@@ -408,9 +408,75 @@ namespace CK.Env.Tests
                 var p = Combine( origin, new[] { (~0, "r0"), (1, "Inserted") }!, 0, 1 );
                 Check( p, "r0", "Inserted", "a1", "a2", "a3", "a4", "a5" );
             }
+
+            {
+                var p = Combine( origin, new[] { (1, "Add"), (~2, "CHANGE") }!, 0, 1 );
+                p.Should().BeEquivalentTo( "a0", "Add", "a1", "CHANGE", "a3", "a4", "a5" );
+            }
+            {
+                var p = Combine( origin, new[] { (2, "Add"), (~1, "CHANGE") }!, 0, 1 );
+                p.Should().BeEquivalentTo( "a0", "CHANGE", "Add", "a2", "a3", "a4", "a5" );
+            }
+            {
+                var p = Combine( origin, new[] { (2, "Add"), (~1, "CHANGE") }!, 0, 1 );
+                p.Should().BeEquivalentTo( "a0", "CHANGE", "Add", "a2", "a3", "a4", "a5" );
+            }
+            {
+                var p = Combine( origin, new[] { (0, "Add"), (~1, "CHANGE") }!, 0, 1 );
+                p.Should().BeEquivalentTo( "Add", "a0", "CHANGE", "a2", "a3", "a4", "a5" );
+            }
+            {
+                var p = Combine( origin, new[] { (0, "Add"), (~3, "CHANGE") }!, 0, 1 );
+                p.Should().BeEquivalentTo( "Add", "a0", "a1", "a2", "CHANGE", "a4", "a5" );
+            }
+            {
+                var p = Combine( origin, new[] { (6, "Add"), (~0, "CHANGE") }!, 0, 1 );
+                p.Should().BeEquivalentTo( "CHANGE", "a1", "a2", "a3", "a4", "a5", "Add" );
+            }
+
+            // Multiple Add/Update
             {
                 var p = Combine( origin, new[] { (~0, "r0"), (1, "Inserted"), (~1, "Updated (U comes after I)") }!, 0, 2 );
                 Check( p, "r0", "Inserted", "Updated (U comes after I)", "a2", "a3", "a4", "a5" );
+            }
+            {
+                var p = Combine( origin, new[] { (5, "Add"), (4, "Add1"), (~5, "CHANGE"), (~3, "CHANGE2") }!, 0, 2 );
+                p.Should().BeEquivalentTo( "a0", "a1", "a2", "CHANGE2", "Add1", "a4", "Add", "CHANGE" );
+            }
+            {
+                var p = Combine( origin, new[] { (4, "Add"), (1, "Add1"), (~2, "CHANGE"), (~4, "CHANGE2") }!, 0, 2 );
+                p.Should().BeEquivalentTo( "a0", "Add1", "a1", "CHANGE", "a3", "Add", "CHANGE2", "a5" );
+            }
+            {
+                var p = Combine( origin, new[] { (0, "Add"), (~0, "CHANGE"), (~5, "CHANGE2"), (5, "Add2") }!, 0, 2 ); ;
+                p.Should().BeEquivalentTo( "Add", "CHANGE", "a1", "a2", "a3", "a4", "Add2", "CHANGE2" );
+            }
+        }
+
+        [Test]
+        public void instance_management_algorithm_update_and_delete()
+        {
+            var origin = new[] { "a0", "a1", "a2", "a3", "a4", "a5" };
+
+            {
+                var p = Combine( origin, new[] { (1, (string?)null), (~2, "CHANGE") }, 1, 1 );
+                p.Should().BeEquivalentTo( "a0", "CHANGE", "a3", "a4", "a5" );
+            }
+            {
+                var p = Combine( origin, new[] { (2, (string?)null), (~0, "CHANGE") }, 1, 1 );
+                p.Should().BeEquivalentTo( "CHANGE", "a1", "a3", "a4", "a5" );
+            }
+            {
+                var p = Combine( origin, new[] { (2, (string?)null), (~5, "CHANGE") }, 1, 1 );
+                p.Should().BeEquivalentTo( "a0", "a1", "a3", "a4", "CHANGE" );
+            }
+            {
+                var p = Combine( origin, new[] { (2, (string?)null), (4, (string?)null), (~1, "CHANGE") }, 2, 1 );
+                p.Should().BeEquivalentTo( "a0", "CHANGE", "a3", "a5" );
+            }
+            {
+                var p = Combine( origin, new[] { (2, (string?)null), (~0, "CHANGE1"), (~1, "CHANGE2") }, 1, 2 );
+                p.Should().BeEquivalentTo( "CHANGE1", "CHANGE2", "a3", "a4", "a5" );
             }
         }
 
@@ -520,13 +586,55 @@ namespace CK.Env.Tests
             packageA.Dependencies.Add( (notFound, SVersionLock.None, PackageQuality.CI, ArtifactDependencyKind.Transitive, null) );
             testFeed.Content.Add( packageA );
 
-            var lPC = new LivePackageCache( pC, new []{ testFeed } );
+            var lPC = new LivePackageCache( pC, new[] { testFeed } );
             var pI = await lPC.EnsureAsync( new ActivityMonitor(), packageA.Key );
 
             pI.Should().NotBeNull( "A has been added." );
             pI!.Dependencies[0].State.Should().Be( PackageState.Ghost, "But its dependency is a Ghost." );
 
             pC.DB.Find( notFound ).Should().BeNull( "A Ghost package must not be found by default." );
+        }
+
+        [Test]
+        public async Task package_instance_should_update_and_raised_event()
+        {
+            var pC = new PackageCache();
+            ChangedInfo changedInfoOuter = null;
+
+            pC.DBChanged += delegate ( object sender, ChangedInfo changedInfo )
+            {
+                changedInfoOuter = changedInfo;
+            };
+
+            var testFeed = new TestFeed( "Test" );
+
+            var packageAArtifactInstance = new ArtifactInstance( TestFeed.TestType, "A", CSVersion.Parse( "1.0.0" ) );
+            var subAinstance = new ArtifactInstance( TestFeed.TestType, "SubA", CSVersion.Parse( "1.0.0" ) );
+
+            var packageA = new FullPackageInstanceInfo() { Key = packageAArtifactInstance };
+            var subA = new FullPackageInstanceInfo() { Key = subAinstance};
+            //subA.FeedNames.Add( "Test" );
+            packageA.Dependencies.Add( (subAinstance, SVersionLock.Lock, PackageQuality.Stable, ArtifactDependencyKind.Transitive, null) );
+            testFeed.Content.Add( packageA );
+            testFeed.Content.Add( subA );
+
+            var lPC = new LivePackageCache( pC, new[] { testFeed } );
+            var pI = await lPC.EnsureAsync( new ActivityMonitor(), subA.Key );
+
+            pI.Should().NotBeNull( "subA has been added." );
+            subA.State = PackageState.Deprecated;
+
+            pC.Add( new ActivityMonitor(), new[] { subA } );
+
+            changedInfoOuter.Should().NotBeNull();
+            changedInfoOuter!.HasChanged.Should().BeTrue();
+            changedInfoOuter.PackageChanges[0].Package.Should().BeEquivalentTo( (PackageInstanceInfo)subA );
+            changedInfoOuter.DB.Feeds.ElementAt(0).Instances[0].Should().BeEquivalentTo( (PackageInstanceInfo)subA );
+
+            pI = await lPC.EnsureAsync( new ActivityMonitor(), subA.Key );
+            pI.Should().NotBeNull( "subA always here" );
+
+            pI.Should().BeEquivalentTo( (PackageInstanceInfo)subA );
         }
 
         [Test]
@@ -539,7 +647,7 @@ namespace CK.Env.Tests
             Array.Sort( v );
             v.Should().BeEquivalentTo( new[] { -7, -5, -3, -2, 0, 5, 7, 8, 10 }, "This is not what we want." );
 
-            Array.Sort( v, (a,b) => Math.Abs(a) - Math.Abs(b) );
+            Array.Sort( v, ( a, b ) => Math.Abs( a ) - Math.Abs( b ) );
 
             v.Should().BeEquivalentTo( new[] { 0, -2, -3, -5, 5, -7, 7, 8, 10 }, "This is (nearly) it." );
 
@@ -558,7 +666,7 @@ namespace CK.Env.Tests
             // item must be inserted at 7 because it is lower than the 7).
             // And the same happens to the 6.
             v = new[] { 7, ~7, 6, ~6 };
-            Array.Sort( v, (a,b) => Math.Abs(a) - Math.Abs(b) );
+            Array.Sort( v, ( a, b ) => Math.Abs( a ) - Math.Abs( b ) );
             v.Select( idx => idx < 0 ? ('U', ~idx) : ('I', idx) ).Should().BeEquivalentTo( new[] {
                 ('I', 6),
                 ('I', 7),
