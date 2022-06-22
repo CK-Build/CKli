@@ -1,5 +1,7 @@
-using CK.Text;
+
+using CK.Core;
 using Microsoft.Extensions.FileProviders;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -20,27 +22,48 @@ namespace CK.Env
         public static string ReadAsText( this IFileInfo @this )
         {
             if( @this is ITextFileInfo txt ) return txt.TextContent;
-            using( var s = @this.CreateReadStream() )
+            using( var s = CheckFileInfoExists( @this ).CreateReadStream() )
             using( var t = new StreamReader( s ) )
             {
-                return t.ReadToEnd().NormalizeEOL();
+                return t.ReadToEnd().ReplaceLineEndings();
             }
         }
 
+        static IFileInfo CheckFileInfoExists( IFileInfo @this )
+        {
+            if( !@this.Exists )
+            {
+                throw new InvalidOperationException( $"File info '{@this.Name}' (PhysicalPath: {@this.PhysicalPath}) doesn't exist." );
+            }
+            return @this;
+        }
+
+        /// <summary>
+        /// Reads this file as a text (uses a <see cref="StreamReader"/>) as multiple
+        /// lines. This must exist and be a file otherwise exceptions will be thrown.
+        /// </summary>
+        /// <param name="this">This file info.</param>
+        /// <returns>The lines.</returns>
         public static IEnumerable<string> ReadAsTextLines( this IFileInfo @this )
         {
             using( var t = @this is ITextFileInfo txt
                                 ? (TextReader)new StringReader( txt.TextContent )
-                                : new StreamReader( @this.CreateReadStream() ) )
+                                : new StreamReader( CheckFileInfoExists( @this ).CreateReadStream() ) )
             {
-                string line;
+                string? line;
                 while( (line = t.ReadLine()) != null ) yield return line;
             }
         }
 
+
+        public static JObject ReadAsJObject( this IFileInfo @this )
+        {
+            return JObject.Parse( @this.ReadAsText() );
+        }
+
         public static XDocument ReadAsXDocument( this IFileInfo @this )
         {
-            using( var s = @this.CreateReadStream() )
+            using( var s = CheckFileInfoExists( @this ).CreateReadStream() )
             {
                 return XDocument.Load( s );
             }
@@ -49,7 +72,7 @@ namespace CK.Env
         public static byte[] ReadAllBytes( this IFileInfo @this )
         {
             if( @this is Transformed t ) return t.BinContent;
-            using( var s = @this.CreateReadStream() )
+            using( var s = CheckFileInfoExists( @this ).CreateReadStream() )
             {
                 var b = new byte[@this.Length];
                 s.Read( b, 0, b.Length );
@@ -57,48 +80,19 @@ namespace CK.Env
             }
         }
 
-        /// <summary>
-        /// Checks content equality. This <see cref="IFileInfo"/> and <paramref name="file"/>
-        /// must both be actual files, not directories.
-        /// </summary>
-        /// <param name="this">This file info.</param>
-        /// <param name="file">The file to check.</param>
-        /// <returns>True of the files have exactly the same content, false otherwise.</returns>
-        public static bool ContentEquals( this IFileInfo @this, IFileInfo file )
-        {
-            if( @this.IsDirectory ) throw new ArgumentException( "Must be a file.", nameof( @this ) );
-            if( file == null ) throw new ArgumentNullException( nameof( file ) );
-            if( file.IsDirectory ) throw new ArgumentException( "Must be a file.", nameof( file ) );
-            if( @this.Length != file.Length ) return false;
-            using( var s = @this.CreateReadStream() )
-            using( var d = file.CreateReadStream() )
-            {
-                return ContentEquals( s, d );
-            }
-        }
-
-        public static bool ContentEquals( Stream s1, Stream s2 )
-        {
-            int read;
-            for(; ; )
-            {
-                if( s1.ReadByte() != (read = s2.ReadByte()) ) return false;
-                if( read == -1 ) return true;
-            }
-        }
-
-        static string[] _textExtensions = new string[]
+        static readonly string[] _textExtensions = new string[]
         {
             ".txt",
             ".cs", ".js", ".sql",
             ".sln", ".csproj", ".proj",
-            ".yml", ".json", ".xml"
+            ".yml", ".json", ".xml",
+            ".editorconfig", ".config"
         };
 
         class Origin : ITextFileInfo
         {
             readonly IFileInfo _source;
-            string _text;
+            string? _text;
 
             public Origin( IFileInfo source )
             {
@@ -131,7 +125,7 @@ namespace CK.Env
             string _text;
             byte[] _bin;
 
-            public Transformed( ITextFileInfo source, Func<string,string> trans )
+            public Transformed( ITextFileInfo source, Func<string, string> trans )
             {
                 Debug.Assert( source.Exists && !source.IsDirectory );
                 Debug.Assert( trans != null );
@@ -151,24 +145,37 @@ namespace CK.Env
 
             public bool IsDirectory => false;
 
-            public string TextContent => _text ?? (_text = _trans( _source.TextContent ) );
+            public string TextContent => _text ?? (_text = _trans( _source.TextContent ));
 
             public byte[] BinContent => _bin ?? (_bin = Encoding.UTF8.GetBytes( TextContent ));
 
             public Stream CreateReadStream() => new MemoryStream( BinContent );
         }
 
-
-        public static ITextFileInfo AsTextFileInfo( this IFileInfo f )
+        /// <summary>
+        /// Creates a <see cref="ITextFileInfo"/> for this file info if it is possible:
+        /// the file exists, is not a directory and its extension denotes a text format.
+        /// Returns null otherwise.
+        /// </summary>
+        /// <param name="f">This file info.</param>
+        /// <param name="ignoreExtension">
+        /// True to ignore the extension.
+        /// By default only extensions that are known to contain text are considered.
+        /// </param>
+        /// <returns>A ITextFileInfo or null.</returns>
+        public static ITextFileInfo? AsTextFileInfo( this IFileInfo f, bool ignoreExtension = false )
         {
             if( f is ITextFileInfo t ) return t;
             if( f == null || !f.Exists || f.IsDirectory ) return null;
-            string ext = System.IO.Path.GetExtension( f.Name );
-            if( Array.IndexOf( _textExtensions, ext ) < 0 ) return null;
+            if( !ignoreExtension )
+            {
+                string ext = Path.GetExtension( f.Name );
+                if( Array.IndexOf( _textExtensions, ext ) < 0 ) return null;
+            }
             return new Origin( f );
         }
 
-        public static ITextFileInfo WithTransformedText( this ITextFileInfo f, Func<string,string> trans )
+        public static ITextFileInfo WithTransformedText( this ITextFileInfo f, Func<string, string> trans )
         {
             return new Transformed( f, trans );
         }

@@ -1,102 +1,112 @@
 using CK.Core;
-using CK.Text;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
 using System.Xml.Linq;
 
 namespace CK.Env
 {
-    public abstract class XTypedObject
+    public class XTypedObject
     {
+        IReadOnlyList<XTypedObject>? _children;
+
         public class Initializer
         {
-            Dictionary<object, object> _initializationState;
-
-            internal Initializer( IActivityMonitor monitor, XTypedObject parent, TypedXml e, SimpleServiceContainer services )
+            /// <summary>
+            /// Constructor for child objects.
+            /// </summary>
+            /// <param name="parent">The parent object. Never null.</param>
+            /// <param name="eReader">The element reader.</param>
+            /// <param name="services">The available services.</param>
+            internal Initializer(
+                XTypedObject parent,
+                in XElementReader eReader,
+                SimpleServiceContainer services )
             {
-                TypedXml = e;
                 Parent = parent;
-                Monitor = monitor;
+                Reader = eReader;
                 Services = services;
                 ChildServices = new SimpleServiceContainer( Services );
             }
 
-            internal Initializer( IActivityMonitor monitor, TypedXml e, IServiceProvider baseProvider )
+            /// <summary>
+            /// Constructor for the root.
+            /// </summary>
+            /// <param name="root">Root factory.</param>
+            /// <param name="eReader">The element reader.</param>
+            /// <param name="baseProvider">Can be null.</param>
+            internal Initializer( XTypedFactory root, in XElementReader eReader, IServiceProvider? baseProvider )
             {
-                TypedXml = e;
-                Monitor = monitor;
+                Reader = eReader;
                 Services = new SimpleServiceContainer( baseProvider );
+                Services.Add( root );
                 ChildServices = new SimpleServiceContainer( Services );
             }
 
-            internal TypedXml TypedXml { get; }
+            /// <summary>
+            /// Gets the element reader.
+            /// </summary>
+            public XElementReader Reader { get; }
 
-            public IActivityMonitor Monitor { get; }
+            /// <summary>
+            /// Gets the monitor to use.
+            /// </summary>
+            public IActivityMonitor Monitor => Reader.Monitor;
 
-            public XElement Element => TypedXml.Element;
+            /// <summary>
+            /// Gets the raw <see cref="XElement"/>.
+            /// Unfortunately, there is no read-only view of XElement, this should not be mutated
+            /// otherwise an InvalidOperationException is thrown.
+            /// </summary>
+            public XElement Element => Reader.Element;
 
-            public XTypedObject Parent { get; }
+            /// <summary>
+            /// Gets the parent typed object.
+            /// </summary>
+            public XTypedObject? Parent { get; }
 
+            /// <summary>
+            /// Gets the service container for siblings and children elements.
+            /// Service added to this container will be available to siblings and children.
+            /// </summary>
             public ISimpleServiceContainer Services { get; }
 
+            /// <summary>
+            /// Gets the service container for children elements only.
+            /// Service added to this container will be available only to children.
+            /// </summary>
             public ISimpleServiceContainer ChildServices { get; }
-
-            public IDictionary<object, object> InitializationState
-            {
-                get
-                {
-                    if( _initializationState == null )
-                    {
-                        _initializationState = new Dictionary<object, object>();
-                    }
-                    return _initializationState;
-                }
-            }
 
         }
 
-        protected XTypedObject( Initializer initializer )
+        /// <summary>
+        /// Initializes a new <see cref="XTypedObject"/> from a <see cref="Initializer"/> that
+        /// exposes the <see cref="Initializer.Element"/> and other build services such as
+        /// the <see cref="Initializer.Monitor"/> to use.
+        /// </summary>
+        /// <param name="initializer">The initializer context.</param>
+        public XTypedObject( Initializer initializer )
         {
             Parent = initializer.Parent;
             XElement = initializer.Element;
-            var a = initializer.Element.FirstAttribute;
-            while( a != null )
-            {
-                var pInh = GetType().GetProperty( a.Name.LocalName );
-                var p = pInh?.DeclaringType.GetProperty( pInh.Name );
-                if( p != null && p.CanWrite )
-                {
-                    object v;
-                    if( p.PropertyType == typeof(NormalizedPath))
-                    {
-                        v = new NormalizedPath( a.Value );
-                    }
-                    else v = Convert.ChangeType( a.Value, p.PropertyType );
-                    p.SetValue( this, v );
-                }
-                a = a.NextAttribute;
-            }
+            initializer.Reader.SetPropertiesFromAttributes( this );
             XElement.AddAnnotation( this );
         }
 
         /// <summary>
         /// Gets the parent typed object.
         /// </summary>
-        public XTypedObject Parent { get; }
+        public XTypedObject? Parent { get; }
 
         /// <summary>
         /// Gets the first child.
         /// </summary>
-        public XTypedObject FirstChild => Children?.Count == 0 ? null : Children[0];
+        public XTypedObject? FirstChild => (_children == null || _children.Count == 0) ? null : _children[0];
 
         /// <summary>
         /// Gets the children typed objects.
         /// This is available right before <see cref="OnCreated(Initializer)"/> is called. 
         /// </summary>
-        public IReadOnlyList<XTypedObject> Children { get; private set; }
+        public IReadOnlyList<XTypedObject> Children => _children!;
 
         /// <summary>
         /// Enumerates through all descendants of the given element, returning the topmost
@@ -104,7 +114,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="predicate">Filter condition. When successful, children nodes are skipped.</param>
         /// <returns>The set of descendants that match the predicate in document order regardless of their depth.</returns>
-        /// <param name="withSelf">True to consider <paramref name="this"/> element. Defaults to consider only the element children.</param>
+        /// <param name="withSelf">True to consider <paramref name="this"/> element. Defaults to consider only the  children elements.</param>
         public IEnumerable<XTypedObject> TopDescendants( Func<XTypedObject, bool> predicate, bool withSelf = false )
         {
             if( predicate == null ) throw new ArgumentNullException( nameof( predicate ) );
@@ -116,8 +126,11 @@ namespace CK.Env
             var current = FirstChild;
             while( current != null )
             {
-                XTypedObject next = null;
-                if( predicate( current ) ) yield return current;
+                XTypedObject? next = null;
+                if( predicate( current ) )
+                {
+                    yield return current;
+                }
                 else
                 {
                     // Dive into the children (if any).
@@ -140,12 +153,32 @@ namespace CK.Env
             }
         }
 
+        /// <summary>
+        /// Gets all the descendants of a given type.
+        /// </summary>
+        /// <typeparam name="T">Type of the descendants that must be enumerated.</typeparam>
+        /// <param name="breadthFirst">
+        /// False to enumerate the nodes in depth-first order rather than breadth-first.
+        /// </param>
+        /// <param name="withSelf">
+        /// True to consider <paramref name="this"/> element. Defaults to consider only the children elements.
+        /// </param>
+        /// <returns>The set of typed descendants.</returns>
+        public IEnumerable<T> Descendants<T>( bool breadthFirst = true, bool withSelf = false )
+        {
+            if( breadthFirst && withSelf && this is T tTb ) yield return tTb;
+            foreach( var c in Children )
+            {
+                foreach( var d in c.Descendants<T>( breadthFirst, true ) ) yield return d;
+            }
+            if( !breadthFirst && withSelf && this is T tTd ) yield return tTd;
+        }
 
         /// <summary>
         /// Gets the next sibling.
         /// Null if this is the last children of the <see cref="Parent"/>.
         /// </summary>
-        public XTypedObject NextSibling { get; private set; }
+        public XTypedObject? NextSibling { get; private set; }
 
         /// <summary>
         /// Gets the next siblings.
@@ -165,8 +198,8 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the raw <see cref="XElement"/>.
-        /// Unfortunaltely, there is no read-only view of XElement, this should not be mutated
-        /// otherwise an InvalidOperationException is thrown.
+        /// Unfortunaltely, there is no read-only view of XElement, so the check is at runtime:
+        /// this should not be mutated otherwise an InvalidOperationException is thrown.
         /// </summary>
         public XElement XElement { get; }
 
@@ -181,40 +214,27 @@ namespace CK.Env
             return true;
         }
 
-        /// <summary>
-        /// Gets all the descendants of a given type.
-        /// </summary>
-        /// <typeparam name="T">Type of the descendants that must be enumerated.</typeparam>
-        /// <returns>The set of typed descendants.</returns>
-        public IEnumerable<T> Descendants<T>()
-        {
-            foreach( var c in Children )
-            {
-                if( c is T tC ) yield return tC;
-                foreach( var d in c.Descendants<T>() )
-                {
-                    if( d is T tD ) yield return tD;
-                }
-            }
-        }
-
         internal bool OnChildrenCreated( Initializer initializer, IReadOnlyList<XTypedObject> children )
         {
-            XTypedObject sibling = null;
-            for( int i = children.Count-1; i >= 0; --i )
+            XTypedObject? sibling = null;
+            for( int i = children.Count - 1; i >= 0; --i )
             {
                 var c = children[i];
                 c.NextSibling = sibling;
-                c.OnSiblingsCreated( initializer.Monitor );
                 sibling = c;
             }
-            Children = children;
+            _children = children;
+            foreach( var c in children )
+            {
+                c.OnSiblingsCreated( initializer.Monitor );
+            }
             return OnCreated( initializer );
         }
 
         /// <summary>
         /// Called once <see cref="NextSibling"/> is available (and all the siblings up to the last child
         /// of the <see cref="Parent"/>.
+        /// This default implementation simply returns true.
         /// </summary>
         /// <param name="monitor">Monitor that must be used to log any information.</param>
         /// <returns>Must return true on success, false if an error occured.</returns>

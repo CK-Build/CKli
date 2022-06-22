@@ -1,0 +1,13 @@
+digraph "CK-Build" {
+    subgraph rank_0 {
+        rank=0;
+        "CodeCake.sln";
+        "CSemVer-Net.sln";
+    }
+    subgraph rank_1 {
+        rank=1;
+        "SGV-Net.sln";
+        "SGV-Net.sln" -> "CSemVer-Net.sln";
+        "SGV-Net.sln" -> "CodeCake.sln";
+    }
+}

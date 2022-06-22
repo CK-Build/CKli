@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Root>
+    <!-- Reusable definition applies to the next siblings. -->
+    <Reusable Name="One">
+        <Thing1 />
+    </Reusable>
+    <!-- A reusable definition can reuse another one. -->
+    <Reusable Name="Two">
+        <Reuse Name="One" /><!-- ==> Thing1 (will come here) -->
+        <Thing2 />
+    </Reusable>
+    <Reuse Name="One" /><!-- ==> Thing1 -->
+    <Reuse Name="Two" /><!-- ==> Thing1, Thing2 -->
+    <Below>
+        <!--
+            One can override a Reusable: this redefinition
+            is available in the context of the current element.
+        -->
+        <Reusable Name="One" Override="True">
+            <Thing1Override />
+            <Reuse Name="Two" /><!-- ==> Thing1, Thing2 -->
+        </Reusable>
+        <Reuse Name="One" /><!-- ==> Thing1Override, Thing1, Thing2 -->
+    </Below>
+
+    <!-- The original Reusables are restored once Below is closed.  -->
+    <Reuse Name="One" /><!-- ==> Thing1 -->
+    <Reuse Name="Two" /><!-- ==> Thing1, Thing2 (will come here) -->
+</Root>

@@ -1,8 +1,7 @@
-using CK.Text;
+using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Xml.Linq;
 
 namespace CK.Env
@@ -24,7 +23,7 @@ namespace CK.Env
         /// <param name="withSelf">True to consider <paramref name="this"/> element. Defaults to consider only the element children.</param>
         public static IEnumerable<XElement> TopDescendants( this XElement @this, Func<XElement, bool> predicate, bool withSelf = false )
         {
-            if( predicate == null ) throw new ArgumentNullException( nameof(predicate) );
+            if( predicate == null ) throw new ArgumentNullException( nameof( predicate ) );
             if( @this == null ) yield break;
             if( withSelf && predicate( @this ) )
             {
@@ -34,8 +33,11 @@ namespace CK.Env
             var current = @this.FirstChild<XElement>();
             while( current != null )
             {
-                XElement next = null;
-                if( predicate( current ) ) yield return current;
+                XElement? next = null;
+                if( predicate( current ) )
+                {
+                    yield return current;
+                }
                 else
                 {
                     // Dive into the children (if any).
@@ -64,7 +66,7 @@ namespace CK.Env
         /// <typeparam name="TNode">Type of the node.</typeparam>
         /// <param name="this">This node.</param>
         /// <returns>The first <typeparamref name="TNode"/> child or null if none.</returns>
-        public static TNode FirstChild<TNode>( this XNode @this ) where TNode : XNode
+        public static TNode? FirstChild<TNode>( this XNode @this ) where TNode : XNode
         {
             var container = @this as XContainer;
             return container?.FirstNode as TNode;
@@ -76,14 +78,13 @@ namespace CK.Env
         /// <typeparam name="TNode">Type of the node.</typeparam>
         /// <param name="this">This node.</param>
         /// <returns>The next <typeparamref name="TNode"/> sibling or null if none.</returns>
-        public static TNode NextSibling<TNode>( this XNode @this ) where TNode : XNode
+        public static TNode? NextSibling<TNode>( this XNode @this ) where TNode : XNode
         {
-            @this = @this?.NextNode;
-            while( @this != null )
+            var next = @this?.NextNode;
+            while( next != null )
             {
-                var n = @this as TNode;
-                if( n != null ) return n;
-                @this = @this.NextNode;
+                if( next is TNode n ) return n;
+                next = next.NextNode;
             }
             return null;
         }

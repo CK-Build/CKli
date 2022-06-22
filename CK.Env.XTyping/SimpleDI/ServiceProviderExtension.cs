@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace CK.Core
 {
@@ -17,10 +16,10 @@ namespace CK.Core
         /// <param name="t">Type to instanciate.</param>
         /// <param name="requiredParameters">Optional required parameters.</param>
         /// <returns>A new instance on success, null on error.</returns>
-        public static object SimpleObjectCreate( this IServiceProvider @this, IActivityMonitor monitor, Type t, IEnumerable<object> requiredParameters )
+        public static object? SimpleObjectCreate( this IServiceProvider @this, IActivityMonitor monitor, Type t, IEnumerable<object> requiredParameters )
         {
             if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
-            ISimpleObjectActivator activator = @this.GetService<ISimpleObjectActivator>();
+            ISimpleObjectActivator activator = @this.GetService<ISimpleObjectActivator>( false );
             if( activator == null )
             {
                 monitor.Info( "No registered ISimpleObjectActivator found. Using transient new SimpleObjectActivator()." );
@@ -40,7 +39,7 @@ namespace CK.Core
         /// <param name="t">Type to instanciate.</param>
         /// <param name="requiredParameter">Required parameter. Must not be null.</param>
         /// <returns>A new instance on success, null on error.</returns>
-        public static object SimpleObjectCreate( this IServiceProvider @this, IActivityMonitor monitor, Type t, object requiredParameter )
+        public static object? SimpleObjectCreate( this IServiceProvider @this, IActivityMonitor monitor, Type t, object requiredParameter )
         {
             if( requiredParameter == null ) throw new ArgumentNullException( nameof( requiredParameter ) );
             return SimpleObjectCreate( @this, monitor, t, new[] { requiredParameter } );
@@ -56,7 +55,7 @@ namespace CK.Core
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="t">Type to instanciate.</param>
         /// <returns>A new instance on success, null on error.</returns>
-        public static object SimpleObjectCreate( this IServiceProvider @this, IActivityMonitor monitor, Type t )
+        public static object? SimpleObjectCreate( this IServiceProvider @this, IActivityMonitor monitor, Type t )
         {
             return SimpleObjectCreate( @this, monitor, t, Array.Empty<object>() );
         }
