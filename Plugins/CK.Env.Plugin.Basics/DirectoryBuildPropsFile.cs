@@ -239,7 +239,7 @@ $@"<PropertyGroup>
             section.StartComment = ": See  https://github.com/dotnet/sdk/issues/1458#issuecomment-695119194 ";
             section.SetContent(
                 XElement.Parse( @"
-  <Target Name=""_ResolveCopyLocalNuGetPackagePdbsAndXml"" Condition=""$(CopyLocalLockFileAssemblies) == true"" AfterTargets=""ResolveReferences"">
+  <Target Name=""_ResolveCopyLocalNuGetPackagePdbsAndXml"" AfterTargets=""ResolveReferences"">
     <ItemGroup>
       <ReferenceCopyLocalPaths
         Include=""@(ReferenceCopyLocalPaths->'%(RootDir)%(Directory)%(Filename).pdb')""
