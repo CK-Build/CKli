@@ -632,8 +632,14 @@ namespace CK.Env.Tests
 
             changedInfoOuter.Should().NotBeNull();
             changedInfoOuter!.HasChanged.Should().BeTrue();
+            changedInfoOuter.PackageChanges.Should().HaveCount( 1 );
             changedInfoOuter.PackageChanges[0].Package.Should().BeEquivalentTo( (PackageInstanceInfo)subA );
+
             changedInfoOuter.DB.Feeds.ElementAt(0).Instances[0].Should().BeEquivalentTo( (PackageInstanceInfo)subA );
+
+            changedInfoOuter.FeedChanges.Should().HaveCount( 1 );
+            changedInfoOuter.FeedChanges[0].AddedPackages.Should().HaveCount( 0 );
+            changedInfoOuter.FeedChanges[0].RemovedPackages.Should().HaveCount( 0 );
 
             pI = await lPC.EnsureAsync( new ActivityMonitor(), subA.Key );
             pI.Should().NotBeNull( "subA always here" );
