@@ -32,6 +32,11 @@ namespace CK.Build.PackageDB
                 Feed = f;
                 _old = new List<int>() { oldIdx };
             }
+            internal Diff( PackageFeed f, (int idx, PackageInstance p)[] newOrUpdated )
+            {
+                Feed = f;
+                _newOrUpdate =  newOrUpdated.ToList();
+            }
 
             public readonly PackageFeed Feed;
 
@@ -51,6 +56,7 @@ namespace CK.Build.PackageDB
             public FeedChangedInfo Create()
             {
                 Debug.Assert( _old != null || _newOrUpdate != null );
+                // Computes the new instances of the feed (the number of updates is computed).
                 var instances = Feed._instances.Add( _newOrUpdate, _old );
                 var f = new PackageFeed( Feed._name, instances );
 
