@@ -480,6 +480,10 @@ namespace CK.Env.Tests
             }
         }
 
+        /// <summary>
+        /// This reproduces the InstanceStore constructor that in one allocation and one pass
+        /// generates a new InstanceStore.
+        /// </summary>
         static T[] Combine<T>( T[] prev, (int idx, T? p)[] indices, int nbToRemove, int nbToUpdate ) where T : class, IComparable<T>
         {
             Debug.Assert( indices.Count( x => x.p == null ) == nbToRemove );

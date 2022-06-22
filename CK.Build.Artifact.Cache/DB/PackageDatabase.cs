@@ -111,8 +111,10 @@ namespace CK.Build.PackageDB
             (IFullPackageInfo info, Artifact[]? feedNames, int idx, PackageEventType status, PackageInstance? p)[] initialization;
             initialization = infos.Select( i => (i, i.CheckValidAndParseFeedNames( monitor ), ~_instances.IndexOf( i.Key ), PackageEventType.None, (PackageInstance?)null) )
                                   .ToArray();
-            // Reusable buffer.
+            // Reusable buffers.
             var removeFeedList = new List<(PackageFeed, int)>( _feeds.Count );
+            var feedToCheckList = new List<PackageFeed>( _feeds.Count );
+
             int newCount = 0;
             int updateCount = 0;
             // The new feeds contains an unordered package list.
@@ -131,6 +133,7 @@ namespace CK.Build.PackageDB
                 Debug.Assert( candidate.info.Key.IsValid && candidate.feedNames.All( f => f.IsValid ) );
 
                 removeFeedList.Clear();
+                feedToCheckList.Clear();
 
                 PackageEventType cs = PackageEventType.None;
                 PackageInstance? pOld = null;
@@ -173,6 +176,13 @@ namespace CK.Build.PackageDB
                                 removeFeedList.Add( (f, idx) );
                             }
                         }
+                    }
+                    else if( pNew != null )
+                    {
+                        // The package instance changed and the provided feed names are not
+                        // the complete known set of feeds.
+                        // We must update the instance in all feeds that reference the package.
+                        feedToCheckList.AddRange( _feeds.Values );
                     }
                 }
                 else
@@ -222,6 +232,7 @@ namespace CK.Build.PackageDB
                                     break;
                                 }
                             }
+                            feedToCheckList.Remove( feed );
                             // At the end of this loop on the feed names, the removeFeedList contains entries that
                             // must be removed since the package (necessarily an updated one otherwise the removeFeedList
                             // would be empty) must no more appear in these feeds.
@@ -251,6 +262,11 @@ namespace CK.Build.PackageDB
                 }
 
                 // If the removeFeedList is not empty, generate the diffs with the remove.
+                // If the removeFeedList is empty, then we may have a non empty feedToCheckList: this
+                // may generate diffs to update the updated package instances.
+                Debug.Assert( (removeFeedList.Count > 0 && feedToCheckList.Count == 0)
+                               || (removeFeedList.Count == 0 && feedToCheckList.Count > 0)
+                               || (removeFeedList.Count == 0 && feedToCheckList.Count == 0) );
                 if( removeFeedList.Count > 0 )
                 {
                     if( feedDiff == null ) feedDiff = new List<PackageFeed.Diff>();
@@ -259,6 +275,19 @@ namespace CK.Build.PackageDB
                         int idx = feedDiff.IndexOf( t => t.Feed == feed );
                         if( idx < 0 ) feedDiff.Add( new PackageFeed.Diff( feed, idxPackage ) );
                         else feedDiff[idx].Remove( idxPackage );
+                    }
+                }
+                else if( feedToCheckList.Count > 0 )
+                {
+                    Debug.Assert( pOld != null && pNew != null );
+                    foreach( var f in feedToCheckList )
+                    {
+                        int idxInFeed = f.IndexOf( pOld.Key );
+                        if( idxInFeed >= 0 )
+                        {
+                            // We add a negative index: its an update.
+                            AddOrUpdateInFeedDiff( ref feedDiff, pNew, f, ~idxInFeed );
+                        }
                     }
                 }
                 // We memorize the change status.
@@ -316,7 +345,6 @@ namespace CK.Build.PackageDB
             FeedChangedInfo[]? feedChanges = null;
             PackageFeed[]? newFeeds = null;
             Dictionary<string, PackageFeed>? feeds = null;
-            var excludeFeeds = new Dictionary<string, PackageFeed>( _feeds );
 
             if( feedDiff != null || brandNewFeeds != null )
             {
@@ -327,9 +355,6 @@ namespace CK.Build.PackageDB
                     int i = 0;
                     foreach( var d in feedDiff )
                     {
-                        var itemToExclude = excludeFeeds.First( x => x.Value == d.Feed );
-                        excludeFeeds.Remove( itemToExclude.Key );
-
                         FeedChangedInfo c = d.Create();
                         feeds[d.Feed.TypedName] = c.Feed;
                         feedChanges[i++] = c;
@@ -348,27 +373,6 @@ namespace CK.Build.PackageDB
                 }
             }
 
-            foreach( var item in excludeFeeds )
-            {
-                var entries = initialization.Where( entry => item.Value.Instances.Contains( entry.p ) && (entry.status == PackageEventType.StateOnlyChanged ||
-                         entry.status == PackageEventType.ContentOnlyChanged ||
-                         entry.status == PackageEventType.ContentOnlyChanged) &&
-                         !entry.info.AllFeedNamesAreKnown &&
-                         entry.p != null );
-
-                if( feeds == null ) feeds = new Dictionary<string, PackageFeed>( _feeds );
-
-                if( entries.Any() )
-                {
-                    var newOrUpdatedList = entries.Select( x => (x.idx, x.p) ).ToArray();
-                    var packageDiff = new PackageFeed.Diff( feeds[item.Value.TypedName], newOrUpdatedList );
-                    var diffCreate = packageDiff.Create();
-                    feeds[item.Value.TypedName] = diffCreate.Feed;
-                }
-
-
-            }
-
             var packageChanges = new PackageChangedInfo[updateCount + newCount];
             var indices = new (int idx, PackageInstance p)[updateCount + newCount];
             int iP = 0;
@@ -379,23 +383,6 @@ namespace CK.Build.PackageDB
                     Debug.Assert( entry.status != PackageEventType.None && entry.status != PackageEventType.Destroyed );
                     packageChanges[iP] = new PackageChangedInfo( entry.status, entry.p );
                     indices[iP++] = (entry.idx, entry.p);
-
-                    //if( (entry.status == PackageEventType.StateOnlyChanged ||
-                    //    entry.status == PackageEventType.ContentOnlyChanged ||
-                    //    entry.status == PackageEventType.ContentOnlyChanged) &&
-                    //    !entry.info.AllFeedNamesAreKnown &&
-                    //    excludeFeed != null
-                    //)
-                    //{
-                    //    foreach( var item in excludeFeed.Values.Where( x => x.Instances.Contains( entry.p ) ) )
-                    //    {
-                    //        if( feeds == null ) feeds = new Dictionary<string, PackageFeed>( _feeds );
-                    //        var a = new PackageFeed.Diff( feeds[item.TypedName], (entry.idx, entry.p) );
-                    //        var test = a.Create();
-                    //        feeds[item.TypedName] = test.Feed;
-                    //    }
-                    //}
-
                 }
             }
             Debug.Assert( indices.All( e => e.p != null ) );
