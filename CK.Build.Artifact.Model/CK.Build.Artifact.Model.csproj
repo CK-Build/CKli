@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CSemVer" Version="11.0.1--0000-develop" />
+    <PackageReference Include="CSemVer" Version="11.0.0" />
     <PackageReference Include="CK.Core" Version="15.0.0-r06-00-0007-develop" />
   </ItemGroup>
 
