@@ -33,9 +33,9 @@ namespace CK.Env.NPM
         /// </summary>
         public HttpClient HttpClient { get; }
 
-        public IArtifactRepository CreateRepositoryFromXml( in XElementReader r )
+        public IArtifactRepository CreateRepositoryFromXml( IActivityMonitor monitor, in XElementReader r )
         {
-            IArtifactRepository result = null;
+            IArtifactRepository? result = null;
             PackageQualityFilter.TryParse( r.HandleOptionalAttribute<string>( "QualityFilter", String.Empty ), out var qualityFilter );
             switch( r.HandleOptionalAttribute<string>( "Type", null ) )
             {
@@ -66,9 +66,9 @@ namespace CK.Env.NPM
             {
                 if( !String.IsNullOrEmpty( result.SecretKeyName ) )
                 {
-                    string DescriptionBuilder( SecretKeyInfo key )
+                    string DescriptionBuilder( SecretKeyInfo? key )
                     {
-                        string desc = key?.Description;
+                        string? desc = key?.Description;
                         string ourDesc = $"Required to push NPM packages to repository '{result.UniqueRepositoryName}'.";
                         return desc != null ? $"{desc}\n{ourDesc}" : ourDesc;
                     }

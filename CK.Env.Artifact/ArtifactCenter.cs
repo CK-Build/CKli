@@ -56,7 +56,7 @@ namespace CK.Env
             // First creates the repositories.
             foreach( var r in repositories )
             {
-                InstantiateRepository( r );
+                InstantiateRepository( monitor, r );
             }
             // And then the feeds since a feed can be based on its corresponding repository.
             foreach( var r in feeds )
@@ -66,12 +66,12 @@ namespace CK.Env
             _packageCache = LivePackageCache.LoadOrCreate( monitor, _packageCacheFilePath, _feeds.OfType<IPackageFeed>() );
         }
 
-        IArtifactRepository InstantiateRepository( in XElementReader r )
+        IArtifactRepository InstantiateRepository( IActivityMonitor monitor, in XElementReader r )
         {
             IArtifactRepository? repo = null;
             foreach( var f in _typeHandlers )
             {
-                repo = f.CreateRepositoryFromXml( r );
+                repo = f.CreateRepositoryFromXml( monitor, r );
                 if( repo != null )
                 {
                     // First, check naming coherency.

@@ -287,7 +287,7 @@ namespace CK.Env.NuGet
         internal NuGetFeedBase( IActivityMonitor monitor, NuGetClient c, string url, string name, SimpleCredentials? creds )
             : this( c, new PackageSource( url, name ) )
         {
-            HandleFeed( c.SecretKeyStore, url, name, creds );
+            HandleFeed( monitor, c.SecretKeyStore, url, name, creds );
         }
 
         private protected NuGetFeedBase( NuGetClient c, PackageSource packageSource )
@@ -315,7 +315,7 @@ namespace CK.Env.NuGet
 
         public string Name => PackageSource.Name;
 
-        internal INuGetFeed HandleFeed( SecretKeyStore keyStore, string url, string name, SimpleCredentials? creds )
+        internal INuGetFeed HandleFeed( IActivityMonitor monitor, SecretKeyStore keyStore, string url, string name, SimpleCredentials? creds )
         {
             Debug.Assert( _feed == null && url.Equals( Url, StringComparison.OrdinalIgnoreCase ) );
             if( creds?.IsSecretKeyName == true )

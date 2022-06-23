@@ -18,7 +18,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="r">The element reader. The Element's <see cref="XElement.Name"/> may be ignored (or used).</param>
         /// <returns>The repository info or null.</returns>
-        IArtifactRepository? CreateRepositoryFromXml( in XElementReader r );
+        IArtifactRepository? CreateRepositoryFromXml( IActivityMonitor monitor, in XElementReader r );
 
         /// <summary>
         /// Creates a source from a <see cref="XElementReader"/> or returns null if the element cannot be handled.

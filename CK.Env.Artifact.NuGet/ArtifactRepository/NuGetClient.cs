@@ -208,7 +208,7 @@ namespace CK.Env.NuGet
             SourceCache.Dispose();
         }
 
-        IArtifactRepository? IArtifactTypeHandler.CreateRepositoryFromXml( in XElementReader r )
+        IArtifactRepository? IArtifactTypeHandler.CreateRepositoryFromXml( IActivityMonitor monitor, in XElementReader r )
         {
             IArtifactRepository? result = null;
             PackageQualityFilter.TryParse( r.HandleOptionalAttribute<string>( "QualityFilter", String.Empty ), out var qualityFilter );
@@ -266,7 +266,7 @@ namespace CK.Env.NuGet
                 if( url.Equals( i.Url, StringComparison.OrdinalIgnoreCase ) )
                 {
                     if( i.Feed != null ) r.ThrowXmlException( $"NuGet feed defined by url '{url}' is already registered (by repository {i.Name})." );
-                    return i.HandleFeed( SecretKeyStore, url, name, creds );
+                    return i.HandleFeed( monitor, SecretKeyStore, url, name, creds );
                 }
             }
             var feed = new PureFeed( monitor, this, url, name, creds );
