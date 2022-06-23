@@ -21,7 +21,27 @@ namespace CK.SimpleKeyVault
         /// </summary>
         public struct Snapshot
         {
-            readonly (string name, string description, string? secret, bool isRequired, string? subKey, string? sourceProviderName)[] _data;
+            readonly (string Name, string Description, string? Secret, bool IsRequired, string? SubKey, string? SourceProviderName)[] _data;
+
+            /// <summary>
+            /// Gets a "safe" data where the secret is only exposed as a bool.
+            /// </summary>
+            /// <returns>The safe data.</returns>
+            public (string Name, string Description, bool SecretAvailable, bool IsRequired, string? SubKey, string? SourceProviderName)[] GetSafeData()
+            {
+                var result = new (string Name, string Description, bool SecretAvailable, bool IsRequired, string? SubKey, string? SourceProviderName)[_data.Length];
+                for( int i = 0; i < _data.Length; ++i )
+                {
+                    ref var s = ref _data[i];
+                    ref var t = ref result[i];
+                    t.Name = s.Name;
+                    t.Description = s.Description;
+                    t.SecretAvailable = s.Secret != null;
+                    t.IsRequired = s.IsRequired;
+                    t.SourceProviderName = s.SourceProviderName;
+                }
+                return result;
+            }
 
             internal Snapshot( SecretKeyStore store )
             {
