@@ -7,7 +7,7 @@ namespace CK.Env.NuGet
     /// <summary>
     /// Internal implementation that may be made public once.
     /// </summary>
-    class NuGetStandardRepository : NuGetRepositoryBase, INuGetStandardRepository
+    sealed class NuGetStandardRepository : NuGetRepositoryBase, INuGetStandardRepository
     {
         internal NuGetStandardRepository( NuGetClient c,
                                           string url,

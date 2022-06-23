@@ -15,6 +15,13 @@ namespace CK.Env
     /// <summary>
     /// Registers <see cref="IArtifactTypeHandler"/> and their created <see cref="IArtifactRepository"/>
     /// and <see cref="IArtifactFeed"/>.
+    /// <para>
+    /// TODO: refactor with a Base that allows one specialization to be initialized
+    /// like the current one (ctor + Register + Initialize) for CKli and a cleaner one (ctor only + register via DI of IEnumerable of multiple services)
+    /// that can Add/Remove repository and feeds.
+    /// Locks should be used. Currently ctor + Register + Initialize must be done sequentially.
+    /// Except this, this class is thread safe.
+    /// </para>
     /// </summary>
     public class ArtifactCenter
     {
@@ -25,12 +32,12 @@ namespace CK.Env
 
         LivePackageCache? _packageCache;
 
-        public ArtifactCenter( NormalizedPath localWorldFolder )
+        public ArtifactCenter( NormalizedPath packageCacheFilePath )
         {
             _typeHandlers = new List<IArtifactTypeHandler>();
             _feeds = new List<IArtifactFeed>();
             _repositories = new List<IArtifactRepository>();
-            _packageCacheFilePath = localWorldFolder.AppendPart( "PackageCache.bin" );
+            _packageCacheFilePath = packageCacheFilePath;
         }
 
         /// <summary>
@@ -39,30 +46,32 @@ namespace CK.Env
         /// <param name="factory">The factory to register.</param>
         public void Register( IArtifactTypeHandler factory )
         {
-            if( factory == null ) throw new ArgumentNullException( nameof( factory ) );
-            if( _typeHandlers.Contains( factory ) ) throw new InvalidOperationException( nameof( factory ) );
+            Throw.CheckNotNullArgument( factory );
+            Throw.CheckState( !_typeHandlers.Contains( factory ) );
             _typeHandlers.Add( factory );
         }
 
         public void Initialize( IActivityMonitor monitor, IEnumerable<XElementReader> feeds, IEnumerable<XElementReader> repositories )
         {
+            // First creates the repositories.
             foreach( var r in repositories )
             {
-                InstanciateRepository( r );
+                InstantiateRepository( r );
             }
+            // And then the feeds since a feed can be based on its corresponding repository.
             foreach( var r in feeds )
             {
-                InstanciateFeed( monitor, r );
+                InstantiateFeed( monitor, r );
             }
-            foreach( var f in _feeds ) f.ConfigureCredentials( monitor );
+            _packageCache = LivePackageCache.LoadOrCreate( monitor, _packageCacheFilePath, _feeds.OfType<IPackageFeed>() );
         }
 
-        IArtifactRepository InstanciateRepository( in XElementReader r )
+        IArtifactRepository InstantiateRepository( in XElementReader r )
         {
             IArtifactRepository? repo = null;
             foreach( var f in _typeHandlers )
             {
-                repo = f.CreateRepository( r );
+                repo = f.CreateRepositoryFromXml( r );
                 if( repo != null )
                 {
                     // First, check naming coherency.
@@ -93,11 +102,11 @@ namespace CK.Env
             return repo;
         }
 
-        IArtifactFeed InstanciateFeed( IActivityMonitor monitor, XElementReader r )
+        IArtifactFeed InstantiateFeed( IActivityMonitor monitor, XElementReader r )
         {
             foreach( var h in _typeHandlers )
             {
-                var f = h.CreateFeedFromXML( monitor, r, _repositories, _feeds );
+                var f = h.CreateFeedFromXml( monitor, r, _repositories, _feeds );
                 if( f != null )
                 {
                     if( _feeds.Any( feed => feed.TypedName == f.TypedName ) )
@@ -107,6 +116,7 @@ namespace CK.Env
                     else
                     {
                         _feeds.Add( f );
+                        f.ConfigureCredentials( monitor );
                     }
                     r.WarnUnhandled();
                     return f;
@@ -125,6 +135,13 @@ namespace CK.Env
         /// Gets the available repositories.
         /// </summary>
         public IReadOnlyCollection<IArtifactRepository> Repositories => _repositories;
+
+        /// <summary>
+        /// Gets the live package cache.
+        /// <see cref="Initialize(IActivityMonitor, IEnumerable{XElementReader}, IEnumerable{XElementReader})"/> MUST have been called
+        /// before using this.
+        /// </summary>
+        public LivePackageCache LiveCache => _packageCache!;
 
         /// <summary>
         /// Attempts to resolve required secrets for a set of <see cref="IArtifactRepository"/>.
@@ -165,45 +182,22 @@ namespace CK.Env
             return r;
         }
 
-        LivePackageCache EnsurePackageCache( IActivityMonitor monitor )
-        {
-            if( _packageCache == null )
-            {
-                var c = new PackageCache();
-                if( File.Exists( _packageCacheFilePath ) )
-                {
-                    using var input = File.OpenRead( _packageCacheFilePath );
-                    if( c.Read( monitor, new CKBinaryReader( input ) ) )
-                    {
-                        monitor.Info( $"Package cache read from file '{_packageCacheFilePath}' with {c.DB.Instances.Count} packages in {c.DB.Feeds.Count} feeds." );
-                    }
-                    else
-                    {
-                        monitor.Warn( $"Unable to read package cache from file '{_packageCacheFilePath}'. Reset it." );
-                    }
-                }
-                else
-                {
-                    monitor.Info( $"Initializing a new package cache (file '{_packageCacheFilePath}')." );
-                }
-                _packageCache = new LivePackageCache( c, _feeds.OfType<IPackageFeed>() );
-            }
-            return _packageCache;
-        }
-
         /// <summary>
         /// Returns a collection of <see cref="ArtifactAvailableInstances"/> for an <see cref="Artifact"/> across all feeds.
         /// Each ArtifactAvailableInstances can contain up to 5 versions that are the best for each of the 5 <see cref="CSemVer.PackageQuality"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="artifact">The artifact to lookup.</param>
-        /// <param name="requestFeeds">True to request the <see cref="LivePackageCache.Feeds"/>.</param>
+        /// <param name="requestFeeds">
+        /// True to request the <see cref="LivePackageCache.Feeds"/>.
+        /// When false, the feeds are requested only if the artifact is totally unknown in the cache.
+        /// </param>
         /// <returns>The collection of available instances across all feeds.</returns>
-        public IReadOnlyCollection<ArtifactAvailableInstances> GetExternalVersions( IActivityMonitor monitor, Artifact artifact, bool requestFeeds )
+        public async Task<IReadOnlyCollection<ArtifactAvailableInstances>> GetExternalVersionsAsync( IActivityMonitor monitor, Artifact artifact, bool requestFeeds )
         {
+            Throw.CheckState( _packageCache != null );
             var result = new List<ArtifactAvailableInstances>();
-            var cache = EnsurePackageCache( monitor );
-            var db = cache.Cache.DB;
+            var db = _packageCache.Cache.DB;
             if( !requestFeeds )
             {
                 var gotThem = db.GetAvailableVersions( artifact );
@@ -211,21 +205,12 @@ namespace CK.Env
                 {
                     return gotThem;
                 }
-                monitor.Trace( $"Artifact available versions for '{artifact}' not found in local cache. Soliciting feeds." );
+                monitor.Trace( $"Artifact available versions for '{artifact}' not found in package cache. Soliciting feeds." );
             }
             foreach( var f in _feeds.Where( f => f.ArtifactType == artifact.Type ) )
             {
-                // This where we sync to async... This is bad.
-                ArtifactAvailableInstances? available = GetVersionsAsync( monitor, artifact, cache, f ).GetAwaiter().GetResult();
+                ArtifactAvailableInstances? available = await GetVersionsAsync( monitor, artifact, _packageCache, f );
                 if( available != null ) result.Add( available );
-            }
-            if( db != cache.Cache.DB )
-            {
-                monitor.Info( $"Saving Package database: {cache.Cache.DB}." );
-                using( var output = File.OpenWrite( _packageCacheFilePath ) )
-                {
-                    cache.Cache.Write( new CKBinaryWriter( output ) );
-                }
             }
             return result;
         }

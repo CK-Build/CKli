@@ -12,7 +12,7 @@ namespace CKli
                                 FileSystem fs )
             : base( initializer )
         {
-            ArtifactCenter = new ArtifactCenter( worldStore.GetWorkingLocalFolder( worldName ) );
+            ArtifactCenter = new ArtifactCenter( worldStore.GetWorkingLocalFolder( worldName ).AppendPart( "PackageCache.bin" ) );
             fs.ServiceContainer.Add( ArtifactCenter );
             initializer.Services.Add( ArtifactCenter );
             // Quick & dirty registration.

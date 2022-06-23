@@ -27,7 +27,7 @@ namespace CK.Env.CKSetup
             _sharedHttpClient = sharedHttpClient;
         }
 
-        public IArtifactRepository CreateRepository( in XElementReader r )
+        public IArtifactRepository CreateRepositoryFromXml( in XElementReader r )
         {
             CKSetupStore store = null;
             string type = r.HandleOptionalAttribute<string>( "Type", null );
@@ -57,7 +57,7 @@ namespace CK.Env.CKSetup
             return store;
         }
 
-        public IArtifactFeed CreateFeedFromXML(
+        public IArtifactFeed CreateFeedFromXml(
             IActivityMonitor m,
             in XElementReader r,
             IReadOnlyList<IArtifactRepository> repositories,

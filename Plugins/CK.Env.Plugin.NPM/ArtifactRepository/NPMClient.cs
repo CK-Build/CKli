@@ -33,7 +33,7 @@ namespace CK.Env.NPM
         /// </summary>
         public HttpClient HttpClient { get; }
 
-        public IArtifactRepository CreateRepository( in XElementReader r )
+        public IArtifactRepository CreateRepositoryFromXml( in XElementReader r )
         {
             IArtifactRepository result = null;
             PackageQualityFilter.TryParse( r.HandleOptionalAttribute<string>( "QualityFilter", String.Empty ), out var qualityFilter );
@@ -78,7 +78,7 @@ namespace CK.Env.NPM
             return result;
         }
 
-        public IArtifactFeed CreateFeedFromXML(
+        public IArtifactFeed CreateFeedFromXml(
             IActivityMonitor m,
             in XElementReader r,
             IReadOnlyList<IArtifactRepository> repositories,

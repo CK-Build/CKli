@@ -8,7 +8,7 @@ namespace CK.Env.NuGet
     /// <summary>
     /// Simple local package description.
     /// </summary>
-    public class LocalNuGetPackageFile
+    public sealed class LocalNuGetPackageFile
     {
         public LocalNuGetPackageFile( string fullPath, string id, SVersion v )
         {

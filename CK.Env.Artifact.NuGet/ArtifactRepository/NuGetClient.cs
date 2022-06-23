@@ -23,7 +23,7 @@ using System.Xml.Linq;
 
 namespace CK.Env.NuGet
 {
-    public class NuGetClient : IArtifactTypeHandler, IDisposable
+    public sealed class NuGetClient : IArtifactTypeHandler, IDisposable
     {
         /// <summary>
         /// Exposes the "NuGet" <see cref="ArtifactType"/>. This type of artifact is installable.
@@ -81,22 +81,18 @@ namespace CK.Env.NuGet
         {
             public string? Id { get; }
 
-            public Task<CredentialResponse> GetAsync(
-                Uri uri,
-                IWebProxy proxy,
-                CredentialRequestType type,
-                string message,
-                bool isRetry,
-                bool nonInteractive,
-                CancellationToken cancellationToken ) =>
-                Task.FromResult(
-                    new CredentialResponse(
-                        new NetworkCredential(
-                            "CKli",
-                                _secretAzureKeys.Single( p => new Uri( p.Key ).ToString() == uri.ToString() ).Value
-                        )
-                    )
-                );
+            public Task<CredentialResponse> GetAsync( Uri uri,
+                                                     IWebProxy proxy,
+                                                     CredentialRequestType type,
+                                                     string message,
+                                                     bool isRetry,
+                                                     bool nonInteractive,
+                                                     CancellationToken cancellationToken )
+            {
+                var theSecret = _secretAzureKeys.Single( p => new Uri( p.Key ).ToString() == uri.ToString() ).Value;
+                return Task.FromResult( new CredentialResponse( new NetworkCredential( "CKli", theSecret ) ) );
+
+            }
         }
         #endregion
 
@@ -182,13 +178,15 @@ namespace CK.Env.NuGet
             _secretAzureKeys = new Dictionary<string, string>();
             HttpHandlerResourceV3.CredentialService = new Lazy<ICredentialService>(
                             () => new CredentialService(
-                                providers: new AsyncLazy<IEnumerable<ICredentialProvider>>(
-                                    () => Task.FromResult<IEnumerable<ICredentialProvider>>(
-                                        new List<Creds> { new Creds() } )
-                                ),
+                                providers: CreateProviders(),
                                 nonInteractive: true,
                                 handlesDefaultCredentials: true )
                             );
+
+            static AsyncLazy<IEnumerable<ICredentialProvider>> CreateProviders()
+            {
+                return new AsyncLazy<IEnumerable<ICredentialProvider>>( () => Task.FromResult<IEnumerable<ICredentialProvider>>( new[] { new Creds() } ) );
+            }
         }
 
         public NuGetClient( HttpClient httpClient, SecretKeyStore keyStore )
@@ -210,7 +208,7 @@ namespace CK.Env.NuGet
             SourceCache.Dispose();
         }
 
-        IArtifactRepository? IArtifactTypeHandler.CreateRepository( in XElementReader r )
+        IArtifactRepository? IArtifactTypeHandler.CreateRepositoryFromXml( in XElementReader r )
         {
             IArtifactRepository? result = null;
             PackageQualityFilter.TryParse( r.HandleOptionalAttribute<string>( "QualityFilter", String.Empty ), out var qualityFilter );
@@ -254,7 +252,7 @@ namespace CK.Env.NuGet
             return result;
         }
 
-        public IArtifactFeed? CreateFeedFromXML( IActivityMonitor monitor, in XElementReader r, IReadOnlyList<IArtifactRepository> repositories, IReadOnlyList<IArtifactFeed> feeds )
+        public IArtifactFeed? CreateFeedFromXml( IActivityMonitor monitor, in XElementReader r, IReadOnlyList<IArtifactRepository> repositories, IReadOnlyList<IArtifactFeed> feeds )
         {
             if( r.HandleOptionalAttribute<string>( "Type", null ) != NuGetType.Name ) return null;
             var url = r.HandleRequiredAttribute<string>( "Url" );
@@ -280,7 +278,7 @@ namespace CK.Env.NuGet
         /// This internal specialization is used for feeds when they don't share the same 
         /// url as an existing Repository.
         /// </summary>
-        class PureFeed : NuGetFeedBase
+        sealed class PureFeed : NuGetFeedBase
         {
             public PureFeed( IActivityMonitor m, NuGetClient c, string url, string name, SimpleCredentials? creds )
                 : base( m, c, url, name, creds )

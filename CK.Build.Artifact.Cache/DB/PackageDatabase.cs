@@ -13,6 +13,9 @@ namespace CK.Build.PackageDB
     public partial class PackageDatabase
     {
         readonly InstanceStore _instances;
+        // The key is the Artifact.TypedName ($"{Type}:{Name}").
+        // Since ArtifactType is case sensitive but Artifact.Name is case insensitive,
+        // This dictionary must use StringComparer.OrdinalIgnoreCase.
         readonly Dictionary<string, PackageFeed> _feeds;
         readonly DateTime _lastUpdate;
         readonly int _updateSerialNumber;
@@ -25,48 +28,35 @@ namespace CK.Build.PackageDB
         PackageDatabase()
         {
             _instances = InstanceStore.Empty;
-            _feeds = new Dictionary<string, PackageFeed>();
+            _feeds = new Dictionary<string, PackageFeed>( StringComparer.OrdinalIgnoreCase );
             _lastUpdate = Util.UtcMinValue;
         }
 
         /// <summary>
         /// Initializes a database from its serialized binary data.
         /// </summary>
-        /// <param name="reader">The reader to use.</param>
-        public PackageDatabase( ICKBinaryReader reader )
-            : this( new DeserializerContext( reader ) )
+        /// <param name="r">The reader to use.</param>
+        public PackageDatabase( ICKBinaryReader r )
         {
+            var ctx = new DeserializerContext( r );
+            _instances = new InstanceStore( ctx );
+            int nbFeeds = ctx.Reader.ReadNonNegativeSmallInt32();
+            _feeds = new Dictionary<string, PackageFeed>( nbFeeds, StringComparer.OrdinalIgnoreCase );
+            while( --nbFeeds >= 0 )
+            {
+                var f = new PackageFeed( _instances, ctx );
+                _feeds.Add( f.TypedName, f );
+            }
+            _lastUpdate = r.ReadDateTime();
         }
 
         /// <summary>
         /// Writes this database into a binary stream.
         /// </summary>
         /// <param name="ctx">The binary writer to use.</param>
-        public void Write( ICKBinaryWriter writer ) => Write( new SerializerContext( writer ) );
-
-        /// <summary>
-        /// Initializes a database from its serialized binary data.
-        /// </summary>
-        /// <param name="ctx">The deserialization context to use.</param>
-        internal PackageDatabase( DeserializerContext ctx )
+        public void Write( ICKBinaryWriter w )
         {
-            _instances = new InstanceStore( ctx );
-            int nbFeeds = ctx.Reader.ReadNonNegativeSmallInt32();
-            _feeds = new Dictionary<string, PackageFeed>( nbFeeds );
-            while( --nbFeeds >= 0 )
-            {
-                var f = new PackageFeed( _instances, ctx );
-                _feeds.Add( f.TypedName, f );
-            }
-            _lastUpdate = DateTime.UtcNow;
-        }
-
-        /// <summary>
-        /// Writes this database into a binary stream.
-        /// </summary>
-        /// <param name="ctx">The serialization context to use.</param>
-        internal void Write( SerializerContext ctx )
-        {
+            var ctx = new SerializerContext( w );
             _instances.Write( ctx );
             ctx.Writer.WriteNonNegativeSmallInt32( _feeds.Count );
             foreach( var kv in _feeds )
@@ -85,6 +75,34 @@ namespace CK.Build.PackageDB
         }
 
         /// <summary>
+        /// Drops a feed if it exists.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="artifact">The feed to drop.</param>
+        /// <returns></returns>
+        public ChangedInfo? DropFeed( IActivityMonitor monitor, in Artifact artifact )
+        {
+            var typedName = artifact.TypedName;
+            if( _feeds.TryGetValue( typedName, out var feed ) )
+            {
+                var newFeeds = new Dictionary<string, PackageFeed>( _feeds.Count - 1, StringComparer.OrdinalIgnoreCase );
+                foreach( var f in _feeds )
+                {
+                    if( f.Key != typedName ) newFeeds.Add( f.Key, f.Value );
+                }
+                var db = new PackageDatabase( this, _instances, newFeeds, DateTime.UtcNow );
+                return new ChangedInfo( db,
+                                        true,
+                                        Array.Empty<PackageChangedInfo>(),
+                                        Array.Empty<PackageFeed>(),
+                                        Array.Empty<FeedChangedInfo>(),
+                                        droppedFeeds: new[] { feed } );
+            }
+            return new ChangedInfo( this );
+        }
+
+
+        /// <summary>
         /// Registers one package. Any <see cref="IPackageInstanceInfo.Dependencies"/> must
         /// be already registered.
         /// </summary>
@@ -96,7 +114,6 @@ namespace CK.Build.PackageDB
             return Add( monitor, new[] { info } );
         }
 
-
         /// <summary>
         /// Registers multiple packages at once. Any <see cref="IPackageInstanceInfo.Dependencies"/> must
         /// be already registered (the <see cref="PackageInstance.Reference.BaseTargetKey"/> of the reference exists in the DB)
@@ -107,7 +124,6 @@ namespace CK.Build.PackageDB
         /// <returns>The change result withe the new database (or this one if nothing changed), or null on error.</returns>
         public ChangedInfo? Add( IActivityMonitor monitor, IEnumerable<IFullPackageInfo> infos )
         {
-            DateTime regDate = DateTime.UtcNow;
             (IFullPackageInfo info, Artifact[]? feedNames, int idx, PackageEventType status, PackageInstance? p)[] initialization;
             initialization = infos.Select( i => (i, i.CheckValidAndParseFeedNames( monitor ), ~_instances.IndexOf( i.Key ), PackageEventType.None, (PackageInstance?)null) )
                                   .ToArray();
@@ -338,7 +354,7 @@ namespace CK.Build.PackageDB
             // If theres is no package updated, no new package, no new fields and no diffs in any feed, we are done.
             if( updateCount == 0 && newCount == 0 && brandNewFeeds == null && feedDiff == null )
             {
-                return new ChangedInfo( this, false, Array.Empty<PackageChangedInfo>(), Array.Empty<PackageFeed>(), Array.Empty<FeedChangedInfo>() );
+                return new ChangedInfo( this );
             }
 
             // Computing the new feeds dictionary and the new feeds and feed changes info.
@@ -348,7 +364,7 @@ namespace CK.Build.PackageDB
 
             if( feedDiff != null || brandNewFeeds != null )
             {
-                feeds = new Dictionary<string, PackageFeed>( _feeds );
+                feeds = new Dictionary<string, PackageFeed>( _feeds, StringComparer.OrdinalIgnoreCase );
                 if( feedDiff != null )
                 {
                     feedChanges = new FeedChangedInfo[feedDiff.Count];
@@ -386,9 +402,14 @@ namespace CK.Build.PackageDB
                 }
             }
             Debug.Assert( indices.All( e => e.p != null ) );
-            var db = new PackageDatabase( this, _instances.AddOrUpdate( indices, updateCount ), feeds, regDate );
+            var db = new PackageDatabase( this, _instances.AddOrUpdate( indices, updateCount ), feeds, DateTime.UtcNow );
 
-            return new ChangedInfo( db, true, packageChanges, newFeeds ?? Array.Empty<PackageFeed>(), feedChanges ?? Array.Empty<FeedChangedInfo>() );
+            return new ChangedInfo( db,
+                                    true,
+                                    packageChanges,
+                                    newFeeds ?? Array.Empty<PackageFeed>(),
+                                    feedChanges ?? Array.Empty<FeedChangedInfo>(),
+                                    droppedFeeds: Array.Empty<PackageFeed>() );
         }
 
         /// <summary>

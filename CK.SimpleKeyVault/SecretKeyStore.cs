@@ -221,7 +221,7 @@ namespace CK.SimpleKeyVault
         /// <returns>True if secret has been changed, false otherwise.</returns>
         public bool SetSecret( IActivityMonitor m, string name, string? secret )
         {
-            if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
+            Throw.CheckNotNullOrWhiteSpaceArgument( name );
             using var l = AcquireLock();
             bool clear = String.IsNullOrEmpty( secret );
             if( !_keyInfos.TryGetValue( name, out var info ) )

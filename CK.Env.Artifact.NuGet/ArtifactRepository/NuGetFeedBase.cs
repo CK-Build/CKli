@@ -66,7 +66,7 @@ namespace CK.Env.NuGet
                 if( isBoundToProtectedRepository )
                 {
                     Debug.Assert( repo != null );
-                    var fromRepo = !String.IsNullOrEmpty( repo.ResolveSecret( m, false ) );
+                    var fromRepo = !String.IsNullOrEmpty( repo.ResolveSecret( m, throwOnEmpty: false ) );
                     if( fromRepo )
                     {
                         m.Trace( $"Feed '{Name}' uses secret from repository '{repo.Name}'." );

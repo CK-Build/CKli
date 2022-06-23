@@ -6,9 +6,9 @@ namespace CK.Build
     /// <summary>
     /// Immutable description of artifacts type that can be registered
     /// from independent modules.
-    /// Implements value equality through reference equality.
+    /// Implements value equality through reference equality: uses <see cref="Name"/> with <see cref="StringComparer.Ordinal"/>.
     /// </summary>
-    public class ArtifactType : IComparable<ArtifactType>
+    public sealed class ArtifactType : IComparable<ArtifactType>
     {
         /// <summary>
         /// Gets whether this type of artifact is installable.
@@ -49,10 +49,11 @@ namespace CK.Build
         /// <returns>The single registered type.</returns>
         public static ArtifactType Single( string name )
         {
-            if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
+            Throw.CheckNotNullOrWhiteSpaceArgument( name );
             var types = _types;
             foreach( var t in types ) if( t.Name == name ) return t;
-            throw new ArgumentException( $"Unregistered Artifact type: '{name}'." );
+            Throw.ArgumentException( $"Unregistered Artifact type: '{name}'." );
+            return null;
         }
 
         /// <summary>
@@ -75,7 +76,10 @@ namespace CK.Build
         /// </summary>
         /// <param name="name">The type name.</param>
         /// <param name="isInstallable">Whether the type is installable.</param>
-        /// <param name="savorSeparator">Optional support of <see cref="ContextSavors"/> by defining a separator.</param>
+        /// <param name="savorSeparator">
+        /// Optional support of <see cref="ContextSavors"/> by defining a separator.
+        /// By default, no savors are supported and <see cref="ContextSavors"/> is null.
+        /// </param>
         /// <returns>The registered type.</returns>
         public static ArtifactType Register( string name, bool isInstallable, char savorSeparator = '\0' )
         {
@@ -114,7 +118,7 @@ namespace CK.Build
         /// </summary>
         /// <param name="other">The other type to compare to. Can be null.</param>
         /// <returns>The negative/zero/positive standard value.</returns>
-        public int CompareTo( ArtifactType? other ) => other != null ? Name.CompareTo( other.Name ) : 1;
+        public int CompareTo( ArtifactType? other ) => other != null ? String.Compare( Name, other.Name, StringComparison.Ordinal ) : 1;
 
         /// <summary>
         /// Returns the <see cref="Name"/>.
