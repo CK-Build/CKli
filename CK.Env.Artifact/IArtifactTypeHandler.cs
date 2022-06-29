@@ -8,6 +8,7 @@ namespace CK.Env
     /// Root abstraction that creates <see cref="IArtifactRepository"/> and <see cref="IArtifactFeed"/> of a certain kind.
     /// These handlers are registered in <see cref="ArtifactCenter"/>.
     /// </summary>
+    [IsMultiple]
     public interface IArtifactTypeHandler
     {
         /// <summary>
