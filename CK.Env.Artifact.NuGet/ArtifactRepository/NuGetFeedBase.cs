@@ -16,6 +16,7 @@ using NuGet.Versioning;
 using NuGet.Frameworks;
 using System.Linq;
 using CK.Build.PackageDB;
+using CK.PerfectEvent;
 
 namespace CK.Env.NuGet
 {
@@ -34,14 +35,16 @@ namespace CK.Env.NuGet
         /// Implements a feed (a package source) on the basis of an already existing one (typically a INuGetRepository).
         /// The credentials can be null or may differ from the base feed ones.
         /// </summary>
-        class ReadFeed : INuGetFeed, IPackageFeed
+        sealed class ReadFeed : INuGetFeed, IPackageFeed
         {
             readonly NuGetFeedBase _baseFeed;
+            readonly PerfectEventSender<IPackageFeed, RawPackageInfoEventArgs> _feedPackageInfoObtained;
 
             public ReadFeed( NuGetFeedBase f, string name, SimpleCredentials? creds )
             {
                 Debug.Assert( f != null );
                 _baseFeed = f;
+                _feedPackageInfoObtained = new PerfectEventSender<IPackageFeed, RawPackageInfoEventArgs>();
                 Name = name;
                 Credentials = creds;
                 TypedName = $"{NuGetClient.NuGetType.Name}:{Name}";
@@ -56,6 +59,10 @@ namespace CK.Env.NuGet
             public string TypedName { get; }
 
             public ArtifactType ArtifactType => NuGetClient.NuGetType;
+
+            public PerfectEvent<IPackageFeed, RawPackageInfoEventArgs> FeedPackageInfoObtained => _feedPackageInfoObtained.PerfectEvent;
+
+            public bool UseFullInformation { get; set; }
 
             public void ConfigureCredentials( IActivityMonitor m )
             {
@@ -140,17 +147,17 @@ namespace CK.Env.NuGet
 
             public Task<IPackageInstanceInfo?> GetPackageInfoAsync( IActivityMonitor m, ArtifactInstance instance )
             {
-                return _baseFeed.SafeCallAsync<DependencyInfoResource, IPackageInstanceInfo?>( m, ( sources, meta, logger ) => GetPackageInfo( meta, logger, instance, default ) );
+                return _baseFeed.SafeCallAsync<DependencyInfoResource, IPackageInstanceInfo?>( m, ( sources, meta, logger ) => GetPackageInfoAsync( meta, logger, instance, default ) );
             }
 
-            class PackageInfoReader
+            sealed class PackageInfoReaderFromRemoteSourceDependencyInfo
             {
                 static readonly Type _tResolver;
                 static readonly MethodInfo _mGetDependencies;
                 static readonly FieldInfo _fClient;
                 static readonly FieldInfo _fRegResource;
 
-                static PackageInfoReader()
+                static PackageInfoReaderFromRemoteSourceDependencyInfo()
                 {
                     /*
                     None of the exposed DependencyInfoResource.ResolvePackages returns the whole set of dependencies for a single version.
@@ -186,7 +193,7 @@ namespace CK.Env.NuGet
 
                 public DependencyInfoResource CurrentInfoResource { get; }
 
-                public PackageInfoReader( DependencyInfoResource meta, SourceCacheContext sourceCache )
+                public PackageInfoReaderFromRemoteSourceDependencyInfo( DependencyInfoResource meta, SourceCacheContext sourceCache )
                 {
                     // Check reflection here: avoid type initialization error.
                     CheckReflection();
@@ -196,7 +203,9 @@ namespace CK.Env.NuGet
                     _client = (HttpSource)_fClient.GetValue( meta )!;
                 }
 
-                public async Task<IPackageInstanceInfo?> GetPackageInfoAsync( NuGetLoggerAdapter logger, ArtifactInstance instance, CancellationToken token )
+                public async Task<(IPackageInstanceInfo?,object?)> GetPackageInfoAsync( NuGetLoggerAdapter logger,
+                                                                                        ArtifactInstance instance,
+                                                                                        CancellationToken token )
                 { 
                     var packageId = instance.Artifact.Name;
                     var version = NuGetVersion.Parse( instance.Version.ParsedText );
@@ -205,7 +214,7 @@ namespace CK.Env.NuGet
                     var uri = _regResource.GetUri( instance.Artifact.Name );
                     var param = new object[] { _client, uri, packageId, singleVersion, _sourceCache, logger, token };
                     var o = await ((Task<IEnumerable<RemoteSourceDependencyInfo>>)_mGetDependencies.Invoke( null, param )!);
-                    if( o == null || !o.Any() ) return null;
+                    if( o == null || !o.Any() ) return (null,null);
                     // Okay... This should never happens... but who really knows ?!
                     var deps = o.SingleOrDefault();
                     if( deps == null )
@@ -220,7 +229,7 @@ namespace CK.Env.NuGet
                                 }
                             }
                         } );
-                        return null;
+                        return (null,null);
                     }
                     var result = new PackageInstanceInfo();
                     result.State = deps.Listed ? PackageState.None : PackageState.Unlisted;
@@ -261,20 +270,37 @@ namespace CK.Env.NuGet
                         }
                     }
                     if( !savors.IsEmpty ) result.Savors = savors;
-                    return result;
+                    return (result, deps);
                 }
 
             }
 
-            PackageInfoReader? _packageReader;
+            PackageInfoReaderFromRemoteSourceDependencyInfo? _packageReaderRemoteSourceDependencyInfo;
 
-            Task<IPackageInstanceInfo?> GetPackageInfo( DependencyInfoResource meta, NuGetLoggerAdapter logger, ArtifactInstance instance, CancellationToken token )
+            async Task<IPackageInstanceInfo?> GetPackageInfoAsync( DependencyInfoResource meta, NuGetLoggerAdapter logger, ArtifactInstance instance, CancellationToken token )
             {
-                if( _packageReader == null || _packageReader.CurrentInfoResource != meta )
+                IPackageInstanceInfo? info;
+                object? rawInfo;
+                if( UseFullInformation )
                 {
-                    _packageReader = new PackageInfoReader( meta, _baseFeed.Client.SourceCache );
+                    if( _packageReaderRemoteSourceDependencyInfo == null || _packageReaderRemoteSourceDependencyInfo.CurrentInfoResource != meta )
+                    {
+                        _packageReaderRemoteSourceDependencyInfo = new PackageInfoReaderFromRemoteSourceDependencyInfo( meta, _baseFeed.Client.SourceCache );
+                    }
+                    (info, rawInfo) = await _packageReaderRemoteSourceDependencyInfo.GetPackageInfoAsync( logger, instance, token );
                 }
-                return _packageReader.GetPackageInfoAsync( logger, instance, token );
+                else
+                {
+                    // TODO.
+                    throw new NotImplementedException();
+                }
+
+                if( info != null )
+                {
+                    Debug.Assert( rawInfo != null );
+                    await _feedPackageInfoObtained.SafeRaiseAsync( logger.Monitor, this, new RawPackageInfoEventArgs( info, rawInfo ) );
+                }
+                return info;
             }
 
             public override string ToString() => TypedName;

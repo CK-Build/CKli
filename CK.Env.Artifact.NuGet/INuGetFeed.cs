@@ -16,5 +16,12 @@ namespace CK.Env
         /// </summary>
         SimpleCredentials? Credentials { get; }
 
+        /// <summary>
+        /// Gets whether the full package information must be required
+        /// instead of the lightest RemoteSourceDependencyInfo.
+        /// Defaults to false.
+        /// </summary>
+        bool UseFullInformation { get; set; }
+
     }
 }
