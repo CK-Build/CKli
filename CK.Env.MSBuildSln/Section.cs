@@ -4,7 +4,12 @@ using System.Diagnostics;
 
 namespace CK.Env.MSBuildSln
 {
-    public class Section
+    /// <summary>
+    /// A section appears in a container and is identified by its <see cref="Name"/>.
+    /// If the container is the <see cref="SolutionFile"/>, then the <see cref="SectionType"/> is a "GlobalSection",
+    /// else it is a "ProjectSection".
+    /// </summary>
+    public sealed class Section
     {
         readonly ISolutionItem _container;
         readonly Dictionary<string, PropertyLine> _propertyLines;
@@ -28,9 +33,21 @@ namespace CK.Env.MSBuildSln
         /// </summary>
         public string Name { get; }
 
+        /// <summary>
+        /// Gets "GlobalSection" or "ProjectSection".
+        /// Used to write the .sln file back.
+        /// </summary>
         public string SectionType => _container is SolutionFile ? "GlobalSection" : "ProjectSection";
 
-        public string Step { get; set; }
+        /// <summary>
+        /// Gets whether this is a global section, attached to the <see cref="SolutionFile"/>.
+        /// </summary>
+        public bool IsGlobalSection => _container is SolutionFile;
+
+        /// <summary>
+        /// Gets the "Step" of the section ("preProject", "preSolution", "postSolution", etc.).
+        /// </summary>
+        public string Step { get; }
 
         /// <summary>
         /// Gets the property lines of this section.

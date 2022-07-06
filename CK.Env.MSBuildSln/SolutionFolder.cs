@@ -22,19 +22,46 @@ namespace CK.Env.MSBuildSln
         internal SolutionFolder( SolutionFile s, string projectGuid, NormalizedPath path )
             : base( s, projectGuid, KnownProjectType.SolutionFolder.ToGuid(), path.LastPart, path )
         {
-            Debug.Assert( ProjectName == Path.LastPart, "The name ends the path for SolutionFolder." );
             _items = new List<NormalizedPath>();
         }
+
+        internal override string ProjectHeader => $@"Project(""{ProjectTypeGuid}"") = ""{ProjectName}"", ""{ProjectName}"", ""{ProjectGuid}""";
+
 
         public override string ProjectName
         {
             get => base.ProjectName;
             set
             {
-                Path = Path.RemoveLastPart().AppendPart( value );
-                base.ProjectName = value;
+                if( base.ProjectName != value )
+                {
+                    base.ProjectName = value;
+                    UpdateSolutionRelativePath();
+                }
             }
         }
+
+        internal override void UpdateSolutionRelativePath()
+        {
+            SolutionRelativePath = SolutionRelativeLogicalFolderPath;
+            foreach( var c in Children )
+            {
+                if( c is SolutionFolder f )
+                {
+                    f.UpdateSolutionRelativePath();
+                }
+            }
+        }
+
+        internal override bool Initialize( FileSystem fs,
+                                           IActivityMonitor m,
+                                           Dictionary<NormalizedPath, MSProjFile> cache )
+        {
+            if( !base.Initialize( fs, m, cache ) ) return false;
+            SolutionRelativePath = SolutionRelativeLogicalFolderPath;
+            return true;
+        }
+
 
         /// <summary>
         /// Overridden to intercept section(SolutionItems): when the section's name is SolutionItems
@@ -105,6 +132,7 @@ namespace CK.Env.MSBuildSln
             }
             return false;
         }
+
 
         public override string ToString() => $"Folder '{SolutionRelativeLogicalFolderPath}'";
 

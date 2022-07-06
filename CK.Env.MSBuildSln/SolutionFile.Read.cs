@@ -123,6 +123,7 @@ namespace CK.Env.MSBuildSln
                 if( p == null ) return false;
                 AddProject( p );
             }
+            // Reads the Global sections. Nesting for SolutionFolder is defined here.
             if( String.Equals( r.Line, "Global", StringComparison.OrdinalIgnoreCase ) )
             {
                 while( r.Forward() && !r.Line.StartsWith( "EndGlobal", StringComparison.OrdinalIgnoreCase ) )
@@ -227,7 +228,7 @@ namespace CK.Env.MSBuildSln
             var propertyLines = ReadPropertyLines( r, "EndGlobalSection" );
             if( propertyLines == null ) return false;
 
-            Section section = null;
+            Section? section = null;
             switch( name )
             {
                 case "NestedProjects":
@@ -261,9 +262,9 @@ namespace CK.Env.MSBuildSln
         }
 
         static Section? HandleNestedProjects( SolutionFile s,
-                                             Reader r,
-                                             string step,
-                                             IEnumerable<PropertyLine> propertyLines )
+                                              Reader r,
+                                              string step,
+                                              IEnumerable<PropertyLine> propertyLines )
         {
             foreach( var propertyLine in propertyLines )
             {
