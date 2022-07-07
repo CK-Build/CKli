@@ -21,7 +21,11 @@ namespace CK.Env
         /// instead of the lightest RemoteSourceDependencyInfo.
         /// Defaults to false.
         /// </summary>
-        bool UseFullInformation { get; set; }
+        bool UseFullInformation { get; }
 
+        /// <summary>
+        /// Sets the <see cref="UseFullInformation"/> to true.
+        /// </summary>
+        void SetUseFullInformation();
     }
 }

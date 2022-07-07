@@ -62,7 +62,9 @@ namespace CK.Env.NuGet
 
             public PerfectEvent<IPackageFeed, RawPackageInfoEventArgs> FeedPackageInfoObtained => _feedPackageInfoObtained.PerfectEvent;
 
-            public bool UseFullInformation { get; set; }
+            public bool UseFullInformation { get; private set; }
+
+            public void SetUseFullInformation() => UseFullInformation = true;
 
             public void ConfigureCredentials( IActivityMonitor m )
             {
