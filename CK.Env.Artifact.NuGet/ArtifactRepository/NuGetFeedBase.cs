@@ -315,8 +315,6 @@ namespace CK.Env.NuGet
 
             async Task<IPackageInstanceInfo?> GetPackageInfoAsync( PackageMetadataResource meta, NuGetLoggerAdapter logger, ArtifactInstance instance, CancellationToken token )
             {
-                IPackageInstanceInfo? info;
-
                 var packageId = instance.Artifact.Name;
                 var version = NuGetVersion.Parse( instance.Version.ParsedText );
 
