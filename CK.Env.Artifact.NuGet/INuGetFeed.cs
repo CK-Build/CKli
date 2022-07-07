@@ -1,10 +1,12 @@
+using CK.Build;
+
 namespace CK.Env
 {
     /// <summary>
     /// Extends <see cref="IArtifactFeed"/> with NuGet specific properties
     /// and specific capabilities.
     /// </summary>
-    public interface INuGetFeed : IArtifactFeed
+    public interface INuGetFeed : IArtifactFeed, IPackageFeed
     {
         /// <summary>
         /// Gets the feed url. Can not be null.
