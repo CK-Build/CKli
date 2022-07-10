@@ -204,26 +204,34 @@ namespace CK.Env
             MustRetry
         }
 
-        BuildState RunBuild( IActivityMonitor m )
+        BuildState RunBuild( IActivityMonitor monitor )
         {
             BuildState finalState = BuildState.Succeed;
             foreach( var (s, d) in DependentSolutionContext.Solutions )
             {
-                DependentSolutionContext.DependencyContext.LogSolutions( m, s );
+                DependentSolutionContext.DependencyContext.LogSolutions( monitor, s );
                 IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade = GetBuildProjectUpgrades( s );
-                using( m.OpenInfo( $"Running {s} build." ) )
+                using( monitor.OpenInfo( $"Running {s} build." ) )
                 {
                     // _targetVersions[i] is null if build must not be done (this is for ReleaseBuilder only).
                     // We use the null version also for DevelopBuilder: 
                     var sVersion = finalState == BuildState.MustRetry ? null : _targetVersions[s.Index];
-                    finalState = Build( m, s, d, _upgrades[s.Index], sVersion, buildProjectsUpgrade );
-                    ZeroBuilder.RegisterSHAlias( m );
+                    finalState = Build( monitor, s, d, _upgrades[s.Index], sVersion, buildProjectsUpgrade );
+                    ZeroBuilder.RegisterSHAlias( monitor );
                     // For DevelopBuilder that returned Retry, we continue to apply the
                     // current change on subsequent solutions to minimize the number of actual builds.
-                    if( finalState == BuildState.Failed ) break;
+                    if( finalState == BuildState.Failed )
+                    {
+                        OnSolutionBuildFailed( monitor, s );
+                        break;
+                    }
                 }
             }
             return finalState;
+        }
+
+        protected virtual void OnSolutionBuildFailed( IActivityMonitor monitor, DependentSolution s )
+        {
         }
 
 

@@ -20,12 +20,11 @@ namespace CK.Env
         readonly string[] _commits;
         readonly bool _withUnitTest;
 
-        public DevelopBuilder(
-            ZeroBuilder zeroBuilder,
-            ArtifactCenter artifacts,
-            IEnvLocalFeedProvider localFeedProvider,
-            IWorldSolutionContext ctx,
-            bool withUnitTest )
+        public DevelopBuilder( ZeroBuilder zeroBuilder,
+                               ArtifactCenter artifacts,
+                               IEnvLocalFeedProvider localFeedProvider,
+                               IWorldSolutionContext ctx,
+                               bool withUnitTest )
             : base( zeroBuilder, BuildResultType.CI, artifacts, localFeedProvider, ctx )
         {
             _commits = new string[ctx.Solutions.Count];
@@ -89,6 +88,25 @@ namespace CK.Env
                     ? BuildState.Succeed
                     : BuildState.Failed;
         }
+
+        protected override void OnSolutionBuildFailed( IActivityMonitor monitor, DependentSolution s )
+        {
+            var solutions = DependentSolutionContext.DependentSolutions;
+            int resetIndex = s.Index + 1;
+            if( resetIndex < solutions.Count )
+            {
+                using( monitor.OpenInfo( $"Restoring states of following {solutions.Count - resetIndex} Git folders." ) )
+                {
+                    for( int i = resetIndex; i < solutions.Count; i++ )
+                    {
+                        var g = DependentSolutionContext.Drivers[i].GitRepository;
+                        g.ResetBranchState( monitor, g.CurrentBranchName, _commits[i] );
+                    }
+
+                }
+            }
+        }
+
 
     }
 }
