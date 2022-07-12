@@ -10,7 +10,7 @@ namespace CK.Env.NuGet
     /// It is hard to say whether the NuGet logger is used concurrency or not.
     /// In doubt, we serialize with a basic lock.
     /// </summary>
-    class NuGetLoggerAdapter : ILogger
+    sealed class NuGetLoggerAdapter : ILogger
     {
         readonly object _lock;
 

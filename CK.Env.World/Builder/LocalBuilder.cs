@@ -26,7 +26,10 @@ namespace CK.Env
             _commitTimes = new DateTimeOffset[ctx.Solutions.Count];
         }
 
-        protected override (SVersion? Version, bool MustBuild) PrepareBuild( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades )
+        protected override (SVersion? Version, bool MustBuild) PrepareBuild( IActivityMonitor m,
+                                                                             DependentSolution s,
+                                                                             ISolutionDriver driver,
+                                                                             IReadOnlyList<UpdatePackageInfo> upgrades )
         {
             if( !driver.UpdatePackageDependencies( m, upgrades ) ) return (null, false);
             if( driver.GitRepository.AmendCommit( m ) == CommittingResult.Error ) return (null, false);
@@ -34,7 +37,12 @@ namespace CK.Env
             return (driver.GitRepository.ReadVersionInfo( m )?.Commit.FinalBuildInfo.Version, true);
         }
 
-        protected override BuildState Build( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade )
+        protected override BuildState Build( IActivityMonitor m,
+                                             DependentSolution s,
+                                             ISolutionDriver driver,
+                                             IReadOnlyList<UpdatePackageInfo> upgrades,
+                                             SVersion sVersion,
+                                             IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade )
         {
             if( !driver.UpdatePackageDependencies( m, buildProjectsUpgrade ) ) return BuildState.Failed;
             if( driver.GitRepository.AmendCommit( m, null, date => _commitTimes[s.Index] ) == CommittingResult.Error ) return BuildState.Failed;

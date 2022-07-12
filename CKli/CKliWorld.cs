@@ -59,6 +59,31 @@ namespace CKli
         /// </summary>
         public event EventHandler<EventMonitoredArgs>? DumpWorldStatus;
 
+
+        IReadOnlyList<PackageReference> GetExternalPackageReferences( IActivityMonitor m, IWorldSolutionContext ctx, bool refreshExternalVersions )
+        {
+            var externals = ctx.DependencyContext.Analyzer.ExternalReferences;
+            if( externals.Count == 0 )
+            {
+                m.Warn( "This World doesn't have any external references." );
+            }
+            else
+            {
+                using( m.OpenInfo( refreshExternalVersions
+                                    ? $"Refreshing external versions for {externals.Count} packages."
+                                    : $"Obtaining external versions for {externals.Count} packages, requesting the feeds only for not yet cached versions." ) )
+                {
+                    foreach( var e in externals )
+                    {
+                        // sync on async... This is bad!
+                        Artifacts.GetExternalVersionsAsync( m, e.Target.Artifact, refreshExternalVersions ).GetAwaiter().GetResult();
+                    }
+                }
+            }
+            return externals;
+        }
+
+
         [CommandMethod]
         public void ShowExternalDependencies( IActivityMonitor m,
                                               bool refreshExternalVersions = false,
@@ -83,7 +108,7 @@ namespace CKli
                     if( !onlyMultipleVersions || byVersion.Count() > 1 )
                     {
                         var maxVersion = byVersion.Select( v => v.Key ).Max();
-                        var externalVersionDisplay = Artifacts.GetExternalVersions( m, byName.Key, false )
+                        var externalVersionDisplay = Artifacts.LiveCache.Cache.DB.GetAvailableVersions( byName.Key )
                                                               .SelectMany( a => a.Versions.Where( v => v.PackageQuality >= quality && v > maxVersion ).Select( v => (v, a.FeedName) ) )
                                                               .GroupBy( v => v.v )
                                                               .OrderByDescending( v => v.Key )
@@ -124,7 +149,7 @@ namespace CKli
                 var maxVersion = byVersion.Select( v => v.Key ).Max();
                 Debug.Assert( maxVersion != null );
                 // We consider greater versions or lower versions with a better quality than the current max version used.
-                var versionAndFeedNames = Artifacts.GetExternalVersions( monitor, byName.Key, false )
+                var versionAndFeedNames = Artifacts.LiveCache.Cache.DB.GetAvailableVersions( byName.Key )
                                                     .SelectMany( a => a.Versions.Where( v => v.PackageQuality >= quality && (v > maxVersion || v.PackageQuality > maxVersion.PackageQuality) )
                                                         .Select( v => (v, a.FeedName) ) )
                                                     .GroupBy( v => v.v )

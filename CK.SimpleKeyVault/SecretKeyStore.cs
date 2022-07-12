@@ -21,7 +21,27 @@ namespace CK.SimpleKeyVault
         /// </summary>
         public struct Snapshot
         {
-            readonly (string name, string description, string? secret, bool isRequired, string? subKey, string? sourceProviderName)[] _data;
+            readonly (string Name, string Description, string? Secret, bool IsRequired, string? SubKey, string? SourceProviderName)[] _data;
+
+            /// <summary>
+            /// Gets a "safe" data where the secret is only exposed as a bool.
+            /// </summary>
+            /// <returns>The safe data.</returns>
+            public (string Name, string Description, bool SecretAvailable, bool IsRequired, string? SubKey, string? SourceProviderName)[] GetSafeData()
+            {
+                var result = new (string Name, string Description, bool SecretAvailable, bool IsRequired, string? SubKey, string? SourceProviderName)[_data.Length];
+                for( int i = 0; i < _data.Length; ++i )
+                {
+                    ref var s = ref _data[i];
+                    ref var t = ref result[i];
+                    t.Name = s.Name;
+                    t.Description = s.Description;
+                    t.SecretAvailable = s.Secret != null;
+                    t.IsRequired = s.IsRequired;
+                    t.SourceProviderName = s.SourceProviderName;
+                }
+                return result;
+            }
 
             internal Snapshot( SecretKeyStore store )
             {
@@ -147,7 +167,10 @@ namespace CK.SimpleKeyVault
         /// Other components may have already put some description.</param>
         /// <param name="isRequired">True if this key is required to initialize a World.</param>
         /// <returns>The secret key info.</returns>
-        public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo?, string> descriptionBuilder, bool isRequired = false, string? sourceProviderName = null )
+        public SecretKeyInfo DeclareSecretKey( string name,
+                                               Func<SecretKeyInfo?, string> descriptionBuilder,
+                                               bool isRequired = false,
+                                               string? sourceProviderName = null )
         {
             bool redeclaration = true;
             SecretKeyInfo? info;
@@ -188,7 +211,10 @@ namespace CK.SimpleKeyVault
         /// <param name="descriptionBuilder">Description builder function.</param>
         /// <param name="subKey">The sub key.</param>
         /// <returns>The secret key info.</returns>
-        public SecretKeyInfo DeclareSecretKey( string name, Func<SecretKeyInfo?, string> descriptionBuilder, SecretKeyInfo subKey, string? sourceNameMaxLength = null )
+        public SecretKeyInfo DeclareSecretKey( string name,
+                                               Func<SecretKeyInfo?, string> descriptionBuilder,
+                                               SecretKeyInfo subKey,
+                                               string? sourceNameMaxLength = null )
         {
             bool redeclaration = true;
             SecretKeyInfo? info;
@@ -215,13 +241,13 @@ namespace CK.SimpleKeyVault
         /// Updates it when <paramref name="secret"/> is not null or empty, otherwise clears it.
         /// Returns true if secret has been changed, false otherwise.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
         /// <param name="name">The secret name.</param>
         /// <param name="secret">The secret value. Null or empty clears the secret.</param>
         /// <returns>True if secret has been changed, false otherwise.</returns>
-        public bool SetSecret( IActivityMonitor m, string name, string? secret )
+        public bool SetSecret( IActivityMonitor monitor, string name, string? secret )
         {
-            if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentNullException( nameof( name ) );
+            Throw.CheckNotNullOrWhiteSpaceArgument( name );
             using var l = AcquireLock();
             bool clear = String.IsNullOrEmpty( secret );
             if( !_keyInfos.TryGetValue( name, out var info ) )
@@ -231,18 +257,18 @@ namespace CK.SimpleKeyVault
                 {
                     if( _undeclaredSecrets.Remove( name ) )
                     {
-                        m.Info( $"Secret '{name}' has been cleared." );
+                        monitor.Info( $"Secret '{name}' has been cleared." );
                     }
                     else
                     {
-                        m.Warn( $"Secret'{name}' not found." );
+                        monitor.Warn( $"Secret'{name}' not found." );
                     }
                 }
                 else
                 {
                     Debug.Assert( secret != null );
                     _undeclaredSecrets[name] = secret;
-                    m.Warn( $"Secret '{name}' has been {(already ? "updated" : "registered")} but is not declared yet." );
+                    monitor.Warn( $"Secret '{name}' has been {(already ? "updated" : "registered")} but is not declared yet." );
                 }
                 return true;
             }
@@ -250,15 +276,15 @@ namespace CK.SimpleKeyVault
                 && info.SuperKey != null
                 && info.SuperKey.IsSecretAvailable )
             {
-                m.Error( $"Secret '{name}' is defined by its super key '{info.SuperKey.Name}'." );
+                monitor.Error( $"Secret '{name}' is defined by its super key '{info.SuperKey.Name}'." );
                 return false;
             }
             if( info.SetSecret( secret ) )
             {
-                m.Info( $"Secret '{name}' has been {(clear ? "cleared" : "updated")}." );
+                monitor.Info( $"Secret '{name}' has been {(clear ? "cleared" : "updated")}." );
                 return true;
             }
-            m.Trace( $"Secret '{name}' unchanged." );
+            monitor.Trace( $"Secret '{name}' unchanged." );
             return false;
         }
 
@@ -271,7 +297,7 @@ namespace CK.SimpleKeyVault
         /// <returns>Null if the secret has not been declared, false if it has been declared but not known.</returns>
         public bool? IsSecretKeyAvailable( string name )
         {
-            if( String.IsNullOrWhiteSpace( name ) ) throw new ArgumentException( nameof( name ) );
+            Throw.CheckNotNullOrWhiteSpaceArgument( name );
             using var l = AcquireLock();
             if( !_keyInfos.TryGetValue( name, out var info ) ) return null;
             return info.IsSecretAvailable;
@@ -280,9 +306,9 @@ namespace CK.SimpleKeyVault
         /// <summary>
         /// Imports a set of keys and their secrets.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
         /// <param name="secrets">The secrets to import.</param>
-        public void ImportSecretKeys( IActivityMonitor m, IReadOnlyDictionary<string, string?> secrets )
+        public void ImportSecretKeys( IActivityMonitor monitor, IReadOnlyDictionary<string, string?> secrets )
         {
             if( secrets == null ) throw new ArgumentException( nameof( secrets ) );
             using var l = AcquireLock();
@@ -292,7 +318,7 @@ namespace CK.SimpleKeyVault
                 {
                     if( !String.IsNullOrEmpty( secret ) )
                     {
-                        info.ImportSecret( m, secret );
+                        info.ImportSecret( monitor, secret );
                     }
                 }
             }

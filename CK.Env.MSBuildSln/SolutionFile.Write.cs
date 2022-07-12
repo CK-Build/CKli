@@ -39,11 +39,7 @@ namespace CK.Env.MSBuildSln
         {
             foreach( var project in AllProjects )
             {
-                w.WriteLine( "Project(\"{0}\") = \"{1}\", \"{2}\", \"{3}\"",
-                                project.ProjectTypeGuid,
-                                project.ProjectName,
-                                project.SolutionRelativePath.ToString( '\\' ),
-                                project.ProjectGuid );
+                w.WriteLine( project.ProjectHeader );
                 if( project is SolutionFolder f )
                 {
                     WriteSection( w, "ProjectSection", "SolutionItems", "preProject",

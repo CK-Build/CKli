@@ -5,6 +5,7 @@ using FluentAssertions;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
@@ -39,6 +40,36 @@ namespace CK.Env.MSBuildSln.Tests
             }
         }
 
+        [Test]
+        public void nested_SolutionFolder_read()
+        {
+            using( var fs = new FileSystem( TestHelper.TestProjectFolder.AppendPart( "Samples" ), _commandRegister, _keyStore, new SimpleServiceContainer() ) )
+            {
+                var s = SolutionFile.Read( fs, TestHelper.Monitor, "CK-StObj.sln", true );
+                Debug.Assert( s != null );
+
+                s.AllProjects.OfType<SolutionFolder>().Should().HaveCount( 6 );
+                s.AllProjects.OfType<SolutionFolder>().Where( f => f.ProjectName == SolutionFile.SolutionFolderName ).Should().HaveCount( 1 );
+                s.AllProjects.OfType<SolutionFolder>().Where( f => f.ProjectName == "Tests" ).Should().HaveCount( 3 );
+                s.AllProjects.OfType<SolutionFolder>().Where( f => f.ProjectName == "StObjEngineTesting" ).Should().HaveCount( 1 );
+                s.AllProjects.OfType<SolutionFolder>().Where( f => f.ProjectName == "StObjSetupTesting" ).Should().HaveCount( 1 );
+
+                using( var w = new System.IO.StringWriter() )
+                {
+                    s.Write( w );
+                    fs.CopyTo( TestHelper.Monitor, w.ToString(), "CK-StObj.sln.txt" );
+                }
+
+                var s2 = SolutionFile.Read( fs, TestHelper.Monitor, "CK-StObj.sln.txt", true );
+                Debug.Assert( s2 != null );
+
+                s2.AllProjects.OfType<SolutionFolder>().Should().HaveCount( 6 );
+                s2.AllProjects.OfType<SolutionFolder>().Where( f => f.ProjectName == SolutionFile.SolutionFolderName ).Should().HaveCount( 1 );
+                s2.AllProjects.OfType<SolutionFolder>().Where( f => f.ProjectName == "Tests" ).Should().HaveCount( 3 );
+                s2.AllProjects.OfType<SolutionFolder>().Where( f => f.ProjectName == "StObjEngineTesting" ).Should().HaveCount( 1 );
+                s2.AllProjects.OfType<SolutionFolder>().Where( f => f.ProjectName == "StObjSetupTesting" ).Should().HaveCount( 1 );
+            }
+        }
 
         [Test]
         public void changing_TargetFrameworks()

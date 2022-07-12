@@ -10,7 +10,7 @@ namespace CK.Env.NuGet
     /// <summary>
     /// Internal implementation that may be made public once.
     /// </summary>
-    class NuGetAzureRepository : NuGetRepositoryBase, INuGetAzureRepository
+    sealed class NuGetAzureRepository : NuGetRepositoryBase, INuGetAzureRepository
     {
         internal NuGetAzureRepository( NuGetClient c,
                                        string name,

@@ -1,3 +1,4 @@
+using CK.Core;
 using CK.SimpleKeyVault;
 using System;
 using System.Text.RegularExpressions;
@@ -45,7 +46,9 @@ namespace CK.Env
             var read = secretKeyStore.DeclareSecretKey( ReadPATKeyName, GetReadPATDescription, isRequired: !IsPublic );
             // The write PAT is the super key of the read PAT.
             WritePATKeyName = GetPATName( "_WRITE_PAT" );
-            secretKeyStore.DeclareSecretKey( WritePATKeyName, current => current?.Description ?? $"Used to push solutions hosted by '{KnownGitProvider}'. This is required to publish builds.", subKey: read );
+            secretKeyStore.DeclareSecretKey( WritePATKeyName,
+                                             current => current?.Description ?? $"Used to push solutions hosted by '{KnownGitProvider}'. This is required to publish builds.",
+                                             subKey: read );
         }
 
         /// <summary>
@@ -55,8 +58,8 @@ namespace CK.Env
         /// <returns>The normalized url.</returns>
         public static Uri CheckAndNormalizeRepositoryUrl( Uri url )
         {
-            if( url == null ) throw new ArgumentNullException( nameof( url ) );
-            if( !url.IsAbsoluteUri ) throw new ArgumentException( $"Invalid Url. It must be absolute: {url}", nameof( url ) );
+            Throw.CheckNotNullArgument( url );
+            if( !url.IsAbsoluteUri ) Throw.ArgumentException( nameof( url ), $"Invalid Url. It must be absolute: {url}" );
             if( url.Query.Length == 0 )
             {
                 // Security: since execution paths may differ before reaching the constructor, multiple suffix may be handled or not.

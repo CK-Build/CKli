@@ -337,7 +337,7 @@ namespace CK.Env
         /// <returns>True on success, false on error.</returns>
         public bool ResetBranchState( IActivityMonitor m, string branchName, string commitSha )
         {
-            if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
+            Throw.CheckNotNullOrWhiteSpaceArgument( branchName );
             bool delete = String.IsNullOrWhiteSpace( commitSha );
             using( m.OpenInfo( delete
                                 ? $"Restoring {SubPath} '{branchName}' state (removing it)."
@@ -383,7 +383,7 @@ namespace CK.Env
                     }
                     if( commitSha == b.Tip.Sha )
                     {
-                        m.Info( $"Current branch '{branchName}' is already on restored state." );
+                        m.Info( $"Branch '{branchName}' is already on restored state." );
                         return true;
                     }
                     Commands.Checkout( Git, b );

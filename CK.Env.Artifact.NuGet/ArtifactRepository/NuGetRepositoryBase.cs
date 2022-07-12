@@ -21,10 +21,9 @@ namespace CK.Env.NuGet
     {
         string? _secret;
 
-        internal NuGetRepositoryBase(
-            NuGetClient c,
-            PackageSource source,
-            PackageQualityFilter qualityFilter )
+        internal NuGetRepositoryBase( NuGetClient c,
+                                      PackageSource source,
+                                      PackageQualityFilter qualityFilter )
             : base( c, source )
         {
             QualityFilter = qualityFilter;

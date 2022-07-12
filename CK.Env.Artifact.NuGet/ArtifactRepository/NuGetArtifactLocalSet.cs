@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace CK.Env.NuGet
 {
-    public class NuGetArtifactLocalSet : IArtifactLocalSet, IReadOnlyCollection<LocalNuGetPackageFile>
+    public sealed class NuGetArtifactLocalSet : IArtifactLocalSet, IReadOnlyCollection<LocalNuGetPackageFile>
     {
         readonly IReadOnlyCollection<LocalNuGetPackageFile> _locals;
 

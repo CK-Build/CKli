@@ -603,11 +603,12 @@ namespace CK.Env.Tests
         public async Task package_instance_should_update_and_raised_event()
         {
             var pC = new PackageCache();
-            ChangedInfo changedInfoOuter = null;
+            ChangedInfo? changedInfoOuter = null;
 
-            pC.DBChanged += delegate ( object sender, ChangedInfo changedInfo )
+            pC.DBChanged += (object? sender, ChangedInfoEventArgs e) =>
             {
-                changedInfoOuter = changedInfo;
+                sender.Should().BeSameAs( pC );
+                changedInfoOuter = e.Info;
             };
 
             var testFeed = new TestFeed( "Test" );
@@ -646,6 +647,7 @@ namespace CK.Env.Tests
 
             pI.Should().BeEquivalentTo( (PackageInstanceInfo)subA );
         }
+
 
         [Test]
         public void how_udates_and_inserts_are_handled()

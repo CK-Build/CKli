@@ -15,7 +15,7 @@ namespace CK.Build.PackageDB
 {
 
     /// <summary>
-    /// Shell around a <see cref="PackageCache"/> that handles updates from package feeds.
+    /// Thread safe shell around a <see cref="PackageCache"/> that handles updates from package feeds.
     /// </summary>
     public class LivePackageCache
     {
@@ -38,6 +38,20 @@ namespace CK.Build.PackageDB
         }
 
         /// <summary>
+        /// Loads or creates a new <see cref="LivePackageCache"/> bound to a file on the file system.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="path">The path that must be <see cref="NormalizedPath.IsRooted"/>.</param>
+        /// <param name="feeds">Optional initial set of feeds to consider.</param>
+        /// <param name="autoSaveCache">False to not save the cache automatically on changes.</param>
+        /// <returns>The live package cache.</returns>
+        public static LivePackageCache LoadOrCreate( IActivityMonitor monitor, in NormalizedPath path, IEnumerable<IPackageFeed>? feeds = null, bool autoSaveCache = true )
+        {
+            var c = PackageCache.LoadOrCreate( monitor, in path, autoSaveCache );
+            return new LivePackageCache( c, feeds );
+        }
+
+        /// <summary>
         /// Gets the package cache that is updated by this updater.
         /// </summary>
         public PackageCache Cache => _cache;
@@ -50,15 +64,33 @@ namespace CK.Build.PackageDB
 
         /// <summary>
         /// Adds a feed into the <see cref="Feeds"/>.
+        /// Note that a feed will appear in the <see cref="Cache"/> only when at least one package that
+        /// is from the feed will be added.
         /// </summary>
         /// <param name="f">The feed to add.</param>
         public void AddFeed( IPackageFeed f ) => Util.InterlockedAdd( ref _feeds, f );
 
         /// <summary>
         /// Removes a feed from the <see cref="Feeds"/>.
+        /// This doesn't drop the feed in the cache: the feed and its existing packages
+        /// are kept. Use <see cref="DropFeed(IActivityMonitor, IPackageFeed)"/> to also
+        /// remove the feed information from the package cache.
         /// </summary>
         /// <param name="f">The feed to remove.</param>
-        public void RemoveFeed( IPackageFeed f ) => Util.InterlockedRemove( ref _feeds, f );
+        public void RemoveFeed( IPackageFeed f, bool dropFromCache )
+        {
+            Util.InterlockedRemove( ref _feeds, f );
+        }
+
+        /// <summary>
+        /// Removes a feed from the <see cref="Feeds"/>.
+        /// </summary>
+        /// <param name="f">The feed to remove.</param>
+        public void DropFeed( IActivityMonitor monitor, IPackageFeed f )
+        {
+            Util.InterlockedRemove( ref _feeds, f );
+            Cache.DropFeed( monitor, f.ArtifactType, f.Name );
+        }
 
         /// <summary>
         /// Clears the current cache of feed requests that triggered an error and/or the ones

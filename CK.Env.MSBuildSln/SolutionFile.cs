@@ -14,8 +14,8 @@ namespace CK.Env.MSBuildSln
         readonly List<MSProject> _projectMSList;
         readonly Dictionary<string, Section> _sections;
         readonly List<string> _headers;
-        bool _isDirtyProjectFiles;
         bool _isDirtyStructure;
+        bool _isDirtyProjectFiles;
 
         public SolutionFile( FileSystem fs, NormalizedPath filePath )
         {
@@ -62,7 +62,10 @@ namespace CK.Env.MSBuildSln
             SetDirtyStructure( true );
         }
 
-        const string SolutionFolderName = "Solution Items";
+        /// <summary>
+        /// The name of the "Solution Items" we manage to be able to add whatever files we want.
+        /// </summary>
+        public const string SolutionFolderName = "Solution Items";
 
         /// <summary>
         /// Ensures that a <see cref="SolutionFolder"/> named "Solution Items" exists.
@@ -121,21 +124,12 @@ namespace CK.Env.MSBuildSln
         /// </summary>
         public IReadOnlyList<MSProject> MSProjects => _projectMSList;
 
-        /// <summary>
-        /// Finds a project by its <see cref="Project.ProjectName"/>, <see cref="ProjectBase.ProjectGuid"/>
-        /// or <see cref="Project.SolutionRelativePath"/>.
-        /// </summary>
-        /// <param name="key">The name, Guid or relative path.</param>
-        /// <returns>The project or null if not found.</returns>
-        public ProjectBase? FindProject( string key ) => _projectIndex.GetValueOrDefault( key, null );
-
         internal void AddProject( ProjectBase p )
         {
             Debug.Assert( p.Solution == this );
             _projectIndex.Add( p.ProjectGuid, p );
-            _projectIndex.Add( p.SolutionRelativePath, p );
-            _projectBaseList.Add( p );
             if( p is MSProject v ) _projectMSList.Add( v );
+            _projectBaseList.Add( p );
             SetDirtyStructure( true );
         }
 
@@ -188,7 +182,8 @@ namespace CK.Env.MSBuildSln
 
         internal ProjectBase? FindProjectByGuid( IActivityMonitor m, string guid, int lineNumber = 0 )
         {
-            var project = FindProject( guid );
+            Debug.Assert( _projectIndex != null );
+            var project = _projectIndex.GetValueOrDefault( guid, null );
             if( project == null )
             {
                 m.Error( lineNumber == 0

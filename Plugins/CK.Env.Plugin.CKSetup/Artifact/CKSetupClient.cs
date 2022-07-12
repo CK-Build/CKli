@@ -27,13 +27,13 @@ namespace CK.Env.CKSetup
             _sharedHttpClient = sharedHttpClient;
         }
 
-        public IArtifactRepository CreateRepository( in XElementReader r )
+        public IArtifactRepository CreateRepositoryFromXml( IActivityMonitor monitor, in XElementReader r )
         {
             CKSetupStore store = null;
-            string type = r.HandleOptionalAttribute<string>( "Type", null );
+            string? type = r.HandleOptionalAttribute<string>( "Type", null );
             if( type == "CKSetup" )
             {
-                string url = r.HandleOptionalAttribute<string>( "Url", null );
+                string? url = r.HandleOptionalAttribute<string>( "Url", null );
                 if( url == null ) store = new CKSetupStore( _keyStore, _sharedHttpClient );
                 else if( !Uri.TryCreate( url, UriKind.Absolute, out var uri ) )
                 {
@@ -57,7 +57,7 @@ namespace CK.Env.CKSetup
             return store;
         }
 
-        public IArtifactFeed CreateFeedFromXML(
+        public IArtifactFeed CreateFeedFromXml(
             IActivityMonitor m,
             in XElementReader r,
             IReadOnlyList<IArtifactRepository> repositories,

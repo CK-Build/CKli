@@ -8,6 +8,7 @@ namespace CK.Env
     /// Root abstraction that creates <see cref="IArtifactRepository"/> and <see cref="IArtifactFeed"/> of a certain kind.
     /// These handlers are registered in <see cref="ArtifactCenter"/>.
     /// </summary>
+    [IsMultiple]
     public interface IArtifactTypeHandler
     {
         /// <summary>
@@ -18,7 +19,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="r">The element reader. The Element's <see cref="XElement.Name"/> may be ignored (or used).</param>
         /// <returns>The repository info or null.</returns>
-        IArtifactRepository? CreateRepository( in XElementReader r );
+        IArtifactRepository? CreateRepositoryFromXml( IActivityMonitor monitor, in XElementReader r );
 
         /// <summary>
         /// Creates a source from a <see cref="XElementReader"/> or returns null if the element cannot be handled.
@@ -29,7 +30,7 @@ namespace CK.Env
         /// <param name="repositories">The repositories already initialized.</param>
         /// <param name="feeds">The feeds already initialized.</param>
         /// <returns>The artifact feed or null.</returns>
-        IArtifactFeed? CreateFeedFromXML( IActivityMonitor monitor, in XElementReader r, IReadOnlyList<IArtifactRepository> repositories, IReadOnlyList<IArtifactFeed> feeds );
+        IArtifactFeed? CreateFeedFromXml( IActivityMonitor monitor, in XElementReader r, IReadOnlyList<IArtifactRepository> repositories, IReadOnlyList<IArtifactFeed> feeds );
 
     }
 }

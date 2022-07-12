@@ -8,6 +8,8 @@ namespace CK.Build
 {
     /// <summary>
     /// An artifact is produced by a solution and can be of any type.
+    /// Implements value equality and comparison based on <see cref="Type"/> that use <see cref="StringComparer.Ordinal"/>
+    /// and the <see cref="Name"/> with <see cref="StringComparer.OrdinalIgnoreCase"/>.
     /// </summary>
     public readonly struct Artifact : IEquatable<Artifact>, IComparable<Artifact>
     {
@@ -44,8 +46,9 @@ namespace CK.Build
         /// <param name="name">Artifact name. Must not be null or whitespace.</param>
         public Artifact( in ArtifactType type, string name )
         {
+            Throw.CheckNotNullArgument( type );
             Throw.CheckNotNullOrWhiteSpaceArgument( name );
-            Type = type ?? throw new ArgumentNullException( nameof( type ) );
+            Type = type;
             Name = name;
         }
 
@@ -137,7 +140,7 @@ namespace CK.Build
         /// Overridden to combine <see cref="Type"/> and <see cref="Name"/>.
         /// </summary>
         /// <returns>The hash code.</returns>
-        public override int GetHashCode() => (Type?.GetHashCode() ??0) ^ StringComparer.OrdinalIgnoreCase.GetHashCode( Name );
+        public override int GetHashCode() => (Type?.GetHashCode() ?? 0) ^ StringComparer.OrdinalIgnoreCase.GetHashCode( Name );
 
         /// <summary>
         /// Implements == operator.
@@ -175,7 +178,7 @@ namespace CK.Build
             if( !other.IsValid ) return 1;
             Debug.Assert( Type != null && other.Type != null );
             int cmp = Type.CompareTo( other.Type );
-            return cmp != 0 ? cmp : Name.CompareTo( other.Name );
+            return cmp != 0 ? cmp : StringComparer.OrdinalIgnoreCase.Compare( Name, other.Name );
         }
     }
 }

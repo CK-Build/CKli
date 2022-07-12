@@ -12,6 +12,8 @@ namespace CK.Env.MSBuildSln
     {
         readonly Dictionary<string, PropertyLine> _versionControlProperties;
         readonly Dictionary<string, PropertyLine> _platformConfigurationProperties;
+        NormalizedPath _solutionRelativeFolderPath;
+        NormalizedPath _projectFilePath;
 
         internal Project( SolutionFile solution,
                           string projectGuid,
@@ -20,9 +22,33 @@ namespace CK.Env.MSBuildSln
                           NormalizedPath relativePath )
             : base( solution, projectGuid, projectTypeGuid, projectName, relativePath )
         {
+            _solutionRelativeFolderPath = relativePath.RemoveLastPart();
+            _projectFilePath = Solution.SolutionFolderPath.Combine( relativePath );
+
             _versionControlProperties = new Dictionary<string, PropertyLine>( StringComparer.OrdinalIgnoreCase );
             _platformConfigurationProperties = new Dictionary<string, PropertyLine>( StringComparer.OrdinalIgnoreCase );
         }
+
+        /// <summary>
+        /// Gets the path to the project directory relative to the <see cref="SolutionFile.SolutionFolderPath"/>.
+        /// This is simply the <see cref="SolutionRelativePath"/> without the last part.
+        /// </summary>
+        public NormalizedPath SolutionRelativeFolderPath
+        {
+            get => _solutionRelativeFolderPath;
+            private set => _solutionRelativeFolderPath = value;
+        }
+
+        /// <summary>
+        /// Gets the project path: it is the .proj (.csproj etc.) for an actual project (relative
+        /// to the <see cref="FileSystem"/>) and the folder path of a <see cref="SolutionFolder"/> .
+        /// </summary>
+        public NormalizedPath Path
+        {
+            get => _projectFilePath;
+            private protected set => _projectFilePath = value;
+        }
+
 
         /// <summary>
         /// Gets the version control lines for this project.

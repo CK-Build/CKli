@@ -551,28 +551,6 @@ namespace CK.Env
             } );
         }
 
-        protected IReadOnlyList<PackageReference> GetExternalPackageReferences( IActivityMonitor m, IWorldSolutionContext ctx, bool refreshExternalVersions )
-        {
-            var externals = ctx.DependencyContext.Analyzer.ExternalReferences;
-            if( externals.Count == 0 )
-            {
-                m.Warn( "This World doesn't have any external references." );
-            }
-            else
-            {
-                using( m.OpenInfo( refreshExternalVersions
-                                    ? $"Refreshing external versions for {externals.Count} packages."
-                                    : $"Obtaining external versions for {externals.Count} packages, requesting the feeds only for not yet cached versions." ) )
-                {
-                    foreach( var e in externals )
-                    {
-                        _artifacts.GetExternalVersions( m, e.Target.Artifact, refreshExternalVersions );
-                    }
-                }
-            }
-            return externals;
-        }
-
         [CommandMethod]
         public void UpgradeDependency( IActivityMonitor m,
                                        string packageName,

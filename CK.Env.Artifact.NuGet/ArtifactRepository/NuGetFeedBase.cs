@@ -16,6 +16,8 @@ using NuGet.Versioning;
 using NuGet.Frameworks;
 using System.Linq;
 using CK.Build.PackageDB;
+using CK.PerfectEvent;
+using NuGet.Packaging;
 
 namespace CK.Env.NuGet
 {
@@ -34,14 +36,16 @@ namespace CK.Env.NuGet
         /// Implements a feed (a package source) on the basis of an already existing one (typically a INuGetRepository).
         /// The credentials can be null or may differ from the base feed ones.
         /// </summary>
-        class ReadFeed : INuGetFeed, IPackageFeed
+        sealed class ReadFeed : INuGetFeed, IPackageFeed
         {
             readonly NuGetFeedBase _baseFeed;
+            readonly PerfectEventSender<IPackageFeed, RawPackageInfoEventArgs> _feedPackageInfoObtained;
 
             public ReadFeed( NuGetFeedBase f, string name, SimpleCredentials? creds )
             {
                 Debug.Assert( f != null );
                 _baseFeed = f;
+                _feedPackageInfoObtained = new PerfectEventSender<IPackageFeed, RawPackageInfoEventArgs>();
                 Name = name;
                 Credentials = creds;
                 TypedName = $"{NuGetClient.NuGetType.Name}:{Name}";
@@ -57,6 +61,12 @@ namespace CK.Env.NuGet
 
             public ArtifactType ArtifactType => NuGetClient.NuGetType;
 
+            public PerfectEvent<IPackageFeed, RawPackageInfoEventArgs> FeedPackageInfoObtained => _feedPackageInfoObtained.PerfectEvent;
+
+            public bool UseFullInformation { get; private set; }
+
+            public void SetUseFullInformation() => UseFullInformation = true;
+
             public void ConfigureCredentials( IActivityMonitor m )
             {
                 string? secret = null;
@@ -66,7 +76,7 @@ namespace CK.Env.NuGet
                 if( isBoundToProtectedRepository )
                 {
                     Debug.Assert( repo != null );
-                    var fromRepo = !String.IsNullOrEmpty( repo.ResolveSecret( m, false ) );
+                    var fromRepo = !String.IsNullOrEmpty( repo.ResolveSecret( m, throwOnEmpty: false ) );
                     if( fromRepo )
                     {
                         m.Trace( $"Feed '{Name}' uses secret from repository '{repo.Name}'." );
@@ -140,17 +150,27 @@ namespace CK.Env.NuGet
 
             public Task<IPackageInstanceInfo?> GetPackageInfoAsync( IActivityMonitor m, ArtifactInstance instance )
             {
-                return _baseFeed.SafeCallAsync<DependencyInfoResource, IPackageInstanceInfo?>( m, ( sources, meta, logger ) => GetPackageInfo( meta, logger, instance, default ) );
+                if( UseFullInformation )
+                {
+                    return _baseFeed.SafeCallAsync<PackageMetadataResource, IPackageInstanceInfo?>( m, ( sources, meta, logger ) => GetPackageInfoAsync( meta, logger, instance, default ) );
+
+                }
+                else
+                {
+                    return _baseFeed.SafeCallAsync<DependencyInfoResource, IPackageInstanceInfo?>( m, ( sources, meta, logger ) => GetPackageInfoAsync( meta, logger, instance, default ) );
+                }
             }
 
-            class PackageInfoReader
+
+
+            sealed class PackageInfoReaderFromRemoteSourceDependencyInfo
             {
                 static readonly Type _tResolver;
                 static readonly MethodInfo _mGetDependencies;
                 static readonly FieldInfo _fClient;
                 static readonly FieldInfo _fRegResource;
 
-                static PackageInfoReader()
+                static PackageInfoReaderFromRemoteSourceDependencyInfo()
                 {
                     /*
                     None of the exposed DependencyInfoResource.ResolvePackages returns the whole set of dependencies for a single version.
@@ -186,7 +206,7 @@ namespace CK.Env.NuGet
 
                 public DependencyInfoResource CurrentInfoResource { get; }
 
-                public PackageInfoReader( DependencyInfoResource meta, SourceCacheContext sourceCache )
+                public PackageInfoReaderFromRemoteSourceDependencyInfo( DependencyInfoResource meta, SourceCacheContext sourceCache )
                 {
                     // Check reflection here: avoid type initialization error.
                     CheckReflection();
@@ -196,8 +216,10 @@ namespace CK.Env.NuGet
                     _client = (HttpSource)_fClient.GetValue( meta )!;
                 }
 
-                public async Task<IPackageInstanceInfo?> GetPackageInfoAsync( NuGetLoggerAdapter logger, ArtifactInstance instance, CancellationToken token )
-                { 
+                public async Task<(IPackageInstanceInfo?, object?)> GetPackageInfoAsync( NuGetLoggerAdapter logger,
+                                                                                        ArtifactInstance instance,
+                                                                                        CancellationToken token )
+                {
                     var packageId = instance.Artifact.Name;
                     var version = NuGetVersion.Parse( instance.Version.ParsedText );
                     var singleVersion = new VersionRange( minVersion: version, includeMinVersion: true, maxVersion: version, includeMaxVersion: true );
@@ -205,7 +227,7 @@ namespace CK.Env.NuGet
                     var uri = _regResource.GetUri( instance.Artifact.Name );
                     var param = new object[] { _client, uri, packageId, singleVersion, _sourceCache, logger, token };
                     var o = await ((Task<IEnumerable<RemoteSourceDependencyInfo>>)_mGetDependencies.Invoke( null, param )!);
-                    if( o == null || !o.Any() ) return null;
+                    if( o == null || !o.Any() ) return (null, null);
                     // Okay... This should never happens... but who really knows ?!
                     var deps = o.SingleOrDefault();
                     if( deps == null )
@@ -220,61 +242,91 @@ namespace CK.Env.NuGet
                                 }
                             }
                         } );
-                        return null;
+                        return (null, null);
                     }
-                    var result = new PackageInstanceInfo();
-                    result.State = deps.Listed ? PackageState.None : PackageState.Unlisted;
-                    result.Key = instance;
-                    var savors = NuGetClient.Savors.EmptyTrait;
-                    foreach( var d in deps.DependencyGroups )
-                    {
-                        var tf = NuGetClient.Savors.FindOrCreate( d.TargetFramework.GetShortFolderName() );
-                        savors = savors.Union( tf );
-                        foreach( var p in d.Packages )
-                        {
-                            var range = p.VersionRange.ToString();
-                            SVersionBound.ParseResult v = SVersionBound.NugetTryParse( range );
-                            if( !v.IsValid )
-                            {
-                                logger.SafeLog( m => m.Warn( $"Unable to parse version '{range}' (Error: {v.Error}) from dependency group '{tf}' of {instance}. Skipped dependency." ) );
-                                continue;
-                            }
-                            if( v.IsApproximated )
-                            {
-                                logger.SafeLog( m => m.Warn( $"Version '{range}' from dependency group '{tf}' of {instance} has been approximated to '{v.Result}'." ) );
-                                continue;
-                            }
-                            var a = new ArtifactInstance( NuGetClient.NuGetType, p.Id, v.Result.Base );
-                            var kind = p.Exclude.Contains( "All" ) ? ArtifactDependencyKind.Development : ArtifactDependencyKind.Transitive;
 
-                            var idxExists = result.Dependencies.IndexOf( d => d.Target == a && d.Lock == v.Result.Lock && d.MinQuality == v.Result.MinQuality && d.Kind == kind );
-                            if( idxExists < 0 )
-                            {
-                                result.Dependencies.Add( (a, v.Result.Lock, v.Result.MinQuality, kind, tf) );
-                            }
-                            else
-                            {
-                                var ef = result.Dependencies[idxExists].Savors;
-                                Debug.Assert( ef != null );
-                                result.Dependencies[idxExists] = (a, v.Result.Lock, v.Result.MinQuality, kind, tf.Union( ef ));
-                            }
-                        }
-                    }
-                    if( !savors.IsEmpty ) result.Savors = savors;
-                    return result;
+                    PackageInstanceInfo result = CreateNugetPackageInstanceInfo( logger, instance, deps.Listed,deps.DependencyGroups );
+                    return (result, deps);
                 }
-
             }
 
-            PackageInfoReader? _packageReader;
-
-            Task<IPackageInstanceInfo?> GetPackageInfo( DependencyInfoResource meta, NuGetLoggerAdapter logger, ArtifactInstance instance, CancellationToken token )
+            private static PackageInstanceInfo CreateNugetPackageInstanceInfo( NuGetLoggerAdapter logger, ArtifactInstance instance, bool isListed, IEnumerable<PackageDependencyGroup> dependencyGroups )
             {
-                if( _packageReader == null || _packageReader.CurrentInfoResource != meta )
+                var result = new PackageInstanceInfo();
+                result.State = isListed ? PackageState.None : PackageState.Unlisted;
+                result.Key = instance;
+                var savors = NuGetClient.Savors.EmptyTrait;
+                foreach( var d in dependencyGroups )
                 {
-                    _packageReader = new PackageInfoReader( meta, _baseFeed.Client.SourceCache );
+                    var tf = NuGetClient.Savors.FindOrCreate( d.TargetFramework.GetShortFolderName() );
+                    savors = savors.Union( tf );
+                    foreach( var p in d.Packages )
+                    {
+                        var range = p.VersionRange.ToString();
+                        SVersionBound.ParseResult v = SVersionBound.NugetTryParse( range );
+                        if( !v.IsValid )
+                        {
+                            logger.SafeLog( m => m.Warn( $"Unable to parse version '{range}' (Error: {v.Error}) from dependency group '{tf}' of {instance}. Skipped dependency." ) );
+                            continue;
+                        }
+                        if( v.IsApproximated )
+                        {
+                            logger.SafeLog( m => m.Warn( $"Version '{range}' from dependency group '{tf}' of {instance} has been approximated to '{v.Result}'." ) );
+                            continue;
+                        }
+                        var a = new ArtifactInstance( NuGetClient.NuGetType, p.Id, v.Result.Base );
+                        var kind = p.Exclude.Contains( "All" ) ? ArtifactDependencyKind.Development : ArtifactDependencyKind.Transitive;
+
+                        var idxExists = result.Dependencies.IndexOf( d => d.Target == a && d.Lock == v.Result.Lock && d.MinQuality == v.Result.MinQuality && d.Kind == kind );
+                        if( idxExists < 0 )
+                        {
+                            result.Dependencies.Add( (a, v.Result.Lock, v.Result.MinQuality, kind, tf) );
+                        }
+                        else
+                        {
+                            var ef = result.Dependencies[idxExists].Savors;
+                            Debug.Assert( ef != null );
+                            result.Dependencies[idxExists] = (a, v.Result.Lock, v.Result.MinQuality, kind, tf.Union( ef ));
+                        }
+                    }
                 }
-                return _packageReader.GetPackageInfoAsync( logger, instance, token );
+                if( !savors.IsEmpty ) result.Savors = savors;
+                return result;
+            }
+
+            PackageInfoReaderFromRemoteSourceDependencyInfo? _packageReaderRemoteSourceDependencyInfo;
+
+            async Task<IPackageInstanceInfo?> GetPackageInfoAsync( DependencyInfoResource meta, NuGetLoggerAdapter logger, ArtifactInstance instance, CancellationToken token )
+            {
+                IPackageInstanceInfo? info;
+                object? rawInfo;
+
+                if( _packageReaderRemoteSourceDependencyInfo == null || _packageReaderRemoteSourceDependencyInfo.CurrentInfoResource != meta )
+                {
+                    _packageReaderRemoteSourceDependencyInfo = new PackageInfoReaderFromRemoteSourceDependencyInfo( meta, _baseFeed.Client.SourceCache );
+                }
+                (info, rawInfo) = await _packageReaderRemoteSourceDependencyInfo.GetPackageInfoAsync( logger, instance, token );
+
+                if( info != null )
+                {
+                    Debug.Assert( rawInfo != null );
+                    await _feedPackageInfoObtained.SafeRaiseAsync( logger.Monitor, this, new RawPackageInfoEventArgs( info, rawInfo ) );
+                }
+                return info;
+            }
+
+            async Task<IPackageInstanceInfo?> GetPackageInfoAsync( PackageMetadataResource meta, NuGetLoggerAdapter logger, ArtifactInstance instance, CancellationToken token )
+            {
+                var packageId = instance.Artifact.Name;
+                var version = NuGetVersion.Parse( instance.Version.ParsedText );
+
+                var metadata = await meta.GetMetadataAsync( new PackageIdentity( packageId, version ), _baseFeed.Client.SourceCache, logger, token );
+
+                if( metadata == null ) return null;
+                var result = CreateNugetPackageInstanceInfo( logger, instance, metadata.IsListed, metadata.DependencySets );
+                await _feedPackageInfoObtained.SafeRaiseAsync( logger.Monitor, this, new RawPackageInfoEventArgs( result, metadata ) );
+
+                return result;
             }
 
             public override string ToString() => TypedName;
@@ -287,7 +339,7 @@ namespace CK.Env.NuGet
         internal NuGetFeedBase( IActivityMonitor monitor, NuGetClient c, string url, string name, SimpleCredentials? creds )
             : this( c, new PackageSource( url, name ) )
         {
-            HandleFeed( c.SecretKeyStore, url, name, creds );
+            HandleFeed( monitor, c.SecretKeyStore, url, name, creds );
         }
 
         private protected NuGetFeedBase( NuGetClient c, PackageSource packageSource )
@@ -315,7 +367,7 @@ namespace CK.Env.NuGet
 
         public string Name => PackageSource.Name;
 
-        internal INuGetFeed HandleFeed( SecretKeyStore keyStore, string url, string name, SimpleCredentials? creds )
+        internal INuGetFeed HandleFeed( IActivityMonitor monitor, SecretKeyStore keyStore, string url, string name, SimpleCredentials? creds )
         {
             Debug.Assert( _feed == null && url.Equals( Url, StringComparison.OrdinalIgnoreCase ) );
             if( creds?.IsSecretKeyName == true )
@@ -326,7 +378,7 @@ namespace CK.Env.NuGet
             return _feed = new ReadFeed( this, name, creds );
         }
 
-        protected async Task<T> SafeCallAsync<TResource,T>( IActivityMonitor monitor,
+        protected async Task<T> SafeCallAsync<TResource, T>( IActivityMonitor monitor,
                                                             Func<SourceRepository, TResource, NuGetLoggerAdapter, Task<T>> f ) where TResource : class, INuGetResource
         {
             bool retry = false;
