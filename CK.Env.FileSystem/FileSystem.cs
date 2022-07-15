@@ -31,11 +31,10 @@ namespace CK.Env
         /// <param name="rootPath">Physical root path.</param>
         /// <param name="commandRegister">Command register.</param>
         /// <param name="sp">Optional base services.</param>
-        public FileSystem(
-            string rootPath,
-            CommandRegister commandRegister,
-            SecretKeyStore secretKeyStore,
-            IServiceProvider sp )
+        public FileSystem( string rootPath,
+                           CommandRegister commandRegister,
+                           SecretKeyStore secretKeyStore,
+                           IServiceProvider sp )
         {
             Root = new NormalizedPath( Path.GetFullPath( rootPath ) );
             _commandRegister = commandRegister;
