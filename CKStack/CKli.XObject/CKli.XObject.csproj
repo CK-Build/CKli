@@ -2,6 +2,10 @@
 
   <Import Project="..\NotPackaged.props" />
 
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Plugins\CK.Env.Plugin.Appveyor\CK.Env.Plugin.Appveyor.csproj" />
     <ProjectReference Include="..\Plugins\CK.Env.Plugin.Basics\CK.Env.Plugin.Basics.csproj" />

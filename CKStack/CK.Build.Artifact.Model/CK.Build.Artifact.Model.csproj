@@ -2,6 +2,10 @@
 
   <Import Project="..\NotPackaged.props" />
   
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="CSemVer" Version="11.0.0" />
     <PackageReference Include="CK.Core" Version="15.1.0" />

@@ -2,8 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
-    <IsPackable>false</IsPackable>
-    <LangVersion>9</LangVersion>
 	<Nullable>enable</Nullable>
     <BuildOnPack Condition=" '$(NoBuild)' == 'true' ">false</BuildOnPack>
     <BuildProjectReferences Condition=" '$(NoBuild)' == 'true' ">false</BuildProjectReferences>

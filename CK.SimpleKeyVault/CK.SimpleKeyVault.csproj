@@ -2,15 +2,12 @@
 
   <Import Project="..\CKStack\NotPackaged.props" />
 
-  <ItemGroup>
-    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="15.1.0" />    
-  </ItemGroup>
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Update="NuGetizer" Version="0.8.0">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
-    </PackageReference>
+    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="15.1.0" />    
   </ItemGroup>
   
 </Project>
