@@ -21,7 +21,7 @@
   </ItemGroup>
   
   <ItemGroup>
-    <ProjectReference Include="..\CKli.XObject\CKli.XObject.csproj" />
+    <ProjectReference Include="..\CKStack\CKli.XObject\CKli.XObject.csproj" />
   </ItemGroup>
 
 </Project>

@@ -17,86 +17,89 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		Common\SharedKey.snk = Common\SharedKey.snk
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.FileSystem", "CK.Env.FileSystem\CK.Env.FileSystem.csproj", "{3B5B07A0-8847-4087-AEF6-D068640E0EE3}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.FileSystem", "CKStack\CK.Env.FileSystem\CK.Env.FileSystem.csproj", "{3B5B07A0-8847-4087-AEF6-D068640E0EE3}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{83CC9529-9A6D-46E5-BBE5-A1C5C6C35B7C}"
 	ProjectSection(SolutionItems) = preProject
 		Tests\TestHelper.config = Tests\TestHelper.config
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Tests", "Tests\CK.Env.Tests\CK.Env.Tests.csproj", "{A2F34930-E314-4ED1-8EC5-4FB932835B08}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Tests", "CKStack\Tests\CK.Env.Tests\CK.Env.Tests.csproj", "{A2F34930-E314-4ED1-8EC5-4FB932835B08}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.XTyping", "CK.Env.XTyping\CK.Env.XTyping.csproj", "{06A5A730-C435-45AB-999C-CDC382445739}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.XTyping", "CKStack\CK.Env.XTyping\CK.Env.XTyping.csproj", "{06A5A730-C435-45AB-999C-CDC382445739}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.MSBuildSln.Tests", "Tests\CK.Env.MSBuildSln.Tests\CK.Env.MSBuildSln.Tests.csproj", "{49349794-CE5E-468D-BAA1-726D59F21F64}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.MSBuildSln.Tests", "CKStack\Tests\CK.Env.MSBuildSln.Tests\CK.Env.MSBuildSln.Tests.csproj", "{49349794-CE5E-468D-BAA1-726D59F21F64}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Xml.Linq.Extension", "CK.Xml.Linq.Extension\CK.Xml.Linq.Extension.csproj", "{6778C7DC-9331-4802-99F2-80EC41D6CE70}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Xml.Linq.Extension", "CKStack\CK.Xml.Linq.Extension\CK.Xml.Linq.Extension.csproj", "{6778C7DC-9331-4802-99F2-80EC41D6CE70}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.SimpleKeyVault", "CK.SimpleKeyVault\CK.SimpleKeyVault.csproj", "{91162FB0-062D-4C6C-BDD2-6324C54F4382}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.SimpleKeyVault.Tests", "Tests\CK.SimpleKeyVault.Tests\CK.SimpleKeyVault.Tests.csproj", "{4F976531-326D-4458-8727-F6ACB7CCB9FD}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.World", "CK.Env.World\CK.Env.World.csproj", "{69F5FC76-F45F-45EB-AA4A-199435D5453D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.World", "CKStack\CK.Env.World\CK.Env.World.csproj", "{69F5FC76-F45F-45EB-AA4A-199435D5453D}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Command", "CK.Env.Command\CK.Env.Command.csproj", "{3D6459DB-218B-46C6-9D19-550E62D87A4D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Command", "CKStack\CK.Env.Command\CK.Env.Command.csproj", "{3D6459DB-218B-46C6-9D19-550E62D87A4D}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Xml.Linq.Extension.Tests", "Tests\CK.Xml.Linq.Extension.Tests\CK.Xml.Linq.Extension.Tests.csproj", "{D886832F-7FC3-424E-B85F-7427DA304896}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Xml.Linq.Extension.Tests", "CKStack\Tests\CK.Xml.Linq.Extension.Tests\CK.Xml.Linq.Extension.Tests.csproj", "{D886832F-7FC3-424E-B85F-7427DA304896}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.Appveyor", "Plugins\CK.Env.Plugin.Appveyor\CK.Env.Plugin.Appveyor.csproj", "{8446F2F2-1C84-44A2-BB79-1BF064312CA6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.Appveyor", "CKStack\Plugins\CK.Env.Plugin.Appveyor\CK.Env.Plugin.Appveyor.csproj", "{8446F2F2-1C84-44A2-BB79-1BF064312CA6}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.Basics", "Plugins\CK.Env.Plugin.Basics\CK.Env.Plugin.Basics.csproj", "{C162156D-AA8F-4592-A31E-1D3BC66F050E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.Basics", "CKStack\Plugins\CK.Env.Plugin.Basics\CK.Env.Plugin.Basics.csproj", "{C162156D-AA8F-4592-A31E-1D3BC66F050E}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Artifact", "CK.Env.Artifact\CK.Env.Artifact.csproj", "{722E1459-AF6C-41BF-AFCB-7878F33E0CF5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Artifact", "CKStack\CK.Env.Artifact\CK.Env.Artifact.csproj", "{722E1459-AF6C-41BF-AFCB-7878F33E0CF5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.CKSetup", "Plugins\CK.Env.Plugin.CKSetup\CK.Env.Plugin.CKSetup.csproj", "{73F50D14-C21A-476B-B150-6BFC962F862F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.CKSetup", "CKStack\Plugins\CK.Env.Plugin.CKSetup\CK.Env.Plugin.CKSetup.csproj", "{73F50D14-C21A-476B-B150-6BFC962F862F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.SolutionSpec", "CK.Env.SolutionSpec\CK.Env.SolutionSpec.csproj", "{ADBC3160-6149-4F73-AAF0-07636E8E83A5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.SolutionSpec", "CKStack\CK.Env.SolutionSpec\CK.Env.SolutionSpec.csproj", "{ADBC3160-6149-4F73-AAF0-07636E8E83A5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Sys", "CK.Env.Sys\CK.Env.Sys.csproj", "{DB371EAB-DEAE-4532-9C40-90B6F82F10CE}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Sys", "CKStack\CK.Env.Sys\CK.Env.Sys.csproj", "{DB371EAB-DEAE-4532-9C40-90B6F82F10CE}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.GitLab", "Plugins\CK.Env.Plugin.GitLab\CK.Env.Plugin.GitLab.csproj", "{1BD159BE-E582-4B58-A3FE-3CE8298EDC46}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.GitLab", "CKStack\Plugins\CK.Env.Plugin.GitLab\CK.Env.Plugin.GitLab.csproj", "{1BD159BE-E582-4B58-A3FE-3CE8298EDC46}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.NPM", "Plugins\CK.Env.Plugin.NPM\CK.Env.Plugin.NPM.csproj", "{37F6F284-C220-4E99-BD9E-7985E41FCEBF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.NPM", "CKStack\Plugins\CK.Env.Plugin.NPM\CK.Env.Plugin.NPM.csproj", "{37F6F284-C220-4E99-BD9E-7985E41FCEBF}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeCakeBuilder", "CodeCakeBuilder\CodeCakeBuilder.csproj", "{370AB245-9A08-48B0-AD43-74661EECB54D}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.DependencyModel", "CK.Env.DependencyModel\CK.Env.DependencyModel.csproj", "{A8F9C82B-83A9-4039-8C34-6A3DBBF792E6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.DependencyModel", "CKStack\CK.Env.DependencyModel\CK.Env.DependencyModel.csproj", "{A8F9C82B-83A9-4039-8C34-6A3DBBF792E6}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.DependencyModel.Tests", "Tests\CK.Env.DependencyModel.Tests\CK.Env.DependencyModel.Tests.csproj", "{8B5CF461-7D41-4BFD-AC5B-B46CA295B38B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.DependencyModel.Tests", "CKStack\Tests\CK.Env.DependencyModel.Tests\CK.Env.DependencyModel.Tests.csproj", "{8B5CF461-7D41-4BFD-AC5B-B46CA295B38B}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.MSBuildSln", "CK.Env.MSBuildSln\CK.Env.MSBuildSln.csproj", "{C7F4C7A4-35C4-4E38-B102-0DD3F480780C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.MSBuildSln", "CKStack\CK.Env.MSBuildSln\CK.Env.MSBuildSln.csproj", "{C7F4C7A4-35C4-4E38-B102-0DD3F480780C}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.SolutionDriver", "Plugins\CK.Env.Plugin.SolutionDriver\CK.Env.Plugin.SolutionDriver.csproj", "{C260F99F-92CB-463B-8797-632BAB700BAB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.SolutionDriver", "CKStack\Plugins\CK.Env.Plugin.SolutionDriver\CK.Env.Plugin.SolutionDriver.csproj", "{C260F99F-92CB-463B-8797-632BAB700BAB}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.NuGet", "Plugins\CK.Env.Plugin.NuGet\CK.Env.Plugin.NuGet.csproj", "{3EC8F673-3DB7-439B-8760-8C44C9410190}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.NuGet", "CKStack\Plugins\CK.Env.Plugin.NuGet\CK.Env.Plugin.NuGet.csproj", "{3EC8F673-3DB7-439B-8760-8C44C9410190}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Artifact.NuGet", "CK.Env.Artifact.NuGet\CK.Env.Artifact.NuGet.csproj", "{EE57B61B-EE50-4400-9959-7B41ADB27430}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Artifact.NuGet", "CKStack\CK.Env.Artifact.NuGet\CK.Env.Artifact.NuGet.csproj", "{EE57B61B-EE50-4400-9959-7B41ADB27430}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Npm.Net.Tests", "Tests\Npm.Net.Tests\Npm.Net.Tests.csproj", "{3A9F2DC4-65AE-4DD1-9E68-298AA4451718}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Npm.Net.Tests", "CKStack\Tests\Npm.Net.Tests\Npm.Net.Tests.csproj", "{3A9F2DC4-65AE-4DD1-9E68-298AA4451718}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Build.Artifact.Model", "CK.Build.Artifact.Model\CK.Build.Artifact.Model.csproj", "{20706B63-81A3-466B-9B12-5E5EB3C0696F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Build.Artifact.Model", "CKStack\CK.Build.Artifact.Model\CK.Build.Artifact.Model.csproj", "{20706B63-81A3-466B-9B12-5E5EB3C0696F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.Dotnet", "Plugins\CK.Env.Plugin.Dotnet\CK.Env.Plugin.Dotnet.csproj", "{777AC8E9-32CE-4B63-8606-6C9D8B531E88}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.Dotnet", "CKStack\Plugins\CK.Env.Plugin.Dotnet\CK.Env.Plugin.Dotnet.csproj", "{777AC8E9-32CE-4B63-8606-6C9D8B531E88}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.World.Host", "CK.Env.World.Host\CK.Env.World.Host.csproj", "{DF602093-45CC-48F6-987C-D567F1E8763B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.World.Host", "CKStack\CK.Env.World.Host\CK.Env.World.Host.csproj", "{DF602093-45CC-48F6-987C-D567F1E8763B}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.XTyping.Tests", "Tests\CK.Env.XTyping.Tests\CK.Env.XTyping.Tests.csproj", "{88315861-9449-4347-8B69-A39A343B66BE}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.XTyping.Tests", "CKStack\Tests\CK.Env.XTyping.Tests\CK.Env.XTyping.Tests.csproj", "{88315861-9449-4347-8B69-A39A343B66BE}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.FileSystem.Tests", "Tests\CK.Env.FileSystem.Tests\CK.Env.FileSystem.Tests.csproj", "{5C5B7030-95D4-4FF1-9132-897F395AF69E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.FileSystem.Tests", "CKStack\Tests\CK.Env.FileSystem.Tests\CK.Env.FileSystem.Tests.csproj", "{5C5B7030-95D4-4FF1-9132-897F395AF69E}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Artifact.Tests", "Tests\CK.Env.Artifact.Tests\CK.Env.Artifact.Tests.csproj", "{297C1A6C-4FA2-467E-9FB8-7EE49056682E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Artifact.Tests", "CKStack\Tests\CK.Env.Artifact.Tests\CK.Env.Artifact.Tests.csproj", "{297C1A6C-4FA2-467E-9FB8-7EE49056682E}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Plugins", "Plugins", "{60D6E9BB-13A8-463A-ACBF-66EE940FCCE5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.Workstation", "Plugins\CK.Env.Plugin.Workstation\CK.Env.Plugin.Workstation.csproj", "{B679ACB9-9FAA-46AB-B01E-E833722E1362}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Env.Plugin.Workstation", "CKStack\Plugins\CK.Env.Plugin.Workstation\CK.Env.Plugin.Workstation.csproj", "{B679ACB9-9FAA-46AB-B01E-E833722E1362}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Build.Artifact.Cache", "CK.Build.Artifact.Cache\CK.Build.Artifact.Cache.csproj", "{256FA6AB-FC79-4503-AD31-32960AC03846}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CK.Build.Artifact.Cache", "CKStack\CK.Build.Artifact.Cache\CK.Build.Artifact.Cache.csproj", "{256FA6AB-FC79-4503-AD31-32960AC03846}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CKli.XObject", "CKli.XObject\CKli.XObject.csproj", "{748C1411-A09A-4F62-9A6E-F70A03E05663}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CKli.XObject", "CKStack\CKli.XObject\CKli.XObject.csproj", "{748C1411-A09A-4F62-9A6E-F70A03E05663}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CKli.AllCode", "CKli.AllCode\CKli.AllCode.csproj", "{AF78DE02-C63C-4850-A6BE-59F134419CAF}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "CKStack", "CKStack", "{5928FC83-333E-4936-B808-6DDF63CF7C26}"
+	ProjectSection(SolutionItems) = preProject
+		CKStack\NotPackaged.props = CKStack\NotPackaged.props
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -253,6 +253,7 @@ paket-files/
 CodeCakeBuilder/Tools/
 Tests/**/TestResult*.xml
 /Tests/A1Test/
-/Tests/**/Logs/
-/Tests/CK.Env.Tests/UniverseZips/
+**/Tests/**/Logs/
 /CodeCakeBuilder/MemoryKey.*.txt
+**/Tests/CK.Env.Tests/UniverseZips/
+**/Tests/CK.Env.Tests/UniverseZips/

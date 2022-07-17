@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="..\NotPackaged.props" />
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CK.Build.Artifact.Model\CK.Build.Artifact.Model.csproj" />
+    
+    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="15.1.0" />
+    <PackageReference Include="CK.PerfectEvent" Version="15.1.0" />
+    <PackageReference Include="System.Threading.Channels" Version="6.0.0" />
+
+  </ItemGroup>
+
+</Project>
