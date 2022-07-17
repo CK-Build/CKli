@@ -125,37 +125,33 @@ namespace CK.Env.MSBuildSln
             _primaryFile = MSProjFile.FindOrLoadProjectFile( fs, monitor, Path, cache );
             if( _primaryFile != null )
             {
-                XElement? f = _primaryFile.Document.Root?
-                                .Elements( "PropertyGroup" )
-                                .Elements()
-                                .Where( x => x.Name.LocalName == "TargetFramework" || x.Name.LocalName == "TargetFrameworks" )
-                                .SingleOrDefault();
-                if( f == null )
+                _directoryBuildPropsFile = FindMSProjFileAbove( fs, monitor, "Directory.Build.props", cache );
+                if( _directoryBuildPropsFile != null )
                 {
-                    monitor.Error( $"There must be one and only one TargetFramework or TargetFrameworks element in {Path}." );
+                    _primaryFile.AddImplicitImport( _directoryBuildPropsFile );
+                    monitor.Trace( $"Implicitly importing '{_directoryBuildPropsFile.Path.RemovePrefix( Solution.SolutionFolderPath )}'." );
+                }
+                _directoryPackagesPropsFile = FindMSProjFileAbove( fs, monitor, "Directory.Packages.props", cache );
+                if( _directoryPackagesPropsFile != null )
+                {
+                    _primaryFile.AddImplicitImport( _directoryPackagesPropsFile );
+                    monitor.Trace( $"Implicitly importing '{_directoryPackagesPropsFile.Path.RemovePrefix( Solution.SolutionFolderPath )}'." );
+                }
+
+                var tE = _primaryFile.FindProperty( name => name.LocalName == "TargetFramework" || name.LocalName == "TargetFrameworks" );
+                if( tE.Count != 1 )
+                {
+                    monitor.Error( $"There must be one and only one TargetFramework or TargetFrameworks element in '{Path}' or in its imports: {_primaryFile.AllFiles.Skip(1).Select( f => f.Path.Path ).Concatenate()}." );
                     _primaryFile = null;
                 }
                 else
                 {
                     Debug.Assert( _primaryFile.Document.Root != null );
-                    TargetFrameworks = Savors.FindOrCreate( f.Value );
+                    TargetFrameworks = Savors.FindOrCreate( tE[0].Value );
 
-                    LangVersion = _primaryFile.Document.Root.Elements( "PropertyGroup" ).Elements( "LangVersion" ).LastOrDefault()?.Value;
-                    OutputType = _primaryFile.Document.Root.Elements( "PropertyGroup" ).Elements( "OutputType" ).LastOrDefault()?.Value;
-                    IsPackable = (bool?)_primaryFile.Document.Root.Elements( "PropertyGroup" ).Elements( "IsPackable" ).LastOrDefault();
-
-                    _directoryBuildPropsFile = FindMSProjFileAbove( fs, monitor, "Directory.Build.props", cache );
-                    if( _directoryBuildPropsFile != null )
-                    {
-                        _primaryFile.AddImplicitImport( _directoryBuildPropsFile );
-                        monitor.Trace( $"Implicitly importing '{_directoryBuildPropsFile.Path.RemovePrefix( Solution.SolutionFolderPath)}'." );
-                    }
-                    _directoryPackagesPropsFile = FindMSProjFileAbove( fs, monitor, "Directory.Packages.props", cache );
-                    if( _directoryPackagesPropsFile != null )
-                    {
-                        _primaryFile.AddImplicitImport( _directoryPackagesPropsFile );
-                        monitor.Trace( $"Implicitly importing '{_directoryPackagesPropsFile.Path.RemovePrefix( Solution.SolutionFolderPath )}'." );
-                    }
+                    LangVersion = _primaryFile.FindProperty( "LangVersion" ).LastOrDefault()?.Value;
+                    OutputType = _primaryFile.FindProperty( "OutputType" ).LastOrDefault()?.Value;
+                    IsPackable = (bool?)_primaryFile.FindProperty( "IsPackable" ).LastOrDefault();
 
                     UseMicrosoftBuildCentralPackageVersions = _primaryFile.Document.Root.Elements( "Sdk" )
                                                                                     .Attributes( "Name" )

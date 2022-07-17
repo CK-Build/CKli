@@ -7,7 +7,7 @@ namespace CK.Env.Tests
 {
     static class LocalTestHelper
     {
-        public static NormalizedPath XmlInputFolder => TestHelper.SolutionFolder.Combine( "Tests/CK.Env.XTyping.Tests/XmlInput" );
+        public static NormalizedPath XmlInputFolder => TestHelper.SolutionFolder.Combine( "CKStack/Tests/CK.Env.XTyping.Tests/XmlInput" );
 
         public static XElement LoadXmlInput( string name )
         {

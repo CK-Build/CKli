@@ -218,6 +218,30 @@ namespace CK.Env.MSBuildSln
         public bool IsDirty => _allFiles.Any( f => f._hasChanged );
 
         /// <summary>
+        /// Finds all &lt;PropertyGroup&gt; ... &lt;<paramref name="propertyName"/> ... &gt; elements
+        /// in <see cref="AllFiles"/>.
+        /// </summary>
+        /// <param name="propertyName">The property name to lookup.</param>
+        /// <returns>The list of elements.</returns>
+        public IList<XElement> FindProperty( string propertyName ) => _allFiles.Select( f => f.Document.Root )
+                                                                                .Elements( "PropertyGroup" )
+                                                                                .Elements()
+                                                                                .Where( x => x.Name.LocalName == propertyName )
+                                                                                .ToList();
+
+        /// <summary>
+        /// Finds all &lt;PropertyGroup&gt; property element with a name that matches a predicate
+        /// in <see cref="AllFiles"/>.
+        /// </summary>
+        /// <param name="elementNameFilter">The element name predicate.</param>
+        /// <returns>The list of elements.</returns>
+        public IList<XElement> FindProperty( Func<XName, bool> elementNameFilter ) => _allFiles.Select( f => f.Document.Root )
+                                                                                .Elements( "PropertyGroup" )
+                                                                                .Elements()
+                                                                                .Where( x => elementNameFilter( x.Name ) )
+                                                                                .ToList();
+
+        /// <summary>
         /// Saves this file if it has been modified as well as all modified imported files.
         /// </summary>
         /// <param name="m">The monitor.</param>

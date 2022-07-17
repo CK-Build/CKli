@@ -2,11 +2,6 @@
 
   <Import Project="..\CKStack\NotPackaged.props" />
 
-  <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
-    <IsPackable>false</IsPackable>
-  </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="15.1.0" />    
   </ItemGroup>
