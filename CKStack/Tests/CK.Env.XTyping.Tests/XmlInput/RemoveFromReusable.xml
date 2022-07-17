@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Root>
+    <Reusable Name="One">
+        <A Name="the A"/>
+        <B Name="the B"/>
+        <C Name="the C"/>
+        <B Name="the BBis"/>
+    </Reusable>
+
+    <X>
+        <Reuse Name="One">
+            <Remove Target="B[@Name='the B']" />
+        </Reuse>
+    </X>
+    
+</Root>

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="..\NotPackaged.props" />
+  
+  <ItemGroup>
+    <PackageReference Include="CSemVer" Version="11.0.0" />
+    <PackageReference Include="CK.Core" Version="15.1.0" />
+  </ItemGroup>
+
+</Project>

@@ -21,7 +21,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CKli.XObject\CKli.XObject.csproj" />
+    <ProjectReference Include="..\CKStack\CKli.XObject\CKli.XObject.csproj" />
     <PackageReference Include="ReadLine" Version="2.0.1" />
     <!-- Fix run: cannot find git2-8e0b172.dll-->
     <PackageReference Include="LibGit2Sharp" Version="0.26.2" />
