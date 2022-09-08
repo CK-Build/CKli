@@ -154,10 +154,10 @@ namespace CK.Env.NuGet
                 if( UseFullInformation )
                 {
                     var packageInfoAndMetadata = await _baseFeed.SafeCallAsync<PackageMetadataResource, (IPackageInstanceInfo? packageInstanceInfo, IPackageSearchMetadata metadata)>( m, ( sources, meta, logger ) => GetPackageInfoAsync( meta, logger, instance, default ) );
-                    var gitUrl = await _baseFeed.SafeCallAsync<FindPackageByIdResource, string>( m, ( sources, meta, logger ) => GetPackageRepositoryUrlAsync( meta, logger, instance, default ) );
 
                     if( packageInfoAndMetadata.packageInstanceInfo != null )
                     {
+                        var gitUrl = await _baseFeed.SafeCallAsync<FindPackageByIdResource, string>( m, ( sources, meta, logger ) => GetPackageRepositoryUrlAsync( meta, logger, instance, default ) );
                         var nugetMetadata = new NugetPackageMetadata { PackageSearchMetadata = (PackageSearchMetadata)packageInfoAndMetadata.metadata, GitUrl = gitUrl };
                         await _feedPackageInfoObtained.SafeRaiseAsync( m, this, new RawPackageInfoEventArgs( packageInfoAndMetadata.packageInstanceInfo, nugetMetadata ) );
                     }
@@ -346,7 +346,6 @@ namespace CK.Env.NuGet
 
                 using( MemoryStream packageStream = new MemoryStream() )
                 {
-
                     await meta.CopyNupkgToStreamAsync(
                         packageId,
                         version,
@@ -354,6 +353,8 @@ namespace CK.Env.NuGet
                         _baseFeed.Client.SourceCache,
                         logger,
                         token );
+
+                    packageStream.Position = 0;
 
                     using( var packageReader = new PackageArchiveReader( packageStream ) )
                     {
