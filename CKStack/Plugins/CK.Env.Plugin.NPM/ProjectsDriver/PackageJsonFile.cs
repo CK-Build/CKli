@@ -63,11 +63,11 @@ namespace CK.Env.Plugin
         /// computed during a build/packaging.
         /// Can be null: a non-published package does not require any version (nor <see cref="Name"/>).
         /// </summary>
-        public SVersion Version
+        public SVersion? Version
         {
             get
             {
-                var v = (string)Root["version"];
+                var v = (string?)Root["version"];
                 return v != null ? SVersion.TryParse( v ) : null;
             }
             set => SetNonNullProperty( Root, "version", value?.ToNormalizedString() );
