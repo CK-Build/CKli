@@ -16,12 +16,11 @@ namespace CK.Env.Plugin
         readonly SolutionSpec _solutionSpec;
         readonly CodeCakeBuilderKeyVaultFile _keyVaultFile;
 
-        public CKSetupCodeCakeBuilderFolder(
-            GitRepository f,
-            SolutionDriver driver,
-            CodeCakeBuilderKeyVaultFile keyVaultFile,
-            SolutionSpec solutionSpec,
-            NormalizedPath branchPath )
+        public CKSetupCodeCakeBuilderFolder( GitRepository f,
+                                             SolutionDriver driver,
+                                             CodeCakeBuilderKeyVaultFile keyVaultFile,
+                                             SolutionSpec solutionSpec,
+                                             NormalizedPath branchPath )
             : base( f, branchPath, "CodeCakeBuilder", "CKSetup/Res" )
         {
             _driver = driver;

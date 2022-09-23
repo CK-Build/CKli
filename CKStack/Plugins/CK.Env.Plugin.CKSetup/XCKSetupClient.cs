@@ -6,13 +6,12 @@ namespace CK.Env.CKSetup
 {
     public class XCKSetupClient : XTypedObject
     {
-        public XCKSetupClient(
-            HttpClient sharedHttpClient,
-            SecretKeyStore secretKeyStore,
-            ArtifactCenter artifact,
-            IEnvLocalFeedProvider localFeedProvider,
-            FileSystem fs,
-            Initializer initializer )
+        public XCKSetupClient( HttpClient sharedHttpClient,
+                               SecretKeyStore secretKeyStore,
+                               ArtifactCenter artifact,
+                               IEnvLocalFeedProvider localFeedProvider,
+                               FileSystem fs,
+                               Initializer initializer )
             : base( initializer )
         {
             Client = new CKSetupClient( secretKeyStore, sharedHttpClient );
