@@ -315,7 +315,7 @@ $@"<PropertyGroup>
             Debug.Assert( Document != null && Document.Root != null );
 
             var section = XCommentSection.FindOrCreate( Document.Root, "Analyzers" );
-            const string currentVersion = "17.3.44";
+            const string currentVersion = "17.3.48";
             const string packageName = "Microsoft.VisualStudio.Threading.Analyzers";
 
             section.StartComment = ": This analyzer provides very welcome guidelines about async and threading issues.";
