@@ -1,19 +1,20 @@
 using CK.Core;
 using CK.Env.NPM;
 using CK.SimpleKeyVault;
-
+using Microsoft.IO;
+using Newtonsoft.Json;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace CK.Env.Plugin
 {
-    /// <summary>
-    /// 
-    /// </summary>
     public class NPMRCFiles : GitBranchPluginBase, IDisposable, ICommandMethodsProvider
     {
         readonly SolutionSpec _solutionSpec;
@@ -43,9 +44,43 @@ namespace CK.Env.Plugin
 
             var projects = _driver.GetSimpleNPMProjects( m );
             if( projects == null ) return;
-            foreach( var f in projects.Select( p => p.FullPath.AppendPart( ".npmrc" ) ) )
+
+            foreach( var project in projects )
             {
-                DoApplySettings( m, f );
+
+                var npmrcPath = project.FullPath.AppendPart( ".npmrc" );
+                var yarnRcPath = project.FullPath.AppendPart( ".yarnrc.yml" );
+                (bool error, bool isUsingYarn) = IsUsingYarn( m, project, GitFolder );
+                if( error ) continue;
+                if( !isUsingYarn )
+                {
+                    DoApplySettings( m, npmrcPath, yarnRcPath );
+                }
+            }
+        }
+
+        public static (bool error, bool isUsingYarn) IsUsingYarn( IActivityMonitor m, NPMProject project, GitRepository gitFolder )
+        {
+            using( var grp = m.OpenInfo( $"Is the project {project.Project.Name} using yarn ?" ) )
+            {
+
+                var npmLockPath = project.FullPath.AppendPart( "package-lock.json" );
+                var npmLockFileInfo = gitFolder.FileSystem.GetFileInfo( npmLockPath );
+                var yarnLockPath = project.FullPath.AppendPart( "yarn.lock" );
+                var yarnLockFileInfo = gitFolder.FileSystem.GetFileInfo( yarnLockPath );
+                if( npmLockFileInfo.Exists && yarnLockFileInfo.Exists )
+                {
+                    m.Error( $"Both {npmLockPath.LastPart} and {yarnLockPath.LastPart} exists. Using 2 packages manager at the same times is not supported." );
+                    return (true, false);
+                }
+                if( !npmLockFileInfo.Exists && !yarnLockFileInfo.Exists )
+                {
+                    m.Error( $"Did not found a {npmLockPath.LastPart} or {yarnLockPath.LastPart}, cannot determine used package manage." );
+                    return (true, false);
+                }
+                bool useYarn = yarnLockFileInfo.Exists;
+                m.CloseGroup( useYarn );
+                return (false, useYarn);
             }
         }
 
@@ -73,7 +108,6 @@ namespace CK.Env.Plugin
                 FullKey = fullKey;
                 Value = value;
             }
-
             public Line( string commentLine )
             {
                 Debug.Assert( commentLine != null
@@ -103,12 +137,14 @@ namespace CK.Env.Plugin
             }
         }
 
-        void DoApplySettings( IActivityMonitor m, NormalizedPath f )
+        void DoApplySettings( IActivityMonitor m, NormalizedPath npmrc, NormalizedPath yarnRc )
         {
             var s = _solutionDriver.GetSolution( m, allowInvalidSolution: true );
             if( s == null ) return;
 
-            string text = GitFolder.FileSystem.GetFileInfo( f ).AsTextFileInfo( ignoreExtension: true )?.TextContent ?? String.Empty;
+            GitFolder.FileSystem.Delete( m, yarnRc );
+
+            string text = GitFolder.FileSystem.GetFileInfo( npmrc ).AsTextFileInfo( ignoreExtension: true )?.TextContent ?? String.Empty;
             List<Line> lines = _rLine.Matches( text )
                             .Cast<Match>()
                             .Select( l => l.Groups[2].Length > 0
@@ -167,7 +203,7 @@ namespace CK.Env.Plugin
             };
             EnsureLine( lines, "git-tag-version", "false" );
             lines.RemoveAll( line => line.Scope != null && _solutionSpec.RemoveNPMScopeNames.Contains( line.Scope ) );
-            GitFolder.FileSystem.CopyTo( m, lines.Select( l => l.ToString() ).Concatenate( "\r\n" ), f );
+            GitFolder.FileSystem.CopyTo( m, lines.Select( l => l.ToString() ).Concatenate( "\r\n" ), npmrc );
         }
 
         void EnsureLine( IList<Line> lines, string scope, string key, string value )

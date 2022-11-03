@@ -1,6 +1,5 @@
 using CK.Core;
-
-using SharpYaml.Model;
+using YamlDotNet.RepresentationModel;
 
 namespace CK.Env.Plugin
 {
@@ -19,7 +18,7 @@ namespace CK.Env.Plugin
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
-            YamlMapping firstMapping = GetFirstMapping( m, true );
+            var firstMapping = GetFirstMapping( m, true );
             if( firstMapping == null )
             {
                 m.Error( "First mapping should not return null !" );
@@ -36,21 +35,21 @@ namespace CK.Env.Plugin
                 return;
             }
             // We use GitLab when the repository is private.
-            YamlMapping codeCakeJob = FindOrCreateYamlElement( m, firstMapping, "codecakebuilder" );
-            SetSequence( codeCakeJob, "tags", new YamlValue( "windows" ) );
-            SetSequence( codeCakeJob, "script",
-                new YamlValue( "dotnet run --project CodeCakeBuilder -nointeraction" )
-            );
-            codeCakeJob["artifacts"] =
-                new YamlMapping()
+            var codeCakeJob = firstMapping.EnsureMap( "codecakebuilder" );
+            codeCakeJob
+                .SetSequence( "tags", "windows" )
+                .SetSequence( "script", "dotnet run --project CodeCakeBuilder -nointeraction" );
+            codeCakeJob.Children["artifacts"] =
+                new YamlMappingNode()
                 {
-                    ["paths"] = new YamlSequence()
-                    {
-                        new YamlValue(@"'**\Tests\**\TestResults\*.trx'"),
-                        new YamlValue(@"'**Tests\**\Logs\**\*'"),
+                    { "paths", new YamlSequenceNode()
+                        {
+                            @"'**\Tests\**\TestResults\*.trx'",
+                            @"'**Tests\**\Logs\**\*'",
+                        }
                     },
-                    ["when"] = new YamlValue( "always" ),
-                    ["expire_in"] = new YamlValue( "6 month" )
+                    { "when" , "always" },
+                    { "expire_in" , "6 month" }
                 };
             CreateOrUpdate( m, YamlMappingToString( m ) );
         }
