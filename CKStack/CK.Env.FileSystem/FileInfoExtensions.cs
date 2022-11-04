@@ -63,7 +63,7 @@ namespace CK.Env
                                 : new StreamReader( CheckFileInfoExists( @this ).CreateReadStream() ) )
             {
                 var deserialiser = new Deserializer();
-                return deserialiser.Deserialize<YamlMappingNode>( t );
+                return deserialiser.Deserialize<YamlMappingNode>( t ) ?? new YamlMappingNode();
             }
         }
 

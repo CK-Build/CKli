@@ -180,7 +180,7 @@ namespace CK.Env
         /// <returns>The file info.</returns>
         public IFileInfo GetFileInfo( NormalizedPath sub )
         {
-            sub = sub.ResolveDots().With( NormalizedPathRootKind.None );
+            sub = sub.ResolveDots();//.With( NormalizedPathRootKind.None );
             GitRepository g = GitFolders.FirstOrDefault( f => sub.StartsWith( f.SubPath, strict: false ) );
             return g != null
                         ? g.GetFileInfo( sub.RemovePrefix( g.SubPath ) ) ?? new NotFoundFileInfo( sub.Path )
@@ -448,7 +448,7 @@ namespace CK.Env
         internal IFileInfo PhysicalGetFileInfo( NormalizedPath sub )
         {
             Debug.Assert( sub == sub.ResolveDots() );
-            var path = Root.Combine( sub );
+            var path = sub.IsRooted ? sub : Root.Combine( sub );
             if( File.Exists( path ) ) return new FileSystemInfoWrapper( new FileInfo( path ) );
             if( Directory.Exists( path ) ) return new FileSystemInfoWrapper( new DirectoryInfo( path ) );
             return new PhysicalNotFoundFileInfo( path );

@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using YamlDotNet.RepresentationModel;
+using YamlDotNet.Serialization;
 
 namespace CK.Env.Plugin.NPM
 {
@@ -64,9 +65,8 @@ namespace CK.Env.Plugin.NPM
                 return;
             }
 
-            var registries = yamldoc.EnsureMap( "npmRegistries" );
-            registries.Children.Clear();
-
+            var scopes = yamldoc.EnsureMap( "npmScopes" );
+            scopes.Children.Clear();
             foreach( var p in s.ArtifactSources.OfType<INPMFeed>() )
             {
                 bool isFile = p.Url.StartsWith( "file:" );
@@ -75,36 +75,32 @@ namespace CK.Env.Plugin.NPM
                     m.Info( "Yarn does not support file repository. Skipping." );
                     continue;
                 }
-                if( p.Credentials == null )
-                {
-                    registries.Add( p.Name, new YamlMappingNode()
-                    {
-                        {"npmRegistryServer", p.Url }
-                    } );
-                    continue;
-                }
-                string password = p.Credentials.IsSecretKeyName
-                                        ? _secretStore.GetSecretKey( m, p.Credentials.PasswordOrSecretKeyName, false )!
-                                        : p.Credentials.PasswordOrSecretKeyName!;
-                if( password == null )
-                {
-                    if( p.Credentials.IsSecretKeyName )
-                        m.Warn( $"Secret '{p.Credentials.PasswordOrSecretKeyName}' is not known. Configuration for feed '{p.Name}' skipped." );
-                    else m.Warn( $"Empty feed password. Configuration for feed '{p.Name}' skipped." );
-                    continue;
-                }
-                if( p.Url.Contains( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) )
-                {
-                    password = Convert.ToBase64String( Encoding.UTF8.GetBytes( password ) );
-                }
-                registries.Add( p.Name, new YamlMappingNode()
-                {
-                    {"npmRegistryServer", p.Url },
-                    {"npmAlwaysAuth", "true" },
-                    {"npmAuthIdent", "placeholder:"+password }
-                } );
+                var scope = scopes.EnsureMap( p.Scope.Substring( 1 ) );
 
+                scope.Children["npmRegistryServer"] = p.Url;
+
+                if( p.Credentials != null )
+                {
+                    string password = p.Credentials.IsSecretKeyName
+                                       ? _secretStore.GetSecretKey( m, p.Credentials.PasswordOrSecretKeyName, false )!
+                                       : p.Credentials.PasswordOrSecretKeyName!;
+                    if( password == null )
+                    {
+                        if( p.Credentials.IsSecretKeyName )
+                            m.Warn( $"Secret '{p.Credentials.PasswordOrSecretKeyName}' is not known. Configuration for feed '{p.Name}' skipped." );
+                        else m.Warn( $"Empty feed password. Configuration for feed '{p.Name}' skipped." );
+                        continue;
+                    }
+                    if( p.Url.Contains( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) )
+                    {
+                        password = Convert.ToBase64String( Encoding.UTF8.GetBytes( password ) );
+                    }
+                    scope.Children["npmAlwaysAuth"] = "true";
+                    scope.Children["npmAuthIdent"] = "username:" + password;
+                }
             }
+
+            GitFolder.FileSystem.CopyTo( m, new Serializer().Serialize( yamldoc ), yamlInfo.PhysicalPath );
         }
 
 
