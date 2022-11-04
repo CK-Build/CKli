@@ -1,5 +1,5 @@
 using CK.Core;
-
+using System;
 using System.Linq;
 using System.Xml.Linq;
 
@@ -33,7 +33,7 @@ namespace CK.Env.Plugin
             if( projects == null ) return;
 
             var workspace = _driver.GetAngularWorkspaces( m );
-            if( (projects.Count + workspace.Count) == 0 )
+            if( (projects.Count + (workspace?.Count ?? 0)) == 0 )
             {
                 Delete( m );
             }
@@ -42,7 +42,10 @@ namespace CK.Env.Plugin
                 var root = new XElement( "NPMSolution",
                     projects.OrderBy( p => p.FullPath ).Select( p => p.ToXml() )
                     .Concat(
-                        workspace.OrderBy( p => p.FullPath ).Select( s => s.ToXml() ) )
+                        workspace?.OrderBy( p => p.FullPath ).Select( s => s.ToXml() )
+                            ?? Enumerable.Empty<XElement>()
+                        )
+                        
                     );
                 Document = new XDocument( root );
             }

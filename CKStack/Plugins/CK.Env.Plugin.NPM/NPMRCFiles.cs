@@ -1,17 +1,13 @@
 using CK.Core;
 using CK.Env.NPM;
 using CK.SimpleKeyVault;
-using Microsoft.IO;
-using Newtonsoft.Json;
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace CK.Env.Plugin
 {
@@ -50,7 +46,7 @@ namespace CK.Env.Plugin
 
                 var npmrcPath = project.FullPath.AppendPart( ".npmrc" );
                 var yarnRcPath = project.FullPath.AppendPart( ".yarnrc.yml" );
-                (bool error, bool isUsingYarn) = IsUsingYarn( m, project, GitFolder );
+                (bool error, bool isUsingYarn) = IsUsingYarn( m, project );
                 if( error ) continue;
                 if( !isUsingYarn )
                 {
@@ -59,30 +55,82 @@ namespace CK.Env.Plugin
             }
         }
 
-        public static (bool error, bool isUsingYarn) IsUsingYarn( IActivityMonitor m, NPMProject project, GitRepository gitFolder )
+        public static (bool error, bool useYarn) IsUsingYarn( IActivityMonitor m, NPMProject project )
         {
-            using( var grp = m.OpenInfo( $"Is the project {project.Project.Name} using yarn ?" ) )
+            using( m.OpenInfo( $"Is the project {(project.Project?.Name ?? project.FullPath)} using yarn ?" ) )
             {
-
-                var npmLockPath = project.FullPath.AppendPart( "package-lock.json" );
-                var npmLockFileInfo = gitFolder.FileSystem.GetFileInfo( npmLockPath );
-                var yarnLockPath = project.FullPath.AppendPart( "yarn.lock" );
-                var yarnLockFileInfo = gitFolder.FileSystem.GetFileInfo( yarnLockPath );
-                if( npmLockFileInfo.Exists && yarnLockFileInfo.Exists )
-                {
-                    m.Error( $"Both {npmLockPath.LastPart} and {yarnLockPath.LastPart} exists. Using 2 packages manager at the same times is not supported." );
-                    return (true, false);
-                }
-                if( !npmLockFileInfo.Exists && !yarnLockFileInfo.Exists )
-                {
-                    m.Error( $"Did not found a {npmLockPath.LastPart} or {yarnLockPath.LastPart}, cannot determine used package manage." );
-                    return (true, false);
-                }
-                bool useYarn = yarnLockFileInfo.Exists;
-                m.CloseGroup( useYarn );
-                return (false, useYarn);
+                var (error, useYarn) = IsUsingYarnInternal( m, project );
+                if( error ) m.CloseGroup( "Error." );
+                else m.CloseGroup( useYarn );
+                return (error, useYarn);
             }
         }
+        private static (bool error, bool useYarn) IsUsingYarnInternal( IActivityMonitor m, NPMProject project )
+        {
+            var fs = project.Driver.GitFolder.FileSystem;
+            var root = project.Driver.BranchPath;
+            var relative = new NormalizedPath( Path.GetRelativePath( root, project.FullPath ) );
+            do
+            {
+                var absPath = root.Combine( relative );
+                var (error, isFound, useYarn) = TryGetByLockFile( m, absPath, fs );
+                if( error ) return (error, false);
+
+                if( isFound ) return (false, useYarn);
+                var pm = GetByManifest( m, fs, absPath );
+                if( pm is not null )
+                {
+                    if( pm.StartsWith( "yarn" ) ) return (false, true);
+                    else if( pm.StartsWith( "npm" ) ) return (false, false);
+                    m.Error( $"Could not identify package manager defined in {absPath}." );
+                    return (true, false);
+                }
+                relative = relative.RemoveLastPart();
+            } while( relative.HasParts );
+
+            m.Error( $"Could not determine the package manager being used." );
+            return (true, false);
+        }
+
+        static string? GetByManifest( IActivityMonitor m, FileSystem fs, NormalizedPath currentPath )
+        {
+            var manifest = fs.GetFileInfo( currentPath.AppendPart( "package.json" ) );
+            if( !manifest.Exists )
+            {
+                m.Trace( $"No package.json in {currentPath}." );
+                return null;
+            }
+
+            return manifest.ReadAsJObject()["packageManager"]?.ToString();
+        }
+
+        static (bool error, bool isFound, bool useYarn) TryGetByLockFile( IActivityMonitor m, NormalizedPath currentPath, FileSystem fileSystem )
+        {
+            var npmLockPath = currentPath.AppendPart( "package-lock.json" );
+            var npmLockFileInfo = fileSystem.GetFileInfo( npmLockPath );
+            var yarnLockPath = currentPath.AppendPart( "yarn.lock" );
+            var yarnLockFileInfo = fileSystem.GetFileInfo( yarnLockPath );
+            if( npmLockFileInfo.Exists && yarnLockFileInfo.Exists )
+            {
+                m.Error( $"Both {npmLockPath.LastPart} and {yarnLockPath.LastPart} exists. Using 2 packages manager at the same times is not supported." );
+                return (true, false, false);
+            }
+
+            if( npmLockFileInfo.Exists )
+            {
+                m.Trace( $"Since {npmLockFileInfo.PhysicalPath} exists, we know this project use NPM." );
+            }
+            if( npmLockFileInfo.Exists )
+            {
+                m.Trace( $"Since {yarnLockFileInfo.PhysicalPath} exists, we know this project use Yarn." );
+            }
+            if( npmLockFileInfo.Exists || yarnLockFileInfo.Exists )
+            {
+                return (false, true, yarnLockFileInfo.Exists);
+            }
+            return (false, false, false);
+        }
+
 
         static readonly Regex _rLine = new Regex( "^(?<1>(;|#).*)\\r$|^(?<1>.+?]*)\\s*=\\s*(?<2>.+?)\\r?$",
                                                     RegexOptions.Multiline
@@ -92,11 +140,11 @@ namespace CK.Env.Plugin
 
         readonly struct Line
         {
-            public readonly string Scope;
+            public readonly string? Scope;
             public readonly string FullKey;
-            public readonly string Value;
+            public readonly string? Value;
 
-            public string VoidLine => Value == null ? FullKey : null;
+            public string? VoidLine => Value == null ? FullKey : null;
 
             public Line( string fullKey, string value )
             {
@@ -133,6 +181,7 @@ namespace CK.Env.Plugin
                             .Select( s => s.Credentials.PasswordOrSecretKeyName );
             foreach( var c in creds )
             {
+                Throw.CheckData( c != null );
                 _secretStore.DeclareSecretKey( c, current => current?.Description ?? "Needed to configure .npmrc file." );
             }
         }

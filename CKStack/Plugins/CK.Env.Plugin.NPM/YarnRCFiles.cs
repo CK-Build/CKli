@@ -41,7 +41,7 @@ namespace CK.Env.Plugin.NPM
 
                 var npmrcPath = project.FullPath.AppendPart( ".npmrc" );
                 var yarnRcPath = project.FullPath.AppendPart( ".yarnrc.yml" );
-                (bool error, bool isUsingYarn) = NPMRCFiles.IsUsingYarn( m, project, GitFolder );
+                (bool error, bool isUsingYarn) = NPMRCFiles.IsUsingYarn( m, project );
                 if( error ) continue;
                 if( isUsingYarn )
                 {
@@ -55,7 +55,8 @@ namespace CK.Env.Plugin.NPM
             var s = _solutionDriver.GetSolution( m, allowInvalidSolution: true );
             if( s is null ) return;
             GitFolder.FileSystem.Delete( m, npmrcPath );
-            var yamldoc = GitFolder.FileSystem.GetFileInfo( yarnRcPath ).ReadAsYaml();
+            var yamlInfo = GitFolder.FileSystem.GetFileInfo( yarnRcPath );
+            var yamldoc = yamlInfo.Exists ? yamlInfo.ReadAsYaml() : new YamlMappingNode();
 
             if( !s.ArtifactSources.Any() )
             {
@@ -74,6 +75,14 @@ namespace CK.Env.Plugin.NPM
                     m.Info( "Yarn does not support file repository. Skipping." );
                     continue;
                 }
+                if( p.Credentials == null )
+                {
+                    registries.Add( p.Name, new YamlMappingNode()
+                    {
+                        {"npmRegistryServer", p.Url }
+                    } );
+                    continue;
+                }
                 string password = p.Credentials.IsSecretKeyName
                                         ? _secretStore.GetSecretKey( m, p.Credentials.PasswordOrSecretKeyName, false )!
                                         : p.Credentials.PasswordOrSecretKeyName!;
@@ -88,13 +97,12 @@ namespace CK.Env.Plugin.NPM
                 {
                     password = Convert.ToBase64String( Encoding.UTF8.GetBytes( password ) );
                 }
-                var val = new YamlMappingNode()
+                registries.Add( p.Name, new YamlMappingNode()
                 {
                     {"npmRegistryServer", p.Url },
                     {"npmAlwaysAuth", "true" },
                     {"npmAuthIdent", "placeholder:"+password }
-                };
-                registries.Add( p.Name, val );
+                } );
 
             }
         }

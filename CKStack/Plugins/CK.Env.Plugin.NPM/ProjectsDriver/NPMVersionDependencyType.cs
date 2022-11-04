@@ -42,6 +42,15 @@ namespace CK.Env.Plugin
         Tag,
 
         /// <summary>
+        /// Yarn specific identifier, kind of project reference by project package name. Project must be in a Yarn Workspace.
+        /// </summary>
+        Workspace,
+        /// <summary>
+        /// Yarn specific identifier, kind of project reference by path.
+        /// </summary>
+        Portal,
+
+        /// <summary>
         /// No version (empty string) or '*'.
         /// </summary>
         AllVersions,

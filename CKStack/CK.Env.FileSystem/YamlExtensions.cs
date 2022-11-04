@@ -29,7 +29,7 @@ namespace CK.Env
             }
             if( m.Children.TryGetValue( key, out var val ) )
             {
-                m.Children.Remove( val );
+                m.Children.Remove( key );
             }
             m.Add( key, seq );
             return m;

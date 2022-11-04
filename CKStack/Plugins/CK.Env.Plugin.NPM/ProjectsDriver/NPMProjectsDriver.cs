@@ -17,7 +17,9 @@ namespace CK.Env.Plugin
         NPMProject[] _npmProjects;
         AngularWorkspace[] _angularWorkspaces;
 
-        IEnumerable<NPMProject> AllNpmProjects => _npmProjects.Concat( _angularWorkspaces.SelectMany( p => p.Projects ) );
+        IEnumerable<NPMProject> AllNpmProjects => _npmProjects
+            .Concat( _angularWorkspaces?.SelectMany( p => p.Projects ) ?? Array.Empty<NPMProject>() )
+            .Where( s => s != null );
 
         public NPMProjectsDriver( GitRepository f, NormalizedPath branchPath, SolutionDriver driver, SolutionSpec spec )
             : base( f, branchPath )

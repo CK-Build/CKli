@@ -172,6 +172,7 @@ namespace CK.SimpleKeyVault
                                                bool isRequired = false,
                                                string? sourceProviderName = null )
         {
+            Throw.CheckNotNullArgument( name );
             bool redeclaration = true;
             SecretKeyInfo? info;
             using( AcquireLock() )
