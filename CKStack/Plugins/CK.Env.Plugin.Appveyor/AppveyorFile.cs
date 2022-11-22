@@ -118,7 +118,8 @@ namespace CK.Env.Plugin
             {
                 CreateKeyValue( "ps", "'Get-ChildItem -Recurse *.log | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''Log files'' }'" ),
                 CreateKeyValue( "ps", "'Get-ChildItem -Recurse **\\Tests\\**\\TestResult*.xml | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''NUnit tests result files'' }'" ),
-                CreateKeyValue( "ps", "'Get-ChildItem -Recurse **Tests\\**\\Logs\\**\\* | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''Log files'' }'" )
+                CreateKeyValue( "ps", "'Get-ChildItem -Recurse **\\Tests\\**\\*.trx | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''NUnit tests result files'' }'" ),
+                CreateKeyValue( "ps", "'Get-ChildItem -Recurse *.ckmon | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''Log files'' }'" )
             };
             firstMapping.Children["on_finish"] = onFinish;
             EnsureDefaultBranches( firstMapping );
