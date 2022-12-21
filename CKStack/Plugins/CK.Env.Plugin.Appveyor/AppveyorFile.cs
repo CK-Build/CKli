@@ -97,7 +97,7 @@ namespace CK.Env.Plugin
                 firstMapping.Children["services"] = ("mssql" + _solutionSpec.SqlServer.ToLowerInvariant());
             }
 
-            if( firstMapping.Children["install"] is YamlSequenceNode inst )
+            if( firstMapping.Children.TryGetValue("install", out var node) && node is YamlSequenceNode inst )
             {
                 if( inst.Children.RemoveWhereAndReturnsRemoved( e => e is YamlMappingNode m
                                                             && m["cmd"] is YamlScalarNode v

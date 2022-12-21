@@ -48,10 +48,8 @@ namespace CK.Env
 
         protected YamlMappingNode CreateKeyValue( string key, string value )
         {
-            var kv = new YamlMappingNode
-            {
-                { key, new YamlMappingNode( value ) }
-            };
+            var kv = new YamlMappingNode();
+            kv.Add( key, value );
             return kv;
         }
 
