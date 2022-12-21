@@ -11,12 +11,11 @@ namespace CK.Env.Plugin
         readonly SolutionDriver _solutionDriver;
         readonly IEnvLocalFeedProvider _localFeedProvider;
 
-        public CKSetupStoreRedirectionFile(
-            GitRepository f,
-            SolutionDriver solutionDriver,
-            SolutionSpec settings,
-            IEnvLocalFeedProvider localFeedProvider,
-            NormalizedPath branchPath )
+        public CKSetupStoreRedirectionFile( GitRepository f,
+                                            SolutionDriver solutionDriver,
+                                            SolutionSpec settings,
+                                            IEnvLocalFeedProvider localFeedProvider,
+                                            NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "CKSetupStore.txt" ) )
         {
             _solutionSpec = settings;

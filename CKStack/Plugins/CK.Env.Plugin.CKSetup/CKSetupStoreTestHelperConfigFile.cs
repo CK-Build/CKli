@@ -15,12 +15,11 @@ namespace CK.Env.Plugin
         readonly SolutionDriver _solutionDriver;
         readonly IEnvLocalFeedProvider _localFeedProvider;
 
-        public CKSetupStoreTestHelperConfigFile(
-            GitRepository f,
-            SolutionDriver solutionDriver,
-            SolutionSpec settings,
-            IEnvLocalFeedProvider localFeedProvider,
-            NormalizedPath branchPath )
+        public CKSetupStoreTestHelperConfigFile( GitRepository f,
+                                                 SolutionDriver solutionDriver,
+                                                 SolutionSpec settings,
+                                                 IEnvLocalFeedProvider localFeedProvider,
+                                                 NormalizedPath branchPath )
             : base( f, branchPath, branchPath.AppendPart( "RemoteStore.TestHelper.config" ) )
         {
             _solutionSpec = settings;

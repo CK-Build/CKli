@@ -10,9 +10,8 @@ namespace CK.Env.DependencyModel
     /// </summary>
     public class BuildProjectsInfo
     {
-        internal BuildProjectsInfo(
-            IDependencySorterResult sortResult,
-            IReadOnlyList<ZeroBuildProjectInfo> zeroBuildProjects )
+        internal BuildProjectsInfo( IDependencySorterResult sortResult,
+                                    IReadOnlyList<ZeroBuildProjectInfo> zeroBuildProjects )
         {
             Debug.Assert( sortResult != null && sortResult.IsComplete == (zeroBuildProjects != null) );
             RawBuildProjectsInfoSorterResult = sortResult;
@@ -34,6 +33,6 @@ namespace CK.Env.DependencyModel
         /// Gets the ordered list of <see cref="ZeroBuildProjectInfo"/>.
         /// Null if <see cref="HasError"/> is true.
         /// </summary>
-        public IReadOnlyList<ZeroBuildProjectInfo> ZeroBuildProjects { get; }
+        public IReadOnlyList<ZeroBuildProjectInfo>? ZeroBuildProjects { get; }
     }
 }

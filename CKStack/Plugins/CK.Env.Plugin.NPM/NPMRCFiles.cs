@@ -1,19 +1,16 @@
 using CK.Core;
 using CK.Env.NPM;
 using CK.SimpleKeyVault;
-
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
 namespace CK.Env.Plugin
 {
-    /// <summary>
-    /// 
-    /// </summary>
     public class NPMRCFiles : GitBranchPluginBase, IDisposable, ICommandMethodsProvider
     {
         readonly SolutionSpec _solutionSpec;
@@ -43,11 +40,97 @@ namespace CK.Env.Plugin
 
             var projects = _driver.GetSimpleNPMProjects( m );
             if( projects == null ) return;
-            foreach( var f in projects.Select( p => p.FullPath.AppendPart( ".npmrc" ) ) )
+
+            foreach( var project in projects )
             {
-                DoApplySettings( m, f );
+
+                var npmrcPath = project.FullPath.AppendPart( ".npmrc" );
+                var yarnRcPath = project.FullPath.AppendPart( ".yarnrc.yml" );
+                (bool error, bool isUsingYarn) = IsUsingYarn( m, project );
+                if( error ) continue;
+                if( !isUsingYarn )
+                {
+                    DoApplySettings( m, npmrcPath, yarnRcPath );
+                }
             }
         }
+
+        public static (bool error, bool useYarn) IsUsingYarn( IActivityMonitor m, NPMProject project )
+        {
+            using( m.OpenInfo( $"Is the project {(project.Project?.Name ?? project.FullPath)} using yarn ?" ) )
+            {
+                var (error, useYarn) = IsUsingYarnInternal( m, project );
+                if( error ) m.CloseGroup( "Error." );
+                else m.CloseGroup( useYarn );
+                return (error, useYarn);
+            }
+        }
+        private static (bool error, bool useYarn) IsUsingYarnInternal( IActivityMonitor m, NPMProject project )
+        {
+            var fs = project.Driver.GitFolder.FileSystem;
+            var root = project.Driver.BranchPath;
+            var relative = new NormalizedPath( Path.GetRelativePath( root, project.FullPath ) );
+            do
+            {
+                var absPath = root.Combine( relative );
+                var (error, isFound, useYarn) = TryGetByLockFile( m, absPath, fs );
+                if( error ) return (error, false);
+
+                if( isFound ) return (false, useYarn);
+                var pm = GetByManifest( m, fs, absPath );
+                if( pm is not null )
+                {
+                    if( pm.StartsWith( "yarn" ) ) return (false, true);
+                    else if( pm.StartsWith( "npm" ) ) return (false, false);
+                    m.Error( $"Could not identify package manager defined in {absPath}." );
+                    return (true, false);
+                }
+                relative = relative.RemoveLastPart();
+            } while( relative.HasParts );
+
+            m.Error( $"Could not determine the package manager being used." );
+            return (true, false);
+        }
+
+        static string? GetByManifest( IActivityMonitor m, FileSystem fs, NormalizedPath currentPath )
+        {
+            var manifest = fs.GetFileInfo( currentPath.AppendPart( "package.json" ) );
+            if( !manifest.Exists )
+            {
+                m.Trace( $"No package.json in {currentPath}." );
+                return null;
+            }
+
+            return manifest.ReadAsJObject()["packageManager"]?.ToString();
+        }
+
+        static (bool error, bool isFound, bool useYarn) TryGetByLockFile( IActivityMonitor m, NormalizedPath currentPath, FileSystem fileSystem )
+        {
+            var npmLockPath = currentPath.AppendPart( "package-lock.json" );
+            var npmLockFileInfo = fileSystem.GetFileInfo( npmLockPath );
+            var yarnLockPath = currentPath.AppendPart( "yarn.lock" );
+            var yarnLockFileInfo = fileSystem.GetFileInfo( yarnLockPath );
+            if( npmLockFileInfo.Exists && yarnLockFileInfo.Exists )
+            {
+                m.Error( $"Both {npmLockPath.LastPart} and {yarnLockPath.LastPart} exists. Using 2 packages manager at the same times is not supported." );
+                return (true, false, false);
+            }
+
+            if( npmLockFileInfo.Exists )
+            {
+                m.Trace( $"Since {npmLockFileInfo.PhysicalPath} exists, we know this project use NPM." );
+            }
+            if( npmLockFileInfo.Exists )
+            {
+                m.Trace( $"Since {yarnLockFileInfo.PhysicalPath} exists, we know this project use Yarn." );
+            }
+            if( npmLockFileInfo.Exists || yarnLockFileInfo.Exists )
+            {
+                return (false, true, yarnLockFileInfo.Exists);
+            }
+            return (false, false, false);
+        }
+
 
         static readonly Regex _rLine = new Regex( "^(?<1>(;|#).*)\\r$|^(?<1>.+?]*)\\s*=\\s*(?<2>.+?)\\r?$",
                                                     RegexOptions.Multiline
@@ -57,11 +140,11 @@ namespace CK.Env.Plugin
 
         readonly struct Line
         {
-            public readonly string Scope;
+            public readonly string? Scope;
             public readonly string FullKey;
-            public readonly string Value;
+            public readonly string? Value;
 
-            public string VoidLine => Value == null ? FullKey : null;
+            public string? VoidLine => Value == null ? FullKey : null;
 
             public Line( string fullKey, string value )
             {
@@ -73,7 +156,6 @@ namespace CK.Env.Plugin
                 FullKey = fullKey;
                 Value = value;
             }
-
             public Line( string commentLine )
             {
                 Debug.Assert( commentLine != null
@@ -89,26 +171,29 @@ namespace CK.Env.Plugin
         }
 
 
-        void OnSolutionConfiguration( object sender, SolutionConfigurationEventArgs e )
+        void OnSolutionConfiguration( object? sender, SolutionConfigurationEventArgs e )
         {
             // These values are not build secrets. They are required by ApplySettings to configure
             // the NuGet.config file: once done, restore can be made and having these keys available
-            // as environement variables will not help.
+            // as environment variables will not help.
             var creds = e.Solution.ArtifactSources.OfType<INPMFeed>()
                             .Where( s => s.Credentials != null && s.Credentials.IsSecretKeyName )
                             .Select( s => s.Credentials.PasswordOrSecretKeyName );
             foreach( var c in creds )
             {
+                Throw.CheckData( c != null );
                 _secretStore.DeclareSecretKey( c, current => current?.Description ?? "Needed to configure .npmrc file." );
             }
         }
 
-        void DoApplySettings( IActivityMonitor m, NormalizedPath f )
+        void DoApplySettings( IActivityMonitor m, NormalizedPath npmrc, NormalizedPath yarnRc )
         {
             var s = _solutionDriver.GetSolution( m, allowInvalidSolution: true );
             if( s == null ) return;
 
-            string text = GitFolder.FileSystem.GetFileInfo( f ).AsTextFileInfo( ignoreExtension: true )?.TextContent ?? String.Empty;
+            GitFolder.FileSystem.Delete( m, yarnRc );
+
+            string text = GitFolder.FileSystem.GetFileInfo( npmrc ).AsTextFileInfo( ignoreExtension: true )?.TextContent ?? String.Empty;
             List<Line> lines = _rLine.Matches( text )
                             .Cast<Match>()
                             .Select( l => l.Groups[2].Length > 0
@@ -167,7 +252,7 @@ namespace CK.Env.Plugin
             };
             EnsureLine( lines, "git-tag-version", "false" );
             lines.RemoveAll( line => line.Scope != null && _solutionSpec.RemoveNPMScopeNames.Contains( line.Scope ) );
-            GitFolder.FileSystem.CopyTo( m, lines.Select( l => l.ToString() ).Concatenate( "\r\n" ), f );
+            GitFolder.FileSystem.CopyTo( m, lines.Select( l => l.ToString() ).Concatenate( "\r\n" ), npmrc );
         }
 
         void EnsureLine( IList<Line> lines, string scope, string key, string value )

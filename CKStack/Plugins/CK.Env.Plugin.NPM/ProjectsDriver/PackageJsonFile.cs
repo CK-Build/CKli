@@ -29,9 +29,9 @@ namespace CK.Env.Plugin
         /// Gets or sets the name.
         /// Can be null: a non-published package does not require a name (nor a <see cref="Version"/>).
         /// </summary>
-        public string Name
+        public string? Name
         {
-            get => (string)Root["name"];
+            get => (string?)Root?["name"];
             set => SetNonNullProperty( Root, "name", value );
         }
 
@@ -47,7 +47,7 @@ namespace CK.Env.Plugin
         /// </summary>
         public bool IsPrivate
         {
-            get => (bool?)Root["private"] ?? false;
+            get => (bool?)Root?["private"] ?? false;
             set => Root["private"] = value;
         }
 
@@ -63,11 +63,11 @@ namespace CK.Env.Plugin
         /// computed during a build/packaging.
         /// Can be null: a non-published package does not require any version (nor <see cref="Name"/>).
         /// </summary>
-        public SVersion Version
+        public SVersion? Version
         {
             get
             {
-                var v = (string)Root["version"];
+                var v = (string?)Root["version"];
                 return v != null ? SVersion.TryParse( v ) : null;
             }
             set => SetNonNullProperty( Root, "version", value?.ToNormalizedString() );
@@ -173,7 +173,7 @@ namespace CK.Env.Plugin
             return NPMProjectStatus.Valid;
         }
 
-        (SVersion, NPMVersionDependencyType) GetVersionType( IActivityMonitor m, string depNameKind, string name, string value )
+        (SVersion?, NPMVersionDependencyType) GetVersionType( IActivityMonitor m, string depNameKind, string name, string value )
         {
             if( value.StartsWith( "file:" ) )
             {
@@ -197,6 +197,14 @@ namespace CK.Env.Plugin
                 }
                 m.Error( $"Dependency '{value}' for {depNameKind}/{name} must be relative and starts with 'file:..'." );
                 return (null, NPMVersionDependencyType.None);
+            }
+            if( value.StartsWith( "workspace:" ) )
+            {
+                return (null, NPMVersionDependencyType.Workspace);
+            }
+            if( value.StartsWith( "portal:" ) )
+            {
+                return (null, NPMVersionDependencyType.Portal);
             }
             else if( value.IndexOf( "://" ) > 0 )
             {

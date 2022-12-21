@@ -10,13 +10,12 @@ namespace CKli
     {
         readonly NPMClient _npmClient;
 
-        public XNPMClient(
-            HttpClient sharedHttpClient,
-            SecretKeyStore secretKeyStore,
-            ArtifactCenter artifact,
-            IEnvLocalFeedProvider localFeedProvider,
-            FileSystem fs,
-            Initializer initializer )
+        public XNPMClient( HttpClient sharedHttpClient,
+                           SecretKeyStore secretKeyStore,
+                           ArtifactCenter artifact,
+                           IEnvLocalFeedProvider localFeedProvider,
+                           FileSystem fs,
+                           Initializer initializer )
             : base( initializer )
         {
             _npmClient = new NPMClient( sharedHttpClient, secretKeyStore );

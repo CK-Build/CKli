@@ -1,8 +1,7 @@
 {
   "profiles": {
     "CKli": {
-      "commandName": "Project",
-      "workingDirectory": "C:\\Dev\\CK"
+      "commandName": "Project"
     }
   }
 }

@@ -62,9 +62,9 @@ namespace CK.Env.Plugin
         /// </summary>
         public PackageJsonFile PackageJson { get; }
 
-        NPMProjectStatus Error( IActivityMonitor m, NPMProjectStatus s, string msg = null )
+        NPMProjectStatus Error( IActivityMonitor m, NPMProjectStatus s, string? msg = null )
         {
-            m.Error( msg ?? $"Error: {s}" );
+            m.Error( msg ?? $"NPM Project Error: {s} ('{FullPath}')." );
             return s;
         }
 
@@ -135,7 +135,10 @@ namespace CK.Env.Plugin
             var toRemove = new HashSet<Artifact>( _project.PackageReferences.Select( r => r.Target.Artifact ) );
             foreach( var dep in PackageJson.Dependencies )
             {
-                if( dep.MinVersion == null && dep.Type != NPMVersionDependencyType.LocalPath )
+                if( dep.MinVersion == null
+                    && dep.Type != NPMVersionDependencyType.LocalPath
+                    && dep.Type != NPMVersionDependencyType.Portal
+                    && dep.Type != NPMVersionDependencyType.Workspace )
                 {
                     m.Warn( $"Unable to handle NPM {dep.Kind.ToPackageJsonKey()} '{dep.RawDep}' in {PackageJson.FilePath}. Only simple minimal version, or 'file:' relative paths, or 'file' absolute path pointing to a tarball are handled." );
                 }

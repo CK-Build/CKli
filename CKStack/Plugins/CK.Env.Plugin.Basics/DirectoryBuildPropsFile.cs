@@ -78,7 +78,11 @@ namespace CK.Env.Plugin
             HandleAnalyzers( monitor, useCentralPackage );
             HandleGenerateDocumentation( monitor );
             HandleSourceLink( monitor, useCentralPackage );
-            HandleSourceLinkDebuggingWorkaround( monitor );
+            // SourceLink doesn't need this workaround any more. Issue https://github.com/dotnet/sdk/issues/1458#issuecomment-695119194
+            // is closed.
+            XCommentSection.Find( Document.Root, "SourceLinkDebuggingWorkaround" )?.Remove();
+            // This is replaced by this section:
+            HandleCopyXmlDocFiles( monitor );
             HandleSPDXLicense( monitor );
 
             Document.Root.Elements( "PropertyGroup" )
@@ -230,24 +234,34 @@ $@"<PropertyGroup>
             }
         }
 
-        void HandleSourceLinkDebuggingWorkaround( IActivityMonitor m )
+        void HandleCopyXmlDocFiles( IActivityMonitor m )
         {
             Debug.Assert( Document != null && Document.Root != null );
 
-            const string sectionName = "SourceLinkDebuggingWorkaround";
+            const string sectionName = "_CopyXmlDocFiles";
             var section = XCommentSection.FindOrCreate( Document.Root, sectionName );
-            section.StartComment = ": See  https://github.com/dotnet/sdk/issues/1458#issuecomment-695119194 ";
+            section.StartComment = @":
+    It's a mess... See  https://github.com/dotnet/sdk/issues/1458#issuecomment-695119194
+    This solution works and filters out System and Microsoft packages.
+    Not sure the .Net 7 solution will enable this: see https://github.com/dotnet/sdk/issues/1458#issuecomment-1265262224";
             section.SetContent(
                 XElement.Parse( @"
-  <Target Name=""_ResolveCopyLocalNuGetPackagePdbsAndXml"" AfterTargets=""ResolveReferences"">
+  <Target Name=""_CopyXmlDocFiles"" AfterTargets=""ResolveReferences"" Condition="" '$(MSBuildProjectName)' != 'CodeCakeBuilder' "" >
     <ItemGroup>
-      <ReferenceCopyLocalPaths
-        Include=""@(ReferenceCopyLocalPaths->'%(RootDir)%(Directory)%(Filename).pdb')""
-        Condition=""'%(ReferenceCopyLocalPaths.NuGetPackageId)' != '' and Exists('%(RootDir)%(Directory)%(Filename).pdb')"" />
-      <ReferenceCopyLocalPaths
-        Include=""@(ReferenceCopyLocalPaths->'%(RootDir)%(Directory)%(Filename).xml')""
-        Condition=""'%(ReferenceCopyLocalPaths.NuGetPackageId)' != '' and Exists('%(RootDir)%(Directory)%(Filename).xml')"" />
+      <XmlDocFiles Include=""@(ReferencePath->'%(RootDir)%(Directory)%(Filename).xml')""
+                   Condition=""!( $([System.String]::new('%(FileName)').StartsWith('System.'))
+                                 Or
+                                 $([System.String]::new('%(FileName)').StartsWith('Microsoft.'))
+                                 Or
+                                 $([System.String]::new('%(FileName)').StartsWith('CommunityToolkit.'))
+                                 Or
+                                 '%(FileName)' == 'netstandard'
+                               )"" />
     </ItemGroup>
+    <Copy SourceFiles=""@(XmlDocFiles)""
+          Condition=""Exists('%(FullPath)')""
+          DestinationFolder=""$(OutDir)""
+          SkipUnchangedFiles=""true"" />
   </Target>" ) );
         }
 
@@ -301,7 +315,7 @@ $@"<PropertyGroup>
             Debug.Assert( Document != null && Document.Root != null );
 
             var section = XCommentSection.FindOrCreate( Document.Root, "Analyzers" );
-            const string currentVersion = "17.2.32";
+            const string currentVersion = "17.3.48";
             const string packageName = "Microsoft.VisualStudio.Threading.Analyzers";
 
             section.StartComment = ": This analyzer provides very welcome guidelines about async and threading issues.";

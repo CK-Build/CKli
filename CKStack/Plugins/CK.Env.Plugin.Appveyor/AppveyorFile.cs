@@ -1,9 +1,8 @@
 using CK.Core;
 using CK.Env.MSBuildSln;
 using CK.SimpleKeyVault;
-
-using SharpYaml.Model;
 using System.Linq;
+using YamlDotNet.RepresentationModel;
 
 namespace CK.Env.Plugin
 {
@@ -37,7 +36,7 @@ namespace CK.Env.Plugin
         public void ApplySettings( IActivityMonitor monitor )
         {
             if( !this.CheckCurrentBranch( monitor ) ) return;
-            YamlMapping firstMapping = GetFirstMapping( monitor, true );
+            YamlMappingNode firstMapping = GetFirstMapping( monitor, true );
             if( firstMapping == null ) return;
             var solution = _driver.GetSolution( monitor, allowInvalidSolution: true );
             if( solution == null ) return;
@@ -57,7 +56,7 @@ namespace CK.Env.Plugin
             solution.Tag<SolutionFile>()?.EnsureSolutionItemFile( monitor, FilePath.RemovePrefix( BranchPath ) );
 
             // We currently always use AppVeyor when the repository is public.
-            YamlMapping env = FindOrCreateYamlElement( monitor, firstMapping, "environment" );
+            YamlMappingNode env = firstMapping.EnsureMap( "environment" );
             if( env == null ) return;
 
             var passphrase = _keyStore.GetSecretKey( monitor, SolutionDriver.CODECAKEBUILDER_SECRET_KEY, false );
@@ -66,7 +65,7 @@ namespace CK.Env.Plugin
                 var central = KeyVault.DecryptValues( _sharedState.CICDKeyVault, passphrase );
                 if( central.TryGetValue( APPVEYOR_ENCRYPTED_CODECAKEBUILDER_SECRET_KEY, out var appveyorSecure ) )
                 {
-                    env[SolutionDriver.CODECAKEBUILDER_SECRET_KEY] = CreateKeyValue( "secure", appveyorSecure );
+                    env.Children[SolutionDriver.CODECAKEBUILDER_SECRET_KEY] = CreateKeyValue( "secure", appveyorSecure );
                 }
                 else
                 {
@@ -88,51 +87,54 @@ namespace CK.Env.Plugin
             env.Remove( "VSS_NUGET_EXTERNAL_FEED_ENDPOINTS" );
             if( _solutionSpec.SqlServer != null )
             {
-                env["SqlServer/MasterConnectionString"] = new YamlValue( $"Server=(local)\\SQL{_solutionSpec.SqlServer.ToUpperInvariant()};Database=master;User ID=sa;Password=Password12!" );
+                env.Children["SqlServer/MasterConnectionString"] = $"Server=(local)\\SQL{_solutionSpec.SqlServer.ToUpperInvariant()};Database=master;User ID=sa;Password=Password12!";
             }
             //
-            firstMapping.Remove( new YamlValue( "init" ) );
+            firstMapping.Remove( "init" );
             firstMapping.Remove( "artifacts" );
             if( _solutionSpec.SqlServer != null )
             {
-                firstMapping["services"] = new YamlValue( "mssql" + _solutionSpec.SqlServer.ToLowerInvariant() );
+                firstMapping.Children["services"] = ("mssql" + _solutionSpec.SqlServer.ToLowerInvariant());
             }
 
-            if( firstMapping["install"] is YamlSequence inst )
+            if( firstMapping.Children["install"] is YamlSequenceNode inst )
             {
-                if( inst.RemoveWhereAndReturnsRemoved( e => e is YamlMapping m
-                                                            && m["cmd"] is YamlValue v
-                                                            && v.Value.StartsWith( "npm install -g npm@" ) ).Count() > 0 )
+                if( inst.Children.RemoveWhereAndReturnsRemoved( e => e is YamlMappingNode m
+                                                            && m["cmd"] is YamlScalarNode v
+                                                            && (v.Value?.StartsWith( "npm install -g npm@" ) ?? false) ).Any() )
                 {
                     monitor.Info( "Removed npm install with a specific version (using the Appveyor's installed one)." );
                 }
-                if( inst.Count == 0 )
+                if( inst.Children.Count == 0 )
                 {
                     firstMapping.Remove( "install" );
                 }
             }
 
-            firstMapping["version"] = new YamlValue( "build{build}" );
-            firstMapping["image"] = new YamlValue( "Visual Studio 2022" );
-            firstMapping["clone_folder"] = new YamlValue( "C:\\CKli-World\\" + GitFolder.SubPath.Path.Replace( '/', '\\' ) );
-            var onFinish = new YamlSequence();
-            onFinish.Add( CreateKeyValue( "ps", "'Get-ChildItem -Recurse *.log | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''Log files'' }'" ) );
-            onFinish.Add( CreateKeyValue( "ps", "'Get-ChildItem -Recurse **\\Tests\\**\\TestResult*.xml | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''NUnit tests result files'' }'" ) );
-            onFinish.Add( CreateKeyValue( "ps", "'Get-ChildItem -Recurse **Tests\\**\\Logs\\**\\* | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''Log files'' }'" ) );
-            firstMapping["on_finish"] = onFinish;
+            firstMapping.Children["version"] = "build{build}";
+            firstMapping.Children["image"] = "Visual Studio 2022";
+            firstMapping.Children["clone_folder"] = "C:\\CKli-World\\" + GitFolder.SubPath.Path.Replace( '/', '\\' );
+            var onFinish = new YamlSequenceNode
+            {
+                CreateKeyValue( "ps", "'Get-ChildItem -Recurse *.log | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''Log files'' }'" ),
+                CreateKeyValue( "ps", "'Get-ChildItem -Recurse **\\Tests\\**\\TestResult*.xml | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''NUnit tests result files'' }'" ),
+                CreateKeyValue( "ps", "'Get-ChildItem -Recurse **\\Tests\\**\\*.trx | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''NUnit tests result files'' }'" ),
+                CreateKeyValue( "ps", "'Get-ChildItem -Recurse *.ckmon | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''Log files'' }'" )
+            };
+            firstMapping.Children["on_finish"] = onFinish;
             EnsureDefaultBranches( firstMapping );
-            SetSequence( firstMapping, "build_script", new YamlValue( "dotnet run --project CodeCakeBuilder -nointeraction" ) );
-            firstMapping["test"] = new YamlValue( "off" );
+            firstMapping.SetSequence( "build_script", "dotnet run --project CodeCakeBuilder -nointeraction" );
+            firstMapping.Children["test"] = "off";
             CreateOrUpdate( monitor, YamlMappingToString( monitor ) );
         }
 
-        void EnsureDefaultBranches( YamlMapping firstMapping )
+        void EnsureDefaultBranches( YamlMappingNode firstMapping )
         {
-            YamlElement branches = firstMapping["branches"];
-            if( branches == null ) firstMapping["branches"] = branches = new YamlMapping();
-            if( branches is YamlMapping m )
+            YamlNode branches = firstMapping["branches"];
+            if( branches == null ) firstMapping.Children["branches"] = branches = new YamlMappingNode();
+            if( branches is YamlMappingNode m )
             {
-                SetSequence( m, "only", new YamlValue( GitFolder.World.MasterBranchName ), new YamlValue( GitFolder.World.DevelopBranchName ) );
+                m.SetSequence( "only", GitFolder.World.MasterBranchName, GitFolder.World.DevelopBranchName );
             }
         }
     }

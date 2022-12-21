@@ -1,5 +1,4 @@
 
-using CK.Core;
 using Microsoft.Extensions.FileProviders;
 using Newtonsoft.Json.Linq;
 using System;
@@ -8,6 +7,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Xml.Linq;
+using YamlDotNet.RepresentationModel;
+using YamlDotNet.Serialization;
 
 namespace CK.Env
 {
@@ -52,6 +53,17 @@ namespace CK.Env
             {
                 string? line;
                 while( (line = t.ReadLine()) != null ) yield return line;
+            }
+        }
+
+        public static YamlMappingNode ReadAsYaml( this IFileInfo @this )
+        {
+            using( var t = @this is ITextFileInfo txt
+                                ? (TextReader)new StringReader( txt.TextContent )
+                                : new StreamReader( CheckFileInfoExists( @this ).CreateReadStream() ) )
+            {
+                var deserialiser = new Deserializer();
+                return deserialiser.Deserialize<YamlMappingNode>( t ) ?? new YamlMappingNode();
             }
         }
 

@@ -18,6 +18,7 @@ using System.Linq;
 using CK.Build.PackageDB;
 using CK.PerfectEvent;
 using NuGet.Packaging;
+using System.IO;
 
 namespace CK.Env.NuGet
 {
@@ -148,16 +149,25 @@ namespace CK.Env.NuGet
                 return v;
             }
 
-            public Task<IPackageInstanceInfo?> GetPackageInfoAsync( IActivityMonitor m, ArtifactInstance instance )
+            public async Task<IPackageInstanceInfo?> GetPackageInfoAsync( IActivityMonitor m, ArtifactInstance instance )
             {
                 if( UseFullInformation )
                 {
-                    return _baseFeed.SafeCallAsync<PackageMetadataResource, IPackageInstanceInfo?>( m, ( sources, meta, logger ) => GetPackageInfoAsync( meta, logger, instance, default ) );
+                    var packageInfoAndMetadata = await _baseFeed.SafeCallAsync<PackageMetadataResource, (IPackageInstanceInfo? packageInstanceInfo, IPackageSearchMetadata metadata)>( m, ( sources, meta, logger ) => GetPackageInfoAsync( meta, logger, instance, default ) );
+
+                    if( packageInfoAndMetadata.packageInstanceInfo != null )
+                    {
+                        var gitUrl = await _baseFeed.SafeCallAsync<FindPackageByIdResource, string>( m, ( sources, meta, logger ) => GetPackageRepositoryUrlAsync( meta, logger, instance, default ) );
+                        var nugetMetadata = new NugetPackageMetadata { PackageSearchMetadata = (PackageSearchMetadata)packageInfoAndMetadata.metadata, GitUrl = gitUrl };
+                        await _feedPackageInfoObtained.SafeRaiseAsync( m, this, new RawPackageInfoEventArgs( packageInfoAndMetadata.packageInstanceInfo, nugetMetadata ) );
+                    }
+
+                    return packageInfoAndMetadata.packageInstanceInfo;
 
                 }
                 else
                 {
-                    return _baseFeed.SafeCallAsync<DependencyInfoResource, IPackageInstanceInfo?>( m, ( sources, meta, logger ) => GetPackageInfoAsync( meta, logger, instance, default ) );
+                    return await _baseFeed.SafeCallAsync<DependencyInfoResource, IPackageInstanceInfo?>( m, ( sources, meta, logger ) => GetPackageInfoAsync( meta, logger, instance, default ) );
                 }
             }
 
@@ -245,7 +255,7 @@ namespace CK.Env.NuGet
                         return (null, null);
                     }
 
-                    PackageInstanceInfo result = CreateNugetPackageInstanceInfo( logger, instance, deps.Listed,deps.DependencyGroups );
+                    PackageInstanceInfo result = CreateNugetPackageInstanceInfo( logger, instance, deps.Listed, deps.DependencyGroups );
                     return (result, deps);
                 }
             }
@@ -315,18 +325,47 @@ namespace CK.Env.NuGet
                 return info;
             }
 
-            async Task<IPackageInstanceInfo?> GetPackageInfoAsync( PackageMetadataResource meta, NuGetLoggerAdapter logger, ArtifactInstance instance, CancellationToken token )
+            async Task<(IPackageInstanceInfo?, IPackageSearchMetadata)> GetPackageInfoAsync( PackageMetadataResource meta, NuGetLoggerAdapter logger, ArtifactInstance instance, CancellationToken token )
             {
                 var packageId = instance.Artifact.Name;
                 var version = NuGetVersion.Parse( instance.Version.ParsedText );
 
                 var metadata = await meta.GetMetadataAsync( new PackageIdentity( packageId, version ), _baseFeed.Client.SourceCache, logger, token );
 
-                if( metadata == null ) return null;
+                if( metadata == null ) return (null, null);
                 var result = CreateNugetPackageInstanceInfo( logger, instance, metadata.IsListed, metadata.DependencySets );
-                await _feedPackageInfoObtained.SafeRaiseAsync( logger.Monitor, this, new RawPackageInfoEventArgs( result, metadata ) );
 
-                return result;
+                return (result, metadata);
+            }
+
+            async Task<string> GetPackageRepositoryUrlAsync( FindPackageByIdResource meta, NuGetLoggerAdapter logger, ArtifactInstance instance, CancellationToken token )
+            {
+                var packageId = instance.Artifact.Name;
+                var version = NuGetVersion.Parse( instance.Version.ParsedText );
+                var url = string.Empty;
+
+                using( MemoryStream packageStream = new MemoryStream() )
+                {
+                    await meta.CopyNupkgToStreamAsync(
+                        packageId,
+                        version,
+                        packageStream,
+                        _baseFeed.Client.SourceCache,
+                        logger,
+                        token );
+
+                    packageStream.Position = 0;
+
+                    using( var packageReader = new PackageArchiveReader( packageStream ) )
+                    {
+                        var nuspecReader = await packageReader.GetNuspecReaderAsync( token );
+                        url = nuspecReader.GetRepositoryMetadata().Url;
+                    }
+                }
+
+
+                return url;
+
             }
 
             public override string ToString() => TypedName;

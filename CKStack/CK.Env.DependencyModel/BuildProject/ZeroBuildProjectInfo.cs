@@ -1,4 +1,5 @@
 using CK.Build;
+using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,7 +8,7 @@ namespace CK.Env.DependencyModel
 {
     /// <summary>
     /// Captures information required to build the Build projects and their dependencies in Zero Version.
-    /// This is computed by analyzing the the pure build projects dependency graph (ignoring Solutions) that is
+    /// This is computed by analyzing the pure build projects dependency graph (ignoring Solutions) that is
     /// the transitive closure of all Solution's build projects.
     /// </summary>
     public class ZeroBuildProjectInfo
@@ -25,22 +26,24 @@ namespace CK.Env.DependencyModel
         /// ProjectReference MUST be transformed into PackageReference during ZeroBuild.
         /// </param>
         /// <param name="dependencies">List of all the dependencies.</param>
-        public ZeroBuildProjectInfo(
-            int index,
-            int rank,
-            IProject project,
-            IReadOnlyCollection<IProject> upgradeProjectPackages,
-            IReadOnlyCollection<IProject> upgradeZeroProjects,
-            IReadOnlyCollection<IProject> allDependencies )
+        public ZeroBuildProjectInfo( int index,
+                                     int rank,
+                                     IProject project,
+                                     IReadOnlyCollection<IProject> upgradeProjectPackages,
+                                     IReadOnlyCollection<IProject> upgradeZeroProjects,
+                                     IReadOnlyCollection<IProject> allDependencies )
         {
-            if( Index < 0 ) throw new ArgumentOutOfRangeException( nameof( index ) );
-            if( Rank < 0 ) throw new ArgumentOutOfRangeException( nameof( rank ) );
+            Throw.CheckOutOfRangeArgument( Index >= 0 );
+            Throw.CheckOutOfRangeArgument( Rank >= 0 );
+            Throw.CheckNotNullArgument( upgradeProjectPackages );
+            Throw.CheckNotNullArgument( upgradeZeroProjects );
+            Throw.CheckNotNullArgument( allDependencies );
             Index = index;
             Rank = rank;
             Project = project;
-            UpgradeProjectPackages = upgradeProjectPackages ?? throw new ArgumentNullException( nameof( upgradeProjectPackages ) );
-            UpgradeZeroProjects = upgradeZeroProjects ?? throw new ArgumentNullException( nameof( upgradeZeroProjects ) );
-            AllDependencies = allDependencies ?? throw new ArgumentNullException( nameof( allDependencies ) );
+            UpgradeProjectPackages = upgradeProjectPackages;
+            UpgradeZeroProjects = upgradeZeroProjects;
+            AllDependencies = allDependencies;
         }
 
         /// <summary>
