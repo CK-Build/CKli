@@ -180,8 +180,9 @@ namespace CK.Env
         /// <returns>The file info.</returns>
         public IFileInfo GetFileInfo( NormalizedPath sub )
         {
-            sub = sub.ResolveDots();//.With( NormalizedPathRootKind.None );
-            GitRepository g = GitFolders.FirstOrDefault( f => sub.StartsWith( f.SubPath, strict: false ) );
+            Throw.CheckArgument( sub.RootKind == NormalizedPathRootKind.None || sub.RootKind == NormalizedPathRootKind.RootedBySeparator );
+            sub = sub.ResolveDots().With( NormalizedPathRootKind.None );
+            GitRepository? g = GitFolders.FirstOrDefault( f => sub.StartsWith( f.SubPath, strict: false ) );
             return g != null
                         ? g.GetFileInfo( sub.RemovePrefix( g.SubPath ) ) ?? new NotFoundFileInfo( sub.Path )
                         : PhysicalGetFileInfo( sub );
@@ -200,7 +201,7 @@ namespace CK.Env
         /// <returns>True on success, false on error.</returns>
         public bool CopyTo( IActivityMonitor m, IFileInfo source, NormalizedPath destination )
         {
-            if( source == null || !source.Exists ) throw new ArgumentNullException( nameof( source ) );
+            Throw.CheckArgument( source != null && source.Exists );
             using( var content = source.CreateReadStream() )
             {
                 return CopyTo( m, content, destination );
@@ -314,7 +315,7 @@ namespace CK.Env
         IFileInfo GetWritableDestination( IActivityMonitor m, ref NormalizedPath destination )
         {
             destination = destination.ResolveDots();
-            if( destination.IsEmptyPath ) throw new ArgumentNullException( nameof( destination ) );
+            Throw.CheckArgument( !destination.IsEmptyPath );
             var fDest = GetFileInfo( destination );
             if( fDest.Exists && fDest.IsDirectory )
             {

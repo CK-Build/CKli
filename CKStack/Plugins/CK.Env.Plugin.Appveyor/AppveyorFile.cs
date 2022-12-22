@@ -94,13 +94,13 @@ namespace CK.Env.Plugin
             firstMapping.Remove( "artifacts" );
             if( _solutionSpec.SqlServer != null )
             {
-                firstMapping.Children["services"] = ("mssql" + _solutionSpec.SqlServer.ToLowerInvariant());
+                firstMapping.Children["services"] = "mssql" + _solutionSpec.SqlServer.ToLowerInvariant();
             }
 
-            if( firstMapping.Children["install"] is YamlSequenceNode inst )
+            if( firstMapping.Children.GetValueOrDefault( "install" ) is YamlSequenceNode inst )
             {
                 if( inst.Children.RemoveWhereAndReturnsRemoved( e => e is YamlMappingNode m
-                                                            && m["cmd"] is YamlScalarNode v
+                                                            && m.Children.GetValueOrDefault( "cmd" ) is YamlScalarNode v
                                                             && (v.Value?.StartsWith( "npm install -g npm@" ) ?? false) ).Any() )
                 {
                     monitor.Info( "Removed npm install with a specific version (using the Appveyor's installed one)." );
@@ -130,7 +130,7 @@ namespace CK.Env.Plugin
 
         void EnsureDefaultBranches( YamlMappingNode firstMapping )
         {
-            YamlNode branches = firstMapping["branches"];
+            YamlNode? branches = firstMapping.Children.GetValueOrDefault( "branches" );
             if( branches == null ) firstMapping.Children["branches"] = branches = new YamlMappingNode();
             if( branches is YamlMappingNode m )
             {

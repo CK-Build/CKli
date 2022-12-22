@@ -4,7 +4,6 @@ using Cake.Npm;
 using Cake.Npm.Publish;
 using CK.Core;
 using CodeCake.Abstractions;
-using CodeCakeBuilder.CakeExtensions;
 using CSemVer;
 using Newtonsoft.Json.Linq;
 using System;
