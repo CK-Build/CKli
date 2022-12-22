@@ -62,9 +62,9 @@ namespace CK.Env.Plugin
         /// </summary>
         public PackageJsonFile PackageJson { get; }
 
-        NPMProjectStatus Error( IActivityMonitor m, NPMProjectStatus s, string? msg = null )
+        NPMProjectStatus Error( IActivityMonitor monitor, NPMProjectStatus s, string? msg = null )
         {
-            m.Error( msg ?? $"NPM Project Error: {s} ('{FullPath}')." );
+            monitor.Error( msg ?? $"NPM Project Error: {s} ('{FullPath}')." );
             return s;
         }
 
