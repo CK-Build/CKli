@@ -39,7 +39,6 @@ namespace CK.Env.Plugin.NPM
 
             foreach( var project in projects )
             {
-
                 var npmrcPath = project.FullPath.AppendPart( ".npmrc" );
                 var yarnRcPath = project.FullPath.AppendPart( ".yarnrc.yml" );
                 (bool error, bool isUsingYarn) = NPMRCFiles.IsUsingYarn( m, project );
@@ -100,7 +99,7 @@ namespace CK.Env.Plugin.NPM
                 }
             }
 
-            GitFolder.FileSystem.CopyTo( m, new Serializer().Serialize( yamldoc ), yamlInfo.PhysicalPath );
+            GitFolder.FileSystem.CopyTo( m, new Serializer().Serialize( yamldoc ), yarnRcPath );
         }
 
 
