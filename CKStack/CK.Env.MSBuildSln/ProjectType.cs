@@ -1,3 +1,4 @@
+using CK.Core;
 using System;
 
 namespace CK.Env.MSBuildSln
@@ -29,16 +30,16 @@ namespace CK.Env.MSBuildSln
         /// <returns>The associated Guid.</returns>
         public static string ToGuid( this KnownProjectType @this )
         {
-            switch( @this )
+            return @this switch
             {
-                case KnownProjectType.None: return "{00000000-0000-0000-0000-000000000000}";
-                case KnownProjectType.SolutionFolder: return "{2150E333-8FDC-42A3-9474-1A3956D46DE8}";
-                case KnownProjectType.CSharp: return "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}";
-                case KnownProjectType.CSharpCore: return "{9A19103F-16F7-4668-BE54-9A1E7A4F7556}";
-                case KnownProjectType.VisualBasic: return "{F184B08F-C81C-45F6-A57F-5ABD9991F28F}";
-                case KnownProjectType.FSharp: return "{F2A71F9B-5D33-465A-A702-920D77279786}";
-                default: throw new ArgumentException();
-            }
+                KnownProjectType.None => "{00000000-0000-0000-0000-000000000000}",
+                KnownProjectType.SolutionFolder => "{2150E333-8FDC-42A3-9474-1A3956D46DE8}",
+                KnownProjectType.CSharp => "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}",
+                KnownProjectType.CSharpCore => "{9A19103F-16F7-4668-BE54-9A1E7A4F7556}",
+                KnownProjectType.VisualBasic => "{F184B08F-C81C-45F6-A57F-5ABD9991F28F}",
+                KnownProjectType.FSharp => "{F2A71F9B-5D33-465A-A702-920D77279786}",
+                _ => Throw.ArgumentException<string>( nameof( @this ) )
+            };
         }
 
         /// <summary>

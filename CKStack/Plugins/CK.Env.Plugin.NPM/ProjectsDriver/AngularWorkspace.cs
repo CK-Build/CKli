@@ -18,7 +18,7 @@ namespace CK.Env.Plugin
             FullPath = Driver.BranchPath.Combine( spec.Path );
         }
 
-        static internal AngularWorkspace LoadAngularSolution( NPMProjectsDriver driver, IActivityMonitor m, IAngularWorkspaceSpec spec )
+        static internal AngularWorkspace LoadAngularSolution( NPMProjectsDriver driver, IActivityMonitor monitor, IAngularWorkspaceSpec spec )
         {
             NormalizedPath packageJsonPath = spec.Path.AppendPart( "package.json" );
             NormalizedPath angularJsonPath = spec.Path.AppendPart( "angular.json" );
@@ -28,11 +28,11 @@ namespace CK.Env.Plugin
             JObject angularJson = fs.GetFileInfo( path.Combine( angularJsonPath ) ).ReadAsJObject();
             if( !(packageJson["private"]?.ToObject<bool?>() ?? false) )
             {
-                throw new InvalidDataException( $"A workspace project should be private. File '{packageJsonPath}' must be fixed with a \"private\": true property." );
+                Throw.InvalidDataException( $"A workspace project should be private. File '{packageJsonPath}' must be fixed with a \"private\": true property." );
             }
             if( angularJson["projects"] is not JObject jProjects )
             {
-                throw new InvalidDataException( $"Missing \"projects\" in '{packageJsonPath}'." );
+                return Throw.InvalidDataException<AngularWorkspace>( $"Missing \"projects\" in '{packageJsonPath}'." );
             }
             List<NPMProject> projects = new();
             foreach( var propProject in jProjects.Properties() )
@@ -41,7 +41,7 @@ namespace CK.Env.Plugin
                 var projPathRelativeToWorkspace = new NormalizedPath( propProject.Value["root"]?.ToString() );
                 if( projPathRelativeToWorkspace.IsEmptyPath )
                 {
-                    m.Warn( $"Project '{name}' is missing \"root\" property. It is ignored." );
+                    monitor.Warn( $"Project '{name}' is missing \"root\" property. It is ignored." );
                 }
                 else
                 {
@@ -50,20 +50,27 @@ namespace CK.Env.Plugin
                     var packageFile = fs.GetFileInfo( driver.BranchPath.Combine( projPathRelativeToGitRepo ).AppendPart( "package.json" ) );
                     if( !packageFile.Exists )
                     {
-                        m.Warn( $"File '{packageFile}' not found. Project '{name}' is ignored." );
+                        monitor.Warn( $"File '{packageFile}' not found. Project '{name}' is ignored." );
                     }
                     else
                     {
                         JObject json = packageFile.ReadAsJObject();
-                        var projectName = json["name"]?.ToString();
-                        if( string.IsNullOrWhiteSpace( projectName ) )
+                        bool isPrivate = json["private"]?.ToObject<bool>() ?? false;
+                        if( isPrivate )
                         {
-                            m.Warn( $"Missing or empty \"name\" in '{packageFile}'. Project '{name}' is ignored." );
+                            monitor.Info( $"Angular project '{name}' is private (not published). It is ignored." );
                         }
                         else
                         {
-                            bool isPrivate = json["private"]?.ToObject<bool>() ?? false;
-                            projects.Add( new NPMProject( driver, m, new NPMProjectSpec( projPathRelativeToGitRepo, projectName, isPrivate ) ) );
+                            var projectName = json["name"]?.ToString();
+                            if( string.IsNullOrWhiteSpace( projectName ) )
+                            {
+                                monitor.Warn( $"Missing or empty \"name\" in '{packageFile}'. Project '{name}' is ignored." );
+                            }
+                            else
+                            {
+                                projects.Add( new NPMProject( driver, monitor, new NPMProjectSpec( projPathRelativeToGitRepo, projectName ) ) );
+                            }
                         }
                     }
                 }
@@ -89,12 +96,5 @@ namespace CK.Env.Plugin
         /// Gets the project-solution folder path relative to the <see cref="FileSystem"/>.
         /// </summary>
         public NormalizedPath FullPath { get; }
-
-        public XElement ToXml()
-        {
-            return new XElement( "AngularWorkspace",
-                new XAttribute( "Path", Specification.Path ),
-                new XAttribute( "OutputFolder", Specification.OutputFolder ) );
-        }
     }
 }

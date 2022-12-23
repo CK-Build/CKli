@@ -324,9 +324,8 @@ namespace CK.Env.Plugin
                     {
                         m.Error( $"Project {project} cannot be a CKSetupComponent since it is not published." );
                     }
-                    foreach( var name in project.Tag<MSProject>()
-                                                .TargetFrameworks.AtomicTraits
-                                                .Select( t => new Artifact( CKSetupType, project.SimpleProjectName + '/' + t.ToString() ) ) )
+                    foreach( var name in msProject.TargetFrameworks.AtomicTraits
+                                                  .Select( t => new Artifact( CKSetupType, project.SimpleProjectName + '/' + t.ToString() ) ) )
                     {
                         project.AddGeneratedArtifacts( name );
                     }

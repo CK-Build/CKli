@@ -1,3 +1,4 @@
+using CK.Core;
 using System;
 
 namespace CK.Env.DependencyModel
@@ -20,8 +21,8 @@ namespace CK.Env.DependencyModel
         /// </returns>
         public object? Tag( Type type, object? newValue = null )
         {
-            if( type == null ) throw new ArgumentNullException( "type" );
-            if( newValue != null && !type.IsInstanceOfType( newValue ) ) throw new ArgumentException( "Invalid type/new object value." );
+            Throw.CheckNotNullArgument( type );
+            Throw.CheckArgument( newValue == null || type.IsInstanceOfType( newValue ) );
             if( _tag == null )
             {
                 if( newValue != null )
@@ -88,7 +89,7 @@ namespace CK.Env.DependencyModel
         /// <param name="type">The type of tags to remove.</param>
         public void RemoveTags( Type type )
         {
-            if( type == null ) throw new ArgumentNullException( "type" );
+            Throw.CheckNotNullArgument( type );
             if( _tag != null )
             {
                 object?[]? a = _tag as object?[];

@@ -81,9 +81,8 @@ namespace CK.Env.DependencyModel
         bool IsPublished { get; }
 
         /// <summary>
-        /// Gets whether this project is published: this project can be "installed" in
-        /// dependent solutions thanks to at least one <see cref="GeneratedArtifacts"/>
-        /// that is <see cref="ArtifactType.IsInstallable"/>.
+        /// Gets whether this is test project.
+        /// Test projects are usually not published but then can be.
         /// </summary>
         bool IsTestProject { get; }
 
@@ -106,5 +105,11 @@ namespace CK.Env.DependencyModel
         /// Gets the references to local projects.
         /// </summary>
         IReadOnlyList<ProjectReference> ProjectReferences { get; }
+
+        /// <summary>
+        /// Return the <see cref="Name"/>.
+        /// </summary>
+        /// <returns>The project's name.</returns>
+        string ToString();
     }
 }

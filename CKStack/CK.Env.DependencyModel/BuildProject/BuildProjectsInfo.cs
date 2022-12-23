@@ -11,7 +11,7 @@ namespace CK.Env.DependencyModel
     public class BuildProjectsInfo
     {
         internal BuildProjectsInfo( IDependencySorterResult sortResult,
-                                    IReadOnlyList<ZeroBuildProjectInfo> zeroBuildProjects )
+                                    IReadOnlyList<ZeroBuildProjectInfo>? zeroBuildProjects )
         {
             Debug.Assert( sortResult != null && sortResult.IsComplete == (zeroBuildProjects != null) );
             RawBuildProjectsInfoSorterResult = sortResult;

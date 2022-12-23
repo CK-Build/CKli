@@ -12,7 +12,6 @@ namespace CK.Env
     {
         internal NPMProjectSpec( XElementReader r )
         {
-            IsPrivate = r.HandleOptionalAttribute( nameof( IsPrivate ), false );
             Folder = new NormalizedPath( r.HandleRequiredAttribute<string>( nameof( Folder ) ) ).With( NormalizedPathRootKind.None );
             PackageName = HandlePackageName( r.HandleOptionalAttribute( nameof( PackageName ), "" ) );
             OutputFolder = r.HandleRequiredAttribute<string>( nameof( OutputFolder ) );
@@ -21,9 +20,8 @@ namespace CK.Env
         }
 
 
-        public NPMProjectSpec( NormalizedPath folderPath, string packageName, bool isPrivate = false )
+        public NPMProjectSpec( NormalizedPath folderPath, string packageName )
         {
-            IsPrivate = isPrivate;
             Folder = folderPath;
             PackageName = HandlePackageName( packageName );
         }
@@ -34,7 +32,7 @@ namespace CK.Env
             {
                 return attributeValue;
             }
-            if( Folder.IsEmptyPath && !IsPrivate )
+            if( Folder.IsEmptyPath )
             {
                 throw new Exception( "NPMProject specified as a public root project (Folder attribute is missing, empty or '/') must specify a PackageName or IsPrivate must be true." );
             }
@@ -43,14 +41,8 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the package name.
-        /// This can be null if <see cref="IsPrivate"/> is true.
         /// </summary>
         public string PackageName { get; }
-
-        /// <summary>
-        /// Gets whether this package must be private (ie. not published).
-        /// </summary>
-        public bool IsPrivate { get; }
 
         /// <summary>
         /// Gets the folder path relative to the solution root.

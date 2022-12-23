@@ -18,14 +18,15 @@ namespace CK.Env.DependencyModel
         readonly List<Solution> _list;
         readonly List<Project> _allProjects;
         int _version;
-        DependencyAnalyzer _analyzer;
+        DependencyAnalyzer? _analyzer;
 
         class ProjectNameComparer : IComparer<Project>
         {
             public static readonly ProjectNameComparer Comparer = new ProjectNameComparer();
 
-            public int Compare( Project x, Project y )
+            public int Compare( Project? x, Project? y )
             {
+                Debug.Assert( x?.Solution != null && y?.Solution != null );
                 int cmp = x.SimpleProjectName.CompareTo( y.SimpleProjectName );
                 if( cmp != 0 ) return cmp;
                 cmp = x.Solution.Name.CompareTo( y.Solution.Name );

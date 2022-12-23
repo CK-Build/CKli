@@ -15,10 +15,7 @@ namespace CK.Env.DependencyModel
     public class DependencyAnalyzer
     {
         readonly IReadOnlyCollection<ISolution> _solutions;
-        /// <summary>
-        /// May be null !
-        /// </summary>
-        readonly ISolutionContext _solutionContext;
+        readonly ISolutionContext? _solutionContext;
         readonly ProjectItem.Cache _projects;
         readonly List<(ISolution Solution, LocalPackageItem LocalPackage)> _solutionDependencies;
         readonly IReadOnlyList<PackageReference> _externalRefs;
@@ -27,7 +24,7 @@ namespace CK.Env.DependencyModel
 
 
         /// <summary>
-        /// Package items are not bound to any container (PrimarySolution). There is 2 kind of packages:
+        /// Package items are not bound to any container (Solution). There is 2 kind of packages:
         /// locally produced (the item requires the Solution that owns its source code), and external
         /// packages.
         /// This handles the locally produced package.
@@ -40,6 +37,7 @@ namespace CK.Env.DependencyModel
 
             internal LocalPackageItem( Artifact package, IProject project )
             {
+                Debug.Assert( project.Solution != null );
                 _requires = new IDependentItemRef[] { (IDependentItemRef)project.Solution };
                 Project = project;
                 Package = package;
@@ -173,14 +171,13 @@ namespace CK.Env.DependencyModel
             public override string ToString() => _p.ToString();
         }
 
-        DependencyAnalyzer(
-            IActivityMonitor m,
-            IReadOnlyCollection<ISolution> solutions,
-            ISolutionContext solutionCtx,
-            List<(ISolution, LocalPackageItem)> solutionDependencies,
-            ProjectItem.Cache projects,
-            List<PackageReference> externalRefs,
-            bool traceGraphDetails )
+        DependencyAnalyzer( IActivityMonitor m,
+                            IReadOnlyCollection<ISolution> solutions,
+                            ISolutionContext solutionCtx,
+                            List<(ISolution, LocalPackageItem)> solutionDependencies,
+                            ProjectItem.Cache projects,
+                            List<PackageReference> externalRefs,
+                            bool traceGraphDetails )
         {
             _solutions = solutions;
             _solutionContext = solutionCtx;
@@ -328,7 +325,7 @@ namespace CK.Env.DependencyModel
         /// By default all projects are considered except build projects (see <see cref="Solution.BuildProject"/>).
         /// </param>
         /// <returns>The context or null on error.</returns>
-        public SolutionDependencyContext CreateDependencyContext( IActivityMonitor m, bool traceGraphDetails, Func<IProject, bool> projectFilter = null )
+        public SolutionDependencyContext CreateDependencyContext( IActivityMonitor m, bool traceGraphDetails, Func<IProject, bool>? projectFilter = null )
         {
             if( projectFilter == null )
             {

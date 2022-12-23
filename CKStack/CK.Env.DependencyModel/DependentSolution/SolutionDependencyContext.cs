@@ -3,6 +3,7 @@ using CK.Setup;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace CK.Env.DependencyModel
@@ -16,7 +17,7 @@ namespace CK.Env.DependencyModel
     public class SolutionDependencyContext
     {
         readonly DependencyAnalyzer _analyzer;
-        readonly Dictionary<object, DependentSolution> _index;
+        readonly Dictionary<object, DependentSolution>? _index;
 
         /// <summary>
         /// Error constructor.
@@ -24,10 +25,9 @@ namespace CK.Env.DependencyModel
         /// <param name="analyzer">The analyzer.</param>
         /// <param name="rSolution">The dependency sorter result.</param>
         /// <param name="buildProjectsInfo">Build info may be on error or not.</param>
-        internal SolutionDependencyContext(
-            DependencyAnalyzer analyzer,
-            IDependencySorterResult rSolution,
-            BuildProjectsInfo buildProjectsInfo )
+        internal SolutionDependencyContext( DependencyAnalyzer analyzer,
+                                            IDependencySorterResult rSolution,
+                                            BuildProjectsInfo buildProjectsInfo )
         {
             Debug.Assert( analyzer != null && buildProjectsInfo != null && rSolution != null && !rSolution.IsComplete );
             _analyzer = analyzer;
@@ -35,15 +35,15 @@ namespace CK.Env.DependencyModel
             BuildProjectsInfo = buildProjectsInfo;
             DependencyTable = Array.Empty<DependentSolution.Row>();
             Solutions = Array.Empty<DependentSolution>();
+            PackageDependencies = Array.Empty<LocalPackageDependency>();
         }
 
-        internal SolutionDependencyContext(
-            DependencyAnalyzer analyzer,
-            Dictionary<object, DependentSolution> index,
-            IDependencySorterResult r,
-            IReadOnlyList<DependentSolution.Row> t,
-            IReadOnlyList<DependentSolution> solutions,
-            BuildProjectsInfo buildProjectsInfo )
+        internal SolutionDependencyContext( DependencyAnalyzer analyzer,
+                                            Dictionary<object, DependentSolution> index,
+                                            IDependencySorterResult r,
+                                            IReadOnlyList<DependentSolution.Row> t,
+                                            IReadOnlyList<DependentSolution> solutions,
+                                            BuildProjectsInfo buildProjectsInfo )
         {
             Debug.Assert( analyzer != null && r != null && r.IsComplete && t != null && solutions != null );
             _analyzer = analyzer;
@@ -96,14 +96,14 @@ namespace CK.Env.DependencyModel
         /// </summary>
         /// <param name="name">The solution name.</param>
         /// <returns>The dependent solution or null.</returns>
-        public DependentSolution? this[string name] => _index.GetValueOrDefault( name, null );
+        public DependentSolution? this[string name] => _index?.GetValueOrDefault( name, null );
 
         /// <summary>
         /// Gets the dependent solution associated to a <see cref="Solution"/>.
         /// </summary>
         /// <param name="s">The solution.</param>
         /// <returns>The dependent solution or null.</returns>
-        public DependentSolution? this[ISolution s] => _index.GetValueOrDefault( s, null );
+        public DependentSolution? this[ISolution s] => _index?.GetValueOrDefault( s, null );
 
         /// <summary>
         /// Gets the <see cref="IDependencySorterResult"/> of the Solution/Project graph.
@@ -125,18 +125,17 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Dumps the <see cref="Solutions"/> order by their index along with optional details.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The target monitor.</param>
         /// <param name="current">The current solution (a star will precede its name).</param>
         /// <param name="solutionLineDetail">Optional details to be appended on the information, header, line.</param>
         /// <param name="solutionDetail">
         /// Optional detailed log generator.
         /// When not null, a group is opened by solution and this is called.
         /// </param>
-        public void LogSolutions(
-            IActivityMonitor m,
-            DependentSolution current = null,
-            Func<DependentSolution, string> solutionLineDetail = null,
-            Action<IActivityMonitor, DependentSolution> solutionDetail = null )
+        public void LogSolutions( IActivityMonitor monitor,
+                                  DependentSolution? current = null,
+                                  Func<DependentSolution, string>? solutionLineDetail = null,
+                                  Action<IActivityMonitor, DependentSolution>? solutionDetail = null )
         {
             int rank = -1;
             foreach( var s in Solutions )
@@ -144,18 +143,18 @@ namespace CK.Env.DependencyModel
                 if( rank != s.Rank )
                 {
                     rank = s.Rank;
-                    m.Info( $" -- Rank {rank}" );
+                    monitor.Info( $" -- Rank {rank}" );
                 }
                 if( solutionDetail != null )
                 {
-                    using( m.OpenInfo( $"{(s == current ? '*' : ' ')}   {s.Index} - {s} {solutionLineDetail?.Invoke( s )}" ) )
+                    using( monitor.OpenInfo( $"{(s == current ? '*' : ' ')}   {s.Index} - {s} {solutionLineDetail?.Invoke( s )}" ) )
                     {
-                        solutionDetail( m, s );
+                        solutionDetail( monitor, s );
                     }
                 }
                 else
                 {
-                    m.Info( $"{(s == current ? '*' : ' ')}   {s.Index} - {s} {solutionLineDetail?.Invoke( s )}" );
+                    monitor.Info( $"{(s == current ? '*' : ' ')}   {s.Index} - {s} {solutionLineDetail?.Invoke( s )}" );
                 }
             }
         }

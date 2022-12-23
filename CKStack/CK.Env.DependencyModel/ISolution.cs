@@ -68,5 +68,11 @@ namespace CK.Env.DependencyModel
         /// </summary>
         IEnumerable<PackageReference> AllPackageReferences { get; }
 
+        /// <summary>
+        /// Returns the <see cref="Name"/>.
+        /// </summary>
+        /// <returns>The solution name.</returns>
+        string ToString();
+
     }
 }

@@ -78,13 +78,8 @@ namespace CK.Env.Plugin
                         ? Error( m, NPMProjectStatus.ErrorMissingPackageJson )
                         : Error( m, NPMProjectStatus.FatalInitializationError );
                 }
-                if( Specification.IsPrivate )
+                if( !PackageJson.IsPrivate )
                 {
-                    if( !PackageJson.IsPrivate ) return Error( m, NPMProjectStatus.ErrorPackageMustBePrivate );
-                }
-                else
-                {
-                    if( PackageJson.IsPrivate ) return Error( m, NPMProjectStatus.ErrorPackageMustNotBePrivate );
                     if( PackageJson.Name == null ) return Error( m, NPMProjectStatus.ErrorPackageNameMissing );
                     if( PackageJson.Name != Specification.PackageName )
                     {
@@ -99,20 +94,6 @@ namespace CK.Env.Plugin
                 return NPMProjectStatus.FatalInitializationError;
             }
 
-        }
-
-        /// <summary>
-        /// This is used to generate the CodeCakeBuilder/NPMSolution.xml file that lists
-        /// all the NPM projects that CodeCakeBuilder must handle.
-        /// </summary>
-        /// <returns>The Xml element.</returns>
-        public XElement ToXml()
-        {
-            return new XElement( "Project",
-                        new XAttribute( "Path", Specification.Folder ),
-                        new XAttribute( "IsPublished", PackageJson.IsPublished ),
-                        new XAttribute( "OutputFolder", Specification.OutputFolder ),
-                        PackageJson.Name != null ? new XAttribute( "ExpectedName", PackageJson.Name ) : null );
         }
 
         internal void Associate( Project p )

@@ -93,12 +93,12 @@ namespace CK.Env.DependencyModel
         [MemberNotNull(nameof(_solution))]
         internal void CheckSolution()
         {
-            Throw.CheckState( $"Project '{_name}' has been removed from its Solution.", _solution != null );
+            if( _solution == null ) Throw.InvalidOperationException( $"Project '{_name}' has been removed from its Solution." );
         }
 
         void CheckNotBuildProject( string something )
         {
-            Throw.CheckState( $"Project {ToString()} cannot {something} since it's the Solution's BuildProject.", _solution?.BuildProject != this );
+            if( _solution?.BuildProject == this ) Throw.InvalidOperationException( $"Project {ToString()} cannot {something} since it's the Solution's BuildProject." );
         }
 
         /// <summary>
@@ -108,7 +108,15 @@ namespace CK.Env.DependencyModel
         public Solution? Solution => _solution;
 
         ISolution? IProject.Solution => _solution;
-        ISolution IPackageReferrer.Solution => _solution;
+
+        ISolution IPackageReferrer.Solution
+        {
+            get
+            {
+                CheckSolution();
+                return _solution;
+            }
+        }
 
         /// <summary>
         /// Gets the path to this project relative to the <see cref="Solution"/>.

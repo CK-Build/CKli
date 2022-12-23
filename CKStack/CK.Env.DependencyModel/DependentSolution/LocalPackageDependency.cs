@@ -15,6 +15,7 @@ namespace CK.Env.DependencyModel
 
         internal LocalPackageDependency( DependentSolution.Row row, ArtifactInstance r, Dictionary<object, DependentSolution> index )
         {
+            Debug.Assert( row.Target?.Solution != null );
             _row = row;
             _reference = r;
             Origin = index[row.Origin.Solution];
@@ -44,7 +45,7 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets the target project, the one that generates the artifact.
         /// </summary>
-        public IProject TargetProject => _row.Target;
+        public IProject TargetProject => _row.Target!;
 
         /// <summary>
         /// Gets the artifact instance that is consumed by <see cref="OriginProject"/> and produced by <see cref="TargetProject"/>.

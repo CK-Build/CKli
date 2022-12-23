@@ -230,10 +230,10 @@ namespace CK.Env
         /// </summary>
         public readonly struct PreProcessResult
         {
-            internal PreProcessResult( IReadOnlyList<ActivityMonitorSimpleCollector.Entry>? errors, XElement result )
+            internal PreProcessResult( IReadOnlyList<ActivityMonitorSimpleCollector.Entry> errors, XElement result )
             {
-                Errors = errors ?? Array.Empty<ActivityMonitorSimpleCollector.Entry>();
-                Result = errors != null ? null : result;
+                Errors = errors;
+                Result = errors.Count > 0 ? null : result;
             }
 
             /// <summary>
@@ -250,13 +250,12 @@ namespace CK.Env
 
         public static PreProcessResult PreProcess( IActivityMonitor monitor, XElement e )
         {
-            IReadOnlyList<ActivityMonitorSimpleCollector.Entry>? errors = null;
             XElement result;
-            using( monitor.CollectEntries( err => errors = err ) )
+            using( monitor.CollectEntries( out var errors ) )
             {
                 result = (XElement)RemoveRegionsAndResolveReusables( monitor, new ReusableWrapper( e ) ).Single();
+                return new PreProcessResult( errors, result );
             }
-            return new PreProcessResult( errors, result );
         }
 
         class ReusableWrapper
