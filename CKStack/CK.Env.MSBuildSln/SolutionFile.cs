@@ -94,6 +94,12 @@ namespace CK.Env.MSBuildSln
             return f;
         }
 
+        /// <summary>
+        /// Ensures that a file appears in the "Solution Items" virtual folder.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="item">The path of the file to add.</param>
+        /// <param name="saveFile">Whether the solution file must be saved or not.</param>
         public void EnsureSolutionItemFile( IActivityMonitor monitor, NormalizedPath item, bool saveFile = true )
         {
             FindOrCreateSolutionItemsFolder().EnsureItem( item );
@@ -101,6 +107,12 @@ namespace CK.Env.MSBuildSln
             if( saveFile ) Save( monitor );
         }
 
+        /// <summary>
+        /// Removes an item in the "Solution Items" virtual folder.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="item">The path of the file to remove.</param>
+        /// <param name="saveFile">Whether the solution file must be saved or not.</param>
         public void RemoveSolutionItemFile( IActivityMonitor monitor, NormalizedPath item, bool saveFile = true )
         {
             FindOrCreateSolutionItemsFolder().RemoveItem( item );
@@ -214,7 +226,7 @@ namespace CK.Env.MSBuildSln
         /// Raised whenever a <see cref="Save"/> has actually been made
         /// and <see cref="IsDirty"/> is now false.
         /// </summary>
-        public event EventHandler<EventMonitoredArgs> Saved;
+        public event EventHandler<EventMonitoredArgs>? Saved;
 
         internal void CheckDirtyProjectFiles( bool shouldBeDirty )
         {

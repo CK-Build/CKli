@@ -101,6 +101,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "CKStack", "CKStack", "{5928
 		CKStack\NotPackaged.props = CKStack\NotPackaged.props
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CK.Env.NodeSln", "CKStack\CK.Env.NodeSln\CK.Env.NodeSln.csproj", "{8D43049C-93CE-41B8-8628-A127A0CD0B57}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -405,6 +407,14 @@ Global
 		{AF78DE02-C63C-4850-A6BE-59F134419CAF}.Release|Any CPU.Build.0 = Release|Any CPU
 		{AF78DE02-C63C-4850-A6BE-59F134419CAF}.Release|x64.ActiveCfg = Release|Any CPU
 		{AF78DE02-C63C-4850-A6BE-59F134419CAF}.Release|x64.Build.0 = Release|Any CPU
+		{8D43049C-93CE-41B8-8628-A127A0CD0B57}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8D43049C-93CE-41B8-8628-A127A0CD0B57}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8D43049C-93CE-41B8-8628-A127A0CD0B57}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8D43049C-93CE-41B8-8628-A127A0CD0B57}.Debug|x64.Build.0 = Debug|Any CPU
+		{8D43049C-93CE-41B8-8628-A127A0CD0B57}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8D43049C-93CE-41B8-8628-A127A0CD0B57}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8D43049C-93CE-41B8-8628-A127A0CD0B57}.Release|x64.ActiveCfg = Release|Any CPU
+		{8D43049C-93CE-41B8-8628-A127A0CD0B57}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -445,6 +455,7 @@ Global
 		{B679ACB9-9FAA-46AB-B01E-E833722E1362} = {60D6E9BB-13A8-463A-ACBF-66EE940FCCE5}
 		{256FA6AB-FC79-4503-AD31-32960AC03846} = {5928FC83-333E-4936-B808-6DDF63CF7C26}
 		{748C1411-A09A-4F62-9A6E-F70A03E05663} = {5928FC83-333E-4936-B808-6DDF63CF7C26}
+		{8D43049C-93CE-41B8-8628-A127A0CD0B57} = {5928FC83-333E-4936-B808-6DDF63CF7C26}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {44AF4FE0-7386-4FB4-B966-0107DAE25DC4}

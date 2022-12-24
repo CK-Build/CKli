@@ -14,7 +14,7 @@ using System.Xml.Linq;
 
 namespace CK.Env.Plugin
 {
-    public class SolutionDriver : GitBranchPluginBase, ISolutionDriver, IDisposable, ICommandMethodsProvider
+    public partial class SolutionDriver : GitBranchPluginBase, ISolutionDriver, IDisposable, ICommandMethodsProvider
     {
         public static readonly ArtifactType NuGetType = NuGet.NuGetClient.NuGetType;
         public static readonly ArtifactType CKSetupType = ArtifactType.Register( "CKSetup", false );
@@ -176,88 +176,8 @@ namespace CK.Env.Plugin
                 }
             }
             _solution.Tag( _sln );
-            var projectsToRemove = new HashSet<DependencyModel.Project>( _solution.Projects );
-            var orderedProjects = new DependencyModel.Project[_sln.MSProjects.Count];
-            int i = 0;
-            bool badPack = false;
-            foreach( var p in _sln.MSProjects )
-            {
-                if( p.ProjectName != p.SolutionRelativeFolderPath.LastPart )
-                {
-                    m.Warn( $"Project named {p.ProjectName} should be in folder of the same name, not in {p.SolutionRelativeFolderPath.LastPart}." );
-                }
-                Debug.Assert( p.ProjectFile != null );
-
-                bool doPack = p.IsPackable ?? true;
-                if( doPack == true )
-                {
-                    if( _solutionSpec.NotPublishedProjects.Contains( p.Path ) )
-                    {
-                        m.Error( $"Project {p.ProjectName} that must not be published have the Element IsPackable not set to false." );
-                        badPack = true;
-                    }
-                    else if( !_solutionSpec.TestProjectsArePublished && (p.Path.Parts.Contains( "Tests" ) || p.ProjectName.EndsWith( ".Tests" )) )
-                    {
-                        m.Error( $"Tests Project {p.ProjectName} does not have IsPackable set to false." );
-                        badPack = true;
-                    }
-                    else if( p.ProjectName.Equals( "CodeCakeBuilder", StringComparison.OrdinalIgnoreCase ) )
-                    {
-                        m.Error( $"CodeCakeBuilder Project does not have IsPackable set to false." );
-                        badPack = true;
-                    }
-                    else
-                    {
-                        m.Trace( $"Project {p.ProjectName} will be published." );
-                    }
-                }
-                else
-                {
-                    m.Trace( $"Project {p.ProjectName} is set to not be packaged: this project won't be published." );
-                }
-                var (project, isNewProject) = _solution.AddOrFindProject( p.SolutionRelativeFolderPath, ".Net", p.ProjectName );
-                project.Tag( p );
-                if( isNewProject )
-                {
-                    project.TransformSavors( _ => p.TargetFrameworks );
-                    ConfigureFromSpec( m, project, _solutionSpec );
-                }
-                else
-                {
-                    var previous = project.Savors;
-                    if( previous != p.TargetFrameworks )
-                    {
-                        var removed = previous.Except( p.TargetFrameworks );
-                        m.Trace( $"TargetFramework changed from {previous} to {p.TargetFrameworks}." );
-                        project.TransformSavors( t =>
-                        {
-                            var c = t.Except( previous );
-                            if( c.AtomicTraits.Count == t.AtomicTraits.Count - previous.AtomicTraits.Count )
-                            {
-                                // The trait contained all the previous ones: we replace all of them with the new one.
-                                return c.Union( p.TargetFrameworks );
-                            }
-                            // The trait doesn't contain all the previous ones: we must not blindly add the new project's trait,
-                            // we only remove the ones that have been removed.
-                            return t.Except( removed );
-                        } );
-                    }
-                }
-                SynchronizePackageReferences( m, project );
-                projectsToRemove.Remove( project );
-                orderedProjects[i++] = project;
-            }
-
-            SynchronizeSolutionPackageReferences( _sln, _solution );
-
-            foreach( var project in _solution.Projects.Where( p => p.Tag<MSProject>() != null ) )
-            {
-                SynchronizeProjectReferences( m, project, msProj => orderedProjects[msProj.MSProjIndex] );
-            }
-            foreach( var noMore in projectsToRemove ) _solution.RemoveProject( noMore );
-
             var buildSecrets = new List<(string SecretKeyName, string? Secret)>();
-            _isSolutionValid = !badPack;
+            _isSolutionValid = UpdateSolutionFromMSBuild( m, _solution, _sln, _solutionSpec );
             var h = OnSolutionConfiguration;
             if( h != null )
             {
@@ -286,99 +206,6 @@ namespace CK.Env.Plugin
             SetSolutionDirty( e.Monitor );
         }
 
-        static void ConfigureFromSpec( IActivityMonitor m, DependencyModel.Project project, SolutionSpec spec )
-        {
-            var msProject = project.Tag<MSProject>();
-            if( project.SimpleProjectName == "CodeCakeBuilder" )
-            {
-                project.IsBuildProject = true;
-            }
-            else
-            {
-                project.IsTestProject = project.SimpleProjectName.EndsWith( ".Tests" );
-                bool mustPublish;
-                if( spec.PublishedProjects.Count > 0 )
-                {
-                    mustPublish = spec.PublishedProjects.Contains( project.SolutionRelativeFolderPath );
-                }
-                else
-                {
-                    bool notPublished = !spec.NotPublishedProjects.Contains( project.SolutionRelativeFolderPath );
-                    bool notRootDirectory = project.SolutionRelativeFolderPath.Parts.Count == 1;
-
-
-
-                    bool ignoreNotRoot = spec.PublishProjectInDirectories && !project.IsTestProject;
-                    // We blindly follow the <IsPackable> element. Only if it's not defined (ie. it's null) we must "think".
-                    mustPublish = msProject.IsPackable
-                                    ?? (notPublished &&
-                                            (notRootDirectory || ignoreNotRoot || (project.IsTestProject && spec.TestProjectsArePublished)));
-                }
-                if( mustPublish )
-                {
-                    project.AddGeneratedArtifacts( new Artifact( NuGetType, project.SimpleProjectName ) );
-                }
-                if( spec.CKSetupComponentProjects.Contains( project.SimpleProjectName ) )
-                {
-                    if( !mustPublish )
-                    {
-                        m.Error( $"Project {project} cannot be a CKSetupComponent since it is not published." );
-                    }
-                    foreach( var name in msProject.TargetFrameworks.AtomicTraits
-                                                  .Select( t => new Artifact( CKSetupType, project.SimpleProjectName + '/' + t.ToString() ) ) )
-                    {
-                        project.AddGeneratedArtifacts( name );
-                    }
-                }
-            }
-        }
-
-        static void SynchronizePackageReferences( IActivityMonitor m, DependencyModel.Project project )
-        {
-            var toRemove = new HashSet<Artifact>( project.PackageReferences.Select( r => r.Target.Artifact ) );
-            var p = project.Tag<MSProject>();
-            foreach( DeclaredPackageDependency dep in p.Deps.Packages )
-            {
-                var d = dep.BaseArtifactInstance;
-                toRemove.Remove( d.Artifact );
-                project.EnsurePackageReference( d,
-                                                dep.PrivateAsset.Equals( "all", StringComparison.OrdinalIgnoreCase ) ? ArtifactDependencyKind.Private : ArtifactDependencyKind.Transitive,
-                                                dep.Frameworks );
-            }
-            foreach( var noMore in toRemove ) project.RemovePackageReference( noMore );
-        }
-
-        static void SynchronizeSolutionPackageReferences( SolutionFile sln, Solution solutionModel )
-        {
-            HashSet<Artifact> solutionRefs = new HashSet<Artifact>( solutionModel.SolutionPackageReferences.Select( p => p.Target.Artifact ) );
-            foreach( var p in sln.StandardDotnetToolConfigFile.Tools )
-            {
-                solutionRefs.Remove( p.Artifact );
-                solutionModel.EnsureSolutionPackageReference( p );
-            }
-            foreach( var p in solutionRefs ) solutionModel.RemoveSolutionPackageReference( p );
-        }
-
-        static void SynchronizeProjectReferences( IActivityMonitor m, DependencyModel.Project project, Func<MSProject, DependencyModel.Project> depsFinder )
-        {
-            var p = project.Tag<MSProject>();
-            var toRemove = new HashSet<IProject>( project.ProjectReferences.Select( r => r.Target ) );
-            foreach( var dep in p.Deps.Projects )
-            {
-                if( dep.TargetProject is MSProject target )
-                {
-                    var mapped = depsFinder( target );
-                    Debug.Assert( mapped != null );
-                    project.EnsureProjectReference( mapped, ArtifactDependencyKind.Transitive );
-                    toRemove.Remove( mapped );
-                }
-                else
-                {
-                    m.Warn( $"Project '{p}' references project {dep.TargetProject} of unhandled type. Reference is ignored." );
-                }
-            }
-            foreach( var noMore in toRemove ) project.RemoveProjectReference( noMore );
-        }
 
         /// <summary>
         /// Gets whether <see cref="IWorldState.WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/>
@@ -567,34 +394,6 @@ namespace CK.Env.Plugin
         }
 
 
-        [CommandMethod]
-        public bool ChangeSingleTargetFramework( IActivityMonitor monitor, string oldOne, string newOne )
-        {
-            if( oldOne == null ) throw new ArgumentNullException( nameof( oldOne ) );
-            if( newOne == null ) throw new ArgumentNullException( nameof( newOne ) );
-
-            var solution = GetSolution( monitor, allowInvalidSolution: false );
-            if( solution == null ) return false;
-            var o = MSProject.Savors.FindOnlyExisting( oldOne );
-            if( o == null || o.IsEmpty )
-            {
-                monitor.Info( $"'{oldOne}' is not an existing target framework. There is nothing to replace." );
-                return true;
-            }
-            if( o.AtomicTraits.Count != 1 )
-            {
-                monitor.Error( $"Target framework '{oldOne}' must be a single framework." );
-                return false;
-            }
-            var n = MSProject.Savors.FindOrCreate( newOne );
-            if( n.AtomicTraits.Count != 1 )
-            {
-                monitor.Error( $"Target framework to replace '{newOne}' must be a single framework." );
-                return false;
-            }
-            return ChangeSingleTargetFramework( monitor, o, n );
-        }
-
         // This should not be here: only CKli (the console) is concerned here.
         [CommandMethod]
         public bool DumpLogsBetweenDates( IActivityMonitor m, string beginning = "01-01-2021", string ending = "31-12-2021" )
@@ -631,7 +430,7 @@ namespace CK.Env.Plugin
 
         // This should not be here: only CKli (the console) is concerned here.
         [CommandMethod]
-        public bool DiffBetweenDates( IActivityMonitor m, string beginning = "01-01-2021", string ending = "31-12-2021", bool showDiffs = false )
+        public bool DiffBetweenDates( IActivityMonitor m, string beginning = "01-01-2022", string ending = "31-12-2022", bool showDiffs = false )
         {
             using var auto = m.TemporarilySetInteractiveUserFilter( new LogClamper( LogFilter.Off, true ) );
             var solution = GetSolution( m, allowInvalidSolution: true );
@@ -659,6 +458,34 @@ namespace CK.Env.Plugin
             }
             _sln.Save( monitor );
             return true;
+        }
+
+        [CommandMethod]
+        public bool ChangeSingleTargetFramework( IActivityMonitor monitor, string oldOne, string newOne )
+        {
+            if( oldOne == null ) throw new ArgumentNullException( nameof( oldOne ) );
+            if( newOne == null ) throw new ArgumentNullException( nameof( newOne ) );
+
+            var solution = GetSolution( monitor, allowInvalidSolution: false );
+            if( solution == null ) return false;
+            var o = MSProject.Savors.FindOnlyExisting( oldOne );
+            if( o == null || o.IsEmpty )
+            {
+                monitor.Info( $"'{oldOne}' is not an existing target framework. There is nothing to replace." );
+                return true;
+            }
+            if( o.AtomicTraits.Count != 1 )
+            {
+                monitor.Error( $"Target framework '{oldOne}' must be a single framework." );
+                return false;
+            }
+            var n = MSProject.Savors.FindOrCreate( newOne );
+            if( n.AtomicTraits.Count != 1 )
+            {
+                monitor.Error( $"Target framework to replace '{newOne}' must be a single framework." );
+                return false;
+            }
+            return ChangeSingleTargetFramework( monitor, o, n );
         }
 
         /// <summary>

@@ -67,7 +67,7 @@ namespace CK.Env.MSBuildSln
                 _dispose = dispose;
             }
 
-            public string Line { get; private set; }
+            public string? Line { get; private set; }
 
             public int LineNumber { get; private set; }
 

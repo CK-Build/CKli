@@ -10,8 +10,8 @@ namespace CK.Env
     /// </summary>
     public abstract class JsonFileBase : TextFileBase
     {
-        JObject _root;
-        string _currentText;
+        JObject? _root;
+        string? _currentText;
 
         /// <summary>
         /// Initializes a new <see cref="JsonFileBase"/>.
@@ -23,7 +23,7 @@ namespace CK.Env
         {
         }
 
-        JObject GetRoot()
+        JObject? GetRoot()
         {
             if( _root == null && (_currentText = TextContent) != null )
             {
@@ -40,7 +40,7 @@ namespace CK.Env
             }
         }
 
-        string GetCurrentText()
+        string? GetCurrentText()
         {
             _currentText = GetRoot()?.ToString( Newtonsoft.Json.Formatting.Indented );
             return _currentText;
@@ -52,7 +52,7 @@ namespace CK.Env
         /// This object is mutable and any change to it are tracked (<see cref="IsDirty"/>
         /// is dynamically updated).
         /// </summary>
-        public JObject Root
+        public JObject? Root
         {
             get => GetRoot();
             set
@@ -90,18 +90,6 @@ namespace CK.Env
         {
             if( !IsDirty && !forceSave ) return true;
             return CreateOrUpdate( m, GetCurrentText(), forceSave );
-        }
-
-        /// <summary>
-        /// Sets a non null property value on a JObject or removes it if it is null.
-        /// </summary>
-        /// <param name="propertyName">The property name. Must not be null nor empty.</param>
-        /// <param name="value">The nullable value.</param>
-        protected void SetNonNullProperty( JObject o, string propertyName, string? value )
-        {
-            Throw.CheckNotNullOrEmptyArgument( propertyName );
-            if( value == null ) o.Remove( propertyName );
-            else Root[propertyName] = value;
         }
 
     }

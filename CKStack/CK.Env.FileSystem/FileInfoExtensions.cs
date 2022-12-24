@@ -134,8 +134,8 @@ namespace CK.Env
             readonly ITextFileInfo _source;
             readonly Func<string, string> _trans;
 
-            string _text;
-            byte[] _bin;
+            string? _text;
+            byte[]? _bin;
 
             public Transformed( ITextFileInfo source, Func<string, string> trans )
             {

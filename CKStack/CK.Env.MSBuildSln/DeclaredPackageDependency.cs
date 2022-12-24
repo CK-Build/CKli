@@ -9,15 +9,14 @@ namespace CK.Env.MSBuildSln
     {
         static readonly ArtifactType _nugetType = ArtifactType.Single( "NuGet" );
 
-        internal DeclaredPackageDependency(
-            Project owner,
-            string packageId,
-            SVersionBound version,
-            XElement originElement,
-            XElement finalVersionElement,
-            CKTrait frameworks,
-            string privateAsset,
-            bool isVersionOverride )
+        internal DeclaredPackageDependency( Project owner,
+                                            string packageId,
+                                            SVersionBound version,
+                                            XElement originElement,
+                                            XElement finalVersionElement,
+                                            CKTrait frameworks,
+                                            string privateAsset,
+                                            bool isVersionOverride )
         {
             Owner = owner;
             PackageId = packageId;

@@ -58,7 +58,8 @@ namespace CK.Env.Plugin
                 p.Associate( project );
                 if( isNew )
                 {
-                    if( p.PackageJson.IsPublished )//add generated artifact if needed.
+                    // Add generated artifact if needed.
+                    if( !p.PackageJson.IsPrivate )
                     {
                         project.AddGeneratedArtifacts( new Artifact( NPMClient.NPMType, p.PackageJson.Name ) );
                         somePublished = true;

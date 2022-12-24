@@ -42,7 +42,7 @@ namespace CK.Env
         /// successfully been built even if some required checks have failed.
         /// </param>
         /// <returns>The solution or null if unable to load the solution.</returns>
-        ISolution GetSolution( IActivityMonitor monitor, bool allowInvalidSolution, bool reloadSolution );
+        ISolution? GetSolution( IActivityMonitor monitor, bool allowInvalidSolution, bool reloadSolution );
 
         /// <summary>
         /// Gets whether the Solution that this driver handles is valid or not.

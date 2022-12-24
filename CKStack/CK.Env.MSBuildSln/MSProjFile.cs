@@ -236,10 +236,10 @@ namespace CK.Env.MSBuildSln
         /// <param name="elementNameFilter">The element name predicate.</param>
         /// <returns>The list of elements.</returns>
         public IList<XElement> FindProperty( Func<XName, bool> elementNameFilter ) => _allFiles.Select( f => f.Document.Root )
-                                                                                .Elements( "PropertyGroup" )
-                                                                                .Elements()
-                                                                                .Where( x => elementNameFilter( x.Name ) )
-                                                                                .ToList();
+                                                                                               .Elements( "PropertyGroup" )
+                                                                                               .Elements()
+                                                                                               .Where( x => elementNameFilter( x.Name ) )
+                                                                                               .ToList();
 
         /// <summary>
         /// Saves this file if it has been modified as well as all modified imported files.
@@ -264,12 +264,10 @@ namespace CK.Env.MSBuildSln
         internal void UpdateAllFilesList()
         {
             var start = new MSProjFile[] { this };
-            _allFiles = start
-                .Concat(
-                    Imports.Where( i => i.ImportedFile != null )
-                    .SelectMany( i => i.ImportedFile!.AllFiles ) )
-                .Distinct()
-                .ToArray();
+            _allFiles = start.Concat( Imports.Where( i => i.ImportedFile != null )
+                                             .SelectMany( i => i.ImportedFile!.AllFiles ) )
+                             .Distinct()
+                             .ToArray();
         }
 
 

@@ -65,15 +65,15 @@ namespace CK.Env.MSBuildSln
         }
 
         /// <summary>
-        /// For Project, gets the path to the project file relative to the <see cref="SolutionFile.SolutionFolderPath"/> (the .csproj file).
+        /// For Project, gets the path to the project file (the .csproj file) relative to the <see cref="SolutionFile.SolutionFolderPath"/>.
         /// <para>
         /// For SolutionFolder, this is by design the <see cref="SolutionRelativeLogicalFolderPath"/>.
         /// </para>
         /// </summary>
-        public virtual NormalizedPath SolutionRelativePath
+        public NormalizedPath SolutionRelativePath
         {
             get => _solutionRelativePath;
-            private protected set
+            internal set
             {
                 // This is only called by SolutionFolder.
                 // It's useless here to dirty the structure.

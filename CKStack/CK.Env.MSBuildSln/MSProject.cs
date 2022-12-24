@@ -323,7 +323,7 @@ namespace CK.Env.MSBuildSln
                                                bool preserveExisting = false,
                                                bool throwOnProjectDependendencies = true )
         {
-            if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
+            Throw.CheckState( Deps.IsInitialized );
             if( frameworks == null || frameworks.IsEmpty )
             {
                 throw new ArgumentException( "Must not be empty.", nameof( frameworks ) );
@@ -506,7 +506,7 @@ namespace CK.Env.MSBuildSln
         /// <returns>The number of changes.</returns>
         public int RemoveUselessDependencies( IActivityMonitor m )
         {
-            if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
+            Throw.CheckState( Deps.IsInitialized );
             int changeCount = _dependencies.UselessDependencies.Count;
             if( changeCount > 0 )
             {
@@ -607,19 +607,19 @@ namespace CK.Env.MSBuildSln
                 System.Xml.Linq.Extensions.Remove( oldProperties );
                 parents.Where( p => !p.HasElements ).Remove();
                 // Removes the Sdk import.
-                _primaryFile.Document.Root.Elements( "Sdk" ).Where( e => e.Attribute( "Name" )?.Value == "Microsoft.Build.CentralPackageVersions" ).Remove();
+                _primaryFile.Document.Root!.Elements( "Sdk" ).Where( e => e.Attribute( "Name" )?.Value == "Microsoft.Build.CentralPackageVersions" ).Remove();
                 UseMicrosoftBuildCentralPackageVersions = false;
                 _centralPackagesFile = null;
                 OnChange( monitor );
             }
         }
 
-        void OnChange( IActivityMonitor m )
+        void OnChange( IActivityMonitor monitor )
         {
-            DoInitializeDependencies( m );
+            DoInitializeDependencies( monitor );
             if( !_dependencies.IsInitialized )
             {
-                throw new Exception( "Altering project files must produce valid dependencies." );
+                Throw.Exception( "Altering project files must produce valid dependencies." );
             }
             Solution.CheckDirtyProjectFiles( true );
         }

@@ -9,9 +9,11 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics;
 
 namespace CK.Env.Plugin
 {
+
     /// <summary>
     /// Specialized <see cref="JsonFileBase"/> for package.json file.
     /// </summary>
@@ -19,6 +21,7 @@ namespace CK.Env.Plugin
     {
         readonly List<NPMDep> _deps;
         readonly List<NPMDep> _unsavedDeps;
+
         internal PackageJsonFile( FileSystem fs, NormalizedPath directoryPath )
             : base( fs, directoryPath.AppendPart( "package.json" ) )
         {
@@ -33,7 +36,10 @@ namespace CK.Env.Plugin
         public string? Name
         {
             get => (string?)Root?["name"];
-            set => SetNonNullProperty( Root, "name", value );
+            set
+            {
+                if( Root != null ) Root["name"] = value;
+            }
         }
 
         /// <summary>
@@ -49,15 +55,11 @@ namespace CK.Env.Plugin
         public bool IsPrivate
         {
             get => (bool?)Root?["private"] ?? false;
-            set => Root["private"] = value;
+            set
+            {
+                if( Root != null ) Root["private"] = value;
+            }
         }
-
-        /// <summary>
-        /// Gets whether this package is published.
-        /// It must not be private and have a name and a version.
-        /// </summary>
-        [MemberNotNullWhen( true, nameof( Name ), nameof( Version ) )]
-        public bool IsPublished => !IsPrivate && Name != null && Version != null;
 
         /// <summary>
         /// Gets or sets the version.
@@ -69,10 +71,13 @@ namespace CK.Env.Plugin
         {
             get
             {
-                var v = (string?)Root["version"];
+                var v = (string?)Root?["version"];
                 return v != null ? SVersion.TryParse( v ) : null;
             }
-            set => SetNonNullProperty( Root, "version", value?.ToNormalizedString() );
+            set
+            {
+                if( Root != null ) Root["version"] = value?.ToNormalizedString();
+            }
         }
 
         /// <summary>
@@ -89,8 +94,9 @@ namespace CK.Env.Plugin
         /// <returns>True if the version has been changed, false it was the same version.</returns>
         internal bool SetDependencyMinVersion( IActivityMonitor m, string name, SVersion v )
         {
+            Debug.Assert( Root != null );
             var idx = _deps.FindIndex( dep => dep.Name == name );
-            if( idx < 0 ) throw new ArgumentException( $"Dependency '{name}' not found.", nameof( name ) );
+            if( idx < 0 ) Throw.ArgumentException( $"Dependency '{name}' not found.", nameof( name ) );
             NPMDep dOrig = _deps[idx];
             if( dOrig.MinVersion != v )
             {
@@ -136,11 +142,10 @@ namespace CK.Env.Plugin
         }
 
         /// <summary>
-        /// Overridden to return the name of the package or the '<see cref="SafeName"/> (unpublished)'
-        /// when <see cref="IsPublished"/> is false.
+        /// Overridden to return '<see cref="SafeName"/>' or '<see cref="SafeName"/> (private)'.
         /// </summary>
         /// <returns>A readable string.</returns>
-        public override string ToString() => IsPublished ? Name : $"{SafeName} (unpublished)";
+        public override string ToString() => IsPrivate ? $"{SafeName} (private)" : SafeName;
 
         internal NPMProjectStatus Refresh( IActivityMonitor m )
         {
