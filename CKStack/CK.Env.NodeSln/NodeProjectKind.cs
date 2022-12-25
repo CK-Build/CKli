@@ -8,7 +8,8 @@ namespace CK.Env.NodeSln
         /// <summary>
         /// A Node project is defined by a package.json file that doesn't
         /// contain a "workspaces": ["*"] property and has no angular.json file
-        /// in the same directory.
+        /// in the same directory and is not in a workspace.
+        /// A node project must not contain subordinated projects or workspaces.
         /// </summary>
         NodeProject,
 
@@ -18,7 +19,8 @@ namespace CK.Env.NodeSln
         /// as child projects.
         /// <para>
         /// For us, when a package.json contains a "workspaces": ["*"], it is like a ".sln" that contains
-        /// the projects that are all the folders with a package.json.
+        /// the projects that are all the folders with a package.json and this NOT recursive: a workspace
+        /// must not contain subordinated workspaces.
         /// </para>
         /// </summary>
         YarnWorkspace,
@@ -28,11 +30,17 @@ namespace CK.Env.NodeSln
         /// the subordinated projects.
         /// <para>
         /// Any package.json that don't appear in the angular.json file is ignored.
+        /// This NOT recursive: a workspace must not contain subordinated workspaces.
         /// </para>
         /// </summary>
-        AngularWorkspace
-    }
+        AngularWorkspace,
 
+        /// <summary>
+        /// A Node project contained in a <see cref="YarnWorkspace"/> or <see cref="AngularWorkspace"/>.
+        /// It must not contain subordinated projects or workspaces.
+        /// </summary>
+        NodeSubProject
+    }
 
 }
 

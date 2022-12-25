@@ -3,21 +3,25 @@ using System;
 
 namespace CK.Env.NodeSln
 {
-    public class NodeProject : NodeProjectBase
+    /// <summary>
+    /// Basic Node project. Everything is defined by the package.json manifest.
+    /// </summary>
+    public sealed class NodeProject : NodeRootProjectBase
     {
-        public NodeProject( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath, int index )
+        internal NodeProject( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath, int index )
             : base( solution, path, outputPath, index )
         {
         }
 
-        internal static NodeProject? Create( IActivityMonitor monitor,
-                                             NodeSolution nodeSolution,
-                                             NormalizedPath path,
-                                             NormalizedPath outputPath,
-                                             int index )
+        internal override bool Initialize( IActivityMonitor monitor )
         {
-            var p = new NodeProject( nodeSolution, path, outputPath, index );
-            return p.Initialize( monitor ) ? p : null;
+            if( !base.Initialize( monitor ) ) return false;
+            if( PackageJsonFile.HasWorkspaces )
+            {
+                monitor.Error( $"Invalid '{PackageJsonFile.FilePath}' for a NodeProject: a \"workspaces\": [\"*\"] property MUST NOT appear." );
+                return false;
+            }
+            return true;
         }
 
     }

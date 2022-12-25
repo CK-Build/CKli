@@ -40,7 +40,7 @@ namespace CK.Env.MSBuildSln
         }
 
         /// <summary>
-        /// Gets the project path: it is the .proj (.csproj etc.) for an actual project (relative
+        /// Gets the project path (in the <see cref="FileSystem"/>): it is the .proj (.csproj etc.) for an actual project (relative
         /// to the <see cref="FileSystem"/>) and the folder path of a <see cref="SolutionFolder"/> .
         /// </summary>
         public NormalizedPath Path

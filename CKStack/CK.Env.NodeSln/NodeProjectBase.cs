@@ -4,27 +4,32 @@ using System.Diagnostics.CodeAnalysis;
 namespace CK.Env.NodeSln
 {
     /// <summary>
-    /// Base class for <see cref="NPMProject"/>, <see cref="AngularWorkspace"/> and <see cref="YarnWorkspace"/>.
+    /// Base class for all kind of projects.
     /// </summary>
     public abstract class NodeProjectBase
     {
         readonly NormalizedPath _solutionRelativePath;
-        readonly NormalizedPath _solutionRelativeOutputPath;
         readonly NormalizedPath _path;
-        readonly NormalizedPath _outputPath;
         [AllowNull]
         PackageJsonFile _packageJson;
         bool _isDirty;
+        bool _restoreRequired;
 
-        private protected NodeProjectBase( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath, int index )
+        private protected NodeProjectBase( NodeSolution solution, NormalizedPath path, int index )
         {
             Solution = solution;
             Index = index;
             _solutionRelativePath = path.ResolveDots();
-            _solutionRelativeOutputPath = _solutionRelativePath.Combine( outputPath ).ResolveDots();
             _path = solution.SolutionFolderPath.Combine( _solutionRelativePath );
-            _outputPath = solution.SolutionFolderPath.Combine( _solutionRelativeOutputPath );
         }
+
+        internal virtual bool Initialize( IActivityMonitor monitor )
+        {
+            var path = Solution.SolutionFolderPath.AppendPart( "package.json" );
+            _packageJson = PackageJsonFile.Read( monitor, this );
+            return _packageJson != null;
+        }
+
 
         /// <summary>
         /// Gets the solution that owns this project.
@@ -32,7 +37,8 @@ namespace CK.Env.NodeSln
         public NodeSolution Solution { get; }
 
         /// <summary>
-        /// Gets the index of this project in the <see cref="NodeSolution.AllProjects"/> list.
+        /// Gets the index of this project in the <see cref="NodeSolution.Projects"/> list for root projects.
+        /// When this is a <see cref="NodeSubProject"/>, this is the index in the <see cref="INodeWorkspace.Projects"/>
         /// </summary>
         public int Index { get; }
 
@@ -50,10 +56,9 @@ namespace CK.Env.NodeSln
         public NormalizedPath Path => _path;
 
         /// <summary>
-        /// Gets the output path (in the <see cref="FileSystem"/>).
-        /// Defaults to <see cref="Path"/>.
+        /// Gets the package.json file.
         /// </summary>
-        public NormalizedPath OutputPath => _outputPath;
+        public PackageJsonFile PackageJsonFile => _packageJson;
 
         /// <summary>
         /// Gets whether this file needs to be saved.
@@ -61,26 +66,24 @@ namespace CK.Env.NodeSln
         public bool IsDirty => _isDirty;
 
         /// <summary>
-        /// Gets the output path. Defaults to <see cref="SolutionRelativePath"/>
+        /// Gets whether a restore of the packages is required
+        /// after the file is saved.
         /// </summary>
-        public NormalizedPath SolutionRelativeOutputPath => _solutionRelativeOutputPath;
+        public bool RestoreRequired => _restoreRequired;
 
 
         public bool Save( IActivityMonitor monitor )
         {
         }
 
-        internal virtual bool Initialize( IActivityMonitor monitor )
+        protected void SetDirty( bool restoreRequired )
         {
-            var path = Solution.SolutionFolderPath.AppendPart( "package.json" );
-            _packageJson = PackageJsonFile.Read( monitor, this );
-            return _packageJson != null;
+            _isDirty = true;
+            _restoreRequired |= restoreRequired;
         }
 
-        protected void SetDirty() => _isDirty = true;
+        public override string ToString() => Path;
     }
-
-
 }
 
 

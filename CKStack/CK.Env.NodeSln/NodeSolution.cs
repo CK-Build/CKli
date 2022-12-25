@@ -4,18 +4,19 @@ using System;
 using System.Xml.Linq;
 using System.Reflection.Metadata;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 namespace CK.Env.NodeSln
 {
     public class NodeSolution
     {
-        readonly List<NodeProjectBase> _projects;
+        readonly List<NodeRootProjectBase> _projects;
 
         public NodeSolution( FileSystem fs, NormalizedPath solutionFolderPath )
         {
             FileSystem = fs;
             SolutionFolderPath = solutionFolderPath;
-            _projects = new List<NodeProjectBase>();
+            _projects = new List<NodeRootProjectBase>();
         }
 
         /// <summary>
@@ -29,9 +30,9 @@ namespace CK.Env.NodeSln
         public NormalizedPath SolutionFolderPath { get; }
 
         /// <summary>
-        /// Gets all projects, regardless of their type.
+        /// Gets the root projects, regardless of their type.
         /// </summary>
-        public IReadOnlyList<NodeProjectBase> AllProjects => _projects;
+        public IReadOnlyList<NodeRootProjectBase> Projects => _projects;
 
         /// <summary>
         /// Reads or creates a new <see cref="SolutionFile"/>.
@@ -70,6 +71,11 @@ namespace CK.Env.NodeSln
                     monitor.Warn( $"Unknown NodeSolution element name '{p.Name.LocalName}'. It is ignored." );
                     continue;
                 }
+                if( kind == NodeProjectKind.NodeSubProject )
+                {
+                    monitor.Warn( $"A NodeSolution cannot contain 'NodeSubProject'. It is ignored." );
+                    continue;
+                }
                 var sPath = p.Attribute( "Path" )?.Value;
                 if( sPath == null )
                 {
@@ -77,54 +83,92 @@ namespace CK.Env.NodeSln
                     continue;
                 }
                 var path = new NormalizedPath( sPath ).ResolveDots( throwOnAboveRoot: false );
-                if( path.IsEmptyPath )
+                var project = nodeSolution.TryReadProject( monitor,
+                                                           kind,
+                                                           null,
+                                                           path,
+                                                           p.Attribute( "OutputPath" )?.Value,
+                                                           ref index,
+                                                           $"NodeSolution element '{p}'" );
+                if( project is NodeRootProjectBase r )
                 {
-                    monitor.Warn( $"NodeSolution element '{p}': Path is empty. It is ignored." );
-                    continue;
-                }
-                var folder = fs.GetFileInfo( nodeSolution.SolutionFolderPath.Combine( path ) );
-                if( !folder.Exists || !folder.IsDirectory )
-                {
-                    if( path.IsEmptyPath )
-                    {
-                        monitor.Warn( $"NodeSolution element '{p}': Path folder not found. It is ignored." );
-                        continue;
-                    }
-                }
-                var sOutputPath = p.Attribute( "OutputPath" )?.Value;
-                var outputPath = new NormalizedPath( sOutputPath ).ResolveDots( throwOnAboveRoot: false );
-                if( string.IsNullOrWhiteSpace( outputPath ) )
-                {
-                    monitor.Warn( $"NodeSolution element '{p}' has no or empty OutputPath attribute. It will use the project's Path." );
-                    outputPath = path;
-                }
-                NodeProjectBase? project;
-                switch( kind )
-                {
-                    case NodeProjectKind.YarnWorkspace:
-                        project = new YarnWorkspace( nodeSolution, path, outputPath, index++ );
-                        break;
-                    case NodeProjectKind.AngularWorkspace:
-                        project = new AngularWorkspace( nodeSolution, path, outputPath, index++ );
-                        break;
-                    default:
-                        Debug.Assert( kind == NodeProjectKind.NodeProject );
-                        project = new NodeProject( nodeSolution, path, outputPath, index++ );
-                        break;
-                }
-                if( project.Initialize( monitor ) )
-                {
-                    nodeSolution._projects.Add( project );
-                }
-                else
-                {
-                    monitor.Warn( $"Project '{project}' initialization failed. It is ignored." );
-                    --index;
+                    nodeSolution._projects.Add( r );
                 }
             }
             return nodeSolution;
         }
 
+        /// <summary>
+        /// Tries to read a project.
+        /// </summary>
+        /// <param name="monitor">The monitor.</param>
+        /// <param name="kind">The kind of project that must be read.</param>
+        /// <param name="workspace">Workspace (<paramref name="kind"/> is necessarily <see cref="NodeProjectKind.NodeSubProject"/></param>
+        /// <param name="path">Project path.</param>
+        /// <param name="outputPath">Optional project output path for root projects only (when <paramref name="workspace"/> is null).</param>
+        /// <param name="index">Index of the project in its holder.</param>
+        /// <returns></returns>
+        internal NodeProjectBase? TryReadProject( IActivityMonitor monitor,
+                                                  NodeProjectKind kind,
+                                                  INodeWorkspace? workspace,
+                                                  NormalizedPath path,
+                                                  string? outputPath,
+                                                  ref int index,
+                                                  string ownerDescription )
+        {
+            Debug.Assert( (workspace == null) == (kind == NodeProjectKind.NodeSubProject) );
+            Debug.Assert( outputPath == null || workspace != null );
+            if( path.IsEmptyPath )
+            {
+                monitor.Warn( $"{ownerDescription}: Path is empty. It is ignored." );
+                return null;
+            }
+            var root = workspace != null ? SolutionFolderPath.Combine( workspace.Path ) : SolutionFolderPath;
+            var folder = FileSystem.GetFileInfo( root.Combine( path ) );
+            if( !folder.Exists || !folder.IsDirectory )
+            {
+                if( path.IsEmptyPath )
+                {
+                    monitor.Warn( $"{ownerDescription}: Path folder not found. It is ignored." );
+                    return null;
+                }
+            }
+            NodeProjectBase? project;
+
+            if( workspace == null )
+            {
+                var outPath = root.Combine( outputPath ).ResolveDots( throwOnAboveRoot: false );
+                if( string.IsNullOrWhiteSpace( outPath ) )
+                {
+                    monitor.Warn( $"{ownerDescription} has no or empty OutputPath attribute. It will use the project's Path." );
+                    outPath = path;
+                }
+                switch( kind )
+                {
+                    case NodeProjectKind.YarnWorkspace:
+                        project = new YarnWorkspace( this, path, outPath, index++ );
+                        break;
+                    case NodeProjectKind.AngularWorkspace:
+                        project = new AngularWorkspace( this, path, outPath, index++ );
+                        break;
+                    default:
+                        Debug.Assert( kind == NodeProjectKind.NodeProject );
+                        project = new NodeProject( this, path, outPath, index++ );
+                        break;
+                }
+            }
+            else
+            {
+                project = new NodeSubProject( this, workspace, path, index++ );
+            }
+            if( project.Initialize( monitor ) )
+            {
+                return project;
+            }
+            monitor.Warn( $"Project '{project}' initialization failed. It is ignored." );
+            --index;
+            return null;
+        }
     }
 
 }

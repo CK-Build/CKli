@@ -27,8 +27,9 @@ namespace CK.Env.NodeSln
         string? _name;
         SVersion _version;
         bool _private;
+        readonly bool _hasWorspaces;
 
-        PackageJsonFile( NormalizedPath filePath, JObject o, NodeProjectBase project, bool isPrivate, string? name, SVersion version )
+        PackageJsonFile( NormalizedPath filePath, JObject o, NodeProjectBase project, bool isPrivate, string? name, SVersion version, bool hasWorspaces )
         {
             _deps = new List<NodeProjectDependency>();
             FilePath = filePath;
@@ -37,6 +38,7 @@ namespace CK.Env.NodeSln
             _private = isPrivate;
             _name = name;
             _version = version;
+            _hasWorspaces = hasWorspaces;
         }
 
         internal static PackageJsonFile? Read( IActivityMonitor monitor, NodeProjectBase project )
@@ -73,7 +75,25 @@ namespace CK.Env.NodeSln
                 monitor.Error( $"File '{filePath}': property \"version\" is invalid: {version.ErrorMessage}." );
                 return null;
             };
-            return new PackageJsonFile( filePath, o, isPrivate, name, version );
+            bool hasWorkspaces = false;
+            var pWorkspaces = o.Property( "workspaces" );
+            if( pWorkspaces != null )
+            {
+                if( pWorkspaces.Value is JArray a )
+                {
+                    if( a.Count != 1 || a[0].Type != JTokenType.String || (string?)a[0] != "*" )
+                    {
+                        monitor.Error( $"File '{filePath}': property \"workspaces\" must be [\"*\"]: only this pattern is supported for workspaces." );
+                        return null;
+                    }
+                    hasWorkspaces = true;
+                }
+                else
+                {
+                    monitor.Warn( $"File '{filePath}': property \"workspaces\" is not an array. It is ignored." );
+                }
+            }
+            return new PackageJsonFile( filePath, o, project, isPrivate, name, version, hasWorkspaces );
 
             static bool TryReadString( IActivityMonitor monitor, NormalizedPath filePath, JObject o, string name, out string? value )
             {
@@ -100,6 +120,9 @@ namespace CK.Env.NodeSln
         /// <summary>
         /// Gets or sets the name.
         /// Can be null: a non-published package does not require a name (nor a <see cref="Version"/>).
+        /// <para>
+        /// This can be set to null only if <see cref="IsPrivate"/> is true.
+        /// </para>
         /// </summary>
         public string? Name
         {
@@ -129,6 +152,9 @@ namespace CK.Env.NodeSln
         /// <summary>
         /// Gets or sets whether this package is private: even if it has a <see cref="Name"/>
         /// and a <see cref="Version"/>, it must not be published.
+        /// <para>
+        /// This can be set to false only if a non null <see cref="Name"/> exists.
+        /// </para>
         /// </summary>
         public bool IsPrivate
         {
@@ -165,6 +191,11 @@ namespace CK.Env.NodeSln
                 }
             }
         }
+
+        /// <summary>
+        /// Gets whether the "workspaces": ["*"] property exists.
+        /// </summary>
+        public bool HasWorkspaces => _hasWorspaces;
 
         /// <summary>
         /// Gets the list of dependencies.

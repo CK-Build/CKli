@@ -3,7 +3,7 @@ using System;
 
 namespace CK.Env.NodeSln
 {
-    public class AngularWorkspace : NodeProjectBase
+    public class AngularWorkspace : NodeRootProjectBase
     {
         public AngularWorkspace( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath, int index )
             : base( solution, path, outputPath, index )
