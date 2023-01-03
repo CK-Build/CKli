@@ -269,7 +269,7 @@ namespace CK.Env.MSBuildSln
         /// <returns>True on success, false on error.</returns>
         public bool Save( IActivityMonitor m )
         {
-            if( !_dependencies.IsInitialized ) throw new InvalidOperationException( "Invalid Project." );
+            Throw.CheckState( _dependencies.IsInitialized );
             Debug.Assert( _primaryFile != null );
             return _primaryFile.Save( m, Solution.FileSystem )
                    && (_centralPackagesFile?.Save( m, Solution.FileSystem ) ?? true);

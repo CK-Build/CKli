@@ -7,7 +7,11 @@ using System.Linq;
 
 namespace CK.Env.MSBuildSln
 {
-    public partial class SolutionFile : ISolutionItem
+    /// <summary>
+    /// Solution (.sln) file. The factory method <see cref="Read(FileSystem, IActivityMonitor, NormalizedPath, bool)"/>
+    /// must be used.
+    /// </summary>
+    public sealed partial class SolutionFile : ISolutionItem
     {
         readonly Dictionary<string, ProjectBase> _projectIndex;
         readonly List<ProjectBase> _projectBaseList;
@@ -17,7 +21,7 @@ namespace CK.Env.MSBuildSln
         bool _isDirtyStructure;
         bool _isDirtyProjectFiles;
 
-        public SolutionFile( FileSystem fs, NormalizedPath filePath )
+        SolutionFile( FileSystem fs, NormalizedPath filePath )
         {
             FileSystem = fs;
             FilePath = filePath;

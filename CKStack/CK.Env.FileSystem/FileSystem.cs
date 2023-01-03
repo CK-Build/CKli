@@ -78,7 +78,7 @@ namespace CK.Env
         /// <returns>The <see cref="ProtoGitFolder"/>.</returns>
         public ProtoGitFolder FindOrCreateProtoGitFolder( IActivityMonitor m, IWorldName world, NormalizedPath folderPath, string urlRepository, bool isPublic = false )
         {
-            ProtoGitFolder g = _protoGits.FirstOrDefault( f => f.FolderPath == folderPath );
+            ProtoGitFolder? g = _protoGits.FirstOrDefault( f => f.FolderPath == folderPath );
             if( g == null )
             {
                 g = new ProtoGitFolder( new Uri( urlRepository ), isPublic, folderPath, world, _secretKeyStore, this, _commandRegister );
@@ -91,19 +91,16 @@ namespace CK.Env
         /// Ensures that the Git folder is loaded.
         /// The <see cref="ProtoGitFolder"/> must have been created first.
         /// </summary>
-        /// <param name="folderPath">
-        /// The folder path is a sub path of <see cref="Root"/> and contains the .git sub folder.
-        /// </param>
+        /// <param name="proto">The folder.</param>
         /// <returns>The <see cref="GitRepository"/> or null on error.</returns>
         public GitRepository EnsureGitFolder( IActivityMonitor m, ProtoGitFolder proto )
         {
-            if( proto == null ) throw new ArgumentNullException( nameof( proto ) );
-            if( proto.FileSystem != this ) throw new ArgumentException( "FileSystem mismatch.", nameof( proto ) );
-            GitRepository g = GitFolders.FirstOrDefault( f => f.ProtoGitFolder == proto );
+            Throw.CheckNotNullArgument( proto );
+            Throw.CheckArgument( proto.FileSystem == this );
+            GitRepository? g = GitFolders.FirstOrDefault( f => f.ProtoGitFolder == proto );
             if( g == null )
             {
                 g = proto.CreateGitFolder( m );
-                // TODO: this SHOULD be done in ProtoGitFolder.EnsureWorkingFolder!
                 if( g != null )
                 {
                     _gits.Add( g );
@@ -120,9 +117,9 @@ namespace CK.Env
         /// The folder path is a sub path of <see cref="Root"/> and contains the .git sub folder.
         /// </param>
         /// <returns>The <see cref="GitRepository"/> or null if not found.</returns>
-        public GitRepository EnsureGitFolder( IActivityMonitor m, NormalizedPath folderPath )
+        public GitRepository? EnsureGitFolder( IActivityMonitor m, NormalizedPath folderPath )
         {
-            ProtoGitFolder pg = _protoGits.FirstOrDefault( f => f.FolderPath == folderPath );
+            ProtoGitFolder? pg = _protoGits.FirstOrDefault( f => f.FolderPath == folderPath );
             return pg != null ? EnsureGitFolder( m, pg ) : null;
         }
 
@@ -142,7 +139,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="subPath">The path (<see cref="Root"/> based). Can be any path inside the Git folder.</param>
         /// <returns>The Git folder or null if not found.</returns>
-        public GitRepository FindGitFolder( NormalizedPath subPath ) => GitFolders.FirstOrDefault( f => subPath.StartsWith( f.SubPath, strict: false ) );
+        public GitRepository? FindGitFolder( NormalizedPath subPath ) => GitFolders.FirstOrDefault( f => subPath.StartsWith( f.SubPath, strict: false ) );
 
         /// <summary>
         /// Gets the directory content for a path below the <see cref="Root"/>.
@@ -159,7 +156,7 @@ namespace CK.Env
         public IDirectoryContents GetDirectoryContents( NormalizedPath sub )
         {
             sub = sub.ResolveDots().With( NormalizedPathRootKind.None );
-            GitRepository g = GitFolders.FirstOrDefault( f => sub.StartsWith( f.SubPath, strict: false ) );
+            GitRepository? g = GitFolders.FirstOrDefault( f => sub.StartsWith( f.SubPath, strict: false ) );
             return g != null
                         ? g.GetDirectoryContents( sub.RemovePrefix( g.SubPath ) ) ?? NotFoundDirectoryContents.Singleton
                         : PhysicalGetDirectoryContents( sub );
@@ -455,6 +452,42 @@ namespace CK.Env
             return new PhysicalNotFoundFileInfo( path );
         }
 
+        // TODO: To be tested. Currently unused.
+        internal IEnumerable<IFileInfo> PhysicalFindFiles( NormalizedPath sub, Func<NormalizedPath, bool>? directoryMatch, Func<NormalizedPath, bool>? fileMatch )
+        {
+            Debug.Assert( sub == sub.ResolveDots() );
+            var path = sub.IsRooted ? sub : Root.Combine( sub );
+            if( Directory.Exists( path ) )
+            {
+                return Find( sub, directoryMatch, fileMatch );
+            }
+            return Array.Empty<IFileInfo>();
+
+
+            static IEnumerable<IFileInfo> Find( NormalizedPath sub, Func<NormalizedPath, bool>? directoryMatch, Func<NormalizedPath, bool>? fileMatch )
+            {
+                foreach( var f in Directory.GetFiles( sub ) )
+                {
+                    if( fileMatch == null || fileMatch.Invoke( new NormalizedPath( f ) ) )
+                    {
+                        yield return new FileSystemInfoWrapper( new FileInfo( f ) );
+                    }
+                }
+                foreach( var f in Directory.GetDirectories( sub ) )
+                {
+                    var p = new NormalizedPath( f );
+                    if( directoryMatch == null || directoryMatch( p ) )
+                    {
+                        foreach( var inside in Find( p, directoryMatch, fileMatch ) )
+                        {
+                            yield return inside;
+                        }
+                    }
+                }
+            }
+        }
+
+
         internal IDirectoryContents PhysicalGetDirectoryContents( NormalizedPath sub )
         {
             Debug.Assert( sub == sub.ResolveDots() );
@@ -465,9 +498,5 @@ namespace CK.Env
         {
             throw new NotImplementedException( "Sorry for that..." );
         }
-
-
-
-
     }
 }

@@ -8,9 +8,14 @@ using System.Runtime.CompilerServices;
 
 namespace CK.Env.NodeSln
 {
+    /// <summary>
+    /// Node solution is defined in the RepositoryInfo.xml file and contains
+    /// <see cref="NodeProject"/>, <see cref="YarnWorkspace"/> and/or <see cref="AngularWorkspace"/>.
+    /// </summary>
     public class NodeSolution
     {
         readonly List<NodeRootProjectBase> _projects;
+        bool _isDirty;
 
         public NodeSolution( FileSystem fs, NormalizedPath solutionFolderPath )
         {
@@ -35,14 +40,69 @@ namespace CK.Env.NodeSln
         public IReadOnlyList<NodeRootProjectBase> Projects => _projects;
 
         /// <summary>
-        /// Reads or creates a new <see cref="SolutionFile"/>.
+        /// Gets whether any of the projects in this solution needs to be saved.
+        /// </summary>
+        public bool IsDirty => _isDirty;
+
+        internal void SetDirty() => _isDirty = true;
+
+        /// <summary>
+        /// Raised whenever a <see cref="Save"/> has actually been made
+        /// and <see cref="IsDirty"/> is now false.
+        /// </summary>
+        public event EventHandler<EventMonitoredArgs>? Saved;
+
+        /// <summary>
+        /// Saves all files that have been modified.
+        /// </summary>
+        /// <param name="monitor">The monitor.</param>
+        /// <param name="callRestoreDependencies">True to call <see cref="RestoreDependencies(IActivityMonitor)"/> after a successful save.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool Save( IActivityMonitor monitor, bool callRestoreDependencies = true )
+        {
+            if( _isDirty )
+            {
+                foreach( var p in _projects )
+                {
+                    if( !p.Save( monitor ) )
+                    {
+                        return false;
+                    }
+                }
+                _isDirty = false;
+                if( callRestoreDependencies && !RestoreDependencies( monitor ) )
+                {
+                    return false;
+                }
+                Saved?.Invoke( this, new EventMonitoredArgs( monitor ) );
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Calls "yarn" or "npm install" to restore the packages on all projects where <see cref="NodeRootProjectBase.RestoreRequired"/> is true.
+        /// Does nothing otherwise.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="ctx">The project file context.</param>
-        /// <param name="solutionPath">The path to the .sln file relative to the <see cref="MSProjContext.FileSystem"/>.</param>
-        /// <param name="mustExist">False to allow the file to not exist.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool RestoreDependencies( IActivityMonitor monitor )
+        {
+            foreach( var p in _projects )
+            {
+                if( !p.RestoreDependencies( monitor ) ) return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Reads a new <see cref="NodeSolution"/> from a RepositoryInfo.xml file.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="fs">The file system.</param>
+        /// <param name="repositoryInfoPath">The path to the RepositoryInfo.xml file relative to the <see cref="FileSystem"/>.</param>
         /// <returns>
-        /// The solution file or null on error (for example when not found and <paramref name="mustExist"/> is true).
+        /// The node solution or null. Whether errors occurred must be handled by handling logs (typically by
+        /// using <see cref="ActivityMonitorExtension.OnError(IActivityMonitor, Action)"/>).
         /// </returns>
         public static NodeSolution? Read( IActivityMonitor monitor, FileSystem fs, NormalizedPath repositoryInfoPath )
         {
@@ -59,7 +119,7 @@ namespace CK.Env.NodeSln
             }
             if( eSolution == null )
             {
-                monitor.Trace( $"No NodeSolution element is '{repositoryInfoPath}'." );
+                monitor.Trace( $"No NodeSolution element in '{repositoryInfoPath}'." );
                 return null;
             }
             var nodeSolution = new NodeSolution( fs, repositoryInfoPath.RemoveLastPart() );

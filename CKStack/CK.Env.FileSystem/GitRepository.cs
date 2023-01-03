@@ -18,7 +18,7 @@ namespace CK.Env
     /// Implements Git repository mapping.
     /// GitFolder are internally created (and disposed) by <see cref="FileSystem"/>.
     /// </summary>
-    public partial class GitRepository : GitHelper, IGitHeadInfo, ICommandMethodsProvider
+    public partial class GitRepository : GitRepositoryBase, IGitHeadInfo, ICommandMethodsProvider
     {
         readonly RootDir _thisDir;
         readonly HeadFolder _headFolder;
@@ -741,19 +741,28 @@ namespace CK.Env
 
         }
 
-        class RootDir : BaseDirFileInfo, IDirectoryContents
+        /// <summary>
+        /// Root directory is this GitRepository.
+        /// Its content is "head" (<see cref="HeadFolder"/>), "branches" (<see cref="BranchesFolder"/>)
+        /// and "remotes" (<see cref="RemotesFolder"/>).
+        /// <para>
+        /// This doesn't override <see cref="BaseDirFileInfo.PhysicalPath"/> since this is the physical
+        /// path of <see cref="HeadFolder"/>: this one is purely virtual.
+        /// </para>
+        /// </summary>
+        sealed class RootDir : BaseDirFileInfo, IDirectoryContents
         {
-            readonly GitRepository _f;
+            readonly GitRepository _repository;
             readonly IReadOnlyList<IFileInfo> _content;
 
-            internal RootDir( GitRepository f, string name )
+            internal RootDir( GitRepository r, string name )
                 : base( name )
             {
-                _f = f;
-                _content = new IFileInfo[] { f._headFolder, f._branchesFolder, f._remoteBranchesFolder };
+                _repository = r;
+                _content = new IFileInfo[] { r._headFolder, r._branchesFolder, r._remoteBranchesFolder };
             }
 
-            public override DateTimeOffset LastModified => Directory.GetLastWriteTimeUtc( _f.FullPhysicalPath.Path );
+            public override DateTimeOffset LastModified => Directory.GetLastWriteTimeUtc( _repository.FullPhysicalPath.Path );
 
             public IEnumerator<IFileInfo> GetEnumerator() => _content.GetEnumerator();
 
@@ -761,7 +770,10 @@ namespace CK.Env
 
         }
 
-        class HeadFolder : BaseDirFileInfo, IDirectoryContents
+        /// <summary>
+        /// "head" sub folder. Its <see cref="BaseDirFileInfo.PhysicalPath"/> is the GitRepository path.
+        /// </summary>
+        sealed class HeadFolder : BaseDirFileInfo, IDirectoryContents
         {
             readonly GitRepository _f;
             IDirectoryContents? _physical;
@@ -778,56 +790,18 @@ namespace CK.Env
 
             public IEnumerator<IFileInfo> GetEnumerator()
             {
-                if( _physical == null ) _physical = _f.FileSystem.PhysicalGetDirectoryContents( _f.SubPath );
+                _physical ??= _f.FileSystem.PhysicalGetDirectoryContents( _f.SubPath );
                 return _physical.GetEnumerator();
             }
 
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-
         }
 
-        class CommitFolder : BaseDirFileInfo, IDirectoryContents
-        {
-            public readonly Commit Commit;
-
-            public CommitFolder( string name, Commit c )
-                : base( name )
-            {
-                Commit = c;
-            }
-
-            public override DateTimeOffset LastModified => Commit.Committer.When;
-
-            public IFileInfo? GetFileInfo( NormalizedPath sub )
-            {
-                var e = Commit.Tree[sub.ToString( '/' )];
-                if( e != null && e.TargetType != TreeEntryTargetType.GitLink )
-                {
-                    return new TreeEntryWrapper( e, this );
-                }
-                return null;
-            }
-
-            public IDirectoryContents GetDirectoryContents( NormalizedPath sub )
-            {
-                if( sub.IsEmptyPath ) return this;
-                TreeEntry e = Commit.Tree[sub.ToString( '/' )];
-                if( e != null && e.TargetType != TreeEntryTargetType.GitLink )
-                {
-                    return new TreeEntryWrapper( e, this );
-                }
-                return NotFoundDirectoryContents.Singleton;
-            }
-
-            public IEnumerator<IFileInfo> GetEnumerator()
-            {
-                return Commit.Tree.Select( t => new TreeEntryWrapper( t, this ) ).GetEnumerator();
-            }
-
-            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-        }
-
-        class RemotesFolder : BaseDirFileInfo, IDirectoryContents
+        /// <summary>
+        /// RemotesFolder (named "remotes") are children of the <see cref="RootDir"/> and
+        /// contain named <see cref="BranchesFolder"/>.
+        /// </summary>
+        sealed class RemotesFolder : BaseDirFileInfo, IDirectoryContents
         {
             readonly GitRepository _f;
             readonly SortedDictionary<string, BranchesFolder> _origins;
@@ -880,7 +854,12 @@ namespace CK.Env
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         }
 
-        class BranchesFolder : BaseDirFileInfo, IDirectoryContents
+        /// <summary>
+        /// BranchesFolder are named. One is "branches" that is a child of the <see cref="RootDir"/>
+        /// and others that are children of <see cref="RemotesFolder"/>.
+        /// They hold named <see cref="CommitFolder"/>.
+        /// </summary>
+        sealed class BranchesFolder : BaseDirFileInfo, IDirectoryContents
         {
             readonly GitRepository _f;
             readonly SortedDictionary<string, CommitFolder> _branches;
@@ -945,7 +924,54 @@ namespace CK.Env
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         }
 
-        class TreeEntryWrapper : IFileInfo, IDirectoryContents
+        /// <summary>
+        /// Wraps a Commit. CommitFolder are named children of a <see cref="BranchesFolder"/>.
+        /// </summary>
+        sealed class CommitFolder : BaseDirFileInfo, IDirectoryContents
+        {
+            public readonly Commit Commit;
+
+            public CommitFolder( string name, Commit c )
+                : base( name )
+            {
+                Commit = c;
+            }
+
+            public override DateTimeOffset LastModified => Commit.Committer.When;
+
+            public IFileInfo? GetFileInfo( NormalizedPath sub )
+            {
+                var e = Commit.Tree[sub];
+                if( e != null && e.TargetType != TreeEntryTargetType.GitLink )
+                {
+                    return new TreeEntryWrapper( e, this );
+                }
+                return null;
+            }
+
+            public IDirectoryContents GetDirectoryContents( NormalizedPath sub )
+            {
+                if( sub.IsEmptyPath ) return this;
+                TreeEntry e = Commit.Tree[sub];
+                if( e != null && e.TargetType != TreeEntryTargetType.GitLink )
+                {
+                    return new TreeEntryWrapper( e, this );
+                }
+                return NotFoundDirectoryContents.Singleton;
+            }
+
+            public IEnumerator<IFileInfo> GetEnumerator()
+            {
+                return Commit.Tree.Select( t => new TreeEntryWrapper( t, this ) ).GetEnumerator();
+            }
+
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        }
+
+        /// <summary>
+        /// Wraps a <see cref="CommitFolder"/> and a LibGit's TreeEntry.
+        /// </summary>
+        sealed class TreeEntryWrapper : IFileInfo, IDirectoryContents
         {
             readonly TreeEntry _e;
             readonly CommitFolder _c;
@@ -993,11 +1019,34 @@ namespace CK.Env
             {
                 foreach( var b in Git.Branches )
                 {
-                    if( !b.IsRemote ) _branchesFolder.Add( b );
-                    else _remoteBranchesFolder.Add( b );
+                    if( b.IsRemote ) _remoteBranchesFolder.Add( b );
+                    else _branchesFolder.Add( b );
                 }
                 _branchRefreshed = true;
             }
+        }
+        // Currently unused. To be tested.
+        internal IEnumerable<IFileInfo> FindFiles( NormalizedPath sub, Func<NormalizedPath, bool>? directoryMatch, Func<NormalizedPath, bool>? fileMatch )
+        {
+            if( sub.IsEmptyPath )
+            {
+                return Throw.NotSupportedException<IEnumerable<IFileInfo>>( "FindFiles in head, branches and remotes at once is not supported." );
+            }
+            if( IsInWorkingFolder( ref sub ) )
+            {
+                return FileSystem.PhysicalFindFiles( SubPath.Combine( sub ), fileMatch, directoryMatch );
+            }
+            RefreshBranches();
+            if( sub.FirstPart == _branchesFolder.Name )
+            {
+                return Throw.NotSupportedException<IEnumerable<IFileInfo>>( "FindFiles is supported only when the branch is checked out." );
+            }
+            if( sub.FirstPart == _remoteBranchesFolder.Name )
+            {
+                return Throw.NotSupportedException<IEnumerable<IFileInfo>>( "FindFiles in remotes is not supported." );
+            }
+            return Array.Empty<IFileInfo>();
+
         }
 
         internal IFileInfo? GetFileInfo( NormalizedPath sub )

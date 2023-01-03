@@ -138,8 +138,9 @@ namespace CK.Env
             {
                 case KnownGitProvider.Unknown:
                     Regex badChars = new( "[^A-Za-z_0-9]" );
-                    string key = badChars.Replace( OriginUrl.Host + "_" + OriginUrl.LocalPath, "_" );  // I did this in a haste, some URI will probably generate bad PAT name. 
-                    if( badChars.IsMatch( key ) ) throw new InvalidOperationException( "TODO better PAT Name autogeneration." );
+                    // I did this in a haste, some URI will probably generate bad PAT name. 
+                    string key = badChars.Replace( OriginUrl.Host + "_" + OriginUrl.LocalPath, "_" ); 
+                    if( badChars.IsMatch( key ) ) Throw.InvalidOperationException( "TODO better PAT Name auto-generation." );
                     key = key.ToUpperInvariant();
                     if( !key.EndsWith( "_GIT" ) ) key += "_GIT";
                     return key + suffix;

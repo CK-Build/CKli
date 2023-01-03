@@ -1,0 +1,167 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ClassDiagram MajorVersion="1" MinorVersion="1">
+  <Class Name="CK.Env.NodeSln.AngularWorkspace">
+    <Position X="6.75" Y="5.75" Width="1.75" />
+    <Members>
+      <Field Name="_subProjects" Hidden="true" />
+      <Method Name="AngularWorkspace" Hidden="true" />
+      <Method Name="Initialize" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAEYAAAAAAAAAAAAAAAAAAAAAAAAAQAQA=</HashCode>
+      <FileName>ProjectTypes\AngularWorkspace.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.908" />
+  </Class>
+  <Class Name="CK.Env.NodeSln.NodeRootProjectBase">
+    <Position X="5.5" Y="3.5" Width="2.25" />
+    <Members>
+      <Field Name="_outputPath" Hidden="true" />
+      <Field Name="_solutionRelativeOutputPath" Hidden="true" />
+      <Method Name="NodeRootProjectBase" Hidden="true" />
+    </Members>
+    <Compartments>
+      <Compartment Name="Fields" Collapsed="true" />
+    </Compartments>
+    <TypeIdentifier>
+      <HashCode>AEAAAAABAABABAAAABIQBAAAQAAIAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>ProjectTypes\NodeRootProjectBase.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CK.Env.NodeSln.NodeProjectBase">
+    <Position X="1" Y="0.5" Width="2.75" />
+    <Members>
+      <Field Name="_isDirty" Hidden="true" />
+      <Field Name="_packageJson" Hidden="true" />
+      <Field Name="_path" Hidden="true" />
+      <Field Name="_solutionRelativePath" Hidden="true" />
+      <Method Name="Initialize" Hidden="true" />
+      <Method Name="NodeProjectBase" Hidden="true" />
+      <Method Name="SetDirty" Hidden="true" />
+      <Method Name="ToString" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>AAAAAJAAAAACFQIEAADAAACgAAAAAAAAAAEBAAQAAAA=</HashCode>
+      <FileName>NodeProjectBase.cs</FileName>
+    </TypeIdentifier>
+    <ShowAsAssociation>
+      <Property Name="PackageJsonFile" />
+    </ShowAsAssociation>
+  </Class>
+  <Class Name="CK.Env.NodeSln.PackageJsonFile">
+    <Position X="5.25" Y="0.5" Width="2.5" />
+    <Members>
+      <Field Name="_deps" Hidden="true" />
+      <Field Name="_name" Hidden="true" />
+      <Field Name="_o" Hidden="true" />
+      <Field Name="_private" Hidden="true" />
+      <Field Name="_project" Hidden="true" />
+      <Field Name="_version" Hidden="true" />
+      <Field Name="_workspaces" Hidden="true" />
+      <Method Name="FillDeps" Hidden="true" />
+      <Method Name="PackageJsonFile" Hidden="true" />
+      <Method Name="Read" Hidden="true" />
+      <Method Name="Refresh" Hidden="true" />
+      <Method Name="SetPackageReferenceVersion" Hidden="true" />
+      <Method Name="ToString" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>YCAAIIAAUABAIAiEACBAAAQgAAAAEAAAAABBCBACAAA=</HashCode>
+      <FileName>PackageJsonFile.cs</FileName>
+    </TypeIdentifier>
+    <ShowAsCollectionAssociation>
+      <Property Name="Dependencies" />
+    </ShowAsCollectionAssociation>
+  </Class>
+  <Class Name="CK.Env.NodeSln.NodeProject">
+    <Position X="3.25" Y="5.75" Width="1.5" />
+    <Members>
+      <Method Name="Initialize" Hidden="true" />
+      <Method Name="NodeProject" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAEQAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>ProjectTypes\NodeProject.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="CK.Env.NodeSln.YarnWorkspace">
+    <Position X="5" Y="5.75" Width="1.5" />
+    <Members>
+      <Field Name="_subProjects" Hidden="true" />
+      <Method Name="Initialize" Hidden="true" />
+      <Method Name="YarnWorkspace" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAEQAAAAAAAAAAAAAAAAAAAAAAAAAQAQA=</HashCode>
+      <FileName>ProjectTypes\YarnWorkspace.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.8" />
+  </Class>
+  <Class Name="CK.Env.NodeSln.NodeSubProject">
+    <Position X="0.5" Y="3.5" Width="1.75" />
+    <AssociationLine Name="Workspace" Type="CK.Env.NodeSln.INodeWorkspace">
+      <MemberNameLabel ManuallyPlaced="true">
+        <Position X="0.193" Y="0.068" />
+      </MemberNameLabel>
+    </AssociationLine>
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAABAFQAAAAAAAAAAAAAAAAAAAAgAAAAAAAA=</HashCode>
+      <FileName>ProjectTypes\NodeSubProject.cs</FileName>
+    </TypeIdentifier>
+    <ShowAsAssociation>
+      <Property Name="Workspace" />
+    </ShowAsAssociation>
+  </Class>
+  <Class Name="CK.Env.NodeSln.NodeSolution">
+    <Position X="0.5" Y="5.75" Width="2.25" />
+    <Members>
+      <Field Name="_projects" Hidden="true" />
+      <Method Name="NodeSolution" Hidden="true" />
+      <Method Name="TryReadProject" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>AACAAICAgAAABAAAADBIAAAgAAAAAAAAAAABAAAAAQA=</HashCode>
+      <FileName>NodeSolution.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Struct Name="CK.Env.NodeSln.NodeProjectDependency">
+    <Position X="9" Y="0.5" Width="2.25" />
+    <Members>
+      <Method Name="NodeProjectDependency" Hidden="true" />
+      <Method Name="ToString" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>IAAAAACCAABAAAAEAAEAAAQAAAAAAAAAAQgAAAAACAA=</HashCode>
+      <FileName>NodeProjectDependency.cs</FileName>
+    </TypeIdentifier>
+  </Struct>
+  <Interface Name="CK.Env.NodeSln.INodeWorkspace">
+    <Position X="3.5" Y="3.5" Width="1.5" />
+    <AssociationLine Name="Projects" Type="CK.Env.NodeSln.NodeSubProject" FixedToPoint="true">
+      <Path>
+        <Point X="3.5" Y="4.554" />
+        <Point X="2.458" Y="4.554" Type="JumpStart" />
+        <Point X="2.292" Y="4.554" Type="JumpEnd" />
+        <Point X="2.25" Y="4.554" />
+      </Path>
+      <MemberNameLabel ManuallyPlaced="true">
+        <Position X="0.277" Y="0.06" />
+      </MemberNameLabel>
+    </AssociationLine>
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAQA=</HashCode>
+      <FileName>INodeWorkspace.cs</FileName>
+    </TypeIdentifier>
+    <ShowAsCollectionAssociation>
+      <Property Name="Projects" />
+    </ShowAsCollectionAssociation>
+  </Interface>
+  <Enum Name="CK.Env.NodeSln.NodeProjectDependencyType">
+    <Position X="9" Y="3.75" Width="2.25" />
+    <TypeIdentifier>
+      <HashCode>ABAEAgAAAARgIAAAAAAAAAAAACCAAAAAAAAAAAEBAAA=</HashCode>
+      <FileName>NodeProjectDependencyType.cs</FileName>
+    </TypeIdentifier>
+  </Enum>
+  <Font Name="Segoe UI" Size="9" />
+</ClassDiagram>

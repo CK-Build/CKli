@@ -8,49 +8,49 @@ using System.Text.RegularExpressions;
 
 namespace CK.Env.MSBuildSln
 {
-    public partial class SolutionFile
+    public sealed partial class SolutionFile
     {
         /// <summary>
         /// Reads or creates a new <see cref="SolutionFile"/>.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="ctx">The project file context.</param>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="fs">The files system.</param>
         /// <param name="solutionPath">The path to the .sln file relative to the <see cref="MSProjContext.FileSystem"/>.</param>
         /// <param name="mustExist">False to allow the file to not exist.</param>
         /// <returns>
         /// The solution file or null on error (for example when not found and <paramref name="mustExist"/> is true).
         /// </returns>
-        public static SolutionFile? Read( FileSystem fs, IActivityMonitor m, NormalizedPath solutionPath, bool mustExist = true )
+        public static SolutionFile? Read( FileSystem fs, IActivityMonitor monitor, NormalizedPath solutionPath, bool mustExist = true )
         {
-            using( m.OpenInfo( $"Reading '{solutionPath}'." ) )
+            using( monitor.OpenInfo( $"Reading '{solutionPath}'." ) )
             {
                 var file = fs.GetFileInfo( solutionPath );
                 if( !file.Exists && mustExist )
                 {
-                    m.Error( $"File '{solutionPath}' not found. Unable to read the solution." );
+                    monitor.Error( $"File '{solutionPath}' not found. Unable to read the solution." );
                     return null;
                 }
                 var s = new SolutionFile( fs, solutionPath );
                 if( file.Exists )
                 {
-                    using( var r = new Reader( m, file.CreateReadStream() ) )
+                    using( var r = new Reader( monitor, file.CreateReadStream() ) )
                     {
                         if( !s.Read( r ) )
                         {
-                            m.Error( "Unable to read the Solution." );
+                            monitor.Error( "Unable to read the Solution." );
                             return null;
                         }
                     }
                 }
                 else
                 {
-                    m.Warn( $"File '{solutionPath}' not found. Creating an empty solution." );
+                    monitor.Warn( $"File '{solutionPath}' not found. Creating an empty solution." );
                 }
                 return s;
             }
         }
 
-        class Reader : IDisposable
+        sealed class Reader : IDisposable
         {
             readonly StreamReader _reader;
             readonly bool _dispose;

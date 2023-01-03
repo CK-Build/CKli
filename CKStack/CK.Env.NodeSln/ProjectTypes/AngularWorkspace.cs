@@ -1,24 +1,90 @@
 using CK.Core;
+using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 
 namespace CK.Env.NodeSln
 {
-    public class AngularWorkspace : NodeRootProjectBase
+    /// <summary>
+    /// Angular workspace: projects are defined by angular.json file.
+    /// </summary>
+    public sealed class AngularWorkspace : NodeRootProjectBase, INodeWorkspace
     {
-        public AngularWorkspace( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath, int index )
+        readonly List<NodeSubProject> _subProjects;
+
+        internal AngularWorkspace( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath, int index )
             : base( solution, path, outputPath, index )
         {
+            _subProjects = new List<NodeSubProject>();
         }
 
-        internal static NodeProjectBase? Create( IActivityMonitor monitor,
-                                                 FileSystem fs,
-                                                 NodeSolution nodeSolution,
-                                                 NormalizedPath path,
-                                                 NormalizedPath outputPath,
-                                                 int index )
+        /// <inheritdoc />
+        public IReadOnlyList<NodeSubProject> Projects => _subProjects;
+
+        private protected override bool DoSave( IActivityMonitor monitor )
         {
-            var p = new NodeProject( nodeSolution, path, outputPath, index );
-            return p.Initialize( monitor ) ? p : null;
+            foreach( var p in _subProjects )
+            {
+                if( !p.Save( monitor ) ) return false;
+            }
+            return true;
+        }
+
+        internal override bool Initialize( IActivityMonitor monitor )
+        {
+            if( !base.Initialize( monitor ) ) return false;
+            JObject? jProjects = TryReadAngularJsonProjects( monitor );
+            if( jProjects == null ) return false;
+            int pIndex = 0;
+            foreach( var propProject in jProjects.Properties() )
+            {
+                var name = propProject.Name;
+                var root = propProject.Value["root"]?.ToString();
+                if( string.IsNullOrWhiteSpace( root ) )
+                {
+                    monitor.Warn( $"Project '{name}' is missing \"root\" property. It is ignored." );
+                }
+                else
+                {
+                    var project = Solution.TryReadProject( monitor, NodeProjectKind.NodeSubProject, this, root, null, ref pIndex, $"AngularWorkspace '{Path}'" );
+                    if( project == null )
+                    {
+                        monitor.Error( $"Unable to load Angular project '{root}'." );
+                        return false;
+                    }
+                    Debug.Assert( project is NodeSubProject );
+                    _subProjects.Add( (NodeSubProject)project );
+                }
+            }
+            return true;
+        }
+
+        JObject? TryReadAngularJsonProjects( IActivityMonitor monitor )
+        {
+            bool success = true;
+            if( !PackageJsonFile.IsPrivate )
+            {
+                monitor.Error( $"An Angular workspace project should be private. File '{PackageJsonFile.FilePath}' must be fixed with a \"private\": true property." );
+                success = false;
+            }
+            var aPath = Path.AppendPart( "angular.json" );
+            var angularFile = Solution.FileSystem.GetFileInfo( aPath );
+            if( !angularFile.Exists || angularFile.IsDirectory )
+            {
+                monitor.Error( $"Missing Angular workspace file '{aPath}'." );
+            }
+            else
+            {
+                JObject angularJson = angularFile.ReadAsJObject();
+                if( angularJson["projects"] is JObject jProjects )
+                {
+                    if( success ) return jProjects;
+                }
+                monitor.Error( $"Missing \"projects\" in '{aPath}'." );
+            }
+            return null;
         }
     }
 

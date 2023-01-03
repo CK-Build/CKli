@@ -11,7 +11,7 @@ namespace CK.Env
     /// This split in two phases is mainly to first collect the secrets required by the
     /// repositories and resolve them before any actual instantiation.
     /// </summary>
-    public class ProtoGitFolder : GitRepositoryKey
+    public sealed class ProtoGitFolder : GitRepositoryKey
     {
         /// <summary>
         /// Initializes a new <see cref="ProtoGitFolder"/>.
@@ -23,23 +23,22 @@ namespace CK.Env
         /// <param name="secretKeyStore">The secret key store.</param>
         /// <param name="fileSystem">=The file system.</param>
         /// <param name="commandRegister">The command register.</param>
-        public ProtoGitFolder(
-            Uri url,
-            bool isPublic,
-            in NormalizedPath folderPath,
-            IWorldName world,
-            SecretKeyStore secretKeyStore,
-            FileSystem fileSystem,
-            CommandRegister commandRegister )
+        public ProtoGitFolder( Uri url,
+                               bool isPublic,
+                               in NormalizedPath folderPath,
+                               IWorldName world,
+                               SecretKeyStore secretKeyStore,
+                               FileSystem fileSystem,
+                               CommandRegister commandRegister )
             : base( secretKeyStore, url, isPublic )
         {
-            if( folderPath.IsEmptyPath ) throw new ArgumentException( "Empty path: FileSystem.Root path can not be a Git folder.", nameof( folderPath ) );
-            if( folderPath.IsRooted ) throw new ArgumentException( "Must be relative to the FileSystem.Root.", nameof( folderPath ) );
-            if( folderPath.EndsWith( ".git" ) ) throw new ArgumentException( "Path should be the repository directory and not the .git directory.", nameof( folderPath ) );
+            Throw.CheckArgument( "Empty path: FileSystem.Root path can not be a Git folder.", !folderPath.IsEmptyPath );
+            Throw.CheckArgument( "Must be relative to the FileSystem.Root.", !folderPath.IsRooted );
+            Throw.CheckArgument( "Path should be the repository directory and not the .git directory.", !folderPath.EndsWith( ".git" ) );
 
-            if( world == null ) throw new ArgumentNullException( nameof( world ) );
-            if( fileSystem == null ) throw new ArgumentNullException( nameof( fileSystem ) );
-            if( commandRegister == null ) throw new ArgumentNullException( nameof( commandRegister ) );
+            Throw.CheckNotNullArgument( world );
+            Throw.CheckNotNullArgument( fileSystem );
+            Throw.CheckNotNullArgument( commandRegister );
 
             World = world;
             FolderPath = folderPath;
@@ -87,16 +86,16 @@ namespace CK.Env
         /// <returns>The GitFolder instance or null on error.</returns>
         public GitRepository? CreateGitFolder( IActivityMonitor m )
         {
-            var r = GitHelper.EnsureWorkingFolder( m, this, FullPhysicalPath, true, World.DevelopBranchName );
+            var r = GitRepositoryBase.EnsureWorkingFolder( m, this, FullPhysicalPath, true, World.DevelopBranchName );
             return r != null ? new GitRepository( r, this ) : null;
         }
 
         /// <summary>
-        /// Binds this <see cref="ProtoGitFolder"/> to the static  <see cref="GitHelper.PATCredentialsHandler(IActivityMonitor, GitRepositoryKey)"/>.
+        /// Binds this <see cref="ProtoGitFolder"/> to the static  <see cref="GitRepositoryBase.PATCredentialsHandler(IActivityMonitor, GitRepositoryKey)"/>.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The Credentials object that is null or a <see cref="UsernamePasswordCredentials"/>.</returns>
-        internal Credentials PATCredentialsHandler( IActivityMonitor m ) => GitHelper.PATCredentialsHandler( m, this );
+        internal Credentials? PATCredentialsHandler( IActivityMonitor m ) => GitRepositoryBase.PATCredentialsHandler( m, this );
 
     }
 }

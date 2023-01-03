@@ -6,9 +6,9 @@ using System;
 namespace CK.Env
 {
     /// <summary>
-    /// Autonomous <see cref="GitHelper"/> implementation that must be disposed once done.
+    /// Autonomous <see cref="GitRepositoryBase"/> implementation that must be disposed once done.
     /// </summary>
-    public class SimpleGitRepository : GitHelper
+    public class SimpleGitRepository : GitRepositoryBase
     {
         SimpleGitRepository( GitRepositoryKey repositoryKey, Repository libRepository, NormalizedPath fullPath, NormalizedPath subPath )
             : base( repositoryKey, libRepository, fullPath, subPath )
@@ -39,18 +39,17 @@ namespace CK.Env
         /// even if the repository already exists.
         /// </param>
         /// <returns>The LibGit2Sharp repository object or null on error.</returns>
-        public static SimpleGitRepository Create(
-            IActivityMonitor m,
-            GitRepositoryKey git,
-            NormalizedPath workingFolder,
-            NormalizedPath subPath,
-            bool ensureHooks,
-            string branchName,
-            bool checkOutBranchName )
+        public static SimpleGitRepository? Create( IActivityMonitor m,
+                                                   GitRepositoryKey git,
+                                                   NormalizedPath workingFolder,
+                                                   NormalizedPath subPath,
+                                                   bool ensureHooks,
+                                                   string branchName,
+                                                   bool checkOutBranchName )
         {
             var r = EnsureWorkingFolder( m, git, workingFolder, ensureHooks, branchName );
             if( r == null ) return null;
-            SimpleGitRepository g = new SimpleGitRepository( git, r, workingFolder, subPath );
+            SimpleGitRepository? g = new SimpleGitRepository( git, r, workingFolder, subPath );
             if( checkOutBranchName
                 && branchName != g.CurrentBranchName
                 && !g.Checkout( m, branchName ).Success )

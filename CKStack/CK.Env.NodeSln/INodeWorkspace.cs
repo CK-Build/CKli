@@ -3,6 +3,10 @@ using System.Collections.Generic;
 
 namespace CK.Env.NodeSln
 {
+
+    /// <summary>
+    /// Unifies <see cref="AngularWorkspace"/> and <see cref="YarnWorkspace"/>.
+    /// </summary>
     public interface INodeWorkspace
     {
         /// <summary>
@@ -10,6 +14,9 @@ namespace CK.Env.NodeSln
         /// </summary>
         NormalizedPath Path { get; }
 
+        /// <summary>
+        /// Gets the projects.
+        /// </summary>
         IReadOnlyList<NodeSubProject> Projects { get; }
     }
 

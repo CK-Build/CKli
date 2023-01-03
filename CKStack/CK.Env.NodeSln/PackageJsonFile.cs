@@ -19,7 +19,7 @@ namespace CK.Env.NodeSln
     /// <summary>
     /// Specialized <see cref="JsonFileBase"/> for package.json file.
     /// </summary>
-    public class PackageJsonFile
+    public partial class PackageJsonFile
     {
         readonly List<NodeProjectDependency> _deps;
         readonly JObject _o;
@@ -27,9 +27,16 @@ namespace CK.Env.NodeSln
         string? _name;
         SVersion _version;
         bool _private;
-        readonly bool _hasWorspaces;
+        bool _isDirty;
+        readonly NormalizedPath[] _workspaces;
 
-        PackageJsonFile( NormalizedPath filePath, JObject o, NodeProjectBase project, bool isPrivate, string? name, SVersion version, bool hasWorspaces )
+        PackageJsonFile( NormalizedPath filePath,
+                         JObject o,
+                         NodeProjectBase project,
+                         bool isPrivate,
+                         string? name,
+                         SVersion version,
+                         NormalizedPath[]? workspaces )
         {
             _deps = new List<NodeProjectDependency>();
             FilePath = filePath;
@@ -38,83 +45,19 @@ namespace CK.Env.NodeSln
             _private = isPrivate;
             _name = name;
             _version = version;
-            _hasWorspaces = hasWorspaces;
+            _workspaces = workspaces ?? Array.Empty<NormalizedPath>();
         }
 
-        internal static PackageJsonFile? Read( IActivityMonitor monitor, NodeProjectBase project )
-        {
-            var filePath = project.Path.AppendPart( "package.json" );
-            var file = project.Solution.FileSystem.GetFileInfo( filePath );
-            if( !file.Exists || file.IsDirectory )
-            {
-                monitor.Warn( $"File '{filePath}' not found. Unable to read the Package.json." );
-                return null;
-            }
-            var o = file.ReadAsJObject();
-            bool isPrivate = false;
-            var pPrivate = o.Property( "private" );
-            if( pPrivate != null  )
-            {
-                if( pPrivate.Type != JTokenType.Boolean )
-                {
-                    monitor.Error( $"File '{filePath}': property \"private\" must be a boolean." );
-                    return null;
-                }
-                isPrivate = (bool)pPrivate;
-            }
-            if( !TryReadString( monitor, filePath, o, "name", out var name ) ) return null;
-            if( !isPrivate && name == null )
-            {
-                monitor.Error( $"File '{filePath}': property \"name\" must be specified since there is no \"private\": true." );
-                return null;
-            }
-            if( !TryReadString( monitor, filePath, o, "version", out var sVersion ) ) return null;
-            SVersion version = SVersion.ZeroVersion;
-            if( sVersion != null && !SVersion.TryParse( sVersion, out version ) )
-            {
-                monitor.Error( $"File '{filePath}': property \"version\" is invalid: {version.ErrorMessage}." );
-                return null;
-            };
-            bool hasWorkspaces = false;
-            var pWorkspaces = o.Property( "workspaces" );
-            if( pWorkspaces != null )
-            {
-                if( pWorkspaces.Value is JArray a )
-                {
-                    if( a.Count != 1 || a[0].Type != JTokenType.String || (string?)a[0] != "*" )
-                    {
-                        monitor.Error( $"File '{filePath}': property \"workspaces\" must be [\"*\"]: only this pattern is supported for workspaces." );
-                        return null;
-                    }
-                    hasWorkspaces = true;
-                }
-                else
-                {
-                    monitor.Warn( $"File '{filePath}': property \"workspaces\" is not an array. It is ignored." );
-                }
-            }
-            return new PackageJsonFile( filePath, o, project, isPrivate, name, version, hasWorkspaces );
+        /// <summary>
+        /// Gets whether this file needs to be saved.
+        /// It is the <see cref="NodeProjectBase.Save(IActivityMonitor)"/> to which this manifest belongs
+        /// that is in charge of saving this file.
+        /// </summary>
+        public bool IsDirty => _isDirty;
 
-            static bool TryReadString( IActivityMonitor monitor, NormalizedPath filePath, JObject o, string name, out string? value )
-            {
-                value = null;
-                var pName = o.Property( name );
-                if( pName != null )
-                {
-                    if( pName.Type != JTokenType.String && pName.Type != JTokenType.Null )
-                    {
-                        monitor.Error( $"File '{filePath}': property \"name\" must be a string." );
-                        return false;
-                    }
-                    value = (string?)pName;
-                    if( value != null )
-                    {
-                        value = value.Trim();
-                        if( value.Length == 0 ) value = null;
-                    }
-                }
-                return true;
-            }
+        internal bool Save( IActivityMonitor monitor )
+        {
+            return _project.Solution.FileSystem.CopyTo( monitor, _o.ToString( Formatting.Indented ), FilePath );
         }
 
         /// <summary>
@@ -139,6 +82,8 @@ namespace CK.Env.NodeSln
                     }
                     _name = value;
                     _o["name"] = value;
+                    _isDirty = true;
+                    _project.SetDirty( false );
                 }
             }
         }
@@ -165,10 +110,12 @@ namespace CK.Env.NodeSln
                 {
                     if( _name == null && !value )
                     {
-                        Throw.InvalidOperationException( "\"private\" cannot be true without a package \"name\"." );
+                        Throw.InvalidOperationException( "\"private\" cannot be true without a non empty package \"name\"." );
                     }
                     _private = value;
                     _o["private"] = value;
+                    _isDirty = true;
+                    _project.SetDirty( false );
                 }
             }
         }
@@ -188,14 +135,16 @@ namespace CK.Env.NodeSln
                 {
                     _version = value;
                     _o["version"] = value.ToNormalizedString();
+                    _isDirty = true;
+                    _project.SetDirty( false );
                 }
             }
         }
 
         /// <summary>
-        /// Gets whether the "workspaces": ["*"] property exists.
+        /// Gets the subordinated paths of the "workspaces" property.
         /// </summary>
-        public bool HasWorkspaces => _hasWorspaces;
+        public IReadOnlyList<NormalizedPath> Workspaces => _workspaces;
 
         /// <summary>
         /// Gets the list of dependencies.
@@ -261,6 +210,8 @@ namespace CK.Env.NodeSln
             s[d.Name] = d.RawDep;
             monitor.Info( $"Updated '{dOrig}' to version '{d.RawDep}'." );
             _deps[idx] = d;
+            _isDirty = true;
+            _project.SetDirty( true );
             return true;
         }
 
@@ -301,69 +252,70 @@ namespace CK.Env.NodeSln
                 }
             }
             return true;
+
+            static (SVersionBound, NodeProjectDependencyType) GetVersionType( IActivityMonitor m, string depNameKind, string name, string value )
+            {
+                if( value.StartsWith( "file:" ) )
+                {
+                    string path;
+                    if( value.EndsWith( ".tgz" ) )
+                    {
+                        path = value.Substring( 5 );
+                        path = Path.GetFileNameWithoutExtension( path );
+                        // Remove the package name.
+                        path = path.Remove( 0, name.Length );
+                        var r = SVersionBound.NpmTryParse( path );
+                        if( !r.IsValid )
+                        {
+                            m.Error( $"Error while parsing version of a local feed package: {r.Error}" );
+                            return (SVersionBound.None, NodeProjectDependencyType.None);
+                        }
+                        return (r.Result, NodeProjectDependencyType.LocalFeedTarball);
+                    }
+                    if( value.StartsWith( "file:.." ) )
+                    {
+                        return (SVersionBound.None, NodeProjectDependencyType.LocalPath);
+                    }
+                    m.Error( $"Dependency '{value}' for {depNameKind}/{name} must be relative and starts with 'file:..'." );
+                    return (SVersionBound.None, NodeProjectDependencyType.None);
+                }
+                if( value.StartsWith( "workspace:" ) )
+                {
+                    return (SVersionBound.None, NodeProjectDependencyType.Workspace);
+                }
+                if( value.StartsWith( "portal:" ) )
+                {
+                    return (SVersionBound.None, NodeProjectDependencyType.Portal);
+                }
+                else if( value.IndexOf( "://" ) > 0 )
+                {
+                    if( value.StartsWith( "http://" ) || value.StartsWith( "https://" ) )
+                    {
+                        return (SVersionBound.None, NodeProjectDependencyType.UrlTar);
+                    }
+                    if( value.StartsWith( "git://" )
+                        || value.StartsWith( "git+ssh://" )
+                        || value.StartsWith( "git+http://" )
+                        || value.StartsWith( "git+https://" )
+                        || value.StartsWith( "git+file://" ) )
+                    {
+                        return (SVersionBound.None, NodeProjectDependencyType.UrlGit);
+                    }
+                    m.Error( $"Unable to handle what seems to be a url dependency '{value}' for {depNameKind}/{name}." );
+                    return (SVersionBound.None, NodeProjectDependencyType.None);
+                }
+                var vR = SVersionBound.NpmTryParse( value );
+                if( vR.IsValid )
+                {
+                    return (vR.Result, NodeProjectDependencyType.VersionBound);
+                }
+                if( Regex.IsMatch( value, "\\w+/\\w+" ) ) return (SVersionBound.None, NodeProjectDependencyType.GitHub);
+                if( Regex.IsMatch( value, "\\w+" ) ) return (SVersionBound.None, NodeProjectDependencyType.Tag);
+                m.Error( $"Invalid version for {depNameKind}/{name} '{value}': {vR.Error}" );
+                return (SVersionBound.None, NodeProjectDependencyType.None);
+            }
         }
 
-        static (SVersionBound, NodeProjectDependencyType) GetVersionType( IActivityMonitor m, string depNameKind, string name, string value )
-        {
-            if( value.StartsWith( "file:" ) )
-            {
-                string path;
-                if( value.EndsWith( ".tgz" ) )
-                {
-                    path = value.Substring( 5 );
-                    path = Path.GetFileNameWithoutExtension( path );
-                    // Remove the package name.
-                    path = path.Remove( 0, name.Length );
-                    var r = SVersionBound.NpmTryParse( path );
-                    if( !r.IsValid )
-                    {
-                        m.Error( $"Error while parsing version of a local feed package: {r.Error}" );
-                        return (SVersionBound.None, NodeProjectDependencyType.None);
-                    }
-                    return (r.Result, NodeProjectDependencyType.LocalFeedTarball);
-                }
-                if( value.StartsWith( "file:.." ) )
-                {
-                    return (SVersionBound.None, NodeProjectDependencyType.LocalPath);
-                }
-                m.Error( $"Dependency '{value}' for {depNameKind}/{name} must be relative and starts with 'file:..'." );
-                return (SVersionBound.None, NodeProjectDependencyType.None);
-            }
-            if( value.StartsWith( "workspace:" ) )
-            {
-                return (SVersionBound.None, NodeProjectDependencyType.Workspace);
-            }
-            if( value.StartsWith( "portal:" ) )
-            {
-                return (SVersionBound.None, NodeProjectDependencyType.Portal);
-            }
-            else if( value.IndexOf( "://" ) > 0 )
-            {
-                if( value.StartsWith( "http://" ) || value.StartsWith( "https://" ) )
-                {
-                    return (SVersionBound.None, NodeProjectDependencyType.UrlTar);
-                }
-                if( value.StartsWith( "git://" )
-                    || value.StartsWith( "git+ssh://" )
-                    || value.StartsWith( "git+http://" )
-                    || value.StartsWith( "git+https://" )
-                    || value.StartsWith( "git+file://" ) )
-                {
-                    return (SVersionBound.None, NodeProjectDependencyType.UrlGit);
-                }
-                m.Error( $"Unable to handle what seems to be a url dependency '{value}' for {depNameKind}/{name}." );
-                return (SVersionBound.None, NodeProjectDependencyType.None);
-            }
-            var vR = SVersionBound.NpmTryParse( value );
-            if( vR.IsValid )
-            {
-                return (vR.Result, NodeProjectDependencyType.VersionBound);
-            }
-            if( Regex.IsMatch( value, "\\w+/\\w+" ) ) return (SVersionBound.None, NodeProjectDependencyType.GitHub);
-            if( Regex.IsMatch( value, "\\w+" ) ) return (SVersionBound.None, NodeProjectDependencyType.Tag);
-            m.Error( $"Invalid version for {depNameKind}/{name} '{value}': {vR.Error}" );
-            return (SVersionBound.None, NodeProjectDependencyType.None);
-        }
     }
 }
 

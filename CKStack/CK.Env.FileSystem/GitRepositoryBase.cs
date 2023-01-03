@@ -12,33 +12,36 @@ namespace CK.Env
 {
     /// <summary>
     /// Abstract base that adds useful methods to LibGit2Sharp <see cref="Repository"/>.
+    /// Base class of <see cref="SimpleGitRepository"/> and FileSystem's <see cref="GitRepository"/>.
     /// </summary>
-    public abstract class GitHelper : IGitHeadInfo, IDisposable
+    public abstract class GitRepositoryBase : IGitHeadInfo, IDisposable
     {
         /// <summary>
-        /// Initializes a new <see cref="GitHelper"/>.
+        /// Initializes a new <see cref="GitRepositoryBase"/>.
         /// </summary>
         /// <param name="repositoryKey">The repository key.</param>
         /// <param name="libRepository">The actual LibGit2Sharp repository instance.</param>
         /// <param name="fullPath">The working folder.</param>
         /// <param name="subPath">See <see cref="SubPath"/>. Can not be empty.</param>
-        protected GitHelper( GitRepositoryKey repositoryKey,
+        protected GitRepositoryBase( GitRepositoryKey repositoryKey,
                              Repository libRepository,
                              NormalizedPath fullPath,
                              NormalizedPath subPath )
         {
-            RepositoryKey = repositoryKey ?? throw new ArgumentNullException( nameof( repositoryKey ) );
-            Git = libRepository ?? throw new ArgumentNullException( nameof( libRepository ) );
+            Throw.CheckNotNullArgument( repositoryKey );
+            Throw.CheckNotNullArgument( libRepository );
+            RepositoryKey = repositoryKey;
+            Git = libRepository;
             FullPhysicalPath = fullPath;
             SubPath = subPath;
 
             if( FullPhysicalPath != libRepository.Info.WorkingDirectory )
             {
-                throw new ArgumentException( "Path mismatch.", nameof( fullPath ) );
+                Throw.ArgumentException( nameof( fullPath ), "Path mismatch." );
             }
             if( !FullPhysicalPath.EndsWith( SubPath ) )
             {
-                throw new ArgumentException( "Path mismatch.", nameof( subPath ) );
+                Throw.ArgumentException( nameof( subPath ), "Path mismatch." );
             }
         }
 
@@ -103,10 +106,9 @@ namespace CK.Env
 
         int? IGitHeadInfo.AheadOriginCommitCount => Git.Head.TrackingDetails.AheadBy;
 
-        string IGitHeadInfo.GetSha( string path )
+        string? IGitHeadInfo.GetSha( string? path )
         {
-            if( path == null ) return Git.Head.Tip.Sha;
-            if( path.Length == 0 ) return Git.Head.Tip.Tree.Sha;
+            if( string.IsNullOrEmpty( path ) ) return Git.Head.Tip.Sha;
             var e = Git.Head.Tip.Tree[path];
             return e?.Target.Sha;
         }
@@ -140,7 +142,7 @@ namespace CK.Env
         /// <returns>The Sha or null.</returns>
         public string? GetBranchSha( IActivityMonitor m, string branchName )
         {
-            if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
+            Throw.CheckNotNullOrWhiteSpaceArgument( branchName );
             var b = GetBranch( m, branchName, false );
             return b?.Tip.Sha;
         }
@@ -189,7 +191,7 @@ namespace CK.Env
         /// <param name="r">The repository.</param>
         /// <param name="branchName">The name of the branch.</param>
         /// <param name="noWarnOnCreate">Log as warning if the branch is created.</param>
-        /// <param name="repoDisplayName">Name of the repo displayed in the logs.</param>
+        /// <param name="repoDisplayName">Name of the repository displayed in the logs.</param>
         /// <returns>The Branch.</returns>
         static Branch DoEnsureBranch( IActivityMonitor m, Repository r, string branchName, bool noWarnOnCreate, string repoDisplayName )
         {
@@ -439,7 +441,7 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Amends the current commit, optionaly changing its message and/or its date.
+        /// Amends the current commit, optionally changing its message and/or its date.
         /// <see cref="CanAmendCommit"/> must be true otherwise an <see cref="InvalidOperationException"/> is thrown.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -454,11 +456,10 @@ namespace CK.Env
         /// False will force the amend to be done if the date or message changed even if the working folder is clean.
         /// </param>
         /// <returns>True on success, false on error.</returns>
-        public CommittingResult AmendCommit(
-            IActivityMonitor m,
-            Func<string, string>? editMessage = null,
-            Func<DateTimeOffset, DateTimeOffset?>? editDate = null,
-            bool skipIfNothingToCommit = true )
+        public CommittingResult AmendCommit( IActivityMonitor m,
+                                             Func<string, string>? editMessage = null,
+                                             Func<DateTimeOffset, DateTimeOffset?>? editDate = null,
+                                             bool skipIfNothingToCommit = true )
         {
             if( !CanAmendCommit ) throw new InvalidOperationException( nameof( CanAmendCommit ) );
             using( m.OpenInfo( $"Amending Commit in '{SubPath}' (branch '{CurrentBranchName}')." ) )
@@ -529,7 +530,7 @@ namespace CK.Env
         /// <returns>False on error. True otherwise.</returns>
         CommittingResult DoCommit( IActivityMonitor m, string commitMessage, DateTimeOffset date, bool amendPreviousCommit )
         {
-            using var grp = m.OpenTrace( "Commiting changes..." );
+            using var grp = m.OpenTrace( "Committing changes..." );
             try
             {
                 Signature? author = amendPreviousCommit ? Git.Head.Tip.Author : Git.Config.BuildSignature( date );
@@ -540,7 +541,7 @@ namespace CK.Env
                 try
                 {
                     Commit commit = Git.Commit( commitMessage, author ?? committer, committer, options );
-                    grp.ConcludeWith( () => $"Commited changes." );
+                    grp.ConcludeWith( () => $"Committed changes." );
                     return amendPreviousCommit ? CommittingResult.Amended : CommittingResult.Commited;
                 }
                 catch( EmptyCommitException )
@@ -652,12 +653,11 @@ namespace CK.Env
         /// This branch is created if needed (just like <see cref="EnsureBranch"/> does).
         /// </param>
         /// <returns>The LibGit2Sharp repository object or null on error.</returns>
-        public static Repository EnsureWorkingFolder(
-            IActivityMonitor m,
-            GitRepositoryKey git,
-            NormalizedPath workingFolder,
-            bool ensureHooks,
-            string branchName = null )
+        public static Repository? EnsureWorkingFolder( IActivityMonitor m,
+                                                       GitRepositoryKey git,
+                                                       NormalizedPath workingFolder,
+                                                       bool ensureHooks,
+                                                       string? branchName = null )
         {
             using( m.OpenTrace( $"Ensuring working folder '{workingFolder}' on '{git.OriginUrl}'." ) )
             {
@@ -742,7 +742,9 @@ namespace CK.Env
         /// <returns>The Credentials object that is null or a <see cref="UsernamePasswordCredentials"/>.</returns>
         internal static Credentials? PATCredentialsHandler( IActivityMonitor m, GitRepositoryKey git )
         {
-            string? pat = git.SecretKeyStore.GetSecretKey( m, git.ReadPATKeyName, !git.IsPublic );
+            string? pat = git.ReadPATKeyName != null
+                            ? git.SecretKeyStore.GetSecretKey( m, git.ReadPATKeyName, !git.IsPublic )
+                            : null;
             return pat != null
                     ? new UsernamePasswordCredentials() { Username = "CKli", Password = pat }
                     : null;
@@ -753,7 +755,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The Credentials object that is null or a <see cref="UsernamePasswordCredentials"/>.</returns>
-        protected Credentials PATCredentialsHandler( IActivityMonitor m ) => PATCredentialsHandler( m, RepositoryKey );
+        protected Credentials? PATCredentialsHandler( IActivityMonitor m ) => PATCredentialsHandler( m, RepositoryKey );
 
 
         #region GitHooks

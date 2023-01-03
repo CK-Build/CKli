@@ -1,10 +1,12 @@
 using CK.Core;
+using System;
 using System.Diagnostics.CodeAnalysis;
 
 namespace CK.Env.NodeSln
 {
     /// <summary>
-    /// Base class for all kind of projects.
+    /// Base class for all kind of projects, including the <see cref="NodeSubProject"/>.
+    /// <see cref="NodeRootProjectBase"/> is the base class for top-level projects.
     /// </summary>
     public abstract class NodeProjectBase
     {
@@ -13,7 +15,6 @@ namespace CK.Env.NodeSln
         [AllowNull]
         PackageJsonFile _packageJson;
         bool _isDirty;
-        bool _restoreRequired;
 
         private protected NodeProjectBase( NodeSolution solution, NormalizedPath path, int index )
         {
@@ -25,7 +26,6 @@ namespace CK.Env.NodeSln
 
         internal virtual bool Initialize( IActivityMonitor monitor )
         {
-            var path = Solution.SolutionFolderPath.AppendPart( "package.json" );
             _packageJson = PackageJsonFile.Read( monitor, this );
             return _packageJson != null;
         }
@@ -61,25 +61,32 @@ namespace CK.Env.NodeSln
         public PackageJsonFile PackageJsonFile => _packageJson;
 
         /// <summary>
-        /// Gets whether this file needs to be saved.
+        /// Gets whether this project needs to be saved.
         /// </summary>
         public bool IsDirty => _isDirty;
 
         /// <summary>
-        /// Gets whether a restore of the packages is required
-        /// after the file is saved.
+        /// Saves this project if <see cref="IsDirty"/> is true.
         /// </summary>
-        public bool RestoreRequired => _restoreRequired;
-
-
+        /// <param name="monitor">The monitor to use.</param>
+        /// <returns>True on success, false on error.</returns>
         public bool Save( IActivityMonitor monitor )
         {
+            if( IsDirty )
+            {
+                if( PackageJsonFile.IsDirty && !PackageJsonFile.Save( monitor ) ) return false;
+                if( !DoSave( monitor ) ) return false;
+                _isDirty = false;
+            }
+            return true;
         }
 
-        protected void SetDirty( bool restoreRequired )
+        abstract private protected bool DoSave( IActivityMonitor monitor );
+
+        internal virtual void SetDirty( bool restoreRequired )
         {
             _isDirty = true;
-            _restoreRequired |= restoreRequired;
+            Solution.SetDirty();
         }
 
         public override string ToString() => Path;
