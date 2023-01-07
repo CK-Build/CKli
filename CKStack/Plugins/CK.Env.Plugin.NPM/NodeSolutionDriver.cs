@@ -30,6 +30,31 @@ namespace CK.Env.Plugin
         public SolutionDriver SolutionDriver => _driver;
 
         /// <summary>
+        /// Gets whether there is a NodeSolution in this repository even if it cannot be successfully loaded.
+        /// This is null when the NodeSolution must be reloaded from the file system.
+        /// </summary>
+        public bool? HasNodeSolution => _nodeSolutionProvider.HasNodeSolution;
+
+        /// <summary>
+        /// Gets a non null <see cref="HasNodeSolution"/> by reloading the solution if it is dirty.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="hasNodeSolution">Whether a Node solution exists in the repository (even if it cannot be successfully loaded).</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool TryGetHasNodeSolution( IActivityMonitor monitor, out bool hasNodeSolution )
+        {
+            hasNodeSolution = false;
+            if( _nodeSolutionProvider.IsDirty )
+            {
+                var solution = _driver.GetSolution( monitor, allowInvalidSolution: false );
+                if( solution == null ) return false;
+                Debug.Assert( !_nodeSolutionProvider.IsDirty && _nodeSolutionProvider.HasNodeSolution.HasValue );
+                hasNodeSolution = _nodeSolutionProvider.HasNodeSolution.Value;
+            }
+            return true;
+        }
+
+        /// <summary>
         /// Gets the <see cref="ISolution"/> and <see cref="NodeSolution"/> if the solution
         /// is valid and if a NodeSolution exists.
         /// </summary>

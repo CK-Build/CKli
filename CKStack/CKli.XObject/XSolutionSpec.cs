@@ -24,8 +24,7 @@ namespace CKli
             //XSharedSolutionSpec.RemoveElementWarnings( initializer );
             initializer.Reader.Handle( initializer
                                         .Element.Elements()
-                                        .Where( c => c.Name.LocalName == nameof( SolutionSpec.NPMProjects )
-                                                        || c.Name.LocalName == nameof( SolutionSpec.CKSetupComponentProjects ) ) );
+                                        .Where( c => c.Name.LocalName == nameof( SolutionSpec.CKSetupComponentProjects ) ) );
 
             // Registers the SolutionSpec as a branch settings: the Solution specifications becomes
             // available to any of this branch plugins.

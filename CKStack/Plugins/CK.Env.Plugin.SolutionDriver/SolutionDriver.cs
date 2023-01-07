@@ -178,30 +178,12 @@ namespace CK.Env.Plugin
                 newSolution = true;
                 var expectedSolutionName = GitFolder.SubPath.LastPart + ".solution";
                 _solution = _solutionContext.AddSolution( BranchPath, expectedSolutionName );
-                foreach( var targetName in _solutionSpec.ArtifactTargets )
-                {
-                    var r = _artifactCenter.Repositories.FirstOrDefault( repo => repo.UniqueRepositoryName == targetName );
-                    if( r == null )
-                    {
-                        m.Error( $"Unable to find the repository named '{targetName}' (available repositories: {_artifactCenter.Repositories.Select( repo => repo.UniqueRepositoryName ).Concatenate()})." );
-                    }
-                    else _solution.AddArtifactTarget( r );
-                }
-                foreach( var sourceName in _solutionSpec.ArtifactSources )
-                {
-                    var f = _artifactCenter.Feeds.FirstOrDefault( feed => feed.TypedName == sourceName );
-                    if( f == null )
-                    {
-                        m.Error( $"Unable to find the feed named '{sourceName}' (available sources: {_artifactCenter.Feeds.Select( feed => feed.TypedName ).Concatenate()})." );
-                    }
-                    else _solution.AddArtifactSource( f );
-                }
             }
             var buildSecrets = new List<(string SecretKeyName, string? Secret)>();
             var e = new SolutionConfigurationEventArgs( m, _solution, newSolution, _solutionSpec, buildSecrets );
             foreach( var provider in _solutionProviders )
             {
-                provider.OnSolutionConfiguration( this, e );
+                provider.ConfigureSolution( this, e );
             }
             if( !e.ConfigurationFailed )
             {

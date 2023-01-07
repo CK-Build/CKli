@@ -17,21 +17,32 @@ namespace CK.Env.NPM
         readonly SolutionDriver _driver;
         // Having a null NodeSolution is perfectly valid: this differs from the MSBuild
         // provider for which a .sln always exists.
-        // The _nodeSolutionHasError flag specifies whether the NodeSolution should
+        // The _hasNodeSolution flag specifies whether the NodeSolution should
         // actually NOT be null.
         NodeSolution? _nodeSolution;
-        bool _noNodeSolution;
+        bool _isDirty;
+        bool _hasNodeSolution;
 
         public NodeSolutionProvider( SolutionDriver driver )
         {
             _driver = driver;
+            _isDirty = true;
         }
 
         /// <inheritdoc/>
-        /// <remarks>
-        /// When there is no NodeSolution, then we are never dirty.
-        /// </remarks>
-        public bool IsDirty => !_noNodeSolution && _nodeSolution == null;
+        public bool IsDirty => _isDirty;
+
+        /// <summary>
+        /// Gets whether there is a NodeSolution in the repository (even if it cannot be successfully loaded)
+        /// or null if <see cref="SetDirty(IActivityMonitor)"/> has been called.
+        /// </summary>
+        public bool? HasNodeSolution => _isDirty ? null : _hasNodeSolution;
+
+        /// <summary>
+        /// Gets whether there is a NodeSolution in the repository (even if it cannot be successfully loaded)
+        /// regardless of the <see cref="IsDirty"/> flag.
+        /// </summary>
+        public bool UnsafeHasNodeSolution => _hasNodeSolution;
 
         /// <summary>
         /// Gets the node solution if available.
@@ -41,9 +52,9 @@ namespace CK.Env.NPM
         /// <inheritdoc/>
         public void SetDirty( IActivityMonitor monitor )
         {
-            if( IsDirty ) return;
+            if( _isDirty ) return;
             monitor.Info( $"Node Solution '{_driver.GitFolder.SubPath}' must be reloaded." );
-            _noNodeSolution = false;
+            _isDirty = true;
             if( _nodeSolution != null )
             {
                 _nodeSolution.Saved -= OnSavedSolution;
@@ -54,17 +65,18 @@ namespace CK.Env.NPM
         void OnSavedSolution( object? sender, EventMonitoredArgs e ) => SetDirty( e.Monitor );
 
         /// <inheritdoc/>
-        public void OnSolutionConfiguration( object? sender, SolutionConfigurationEventArgs e )
+        public void ConfigureSolution( object? sender, SolutionConfigurationEventArgs e )
         {
             if( !IsDirty ) return;
+            _isDirty = false;
             var monitor = e.Monitor;
             var repositoryInfoPath = _driver.BranchPath.AppendPart( "RepositoryInfo.xml" );
-            _noNodeSolution = true;
-            using( monitor.OnError( () => _noNodeSolution = false ) )
+            _hasNodeSolution = false;
+            using( monitor.OnError( () => _hasNodeSolution = true ) )
             {
                 _nodeSolution = NodeSolution.Read( monitor, _driver.GitFolder.FileSystem, repositoryInfoPath );
             }
-            if( !_noNodeSolution )
+            if( _hasNodeSolution )
             {
                 e.PreventSolutionUse( $"Error while loading Node Solution from '{repositoryInfoPath}'." );
             }
@@ -74,7 +86,7 @@ namespace CK.Env.NPM
                 Debug.Assert( _nodeSolution.RootProjects.Count > 0 );
                 if( !UpdateSolutionFromNode( monitor, e.Solution, _nodeSolution, out bool atLeastOnePublished ) )
                 {
-                    _noNodeSolution = false;
+                    _hasNodeSolution = true;
                     e.PreventSolutionUse( $"Error while synchronizing Node Solution from '{repositoryInfoPath}'." );
                 }
             }

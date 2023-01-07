@@ -37,7 +37,7 @@ namespace CK.Env.Plugin
         void OnSavedSolution( object? sender, EventMonitoredArgs e ) => SetDirty( e.Monitor );
 
         /// <inheritdoc/>
-        public void OnSolutionConfiguration( object? sender, SolutionConfigurationEventArgs e )
+        public void ConfigureSolution( object? sender, SolutionConfigurationEventArgs e )
         {
             if( !IsDirty ) return;
             var monitor = e.Monitor;

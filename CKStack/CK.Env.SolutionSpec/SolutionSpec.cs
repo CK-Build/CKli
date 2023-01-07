@@ -14,14 +14,6 @@ namespace CK.Env
         {
             UseCKSetup = r.HandleOptionalAttribute( nameof( UseCKSetup ), false );
             SqlServer = r.HandleOptionalAttribute<string>( nameof( SqlServer ), null );
-            NPMProjects = r.HandleCollection(
-                nameof( NPMProjects ),
-                new HashSet<NPMProjectSpec>(),
-                eR => new NPMProjectSpec( eR ) );
-            AngularWorkspaces = r.HandleCollection(
-                nameof( AngularWorkspaces ),
-                new HashSet<AngularWorkspaceSpec>(),
-                eR => new AngularWorkspaceSpec( eR ) );
             CKSetupComponentProjects = r.HandleCollection(
                     nameof( CKSetupComponentProjects ),
                     new HashSet<string>(),
@@ -46,16 +38,6 @@ namespace CK.Env
         /// "2008R2SP2", "2012SP1", "2014", "2016", "2017".
         /// </summary>
         public string? SqlServer { get; }
-
-        /// <summary>
-        /// Gets the list of npm projects specifications.
-        /// </summary>
-        public IReadOnlyCollection<INPMProjectSpec> NPMProjects { get; }
-
-        /// <summary>
-        /// Gets the list of angular workspace specifications.
-        /// </summary>
-        public IReadOnlyCollection<IAngularWorkspaceSpec> AngularWorkspaces { get; }
 
         /// <summary>
         /// Gets the list of .Net project names that are CKSetup components.

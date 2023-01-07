@@ -44,6 +44,6 @@ namespace CK.Env.Plugin
         /// </summary>
         /// <param name="sender">The sender (the driver).</param>
         /// <param name="e">The event that expose the solution and build secrets that may be declared or provided.</param>
-        void OnSolutionConfiguration( object? sender, SolutionConfigurationEventArgs e );
+        void ConfigureSolution( object? sender, SolutionConfigurationEventArgs e );
     }
 }

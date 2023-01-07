@@ -20,23 +20,12 @@ namespace CK.Env
             PrimaryTargetFramework = r.HandleOptionalAttribute<string>( nameof( PrimaryTargetFramework ), null );
             NoDotNetUnitTests = r.HandleOptionalAttribute( nameof( NoDotNetUnitTests ), false );
             NoStrongNameSigning = r.HandleOptionalAttribute( nameof( NoStrongNameSigning ), false );
-            NoSharedPropsFile = r.HandleOptionalAttribute( nameof( NoSharedPropsFile ), false );
             DisableSourceLink = r.HandleOptionalAttribute( nameof( DisableSourceLink ), false );
             GlobalJsonSdkVersion = r.HandleOptionalAttribute<string>( nameof( GlobalJsonSdkVersion ), null );
             SPDXLicense = r.HandleOptionalAttribute<string>( nameof( SPDXLicense ), null );
             BuildTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( BuildTimeoutMilliseconds ), 5 * 60_000 );
             RunTestTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( RunTestTimeoutMilliseconds ), 5 * 60_000 );
             RemotePushTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( RemotePushTimeoutMilliseconds ), 5 * 60_000 );
-
-            ArtifactTargets = r.HandleCollection(
-                    nameof( ArtifactTargets ),
-                    new HashSet<string>(),
-                    eR => eR.HandleRequiredAttribute<string>( "Name" ) );
-
-            ArtifactSources = r.HandleCollection(
-                    nameof( ArtifactSources ),
-                    new HashSet<string>(),
-                    eR => eR.HandleRequiredAttribute<string>( "Name" ) );
 
             ExcludedPlugins = r.HandleCollection(
                                     nameof( ExcludedPlugins ),
@@ -62,7 +51,6 @@ namespace CK.Env
             DisableSourceLink = r.HandleOptionalAttribute( nameof( DisableSourceLink ), other.DisableSourceLink );
             NoDotNetUnitTests = r.HandleOptionalAttribute( nameof( NoDotNetUnitTests ), other.NoDotNetUnitTests );
             NoStrongNameSigning = r.HandleOptionalAttribute( nameof( NoStrongNameSigning ), other.NoStrongNameSigning );
-            NoSharedPropsFile = r.HandleOptionalAttribute( nameof( NoSharedPropsFile ), other.NoSharedPropsFile );
             GlobalJsonSdkVersion = r.HandleOptionalAttribute( nameof( GlobalJsonSdkVersion ), other.GlobalJsonSdkVersion );
             SPDXLicense = r.HandleOptionalAttribute( nameof( SPDXLicense ), other.SPDXLicense );
             BuildTimeoutMilliseconds = r.HandleOptionalAttribute( nameof( BuildTimeoutMilliseconds ), other.BuildTimeoutMilliseconds );
@@ -71,16 +59,6 @@ namespace CK.Env
 
             var excludedNuGetSourceNames = new HashSet<string>( other.RemoveNuGetSourceNames );
             var excludedNPMScopeNames = new HashSet<string>( other.RemoveNPMScopeNames );
-
-            ArtifactTargets = r.HandleCollection(
-                                nameof( ArtifactTargets ),
-                                new HashSet<string>( other.ArtifactTargets ),
-                                eR => eR.HandleRequiredAttribute<string>( "Name" ) );
-
-            ArtifactSources = r.HandleCollection(
-                                nameof( ArtifactSources ),
-                                new HashSet<string>( other.ArtifactSources ),
-                                eR => eR.HandleRequiredAttribute<string>( "Name" ) );
 
             ExcludedPlugins = r.HandleCollection(
                                     nameof( ExcludedPlugins ),
@@ -128,12 +106,6 @@ namespace CK.Env
         public bool NoStrongNameSigning { get; }
 
         /// <summary>
-        /// Gets whether no shared props file should be used.
-        /// Defaults to false.
-        /// </summary>
-        public bool NoSharedPropsFile { get; }
-
-        /// <summary>
         /// Gets whether source link is disabled.
         /// Impacts Common/Shared.props file.
         /// Defaults to false.
@@ -168,16 +140,6 @@ namespace CK.Env
         /// Impacts .npmrc file.
         /// </summary>
         public IReadOnlyCollection<string> RemoveNPMScopeNames { get; }
-
-        /// <summary>
-        /// Gets the repositories names where produced artifacts must be pushed.
-        /// </summary>
-        public IReadOnlyCollection<string> ArtifactTargets { get; }
-
-        /// <summary>
-        /// Gets the source feed names from which artifacts must be retrieved.
-        /// </summary>
-        public IReadOnlyCollection<string> ArtifactSources { get; }
 
         /// <summary>
         /// Defines the set of Git or GitBranch plugins type that must NOT be activated.

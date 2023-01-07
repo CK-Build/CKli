@@ -26,11 +26,6 @@ namespace CK.Env.Plugin
         [CommandMethod]
         public void ApplySettings( IActivityMonitor monitor )
         {
-            if( _solutionSpec.NoSharedPropsFile )
-            {
-                Delete( monitor );
-                return;
-            }
             var s = _driver.GetSolution( monitor, false );
             if( s == null ) return;
 

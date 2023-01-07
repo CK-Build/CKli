@@ -3,6 +3,7 @@ using CK.Env.DependencyModel;
 using CK.Env.NPM;
 
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -11,13 +12,13 @@ namespace CK.Env.Plugin
 {
     public class NPMCodeCakeBuilderFolder : PluginFolderBase
     {
-        readonly NPMProjectsDriver _npmDriver;
+        readonly NodeSolutionDriver _nodeDriver;
         readonly SolutionDriver _driver;
 
-        public NPMCodeCakeBuilderFolder( GitRepository f, NPMProjectsDriver npmDriver, SolutionDriver driver, NormalizedPath branchPath )
+        public NPMCodeCakeBuilderFolder( GitRepository f, NodeSolutionDriver nodeDriver, SolutionDriver driver, NormalizedPath branchPath )
             : base( f, branchPath, "CodeCakeBuilder", "NPM/Res" )
         {
-            _npmDriver = npmDriver;
+            _nodeDriver = nodeDriver;
             _driver = driver;
         }
 
@@ -29,17 +30,17 @@ namespace CK.Env.Plugin
 
         protected override void DoApplySettings( IActivityMonitor m )
         {
-            var solution = _driver.GetSolution( m, allowInvalidSolution: true );
-            if( solution == null ) return;
-
-            var projects = _npmDriver.GetAllNPMProjects( m );
-            if( projects == null ) return;
+            if( !_nodeDriver.TryGetHasNodeSolution( m, out var hasNodeSolution ) ) return;
 
             // Delete all "yarn".
             DeleteFileOrFolder( m, "yarn" );
 
-            bool useNpm = projects.Any();
-            if( useNpm )
+            // Temporary until we throw away AdaptBuildNPMArtifactForPushFeeds
+            // since CCB will rely on the RepositoryInfo.xml file.
+            var solution = _nodeDriver.SolutionDriver.GetSolution( m, false );
+            Debug.Assert( solution != null );
+
+            if( hasNodeSolution )
             {
                 //CakeExtensions
                 SetTextResource( m, "CakeExtensions/NpmDistTagRunner.cs" );
