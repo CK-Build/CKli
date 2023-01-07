@@ -2,6 +2,7 @@ using CK.Core;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
 using System.IO;
+using System.Security.Cryptography;
 
 namespace CK.Env.NodeSln
 {
@@ -13,14 +14,24 @@ namespace CK.Env.NodeSln
     {
         readonly NormalizedPath _solutionRelativeOutputPath;
         readonly NormalizedPath _outputPath;
+        readonly NormalizedPath _yarnPath;
         bool _restoreRequired;
 
-        private protected NodeRootProjectBase( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath, int index )
-            : base( solution, path, index )
+        private protected NodeRootProjectBase( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath )
+            : base( solution, path )
         {
             _solutionRelativeOutputPath = SolutionRelativePath.Combine( outputPath ).ResolveDots();
             _outputPath = solution.SolutionFolderPath.Combine( _solutionRelativeOutputPath );
+            _yarnPath = GetYarnPath();
         }
+
+        internal NormalizedPath YarnPath => _yarnPath;
+
+        /// <summary>
+        /// Gets whether this project uses Yarn instead of NPM: a ".yarn" folder
+        /// exists in the project folder or above (up to the repository root).
+        /// </summary>
+        public bool UseYarn => !_yarnPath.IsEmptyPath;
 
         /// <summary>
         /// Gets whether a restore of the packages is required
@@ -68,12 +79,12 @@ namespace CK.Env.NodeSln
         bool DoRestoreDependencies( IActivityMonitor monitor )
         {
             var physicalPath = Solution.FileSystem.GetFileInfo( Path ).PhysicalPath;
-            if( TryFindYarn( monitor, physicalPath, out var yarnCjs ) )
+            if( UseYarn )
             {
                 return ProcessRunner.Run( monitor,
                                           physicalPath,
-                                          "node",
-                                          yarnCjs, 10 * 60 * 1000 );
+                                          "cmd.exe",
+                                          "/C yarn", 10 * 60 * 1000 );
             }
             else
             {
@@ -84,28 +95,19 @@ namespace CK.Env.NodeSln
             }
         }
 
-        bool TryFindYarn( IActivityMonitor monitor, string physicalPath, [NotNullWhen( true )] out string? yarnCjs )
+        NormalizedPath GetYarnPath()
         {
-            yarnCjs = null;
-            int hopCount = Path.Parts.Count - Solution.SolutionFolderPath.Parts.Count;
-            Debug.Assert( hopCount > 0 );
-            var searchPath = physicalPath;
+            var p = Path;
+            int rootDepth = Solution.SolutionFolderPath.Parts.Count;
             do
             {
-                var dir = System.IO.Path.Combine( searchPath, ".yarn" );
-                if( Directory.Exists( dir ) )
-                {
-                    yarnCjs = System.IO.Path.Combine( dir, "releases", "yarn.cjs" );
-                    if( !File.Exists( yarnCjs ) )
-                    {
-                        monitor.Error( $"Missing file 'yarn.cjs' in '{dir}/releases'." );
-                        return false;
-                    }
-                    return true;
-                }
+                var yarn = p.AppendPart( ".yarn" );
+                var dirYarn = Solution.FileSystem.GetFileInfo( yarn );
+                if( dirYarn.Exists && dirYarn.IsDirectory ) return yarn;
+                p = p.RemoveLastPart();
             }
-            while( --hopCount >= 0 );
-            return false;
+            while( p.Parts.Count >= rootDepth );
+            return default;
         }
 
     }

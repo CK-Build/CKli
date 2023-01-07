@@ -192,6 +192,8 @@ namespace CK.Env.Plugin
                             new XElement( "NoWarn", "NU5105" ),
                             new XComment( "Considering .net6 'global using' to be an opt-in (simply reproduce this with 'false' in the csproj if needed)." ),
                             new XElement( "ImplicitUsings", "disable" ),
+                            new XComment( "By default, a project is NOT packable. Set this to true for projects that generate a NuGet package." ),
+                            new XElement( "IsPackable", "false" ),
                             new XElement( "PackageIcon", "PackageIcon.png" ) );
 
             if( !_solutionSpec.NoStrongNameSigning )

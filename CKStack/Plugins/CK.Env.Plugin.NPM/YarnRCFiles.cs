@@ -1,8 +1,10 @@
 using CK.Core;
+using CK.Env.DependencyModel;
 using CK.Env.NPM;
 using CK.SimpleKeyVault;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -15,90 +17,84 @@ namespace CK.Env.Plugin.NPM
     public class YarnRCFiles : GitBranchPluginBase, ICommandMethodsProvider
     {
         readonly SolutionSpec _solutionSpec;
-        readonly NPMProjectsDriver _driver;
-        readonly SolutionDriver _solutionDriver;
+        readonly NodeSolutionDriver _driver;
         readonly SecretKeyStore _secretStore;
 
-        public YarnRCFiles( GitRepository f, NPMProjectsDriver driver, SolutionDriver solutionDriver, SecretKeyStore secretStore, SolutionSpec solutionSpec, NormalizedPath branchPath )
+        public YarnRCFiles( GitRepository f, NodeSolutionDriver nodeDriver, SecretKeyStore secretStore, SolutionSpec solutionSpec, NormalizedPath branchPath )
             : base( f, branchPath )
         {
-            _solutionDriver = solutionDriver;
             _solutionSpec = solutionSpec;
-            _driver = driver;
+            _driver = nodeDriver;
             _secretStore = secretStore;
-            _solutionDriver.OnSolutionConfiguration += OnSolutionConfiguration;
+            nodeDriver.SolutionDriver.OnSolutionConfiguration += OnSolutionConfiguration;
         }
 
         [CommandMethod]
         public void ApplySettings( IActivityMonitor m )
         {
-            if( !this.CheckCurrentBranch( m ) ) return;
+            if( !this.CheckCurrentBranch( m )
+                || !_driver.TryGetSolution( m, out var solution, out var nodeSolution ) ) return;
 
-            var projects = _driver.GetSimpleNPMProjects( m );
-            if( projects == null ) return;
-
-            foreach( var project in projects )
+            foreach( var project in nodeSolution.RootProjects )
             {
-                var npmrcPath = project.FullPath.AppendPart( ".npmrc" );
-                var yarnRcPath = project.FullPath.AppendPart( ".yarnrc.yml" );
-                (bool error, bool isUsingYarn) = NPMRCFiles.IsUsingYarn( m, project );
-                if( error ) continue;
-                if( isUsingYarn )
+                var npmrcPath = project.Path.AppendPart( ".yarnrc.yml" );
+                if( project.UseYarn )
                 {
-                    DoApplySettings( m, npmrcPath, yarnRcPath );
+                    DoApplySettings( m, solution, npmrcPath );
+                }
+                else
+                {
+                    GitFolder.FileSystem.Delete( m, npmrcPath );
                 }
             }
         }
 
-        void DoApplySettings( IActivityMonitor m, NormalizedPath npmrcPath, NormalizedPath yarnRcPath )
+        void DoApplySettings( IActivityMonitor m, ISolution solution, NormalizedPath yarnRcPath )
         {
-            var s = _solutionDriver.GetSolution( m, allowInvalidSolution: true );
-            if( s is null ) return;
-            GitFolder.FileSystem.Delete( m, npmrcPath );
             var yamlInfo = GitFolder.FileSystem.GetFileInfo( yarnRcPath );
             var yamldoc = yamlInfo.Exists ? yamlInfo.ReadAsYaml() : new YamlMappingNode();
 
-            if( !s.ArtifactSources.Any() )
+            if( !solution.ArtifactSources.Any() )
             {
                 yamldoc.Remove( "npmRegistries" );
-                return;
             }
-
-            var scopes = yamldoc.EnsureMap( "npmScopes" );
-            scopes.Children.Clear();
-            foreach( var p in s.ArtifactSources.OfType<INPMFeed>() )
+            else
             {
-                bool isFile = p.Url.StartsWith( "file:" );
-                if( isFile )
+                var scopes = yamldoc.EnsureMap( "npmScopes" );
+                scopes.Children.Clear();
+                foreach( var feed in solution.ArtifactSources.OfType<INPMFeed>() )
                 {
-                    m.Info( "Yarn does not support file repository. Skipping." );
-                    continue;
-                }
-                var scope = scopes.EnsureMap( p.Scope.Substring( 1 ) );
-
-                scope.Children["npmRegistryServer"] = p.Url;
-
-                if( p.Credentials != null )
-                {
-                    string password = p.Credentials.IsSecretKeyName
-                                       ? _secretStore.GetSecretKey( m, p.Credentials.PasswordOrSecretKeyName, false )!
-                                       : p.Credentials.PasswordOrSecretKeyName!;
-                    if( password == null )
+                    bool isFile = feed.Url.StartsWith( "file:" );
+                    if( isFile )
                     {
-                        if( p.Credentials.IsSecretKeyName )
-                            m.Warn( $"Secret '{p.Credentials.PasswordOrSecretKeyName}' is not known. Configuration for feed '{p.Name}' skipped." );
-                        else m.Warn( $"Empty feed password. Configuration for feed '{p.Name}' skipped." );
+                        m.Info( "Yarn does not support file repository. Skipping." );
                         continue;
                     }
-                    if( p.Url.Contains( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) )
+                    var scope = scopes.EnsureMap( feed.Scope.Substring( 1 ) );
+
+                    scope.Children["npmRegistryServer"] = feed.Url;
+
+                    if( feed.Credentials != null )
                     {
-                        password = Convert.ToBase64String( Encoding.UTF8.GetBytes( password ) );
+                        string password = feed.Credentials.IsSecretKeyName
+                                           ? _secretStore.GetSecretKey( m, feed.Credentials.PasswordOrSecretKeyName, false )!
+                                           : feed.Credentials.PasswordOrSecretKeyName!;
+                        if( password == null )
+                        {
+                            if( feed.Credentials.IsSecretKeyName )
+                                m.Warn( $"Secret '{feed.Credentials.PasswordOrSecretKeyName}' is not known. Configuration for feed '{feed.Name}' skipped." );
+                            else m.Warn( $"Empty feed password. Configuration for feed '{feed.Name}' skipped." );
+                            continue;
+                        }
+                        if( feed.Url.Contains( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) )
+                        {
+                            password = Convert.ToBase64String( Encoding.UTF8.GetBytes( password ) );
+                        }
+                        scope.Children["npmAlwaysAuth"] = "true";
+                        scope.Children["npmAuthIdent"] = "username:" + password;
                     }
-                    scope.Children["npmAlwaysAuth"] = "true";
-                    scope.Children["npmAuthIdent"] = "username:" + password;
                 }
             }
-
             GitFolder.FileSystem.CopyTo( m, new Serializer().Serialize( yamldoc ), yarnRcPath );
         }
 
@@ -114,7 +110,10 @@ namespace CK.Env.Plugin.NPM
                             .Select( s => s.Credentials.PasswordOrSecretKeyName );
             foreach( var c in creds )
             {
-                _secretStore.DeclareSecretKey( c, current => current?.Description ?? "Needed to configure .yarnrc.yml file." );
+                Debug.Assert( c != null );
+                _secretStore.DeclareSecretKey( c, current => current?.Description == null
+                                                                ? "Needed to configure .yarnrc.yml file."
+                                                                : current.Description + Environment.NewLine + "Needed to configure .yarnrc.yml file." );
             }
         }
 

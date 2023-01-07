@@ -11,6 +11,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Xml.Linq;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CK.Env.Plugin
 {
@@ -28,9 +29,9 @@ namespace CK.Env.Plugin
         readonly ArtifactCenter _artifactCenter;
         readonly SolutionSpec _solutionSpec;
         readonly SolutionContext _solutionContext;
+        readonly List<ISolutionProvider> _solutionProviders;
 
         Solution? _solution;
-        SolutionFile? _sln;
         IReadOnlyList<(string SecretKeyName, string? Secret)>? _buildSecrets;
         bool _isSolutionValid;
 
@@ -42,24 +43,24 @@ namespace CK.Env.Plugin
                                IEnvLocalFeedProvider localFeedProvider )
             : base( f, branchPath )
         {
-            _solutionContext = w.Register( this );
+            _solutionProviders = new List<ISolutionProvider>();
             _world = w;
             _artifactCenter = artifactCenter;
             _solutionSpec = spec;
             _localFeedProvider = localFeedProvider;
+            _solutionContext = w.Register( this );
             f.Reset += OnReset;
             f.RunProcessStarting += OnRunProcessStarting;
+            // The MSBuildSolutionProvider is implemented here to avoid
+            // yet another assembly/plugin.
+            _solutionProviders.Add( new MSBuildSolutionProvider( this ) );
         }
 
         void OnRunProcessStarting( object? sender, RunCommandEventArgs e )
         {
             e.StartInfo.EnvironmentVariables.Add( "CKLI_CURRENT_WORLD_FULLNAME", GitFolder.World.FullName );
             e.StartInfo.EnvironmentVariables.Add( "CKLI_CURRENT_WORLD_NAME", GitFolder.World.Name );
-            ISolution? s = GetSolution( e.Monitor, true );
-            if( s != null )
-            {
-                e.StartInfo.EnvironmentVariables.Add( "CKLI_CURRENT_SOLUTION_NAME", s.Name );
-            }
+            e.StartInfo.EnvironmentVariables.Add( "CKLI_CURRENT_SOLUTION_NAME", GitFolder.SubPath.LastPart );
         }
 
         void OnReset( IActivityMonitor m )
@@ -97,6 +98,13 @@ namespace CK.Env.Plugin
                     : GitFolder.PluginManager.BranchPlugins[GitFolder.CurrentBranchName].GetPlugin<SolutionDriver>();
         }
 
+        public void RegisterSolutionProvider( ISolutionProvider provider )
+        {
+            Throw.CheckNotNullArgument( provider );
+            Throw.CheckState( !_solutionProviders.Contains( provider ) );
+            _solutionProviders.Add( provider );
+        }
+
         /// <summary>
         /// Fires whenever a solution has been loaded so that any other
         /// plugins can participate to its configuration.
@@ -107,27 +115,25 @@ namespace CK.Env.Plugin
         /// Gets whether the solution has been correctly read and configured.
         /// Nothing should be done with the solution when this is false, except fix operations.
         /// </summary>
-        public bool IsSolutionValid => _isSolutionValid;
+        public bool IsSolutionValid => _isSolutionValid && _solutionProviders.All( p => !p.IsDirty );
 
         /// <summary>
         /// Gets the secrets required to build the solution.
-        /// This not null as soon as the solution has been successfully read (this is available even
+        /// This is not null as soon as the solution has been successfully read (this is available even
         /// if <see cref="IsSolutionValid"/> is false).
         /// </summary>
         public IReadOnlyList<(string SecretKeyName, string? Secret)>? BuildRequiredSecrets => _buildSecrets;
 
         /// <summary>
-        /// Forces the solution to be reloaded next time <see cref="GetSolution"/> is called.
+        /// Forces the solution to be reloaded next time <see cref="GetSolution"/> is called by
+        /// calling <see cref="ISolutionProvider.SetDirty(IActivityMonitor)"/> an all registered providers.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         public void SetSolutionDirty( IActivityMonitor m )
         {
-            if( _sln != null )
+            foreach( var p in _solutionProviders )
             {
-                _sln.Saved -= OnSolutionSaved;
-                m.Info( $"Solution '{GitFolder.SubPath}' must be reloaded." );
-                _isSolutionValid = false;
-                _sln = null;
+                p.SetDirty( m );
             }
         }
 
@@ -144,24 +150,41 @@ namespace CK.Env.Plugin
             return _isSolutionValid || allowInvalidSolution ? _solution : null;
         }
 
+        /// <summary>
+        /// Gets the <see cref="ISolution"/> and <see cref="SolutionFile"/> if the solution
+        /// is valid.
+        /// </summary>
+        /// <param name="monitor">The monitor.</param>
+        /// <param name="solution">The logical solution.</param>
+        /// <param name="sln">The MSBuild solution.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool TryGetSolution( IActivityMonitor monitor, [NotNullWhen(true)] out ISolution? solution, [NotNullWhen( true )] out SolutionFile? sln )
+        {
+            sln = null;
+            solution = GetSolution( monitor, allowInvalidSolution: false );
+            if( solution == null ) return false;
+            sln = solution.Tag<SolutionFile>();
+            if( sln == null ) return false;
+            return true;
+        }
+
         void DoLoadSolution( IActivityMonitor m )
         {
             _isSolutionValid = false;
-            var expectedSolutionName = GitFolder.SubPath.LastPart + ".sln";
             _buildSecrets = null;
-            _sln = SolutionFile.Read( GitFolder.FileSystem, m, BranchPath.AppendPart( expectedSolutionName ) );
-            if( _sln == null ) return;
-
-            _sln.Saved += OnSolutionSaved;
             bool newSolution = false;
             if( _solution == null )
             {
                 newSolution = true;
+                var expectedSolutionName = GitFolder.SubPath.LastPart + ".solution";
                 _solution = _solutionContext.AddSolution( BranchPath, expectedSolutionName );
                 foreach( var targetName in _solutionSpec.ArtifactTargets )
                 {
                     var r = _artifactCenter.Repositories.FirstOrDefault( repo => repo.UniqueRepositoryName == targetName );
-                    if( r == null ) m.Error( $"Unable to find the repository named '{targetName}' (available repositories: {_artifactCenter.Repositories.Select( repo => repo.UniqueRepositoryName ).Concatenate()})." );
+                    if( r == null )
+                    {
+                        m.Error( $"Unable to find the repository named '{targetName}' (available repositories: {_artifactCenter.Repositories.Select( repo => repo.UniqueRepositoryName ).Concatenate()})." );
+                    }
                     else _solution.AddArtifactTarget( r );
                 }
                 foreach( var sourceName in _solutionSpec.ArtifactSources )
@@ -170,25 +193,33 @@ namespace CK.Env.Plugin
                     if( f == null )
                     {
                         m.Error( $"Unable to find the feed named '{sourceName}' (available sources: {_artifactCenter.Feeds.Select( feed => feed.TypedName ).Concatenate()})." );
-                        continue;
                     }
-                    _solution.AddArtifactSource( f );
+                    else _solution.AddArtifactSource( f );
                 }
             }
-            _solution.Tag( _sln );
             var buildSecrets = new List<(string SecretKeyName, string? Secret)>();
-            _isSolutionValid = UpdateSolutionFromMSBuild( m, _solution, _sln, _solutionSpec );
-            var h = OnSolutionConfiguration;
-            if( h != null )
+            var e = new SolutionConfigurationEventArgs( m, _solution, newSolution, _solutionSpec, buildSecrets );
+            foreach( var provider in _solutionProviders )
             {
-                var e = new SolutionConfigurationEventArgs( m, _solution, newSolution, _solutionSpec, buildSecrets );
-                h( this, e );
-                if( e.ConfigurationFailed )
-                {
-                    m.Error( "Solution initialization failed: " + e.FailureMessage );
-                    _isSolutionValid = false;
-                }
+                provider.OnSolutionConfiguration( this, e );
             }
+            if( !e.ConfigurationFailed )
+            {
+                SynchronizeSources( e );
+                SynchronizeArtifactTargets( e );
+                OnSolutionConfiguration?.Invoke( this, e );
+            }
+
+            Debug.Assert( !_isSolutionValid, "We have been pessimistic." );
+            if( e.ConfigurationFailed )
+            {
+                m.Error( "Solution initialization failed: " + e.FailureMessage );
+            }
+            else
+            {
+                _isSolutionValid = true;
+            }
+            // Always tries to resolve the secrets of the artifact targets even on failure.
             var l = _artifactCenter.ResolveSecrets( m, _solution.ArtifactTargets, allMustBeResolved: false );
             Debug.Assert( l != null, "We allow unresolved secrets." );
             foreach( var sc in l )
@@ -199,13 +230,56 @@ namespace CK.Env.Plugin
                 }
             }
             _buildSecrets = buildSecrets;
+
+            void SynchronizeSources( SolutionConfigurationEventArgs e )
+            {
+                var requiredFeedTypes = new HashSet<ArtifactType>( _solution.AllPackageReferences.Select( r => r.Target.Artifact.Type! ) );
+                foreach( var feed in _artifactCenter.Feeds )
+                {
+                    if( requiredFeedTypes.Contains( feed.ArtifactType ) )
+                    {
+                        if( _solution.AddArtifactSource( feed ) )
+                        {
+                            e.Monitor.Info( $"Added feed '{feed}' to {_solution}." );
+                        }
+                    }
+                    else
+                    {
+                        if( _solution.RemoveArtifactSource( feed ) )
+                        {
+                            e.Monitor.Info( $"Removed feed '{feed}' from {_solution}." );
+                        }
+                    }
+                }
+            }
+
+            void SynchronizeArtifactTargets( SolutionConfigurationEventArgs e )
+            {
+                var requiredRepostoryTypes = new HashSet<ArtifactType>( _solution.GeneratedArtifacts.Select( g => g.Artifact.Type! ) );
+                foreach( var repository in _artifactCenter.Repositories )
+                {
+                    if( requiredRepostoryTypes.Any( t => repository.HandleArtifactType( t ) ) )
+                    {
+                        if( _solution.AddArtifactTarget( repository ) )
+                        {
+                            e.Monitor.Info( $"Added repository '{repository}' to {_solution}." );
+                        }
+                    }
+                    else
+                    {
+                        if( _solution.RemoveArtifactTarget( repository ) )
+                        {
+                            e.Monitor.Info( $"Removed repository '{repository}' from {_solution}." );
+                        }
+                    }
+                }
+            }
         }
 
         void OnSolutionSaved( object? sender, EventMonitoredArgs e )
         {
             SetSolutionDirty( e.Monitor );
         }
-
 
         /// <summary>
         /// Gets whether <see cref="IWorldState.WorkStatus"/> is <see cref="GlobalWorkStatus.Idle"/>
@@ -221,9 +295,9 @@ namespace CK.Env.Plugin
         [CommandMethod]
         public bool Pull( IActivityMonitor m )
         {
-            var (Success, ReloadNeeded) = GitFolder.Pull( m );
-            if( !Success ) return false;
-            return !ReloadNeeded || GetSolution( m, true ) != null;
+            var (success, reloadNeeded) = GitFolder.Pull( m );
+            if( !success ) return false;
+            return !reloadNeeded || GetSolution( m, true ) != null;
         }
 
         [CommandMethod]
@@ -290,20 +364,20 @@ namespace CK.Env.Plugin
             }
 
             Console.Write( b.ToString() );
-        }
 
-        static void DumpProject( StringBuilder b, IProject p, bool withHeader )
-        {
-            if( withHeader )
+            static void DumpProject( StringBuilder b, IProject p, bool withHeader )
             {
-                b.Append( "|   " ).Append( p.SimpleProjectName ).Append( " [" ).Append( p.Type ).Append( "] " );
-                if( p.IsTestProject ) b.Append( "[Test]" );
-                if( p.Savors != null ) b.Append( " [" ).Append( p.Savors ).Append( "]" );
-                b.AppendLine();
+                if( withHeader )
+                {
+                    b.Append( "|   " ).Append( p.SimpleProjectName ).Append( " [" ).Append( p.Type ).Append( "] " );
+                    if( p.IsTestProject ) b.Append( "[Test]" );
+                    if( p.Savors != null ) b.Append( " [" ).Append( p.Savors ).Append( "]" );
+                    b.AppendLine();
+                }
+                if( p.GeneratedArtifacts.Any() ) b.Append( "|     => " ).AppendJoin( ", ", p.GeneratedArtifacts ).AppendLine();
+                b.Append( "|     PackageReferences: " ).AppendJoin( ", ", p.PackageReferences.Select( p => p.ToStringTarget() ) ).AppendLine();
+                b.Append( "|     ProjectReferences: " ).AppendJoin( ", ", p.ProjectReferences.Select( p => p.ToStringTarget() ) ).AppendLine();
             }
-            if( p.GeneratedArtifacts.Any() ) b.Append( "|     => " ).AppendJoin( ", ", p.GeneratedArtifacts ).AppendLine();
-            b.Append( "|     PackageReferences: " ).AppendJoin( ", ", p.PackageReferences.Select( p => p.ToStringTarget() ) ).AppendLine();
-            b.Append( "|     ProjectReferences: " ).AppendJoin( ", ", p.ProjectReferences.Select( p => p.ToStringTarget() ) ).AppendLine();
         }
 
         /// <summary>
@@ -335,9 +409,7 @@ namespace CK.Env.Plugin
                                                IReadOnlyCollection<UpdatePackageInfo> packageInfos,
                                                string? frameworkFilter = null )
         {
-            var solution = GetSolution( monitor, allowInvalidSolution: false );
-            if( solution == null ) return false;
-            Debug.Assert( _sln != null );
+            if( !TryGetSolution( monitor, out var solution, out var sln ) ) return false;
 
             // Resolves frameworks after the load: MSProject.Savors is initialized.
             CKTrait? frameworks = null;
@@ -373,7 +445,7 @@ namespace CK.Env.Plugin
                 }
                 else
                 {
-                    mustSave |= _sln.StandardDotnetToolConfigFile.SetPackageReferenceVersion( monitor, update.PackageUpdate );
+                    mustSave |= sln.StandardDotnetToolConfigFile.SetPackageReferenceVersion( monitor, update.PackageUpdate );
                 }
             }
             bool error = false;
@@ -390,9 +462,8 @@ namespace CK.Env.Plugin
                 }
             }
             if( error ) return false;
-            return mustSave ? _sln.Save( monitor ) : true;
+            return mustSave ? sln.Save( monitor ) : true;
         }
-
 
         // This should not be here: only CKli (the console) is concerned here.
         [CommandMethod]
@@ -447,24 +518,21 @@ namespace CK.Env.Plugin
 
         public bool StopUsingPropertyVersionAndOldCentralPackageManagement( IActivityMonitor monitor )
         {
-            var solution = GetSolution( monitor, allowInvalidSolution: false );
-            if( solution == null ) return false;
-            Debug.Assert( _sln != null );
-
-            var msProjects = _sln.MSProjects;
+            if( !TryGetSolution( monitor, out var _, out var sln ) ) return false;
+            var msProjects = sln.MSProjects;
             foreach( var p in msProjects )
             {
                 p.StopUsingPropertyVersionAndOldCentralPackageManagement( monitor );
             }
-            _sln.Save( monitor );
+            sln.Save( monitor );
             return true;
         }
 
         [CommandMethod]
         public bool ChangeSingleTargetFramework( IActivityMonitor monitor, string oldOne, string newOne )
         {
-            if( oldOne == null ) throw new ArgumentNullException( nameof( oldOne ) );
-            if( newOne == null ) throw new ArgumentNullException( nameof( newOne ) );
+            Throw.CheckNotNullArgument( oldOne );
+            Throw.CheckNotNullArgument( newOne );
 
             var solution = GetSolution( monitor, allowInvalidSolution: false );
             if( solution == null ) return false;
@@ -498,12 +566,10 @@ namespace CK.Env.Plugin
         /// <returns>True on success, false on error.</returns>
         public bool ChangeSingleTargetFramework( IActivityMonitor monitor, CKTrait oldOne, CKTrait newOne )
         {
-            if( oldOne == null ) throw new ArgumentNullException( nameof( oldOne ) );
-            if( newOne == null ) throw new ArgumentNullException( nameof( newOne ) );
+            Throw.CheckNotNullArgument( oldOne );
+            Throw.CheckNotNullArgument( newOne );
 
-            var solution = GetSolution( monitor, allowInvalidSolution: false );
-            if( solution == null ) return false;
-            Debug.Assert( _sln != null );
+            if( !TryGetSolution( monitor, out var solution, out var sln ) ) return false;
 
             bool mustSave = false;
             foreach( var p in solution.Projects )
@@ -529,7 +595,7 @@ namespace CK.Env.Plugin
                     }
                 }
             }
-            return mustSave ? _sln.Save( monitor ) : true;
+            return mustSave ? sln.Save( monitor ) : true;
         }
 
 
@@ -538,7 +604,7 @@ namespace CK.Env.Plugin
         /// Fires before and after <see cref="ZeroBuildProject"/> actually builds a
         /// project in ZeroVersion.
         /// </summary>
-        public event EventHandler<ZeroBuildEventArgs> OnZeroBuildProject;
+        public event EventHandler<ZeroBuildEventArgs>? OnZeroBuildProject;
 
         /// <summary>
         /// Builds the given project (that must be handled by this driver otherwise an exception is thrown).
@@ -550,7 +616,7 @@ namespace CK.Env.Plugin
         /// <returns>True on success, false on error.</returns>
         public bool ZeroBuildProject( IActivityMonitor monitor, ZeroBuildProjectInfo info )
         {
-            if( info == null ) throw new ArgumentNullException( nameof( info ) );
+            Throw.CheckNotNullArgument( info );
 
             var solution = GetSolution( monitor, allowInvalidSolution: false );
             if( solution == null ) return false;
@@ -653,12 +719,12 @@ namespace CK.Env.Plugin
         /// <summary>
         /// Fires before a build.
         /// </summary>
-        public event EventHandler<BuildStartEventArgs> OnStartBuild;
+        public event EventHandler<BuildStartEventArgs>? OnStartBuild;
 
         /// <summary>
         /// Fires after a build.
         /// </summary>
-        public event EventHandler<BuildEndEventArgs> OnEndBuild;
+        public event EventHandler<BuildEndEventArgs>? OnEndBuild;
 
         /// <summary>
         /// The solution must be valid (see <see cref="IsSolutionValid"/>) and all build secrets
@@ -821,15 +887,14 @@ namespace CK.Env.Plugin
                 // Consider that 15 seconds to build the CodeCakeBuilder is enough.
                 timeout += 15 * 1000;
             }
-            var ev = new BuildStartEventArgs(
-                            monitor,
-                            buildRequired,
-                            solution,
-                            v,
-                            buildType,
-                            GitFolder.FullPhysicalPath,
-                            ccbPath,
-                            timeout );
+            var ev = new BuildStartEventArgs( monitor,
+                                              buildRequired,
+                                              solution,
+                                              v,
+                                              buildType,
+                                              GitFolder.FullPhysicalPath,
+                                              ccbPath,
+                                              timeout );
 
             bool FireEvent( bool start, bool success )
             {

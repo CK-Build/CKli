@@ -63,6 +63,7 @@ namespace CK.Env.NodeSln
                     monitor.Warn( $"File '{filePath}': property \"workspaces\" is not an array or is an empty array. It is ignored." );
                 }
             }
+
             return new PackageJsonFile( filePath, o, project, isPrivate, name, version, workspaces );
 
             static bool TryReadString( IActivityMonitor monitor, NormalizedPath filePath, JObject o, string name, out string? value )

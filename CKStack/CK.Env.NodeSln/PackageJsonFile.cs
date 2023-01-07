@@ -13,6 +13,7 @@ using System.Threading;
 using System.Xml.Linq;
 using Newtonsoft.Json;
 using YamlDotNet.Core.Tokens;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CK.Env.NodeSln
 {
@@ -101,6 +102,7 @@ namespace CK.Env.NodeSln
         /// This can be set to false only if a non null <see cref="Name"/> exists.
         /// </para>
         /// </summary>
+        [MemberNotNullWhen( false, nameof( Name ) )]
         public bool IsPrivate
         {
             get => _private;
@@ -166,10 +168,10 @@ namespace CK.Env.NodeSln
         /// and <see cref="SVersionBound.MinQuality"/>.
         /// </param>
         /// <returns>True if the version has been changed, false if no change occurred.</returns>
-        internal bool SetPackageReferenceVersion( IActivityMonitor monitor,
-                                                  string packageId,
-                                                  SVersion version,
-                                                  bool ignoreCurrentBound = true )
+        public bool SetPackageReferenceVersion( IActivityMonitor monitor,
+                                                string packageId,
+                                                SVersion version,
+                                                bool ignoreCurrentBound = true )
         {
             var idx = _deps.FindIndex( dep => dep.Name == packageId );
             if( idx < 0 )

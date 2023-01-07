@@ -19,13 +19,13 @@ namespace CK.Env.DependencyModel
         /// <param name="index">The project index in <see cref="IDependentSolutionContext.BuildProjectsInfo"/> ordered list.</param>
         /// <param name="rank">The project rank.</param>
         /// <param name="project">The project itself.</param>
-        /// <param name="upgradePackages">Set of projects for which package references must be upgraded.</param>
+        /// <param name="upgradeProjectPackages">Set of projects for which package references must be upgraded.</param>
         /// <param name="upgradeZeroProjects">
         /// All the published projects: the ones who are actually referenced as a package AND the
         /// ones that are ProjectReference.
         /// ProjectReference MUST be transformed into PackageReference during ZeroBuild.
         /// </param>
-        /// <param name="dependencies">List of all the dependencies.</param>
+        /// <param name="allDependencies">List of all the dependencies.</param>
         public ZeroBuildProjectInfo( int index,
                                      int rank,
                                      IProject project,

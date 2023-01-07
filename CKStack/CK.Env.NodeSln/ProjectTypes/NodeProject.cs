@@ -14,8 +14,8 @@ namespace CK.Env.NodeSln
     /// </summary>
     public sealed class NodeProject : NodeRootProjectBase
     {
-        internal NodeProject( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath, int index )
-            : base( solution, path, outputPath, index )
+        internal NodeProject( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath )
+            : base( solution, path, outputPath )
         {
         }
 

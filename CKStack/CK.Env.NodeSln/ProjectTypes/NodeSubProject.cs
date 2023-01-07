@@ -16,8 +16,8 @@ namespace CK.Env.NodeSln
     {
         readonly INodeWorkspace _workspace;
 
-        internal NodeSubProject( NodeSolution solution, INodeWorkspace workspace, NormalizedPath path, int index )
-            : base( solution, path, index )
+        internal NodeSubProject( NodeSolution solution, INodeWorkspace workspace, NormalizedPath path )
+            : base( solution, path )
         {
             _workspace = workspace;
         }

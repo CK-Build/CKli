@@ -1,10 +1,10 @@
 using CK.Core;
-
 using CSemVer;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -18,6 +18,12 @@ using System.Threading.Tasks;
 
 namespace CK.Env.NPM
 {
+
+    /// <summary>
+    /// Helper that interacts with a npm registry.
+    /// The <see cref="Publish(IActivityMonitor, NormalizedPath, bool, string?, string?)"/> relies
+    /// on an installed npm.
+    /// </summary>
     public class Registry
     {
         static readonly string _userAgent = "CKli";
@@ -25,11 +31,11 @@ namespace CK.Env.NPM
         public static readonly Uri NPMJSOrgUri = new Uri( "https://registry.npmjs.org/" );
 
         readonly HttpClient _httpClient;
-        readonly AuthenticationHeaderValue _authHeader;
+        readonly AuthenticationHeaderValue? _authHeader;
         readonly string _session = GenerateSessionId();
 
-        readonly string _password;
-        readonly string _username;
+        readonly string? _password;
+        readonly string? _username;
 
         /// <summary>
         /// NPM ask a one time password, so here you have one.
@@ -37,8 +43,7 @@ namespace CK.Env.NPM
         /// <returns></returns>
         static string GenerateSessionId()
         {
-            byte[] bytes = new byte[8];
-            using( var r = RandomNumberGenerator.Create() ) r.GetBytes( bytes );
+            byte[] bytes = RandomNumberGenerator.GetBytes( 8 );
             return BitConverter.ToString( bytes ).Replace( "-", "" ).ToLower();
         }
 
@@ -62,6 +67,7 @@ namespace CK.Env.NPM
         public Registry( HttpClient httpClient, string token, Uri? uri = null )
             : this( httpClient, uri ?? NPMJSOrgUri )
         {
+            Throw.CheckNotNullArgument( token );
             _authHeader = new AuthenticationHeaderValue( "Bearer", token );
         }
 
@@ -72,9 +78,11 @@ namespace CK.Env.NPM
         /// <param name="username">The user name.</param>
         /// <param name="password">The password.</param>
         /// <param name="uri">Defaults to https://registry.npmjs.org/ </param>
-        public Registry( HttpClient httpClient, string username, string password, Uri uri = null )
+        public Registry( HttpClient httpClient, string username, string password, Uri? uri = null )
             : this( httpClient, uri ?? NPMJSOrgUri )
         {
+            Throw.CheckNotNullArgument( username );
+            Throw.CheckNotNullArgument( password );
             _username = username;
             _password = password;
             string basic = Convert.ToBase64String( Encoding.ASCII.GetBytes( $"{username}:{password}" ) );
@@ -117,7 +125,7 @@ namespace CK.Env.NPM
         {
             if( RegistryUri.IsFile )
             {
-                m.Warn( "Dist tags are not supported on a filesystem registry." );
+                m.Warn( "Dist tags are not supported on a file system registry." );
                 return true;
             }
             if( String.IsNullOrWhiteSpace( tagName ) ) throw new ArgumentNullException( nameof( tagName ) );
@@ -126,8 +134,7 @@ namespace CK.Env.NPM
             using( HttpRequestMessage req = NpmRequestMessage( m, $"/-/package/{packageName}/dist-tags/{tagName}", HttpMethod.Put ) )
             {
                 req.Content = new StringContent( "\"" + version.ToNormalizedString() + "\"" );
-                req.Content.Headers.ContentType.MediaType = "application/json";
-                req.Content.Headers.ContentType.CharSet = "";
+                req.Content.Headers.ContentType = new MediaTypeHeaderValue( "application/json" );
                 using( HttpResponseMessage response = await _httpClient.SendAsync( req ) )
                 {
                     return await HandleResponse( m, response );
@@ -166,15 +173,11 @@ namespace CK.Env.NPM
                 try
                 {
                     Directory.CreateDirectory( tempDirectory );
-                    m.Debug( $"Creating temp directory {tempDirectory}." );
-                    using( m.OpenInfo( "Creating .npmrc with content:" ) )
-                    using( StreamWriter w = File.CreateText( Path.Combine( tempDirectory, ".npmrc" ) ) )
+                    using( var w = new StringWriter() )
                     {
                         string uriString = RegistryUri.ToString();
                         w.WriteLine( $"registry={uriString}" );
-                        m.Debug( $"registry={uriString}" );
                         string uriConfig = uriString.Remove( 0, uriString.IndexOf( '/' ) );
-
                         if( _authHeader == null )
                         {
                             m.Error( "Missing credentials to configure .npmrc file." );
@@ -182,28 +185,24 @@ namespace CK.Env.NPM
                         }
                         if( _authHeader.Scheme == "Basic" )
                         {
+                            Debug.Assert( _username != null && _password != null );
                             w.WriteLine( $"{uriConfig}:always-auth=true" );
-                            m.Debug( $"{uriConfig}:always-auth=true" );
-
                             w.WriteLine( $"{uriConfig}:_password={Convert.ToBase64String( Encoding.UTF8.GetBytes( _password ) )}" );
-                            m.Debug( $"{uriConfig}:_password=[REDACTED]" );
-
                             w.WriteLine( $"{uriConfig}:username={_username}" );
-                            m.Debug( $"{uriConfig}:username={_username}" );
                         }
                         else if( _authHeader.Scheme == "Bearer" )
                         {
                             w.WriteLine( $"{uriConfig}:always-auth=true" );
-                            m.Debug( $"{uriConfig}:always-auth=true" );
                             w.WriteLine( $"{uriConfig}:_authToken={_authHeader.Parameter}" );
-                            m.Debug( $"{uriConfig}:_authToken=[REDACTED]" );
                         }
-
                         if( !string.IsNullOrWhiteSpace( scope ) )
                         {
                             w.WriteLine( scope + $":registry={RegistryUri}" );
-                            m.Debug( scope + $":registry={RegistryUri}" );
                         }
+                        var filePath = Path.Combine( tempDirectory, ".npmrc" );
+                        var content = w.ToString();
+                        m.Debug( $"Created '{filePath}':{Environment.NewLine}{content}" );
+                        File.WriteAllText( filePath, content );
                     }
                     string tarPath = Path.GetFullPath( tarballPath );
                     string distTagArg = distTag != null ? $"--tag {distTag.ToLowerInvariant()}" : "";

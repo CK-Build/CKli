@@ -19,12 +19,12 @@ namespace CK.Env.DependencyModel
         object? Tag( Type type, object? newValue = null );
 
         /// <summary>
-        /// Gets or sets a non null tag object of the specified type..
+        /// Gets or sets a non null tag object of the specified type.
         /// </summary>
         /// <typeparam name="T">The type of the tag to retrieve or set.</typeparam>
         /// <param name="newValue">Non null value to be set as the new tag value.</param>
         /// <returns>
-        /// When <paramref name="newValue"/> is null, the first tag of the type, or null if no tag matches the specified type.
+        /// When <paramref name="newValue"/> is null, the first tag that is an instance of the type, or null if no tag matches the specified type.
         /// Otherwise, newValue is always returned.
         /// </returns>
         T? Tag<T>( T? newValue = null ) where T : class;
@@ -33,12 +33,14 @@ namespace CK.Env.DependencyModel
         /// Removes the tags of the specified type.
         /// </summary>
         /// <param name="type">The type of tags to remove.</param>
-        void RemoveTags( Type type );
+        /// <returns>True if one or more instances have been found and removed, false otherwise.</returns>
+        bool RemoveTags( Type type );
 
         /// <summary>
         /// Removes the tags of the specified type.
         /// </summary>
         /// <typeparam name="T">The type of tags to remove.</typeparam>
-        void RemoveTags<T>() where T : class;
+        /// <returns>True if one or more instances have been found and removed, false otherwise.</returns>
+        bool RemoveTags<T>() where T : class;
     }
 }

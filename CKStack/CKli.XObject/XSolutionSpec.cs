@@ -25,8 +25,6 @@ namespace CKli
             initializer.Reader.Handle( initializer
                                         .Element.Elements()
                                         .Where( c => c.Name.LocalName == nameof( SolutionSpec.NPMProjects )
-                                                        || c.Name.LocalName == nameof( SolutionSpec.PublishedProjects )
-                                                        || c.Name.LocalName == nameof( SolutionSpec.NotPublishedProjects )
                                                         || c.Name.LocalName == nameof( SolutionSpec.CKSetupComponentProjects ) ) );
 
             // Registers the SolutionSpec as a branch settings: the Solution specifications becomes

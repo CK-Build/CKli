@@ -14,8 +14,8 @@ namespace CK.Env.NodeSln
     {
         readonly List<NodeSubProject> _subProjects;
 
-        internal AngularWorkspace( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath, int index )
-            : base( solution, path, outputPath, index )
+        internal AngularWorkspace( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath )
+            : base( solution, path, outputPath )
         {
             _subProjects = new List<NodeSubProject>();
         }
@@ -37,7 +37,6 @@ namespace CK.Env.NodeSln
             if( !base.Initialize( monitor ) ) return false;
             JObject? jProjects = TryReadAngularJsonProjects( monitor );
             if( jProjects == null ) return false;
-            int pIndex = 0;
             foreach( var propProject in jProjects.Properties() )
             {
                 var name = propProject.Name;
@@ -48,7 +47,7 @@ namespace CK.Env.NodeSln
                 }
                 else
                 {
-                    var project = Solution.TryReadProject( monitor, NodeProjectKind.NodeSubProject, this, root, null, ref pIndex, $"AngularWorkspace '{Path}'" );
+                    var project = Solution.TryReadProject( monitor, NodeProjectKind.NodeSubProject, this, root, null, $"AngularWorkspace '{Path}'" );
                     if( project == null )
                     {
                         monitor.Error( $"Unable to load Angular project '{root}'." );

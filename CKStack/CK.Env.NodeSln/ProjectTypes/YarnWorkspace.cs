@@ -10,8 +10,8 @@ namespace CK.Env.NodeSln
     {
         readonly List<NodeSubProject> _subProjects;
 
-        internal YarnWorkspace( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath, int index )
-            : base( solution, path, outputPath, index )
+        internal YarnWorkspace( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath )
+            : base( solution, path, outputPath )
         {
             _subProjects = new List<NodeSubProject>();
         }
@@ -36,10 +36,9 @@ namespace CK.Env.NodeSln
             }
             if( !success ) return false;
             // Loads all subordinate projects.
-            int pIndex = 0;
             foreach( var p in PackageJsonFile.Workspaces )
             {
-                var project = Solution.TryReadProject( monitor, NodeProjectKind.NodeSubProject, this, p, null, ref pIndex, $"YarnWorkspace '{Path}'" );
+                var project = Solution.TryReadProject( monitor, NodeProjectKind.NodeSubProject, this, p, null, $"YarnWorkspace '{Path}'" );
                 if( project == null )
                 {
                     monitor.Error( $"Unable to load project '{p}'." );

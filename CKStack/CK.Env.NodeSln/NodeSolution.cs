@@ -15,6 +15,7 @@ namespace CK.Env.NodeSln
     public class NodeSolution
     {
         readonly List<NodeRootProjectBase> _projects;
+        readonly bool _useYarn;
         bool _isDirty;
 
         public NodeSolution( FileSystem fs, NormalizedPath solutionFolderPath )
@@ -30,14 +31,41 @@ namespace CK.Env.NodeSln
         public FileSystem FileSystem { get; }
 
         /// <summary>
-        /// Gets the folder path (relative to the <see cref="FileSystem"/>).
+        /// Gets the folder path (relative to the <see cref="FileSystem"/>):
+        /// this is the root of the repository.
         /// </summary>
         public NormalizedPath SolutionFolderPath { get; }
 
         /// <summary>
+        /// Gets whether a ".yarn" folder exists at the 
+        /// </summary>
+        public bool UseYarn => _useYarn;
+
+        /// <summary>
         /// Gets the root projects, regardless of their type.
         /// </summary>
-        public IReadOnlyList<NodeRootProjectBase> Projects => _projects;
+        public IReadOnlyList<NodeRootProjectBase> RootProjects => _projects;
+
+        /// <summary>
+        /// Gets all the projects. Workspaces are followed by their <see cref="NodeSubProject"/>.
+        /// </summary>
+        public IEnumerable<NodeProjectBase> AllProjects
+        {
+            get
+            {
+                foreach( var r in _projects )
+                {
+                    yield return r;
+                    if( r is INodeWorkspace w )
+                    {
+                        foreach( var p in w.Projects )
+                        {
+                            yield return p;
+                        }
+                    }
+                }
+            }
+        }
 
         /// <summary>
         /// Gets whether any of the projects in this solution needs to be saved.
@@ -101,7 +129,7 @@ namespace CK.Env.NodeSln
         /// <param name="fs">The file system.</param>
         /// <param name="repositoryInfoPath">The path to the RepositoryInfo.xml file relative to the <see cref="FileSystem"/>.</param>
         /// <returns>
-        /// The node solution or null. Whether errors occurred must be handled by handling logs (typically by
+        /// The node solution that has at least one project or null. Whether errors occurred must be handled by handling logs (typically by
         /// using <see cref="ActivityMonitorExtension.OnError(IActivityMonitor, Action)"/>).
         /// </returns>
         public static NodeSolution? Read( IActivityMonitor monitor, FileSystem fs, NormalizedPath repositoryInfoPath )
@@ -123,7 +151,6 @@ namespace CK.Env.NodeSln
                 return null;
             }
             var nodeSolution = new NodeSolution( fs, repositoryInfoPath.RemoveLastPart() );
-            int index = 0;
             foreach( var p in eSolution.Elements() )
             {
                 if( !Enum.TryParse<NodeProjectKind>( p.Name.LocalName, out var kind ) )
@@ -148,14 +175,54 @@ namespace CK.Env.NodeSln
                                                            null,
                                                            path,
                                                            p.Attribute( "OutputPath" )?.Value,
-                                                           ref index,
                                                            $"NodeSolution element '{p}'" );
-                if( project is NodeRootProjectBase r )
+                if( project is NodeRootProjectBase root )
                 {
-                    nodeSolution._projects.Add( r );
+                    LogCheckPackageManager( monitor, root );
+                    nodeSolution._projects.Add( root );
                 }
             }
+            if( nodeSolution.RootProjects.Count == 0 )
+            {
+                monitor.Error( $"Unable to read at least one Node project from '{repositoryInfoPath}'." );
+                nodeSolution = null;
+            }
+
             return nodeSolution;
+        }
+
+        static void LogCheckPackageManager( IActivityMonitor monitor, NodeRootProjectBase root )
+        {
+            if( root.Solution._projects.Count == 0 )
+            {
+                if( root.UseYarn )
+                {
+                    monitor.Info( $"'{root}' project uses yarn since .yarn/ folder found: {root.YarnPath}. All other projects in this repository should be the same." );
+                }
+                else
+                {
+                    monitor.Info( $"'{root}' project uses NPM. All other projects should be the same. All other projects in this repository should also use NPM." );
+                }
+            }
+            else
+            {
+                var first = root.Solution._projects[0];
+                if( first.UseYarn != root.UseYarn )
+                {
+                    if( root.UseYarn )
+                    {
+                        monitor.Warn( $"{root} uses yarn ({root.YarnPath})." );
+                    }
+                    else
+                    {
+                        monitor.Warn( $"{root} uses NPM." );
+                    }
+                }
+                else if( first.YarnPath != root.YarnPath )
+                {
+                    monitor.Warn( $"{root} uses yarn but it's .yarn is '{root.YarnPath}'." );
+                }
+            }
         }
 
         /// <summary>
@@ -166,14 +233,13 @@ namespace CK.Env.NodeSln
         /// <param name="workspace">Workspace (<paramref name="kind"/> is necessarily <see cref="NodeProjectKind.NodeSubProject"/></param>
         /// <param name="path">Project path.</param>
         /// <param name="outputPath">Optional project output path for root projects only (when <paramref name="workspace"/> is null).</param>
-        /// <param name="index">Index of the project in its holder.</param>
+        /// <param name="ownerDescription">The caller description (for logs).</param>
         /// <returns></returns>
         internal NodeProjectBase? TryReadProject( IActivityMonitor monitor,
                                                   NodeProjectKind kind,
                                                   INodeWorkspace? workspace,
                                                   NormalizedPath path,
                                                   string? outputPath,
-                                                  ref int index,
                                                   string ownerDescription )
         {
             Debug.Assert( (workspace == null) == (kind == NodeProjectKind.NodeSubProject) );
@@ -206,27 +272,26 @@ namespace CK.Env.NodeSln
                 switch( kind )
                 {
                     case NodeProjectKind.YarnWorkspace:
-                        project = new YarnWorkspace( this, path, outPath, index++ );
+                        project = new YarnWorkspace( this, path, outPath );
                         break;
                     case NodeProjectKind.AngularWorkspace:
-                        project = new AngularWorkspace( this, path, outPath, index++ );
+                        project = new AngularWorkspace( this, path, outPath );
                         break;
                     default:
                         Debug.Assert( kind == NodeProjectKind.NodeProject );
-                        project = new NodeProject( this, path, outPath, index++ );
+                        project = new NodeProject( this, path, outPath );
                         break;
                 }
             }
             else
             {
-                project = new NodeSubProject( this, workspace, path, index++ );
+                project = new NodeSubProject( this, workspace, path );
             }
             if( project.Initialize( monitor ) )
             {
                 return project;
             }
             monitor.Warn( $"Project '{project}' initialization failed. It is ignored." );
-            --index;
             return null;
         }
     }

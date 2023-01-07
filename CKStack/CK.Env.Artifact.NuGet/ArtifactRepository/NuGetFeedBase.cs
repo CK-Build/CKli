@@ -332,7 +332,7 @@ namespace CK.Env.NuGet
 
                 var metadata = await meta.GetMetadataAsync( new PackageIdentity( packageId, version ), _baseFeed.Client.SourceCache, logger, token );
 
-                if( metadata == null ) return (null, null);
+                if( metadata == null ) return (null, null!);
                 var result = CreateNugetPackageInstanceInfo( logger, instance, metadata.IsListed, metadata.DependencySets );
 
                 return (result, metadata);

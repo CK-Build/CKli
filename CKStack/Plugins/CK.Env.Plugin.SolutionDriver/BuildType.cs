@@ -48,12 +48,12 @@ namespace CK.Env.Plugin
         Local = IsTargetLocal,
 
         /// <summary>
-        /// Local only CI build on 'develop' branch. Artefacts are kept locally.
+        /// Local only CI build on 'develop' branch. Artifacts are kept locally.
         /// </summary>
         CI = IsTargetCI | IsUsingDirtyFolder,
 
         /// <summary>
-        /// Release build. Artefacts are kept locally and always use the ZeroBuilder.
+        /// Release build. Artifacts are kept locally and always use the ZeroBuilder.
         /// </summary>
         Release = IsTargetRelease | IsUsingDirtyFolder | WithZeroBuilder
     }

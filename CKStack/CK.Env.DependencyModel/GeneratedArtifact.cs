@@ -32,7 +32,7 @@ namespace CK.Env.DependencyModel
         /// <param name="a">The artifact.</param>
         /// <param name="project">The project.</param>
         /// <param name="sources">Optional explicit sources that differ from <see cref="IProject.ProjectSources"/>.</param>
-        public GeneratedArtifact( Artifact a, IProject project, IReadOnlyCollection<NormalizedPath> sources = null )
+        public GeneratedArtifact( Artifact a, IProject project, IReadOnlyCollection<NormalizedPath>? sources = null )
         {
             Artifact = a;
             Project = project;

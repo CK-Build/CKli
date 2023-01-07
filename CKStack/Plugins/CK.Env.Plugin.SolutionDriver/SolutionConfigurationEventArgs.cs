@@ -1,3 +1,4 @@
+using CK.Build;
 using CK.Core;
 using CK.Env.DependencyModel;
 using System;
@@ -11,7 +12,6 @@ namespace CK.Env.Plugin
     /// </summary>
     public class SolutionConfigurationEventArgs : EventMonitoredArgs
     {
-
         /// <summary>
         /// Initializes a new <see cref="SolutionConfigurationEventArgs"/>.
         /// </summary>

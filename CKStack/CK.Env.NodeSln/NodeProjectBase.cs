@@ -16,10 +16,9 @@ namespace CK.Env.NodeSln
         PackageJsonFile _packageJson;
         bool _isDirty;
 
-        private protected NodeProjectBase( NodeSolution solution, NormalizedPath path, int index )
+        private protected NodeProjectBase( NodeSolution solution, NormalizedPath path )
         {
             Solution = solution;
-            Index = index;
             _solutionRelativePath = path.ResolveDots();
             _path = solution.SolutionFolderPath.Combine( _solutionRelativePath );
         }
@@ -35,12 +34,6 @@ namespace CK.Env.NodeSln
         /// Gets the solution that owns this project.
         /// </summary>
         public NodeSolution Solution { get; }
-
-        /// <summary>
-        /// Gets the index of this project in the <see cref="NodeSolution.Projects"/> list for root projects.
-        /// When this is a <see cref="NodeSubProject"/>, this is the index in the <see cref="INodeWorkspace.Projects"/>
-        /// </summary>
-        public int Index { get; }
 
         /// <summary>
         /// Gets the path to the project folder relative to the <see cref="NodeSolution.SolutionFolderPath"/>.
@@ -89,7 +82,7 @@ namespace CK.Env.NodeSln
             Solution.SetDirty();
         }
 
-        public override string ToString() => Path;
+        public sealed override string ToString() => $"{GetType().Name}: {Solution.SolutionFolderPath.LastPart}/{SolutionRelativePath}";
     }
 }
 

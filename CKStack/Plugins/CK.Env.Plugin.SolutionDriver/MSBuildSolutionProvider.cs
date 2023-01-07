@@ -6,61 +6,83 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System;
+using LibGit2Sharp;
+using System.Security.Cryptography;
 
 namespace CK.Env.Plugin
 {
-    public partial class SolutionDriver
+    sealed class MSBuildSolutionProvider : ISolutionProvider
     {
+        readonly SolutionDriver _driver;
+
+        SolutionFile? _sln;
+
+        public MSBuildSolutionProvider( SolutionDriver driver )
+        {
+            _driver = driver;
+        }
+
+        /// <inheritdoc/>
+        public bool IsDirty => _sln == null;
+
+        /// <inheritdoc/>
+        public void SetDirty( IActivityMonitor monitor )
+        {
+            if( _sln == null ) return;
+            monitor.Info( $"MSBuild Solution '{_driver.GitFolder.SubPath}' must be reloaded." );
+            _sln.Saved -= OnSavedSolution;
+            _sln = null;
+        }
+
+        void OnSavedSolution( object? sender, EventMonitoredArgs e ) => SetDirty( e.Monitor );
+
+        /// <inheritdoc/>
+        public void OnSolutionConfiguration( object? sender, SolutionConfigurationEventArgs e )
+        {
+            if( !IsDirty ) return;
+            var monitor = e.Monitor;
+            var expectedSolutionName = _driver.GitFolder.SubPath.LastPart + ".sln";
+            _sln = SolutionFile.Read( _driver.GitFolder.FileSystem, monitor, _driver.BranchPath.AppendPart( expectedSolutionName ) );
+            if( _sln == null )
+            {
+                e.PreventSolutionUse( $"Unable to load MSBuild Solution '{_driver.GitFolder.SubPath.Path + ".sln"}'." );
+                // On error, we remove all the MSBuild projects.
+                if( e.Solution.RemoveTags<SolutionFile>() )
+                {
+                    foreach( var project in e.Solution.Projects.Where( p => p.RemoveTags<MSProject>() ).ToArray() )
+                    {
+                        e.Solution.RemoveProject( project );
+                    }
+                }
+                return;
+            }
+            _sln.Saved += OnSavedSolution;
+            UpdateSolutionFromMSBuild( monitor, e.Solution, _sln, e.SolutionSpec );
+        }
+
         /// <summary>
         /// Updates the <paramref name="solution"/> from a <see cref="SolutionFile"/> and a <see cref="SolutionSpec"/>.
         /// </summary>
-        static bool UpdateSolutionFromMSBuild( IActivityMonitor m, Solution solution, SolutionFile sln, SolutionSpec solutionSpec )
+        static void UpdateSolutionFromMSBuild( IActivityMonitor monitor, Solution solution, SolutionFile sln, SolutionSpec solutionSpec )
         {
+            solution.Tag( sln );
             var projectsToRemove = new HashSet<DependencyModel.Project>( solution.Projects );
             var orderedProjects = new DependencyModel.Project[sln.MSProjects.Count];
             int i = 0;
-            bool badPack = false;
             foreach( var p in sln.MSProjects )
             {
                 if( p.ProjectName != p.SolutionRelativeFolderPath.LastPart )
                 {
-                    m.Warn( $"Project named {p.ProjectName} should be in folder of the same name, not in {p.SolutionRelativeFolderPath.LastPart}." );
+                    monitor.Warn( $"Project named {p.ProjectName} should be in folder of the same name, not in {p.SolutionRelativeFolderPath.LastPart}." );
                 }
                 Debug.Assert( p.ProjectFile != null );
 
-                bool doPack = p.IsPackable ?? true;
-                if( doPack == true )
-                {
-                    if( solutionSpec.NotPublishedProjects.Contains( p.Path ) )
-                    {
-                        m.Error( $"Project {p.ProjectName} that must not be published have the Element IsPackable not set to false." );
-                        badPack = true;
-                    }
-                    else if( !solutionSpec.TestProjectsArePublished && (p.Path.Parts.Contains( "Tests" ) || p.ProjectName.EndsWith( ".Tests" )) )
-                    {
-                        m.Error( $"Tests Project {p.ProjectName} does not have IsPackable set to false." );
-                        badPack = true;
-                    }
-                    else if( p.ProjectName.Equals( "CodeCakeBuilder", StringComparison.OrdinalIgnoreCase ) )
-                    {
-                        m.Error( $"CodeCakeBuilder Project does not have IsPackable set to false." );
-                        badPack = true;
-                    }
-                    else
-                    {
-                        m.Trace( $"Project {p.ProjectName} will be published." );
-                    }
-                }
-                else
-                {
-                    m.Trace( $"Project {p.ProjectName} is set to not be packaged: this project won't be published." );
-                }
                 var (project, isNewProject) = solution.AddOrFindProject( p.SolutionRelativeFolderPath, ".Net", p.ProjectName );
                 project.Tag( p );
                 if( isNewProject )
                 {
                     project.TransformSavors( _ => p.TargetFrameworks );
-                    ConfigureFromSpec( m, project, solutionSpec );
+                    ConfigureFromSpec( monitor, project, solutionSpec );
                 }
                 else
                 {
@@ -68,7 +90,7 @@ namespace CK.Env.Plugin
                     if( previous != p.TargetFrameworks )
                     {
                         var removed = previous.Except( p.TargetFrameworks );
-                        m.Trace( $"TargetFramework changed from {previous} to {p.TargetFrameworks}." );
+                        monitor.Trace( $"TargetFramework changed from {previous} to {p.TargetFrameworks}." );
                         project.TransformSavors( t =>
                         {
                             var c = t.Except( previous );
@@ -83,7 +105,7 @@ namespace CK.Env.Plugin
                         } );
                     }
                 }
-                SynchronizePackageReferences( m, project );
+                SynchronizePackageReferences( monitor, project );
                 projectsToRemove.Remove( project );
                 orderedProjects[i++] = project;
             }
@@ -92,15 +114,16 @@ namespace CK.Env.Plugin
 
             foreach( var project in solution.Projects.Where( p => p.Tag<MSProject>() != null ) )
             {
-                SynchronizeProjectReferences( m, project, msProj => orderedProjects[msProj.MSProjIndex] );
+                SynchronizeProjectReferences( monitor, project, msProj => orderedProjects[msProj.MSProjIndex] );
             }
             foreach( var noMore in projectsToRemove ) solution.RemoveProject( noMore );
-            return !badPack;
+            return;
 
 
             static void ConfigureFromSpec( IActivityMonitor m, DependencyModel.Project project, SolutionSpec spec )
             {
                 var msProject = project.Tag<MSProject>();
+                Debug.Assert( msProject != null );
                 if( project.SimpleProjectName == "CodeCakeBuilder" )
                 {
                     project.IsBuildProject = true;
@@ -108,41 +131,38 @@ namespace CK.Env.Plugin
                 else
                 {
                     project.IsTestProject = project.SimpleProjectName.EndsWith( ".Tests" );
-                    bool mustPublish;
-                    if( spec.PublishedProjects.Count > 0 )
+                    // <IsPackable> defaults to false for us!
+                    //
+                    // Originally (dnx may be), there was no .sln taken into account.
+                    // To pack, you did "dotnet pack" in each project you wanted to pack. And basta.
+                    //
+                    // IsPackable was created to say that when you "dotnet pack" on a .sln, you should NOT pack THE project
+                    // (hence a form of "super default" to true).
+                    // This allows to understand the terrific NuGet property: WarnOnPackingNonPackableProject
+                    //
+                    // And then the bacteria invaded the system: for example, the xunit guys who made that IF you depend on xunit,
+                    // then IsPackable is false by default...
+                    //
+                    // One day, we should make a site "https://optout-that-should-have-been-optin-and-vice-versa.horror".
+                    //
+                    bool isPackable = msProject.IsPackable ?? false;
+                    if( msProject.IsPackable ?? false )
                     {
-                        mustPublish = spec.PublishedProjects.Contains( project.SolutionRelativeFolderPath );
-                    }
-                    else
-                    {
-                        // We blindly follow the <IsPackable> element... except if it's not defined (ie. it's null) we must "think".
-                        if( msProject.IsPackable.HasValue )
-                        {
-                            mustPublish = msProject.IsPackable.Value;
-                        }
-                        else
-                        {
-                            bool notPublishedCheck = !spec.NotPublishedProjects.Contains( project.SolutionRelativeFolderPath );
-                            bool notRootDirectory = project.SolutionRelativeFolderPath.Parts.Count == 1;
-                            bool ignoreNotRoot = spec.PublishProjectInDirectories && !project.IsTestProject;
-                            mustPublish = notPublishedCheck
-                                          && (notRootDirectory || ignoreNotRoot || (project.IsTestProject && spec.TestProjectsArePublished));
-                        }
-                    }
-                    if( mustPublish )
-                    {
-                        project.AddGeneratedArtifacts( new Artifact( NuGetType, project.SimpleProjectName ) );
+                        project.AddGeneratedArtifacts( new Artifact( NuGet.NuGetClient.NuGetType, project.SimpleProjectName ) );
                     }
                     if( spec.CKSetupComponentProjects.Contains( project.SimpleProjectName ) )
                     {
-                        if( !mustPublish )
+                        if( !isPackable )
                         {
-                            m.Error( $"Project {project} cannot be a CKSetupComponent since it is not published." );
+                            m.Error( $"Project {project} must be <IsPackable>true</IsPackable> to be a CKSetupComponent." );
                         }
-                        foreach( var name in msProject.TargetFrameworks.AtomicTraits
-                                                      .Select( t => new Artifact( CKSetupType, project.SimpleProjectName + '/' + t.ToString() ) ) )
+                        else
                         {
-                            project.AddGeneratedArtifacts( name );
+                            foreach( var name in msProject.TargetFrameworks.AtomicTraits
+                                                          .Select( t => new Artifact( NuGet.NuGetClient.NuGetType, project.SimpleProjectName + '/' + t.ToString() ) ) )
+                            {
+                                project.AddGeneratedArtifacts( name );
+                            }
                         }
                     }
                 }
@@ -153,7 +173,7 @@ namespace CK.Env.Plugin
                 foreach( var p in sln.StandardDotnetToolConfigFile.Tools )
                 {
                     solutionRefs.Remove( p.Artifact );
-                    solutionModel.EnsureSolutionPackageReference( p );
+                    solutionModel.AddSolutionPackageReference( p );
                 }
                 foreach( var p in solutionRefs ) solutionModel.RemoveSolutionPackageReference( p );
             }
@@ -196,5 +216,6 @@ namespace CK.Env.Plugin
             }
 
         }
+
     }
 }

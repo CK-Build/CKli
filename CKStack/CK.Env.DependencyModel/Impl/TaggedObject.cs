@@ -10,15 +10,7 @@ namespace CK.Env.DependencyModel
     {
         object? _tag;
 
-        /// <summary>
-        /// Gets or sets a non null tag object of the specified type.
-        /// </summary>
-        /// <param name="type">The type of the tag to retrieve or sets.</param>
-        /// <param name="newValue">Non null value of type <paramref name="type"/> to be set as the new tag value.</param>
-        /// <returns>
-        /// When <paramref name="newValue"/> is null, the first tag of the type, or null if no tag is the specified type.
-        /// Otherwise, newValue is always returned.
-        /// </returns>
+        /// <inheritdoc />
         public object? Tag( Type type, object? newValue = null )
         {
             Throw.CheckNotNullArgument( type );
@@ -72,22 +64,11 @@ namespace CK.Env.DependencyModel
             return null;
         }
 
-        /// <summary>
-        /// Gets or sets a non null tag object of the specified type..
-        /// </summary>
-        /// <typeparam name="T">The type of the tag to retrieve or set.</typeparam>
-        /// <param name="newValue">Non null value to be set as the new tag value.</param>
-        /// <returns>
-        /// When <paramref name="newValue"/> is null, the first tag of the type, or null if no tag is the specified type.
-        /// Otherwise, newValue is always returned.
-        /// </returns>
+        /// <inheritdoc />
         public T? Tag<T>( T? newValue = null ) where T : class => (T?)Tag( typeof( T ), newValue );
 
-        /// <summary>
-        /// Removes the tags of the specified type from this <see cref="TaggedObject"/>.
-        /// </summary>
-        /// <param name="type">The type of tags to remove.</param>
-        public void RemoveTags( Type type )
+        /// <inheritdoc />
+        public bool RemoveTags( Type type )
         {
             Throw.CheckNotNullArgument( type );
             if( _tag != null )
@@ -95,35 +76,41 @@ namespace CK.Env.DependencyModel
                 object?[]? a = _tag as object?[];
                 if( a == null )
                 {
-                    if( type.IsInstanceOfType( _tag ) ) _tag = null;
-                }
-                else
-                {
-                    int i = 0, j = 0;
-                    while( i < a.Length )
-                    {
-                        object? obj = a[i];
-                        if( obj == null ) break;
-                        if( !type.IsInstanceOfType( obj ) ) a[j++] = obj;
-                        i++;
-                    }
-                    if( j == 0 )
+                    if( type.IsInstanceOfType( _tag ) )
                     {
                         _tag = null;
+                        return true;
                     }
-                    else
+                    return false;
+                }
+                int i = 0, j = 0;
+                while( i < a.Length )
+                {
+                    object? obj = a[i];
+                    if( obj == null ) break;
+                    if( !type.IsInstanceOfType( obj ) ) a[j++] = obj;
+                    i++;
+                }
+                if( j == 0 )
+                {
+                    _tag = null;
+                    return true;
+                }
+                else if( j < i )
+                {
+                    do
                     {
-                        while( j < i ) a[j++] = null;
+                        a[j++] = null;
                     }
+                    while( j < i );
+                    return true;
                 }
             }
+            return false;
         }
 
-        /// <summary>
-        /// Removes the tags of the specified type from this <see cref="TaggedObject"/>.
-        /// </summary>
-        /// <typeparam name="T">The type of tags to remove.</typeparam>
-        public void RemoveTags<T>() where T : class => RemoveTags( typeof( T ) );
+        /// <inheritdoc />
+        public bool RemoveTags<T>() where T : class => RemoveTags( typeof( T ) );
 
     }
 }

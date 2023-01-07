@@ -14,8 +14,6 @@ namespace CK.Env
         {
             UseCKSetup = r.HandleOptionalAttribute( nameof( UseCKSetup ), false );
             SqlServer = r.HandleOptionalAttribute<string>( nameof( SqlServer ), null );
-            TestProjectsArePublished = r.HandleOptionalAttribute( nameof( TestProjectsArePublished ), false );
-            PublishProjectInDirectories = r.HandleOptionalAttribute( nameof( PublishProjectInDirectories ), false );
             NPMProjects = r.HandleCollection(
                 nameof( NPMProjects ),
                 new HashSet<NPMProjectSpec>(),
@@ -30,16 +28,6 @@ namespace CK.Env
                     eR => eR.HandleRequiredAttribute<string>( "Name" )
                 );
             UseCKSetup |= CKSetupComponentProjects.Count > 0;
-            PublishedProjects = r.HandleCollection(
-                 nameof( PublishedProjects ),
-                    new HashSet<NormalizedPath>(),
-                    eR => new NormalizedPath( eR.HandleRequiredAttribute<string>( "Folder" ) )
-                );
-            NotPublishedProjects = r.HandleCollection(
-                    nameof( NotPublishedProjects ),
-                    new HashSet<NormalizedPath>(),
-                    eR => new NormalizedPath( eR.HandleRequiredAttribute<string>( "Folder" ) )
-                );
         }
 
         /// <summary>
@@ -57,14 +45,7 @@ namespace CK.Env
         /// Names are the ones of Appveyor (https://www.appveyor.com/docs/services-databases/).
         /// "2008R2SP2", "2012SP1", "2014", "2016", "2017".
         /// </summary>
-        public string SqlServer { get; }
-
-        /// <summary>
-        /// Gets whether .Net Test projects (all projects with a name that ends with ".Tests") of the actual
-        /// solution must be published as NuGet packages.
-        /// Defaults to false.
-        /// </summary>
-        public bool TestProjectsArePublished { get; }
+        public string? SqlServer { get; }
 
         /// <summary>
         /// Gets the list of npm projects specifications.
@@ -83,27 +64,6 @@ namespace CK.Env
         /// their NuGet packages.
         /// </summary>
         public IReadOnlyCollection<string> CKSetupComponentProjects { get; }
-
-        /// <summary>
-        /// Gets whether the projects not defined at the solution level should be published.
-        /// This does not impact the projects in the Tests folder.
-        /// Defaults to false.
-        /// </summary>
-        public bool PublishProjectInDirectories { get; }
-
-        /// <summary>
-        /// Gets the white list of explicitly published .Net projects paths.
-        /// When empty (or not specified), the published .Net projects are the ones
-        /// defined at the solution level whose name does not end with ".Test" (except
-        /// if <see cref="TestProjectsArePublished"/>) and that is not the build project (CodeCakeBuilder).
-        /// </summary>
-        public IReadOnlyCollection<NormalizedPath> PublishedProjects { get; }
-
-
-        /// <summary>
-        /// Gets the optional set of .Net project folders that must not be published.
-        /// </summary>
-        public IReadOnlyCollection<NormalizedPath> NotPublishedProjects { get; }
 
     }
 }

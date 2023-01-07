@@ -39,7 +39,7 @@ namespace CK.Env.NodeSln
         /// <para>
         /// This version can be <see cref="SVersionLock.Lock"/>:
         /// <list type="bullet">
-        ///     <item>For npm, this is the naked version: the '=' prefix is implied ("1.2.3" is like "=1.2.3").</item>
+        ///     <item>For npm, [Lock] is the naked version: the '=' prefix is implied ("1.2.3" is like "=1.2.3").</item>
         ///     <item>"^1.2.3" is [LockMajor].</item>
         ///     <item>"~1.2.3" is [LockMinor].</item>
         ///     <item>">=1.2.3" is not locked (">1.2.3" is the same but <see cref="SVersionBound.ParseResult.IsApproximated"/> is true).</item>
