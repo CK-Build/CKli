@@ -17,7 +17,6 @@ namespace CK.Env.Plugin
 {
     public partial class SolutionDriver : GitBranchPluginBase, ISolutionDriver, IDisposable, ICommandMethodsProvider
     {
-        public static readonly ArtifactType NuGetType = NuGet.NuGetClient.NuGetType;
         public static readonly ArtifactType CKSetupType = ArtifactType.Register( "CKSetup", false );
         /// <summary>
         /// This is shared here: more than one plugin needs this.
@@ -606,7 +605,7 @@ namespace CK.Env.Plugin
             // This is required, otherwise the NuGet cache keeps the previous version (lost 4 hours of my life here).
             if( info.MustPack )
             {
-                var packageName = info.Project.GeneratedArtifacts.Single( a => a.Artifact.Type == NuGetType ).Artifact.Name;
+                var packageName = info.Project.GeneratedArtifacts.Single( a => a.Artifact.Type == NuGet.NuGetClient.NuGetType ).Artifact.Name;
                 _localFeedProvider.RemoveFromNuGetCache( monitor, packageName, SVersion.ZeroVersion );
             }
             var msP = info.Project.Tag<MSProject>();
@@ -681,7 +680,7 @@ namespace CK.Env.Plugin
                         .SelectMany( p => p.PackageReferences )
                         .Select( dep => (Dep: dep, LocalVersion: feed.GetBestNuGetVersion( monitor, dep.Target.Artifact.Name )) )
                         .Where( pv => pv.LocalVersion != null )
-                        .Select( pv => new UpdatePackageInfo( pv.Dep.Owner, new ArtifactInstance( NuGetType, pv.Dep.Target.Artifact.Name, pv.LocalVersion ) ) )
+                        .Select( pv => new UpdatePackageInfo( pv.Dep.Owner, new ArtifactInstance( NuGet.NuGetClient.NuGetType, pv.Dep.Target.Artifact.Name, pv.LocalVersion ) ) )
                         .ToList();
 
             if( !UpdatePackageDependencies( monitor, toUpgrade, ISolutionDriver.UsePrimaryTargetFramework ) ) return false;

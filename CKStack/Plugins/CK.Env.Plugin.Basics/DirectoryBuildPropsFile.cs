@@ -67,7 +67,7 @@ namespace CK.Env.Plugin
             Debug.Assert( Document != null && Document.Root != null );
 
             HandleBasicDefinitions( monitor, useCentralPackage );
-            HandleStandardProperties( monitor );
+            HandleStandardProperties( monitor, s );
             HandleReproducibleBuilds( monitor );
             HandleZeroVersion( monitor );
             HandleAnalyzers( monitor, useCentralPackage );
@@ -163,10 +163,11 @@ namespace CK.Env.Plugin
             section.SetContent( reproBuildsComments, reproBuilds, isolatedBuildsComments, isolatedBuilds );
         }
 
-        void HandleStandardProperties( IActivityMonitor m )
+        void HandleStandardProperties( IActivityMonitor m, ISolution solution )
         {
             Debug.Assert( Document != null && Document.Root != null );
             const string sectionName = "StandardProperties";
+            bool mustRevertIsPackable = false;
             var section = XCommentSection.Find( Document.Root, sectionName );
             if( section == null )
             {
@@ -176,6 +177,32 @@ namespace CK.Env.Plugin
                         .Select( x => x.ClearCommentsBeforeAndNewLineAfter() )
                         .Remove();
                 section = XCommentSection.FindOrCreate( Document.Root, sectionName );
+                mustRevertIsPackable = true;
+            }
+            else
+            {
+                var eP = section.Content.Elements( "PropertyGroup" ).Elements( "IsPackable" ).LastOrDefault();
+                mustRevertIsPackable = eP == null || (bool)eP;
+            }
+            if( mustRevertIsPackable )
+            {
+                using( m.OpenInfo( "Reverting IsPackable default: it is now false by default." ) )
+                {
+                    var msBuildSolution = solution.Tag<SolutionFile>();
+                    Throw.CheckState( msBuildSolution != null );
+                    foreach( var project in msBuildSolution.MSProjects )
+                    {
+                        if( !project.IsPackable.HasValue )
+                        {
+                            project.SetIsPackable( m, true );
+                        }
+                        else if( project.IsPackable is false )
+                        {
+                            project.SetIsPackable( m, null );
+                        }
+                    }
+                    msBuildSolution.Save( m );
+                }
             }
             var p = new XElement( "PropertyGroup",
                             new XElement( "RepositoryUrl", GitFolder.OriginUrl ),

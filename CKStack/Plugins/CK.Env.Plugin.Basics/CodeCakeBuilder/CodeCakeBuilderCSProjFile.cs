@@ -53,7 +53,8 @@ namespace CK.Env.Plugin
 
             Debug.Assert( ccbProject.ProjectFile != null && ccbProject.ProjectFile.Document.Root != null );
             var props = ccbProject.ProjectFile.Document.Root.EnsureElement( "PropertyGroup" );
-            props.EnsureElement( "IsPackable" ).Value = "false";
+            // IsPackable is false by default (Directory.Build.props).
+            props.Element( "IsPackable" )?.Remove();
             props.EnsureElement( "SignAssembly" ).Value = "false";
             props.EnsureElement( "Nullable" ).Value = "annotations";
             props.EnsureElement( "GenerateDocumentationFile" ).Value = "false";

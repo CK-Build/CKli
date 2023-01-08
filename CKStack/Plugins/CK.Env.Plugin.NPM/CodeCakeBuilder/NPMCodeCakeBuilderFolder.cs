@@ -7,17 +7,26 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace CK.Env.Plugin
 {
     public class NPMCodeCakeBuilderFolder : PluginFolderBase
     {
+        readonly RepositoryXmlFile _repositoryXml;
         readonly NodeSolutionDriver _nodeDriver;
         readonly SolutionDriver _driver;
 
-        public NPMCodeCakeBuilderFolder( GitRepository f, NodeSolutionDriver nodeDriver, SolutionDriver driver, NormalizedPath branchPath )
+        public NPMCodeCakeBuilderFolder( GitRepository f,
+                                         // When this will not be used (migration from NPMSolution.xml done),
+                                         // The package dependency to CK.Env.Basics can be removed.
+                                         RepositoryXmlFile repositoryXml,
+                                         NodeSolutionDriver nodeDriver,
+                                         SolutionDriver driver,
+                                         NormalizedPath branchPath )
             : base( f, branchPath, "CodeCakeBuilder", "NPM/Res" )
         {
+            _repositoryXml = repositoryXml;
             _nodeDriver = nodeDriver;
             _driver = driver;
         }
@@ -40,6 +49,33 @@ namespace CK.Env.Plugin
             var solution = _nodeDriver.SolutionDriver.GetSolution( m, false );
             Debug.Assert( solution != null );
 
+            // Temporary.
+            if( !hasNodeSolution )
+            {
+                var old = FolderPath.AppendPart( "NPMSolution.xml" );
+                var oldNPMSolutionfile = GitFolder.FileSystem.GetFileInfo( old );
+                if( oldNPMSolutionfile.Exists )
+                {
+                    m.Info( $"Migrating NPMSolution to RepositoryInfo.xml" );
+                    Throw.CheckState( !oldNPMSolutionfile.IsDirectory );
+                    var r = oldNPMSolutionfile.ReadAsXDocument().Root!;
+                    _repositoryXml.Document.Root!.Add( r.Elements( "Project" )
+                                                        .Where( p => p.HasAttributes && !string.IsNullOrEmpty( p.Attribute( "Path" )?.Value ) )
+                                                        .Select( p => new XElement( "NodeProject",
+                                                                                    new XAttribute( p.Attribute( "Path" ) ),
+                                                                                    !string.IsNullOrEmpty( p.Attribute( "OutputFolder" )?.Value )
+                                                                                        ? new XAttribute( "OutputPath", p.Attribute( "OutputFolder" ).Value )
+                                                                                        : null ) ),
+                                                      r.Elements( "AngularWorkspace" )
+                                                       .Where( p => p.HasAttributes && !string.IsNullOrEmpty( p.Attribute( "Path" )?.Value ) )
+                                                       .Select( e => new XElement( e ) )
+                                                     );
+                    _repositoryXml.Save( m );
+                    GitFolder.FileSystem.Delete( m, old );
+                    hasNodeSolution = true;
+                }
+            }
+
             if( hasNodeSolution )
             {
                 //CakeExtensions
@@ -59,7 +95,6 @@ namespace CK.Env.Plugin
             }
             else
             {
-                
                 DeleteFileOrFolder( m, "CakeExtensions/NpmDistTagRunner.cs" );
                 DeleteFileOrFolder( m, "CakeExtensions/NpmView.cs" );
                 DeleteFileOrFolder( m, "CakeExtensions/NpmGetNpmVersion.cs" );

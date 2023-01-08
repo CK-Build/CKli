@@ -464,7 +464,7 @@ namespace CK.Env.MSBuildSln
         /// <returns>True on success, false on error.</returns>
         public bool SetNullable( IActivityMonitor m, string? nullable )
         {
-            DoSetSimpleProperty( m, "Nullable", nullable );
+            DoSetSimpleProperty( m, "Nullable", nullable ); 
             return true;
         }
 
@@ -494,7 +494,8 @@ namespace CK.Env.MSBuildSln
         {
             if( isPackable != IsPackable )
             {
-                DoSetSimpleProperty( m, "IsPackable", isPackable?.ToString() );
+                DoSetSimpleProperty( m, "IsPackable", isPackable?.ToString().ToLowerInvariant() );
+                IsPackable = isPackable;
             }
             return true;
         }
