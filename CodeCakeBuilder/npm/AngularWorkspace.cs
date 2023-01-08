@@ -36,6 +36,7 @@ namespace CodeCake
             foreach( var project in jsonProject.Properties() )
             {
                 var projectPath = project.Value["root"].ToString();
+
                 var options = project.Value["architect"]["build"]["options"];
                 string outputPathJson = options["outputPath"]?.Value<string>();
                 bool havePath = outputPathJson != null;

@@ -59,17 +59,19 @@ namespace CK.Env.Plugin
                     m.Info( $"Migrating NPMSolution to RepositoryInfo.xml" );
                     Throw.CheckState( !oldNPMSolutionfile.IsDirectory );
                     var r = oldNPMSolutionfile.ReadAsXDocument().Root!;
-                    _repositoryXml.Document.Root!.Add( r.Elements( "Project" )
+                    var nodeSolution = new XElement( "NodeSolution",
+                                                        r.Elements( "Project" )
                                                         .Where( p => p.HasAttributes && !string.IsNullOrEmpty( p.Attribute( "Path" )?.Value ) )
                                                         .Select( p => new XElement( "NodeProject",
-                                                                                    new XAttribute( p.Attribute( "Path" ) ),
+                                                                                    new XAttribute( p.Attribute( "Path" )! ),
                                                                                     !string.IsNullOrEmpty( p.Attribute( "OutputFolder" )?.Value )
-                                                                                        ? new XAttribute( "OutputPath", p.Attribute( "OutputFolder" ).Value )
+                                                                                    && p.Attribute( "Path" )?.Value != p.Attribute( "OutputFolder" )?.Value
+                                                                                        ? new XAttribute( "OutputPath", p.Attribute( "OutputFolder" )!.Value )
                                                                                         : null ) ),
                                                       r.Elements( "AngularWorkspace" )
                                                        .Where( p => p.HasAttributes && !string.IsNullOrEmpty( p.Attribute( "Path" )?.Value ) )
-                                                       .Select( e => new XElement( e ) )
-                                                     );
+                                                       .Select( e => new XElement( e ) ) );
+                    _repositoryXml.EnsureDocument().Root!.Add( nodeSolution );
                     _repositoryXml.Save( m );
                     GitFolder.FileSystem.Delete( m, old );
                     hasNodeSolution = true;

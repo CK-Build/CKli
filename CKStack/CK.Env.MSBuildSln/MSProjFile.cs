@@ -263,11 +263,10 @@ namespace CK.Env.MSBuildSln
 
         internal void UpdateAllFilesList()
         {
-            var start = new MSProjFile[] { this };
-            _allFiles = start.Concat( Imports.Where( i => i.ImportedFile != null )
-                                             .SelectMany( i => i.ImportedFile!.AllFiles ) )
-                             .Distinct()
-                             .ToArray();
+            _allFiles = Imports.Where( i => i.ImportedFile != null ).SelectMany( i => i.ImportedFile!.AllFiles )
+                        .Append( this )
+                        .Distinct()
+                        .ToArray();
         }
 
 

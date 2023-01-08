@@ -213,6 +213,20 @@ namespace CK.Env.MSBuildSln
         /// <summary>
         /// Gets the &lt;IsPackable&gt; element value.
         /// Null if the project can not be read or if IsPackable is not defined.
+        /// <para>
+        /// IsPackable defaults to false for us!
+        /// Originally (dnx may be), there was no .sln taken into account.
+        /// To pack, you did "dotnet pack" in each project you wanted to pack. And basta!
+        ///
+        /// IsPackable was created to say that when you "dotnet pack" on a .sln, you should NOT pack THE project
+        /// (hence a form of "super default" to true).
+        /// This allows us to understand the terrific NuGet property: WarnOnPackingNonPackableProject
+        /// 
+        /// And then the bacteria invaded the system: for example, the xunit guys who decided that IF you depend on xunit,
+        /// then IsPackable is false by default...
+        /// 
+        /// One day, we should make a site "https://optout-that-should-have-been-optin-and-vice-versa.horror".
+        /// </para>
         /// </summary>
         public bool? IsPackable { get; private set; }
 

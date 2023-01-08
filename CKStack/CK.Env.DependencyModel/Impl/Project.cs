@@ -135,8 +135,8 @@ namespace CK.Env.DependencyModel
 
         /// <summary>
         /// Gets the project name: it can be the <see cref="SimpleProjectName"/>, prefixed or
-        /// not by the <see cref="Solution.Name"/> and automatically prefixed by (<see cref="Type"/>)
-        /// or the specified with <see cref="SolutionRelativeFolderPath"/> in case of conflicts
+        /// not by the <see cref="Solution.Name"/> and automatically prefixed by <see cref="Type"/>
+        /// (enclosed in parentheses) or be <see cref="SolutionRelativeFolderPath"/> in case of conflicts
         /// with other projects in the <see cref="SolutionContext"/>.
         /// Given that the solution name is unique by design and that only one project of a given type can
         /// be defined in a folder, this name is eventually always unique. 
@@ -199,13 +199,49 @@ namespace CK.Env.DependencyModel
         }
 
         /// <summary>
-        /// Gets the savors of this project. This is null by default.
+        /// Gets or sets the savors of this project. This is null by default.
+        /// <para>
+        /// When setting a new savor, the <see cref="ProjectPackageReference.ApplicableSavors"/> and
+        /// <see cref="ProjectReference.ApplicableSavors"/> are updated by removing from them any
+        /// savor that are not in the new ones.
+        /// </para>
         /// <para>
         /// When not null, the <see cref="CKTrait.Context"/> can be any context (typically
         /// the <see cref="ArtifactType.ContextSavors"/> of the "primary" artifact produced by this project).
         /// </para>
         /// </summary>
-        public CKTrait? Savors => _savors;
+        public CKTrait? Savors
+        {
+            get => _savors;
+            set
+            {
+                if( _savors == value ) return;
+                // If we had no savor at all or must no more have them,
+                // this is easy.
+                if( _savors == null || value == null )
+                {
+                    TransformSavors( _ => value );
+                    return;
+                }
+                var previousSavors = _savors;
+                var removed = previousSavors.Except( value );
+                // This applies to _savors and to the dependencies.
+                TransformSavors( t =>
+                {
+                    Debug.Assert( t != null );
+                    if( t == previousSavors )
+                    {
+                        // The trait contained all the previous ones: we replace all of them with the new one.
+                        return value;
+                    }
+                    // The trait didn't contain all the previous ones: we must not blindly add the new project's trait,
+                    // to the dependency: we only remove the ones that have been removed.
+                    var r = t.Except( removed );
+                    // Empty savors must be the whole project's savor.
+                    return r.IsEmpty ? value : r;
+                } );
+            }
+        }
 
         /// <summary>
         /// Applies a transformation to all the savors in this project: this <see cref="Savors"/>
@@ -442,7 +478,7 @@ namespace CK.Env.DependencyModel
             if( applicableSavors != null
                 && (Savors!.Context != applicableSavors.Context || !Savors.IsSupersetOf( applicableSavors )) )
             {
-                Throw.ArgumentException( $"Savors '{applicableSavors}' must be a subset of '{Savors}' (and belong to the same context).", nameof( applicableSavors ) );
+                Throw.ArgumentException( nameof( applicableSavors ), $"Savors '{applicableSavors}' must be a subset of project's '{Savors}' (and belong to the same context)." );
             }
             return applicableSavors;
         }

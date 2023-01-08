@@ -181,7 +181,7 @@ namespace CK.Env.Plugin
             }
             else
             {
-                var eP = section.Content.Elements( "PropertyGroup" ).Elements( "IsPackable" ).LastOrDefault();
+                var eP = section.Content.Elements( "IsPackable" ).LastOrDefault();
                 mustRevertIsPackable = eP == null || (bool)eP;
             }
             if( mustRevertIsPackable )
@@ -192,7 +192,7 @@ namespace CK.Env.Plugin
                     Throw.CheckState( msBuildSolution != null );
                     foreach( var project in msBuildSolution.MSProjects )
                     {
-                        if( !project.IsPackable.HasValue )
+                        if( !project.IsPackable.HasValue && project.ProjectName != "CodeCakeBuilder" )
                         {
                             project.SetIsPackable( m, true );
                         }

@@ -34,16 +34,16 @@ namespace CodeCake
                                          NormalizedPath outputPath )
         {
             var json = SimplePackageJsonFile.Create( solution.GlobalInfo.Cake, dirPath );
-            NPMProject output;
+            NPMProject result;
             if( json.IsPrivate )
             {
-                output = CreateNPMProject( solution, json, outputPath );
+                result = CreateNPMProject( solution, json, outputPath );
             }
             else
             {
-                output = new NPMPublishedProject( solution, json, outputPath );
+                result = new NPMPublishedProject( solution, json, outputPath );
             }
-            return output;
+            return result;
         }
 
         public override bool IsPublished => true;
@@ -85,7 +85,7 @@ namespace CodeCake
                     } );
                 }
 
-                if(_ckliLocalFeedMode)
+                if( _ckliLocalFeedMode )
                 {
                     //It meant that we just build a "dirty" package: we need to build the one that will actually get published.
                     File.Move( tgz, tgz.Path + ".local" );

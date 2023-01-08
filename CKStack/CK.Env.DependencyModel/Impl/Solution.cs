@@ -121,7 +121,9 @@ namespace CK.Env.DependencyModel
         /// <param name="type">The project type.</param>
         /// <param name="simpleProjecName">The project name.</param>
         /// <returns>The new project.</returns>
-        public Project AddProject( NormalizedPath solutionRelativeFolderPath, string type, string simpleProjecName )
+        public Project AddProject( NormalizedPath solutionRelativeFolderPath,
+                                   string type,
+                                   string simpleProjecName )
         {
             var r = AddOrFindProject( solutionRelativeFolderPath, type, simpleProjecName );
             if( !r.Created ) Throw.InvalidOperationException( $"Project at '{solutionRelativeFolderPath}' of type '{type}' is already registered in '{ToString()}'." );

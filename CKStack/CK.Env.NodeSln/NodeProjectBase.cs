@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 namespace CK.Env.NodeSln
@@ -12,6 +13,8 @@ namespace CK.Env.NodeSln
     {
         readonly NormalizedPath _solutionRelativePath;
         readonly NormalizedPath _path;
+        NormalizedPath _solutionRelativeOutputPath;
+        NormalizedPath _outputPath;
         [AllowNull]
         PackageJsonFile _packageJson;
         bool _isDirty;
@@ -23,12 +26,17 @@ namespace CK.Env.NodeSln
             _path = solution.SolutionFolderPath.Combine( _solutionRelativePath );
         }
 
+        private protected NodeProjectBase( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath )
+            : this( solution, path )
+        {
+            SetOutputPath( outputPath );
+        }
+
         internal virtual bool Initialize( IActivityMonitor monitor )
         {
             _packageJson = PackageJsonFile.Read( monitor, this );
             return _packageJson != null;
         }
-
 
         /// <summary>
         /// Gets the solution that owns this project.
@@ -57,6 +65,25 @@ namespace CK.Env.NodeSln
         /// Gets whether this project needs to be saved.
         /// </summary>
         public bool IsDirty => _isDirty;
+
+        /// <summary>
+        /// Gets the output path (in the <see cref="FileSystem"/>).
+        /// Defaults to <see cref="Path"/>.
+        /// </summary>
+        public NormalizedPath OutputPath => _outputPath;
+
+        /// <summary>
+        /// Gets the output path. Defaults to <see cref="SolutionRelativePath"/>
+        /// </summary>
+        public NormalizedPath SolutionRelativeOutputPath => _solutionRelativeOutputPath;
+
+        private protected void SetOutputPath( NormalizedPath outputPath )
+        {
+            Debug.Assert( _outputPath.IsEmptyPath );
+            _solutionRelativeOutputPath = SolutionRelativePath.Combine( outputPath ).ResolveDots();
+            _outputPath = Solution.SolutionFolderPath.Combine( _solutionRelativeOutputPath );
+        }
+
 
         /// <summary>
         /// Saves this project if <see cref="IsDirty"/> is true.

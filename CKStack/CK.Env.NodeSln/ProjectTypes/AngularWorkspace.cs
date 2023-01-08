@@ -14,8 +14,8 @@ namespace CK.Env.NodeSln
     {
         readonly List<NodeSubProject> _subProjects;
 
-        internal AngularWorkspace( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath )
-            : base( solution, path, outputPath )
+        internal AngularWorkspace( NodeSolution solution, NormalizedPath path )
+            : base( solution, path )
         {
             _subProjects = new List<NodeSubProject>();
         }

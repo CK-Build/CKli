@@ -232,7 +232,7 @@ namespace CK.Env.NodeSln
         /// <param name="kind">The kind of project that must be read.</param>
         /// <param name="workspace">Workspace (<paramref name="kind"/> is necessarily <see cref="NodeProjectKind.NodeSubProject"/></param>
         /// <param name="path">Project path.</param>
-        /// <param name="outputPath">Optional project output path for root projects only (when <paramref name="workspace"/> is null).</param>
+        /// <param name="outputPath">Optional project output path for YarnWorkspace and NodeProject only (when <paramref name="workspace"/> is null).</param>
         /// <param name="ownerDescription">The caller description (for logs).</param>
         /// <returns></returns>
         internal NodeProjectBase? TryReadProject( IActivityMonitor monitor,
@@ -242,8 +242,8 @@ namespace CK.Env.NodeSln
                                                   string? outputPath,
                                                   string ownerDescription )
         {
-            Debug.Assert( (workspace == null) == (kind == NodeProjectKind.NodeSubProject) );
-            Debug.Assert( outputPath == null || workspace != null );
+            Debug.Assert( (workspace != null) == (kind == NodeProjectKind.NodeSubProject) );
+            Debug.Assert( outputPath == null || workspace != null, "outputPath => root project." );
             if( path.IsEmptyPath )
             {
                 monitor.Warn( $"{ownerDescription}: Path is empty. It is ignored." );
@@ -263,23 +263,23 @@ namespace CK.Env.NodeSln
 
             if( workspace == null )
             {
-                var outPath = root.Combine( outputPath ).ResolveDots( throwOnAboveRoot: false );
-                if( string.IsNullOrWhiteSpace( outPath ) )
-                {
-                    monitor.Warn( $"{ownerDescription} has no or empty OutputPath attribute. It will use the project's Path." );
-                    outPath = path;
-                }
+                NormalizedPath outPath = GetOutputPath( monitor, path, outputPath, ownerDescription, root );
                 switch( kind )
                 {
                     case NodeProjectKind.YarnWorkspace:
-                        project = new YarnWorkspace( this, path, outPath );
+                        project = new YarnWorkspace( this, path, GetOutputPath( monitor, path, outputPath, ownerDescription, root ) );
                         break;
                     case NodeProjectKind.AngularWorkspace:
-                        project = new AngularWorkspace( this, path, outPath );
+                        if( outputPath != null )
+                        {
+                            monitor.Error( $"{ownerDescription}: An AngularWorkspace cannot have an OutputPath." );
+                            return null;
+                        }
+                        project = new AngularWorkspace( this, path );
                         break;
                     default:
                         Debug.Assert( kind == NodeProjectKind.NodeProject );
-                        project = new NodeProject( this, path, outPath );
+                        project = new NodeProject( this, path, GetOutputPath( monitor, path, outputPath, ownerDescription, root ) );
                         break;
                 }
             }
@@ -293,6 +293,18 @@ namespace CK.Env.NodeSln
             }
             monitor.Warn( $"Project '{project}' initialization failed. It is ignored." );
             return null;
+
+            static NormalizedPath GetOutputPath( IActivityMonitor monitor, NormalizedPath path, string? outputPath, string ownerDescription, NormalizedPath root )
+            {
+                var outPath = root.Combine( outputPath ).ResolveDots( throwOnAboveRoot: false );
+                if( string.IsNullOrWhiteSpace( outPath ) )
+                {
+                    monitor.Warn( $"{ownerDescription} has no or empty OutputPath attribute. It will use the project's Path." );
+                    outPath = path;
+                }
+
+                return outPath;
+            }
         }
     }
 

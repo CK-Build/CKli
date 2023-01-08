@@ -31,7 +31,7 @@ namespace CodeCake
 
         /// <summary>
         /// Adds the <see cref="Build.NPMArtifactType"/> for NPM based on <see cref="NPMSolution.ReadFromNPMSolutionFile"/>
-        /// (projects are defined by "CodeCakeBuilder/NPMSolution.xml" file).
+        /// (projects are defined by RepositoryInfo.xml &lt;NodeSolution&gt; element.
         /// </summary>
         /// <param name="this">This global info.</param>
         /// <returns>This info.</returns>
@@ -88,7 +88,6 @@ namespace CodeCake
         /// </summary>
         /// <param name="projects">Set of projects.</param>
         NPMSolution( StandardGlobalInfo globalInfo, bool useYarn )
-            : base()
         {
             GlobalInfo = globalInfo;
             UseYarn = useYarn;
@@ -199,7 +198,7 @@ namespace CodeCake
         /// <returns>The solution object.</returns>
         public static NPMSolution ReadFromNPMSolutionFile( StandardGlobalInfo globalInfo, bool useYarn )
         {
-            var document = XDocument.Load( "CodeCakeBuilder/NPMSolution.xml" ).Root;
+            var document = XDocument.Load( "RepositoryInfo.xml" ).Root.Element( "NodeSolution" );
             var solution = new NPMSolution( globalInfo, useYarn );
             foreach( var item in document.Elements( "AngularWorkspace" ) )
             {
@@ -210,7 +209,7 @@ namespace CodeCake
             {
                 solution.Add( NPMPublishedProject.Create( solution,
                                                           (string)item.Attribute( "Path" ),
-                                                          (string)item.Attribute( "OutputFolder" ) ) );
+                                                          (string)item.Attribute( "OutputPath" ) ) );
             }
             return solution;
         }

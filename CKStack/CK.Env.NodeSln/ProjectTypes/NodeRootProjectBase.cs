@@ -8,20 +8,21 @@ namespace CK.Env.NodeSln
 {
     /// <summary>
     /// Base class for projects that are defined by the <see cref="NodeSolution"/>.
-    /// They have an optional <see cref="OutputPath"/>.
     /// </summary>
     public abstract class NodeRootProjectBase : NodeProjectBase
     {
-        readonly NormalizedPath _solutionRelativeOutputPath;
-        readonly NormalizedPath _outputPath;
         readonly NormalizedPath _yarnPath;
         bool _restoreRequired;
 
-        private protected NodeRootProjectBase( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath )
+        private protected NodeRootProjectBase( NodeSolution solution, NormalizedPath path )
             : base( solution, path )
         {
-            _solutionRelativeOutputPath = SolutionRelativePath.Combine( outputPath ).ResolveDots();
-            _outputPath = solution.SolutionFolderPath.Combine( _solutionRelativeOutputPath );
+            _yarnPath = GetYarnPath();
+        }
+
+        private protected NodeRootProjectBase( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath )
+            : base( solution, path, outputPath )
+        {
             _yarnPath = GetYarnPath();
         }
 
@@ -42,17 +43,6 @@ namespace CK.Env.NodeSln
         /// </para>
         /// </summary>
         public bool RestoreRequired => _restoreRequired;
-
-        /// <summary>
-        /// Gets the output path (in the <see cref="FileSystem"/>).
-        /// Defaults to <see cref="Path"/>.
-        /// </summary>
-        public NormalizedPath OutputPath => _outputPath;
-
-        /// <summary>
-        /// Gets the output path. Defaults to <see cref="SolutionRelativePath"/>
-        /// </summary>
-        public NormalizedPath SolutionRelativeOutputPath => _solutionRelativeOutputPath;
 
         internal override void SetDirty( bool restoreRequired )
         {

@@ -17,7 +17,7 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets the project that generates this artifact.
         /// </summary>
-        public IProject Project { get; }
+        public Project Project { get; }
 
         /// <summary>
         /// Gets a set of full paths (folder or files) that are "sources" for this artifact.
@@ -32,7 +32,7 @@ namespace CK.Env.DependencyModel
         /// <param name="a">The artifact.</param>
         /// <param name="project">The project.</param>
         /// <param name="sources">Optional explicit sources that differ from <see cref="IProject.ProjectSources"/>.</param>
-        public GeneratedArtifact( Artifact a, IProject project, IReadOnlyCollection<NormalizedPath>? sources = null )
+        internal GeneratedArtifact( Artifact a, Project project, IReadOnlyCollection<NormalizedPath>? sources = null )
         {
             Artifact = a;
             Project = project;

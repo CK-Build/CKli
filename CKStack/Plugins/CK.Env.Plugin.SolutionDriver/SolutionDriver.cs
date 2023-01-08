@@ -32,6 +32,7 @@ namespace CK.Env.Plugin
 
         Solution? _solution;
         IReadOnlyList<(string SecretKeyName, string? Secret)>? _buildSecrets;
+        // Whether the last solution configuration succeeded.
         bool _isSolutionValid;
 
         public SolutionDriver( ISolutionDriverWorld w,
@@ -48,7 +49,7 @@ namespace CK.Env.Plugin
             _solutionSpec = spec;
             _localFeedProvider = localFeedProvider;
             _solutionContext = w.Register( this );
-            f.Reset += OnReset;
+            f.OnReset += OnReset;
             f.RunProcessStarting += OnRunProcessStarting;
             // The MSBuildSolutionProvider is implemented here to avoid
             // yet another assembly/plugin.
@@ -139,7 +140,7 @@ namespace CK.Env.Plugin
         /// <inheritdoc />
         public ISolution? GetSolution( IActivityMonitor monitor, bool allowInvalidSolution, bool reloadSolution = false )
         {
-            if( !_isSolutionValid || reloadSolution )
+            if( !IsSolutionValid || reloadSolution )
             {
                 using( monitor.OpenInfo( $"Loading solution '{GitFolder.SubPath}'." ) )
                 {

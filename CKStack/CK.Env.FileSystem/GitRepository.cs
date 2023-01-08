@@ -86,7 +86,7 @@ namespace CK.Env
         /// <summary>
         /// Fires whenever the repository is reset.
         /// </summary>
-        public event Action<IActivityMonitor>? Reset;
+        public event Action<IActivityMonitor>? OnReset;
 
 
         /// <summary>
@@ -288,17 +288,32 @@ namespace CK.Env
         public (bool Success, bool ReloadNeeded) Pull( IActivityMonitor m ) => Pull( m, MergeFileFavor.Theirs );
 
         /// <summary>
-        /// Resets the index to the tree recorded by the commit and updates the working directory to
-        /// match the content of the index.
+        /// Raises the <see cref="OnReset"/> event only or calls <see cref="ResetHard(IActivityMonitor)"/>.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="gitResetHard">True to reset the working folder.</param>
         /// <returns>True on success, false on error.</returns>
         [CommandMethod]
-        public bool ResetHard( IActivityMonitor m )
+        public bool Reset( IActivityMonitor monitor, bool gitResetHard = false )
         {
-            using( m.OpenInfo( $"Reset --hard changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
+            if( gitResetHard ) return ResetHard( monitor );
+            using( monitor.OpenInfo( $"Soft reset '{SubPath}' (branch '{CurrentBranchName}')." ) )
             {
-                Reset?.Invoke( m );
+                OnReset?.Invoke( monitor );
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Resets the index to the tree recorded by the commit and updates the working directory to
+        /// match the content of the index and raises the <see cref="OnReset"/> event.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <returns>True on success, false on error.</returns>
+        public bool ResetHard( IActivityMonitor monitor )
+        {
+            using( monitor.OpenInfo( $"Reset --hard changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
+            {
                 try
                 {
                     Git.Reset( ResetMode.Hard );
@@ -307,11 +322,11 @@ namespace CK.Env
                     bool success = true;
                     if( untrackedCount > 0 )
                     {
-                        using( m.OpenWarn( $"Attempting to delete {untrackedCount} untracked files." ) )
+                        using( monitor.OpenWarn( $"Attempting to delete {untrackedCount} untracked files." ) )
                         {
                             foreach( var e in status.Untracked )
                             {
-                                if( !FileSystem.Delete( m, SubPath.AppendPart( "branches" ).AppendPart( CurrentBranchName ).Combine( e.FilePath ) ) )
+                                if( !FileSystem.Delete( monitor, SubPath.AppendPart( "branches" ).AppendPart( CurrentBranchName ).Combine( e.FilePath ) ) )
                                 {
                                     success = false;
                                 }
@@ -322,8 +337,12 @@ namespace CK.Env
                 }
                 catch( Exception ex )
                 {
-                    m.Error( ex );
+                    monitor.Error( ex );
                     return false;
+                }
+                finally
+                {
+                    OnReset?.Invoke( monitor );
                 }
             }
         }

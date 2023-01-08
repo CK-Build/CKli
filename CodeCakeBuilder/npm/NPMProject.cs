@@ -52,7 +52,7 @@ namespace CodeCake
 
         /// <summary>
         /// Runs "npm ci" (instead of "npm install") on this project or
-        /// "yarn install --frozen-lockfile" is <see cref="NPMSolution.UseYarn"/> is true.
+        /// "yarn install --immutable" is <see cref="NPMSolution.UseYarn"/> is true.
         /// See https://docs.npmjs.com/cli/ci.html.
         /// </summary>
         /// <param name="globalInfo">The global information object.</param>

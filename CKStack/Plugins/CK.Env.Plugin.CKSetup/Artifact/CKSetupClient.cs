@@ -57,11 +57,10 @@ namespace CK.Env.CKSetup
             return store;
         }
 
-        public IArtifactFeed CreateFeedFromXml(
-            IActivityMonitor m,
-            in XElementReader r,
-            IReadOnlyList<IArtifactRepository> repositories,
-            IReadOnlyList<IArtifactFeed> feeds )
+        public IArtifactFeed CreateFeedFromXml( IActivityMonitor m,
+                                                in XElementReader r,
+                                                IReadOnlyList<IArtifactRepository> repositories,
+                                                IReadOnlyList<IArtifactFeed> feeds )
         {
             return null;
         }

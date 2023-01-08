@@ -26,36 +26,21 @@ namespace CK.Env.Plugin
         public void ApplySettings( IActivityMonitor m )
         {
             if( !this.CheckCurrentBranch( m ) ) return;
-
             var solution = _solutionDriver.GetSolution( m, allowInvalidSolution: true );
             if( solution == null ) return;
 
-            var csprojs = solution.Projects.Select<IProject, (IProject project, MSProject msproject)>( p => (p, p.Tag<MSProject>()!) ).Where( p => p.Item2 != null );
-
-            foreach( (IProject project, MSProject msproject) in csprojs )
+            foreach( var p in solution.Projects.Select( p => p.Tag<MSProject>() ).Where( p => p != null ) )
             {
-                if( msproject.ProjectFile == null )
+                if( p!.ProjectFile != null )
                 {
-                    m.Warn( $"Project {project.Name} has no project file. It is skipped." );
-                    continue;
+                    // Removing the old <Import Project="..\Common\Shared.props" />.
+                    foreach( var pFile in p.ProjectFile.AllFiles )
+                    {
+                        pFile.RemoveImports( i => string.Compare( i.Path.LastPart, "Shared.props", true ) == 0 );
+                    }
                 }
-                // Removing the old <Import Project="..\Common\Shared.props" />.
-                foreach( var pFile in  msproject.ProjectFile.AllFiles )
-                {
-                    pFile.RemoveImports( i => string.Compare( i.Path.LastPart, "Shared.props", true ) == 0 );
-                }
-                if( project.IsPublished )
-                {
-                    // For test projects we want the IsPackable element to be explicit.
-                    msproject.SetIsPackable( m, project.IsTestProject ? true : null );
-                }
-                else
-                {
-                    msproject.SetIsPackable( m, false );
-                }
-                // Saves the project.
-                msproject.Save( m );
             }
+            solution.Tag<SolutionFile>()!.Save( m );
         }
     }
 }

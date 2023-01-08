@@ -48,9 +48,9 @@ namespace CK.Env.Plugin
             {
                 var solution = _driver.GetSolution( monitor, allowInvalidSolution: false );
                 if( solution == null ) return false;
-                Debug.Assert( !_nodeSolutionProvider.IsDirty && _nodeSolutionProvider.HasNodeSolution.HasValue );
-                hasNodeSolution = _nodeSolutionProvider.HasNodeSolution.Value;
             }
+            Debug.Assert( !_nodeSolutionProvider.IsDirty && _nodeSolutionProvider.HasNodeSolution.HasValue );
+            hasNodeSolution = _nodeSolutionProvider.HasNodeSolution.Value;
             return true;
         }
 
