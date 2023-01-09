@@ -24,18 +24,20 @@ namespace CodeCake
             var infoPath = Path.GetFullPath( "RepositoryInfo.xml" );
             var ckSetup = File.Exists( infoPath ) ? XDocument.Load( infoPath ).Root?.Element( "CKSetup" ) : null;
             if( ckSetup == null ) Throw.InvalidOperationException( $"File '{infoPath}' must contain a CKSetup element." );
-            foreach( var p in ckSetup.Elements( "Component" ).Select( e => e.Value ) )
+            foreach( var p in ckSetup.Elements( "Component" )
+                                     .Select( e =>  e.Value )
+                                     .Where( p => !string.IsNullOrWhiteSpace( p ) )
+                                     .Select( p => Path.GetFullPath( p ) ) )
             {
-                var csProj = Path.GetFullPath( p );
+                var componentName = Path.GetFileName( p );
+                var csProj = Path.Combine( p, $"{componentName}.csproj" );
                 var props = File.Exists( csProj ) ? XDocument.Load( csProj ).Root?.Element( "PropertyGroup" ) : null;
                 var frameworks = (props != null ? props.Element( "TargetFrameworks" ) ?? props.Element( "TargetFramework" ) : null)?
                                     .Value.Split( ';', System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries );
-
                 if( frameworks == null || frameworks.Length == 0 )
                 {
                     Throw.InvalidOperationException( $"File '{csProj}' must exist and contain a non empty <TargetFrameworks> element." );
                 }
-                var componentName = Path.GetFileNameWithoutExtension( p );
                 foreach( var t in frameworks )
                 {
                     yield return new CKSetupComponent( componentName, t );
