@@ -12,25 +12,25 @@ namespace CK.Env.DependencyModel.Tests
             var ctx = new SolutionContext();
             var s = ctx.AddSolution( "/Solution/Path", "SolutionName" );
 
-            var pC = s.AddProject( "Dir1", "c#", "Homonym" );
+            var pC = s.AddProject( "Dir1", ".Net", "Homonym" );
             pC.Name.Should().Be( "Homonym" );
-            s.Invoking( _ => _.AddProject( "Dir1", "c#", "Homonym" ) ).Should().Throw<InvalidOperationException>();
+            s.Invoking( _ => _.AddProject( "Dir1", ".Net", "Homonym" ) ).Should().Throw<InvalidOperationException>();
             pC.Name.Should().Be( "Homonym" );
 
-            var pJ = s.AddProject( "Dir1", "js", "Homonym" );
-            pC.Name.Should().Be( "(c#)Homonym" );
-            pJ.Name.Should().Be( "(js)Homonym" );
+            var pJ = s.AddProject( "Dir1", "Node", "Homonym" );
+            pC.Name.Should().Be( "(.Net)Homonym" );
+            pJ.Name.Should().Be( "(Node)Homonym" );
 
-            var pJa = s.AddProject( "AltDir", "js", "Homonym" );
-            pC.Name.Should().Be( "(c#)Homonym" );
-            pJ.Name.Should().Be( "(js)Dir1/Homonym" );
-            pJa.Name.Should().Be( "(js)AltDir/Homonym" );
+            var pJa = s.AddProject( "AltDir", "Node", "Homonym" );
+            pC.Name.Should().Be( "(.Net)Homonym" );
+            pJ.Name.Should().Be( "(Node)Dir1/Homonym" );
+            pJa.Name.Should().Be( "(Node)AltDir/Homonym" );
 
-            var pCa = s.AddProject( "AltDir", "c#", "Homonym" );
-            pC.Name.Should().Be( "(c#)Dir1/Homonym" );
-            pCa.Name.Should().Be( "(c#)AltDir/Homonym" );
-            pJ.Name.Should().Be( "(js)Dir1/Homonym" );
-            pJa.Name.Should().Be( "(js)AltDir/Homonym" );
+            var pCa = s.AddProject( "AltDir", ".Net", "Homonym" );
+            pC.Name.Should().Be( "(.Net)Dir1/Homonym" );
+            pCa.Name.Should().Be( "(.Net)AltDir/Homonym" );
+            pJ.Name.Should().Be( "(Node)Dir1/Homonym" );
+            pJa.Name.Should().Be( "(Node)AltDir/Homonym" );
         }
 
         [Test]
@@ -39,24 +39,24 @@ namespace CK.Env.DependencyModel.Tests
             var ctx = new SolutionContext();
             var s = ctx.AddSolution( "/Solution/Path", "SolutionName" );
 
-            var pC = s.AddProject( "Dir1", "c#", "Homonym" );
-            var pJ = s.AddProject( "Dir1", "js", "Homonym" );
-            var pJa = s.AddProject( "AltDir", "js", "Homonym" );
-            var pCa = s.AddProject( "AltDir", "c#", "Homonym" );
+            var pC = s.AddProject( "Dir1", ".Net", "Homonym" );
+            var pJ = s.AddProject( "Dir1", "Node", "Homonym" );
+            var pJa = s.AddProject( "AltDir", "Node", "Homonym" );
+            var pCa = s.AddProject( "AltDir", ".Net", "Homonym" );
 
-            pC.Name.Should().Be( "(c#)Dir1/Homonym" );
-            pCa.Name.Should().Be( "(c#)AltDir/Homonym" );
-            pJ.Name.Should().Be( "(js)Dir1/Homonym" );
-            pJa.Name.Should().Be( "(js)AltDir/Homonym" );
+            pC.Name.Should().Be( "(.Net)Dir1/Homonym" );
+            pCa.Name.Should().Be( "(.Net)AltDir/Homonym" );
+            pJ.Name.Should().Be( "(Node)Dir1/Homonym" );
+            pJa.Name.Should().Be( "(Node)AltDir/Homonym" );
 
             s.RemoveProject( pC );
-            pCa.Name.Should().Be( "(c#)Homonym" );
-            pJ.Name.Should().Be( "(js)Dir1/Homonym" );
-            pJa.Name.Should().Be( "(js)AltDir/Homonym" );
+            pCa.Name.Should().Be( "(.Net)Homonym" );
+            pJ.Name.Should().Be( "(Node)Dir1/Homonym" );
+            pJa.Name.Should().Be( "(Node)AltDir/Homonym" );
 
             s.RemoveProject( pJa );
-            pCa.Name.Should().Be( "(c#)Homonym" );
-            pJ.Name.Should().Be( "(js)Homonym" );
+            pCa.Name.Should().Be( "(.Net)Homonym" );
+            pJ.Name.Should().Be( "(Node)Homonym" );
 
         }
 

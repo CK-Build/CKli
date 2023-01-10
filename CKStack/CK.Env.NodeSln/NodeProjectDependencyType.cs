@@ -21,7 +21,7 @@ namespace CK.Env.NodeSln
         LocalPath,
 
         /// <summary>
-        ///  'file:' url that reference a tarball in a local feed.
+        ///  'file:' url that reference a tarball (.tgz) in a local feed.
         /// </summary>
         LocalFeedTarball,
 

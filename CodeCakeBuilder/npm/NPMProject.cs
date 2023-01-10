@@ -18,22 +18,17 @@ namespace CodeCake
     public class NPMProject
     {
 
-        protected NPMProject( NPMSolution npmSolution,
-                              SimplePackageJsonFile json,
-                              NormalizedPath outputPath )
+        internal NPMProject( NPMSolution npmSolution,
+                             SimplePackageJsonFile json,
+                             NormalizedPath outputPath,
+                             bool useYarn )
         {
             DirectoryPath = json.JsonFilePath.RemoveLastPart();
             PackageJson = json;
-            OutputPath = outputPath;
+            UseYarn = useYarn;
+            OutputPath = outputPath.IsEmptyPath ? DirectoryPath : outputPath;
             NPMRCPath = DirectoryPath.AppendPart( ".npmrc" );
             NpmSolution = npmSolution;
-        }
-
-        protected static NPMProject CreateNPMProject( NPMSolution npmSolution,
-                                                      SimplePackageJsonFile json,
-                                                      NormalizedPath outputPath )
-        {
-            return new NPMProject( npmSolution, json, outputPath );
         }
 
         public StandardGlobalInfo GlobalInfo => NpmSolution.GlobalInfo;
@@ -45,6 +40,11 @@ namespace CodeCake
         public NormalizedPath DirectoryPath { get; }
 
         public SimplePackageJsonFile PackageJson { get; }
+
+        /// <summary>
+        /// Gets whether this project uses Yarn instead of Npm.
+        /// </summary>
+        public bool UseYarn { get; }
 
         public NormalizedPath OutputPath { get; }
 
@@ -58,7 +58,7 @@ namespace CodeCake
         /// <param name="globalInfo">The global information object.</param>
         public virtual void RunNpmCi()
         {
-            if( NpmSolution.UseYarn )
+            if( UseYarn )
             {
                 GlobalInfo.Cake.Information( $"Running 'yarn install --immutable' in {DirectoryPath.Path}" );
                 GlobalInfo.Cake.Yarn().Install( settings =>
@@ -169,7 +169,7 @@ namespace CodeCake
         /// <param name="runInBuildDirectory">Whether the script should be run in <see cref="OutputPath"/> or <see cref="DirectoryPath"/> if false.</param>
         private protected virtual void DoRunScript( string scriptName, bool runInBuildDirectory )
         {
-            if( NpmSolution.UseYarn )
+            if( UseYarn )
             {
                 GlobalInfo.Cake.Yarn().RunScript( scriptName,
                                                   settings =>

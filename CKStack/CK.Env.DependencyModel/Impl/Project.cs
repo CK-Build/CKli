@@ -317,7 +317,10 @@ namespace CK.Env.DependencyModel
             {
                 _generatedArtifacts.RemoveAt( idx );
                 _solution.OnArtifactRemoved( a, this );
-                IsPublished = _generatedArtifacts.Any( g => g.Artifact.Type!.IsInstallable );
+                if( a.Type.IsInstallable )
+                {
+                    IsPublished = _generatedArtifacts.Any( g => g.Artifact.Type!.IsInstallable );
+                }
                 return true;
             }
             return false;
@@ -417,25 +420,12 @@ namespace CK.Env.DependencyModel
         public IReadOnlyList<ProjectPackageReference> PackageReferences => _packageReferences;
 
         /// <summary>
-        /// Adds a new <see cref="ProjectPackageReference"/> to this project.
-        /// </summary>
-        /// <param name="target">The referenced package.</param>
-        /// <param name="kind">The dependency kind.</param>
-        /// <param name="applicableSavors">Optional savors that, when defined, must be a subset of this <see cref="Savors"/>.</param>
-        public void AddPackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait? applicableSavors = null )
-        {
-            CheckSolution();
-            Throw.CheckState( $"Package '{target.Artifact}' is already referenced by '{ToString()}'.", !_packageReferences.Any( p => p.Target.Artifact == target.Artifact ) );
-            DoAddPackageReference( target, kind, applicableSavors ?? Savors );
-        }
-
-        /// <summary>
         /// Ensures that a new <see cref="ProjectPackageReference"/> with the exact same target and kind exists.
         /// </summary>
         /// <param name="target">The referenced package.</param>
         /// <param name="kind">The dependency kind.</param>
         /// <param name="applicableSavors">Optional savors that, when defined, must be a subset of this <see cref="Savors"/>.</param>
-        public void EnsurePackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait? applicableSavors = null )
+        public bool EnsurePackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait? applicableSavors = null )
         {
             CheckSolution();
             var savors = applicableSavors ?? Savors;
@@ -445,10 +435,23 @@ namespace CK.Env.DependencyModel
                 var exists = _packageReferences[idx];
                 if( exists.Kind == kind
                     && exists.Target == target
-                    && exists.ApplicableSavors == savors ) return;
-                DoRemovePackageReferenceAt( idx );
+                    && exists.ApplicableSavors == savors )
+                {
+                    return false;
+                }
             }
-            DoAddPackageReference( target, kind, savors );
+            var r = new ProjectPackageReference( this, target, kind, CheckSavors( applicableSavors ) );
+            if( idx < 0 )
+            {
+                _packageReferences.Add( r );
+                _solution.OnPackageReferenceAdded( r );
+            }
+            else
+            {
+                _packageReferences[idx] = r;
+                _solution.OnPackageReferenceUpdated( r );
+            }
+            return true;
         }
 
         /// <summary>
@@ -460,17 +463,23 @@ namespace CK.Env.DependencyModel
         {
             CheckSolution();
             int idx = _packageReferences.IndexOf( p => p.Target.Artifact == target );
-            if( idx >= 0 ) DoRemovePackageReferenceAt( idx );
+            if( idx >= 0 )
+            {
+                var r = _packageReferences[idx];
+                DoRemovePackageReferenceAt( idx );
+                _solution.OnPackageReferenceRemoved( r );
+                return true;
+            }
             return false;
         }
 
-        void DoAddPackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait? applicableSavors )
-        {
-            Debug.Assert( _solution != null );
-            var r = new ProjectPackageReference( this, target, kind, CheckSavors( applicableSavors ) );
-            _packageReferences.Add( r );
-            _solution.OnPackageReferenceAdded( r );
-        }
+        //void DoAddPackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait? applicableSavors )
+        //{
+        //    Debug.Assert( _solution != null );
+        //    var r = new ProjectPackageReference( this, target, kind, CheckSavors( applicableSavors ) );
+        //    _packageReferences.Add( r );
+        //    _solution.OnPackageReferenceAdded( r );
+        //}
 
         CKTrait? CheckSavors( CKTrait? applicableSavors )
         {
@@ -488,7 +497,6 @@ namespace CK.Env.DependencyModel
             Debug.Assert( _solution != null );
             var r = _packageReferences[idx];
             _packageReferences.RemoveAt( idx );
-            _solution.OnPackageReferenceRemoved( r );
         }
 
         /// <summary>

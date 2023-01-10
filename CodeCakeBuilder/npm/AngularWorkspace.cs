@@ -8,14 +8,11 @@ using System.Linq;
 
 namespace CodeCake
 {
-    public class AngularWorkspace : NPMProjectContainer
+    public sealed class AngularWorkspace : NPMProjectContainer
     {
         public NPMProject WorkspaceProject { get; }
 
-        AngularWorkspace(
-            NPMProject workspaceProject,
-            IReadOnlyList<NPMProject> projects )
-            : base()
+        AngularWorkspace( NPMProject workspaceProject, IReadOnlyList<NPMProject> projects )
         {
             WorkspaceProject = workspaceProject;
             foreach( var p in projects )
@@ -23,7 +20,8 @@ namespace CodeCake
                 Add( p );
             }
         }
-        public static AngularWorkspace Create( NPMSolution npmSolution, NormalizedPath path )
+
+        public static AngularWorkspace Create( NPMSolution npmSolution, NormalizedPath path, bool useYarn )
         {
             NormalizedPath packageJsonPath = path.AppendPart( "package.json" );
             NormalizedPath angularJsonPath = path.AppendPart( "angular.json" );
@@ -37,12 +35,17 @@ namespace CodeCake
             {
                 var projectPath = project.Value["root"].ToString();
 
+                // The "outputPath" is for Applications.
                 var options = project.Value["architect"]["build"]["options"];
                 string outputPathJson = options["outputPath"]?.Value<string>();
                 bool havePath = outputPathJson != null;
+                // The "project" is for libraries.
                 string ngPackagePath = options["project"]?.Value<string>();
                 bool haveNgPackageJson = ngPackagePath != null;
-                if( havePath && haveNgPackageJson ) throw new NotImplementedException();//I don't know what to do in this case.
+                if( havePath && haveNgPackageJson )
+                {
+                    Throw.NotSupportedException( $"File '{angularJsonPath}' has both architect/build/options/outputPath (application) and project (library) properties." );
+                }
                 NormalizedPath outputPath;
                 NormalizedPath ngPackagePathFullPath = path.Combine( ngPackagePath );
                 if( haveNgPackageJson )
@@ -58,13 +61,13 @@ namespace CodeCake
                 }
                 else
                 {
-                    npmSolution.GlobalInfo.Cake.Warning( $"No path found for angular project '{path}'." );
+                    npmSolution.GlobalInfo.Cake.Warning( $"No architect/build/options/outputPath (application) nor project (library) found for angular project '{path}'. Using the project's path." );
                     outputPath = path.Combine( projectPath );
                 }
 
-                projects.Add( NPMPublishedProject.Create( npmSolution, path.Combine( projectPath ), outputPath ) );
+                projects.Add( NPMPublishedProject.Create( npmSolution, path.Combine( projectPath ), outputPath, useYarn ) );
             }
-            return new AngularWorkspace( NPMPublishedProject.Create( npmSolution, path, path ), projects );
+            return new AngularWorkspace( NPMPublishedProject.Create( npmSolution, path, path, useYarn ), projects );
         }
     }
 }

@@ -9,12 +9,12 @@ using System.IO;
 
 namespace CodeCake
 {
-    public class NPMPublishedProject : NPMProject, ILocalArtifact
+    public sealed class NPMPublishedProject : NPMProject, ILocalArtifact
     {
         readonly bool _ckliLocalFeedMode;
 
-        NPMPublishedProject( NPMSolution npmSolution, SimplePackageJsonFile json, NormalizedPath outputPath )
-            : base( npmSolution, json, outputPath )
+        NPMPublishedProject( NPMSolution npmSolution, SimplePackageJsonFile json, NormalizedPath outputPath, bool useYarn )
+            : base( npmSolution, json, outputPath, useYarn )
         {
             _ckliLocalFeedMode = json.CKliLocalFeedMode;
             ArtifactInstance = new ArtifactInstance( new Artifact( "NPM", json.Name ), GlobalInfo.BuildInfo.Version );
@@ -26,22 +26,24 @@ namespace CodeCake
         /// Create a <see cref="NPMProject"/> that can be a <see cref="NPMPublishedProject"/>.
         /// </summary>
         /// <param name="solution">The NPM solution that contains the project.</param>
-        /// <param name="dirPath">The directory path where is located the npm package.</param>
-        /// <param name="outputPath">The directory path where the build output is. It can be the same than <paramref name="dirPath"/>.</param>
-        /// <returns></returns>
+        /// <param name="path">The directory path (relative to the repository root) where is located the npm package.</param>
+        /// <param name="outputPath">The directory path where the build output is. It can be the same than <paramref name="path"/>.</param>
+        /// <param name="useYarn">Whether this project uses Yarn instead of Npm.</param>
+        /// <returns>The new NodeProject.</returns>
         public static NPMProject Create( NPMSolution solution,
-                                         NormalizedPath dirPath,
-                                         NormalizedPath outputPath )
+                                         NormalizedPath path,
+                                         NormalizedPath outputPath,
+                                         bool useYarn )
         {
-            var json = SimplePackageJsonFile.Create( solution.GlobalInfo.Cake, dirPath );
+            var json = SimplePackageJsonFile.Create( solution.GlobalInfo.Cake, path );
             NPMProject result;
             if( json.IsPrivate )
             {
-                result = CreateNPMProject( solution, json, outputPath );
+                result = new NPMProject( solution, json, outputPath, useYarn );
             }
             else
             {
-                result = new NPMPublishedProject( solution, json, outputPath );
+                result = new NPMPublishedProject( solution, json, outputPath, useYarn );
             }
             return result;
         }

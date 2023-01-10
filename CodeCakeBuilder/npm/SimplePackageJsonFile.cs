@@ -12,30 +12,53 @@ namespace CodeCake
 {
     public readonly struct SimplePackageJsonFile
     {
-        public readonly NormalizedPath JsonFilePath;
-        public readonly string Name;
-        public readonly string Scope;
-        public readonly string ShortName;
-        public readonly string Version;
-        public readonly IReadOnlyList<string> Scripts;
-        public readonly bool IsPrivate;
-        public readonly bool CKliLocalFeedMode;
+        /// <summary>
+        /// Gets this file path.
+        /// </summary>
+        public NormalizedPath JsonFilePath { get; }
 
-        SimplePackageJsonFile(
-            NormalizedPath jsonFilePath,
-            string name,
-            string scope,
-            string shortName,
-            string version,
-            IReadOnlyList<string> scripts,
-            bool isPrivate,
-            bool ckliLocalFeedMode )
+        /// <summary>
+        /// Gets the package name, starting with the <see cref="Scope"/> if scope is not null.
+        /// </summary>
+        public string Name { get; }
+
+        /// <summary>
+        /// Gets the "@scope" name prefix if any.
+        /// </summary>
+        public string? Scope { get; }
+
+        /// <summary>
+        /// Gets the name without <see cref="Scope"/>.
+        /// </summary>
+        public string ShortName { get; }
+
+        /// <summary>
+        /// Gets the "scripts" name that this package exposes.
+        /// </summary>
+        public IReadOnlyList<string> Scripts { get; }
+
+        /// <summary>
+        /// Gets whether this package is "private": no package should be generated.
+        /// </summary>
+        public bool IsPrivate { get; }
+
+        /// <summary>
+        /// Gets whether at least one dependency is a local "file:...tgz".
+        /// </summary>
+        public bool CKliLocalFeedMode { get; }
+
+        SimplePackageJsonFile( NormalizedPath jsonFilePath,
+                               string name,
+                               string scope,
+                               string shortName,
+                               IReadOnlyList<string> scripts,
+                               bool isPrivate,
+                               bool ckliLocalFeedMode )
         {
             JsonFilePath = jsonFilePath;
             Name = name;
             Scope = scope;
             ShortName = shortName;
-            Version = version;
             Scripts = scripts;
             IsPrivate = isPrivate;
             CKliLocalFeedMode = ckliLocalFeedMode;
@@ -62,7 +85,6 @@ namespace CodeCake
                 scope = null;
                 shortName = name;
             }
-            string version = json.Value<string>( "version" );
             IReadOnlyList<string> scripts;
             if( json.TryGetValue( "scripts", out JToken scriptsToken ) && scriptsToken.HasValues )
             {
@@ -82,8 +104,8 @@ namespace CodeCake
             };
             bool ckliLocalFeedMode = false;
 
-
-            if( _dependencyPropNames //this monstrosity return true when a dependency end with a .tgz
+            // This monstrosity return true when a dependency end with a ".tgz".
+            if( _dependencyPropNames 
                     .Where( p => json.ContainsKey( p ) )
                     .Any( dependencyPropName =>
                         ((IEnumerable<KeyValuePair<string, JToken>>)(JObject)json[dependencyPropName]) // Blame NewtonSoft.JSON for explicit implementation.
@@ -99,7 +121,7 @@ namespace CodeCake
                     "***********************************************************" );
             }
 
-            return new SimplePackageJsonFile( jsonFilePath, name, scope, shortName, version, scripts, isPrivate, ckliLocalFeedMode );
+            return new SimplePackageJsonFile( jsonFilePath, name, scope, shortName, scripts, isPrivate, ckliLocalFeedMode );
         }
     }
 }

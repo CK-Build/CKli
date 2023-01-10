@@ -64,7 +64,7 @@ namespace CK.Env.Plugin
         static void UpdateSolutionFromMSBuild( IActivityMonitor monitor, Solution solution, SolutionFile sln )
         {
             solution.Tag( sln );
-            var projectsToRemove = new HashSet<DependencyModel.Project>( solution.Projects );
+            var projectsToRemove = new HashSet<DependencyModel.Project>( solution.Projects.Where( p => p.Type == ".Net" ) );
             var orderedProjects = new DependencyModel.Project[sln.MSProjects.Count];
             int i = 0;
             foreach( var p in sln.MSProjects )

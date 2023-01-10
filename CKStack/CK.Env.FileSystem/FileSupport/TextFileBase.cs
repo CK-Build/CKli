@@ -122,5 +122,13 @@ namespace CK.Env
             _file = null;
             return true;
         }
+
+        /// <summary>
+        /// Resets this object's state. Any content will be read again.
+        /// </summary>
+        public virtual void ResetState()
+        {
+            _file = null;
+        }
     }
 }

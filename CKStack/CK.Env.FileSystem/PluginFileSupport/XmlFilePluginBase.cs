@@ -10,7 +10,7 @@ namespace CK.Env.Plugin
     /// <summary>
     /// Exposes a <see cref="XDocument"/> from a file.
     /// </summary>
-    public abstract class XmlFilePluginBase : XmlFileBase, IGitBranchPlugin
+    public abstract class XmlFilePluginBase : XmlFileBase, IGitBranchPlugin, IDisposable
     {
         readonly GitBranchPluginImpl _pluginImpl;
 
@@ -27,6 +27,7 @@ namespace CK.Env.Plugin
         {
             if( !filePath.StartsWith( branchPath ) ) Throw.ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
             _pluginImpl = new GitBranchPluginImpl( f, branchPath );
+            f.OnReset += OnFileSystemReset;
         }
 
         /// <summary>
@@ -49,5 +50,10 @@ namespace CK.Env.Plugin
         /// the 3 standard ones.
         /// </summary>
         public StandardGitStatus StandardPluginBranch => _pluginImpl.StandardPluginBranch;
+
+        void OnFileSystemReset( IActivityMonitor obj ) => ResetState();
+
+        void IDisposable.Dispose() => GitFolder.OnReset -= OnFileSystemReset;
+
     }
 }

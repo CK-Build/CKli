@@ -72,6 +72,12 @@ namespace CK.Env.Plugin
             return true;
         }
 
+        /// <summary>
+        /// Forces this the Node provider to resynchronize the solution.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        public void SetDirty( IActivityMonitor monitor ) => _nodeSolutionProvider.SetDirty( monitor );
+
         void OnUpdatePackageDependency( object? sender, UpdatePackageDependencyEventArgs e )
         {
             bool mustSave = false;

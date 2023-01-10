@@ -49,15 +49,15 @@ namespace CK.Env.DependencyModel
                         {
                             return newValue != null ? a[i] = newValue : obj;
                         }
-                        if( newValue != null )
+                    }
+                    if( newValue != null )
+                    {
+                        if( i == a.Length )
                         {
-                            if( i == a.Length )
-                            {
-                                Array.Resize( ref a, i * 2 );
-                                _tag = a;
-                            }
-                            a[i] = newValue;
+                            Array.Resize( ref a, i * 2 );
+                            _tag = a;
                         }
+                        a[i] = newValue;
                     }
                 }
             }

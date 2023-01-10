@@ -188,22 +188,27 @@ namespace CK.Env.DependencyModel
             ++_version;
         }
 
-        internal void OnPackageReferenceRemoved( ProjectPackageReference r )
+        internal void OnPackageReferenceRemoved( in ProjectPackageReference r )
         {
             ++_version;
         }
 
-        internal void OnPackageReferenceAdded( ProjectPackageReference r )
+        internal void OnPackageReferenceAdded( in ProjectPackageReference r )
         {
             ++_version;
         }
 
-        internal void OnProjectReferenceAdded( ProjectReference r )
+        internal void OnPackageReferenceUpdated( in ProjectPackageReference r )
         {
             ++_version;
         }
 
-        internal void OnProjectReferenceRemoved( ProjectReference r )
+        internal void OnProjectReferenceAdded( in ProjectReference r )
+        {
+            ++_version;
+        }
+
+        internal void OnProjectReferenceRemoved( in ProjectReference r )
         {
             ++_version;
         }

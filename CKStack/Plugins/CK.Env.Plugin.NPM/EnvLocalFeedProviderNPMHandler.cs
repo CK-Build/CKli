@@ -2,6 +2,7 @@ using CK.Core;
 using CK.Env.NPM;
 using CK.Build;
 using System.Collections.Generic;
+using CK.Env.NodeSln;
 
 namespace CK.Env
 {
@@ -29,7 +30,7 @@ namespace CK.Env
                     var local = feed.GetNPMPackageFile( m, a.Artifact.Name, a.Version );
                     if( local == null )
                     {
-                        m.Error( $"Unable to find local NPM package {a} in '{feed.PhysicalPath}'." );
+                        m.Error( $"Unable to find local NPM package {a}. File '{local}' not found." );
                         return false;
                     }
                     locals.Add( local );
@@ -44,7 +45,7 @@ namespace CK.Env
             {
                 if( n.Artifact.Type == NPMClient.NPMType )
                 {
-                    var f = NPMEnvLocalFeedProviderExtension.GetNPMPackagePath( feed.PhysicalPath, n.Artifact.Name, n.Version );
+                    var f = NodeProjectDependency.CreateTarballPath( feed.PhysicalPath, n.Artifact.Name, n.Version );
                     if( System.IO.File.Exists( f ) )
                     {
                         System.IO.File.Delete( f );

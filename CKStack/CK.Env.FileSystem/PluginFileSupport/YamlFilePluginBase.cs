@@ -3,7 +3,7 @@ using System;
 
 namespace CK.Env.Plugin
 {
-    public abstract class YamlFilePluginBase : YamlFileBase, IGitBranchPlugin
+    public abstract class YamlFilePluginBase : YamlFileBase, IGitBranchPlugin, IDisposable
     {
         readonly GitBranchPluginImpl _pluginImpl;
 
@@ -12,6 +12,7 @@ namespace CK.Env.Plugin
         {
             if( !filePath.StartsWith( branchPath ) ) throw new ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
             _pluginImpl = new GitBranchPluginImpl( f, branchPath );
+            f.OnReset += OnFileSystemReset;
         }
 
         /// <summary>
@@ -34,5 +35,10 @@ namespace CK.Env.Plugin
         /// the 3 standard ones.
         /// </summary>
         public StandardGitStatus StandardPluginBranch => _pluginImpl.StandardPluginBranch;
+
+        void OnFileSystemReset( IActivityMonitor obj ) => ResetState();
+
+        void IDisposable.Dispose() => GitFolder.OnReset -= OnFileSystemReset;
+
     }
 }

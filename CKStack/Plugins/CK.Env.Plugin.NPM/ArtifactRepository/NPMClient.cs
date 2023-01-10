@@ -122,9 +122,9 @@ namespace CK.Env.NPM
 
             return new NPMFeed( scope, url, creds, () =>
             {
-                Registry registry = repositories.OfType<NPMAzureRepository>().FirstOrDefault( repo => repo.Scope == scope )?.GetRegistry( m, false )
+                Registry? registry = repositories.OfType<NPMAzureRepository>().FirstOrDefault( repo => repo.Scope == scope )?.TryGetRegistry( m )
                                     ?? repositories.OfType<NPMStandardRepository>()
-                                                    .FirstOrDefault( repo => repo.Url.Equals( url, StringComparison.OrdinalIgnoreCase ) )?.GetRegistry( m, false );
+                                                    .FirstOrDefault( repo => repo.Url.Equals( url, StringComparison.OrdinalIgnoreCase ) )?.TryGetRegistry( m );
                 if( registry != null ) return registry;
 
                 if( creds == null ) return new Registry( HttpClient, uri );

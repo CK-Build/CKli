@@ -21,7 +21,7 @@ namespace CK.Env.NPM
     class NPMFeed : INPMFeed //, IPackageFeed
     {
         readonly Func<Registry> _registryFactory;
-        Registry _registry;
+        Registry? _registry;
 
         internal NPMFeed( string scope,
                           string url,
@@ -51,7 +51,7 @@ namespace CK.Env.NPM
 
         public async Task<IPackageInstanceInfo?> GetPackageInfoAsync( IActivityMonitor monitor, ArtifactInstance instance )
         {
-            if( _registry == null ) _registry = _registryFactory();
+            _registry ??= _registryFactory();
             using( monitor.OpenTrace( $"Getting package information for '{instance}'." ) )
             {
                 var (doc, versions) = await _registry.CreateViewDocumentAndVersionsElementAsync( monitor, instance.Artifact.Name, abbreviatedResponse: true );
@@ -125,7 +125,7 @@ namespace CK.Env.NPM
 
         public async Task<ArtifactAvailableInstances?> GetVersionsAsync( IActivityMonitor monitor, string artifactName )
         {
-            if( _registry == null ) _registry = _registryFactory();
+            _registry ??= _registryFactory();
 
             using( monitor.OpenDebug( $"Getting all the versions of '{artifactName}'." ) )
             {
@@ -158,5 +158,7 @@ namespace CK.Env.NPM
                 }
             }
         }
+
+        public override string ToString() => TypedName;
     }
 }

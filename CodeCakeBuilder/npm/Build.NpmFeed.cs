@@ -116,7 +116,7 @@ namespace CodeCake
                          .Where( a =>
                             {
                                 string viewString;
-                                if( a.NpmSolution.UseYarn )
+                                if( a.UseYarn )
                                 {
                                     using( TokenInjector( a ) )
                                     {

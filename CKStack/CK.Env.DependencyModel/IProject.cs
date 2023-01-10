@@ -42,7 +42,7 @@ namespace CK.Env.DependencyModel
         string SimpleProjectName { get; }
 
         /// <summary>
-        /// Gets the project type: basically supported types are ".Net" and "js".
+        /// Gets the project type: basically supported types are ".Net" and "Node".
         /// </summary>
         string Type { get; }
 

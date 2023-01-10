@@ -82,11 +82,12 @@ namespace CK.Env.NPM
             }
             if( _nodeSolution != null )
             {
-                Debug.Assert( !IsDirty );
+                _hasNodeSolution = true;
+                Debug.Assert( !_isDirty );
                 Debug.Assert( _nodeSolution.RootProjects.Count > 0 );
                 if( !UpdateSolutionFromNode( monitor, e.Solution, _nodeSolution, out bool atLeastOnePublished ) )
                 {
-                    _hasNodeSolution = true;
+                    _nodeSolution = null;
                     e.PreventSolutionUse( $"Error while synchronizing Node Solution from '{repositoryInfoPath}'." );
                 }
             }
@@ -96,7 +97,7 @@ namespace CK.Env.NPM
             {
                 if( e.Solution.RemoveTags<NodeSolution>() )
                 {
-                    foreach( var project in e.Solution.Projects.Where( p => p.RemoveTags<NodeProjectBase>() ).ToArray() )
+                    foreach( var project in e.Solution.Projects.Where( p => p.Type == "Node" ).ToArray() )
                     {
                         e.Solution.RemoveProject( project );
                     }
@@ -111,10 +112,10 @@ namespace CK.Env.NPM
 
             atLeastOnePublished = false;
             // Ensuring project, their references to packages and their generated artifact (when IsPrivate is false).
-            var toRemove = new HashSet<DependencyModel.Project>( solution.Projects.Where( p => p.Tag<NodeProjectBase>() != null ) );
+            var toRemove = new HashSet<DependencyModel.Project>( solution.Projects.Where( p => p.Type == "Node" ) );
             foreach( var p in nodeSolution.AllProjects )
             {
-                var (project, isNew) = solution.AddOrFindProject( p.SolutionRelativePath, "js", p.PackageJsonFile.SafeName );
+                var (project, isNew) = solution.AddOrFindProject( p.SolutionRelativePath, "Node", p.PackageJsonFile.SafeName );
                 project.Tag( p );
                 toRemove.Remove( project );
                 // Synchronizing the generated Artifact by first removing any previous.
@@ -135,7 +136,7 @@ namespace CK.Env.NPM
 
             // Now that all the projects have been synchronized, we can handle the project references
             // (the "file://", i.e  NodeProjectDependencyType.LocalPath).
-            foreach( var project in solution.Projects )
+            foreach( var project in solution.Projects.Where( p => p.Tag<NodeProjectBase>() != null ) )
             {
                 success &= SynchronizeProjectReferences( monitor, project );
             }
@@ -147,9 +148,11 @@ namespace CK.Env.NPM
                 var toRemove = new HashSet<Artifact>( project.PackageReferences.Select( r => r.Target.Artifact ) );
                 foreach( var dep in p.PackageJsonFile.Dependencies )
                 {
+                    // Yarn workspace is a ProjectReference.
+                    if( dep.Type == NodeProjectDependencyType.Workspace ) continue;
                     if( dep.Version == SVersionBound.None )
                     {
-                        monitor.Warn( $"Unable to handle NPM {dep.Kind.ToPackageJsonKey()} '{dep.RawDep}' in {p.PackageJsonFile.FilePath}. Only simple minimal version, or 'file:' relative paths, or 'file' absolute path pointing to a tarball are handled." );
+                        monitor.Warn( $"Unable to handle NPM {dep.Kind.ToPackageJsonKey()} '{dep.Name}' -> '{dep.RawDep}' (type {dep.Type}) in {p.PackageJsonFile.FilePath}. Only simple minimal version, or 'file:' relative paths, or 'file' absolute path pointing to a tarball are handled." );
                     }
                     else
                     {
@@ -172,7 +175,7 @@ namespace CK.Env.NPM
                     if( dep.Type == NodeProjectDependencyType.LocalPath )
                     {
                         var path = project.SolutionRelativeFolderPath.Combine( dep.RawDep.Substring( "file:".Length ) );
-                        var mapped = project.Solution.Projects.FirstOrDefault( d => d.SolutionRelativeFolderPath == path.ResolveDots() && d.Type == "js" );
+                        var mapped = project.Solution.Projects.FirstOrDefault( d => d.SolutionRelativeFolderPath == path.ResolveDots() && d.Type == "Node" );
                         if( mapped == null )
                         {
                             monitor.Error( $"Unable to resolve local reference to project '{dep.RawDep}' in {p.PackageJsonFile.FilePath}." );

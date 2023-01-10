@@ -47,7 +47,7 @@ namespace CK.Env.NodeSln
                 }
                 else
                 {
-                    var project = Solution.TryReadProject( monitor, NodeProjectKind.NodeSubProject, this, root, null, $"AngularWorkspace '{Path}'" );
+                    var project = Solution.TryReadProject( monitor, NodeProjectKind.NodeSubProject, this, root, $"AngularWorkspace '{Path}'" );
                     if( project == null )
                     {
                         monitor.Error( $"Unable to load Angular project '{root}'." );

@@ -37,16 +37,16 @@ namespace CK.Env.Plugin
         /// <returns>The command name.</returns>
         protected override NormalizedPath GetCommandProviderName() => FolderPath.AppendPart( "(NPM)" );
 
-        protected override void DoApplySettings( IActivityMonitor m )
+        protected override void DoApplySettings( IActivityMonitor monitor )
         {
-            if( !_nodeDriver.TryGetHasNodeSolution( m, out var hasNodeSolution ) ) return;
+            if( !_nodeDriver.TryGetHasNodeSolution( monitor, out var hasNodeSolution ) ) return;
 
             // Delete all "yarn".
-            DeleteFileOrFolder( m, "yarn" );
+            DeleteFileOrFolder( monitor, "yarn" );
 
             // Temporary until we throw away AdaptBuildNPMArtifactForPushFeeds
             // since CCB will rely on the RepositoryInfo.xml file.
-            var solution = _nodeDriver.SolutionDriver.GetSolution( m, false );
+            var solution = _nodeDriver.SolutionDriver.GetSolution( monitor, false );
             Debug.Assert( solution != null );
 
             // Temporary.
@@ -56,9 +56,11 @@ namespace CK.Env.Plugin
                 var oldNPMSolutionfile = GitFolder.FileSystem.GetFileInfo( old );
                 if( oldNPMSolutionfile.Exists )
                 {
-                    m.Info( $"Migrating NPMSolution to RepositoryInfo.xml" );
+                    monitor.Info( $"Migrating NPMSolution to RepositoryInfo.xml" );
                     Throw.CheckState( !oldNPMSolutionfile.IsDirectory );
                     var r = oldNPMSolutionfile.ReadAsXDocument().Root!;
+                    var nodeComment = new XComment( "NodeProject must have a Path attribute and an optional OutputPath if it differs from the Path." + Environment.NewLine
+                                                    + "AngularWorkspace and YarnWorkspace must have only a Path attribute." );
                     var nodeSolution = new XElement( "NodeSolution",
                                                         r.Elements( "Project" )
                                                         .Where( p => p.HasAttributes && !string.IsNullOrEmpty( p.Attribute( "Path" )?.Value ) )
@@ -71,9 +73,10 @@ namespace CK.Env.Plugin
                                                       r.Elements( "AngularWorkspace" )
                                                        .Where( p => p.HasAttributes && !string.IsNullOrEmpty( p.Attribute( "Path" )?.Value ) )
                                                        .Select( e => new XElement( e ) ) );
-                    _repositoryXml.EnsureDocument().Root!.Add( nodeSolution );
-                    _repositoryXml.Save( m );
-                    GitFolder.FileSystem.Delete( m, old );
+                    _repositoryXml.EnsureDocument().Root!.Add( nodeComment, nodeSolution );
+                    _repositoryXml.Save( monitor );
+                    GitFolder.FileSystem.Delete( monitor, old );
+                    _nodeDriver.SetDirty( monitor );
                     hasNodeSolution = true;
                 }
             }
@@ -81,26 +84,26 @@ namespace CK.Env.Plugin
             if( hasNodeSolution )
             {
                 //CakeExtensions
-                SetTextResource( m, "CakeExtensions/NpmDistTagRunner.cs" );
-                SetTextResource( m, "CakeExtensions/NpmView.cs" );
-                SetTextResource( m, "CakeExtensions/NpmGetNpmVersion.cs" );
+                SetTextResource( monitor, "CakeExtensions/NpmDistTagRunner.cs" );
+                SetTextResource( monitor, "CakeExtensions/NpmView.cs" );
+                SetTextResource( monitor, "CakeExtensions/NpmGetNpmVersion.cs" );
                 //npm itself
-                SetTextResource( m, "npm/Build.NPMArtifactType.cs", text => AdaptBuildNPMArtifactForPushFeeds( text, solution ) );
-                SetTextResource( m, "npm/Build.NPMFeed.cs" );
-                SetTextResource( m, "npm/NPMProject.cs" );
-                SetTextResource( m, "npm/NPMPublishedProject.cs" );
-                SetTextResource( m, "npm/NPMSolution.cs" );
-                SetTextResource( m, "npm/NPMProjectContainer.cs" );
-                SetTextResource( m, "npm/TempFileTextModification.cs" );
-                SetTextResource( m, "npm/SimplePackageJsonFile.cs" );
-                SetTextResource( m, "npm/AngularWorkspace.cs" );
+                SetTextResource( monitor, "npm/Build.NPMArtifactType.cs", text => AdaptBuildNPMArtifactForPushFeeds( text, solution ) );
+                SetTextResource( monitor, "npm/Build.NPMFeed.cs" );
+                SetTextResource( monitor, "npm/NPMProject.cs" );
+                SetTextResource( monitor, "npm/NPMPublishedProject.cs" );
+                SetTextResource( monitor, "npm/NPMSolution.cs" );
+                SetTextResource( monitor, "npm/NPMProjectContainer.cs" );
+                SetTextResource( monitor, "npm/TempFileTextModification.cs" );
+                SetTextResource( monitor, "npm/SimplePackageJsonFile.cs" );
+                SetTextResource( monitor, "npm/AngularWorkspace.cs" );
             }
             else
             {
-                DeleteFileOrFolder( m, "CakeExtensions/NpmDistTagRunner.cs" );
-                DeleteFileOrFolder( m, "CakeExtensions/NpmView.cs" );
-                DeleteFileOrFolder( m, "CakeExtensions/NpmGetNpmVersion.cs" );
-                DeleteFileOrFolder( m, "npm" );
+                DeleteFileOrFolder( monitor, "CakeExtensions/NpmDistTagRunner.cs" );
+                DeleteFileOrFolder( monitor, "CakeExtensions/NpmView.cs" );
+                DeleteFileOrFolder( monitor, "CakeExtensions/NpmGetNpmVersion.cs" );
+                DeleteFileOrFolder( monitor, "npm" );
             }
 
         }

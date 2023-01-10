@@ -129,7 +129,7 @@ namespace CKli
         /// <param name="handler">New artifact handler.</param>
         public void Register( IEnvLocalFeedProviderArtifactHandler handler )
         {
-            if( _handlers.Contains( handler ) ) throw new InvalidOperationException();
+            Throw.CheckState( !_handlers.Contains( handler ) );
             _handlers.Add( handler );
         }
     }

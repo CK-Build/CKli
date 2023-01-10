@@ -20,6 +20,7 @@ namespace CK.Env.Plugin
             public SolutionProvider( RepositoryXmlFile repositoryInfo )
             {
                 _repositoryInfo = repositoryInfo;
+                IsDirty = true;
             }
 
             public bool IsDirty { get; private set; }
@@ -28,11 +29,14 @@ namespace CK.Env.Plugin
 
             public void ConfigureSolution( object? sender, SolutionConfigurationEventArgs e )
             {
-                var s = e.Solution.Tag<SolutionFile>();
-                if( s == null ) return;
+                // Even if we are not dirty, since we depend on the MSBuildSolution,
+                // we must handle a change in it.
                 var existing = new HashSet<GeneratedArtifact>( e.Solution.GeneratedArtifacts.Where( g => g.Artifact.Type == CKSetupClient.CKSetupType ) );
                 var ckSetup = _repositoryInfo.Document?.Root?.Element( "CKSetup" );
-                if( ckSetup == null )
+                var s = e.Solution.Tag<SolutionFile>();
+                // If the MSBuildSolution is not available, we clear the UseCKSetup tag and any GeneratedArtifacts
+                // that may exist.
+                if( ckSetup == null || s == null )
                 {
                     e.Solution.RemoveTags<CKSetupSolutionExtensions.Marker>();
                 }
@@ -49,6 +53,7 @@ namespace CK.Env.Plugin
                     e.Monitor.Info( $"Removing {existing.Select( g => g.ToString() )} artifacts from {e.Solution}." );
                     foreach( var g in existing ) g.Project.RemoveGeneratedArtifact( g.Artifact );
                 }
+                IsDirty = false;
             }
 
             bool SynchronizeGeneratedArtifacts( IActivityMonitor monitor, Solution solution, HashSet<GeneratedArtifact> existing, XElement ckSetup )

@@ -13,19 +13,18 @@ namespace CK.Env.NPM
     /// </summary>
     class NPMAzureRepository : NPMRepositoryBase, INPMAzureRepository
     {
-        internal NPMAzureRepository(
-            NPMClient c,
-            PackageQualityFilter qualityFilter,
-            string organization,
-            string feedName,
-            string scope,
-            string projectName )
-            : base( c,
-                    qualityFilter,
-                    $"Azure:{scope}->{organization}-{feedName}",
-                    projectName != null ?
-                      $"https://pkgs.dev.azure.com/{organization}/{projectName}/_packaging/{feedName}/npm/registry/"
-                    : $"https://pkgs.dev.azure.com/{organization}/_packaging/{feedName}/npm/registry/" )
+        internal NPMAzureRepository( NPMClient c,
+                                     PackageQualityFilter qualityFilter,
+                                     string organization,
+                                     string feedName,
+                                     string scope,
+                                     string projectName )
+                                     : base( c,
+                                             qualityFilter,
+                                             $"Azure:{scope}->{organization}-{feedName}",
+                                             projectName != null ?
+                                               $"https://pkgs.dev.azure.com/{organization}/{projectName}/_packaging/{feedName}/npm/registry/"
+                                             : $"https://pkgs.dev.azure.com/{organization}/_packaging/{feedName}/npm/registry/" )
         {
             Organization = organization;
             FeedName = feedName;
@@ -59,11 +58,10 @@ namespace CK.Env.NPM
         /// </summary>
         public override string SecretKeyName => AzureDevOpsAPIHelper.GetSecretKeyName( Organization );
 
-        protected override Registry CreateRegistry( IActivityMonitor m, bool throwOnError )
+        protected override Registry? CreateRegistry( IActivityMonitor m, bool throwOnError )
         {
-            string pat = ResolveSecret( m, throwOnError );
-            if( string.IsNullOrWhiteSpace( pat ) ) return null;
-            return new Registry( Client.HttpClient, "CKli", pat, new Uri( Url ) );
+            string? pat = ResolveSecret( m, throwOnError );
+            return string.IsNullOrWhiteSpace( pat ) ? null : new Registry( Client.HttpClient, "CKli", pat, new Uri( Url ) );
         }
 
         /// <summary>

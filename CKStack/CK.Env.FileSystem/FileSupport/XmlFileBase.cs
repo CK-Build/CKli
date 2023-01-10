@@ -19,9 +19,12 @@ namespace CK.Env
 
         /// <summary>
         /// Small helper to manage document child objects.
+        /// This is not public: the owner must be the <see cref="XmlFileBase"/>
+        /// and <see cref="XmlFileBase.ResetState()"/> implementation should be overridden
+        /// to call this <see cref="OnResetState()"/> method if the child object is long lived.
         /// </summary>
-        /// <typeparam name="T">The oject's type.</typeparam>
-        public sealed class ChildObject<T> where T : class
+        /// <typeparam name="T">The object's type.</typeparam>
+        protected sealed class ChildObject<T> where T : class
         {
             readonly XmlFileBase _file;
             readonly XName _name;
@@ -47,7 +50,7 @@ namespace CK.Env
             }
 
             /// <summary>
-            /// Gets whether something changed in the Xml object represetation.
+            /// Gets whether something changed in the Xml object representation.
             /// </summary>
             public bool HasChanged => _object != null && !XElement.DeepEquals( _original, _writer( _object ) );
 
@@ -58,14 +61,14 @@ namespace CK.Env
             {
                 if( _object == null )
                 {
-                    _object = _reader( _file.EnsureDocument().Root.EnsureElement( _name ) );
+                    _object = _reader( _file.EnsureDocument().Root!.EnsureElement( _name ) );
                     _original = _writer( _object );
                 }
                 return _object;
             }
 
             /// <summary>
-            /// Gets the object if it has been previouly <see cref="EnsureChildElement(XName)"/>.
+            /// Gets the object if it has been previously <see cref="EnsureObject()"/>.
             /// </summary>
             public T? GetCurrentObject() => _object;
 
@@ -82,7 +85,7 @@ namespace CK.Env
                     var newE = _writer( _object );
                     if( !XElement.DeepEquals( _original, newE ) )
                     {
-                        var e = _file.Document?.Root.Element( _name );
+                        var e = _file.Document?.Root?.Element( _name );
                         if( e == null ) throw new InvalidOperationException( $"Xml document '{_file.FilePath}': child element '{_name}' has been unexpectedly removed." );
                         e.ReplaceWith( newE );
                         _original = newE;
@@ -91,6 +94,16 @@ namespace CK.Env
                     }
                 }
                 return false;
+            }
+
+            /// <summary>
+            /// Must be called by specialized <see cref="XmlFileBase.ResetState"/> to
+            /// reset the state of this object.
+            /// </summary>
+            public void OnResetState()
+            {
+                _original = null;
+                _object = null;
             }
         }
 
@@ -229,6 +242,18 @@ namespace CK.Env
                 _currentText = null;
             }
             return CreateOrUpdate( m, GetCurrentText(), forceSave );
+        }
+
+        /// <inheritdoc />
+        /// <remarks>
+        /// If one or more <see cref="ChildObject{T}"/> are used and referenced from this xml file,
+        /// this method must be overridden to call <see cref="ChildObject{T}.OnResetState()"/> on them.
+        /// </remarks>
+        public override void ResetState()
+        {
+            base.ResetState();
+            _doc = null;
+            _currentText = null;
         }
 
     }

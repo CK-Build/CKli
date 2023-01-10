@@ -24,7 +24,7 @@ namespace CK.Env.Plugin
                                           NormalizedPath branchPath,
                                           SolutionDriver solutionDriver,
                                           BuildProjectSpec buildSpec )
-            : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" ), System.Xml.Linq.XNamespace.None + "Project" )
+            : base( f.GitFolder, branchPath, f.FolderPath.AppendPart( "CodeCakeBuilder.csproj" ), XNamespace.None + "Project" )
         {
             _f = f;
             _solutionDriver = solutionDriver;

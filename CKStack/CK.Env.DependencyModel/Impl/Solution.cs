@@ -357,25 +357,31 @@ namespace CK.Env.DependencyModel
             _ctx.OnArtifactRemoved( a, project );
         }
 
-        internal void OnPackageReferenceRemoved( ProjectPackageReference r )
+        internal void OnPackageReferenceRemoved( in ProjectPackageReference r )
         {
             _version++;
             _ctx.OnPackageReferenceRemoved( r );
         }
 
-        internal void OnPackageReferenceAdded( ProjectPackageReference r )
+        internal void OnPackageReferenceAdded( in ProjectPackageReference r )
         {
             _version++;
             _ctx.OnPackageReferenceAdded( r );
         }
 
-        internal void OnProjectReferenceAdded( ProjectReference r )
+        internal void OnPackageReferenceUpdated( in ProjectPackageReference r )
+        {
+            _version++;
+            _ctx.OnPackageReferenceUpdated( r );
+        }
+
+        internal void OnProjectReferenceAdded( in ProjectReference r )
         {
             _version++;
             _ctx.OnProjectReferenceAdded( r );
         }
 
-        internal void OnProjectReferenceRemoved( ProjectReference r )
+        internal void OnProjectReferenceRemoved( in ProjectReference r )
         {
             _version++;
             _ctx.OnProjectReferenceRemoved( r );

@@ -55,14 +55,18 @@ namespace CK.Env.NodeSln
             return new NodeProjectDependency( name, NodeProjectDependencyType.VersionBound, kind, ">=" + minVersion.ToString(), new SVersionBound( minVersion ) );
         }
 
-        public static NodeProjectDependency CreateNPMDepLocalFeedTarball( NormalizedPath dirPath, string name, ArtifactDependencyKind kind, SVersion version )
+        public static NodeProjectDependency CreateNPMDepLocalFeedTarball( NormalizedPath localFeedPath, string name, ArtifactDependencyKind kind, SVersion version )
         {
-            string fileName = $"{name.Replace( "@", "" ).Replace( "/", "-" )}-{version.ToNormalizedString()}.tgz";
             return new NodeProjectDependency( name,
-                               NodeProjectDependencyType.LocalFeedTarball,
-                               kind,
-                               $"file:{dirPath.AppendPart( fileName )}",
-                               new SVersionBound( version ) );
+                                              NodeProjectDependencyType.LocalFeedTarball,
+                                              kind,
+                                              $"file:{CreateTarballPath( localFeedPath, name,version )}",
+                                              new SVersionBound( version ) );
+        }
+
+        public static NormalizedPath CreateTarballPath( NormalizedPath localFeedPath, string name, SVersion version )
+        {
+            return localFeedPath.AppendPart( $"{name.Replace( "@", "" ).Replace( "/", "-" )}-{version.ToNormalizedString()}.tgz" );
         }
 
         public static NodeProjectDependency CreateLocalFeedTarballFromRawDep( string rawDep, string name, ArtifactDependencyKind kind, SVersion version )
@@ -71,14 +75,6 @@ namespace CK.Env.NodeSln
                                                  name,
                                                  kind,
                                                  version );
-        }
-
-        internal static SVersion GetVersionOutOfTarballPath( string path, string packageName )
-        {
-            path = Path.GetFileNameWithoutExtension( path );
-            // Remove the package name.
-            path = path.Remove( packageName.Length + 1 ); 
-            return SVersion.TryParse( path );
         }
 
         public NodeProjectDependency( string name, NodeProjectDependencyType type, ArtifactDependencyKind kind, string rawDep, SVersionBound version )

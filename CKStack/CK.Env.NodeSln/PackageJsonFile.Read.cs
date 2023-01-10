@@ -22,7 +22,7 @@ namespace CK.Env.NodeSln
             var pPrivate = o.Property( "private" );
             if( pPrivate != null )
             {
-                if( pPrivate.Type != JTokenType.Boolean )
+                if( pPrivate.Value.Type != JTokenType.Boolean )
                 {
                     monitor.Error( $"File '{filePath}': property \"private\" must be a boolean." );
                     return null;
@@ -64,7 +64,8 @@ namespace CK.Env.NodeSln
                 }
             }
 
-            return new PackageJsonFile( filePath, o, project, isPrivate, name, version, workspaces );
+            var p = new PackageJsonFile( filePath, o, project, isPrivate, name, version, workspaces );
+            return p.Initialize( monitor ) ? p : null;
 
             static bool TryReadString( IActivityMonitor monitor, NormalizedPath filePath, JObject o, string name, out string? value )
             {
@@ -72,12 +73,12 @@ namespace CK.Env.NodeSln
                 var pName = o.Property( name );
                 if( pName != null )
                 {
-                    if( pName.Type != JTokenType.String && pName.Type != JTokenType.Null )
+                    if( pName.Value.Type != JTokenType.String && pName.Value.Type != JTokenType.Null )
                     {
                         monitor.Error( $"File '{filePath}': property \"name\" must be a string." );
                         return false;
                     }
-                    value = (string?)pName;
+                    value = (string?)pName.Value;
                     if( value != null )
                     {
                         value = value.Trim();

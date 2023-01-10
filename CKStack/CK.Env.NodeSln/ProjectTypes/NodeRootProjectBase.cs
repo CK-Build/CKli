@@ -20,12 +20,6 @@ namespace CK.Env.NodeSln
             _yarnPath = GetYarnPath();
         }
 
-        private protected NodeRootProjectBase( NodeSolution solution, NormalizedPath path, NormalizedPath outputPath )
-            : base( solution, path, outputPath )
-        {
-            _yarnPath = GetYarnPath();
-        }
-
         internal NormalizedPath YarnPath => _yarnPath;
 
         /// <summary>

@@ -61,5 +61,14 @@ namespace CK.Env
             }
             return m;
         }
+
+        /// <inheritdoc />
+        public override void ResetState()
+        {
+            base.ResetState();
+            _firstMapping = null;
+        }
+
+
     }
 }

@@ -92,5 +92,12 @@ namespace CK.Env
             return CreateOrUpdate( m, GetCurrentText(), forceSave );
         }
 
+        /// <inheritdoc />
+        public override void ResetState()
+        {
+            base.ResetState();
+            _root = null;
+            _currentText = null;
+        }
     }
 }

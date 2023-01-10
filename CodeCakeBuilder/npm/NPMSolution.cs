@@ -1,9 +1,11 @@
 using Cake.Npm;
+using CK.Core;
 using CodeCake.Abstractions;
 using CSemVer;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Xml.Linq;
 
@@ -29,26 +31,16 @@ namespace CodeCake
             return globalInfo;
         }
 
-        /// <summary>
-        /// Adds the <see cref="Build.NPMArtifactType"/> for NPM based on <see cref="NPMSolution.ReadFromNPMSolutionFile"/>
-        /// (projects are defined by RepositoryInfo.xml &lt;NodeSolution&gt; element.
-        /// </summary>
-        /// <param name="this">This global info.</param>
-        /// <returns>This info.</returns>
+        [Obsolete("Simply use GetNodeSolution() instead.", true )]
         public static StandardGlobalInfo AddNPM( this StandardGlobalInfo @this )
         {
-            return AddNPM( @this, NPMSolution.ReadFromNPMSolutionFile( @this, false ) );
+            return null!;
         }
 
-        /// <summary>
-        /// Adds the <see cref="Build.NPMArtifactType"/> for NPM based on <see cref="NPMSolution.ReadFromNPMSolutionFile"/>
-        /// (projects are defined by "CodeCakeBuilder/NPMSolution.xml" file) using Yarn instead of NPM.
-        /// </summary>
-        /// <param name="this">This global info.</param>
-        /// <returns>This info.</returns>
+        [Obsolete( "Simply use GetNodeSolution() instead.", true )]
         public static StandardGlobalInfo AddYarn( this StandardGlobalInfo @this )
         {
-            return AddNPM( @this, NPMSolution.ReadFromNPMSolutionFile( @this, true ) );
+            return null!;
         }
 
         /// <summary>
@@ -56,22 +48,36 @@ namespace CodeCake
         /// </summary>
         /// <param name="this">This global info.</param>
         /// <returns>The NPM solution.</returns>
+        [Obsolete( "Call GetNodeSolution() instead.", true )]
         public static NPMSolution GetNPMSolution( this StandardGlobalInfo @this )
         {
-            var s = @this.Solutions.OfType<NPMSolution>().Single();
-            if( s.UseYarn ) throw new Exception( "Solution is using Yarn. Call GetYarnSolution() instead of GetNPMSolution()." );
-            return s;
+            return GetNodeSolution( @this );
+        }
+
+        [Obsolete( "Call GetNodeSolution() instead.", true )]
+        public static NPMSolution GetYarnSolution( this StandardGlobalInfo @this )
+        {
+            return GetNodeSolution( @this );
         }
 
         /// <summary>
-        /// Gets the single NPM solution (that must be using Yarn).
+        /// Gets the Node solution.
         /// </summary>
         /// <param name="this">This global info.</param>
-        /// <returns>The NPM solution.</returns>
-        public static NPMSolution GetYarnSolution( this StandardGlobalInfo @this )
+        /// <returns>The Node solution.</returns>
+        public static NPMSolution GetNodeSolution( this StandardGlobalInfo @this )
         {
-            var s = @this.Solutions.OfType<NPMSolution>().Single();
-            if( !s.UseYarn ) throw new Exception( "Solution is using NPM, not Yarn. Call GetNPMSolution() instead of GetYarnSolution()." );
+            var s = @this.Solutions.OfType<NPMSolution>().SingleOrDefault();
+            if( s == null )
+            {
+                SVersion minmimalNpmVersionRequired = SVersion.Create( 6, 7, 0 );
+                string npmVersion = @this.Cake.NpmGetNpmVersion();
+                if( SVersion.Parse( npmVersion ) < minmimalNpmVersionRequired )
+                {
+                    @this.Cake.TerminateWithError( "Outdated npm. Version older than v6.7.0 are known to fail on publish." );
+                }
+                @this.RegisterSolution( s );
+            }
             return s;
         }
 
@@ -87,16 +93,10 @@ namespace CodeCake
         /// Initializes a new <see cref="NPMSolution" />.
         /// </summary>
         /// <param name="projects">Set of projects.</param>
-        NPMSolution( StandardGlobalInfo globalInfo, bool useYarn )
+        NPMSolution( StandardGlobalInfo globalInfo )
         {
             GlobalInfo = globalInfo;
-            UseYarn = useYarn;
         }
-
-        /// <summary>
-        /// Gets whether Yarn is used instead of npm.
-        /// </summary>
-        public bool UseYarn { get; }
 
         public IEnumerable<AngularWorkspace> AngularWorkspaces => Containers.OfType<AngularWorkspace>();
 
@@ -181,7 +181,7 @@ namespace CodeCake
         /// <param name="cleanupPackageJson">
         /// By default, "scripts" and "devDependencies" are removed from the package.json file.
         /// </param>
-        /// <param name="packageJsonPreProcessor">Optional package.json pre processor.</param>
+        /// <param name="packageJsonPreProcessor">Optional package.json preprocessor.</param>
         public void RunPack( Action<JObject> packageJsonPreProcessor = null )
         {
             foreach( var p in AllPublishedProjects )
@@ -191,27 +191,55 @@ namespace CodeCake
         }
 
         /// <summary>
-        /// Reads the "CodeCakeBuilder/NPMSolution.xml" file that must exist.
+        /// Reads the RepositoryInfo.xml" &lt;NodeSolution&gt; that must exist.
         /// </summary>
         /// <param name="globalInfo">The global information.</param>
         /// <param name="useYarn">True to use Yarn instead of NPM.</param>
         /// <returns>The solution object.</returns>
-        public static NPMSolution ReadFromNPMSolutionFile( StandardGlobalInfo globalInfo, bool useYarn )
+        public static NPMSolution ReadFromRepositoryInfo( StandardGlobalInfo globalInfo )
         {
             var document = XDocument.Load( "RepositoryInfo.xml" ).Root.Element( "NodeSolution" );
-            var solution = new NPMSolution( globalInfo, useYarn );
-            foreach( var item in document.Elements( "AngularWorkspace" ) )
+            var solution = new NPMSolution( globalInfo );
+            foreach( var item in document.Elements() )
             {
-                solution.Add( AngularWorkspace.Create( solution,
-                                                       (string)item.Attribute( "Path" ) ) );
-            }
-            foreach( var item in document.Elements( "Project" ) )
-            {
-                solution.Add( NPMPublishedProject.Create( solution,
-                                                          (string)item.Attribute( "Path" ),
-                                                          (string)item.Attribute( "OutputPath" ) ) );
+                var path = new NormalizedPath( (string?)item.Attribute( "Path" ) );
+                if( path.IsEmptyPath )
+                {
+                    Throw.InvalidOperationException( $"RepositoryInfo.xml: <NodeSolution> element {item} requires a Path non empty attribute." );
+                }
+                bool useYarn = FindYarnFolder( path );
+                if( item.Name.LocalName == "AngularWorkspace" )
+                {
+                    solution.Add( AngularWorkspace.Create( solution, path, useYarn ) );
+                }
+                else if( item.Name.LocalName == "NodeProject" )
+                {
+                    solution.Add( NPMPublishedProject.Create( solution,
+                                                              path,
+                                                              (string?)item.Attribute( "OutputPath" ),
+                                                              useYarn ) );
+                }
+                else if( item.Name.LocalName == "YarnWorkspace" )
+                {
+                    Throw.NotSupportedException( $"RepositoryInfo.xml: YarnWorkspace is not supported yet (where are the projects output paths?)." );
+                }
+                else
+                {
+                    Throw.InvalidOperationException( $"RepositoryInfo.xml: <NodeSolution> unhandled element {item}." );
+                }
             }
             return solution;
+        }
+
+        static bool FindYarnFolder( NormalizedPath path )
+        {
+            var yarnPath = path;
+            while( !yarnPath.IsEmptyPath )
+            {
+                if( Directory.Exists( yarnPath.AppendPart( ".yarn" ) ) ) return true;
+                yarnPath = yarnPath.RemoveLastPart();
+            }
+            return false;
         }
     }
 }

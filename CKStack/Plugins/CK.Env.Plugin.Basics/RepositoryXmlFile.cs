@@ -156,5 +156,11 @@ namespace CK.Env.Plugin
         /// <param name="m">The monitor to use.</param>
         void RemoveLocalBranch( IActivityMonitor m ) => RemoveBranchMapping( m, GitFolder.World.LocalBranchName );
 
+        public override void ResetState()
+        {
+            base.ResetState();
+            _simpleGitVersionOption.OnResetState();
+        }
+
     }
 }

@@ -223,100 +223,100 @@ namespace CK.Env.NodeSln
         /// <returns>A readable string.</returns>
         public override string ToString() => IsPrivate ? $"{SafeName} (private)" : SafeName;
 
-        internal bool Refresh( IActivityMonitor m )
+        internal bool Initialize( IActivityMonitor m )
         {
-            _deps.Clear();
             return FillDeps( m, ArtifactDependencyKind.Private )
                    && FillDeps( m, ArtifactDependencyKind.Development )
                    && FillDeps( m, ArtifactDependencyKind.Transitive );
-        }
 
-        bool FillDeps( IActivityMonitor m, ArtifactDependencyKind depKind )
-        {
-            var depNameKind = depKind.ToPackageJsonKey();
-            var oDeps = _o[depNameKind];
-            if( oDeps != null )
+            bool FillDeps( IActivityMonitor m, ArtifactDependencyKind depKind )
             {
-                foreach( var d in oDeps )
+                var depNameKind = depKind.ToPackageJsonKey();
+                var oDeps = _o[depNameKind];
+                if( oDeps != null )
                 {
-                    string? rawDep;
-                    if( d is not JProperty dP
-                        || String.IsNullOrWhiteSpace( dP.Name )
-                        || dP.Value.Type != JTokenType.String
-                        || string.IsNullOrWhiteSpace( rawDep = (string?)dP.Value ) )
+                    foreach( var d in oDeps )
                     {
-                        m.Error( $"Invalid dependency in {depNameKind}: {d}." );
-                        return false;
-                    }
-                    var (v, type) = GetVersionType( m, depNameKind, dP.Name, rawDep );
-                    if( type == NodeProjectDependencyType.None ) return false;
-                    _deps.Add( new NodeProjectDependency( dP.Name, type, depKind, rawDep, v ) );
-                }
-            }
-            return true;
-
-            static (SVersionBound, NodeProjectDependencyType) GetVersionType( IActivityMonitor m, string depNameKind, string name, string value )
-            {
-                if( value.StartsWith( "file:" ) )
-                {
-                    string path;
-                    if( value.EndsWith( ".tgz" ) )
-                    {
-                        path = value.Substring( 5 );
-                        path = Path.GetFileNameWithoutExtension( path );
-                        // Remove the package name.
-                        path = path.Remove( 0, name.Length );
-                        var r = SVersionBound.NpmTryParse( path );
-                        if( !r.IsValid )
+                        string? rawDep;
+                        if( d is not JProperty dP
+                            || String.IsNullOrWhiteSpace( dP.Name )
+                            || dP.Value.Type != JTokenType.String
+                            || string.IsNullOrWhiteSpace( rawDep = (string?)dP.Value ) )
                         {
-                            m.Error( $"Error while parsing version of a local feed package: {r.Error}" );
-                            return (SVersionBound.None, NodeProjectDependencyType.None);
+                            m.Error( $"Invalid dependency in {depNameKind}: {d}." );
+                            return false;
                         }
-                        return (r.Result, NodeProjectDependencyType.LocalFeedTarball);
+                        var (v, type) = GetVersionType( m, depNameKind, dP.Name, rawDep );
+                        if( type == NodeProjectDependencyType.None ) return false;
+                        _deps.Add( new NodeProjectDependency( dP.Name, type, depKind, rawDep, v ) );
                     }
-                    if( value.StartsWith( "file:.." ) )
+                }
+                return true;
+
+                static (SVersionBound, NodeProjectDependencyType) GetVersionType( IActivityMonitor m, string depNameKind, string name, string value )
+                {
+                    if( value.StartsWith( "file:" ) )
                     {
-                        return (SVersionBound.None, NodeProjectDependencyType.LocalPath);
+                        string path;
+                        if( value.EndsWith( ".tgz" ) )
+                        {
+                            path = value.Substring( 5 );
+                            path = Path.GetFileNameWithoutExtension( path );
+                            // Remove the package name.
+                            path = path.Remove( 0, name.Length );
+                            var r = SVersionBound.NpmTryParse( path );
+                            if( !r.IsValid )
+                            {
+                                m.Error( $"Error while parsing version of a local feed package: {r.Error}" );
+                                return (SVersionBound.None, NodeProjectDependencyType.None);
+                            }
+                            return (r.Result, NodeProjectDependencyType.LocalFeedTarball);
+                        }
+                        if( value.StartsWith( "file:.." ) )
+                        {
+                            return (SVersionBound.None, NodeProjectDependencyType.LocalPath);
+                        }
+                        m.Error( $"Dependency '{value}' for {depNameKind}/{name} must be relative and starts with 'file:..'." );
+                        return (SVersionBound.None, NodeProjectDependencyType.None);
                     }
-                    m.Error( $"Dependency '{value}' for {depNameKind}/{name} must be relative and starts with 'file:..'." );
+                    if( value.StartsWith( "workspace:" ) )
+                    {
+                        return (SVersionBound.None, NodeProjectDependencyType.Workspace);
+                    }
+                    if( value.StartsWith( "portal:" ) )
+                    {
+                        return (SVersionBound.None, NodeProjectDependencyType.Portal);
+                    }
+                    else if( value.IndexOf( "://" ) > 0 )
+                    {
+                        if( value.StartsWith( "http://" ) || value.StartsWith( "https://" ) )
+                        {
+                            return (SVersionBound.None, NodeProjectDependencyType.UrlTar);
+                        }
+                        if( value.StartsWith( "git://" )
+                            || value.StartsWith( "git+ssh://" )
+                            || value.StartsWith( "git+http://" )
+                            || value.StartsWith( "git+https://" )
+                            || value.StartsWith( "git+file://" ) )
+                        {
+                            return (SVersionBound.None, NodeProjectDependencyType.UrlGit);
+                        }
+                        m.Error( $"Unable to handle what seems to be a url dependency '{value}' for {depNameKind}/{name}." );
+                        return (SVersionBound.None, NodeProjectDependencyType.None);
+                    }
+                    var vR = SVersionBound.NpmTryParse( value );
+                    if( vR.IsValid )
+                    {
+                        return (vR.Result, NodeProjectDependencyType.VersionBound);
+                    }
+                    if( Regex.IsMatch( value, "\\w+/\\w+" ) ) return (SVersionBound.None, NodeProjectDependencyType.GitHub);
+                    if( Regex.IsMatch( value, "\\w+" ) ) return (SVersionBound.None, NodeProjectDependencyType.Tag);
+                    m.Error( $"Invalid version for {depNameKind}/{name} '{value}': {vR.Error}" );
                     return (SVersionBound.None, NodeProjectDependencyType.None);
                 }
-                if( value.StartsWith( "workspace:" ) )
-                {
-                    return (SVersionBound.None, NodeProjectDependencyType.Workspace);
-                }
-                if( value.StartsWith( "portal:" ) )
-                {
-                    return (SVersionBound.None, NodeProjectDependencyType.Portal);
-                }
-                else if( value.IndexOf( "://" ) > 0 )
-                {
-                    if( value.StartsWith( "http://" ) || value.StartsWith( "https://" ) )
-                    {
-                        return (SVersionBound.None, NodeProjectDependencyType.UrlTar);
-                    }
-                    if( value.StartsWith( "git://" )
-                        || value.StartsWith( "git+ssh://" )
-                        || value.StartsWith( "git+http://" )
-                        || value.StartsWith( "git+https://" )
-                        || value.StartsWith( "git+file://" ) )
-                    {
-                        return (SVersionBound.None, NodeProjectDependencyType.UrlGit);
-                    }
-                    m.Error( $"Unable to handle what seems to be a url dependency '{value}' for {depNameKind}/{name}." );
-                    return (SVersionBound.None, NodeProjectDependencyType.None);
-                }
-                var vR = SVersionBound.NpmTryParse( value );
-                if( vR.IsValid )
-                {
-                    return (vR.Result, NodeProjectDependencyType.VersionBound);
-                }
-                if( Regex.IsMatch( value, "\\w+/\\w+" ) ) return (SVersionBound.None, NodeProjectDependencyType.GitHub);
-                if( Regex.IsMatch( value, "\\w+" ) ) return (SVersionBound.None, NodeProjectDependencyType.Tag);
-                m.Error( $"Invalid version for {depNameKind}/{name} '{value}': {vR.Error}" );
-                return (SVersionBound.None, NodeProjectDependencyType.None);
             }
         }
+
 
     }
 }

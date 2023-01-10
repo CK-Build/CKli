@@ -3,15 +3,16 @@ using System;
 
 namespace CK.Env.Plugin
 {
-    public abstract class JsonFilePluginBase : JsonFileBase, IGitBranchPlugin
+    public abstract class JsonFilePluginBase : JsonFileBase, IGitBranchPlugin, IDisposable
     {
         readonly GitBranchPluginImpl _pluginImpl;
 
         public JsonFilePluginBase( GitRepository f, NormalizedPath branchPath, NormalizedPath filePath )
             : base( f.FileSystem, filePath )
         {
-            if( !filePath.StartsWith( branchPath ) ) throw new ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
+            if( !filePath.StartsWith( branchPath ) ) Throw.ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
             _pluginImpl = new GitBranchPluginImpl( f, branchPath );
+            f.OnReset += OnFileSystemReset;
         }
 
         /// <summary>
@@ -34,5 +35,9 @@ namespace CK.Env.Plugin
         /// the 3 standard ones.
         /// </summary>
         public StandardGitStatus StandardPluginBranch => _pluginImpl.StandardPluginBranch;
+
+        void OnFileSystemReset( IActivityMonitor obj ) => ResetState();
+
+        void IDisposable.Dispose() => GitFolder.OnReset -= OnFileSystemReset;
     }
 }
