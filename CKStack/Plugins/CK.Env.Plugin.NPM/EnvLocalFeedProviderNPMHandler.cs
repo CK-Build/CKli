@@ -57,7 +57,23 @@ namespace CK.Env
 
         public void RemoveFromAllCaches( IActivityMonitor m, IEnumerable<ArtifactInstance> instances )
         {
-            // Once there is a global NPM cache...
+            /*
+For npm, the cache should be managed through "cacache".
+==> https://github.com/greggman/npm-cache-rm/tree/master
+cacache, that has numerous dependencies. It must be launched
+by a node project (or is there a simpler way?).
+
+"yarn cache dir"
+C:\Users\olivier.spinelli>yarn cache dir
+C:\Users\olivier.spinelli\AppData\Local\Yarn\Cache\v6
+
+In this folder packages are folders with this pattern:
+npm-@signature-crs-client-signalr-7.1.1-integrity
+
+"yarn cache dir" can only be called near the root (no .yarn folder should
+be above it otherwise it fails).
+There seems to be no other way than manually deleting the folder in the cache.
+             */
         }
     }
 }

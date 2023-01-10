@@ -260,6 +260,7 @@ namespace CK.Env.NodeSln
                         string path;
                         if( value.EndsWith( ".tgz" ) )
                         {
+                            // Remove "file:"
                             path = value.Substring( 5 );
                             path = Path.GetFileNameWithoutExtension( path );
                             // Remove the package name.
@@ -267,7 +268,7 @@ namespace CK.Env.NodeSln
                             var r = SVersionBound.NpmTryParse( path );
                             if( !r.IsValid )
                             {
-                                m.Error( $"Error while parsing version of a local feed package: {r.Error}" );
+                                m.Error( $"Unable to extract version for package '{name}' from '{value}': {r.Error}" );
                                 return (SVersionBound.None, NodeProjectDependencyType.None);
                             }
                             return (r.Result, NodeProjectDependencyType.LocalFeedTarball);

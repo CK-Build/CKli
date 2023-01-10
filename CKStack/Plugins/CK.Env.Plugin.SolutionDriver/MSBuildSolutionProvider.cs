@@ -155,7 +155,7 @@ namespace CK.Env.Plugin
                 {
                     var d = dep.BaseArtifactInstance;
                     toRemove.Remove( d.Artifact );
-                    project.EnsurePackageReference( d,
+                    project.AddPackageReference( d,
                                                     dep.PrivateAsset.Equals( "all", StringComparison.OrdinalIgnoreCase ) ? ArtifactDependencyKind.Private : ArtifactDependencyKind.Transitive,
                                                     dep.Frameworks );
                 }

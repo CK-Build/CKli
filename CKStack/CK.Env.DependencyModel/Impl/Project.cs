@@ -425,7 +425,8 @@ namespace CK.Env.DependencyModel
         /// <param name="target">The referenced package.</param>
         /// <param name="kind">The dependency kind.</param>
         /// <param name="applicableSavors">Optional savors that, when defined, must be a subset of this <see cref="Savors"/>.</param>
-        public bool EnsurePackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait? applicableSavors = null )
+        /// <returns>True if the dependency has been added or updated, false is it already exists.</returns>
+        public bool AddPackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait? applicableSavors = null )
         {
             CheckSolution();
             var savors = applicableSavors ?? Savors;
