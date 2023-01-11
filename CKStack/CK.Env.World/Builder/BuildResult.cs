@@ -12,10 +12,9 @@ namespace CK.Env
 {
     public class BuildResult
     {
-        BuildResult(
-            BuildResultType type,
-            IReadOnlyList<(ArtifactInstance Artifact, string SolutionName, string TargetName)> g,
-            IReadOnlyList<ReleaseNoteInfo>? releaseNotes )
+        BuildResult( BuildResultType type,
+                     IReadOnlyList<(ArtifactInstance Artifact, string SolutionName, string TargetName)> g,
+                     IReadOnlyList<ReleaseNoteInfo>? releaseNotes )
         {
             Debug.Assert( type != BuildResultType.None );
             Type = type;
@@ -24,13 +23,12 @@ namespace CK.Env
             CreationDate = DateTime.UtcNow;
         }
 
-        internal static BuildResult? Create(
-            IActivityMonitor m,
-            BuildResultType type,
-            ArtifactCenter artifacts,
-            IWorldSolutionContext ctx,
-            IReadOnlyList<SVersion?> versions,
-            IReadOnlyList<ReleaseNoteInfo>? releaseNotes )
+        internal static BuildResult? Create( IActivityMonitor m,
+                                             BuildResultType type,
+                                             ArtifactCenter artifacts,
+                                             IWorldSolutionContext ctx,
+                                             IReadOnlyList<SVersion?> versions,
+                                             IReadOnlyList<ReleaseNoteInfo>? releaseNotes )
         {
             var result = new List<(ArtifactInstance Artifact, string SolutionName, string TargetName)>();
             foreach( var row in ctx.DependentSolutions

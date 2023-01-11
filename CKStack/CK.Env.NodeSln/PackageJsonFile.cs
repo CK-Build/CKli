@@ -27,6 +27,7 @@ namespace CK.Env.NodeSln
         readonly NodeProjectBase _project;
         string? _name;
         SVersion _version;
+        bool _isCKArtifact;
         bool _private;
         bool _isDirty;
         readonly NormalizedPath[] _workspaces;
@@ -37,6 +38,7 @@ namespace CK.Env.NodeSln
                          bool isPrivate,
                          string? name,
                          SVersion version,
+                         bool isCKArtifact,
                          NormalizedPath[]? workspaces )
         {
             _deps = new List<NodeProjectDependency>();
@@ -46,6 +48,7 @@ namespace CK.Env.NodeSln
             _private = isPrivate;
             _name = name;
             _version = version;
+            _isCKArtifact = isCKArtifact;
             _workspaces = workspaces ?? Array.Empty<NormalizedPath>();
         }
 
@@ -96,8 +99,29 @@ namespace CK.Env.NodeSln
         public string SafeName => Name ?? FilePath.Parts[FilePath.Parts.Count - 2];
 
         /// <summary>
-        /// Gets or sets whether this package is private: even if it has a <see cref="Name"/>
-        /// and a <see cref="Version"/>, it must not be published.
+        /// Gets or sets whether this project generates a "CKArt" artifact.
+        /// </summary>
+        public bool IsCKArtifact
+        {
+            get => _isCKArtifact;
+            set
+            {
+                if( _isCKArtifact != value )
+                {
+                    if( _name == null && value )
+                    {
+                        Throw.InvalidOperationException( "\"isCKArtifact\" cannot be true: without a non empty package \"name\"." );
+                    }
+                    _isCKArtifact = value;
+                    _o["isCKArtifact"] = value;
+                    _isDirty = true;
+                    _project.SetDirty( false );
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets whether this package is private: even if it has a <see cref="Name"/>, it must not be packed.
         /// <para>
         /// This can be set to false only if a non null <see cref="Name"/> exists.
         /// </para>
@@ -112,7 +136,7 @@ namespace CK.Env.NodeSln
                 {
                     if( _name == null && !value )
                     {
-                        Throw.InvalidOperationException( "\"private\" cannot be true without a non empty package \"name\"." );
+                        Throw.InvalidOperationException( "\"private\" cannot be false without a non empty package \"name\"." );
                     }
                     _private = value;
                     _o["private"] = value;
@@ -246,73 +270,80 @@ namespace CK.Env.NodeSln
                             m.Error( $"Invalid dependency in {depNameKind}: {d}." );
                             return false;
                         }
-                        var (v, type) = GetVersionType( m, depNameKind, dP.Name, rawDep );
-                        if( type == NodeProjectDependencyType.None ) return false;
-                        _deps.Add( new NodeProjectDependency( dP.Name, type, depKind, rawDep, v ) );
+                        if( dP.Name == "@local/ck-gen" )
+                        {
+                            m.Trace( "Ignoring '@local/ck-gen' dependency." );
+                        }
+                        else
+                        {
+                            var (v, type) = GetVersionType( m, depNameKind, dP.Name, rawDep );
+                            if( type == NodeProjectDependencyType.None ) return false;
+                            _deps.Add( new NodeProjectDependency( dP.Name, type, depKind, rawDep, v ) );
+                        }
                     }
                 }
                 return true;
 
-                static (SVersionBound, NodeProjectDependencyType) GetVersionType( IActivityMonitor m, string depNameKind, string name, string value )
+                static (SVersionBound, NodeProjectDependencyType) GetVersionType( IActivityMonitor m, string depNameKind, string name, string rawDep )
                 {
-                    if( value.StartsWith( "file:" ) )
+                    if( rawDep.StartsWith( "file:" ) )
                     {
                         string path;
-                        if( value.EndsWith( ".tgz" ) )
+                        if( rawDep.EndsWith( ".tgz" ) )
                         {
                             // Remove "file:"
-                            path = value.Substring( 5 );
+                            path = rawDep.Substring( 5 );
                             path = Path.GetFileNameWithoutExtension( path );
                             // Remove the package name.
                             path = path.Remove( 0, name.Length );
                             var r = SVersionBound.NpmTryParse( path );
                             if( !r.IsValid )
                             {
-                                m.Error( $"Unable to extract version for package '{name}' from '{value}': {r.Error}" );
+                                m.Error( $"Unable to extract version for package '{name}' from '{rawDep}': {r.Error}" );
                                 return (SVersionBound.None, NodeProjectDependencyType.None);
                             }
                             return (r.Result, NodeProjectDependencyType.LocalFeedTarball);
                         }
-                        if( value.StartsWith( "file:.." ) )
+                        if( rawDep.StartsWith( "file:.." ) )
                         {
                             return (SVersionBound.None, NodeProjectDependencyType.LocalPath);
                         }
-                        m.Error( $"Dependency '{value}' for {depNameKind}/{name} must be relative and starts with 'file:..'." );
+                        m.Error( $"Dependency '{rawDep}' for {depNameKind}/{name} must be relative and starts with 'file:..'." );
                         return (SVersionBound.None, NodeProjectDependencyType.None);
                     }
-                    if( value.StartsWith( "workspace:" ) )
+                    if( rawDep.StartsWith( "workspace:" ) )
                     {
                         return (SVersionBound.None, NodeProjectDependencyType.Workspace);
                     }
-                    if( value.StartsWith( "portal:" ) )
+                    if( rawDep.StartsWith( "portal:" ) )
                     {
                         return (SVersionBound.None, NodeProjectDependencyType.Portal);
                     }
-                    else if( value.IndexOf( "://" ) > 0 )
+                    else if( rawDep.IndexOf( "://" ) > 0 )
                     {
-                        if( value.StartsWith( "http://" ) || value.StartsWith( "https://" ) )
+                        if( rawDep.StartsWith( "http://" ) || rawDep.StartsWith( "https://" ) )
                         {
                             return (SVersionBound.None, NodeProjectDependencyType.UrlTar);
                         }
-                        if( value.StartsWith( "git://" )
-                            || value.StartsWith( "git+ssh://" )
-                            || value.StartsWith( "git+http://" )
-                            || value.StartsWith( "git+https://" )
-                            || value.StartsWith( "git+file://" ) )
+                        if( rawDep.StartsWith( "git://" )
+                            || rawDep.StartsWith( "git+ssh://" )
+                            || rawDep.StartsWith( "git+http://" )
+                            || rawDep.StartsWith( "git+https://" )
+                            || rawDep.StartsWith( "git+file://" ) )
                         {
                             return (SVersionBound.None, NodeProjectDependencyType.UrlGit);
                         }
-                        m.Error( $"Unable to handle what seems to be a url dependency '{value}' for {depNameKind}/{name}." );
+                        m.Error( $"Unable to handle what seems to be a url dependency '{rawDep}' for {depNameKind}/{name}." );
                         return (SVersionBound.None, NodeProjectDependencyType.None);
                     }
-                    var vR = SVersionBound.NpmTryParse( value );
+                    var vR = SVersionBound.NpmTryParse( rawDep );
                     if( vR.IsValid )
                     {
                         return (vR.Result, NodeProjectDependencyType.VersionBound);
                     }
-                    if( Regex.IsMatch( value, "\\w+/\\w+" ) ) return (SVersionBound.None, NodeProjectDependencyType.GitHub);
-                    if( Regex.IsMatch( value, "\\w+" ) ) return (SVersionBound.None, NodeProjectDependencyType.Tag);
-                    m.Error( $"Invalid version for {depNameKind}/{name} '{value}': {vR.Error}" );
+                    if( Regex.IsMatch( rawDep, "\\w+/\\w+" ) ) return (SVersionBound.None, NodeProjectDependencyType.GitHub);
+                    if( Regex.IsMatch( rawDep, "\\w+" ) ) return (SVersionBound.None, NodeProjectDependencyType.Tag);
+                    m.Error( $"Invalid version for {depNameKind}/{name} '{rawDep}': {vR.Error}" );
                     return (SVersionBound.None, NodeProjectDependencyType.None);
                 }
             }

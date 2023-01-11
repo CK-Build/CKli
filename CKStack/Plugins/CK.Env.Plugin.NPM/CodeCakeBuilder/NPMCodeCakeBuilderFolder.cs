@@ -59,7 +59,7 @@ namespace CK.Env.Plugin
                     monitor.Info( $"Migrating NPMSolution to RepositoryInfo.xml" );
                     Throw.CheckState( !oldNPMSolutionfile.IsDirectory );
                     var r = oldNPMSolutionfile.ReadAsXDocument().Root!;
-                    var nodeComment = new XComment( "NodeProject must have a Path attribute and an optional OutputPath if it differs from the Path." + Environment.NewLine
+                    var nodeComment = new XComment( "NodeProject must have a Path attribute and an optional OutputPath (where the 'npm pack' will be executed) if it differs from the Path." + Environment.NewLine
                                                     + "AngularWorkspace and YarnWorkspace must have only a Path attribute." );
                     var nodeSolution = new XElement( "NodeSolution",
                                                         r.Elements( "Project" )

@@ -208,6 +208,11 @@ namespace CK.Env.DependencyModel
             ++_version;
         }
 
+        internal void OnPackageReferenceUpdated( in ProjectReference r )
+        {
+            ++_version;
+        }
+
         internal void OnProjectReferenceRemoved( in ProjectReference r )
         {
             ++_version;

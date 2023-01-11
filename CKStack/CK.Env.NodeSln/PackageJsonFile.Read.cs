@@ -18,23 +18,25 @@ namespace CK.Env.NodeSln
                 return null;
             }
             var o = file.ReadAsJObject();
-            bool isPrivate = false;
-            var pPrivate = o.Property( "private" );
-            if( pPrivate != null )
-            {
-                if( pPrivate.Value.Type != JTokenType.Boolean )
-                {
-                    monitor.Error( $"File '{filePath}': property \"private\" must be a boolean." );
-                    return null;
-                }
-                isPrivate = (bool)pPrivate;
-            }
+
             if( !TryReadString( monitor, filePath, o, "name", out var name ) ) return null;
+
+            bool isPrivate = false;
+            if( !TryReadBoolean( monitor, filePath, o, "isPrivate", ref isPrivate ) ) return null;
             if( !isPrivate && name == null )
             {
                 monitor.Error( $"File '{filePath}': property \"name\" must be specified since there is no \"private\": true." );
                 return null;
             }
+
+            bool isCKArtifact = false;
+            if( !TryReadBoolean( monitor, filePath, o, "isCKArtifact", ref isCKArtifact ) ) return null;
+            if( isCKArtifact && name == null )
+            {
+                monitor.Error( $"File '{filePath}': property \"name\" must be specified since \"isCKArtifact\": true." );
+                return null;
+            }
+
             if( !TryReadString( monitor, filePath, o, "version", out var sVersion ) ) return null;
             SVersion version = SVersion.ZeroVersion;
             if( sVersion != null && !SVersion.TryParse( sVersion, out version ) )
@@ -42,6 +44,7 @@ namespace CK.Env.NodeSln
                 monitor.Error( $"File '{filePath}': property \"version\" is invalid: {version.ErrorMessage}." );
                 return null;
             };
+
             NormalizedPath[]? workspaces = null;
             var pWorkspaces = o.Property( "workspaces" );
             if( pWorkspaces != null )
@@ -64,7 +67,7 @@ namespace CK.Env.NodeSln
                 }
             }
 
-            var p = new PackageJsonFile( filePath, o, project, isPrivate, name, version, workspaces );
+            var p = new PackageJsonFile( filePath, o, project, isPrivate, name, version, isCKArtifact, workspaces );
             return p.Initialize( monitor ) ? p : null;
 
             static bool TryReadString( IActivityMonitor monitor, NormalizedPath filePath, JObject o, string name, out string? value )
@@ -75,7 +78,7 @@ namespace CK.Env.NodeSln
                 {
                     if( pName.Value.Type != JTokenType.String && pName.Value.Type != JTokenType.Null )
                     {
-                        monitor.Error( $"File '{filePath}': property \"name\" must be a string." );
+                        monitor.Error( $"File '{filePath}': property \"{name}\" must be a string." );
                         return false;
                     }
                     value = (string?)pName.Value;
@@ -84,6 +87,21 @@ namespace CK.Env.NodeSln
                         value = value.Trim();
                         if( value.Length == 0 ) value = null;
                     }
+                }
+                return true;
+            }
+
+            static bool TryReadBoolean( IActivityMonitor monitor, NormalizedPath filePath, JObject o, string name, ref bool value )
+            {
+                var pName = o.Property( name );
+                if( pName != null )
+                {
+                    if( pName.Value.Type != JTokenType.Boolean )
+                    {
+                        monitor.Error( $"File '{filePath}': property \"{name}\" must be a true or false." );
+                        return false;
+                    }
+                    value = (bool)pName.Value;
                 }
                 return true;
             }

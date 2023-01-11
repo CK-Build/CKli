@@ -148,11 +148,15 @@ namespace CK.Env.NPM
                 var toRemove = new HashSet<Artifact>( project.PackageReferences.Select( r => r.Target.Artifact ) );
                 foreach( var dep in p.PackageJsonFile.Dependencies )
                 {
-                    // Yarn workspace is a ProjectReference.
-                    if( dep.Type == NodeProjectDependencyType.Workspace ) continue;
+                    if( dep.Type == NodeProjectDependencyType.LocalFeedTarball
+                        || dep.Type == NodeProjectDependencyType.Workspace )
+                    {
+                        // a Yarn "workspace:*" or "file:...tgz" dependency is a ProjectReference.
+                        continue;
+                    }
                     if( dep.Version == SVersionBound.None )
                     {
-                        monitor.Warn( $"Unable to handle NPM {dep.Kind.ToPackageJsonKey()} '{dep.Name}' -> '{dep.RawDep}' (type {dep.Type}) in {p.PackageJsonFile.FilePath}. Only simple minimal version, or 'file:' relative paths, or 'file' absolute path pointing to a tarball are handled." );
+                        monitor.Warn( $"Unable to handle '{dep}' in {p.PackageJsonFile.FilePath}. Only version, 'workspace:*', or 'file:' relative paths, or 'file' absolute path pointing to a tarball are handled." );
                     }
                     else
                     {
@@ -174,16 +178,13 @@ namespace CK.Env.NPM
                     Debug.Assert( project.Solution != null, "Project is not detached from its solution." );
 
                     var available = project.Solution.Projects.Where( d => d.Type == "Node" );
-                    if( dep.Type == NodeProjectDependencyType.LocalFeedTarball )
+                    if( dep.Type == NodeProjectDependencyType.LocalFeedTarball
+                        || dep.Type == NodeProjectDependencyType.Workspace )
                     {
                         if( !TryAddProjectReference( monitor, project, p, toRemove, dep, available ) )
                         {
                             return false;
                         }
-                    }
-                    else if( dep.Type == NodeProjectDependencyType.Workspace )
-                    {
-
                     }
                 }
                 foreach( var noMore in toRemove ) project.RemoveProjectReference( noMore );
@@ -191,7 +192,7 @@ namespace CK.Env.NPM
 
                 static bool TryAddProjectReference( IActivityMonitor monitor,
                                                     DependencyModel.Project project,
-                                                    NodeProjectBase? p,
+                                                    NodeProjectBase p,
                                                     HashSet<IProject> toRemove,
                                                     NodeProjectDependency dep,
                                                     IEnumerable<DependencyModel.Project> available )
@@ -199,15 +200,15 @@ namespace CK.Env.NPM
                     var mapped = available.Where( d => d.SimpleProjectName == dep.Name ).ToArray();
                     if( mapped.Length == 0 )
                     {
-                        monitor.Error( $"Unable to resolve project reference '{project.Name}' => '{dep.RawDep}' in {p.PackageJsonFile.FilePath}. '{dep.Name}' project not found in '{available.Select( p => p.ToString() ).Concatenate( "', '" )}'." );
+                        monitor.Error( $"Unable to resolve project reference '{dep}' in {p.PackageJsonFile.FilePath}. '{dep.Name}' project not found in '{available.Select( p => p.ToString() ).Concatenate( "', '" )}'." );
                         return false;
                     }
                     if( mapped.Length > 1 )
                     {
-                        monitor.Error( $"Project reference '{project.Name}' => '{dep.RawDep}' in {p.PackageJsonFile.FilePath} maps to more than one project: {mapped.Select( p => p.ToString() ).Concatenate( "', '" )}." );
+                        monitor.Error( $"Project reference '{dep}' in {p.PackageJsonFile.FilePath} maps to more than one project: {mapped.Select( p => p.ToString() ).Concatenate( "', '" )}." );
                         return false;
                     }
-                    project.EnsureProjectReference( mapped[0], dep.Kind );
+                    project.AddProjectReference( mapped[0], dep.Kind );
                     toRemove.Remove( mapped[0] );
                     return true;
                 }

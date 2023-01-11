@@ -135,7 +135,7 @@ namespace CK.Env.Plugin
                     {
                         var mapped = depsFinder( target );
                         Debug.Assert( mapped != null );
-                        project.EnsureProjectReference( mapped, ArtifactDependencyKind.Transitive );
+                        project.AddProjectReference( mapped, ArtifactDependencyKind.Transitive, dep.Frameworks );
                         toRemove.Remove( mapped );
                     }
                     else
@@ -149,6 +149,7 @@ namespace CK.Env.Plugin
 
             static void SynchronizePackageReferences( IActivityMonitor m, DependencyModel.Project project )
             {
+                Debug.Assert( project.Type == ".Net" );
                 var toRemove = new HashSet<Artifact>( project.PackageReferences.Select( r => r.Target.Artifact ) );
                 var p = project.Tag<MSProject>();
                 foreach( DeclaredPackageDependency dep in p.Deps.Packages )
@@ -156,8 +157,8 @@ namespace CK.Env.Plugin
                     var d = dep.BaseArtifactInstance;
                     toRemove.Remove( d.Artifact );
                     project.AddPackageReference( d,
-                                                    dep.PrivateAsset.Equals( "all", StringComparison.OrdinalIgnoreCase ) ? ArtifactDependencyKind.Private : ArtifactDependencyKind.Transitive,
-                                                    dep.Frameworks );
+                                                 dep.PrivateAsset.Equals( "all", StringComparison.OrdinalIgnoreCase ) ? ArtifactDependencyKind.Private : ArtifactDependencyKind.Transitive,
+                                                 dep.Frameworks );
                 }
                 foreach( var noMore in toRemove ) project.RemovePackageReference( noMore );
             }

@@ -276,8 +276,11 @@ namespace CK.Env.DependencyModel
         /// </para>
         /// </summary>
         /// <param name="a">The artifact to add.</param>
-        /// <param name="sources">Optional explicit sources that can differ from <see cref="ProjectSources"/>.</param>
-        /// <returns>True if the artifact has been added, false if it was already present (its sources may have been updated).</returns>
+        /// <param name="sources">
+        /// Optional explicit sources that can differ from <see cref="ProjectSources"/>.
+        /// When null, the current sources are not updated.
+        /// </param>
+        /// <returns>True if the artifact has been added or its sources may have been updated, false if it was already present.</returns>
         public bool AddGeneratedArtifacts( Artifact a, IReadOnlyCollection<NormalizedPath>? sources = null )
         {
             Throw.CheckArgument( a.IsValid );
@@ -294,6 +297,7 @@ namespace CK.Env.DependencyModel
                     int idx = _generatedArtifacts.IndexOf( already );
                     Debug.Assert( idx >= 0, "Since we found it in this Project." );
                     _generatedArtifacts[idx] = new GeneratedArtifact( a, this, sources );
+                    return true;
                 }
                 return false;
             }
@@ -347,27 +351,14 @@ namespace CK.Env.DependencyModel
         public IReadOnlyList<ProjectReference> ProjectReferences => _projectReferences;
 
         /// <summary>
-        /// Adds a new <see cref="ProjectReference"/> to this project.
-        /// </summary>
-        /// <param name="target">The referenced project.</param>
-        /// <param name="kind">Optional non standard dependency kind if needed.</param>
-        /// <param name="applicableSavors">Optional savors that, when defined, must be a subset of this <see cref="Savors"/>.</param>
-        public void AddProjectReference( Project target, ArtifactDependencyKind kind = ArtifactDependencyKind.Transitive, CKTrait? applicableSavors = null )
-        {
-            CheckSolution();
-            Throw.CheckState( $"Project '{target}' is already referenced by '{ToString()}'.", !_projectReferences.Any( p => p.Target == target ) );
-            Throw.CheckState( $"Project '{target}' belongs to '{target._solution}' whereas {ToString()} belongs to '{_solution}'.", target._solution != _solution );
-            DoAddProjectReference( target, kind, applicableSavors ?? Savors );
-        }
-
-        /// <summary>
         /// Ensures that a new <see cref="ProjectReference"/> with the exact same target
         /// project and kind exists.
         /// </summary>
         /// <param name="target">The referenced project.</param>
         /// <param name="kind">The dependency kind.</param>
         /// <param name="applicableSavors">Optional savors that, when defined, must be a subset of this <see cref="Savors"/>.</param>
-        public void EnsureProjectReference( Project target, ArtifactDependencyKind kind = ArtifactDependencyKind.Transitive, CKTrait? applicableSavors = null )
+        /// <returns>True if the dependency has been added or its savors updated, false is it already exists as-is.</returns>
+        public bool AddProjectReference( Project target, ArtifactDependencyKind kind = ArtifactDependencyKind.Transitive, CKTrait? applicableSavors = null )
         {
             CheckSolution();
             var savors = applicableSavors ?? Savors;
@@ -375,10 +366,23 @@ namespace CK.Env.DependencyModel
             if( idx >= 0 )
             {
                 var exists = _projectReferences[idx];
-                if( exists.Kind == kind && exists.ApplicableSavors == savors ) return;
-                DoRemoveProjectReferenceAt( idx );
+                if( exists.Kind == kind && exists.ApplicableSavors == savors )
+                {
+                    return false;
+                }
             }
-            DoAddProjectReference( target, kind, savors );
+            var r = new ProjectReference( this, target, kind, CheckSavors( applicableSavors ) );
+            if( idx < 0 )
+            {
+                _projectReferences.Add( r );
+                _solution.OnProjectReferenceAdded( r );
+            }
+            else
+            {
+                _projectReferences[idx] = r;
+                _solution.OnPackageReferenceUpdated( r );
+            }
+            return true;
         }
 
         /// <summary>
@@ -392,26 +396,12 @@ namespace CK.Env.DependencyModel
             int idx = _projectReferences.IndexOf( r => r.Target == target );
             if( idx >= 0 )
             {
-                DoRemoveProjectReferenceAt( idx );
+                var r = _projectReferences[idx];
+                _projectReferences.RemoveAt( idx );
+                _solution.OnProjectReferenceRemoved( r );
                 return true;
             }
             return false;
-        }
-
-        void DoAddProjectReference( Project target, ArtifactDependencyKind kind, CKTrait? applicableSavors )
-        {
-            Debug.Assert( _solution != null );
-            var r = new ProjectReference( this, target, kind, CheckSavors( applicableSavors ) );
-            _projectReferences.Add( r );
-            _solution.OnProjectReferenceAdded( r );
-        }
-
-        void DoRemoveProjectReferenceAt( int idx )
-        {
-            Debug.Assert( _solution != null );
-            var r = _projectReferences[idx];
-            _projectReferences.RemoveAt( idx );
-            _solution.OnProjectReferenceRemoved( r );
         }
 
         /// <summary>
@@ -425,7 +415,7 @@ namespace CK.Env.DependencyModel
         /// <param name="target">The referenced package.</param>
         /// <param name="kind">The dependency kind.</param>
         /// <param name="applicableSavors">Optional savors that, when defined, must be a subset of this <see cref="Savors"/>.</param>
-        /// <returns>True if the dependency has been added or updated, false is it already exists.</returns>
+        /// <returns>True if the dependency has been added or its savors updated, false is it already exists as-is.</returns>
         public bool AddPackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait? applicableSavors = null )
         {
             CheckSolution();
@@ -467,20 +457,12 @@ namespace CK.Env.DependencyModel
             if( idx >= 0 )
             {
                 var r = _packageReferences[idx];
-                DoRemovePackageReferenceAt( idx );
+                _packageReferences.RemoveAt( idx );
                 _solution.OnPackageReferenceRemoved( r );
                 return true;
             }
             return false;
         }
-
-        //void DoAddPackageReference( ArtifactInstance target, ArtifactDependencyKind kind, CKTrait? applicableSavors )
-        //{
-        //    Debug.Assert( _solution != null );
-        //    var r = new ProjectPackageReference( this, target, kind, CheckSavors( applicableSavors ) );
-        //    _packageReferences.Add( r );
-        //    _solution.OnPackageReferenceAdded( r );
-        //}
 
         CKTrait? CheckSavors( CKTrait? applicableSavors )
         {
@@ -491,13 +473,6 @@ namespace CK.Env.DependencyModel
                 Throw.ArgumentException( nameof( applicableSavors ), $"Savors '{applicableSavors}' must be a subset of project's '{Savors}' (and belong to the same context)." );
             }
             return applicableSavors;
-        }
-
-        void DoRemovePackageReferenceAt( int idx )
-        {
-            Debug.Assert( _solution != null );
-            var r = _packageReferences[idx];
-            _packageReferences.RemoveAt( idx );
         }
 
         /// <summary>

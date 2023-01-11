@@ -18,11 +18,9 @@ namespace CodeCake
         readonly NormalizedPath _path;
         private readonly bool _filePreviouslyExisted;
 
-        TempFileTextModification(
-            string savedPackageJson,
-            NormalizedPath path,
-            bool filePreviouslyExisted
-            )
+        TempFileTextModification( string savedPackageJson,
+                                  NormalizedPath path,
+                                  bool filePreviouslyExisted )
         {
             _originalText = savedPackageJson;
             _path = path;
@@ -44,7 +42,7 @@ namespace CodeCake
         }
 
         /// <summary>
-        /// Revert the change made to the package.json
+        /// Revert the change made to the file.
         /// </summary>
         public void Dispose()
         {
@@ -58,16 +56,12 @@ namespace CodeCake
 
 
         /// <summary>
-        /// Set the package version and change the project reference to package reference.
+        /// Sets the "version" property.
         /// </summary>
-        /// <param name="p"></param>
-        /// <param name="version"></param>
-        /// <param name="preparePack"></param>
-        /// <param name="packageJsonPreProcessor"></param>
+        /// <param name="jsonPath">The path to an existing json file.</param>
+        /// <param name="version">The version to set.</param>
         /// <returns></returns>
-        public static IDisposable TemporaryReplacePackageVersion(
-            NormalizedPath jsonPath,
-            SVersion version)
+        public static IDisposable TemporaryReplacePackageVersion( NormalizedPath jsonPath, SVersion version )
         {
             (string content, TempFileTextModification temp) = CreateTempFileTextModification( jsonPath );
             JObject json = JObject.Parse( content );
@@ -76,33 +70,38 @@ namespace CodeCake
             return temp;
         }
 
-        public static IDisposable TemporaryReplaceDependenciesVersion(
-            NPMSolution npmSolution,
-            NormalizedPath jsonPath,
-            bool ckliLocalFeedMode,
-            SVersion version,
-            Action<JObject> packageJsonPreProcessor
-        )
+        /// <summary>
+        /// Removes the "devDependencies" property and updates "dependencies", "peerDependencies", "bundledDependencies"
+        /// and "optionalDependencies" by updating any reference to a package that appears in the Solution's <see cref="NPMProjectContainer.AllPublishedProjects"/>
+        /// to use the published <paramref name="version"/>.
+        /// </summary>
+        /// <param name="npmSolution"></param>
+        /// <param name="jsonPath"></param>
+        /// <param name="ckliLocalFeedMode"></param>
+        /// <param name="version"></param>
+        /// <param name="packageJsonPreProcessor"></param>
+        /// <returns></returns>
+        public static IDisposable TemporaryReplaceDependenciesVersion( NPMSolution npmSolution,
+                                                                       NormalizedPath jsonPath,
+                                                                       bool ckliLocalFeedMode,
+                                                                       SVersion version,
+                                                                       Action<JObject> packageJsonPreProcessor )
         {
             (string content, TempFileTextModification temp) = CreateTempFileTextModification( jsonPath );
             JObject json = JObject.Parse( content );
             packageJsonPreProcessor?.Invoke( json );
             json.Remove( "devDependencies" );
-            foreach( var dependencyPropName in new string[]
-            {
-                "dependencies",
-                "peerDependencies",
-                "bundledDependencies",
-                "optionalDependencies",
-            } )
+            foreach( var dependencyPropName in new string[] { "dependencies",
+                                                              "peerDependencies",
+                                                              "bundledDependencies",
+                                                              "optionalDependencies" } )
             {
                 if( json.ContainsKey( dependencyPropName ) )
                 {
                     JObject dependencies = (JObject)json[dependencyPropName]!;
                     foreach( KeyValuePair<string, JToken?> keyValuePair in dependencies )
                     {
-                        if( npmSolution.AllPublishedProjects.FirstOrDefault( x => x.PackageJson.Name == keyValuePair.Key )
-                            is NPMPublishedProject localProject )
+                        if( npmSolution.AllPublishedProjects.FirstOrDefault( x => x.PackageJson.Name == keyValuePair.Key ) is NPMPublishedProject localProject )
                         {
                             dependencies[keyValuePair.Key] = new JValue( "^" + version );
                         }
@@ -110,11 +109,11 @@ namespace CodeCake
                     if( ckliLocalFeedMode )
                     {
                         foreach( var dependency in ((IEnumerable<KeyValuePair<string, JToken>>)dependencies)
-                            .Select( s => new KeyValuePair<string, string>( s.Key, s.Value.ToString() ) )
-                            .Where( p => p.Value.StartsWith( "file:" ) )
-                            .Select( s => new KeyValuePair<string, SVersion>( s.Key, ParseVersionFromPackagePath( s.Value ) ) ) )
+                                                        .Select( d => ( name: d.Key, rawDep: d.Value.ToString() ) )
+                                                        .Where( d => d.rawDep.StartsWith( "file:" ) && d.rawDep.EndsWith( ".tgz" ) )
+                                                        .Select( d => ( d.name, version: ParseVersionFromPackagePath( d.rawDep ) ) ) )
                         {
-                            dependencies[dependency.Key] = dependency.Value.ToNormalizedString();
+                            dependencies[dependency.name] = dependency.version.ToNormalizedString();
                         }
                     }
                 }
@@ -132,7 +131,6 @@ namespace CodeCake
         {
             var fName = Path.GetFileNameWithoutExtension( fullPath );
             int idxV = Regex.Match( fName, "\\.\\d" ).Index;
-            var id = fName.Substring( 0, idxV );
             return SVersion.Parse( fName.Substring( idxV + 1 ) );
         }
 

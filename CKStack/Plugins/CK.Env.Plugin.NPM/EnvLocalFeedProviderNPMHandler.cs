@@ -58,21 +58,26 @@ namespace CK.Env
         public void RemoveFromAllCaches( IActivityMonitor m, IEnumerable<ArtifactInstance> instances )
         {
             /*
-For npm, the cache should be managed through "cacache".
-==> https://github.com/greggman/npm-cache-rm/tree/master
-cacache, that has numerous dependencies. It must be launched
-by a node project (or is there a simpler way?).
+                For npm, the cache should be managed through "cacache".
+                    ==> https://github.com/greggman/npm-cache-rm/tree/master
+                    cacache, that has numerous dependencies. It must be launched
+                    by a node project (or is there a simpler way?).
 
-"yarn cache dir"
-C:\Users\olivier.spinelli>yarn cache dir
-C:\Users\olivier.spinelli\AppData\Local\Yarn\Cache\v6
+                For Yarn: yarn config --json
 
-In this folder packages are folders with this pattern:
-npm-@signature-crs-client-signalr-7.1.1-integrity
+                    ==> "globalFolder": "C:\\Users\\olivier.spinelli\\AppData\\Local\\Yarn\\Berry"
+                    ==> "cacheFolder": "C:\\Dev\\SC\\Core-Projects\\CK-Observable-Domain\\Clients\\.yarn\\cache"
 
-"yarn cache dir" can only be called near the root (no .yarn folder should
-be above it otherwise it fails).
-There seems to be no other way than manually deleting the folder in the cache.
+                    Cache global: "globalFolder"/cache
+                    One zip per package: @babel-core-npm-7.20.2-7fb00344fc-98faaaef26.zip
+                    The @scope/name is replace with a @scope-name (just like we do). A trailing hash must be ignored.
+
+                    Problem: The 2 caches are both somehow local to a project...
+                    - The cacheFolder (local) is in the project root.
+                    - The global cache depends on the yarn version that is used by the project (.yarnrc).
+
+                    This implies that it may be better that this cleanup is a CCB feature.
+
              */
         }
     }

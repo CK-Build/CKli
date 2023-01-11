@@ -51,7 +51,7 @@ namespace CK.Env
                                              DependentSolution s,
                                              ISolutionDriver driver,
                                              IReadOnlyList<UpdatePackageInfo> upgrades,
-                                             SVersion sVersion,
+                                             SVersion? sVersion,
                                              IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade )
         {
             if( _commits[s.Index] != driver.GitRepository.Head.CommitSha )
@@ -102,7 +102,6 @@ namespace CK.Env
                         var g = DependentSolutionContext.Drivers[i].GitRepository;
                         g.ResetBranchState( monitor, g.CurrentBranchName, _commits[i] );
                     }
-
                 }
             }
         }

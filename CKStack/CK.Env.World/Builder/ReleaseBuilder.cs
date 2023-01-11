@@ -17,17 +17,15 @@ namespace CK.Env
         readonly string[] _commits;
         readonly ReleaseRoadmap _roadmap;
 
-        public ReleaseBuilder(
-                ZeroBuilder zeroBuilder,
-                ArtifactCenter artifacts,
-                ReleaseRoadmap roadmap,
-                IEnvLocalFeedProvider localFeedProvider )
+        public ReleaseBuilder( ZeroBuilder zeroBuilder,
+                               ArtifactCenter artifacts,
+                               ReleaseRoadmap roadmap,
+                               IEnvLocalFeedProvider localFeedProvider )
             : base( zeroBuilder, BuildResultType.Release, artifacts, localFeedProvider, roadmap.SolutionContext )
         {
             _commits = new string[roadmap.SolutionContext.Solutions.Count];
             _roadmap = roadmap;
         }
-
 
         protected override (SVersion? Version, bool MustBuild) PrepareBuild( IActivityMonitor m,
                                                                              DependentSolution s,
@@ -57,10 +55,10 @@ namespace CK.Env
             {
                 var buildProjectUpgrades = GetBuildProjectUpgrades( s );
                 if( !driver.UpdatePackageDependencies( m, buildProjectUpgrades ) ) return null;
-                if( driver.GitRepository.Commit( m, "Updated Build project dependencies.", CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage )
-                    == CommittingResult.Error
-
-                    ) return null;
+                if( driver.GitRepository.Commit( m, "Updated Build project dependencies.", CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage ) == CommittingResult.Error )
+                {
+                    return null;
+                }
                 _commits[s.Index] = driver.GitRepository.Head.CommitSha;
             }
             return base.CreateBuildResult( m );
@@ -68,13 +66,12 @@ namespace CK.Env
 
         protected override IReadOnlyList<ReleaseNoteInfo> GetReleaseNotes() => _roadmap.GetReleaseNotes();
 
-        protected override BuildState Build(
-            IActivityMonitor m,
-            DependentSolution s,
-            ISolutionDriver driver,
-            IReadOnlyList<UpdatePackageInfo> upgrades,
-            SVersion sVersion,
-            IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade )
+        protected override BuildState Build( IActivityMonitor m,
+                                             DependentSolution s,
+                                             ISolutionDriver driver,
+                                             IReadOnlyList<UpdatePackageInfo> upgrades,
+                                             SVersion? sVersion,
+                                             IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade )
         {
             IReleaseSolutionInfo info = _roadmap.ReleaseInfos[s.Index];
             Debug.Assert( (sVersion == null) == (info.CurrentReleaseInfo.Level == ReleaseLevel.None) );

@@ -5,6 +5,7 @@ using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Diagnostics;
 
 namespace CK.Env
 {
@@ -21,18 +22,21 @@ namespace CK.Env
         readonly SVersion?[] _targetVersions;
         readonly ArtifactCenter _artifacts;
 
-        protected Builder(
-            ZeroBuilder zeroBuilder,
-            BuildResultType type,
-            ArtifactCenter artifacts,
-            IEnvLocalFeedProvider localFeedProvider,
-            IWorldSolutionContext ctx )
+        protected Builder( ZeroBuilder zeroBuilder,
+                           BuildResultType type,
+                           ArtifactCenter artifacts,
+                           IEnvLocalFeedProvider localFeedProvider,
+                           IWorldSolutionContext ctx )
         {
-            ZeroBuilder = zeroBuilder ?? throw new ArgumentNullException( nameof( zeroBuilder ) );
+            Throw.CheckNotNullArgument( zeroBuilder );
+            Throw.CheckNotNullArgument( artifacts );
+            Throw.CheckNotNullArgument( localFeedProvider );
+            Throw.CheckNotNullArgument( ctx );
+            ZeroBuilder = zeroBuilder;
             _type = type;
-            _artifacts = artifacts ?? throw new ArgumentNullException( nameof( artifacts ) );
-            _localFeedProvider = localFeedProvider ?? throw new ArgumentNullException( nameof( localFeedProvider ) );
-            DependentSolutionContext = ctx ?? throw new ArgumentNullException( nameof( ctx ) );
+            _artifacts = artifacts;
+            _localFeedProvider = localFeedProvider;
+            DependentSolutionContext = ctx;
             _packagesVersion = new Dictionary<Artifact, SVersion>();
             _upgrades = new List<UpdatePackageInfo>[ctx.Solutions.Count];
             _targetVersions = new SVersion?[ctx.Solutions.Count];
@@ -50,7 +54,7 @@ namespace CK.Env
         /// <returns>The BuildResult on success, null on error.</returns>
         public BuildResult? Run( IActivityMonitor m, bool forceRebuild )
         {
-            if( _packagesVersion.Count > 0 ) throw new InvalidOperationException();
+            Throw.CheckState( _packagesVersion.Count == 0 );
 
             BuildResult? result = CreateResultByPreparingBuilds( m, forceRebuild );
             if( result == null ) return null;
@@ -68,6 +72,7 @@ namespace CK.Env
                 }
                 else
                 {
+                    Debug.Assert( state == BuildState.MustRetry );
                     // This is not really optimal but it is required only for DevelopBuilder
                     // (where version numbers are not fully known upfront AND commit may not be
                     // amendable (when on a fresh checkout).
@@ -244,7 +249,10 @@ namespace CK.Env
         /// <param name="driver">The solution driver.</param>
         /// <param name="upgrades">The set of required package upgrades.</param>
         /// <returns>The version (or null if an error occurred) and whether the build must be actually done or skipped.</returns>
-        protected abstract (SVersion? Version, bool MustBuild) PrepareBuild( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades );
+        protected abstract (SVersion? Version, bool MustBuild) PrepareBuild( IActivityMonitor m,
+                                                                             DependentSolution s,
+                                                                             ISolutionDriver driver,
+                                                                             IReadOnlyList<UpdatePackageInfo> upgrades );
 
         /// <summary>
         /// Builds the solution.
@@ -256,7 +264,12 @@ namespace CK.Env
         /// <param name="sVersion">The version computed by <see cref="PrepareBuild"/>.</param>
         /// <param name="buildProjectsUpgrade">The build projects upgrades.</param>
         /// <returns>The build state.</returns>
-        protected abstract BuildState Build( IActivityMonitor m, DependentSolution s, ISolutionDriver driver, IReadOnlyList<UpdatePackageInfo> upgrades, SVersion sVersion, IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade );
+        protected abstract BuildState Build( IActivityMonitor m,
+                                             DependentSolution s,
+                                             ISolutionDriver driver,
+                                             IReadOnlyList<UpdatePackageInfo> upgrades,
+                                             SVersion? sVersion,
+                                             IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade );
 
     }
 }

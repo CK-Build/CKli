@@ -41,7 +41,7 @@ namespace CK.Env
                                              DependentSolution s,
                                              ISolutionDriver driver,
                                              IReadOnlyList<UpdatePackageInfo> upgrades,
-                                             SVersion sVersion,
+                                             SVersion? sVersion,
                                              IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade )
         {
             if( !driver.UpdatePackageDependencies( m, buildProjectsUpgrade ) ) return BuildState.Failed;

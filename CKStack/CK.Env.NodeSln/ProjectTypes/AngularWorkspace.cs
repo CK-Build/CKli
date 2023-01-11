@@ -39,11 +39,16 @@ namespace CK.Env.NodeSln
             if( jProjects == null ) return false;
             foreach( var propProject in jProjects.Properties() )
             {
-                var name = propProject.Name;
+                var type = propProject.Value["projectType"]?.ToString();
+                if( type != "library" )
+                {
+                    monitor.Trace( $"Project '{propProject.Name}' is a \"{type}\". It is ignored." );
+
+                }
                 var root = propProject.Value["root"]?.ToString();
                 if( string.IsNullOrWhiteSpace( root ) )
                 {
-                    monitor.Warn( $"Project '{name}' is missing \"root\" property. It is ignored." );
+                    monitor.Warn( $"Project '{propProject.Name}' is missing \"root\" property. It is ignored." );
                 }
                 else
                 {
