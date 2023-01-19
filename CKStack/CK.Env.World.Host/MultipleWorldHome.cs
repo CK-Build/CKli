@@ -23,15 +23,14 @@ namespace CK.Env
         readonly IWorldLocalMapping _worldMapping;
         readonly GitWorldStore _store;
 
-        MultipleWorldHome( NormalizedPath userHostPath, XTypedFactory baseFactory, FileKeyVault userKeyVault, IWorldLocalMapping mapping, Func<IReleaseVersionSelector> releaseVersionSelectorFatory )
+        MultipleWorldHome( ICkliApplicationContext appContext, FileKeyVault userKeyVault, IWorldLocalMapping mapping )
         {
-            Directory.CreateDirectory( userHostPath );
-            CommandRegister = new CommandRegister();
-            _xTypedObjectfactory = new XTypedFactory( baseFactory );
+            CommandRegister = appContext.CommandRegistry;
+            _xTypedObjectfactory = new XTypedFactory( appContext.CoreXTypedMap );
             UserKeyVault = userKeyVault;
             _worldMapping = mapping;
-            _store = new GitWorldStore( userHostPath, _worldMapping, UserKeyVault.KeyStore, CommandRegister );
-            WorldSelector = new WorldSelector( _store, CommandRegister, _xTypedObjectfactory, UserKeyVault.KeyStore, releaseVersionSelectorFatory );
+            _store = new GitWorldStore( appContext.UserHostPath, _worldMapping, UserKeyVault.KeyStore, CommandRegister );
+            WorldSelector = new WorldSelector( appContext, _store, _xTypedObjectfactory );
             CommandRegister.Register( this );
         }
 
@@ -44,9 +43,12 @@ namespace CK.Env
         /// <param name="mapping">World local mapping.</param>
         /// <param name="releaseVersionSelectorFactory">Factory for <see cref="IReleaseVersionSelector"/>. One of them will be created for each world.</param>
         /// <returns>A UserHost.</returns>
-        public static MultipleWorldHome Create( IActivityMonitor m, NormalizedPath userHostPath, XTypedFactory sharedFactory, FileKeyVault userKeyVault, IWorldLocalMapping mapping, Func<IReleaseVersionSelector> releaseVersionSelectorFatory )
+        public static MultipleWorldHome Create( IActivityMonitor m,
+                                                ICkliApplicationContext appContext,
+                                                FileKeyVault userKeyVault,
+                                                IWorldLocalMapping mapping )
         {
-            var u = new MultipleWorldHome( userHostPath, sharedFactory, userKeyVault, mapping, releaseVersionSelectorFatory );
+            var u = new MultipleWorldHome( appContext, userKeyVault, mapping );
             u._store.ReadStacksFromLocalStacksFilePath( m );
             u._store.ReadWorlds( m, withPull: true );
             return u;
@@ -54,7 +56,7 @@ namespace CK.Env
 
         NormalizedPath ICommandMethodsProvider.CommandProviderName => HomeCommandPath;
 
-        public CommandRegister CommandRegister { get; }
+        public CommandRegistry CommandRegister { get; }
 
         /// <summary>
         /// Gets the world store.

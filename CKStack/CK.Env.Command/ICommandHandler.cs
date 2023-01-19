@@ -6,6 +6,9 @@ using System;
 
 namespace CK.Env
 {
+    /// <summary>
+    /// Basic command executor.
+    /// </summary>
     public interface ICommandHandler
     {
         /// <summary>
@@ -25,11 +28,6 @@ namespace CK.Env
         /// before being submitted.
         /// </summary>
         bool ConfirmationRequired { get; }
-
-        /// <summary>
-        /// Gets the parallel mode for this command.
-        /// </summary>
-        ParallelCommandMode ParallelMode { get; }
 
         /// <summary>
         /// Gets the signature of the payload.

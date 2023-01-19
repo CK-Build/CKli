@@ -22,7 +22,7 @@ namespace CK.Env.NodeSln
             if( !TryReadString( monitor, filePath, o, "name", out var name ) ) return null;
 
             bool isPrivate = false;
-            if( !TryReadBoolean( monitor, filePath, o, "isPrivate", ref isPrivate ) ) return null;
+            if( !TryReadBoolean( monitor, filePath, o, "private", ref isPrivate ) ) return null;
             if( !isPrivate && name == null )
             {
                 monitor.Error( $"File '{filePath}': property \"name\" must be specified since there is no \"private\": true." );
@@ -30,7 +30,7 @@ namespace CK.Env.NodeSln
             }
 
             bool isCKArtifact = false;
-            if( !TryReadBoolean( monitor, filePath, o, "isCKArtifact", ref isCKArtifact ) ) return null;
+            if( !TryReadBoolean( monitor, filePath, o, "ckArtifact", ref isCKArtifact ) ) return null;
             if( isCKArtifact && name == null )
             {
                 monitor.Error( $"File '{filePath}': property \"name\" must be specified since \"isCKArtifact\": true." );

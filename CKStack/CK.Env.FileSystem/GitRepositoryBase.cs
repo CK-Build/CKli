@@ -1,5 +1,5 @@
 using CK.Core;
-
+using CK.SimpleKeyVault;
 using CSemVer;
 using LibGit2Sharp;
 using System;
@@ -16,33 +16,29 @@ namespace CK.Env
     /// </summary>
     public abstract class GitRepositoryBase : IGitHeadInfo, IDisposable
     {
+        internal static readonly StatusOptions _checkDirtyOptions = new StatusOptions() { IncludeIgnored = false };
+
         /// <summary>
         /// Initializes a new <see cref="GitRepositoryBase"/>.
         /// </summary>
         /// <param name="repositoryKey">The repository key.</param>
         /// <param name="libRepository">The actual LibGit2Sharp repository instance.</param>
         /// <param name="fullPath">The working folder.</param>
-        /// <param name="subPath">See <see cref="SubPath"/>. Can not be empty.</param>
+        /// <param name="displayPath">See <see cref="DisplayPath"/>. Can not be empty.</param>
         protected GitRepositoryBase( GitRepositoryKey repositoryKey,
-                             Repository libRepository,
-                             NormalizedPath fullPath,
-                             NormalizedPath subPath )
+                                     Repository libRepository,
+                                     in NormalizedPath fullPath,
+                                     in NormalizedPath displayPath )
         {
             Throw.CheckNotNullArgument( repositoryKey );
             Throw.CheckNotNullArgument( libRepository );
             RepositoryKey = repositoryKey;
             Git = libRepository;
             FullPhysicalPath = fullPath;
-            SubPath = subPath;
+            DisplayPath = displayPath;
 
-            if( FullPhysicalPath != libRepository.Info.WorkingDirectory )
-            {
-                Throw.ArgumentException( nameof( fullPath ), "Path mismatch." );
-            }
-            if( !FullPhysicalPath.EndsWith( SubPath ) )
-            {
-                Throw.ArgumentException( nameof( subPath ), "Path mismatch." );
-            }
+            Throw.CheckArgument( FullPhysicalPath == libRepository.Info.WorkingDirectory );
+            Throw.CheckArgument( FullPhysicalPath.EndsWith( DisplayPath, strict: false ) );
         }
 
         /// <summary>
@@ -74,9 +70,9 @@ namespace CK.Env
         public Uri OriginUrl => RepositoryKey.OriginUrl;
 
         /// <summary>
-        /// The short path to display, relative to a well known root.
+        /// The short path to display.
         /// </summary>
-        public NormalizedPath SubPath { get; }
+        public NormalizedPath DisplayPath { get; }
 
         /// <summary>
         /// Full physical path is the same as LibGit's <see cref="RepositoryInformation.WorkingDirectory"/>.
@@ -114,6 +110,56 @@ namespace CK.Env
         }
 
         /// <summary>
+        /// Captures minimal status information.
+        /// </summary>
+        public struct SimpleStatusInfo
+        {
+            /// <summary>
+            /// The Git folder name.
+            /// </summary>
+            public NormalizedPath DisplayName;
+
+            /// <summary>
+            /// The currently checked out branch.
+            /// </summary>
+            public string CurrentBranchName;
+
+            /// <summary>
+            /// Whether the WorkingFolder is dirty.
+            /// </summary>
+            public bool IsDirty;
+
+            /// <summary>
+            /// The number of commit that are ahead of the origin.
+            /// 0 mean that there a no commit ahead of origin.
+            /// Null if there is no origin (the branch is not tacked).
+            /// </summary>
+            public int? CommitAhead;
+
+            /// <summary>
+            /// The number of plugins that are associated to this branch.
+            /// Null if a plugin initialization occurred: this folder is on error.
+            /// </summary>
+            public int? PluginCount;
+        }
+
+        /// <summary>
+        /// Gets a <see cref="SimpleStatusInfo"/> for this repository.
+        /// The <see cref="SimpleStatusInfo.PluginCount"/> is let to null at this level.
+        /// </summary>
+        /// <returns>The simplified status info</returns>
+        public SimpleStatusInfo GetSimpleStatusInfo()
+        {
+            return new SimpleStatusInfo()
+            {
+                DisplayName = DisplayPath,
+                CommitAhead = Git.Head.TrackingDetails.AheadBy,
+                CurrentBranchName = Git.Head.FriendlyName,
+                IsDirty = Git.RetrieveStatus( _checkDirtyOptions ).IsDirty,
+            };
+        }
+
+        /// <summary>
         /// Gets whether the head can be amended: the current branch
         /// is not tracked or the current commit is ahead of the remote branch.
         /// </summary>
@@ -126,9 +172,9 @@ namespace CK.Env
         /// <returns>True if the current head is clean, false otherwise.</returns>
         public bool CheckCleanCommit( IActivityMonitor m )
         {
-            if( Git.RetrieveStatus().IsDirty )
+            if( Git.RetrieveStatus( _checkDirtyOptions ).IsDirty )
             {
-                m.Error( $"Repository '{SubPath}' has uncommitted changes ({CurrentBranchName})." );
+                m.Error( $"Repository '{DisplayPath}' has uncommitted changes ({CurrentBranchName})." );
                 return false;
             }
             return true;
@@ -138,7 +184,7 @@ namespace CK.Env
         /// Gets the sha of the given branch tip or null if the branch doesn't exist.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
-        /// <param name="branchName">The branch name. Must not be null or empty.</param>
+        /// <param name="branchName">The branch name. Must not be null or white space.</param>
         /// <returns>The Sha or null.</returns>
         public string? GetBranchSha( IActivityMonitor m, string branchName )
         {
@@ -149,7 +195,7 @@ namespace CK.Env
 
         Branch? GetBranch( IActivityMonitor m, string branchName, bool logErrorMissingLocalAndRemote )
         {
-            return DoGetBranch( m, Git, branchName, logErrorMissingLocalAndRemote, SubPath );
+            return DoGetBranch( m, Git, branchName, logErrorMissingLocalAndRemote, DisplayPath );
         }
 
         static Branch? DoGetBranch( IActivityMonitor m, Repository r, string branchName, bool logErrorMissingLocalAndRemote, string repoDisplayName )
@@ -176,12 +222,14 @@ namespace CK.Env
         /// <summary>
         /// Ensures that a local branch exists.
         /// If the branch is created, it will point at the same commit as the current <see cref="Head"/>.
+        /// The branch is guaranteed to exist but the <see cref="CurrentBranchName"/> stays where it is.
+        /// Use <see cref="Checkout(IActivityMonitor, string, bool, bool)"/> to change the current branch.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="branchName">The branch name.</param>
         public void EnsureBranch( IActivityMonitor m, string branchName, bool noWarnOnCreate = false )
         {
-            DoEnsureBranch( m, Git, branchName, noWarnOnCreate, SubPath );
+            DoEnsureBranch( m, Git, branchName, noWarnOnCreate, DisplayPath );
         }
 
         /// <summary>
@@ -195,7 +243,7 @@ namespace CK.Env
         /// <returns>The Branch.</returns>
         static Branch DoEnsureBranch( IActivityMonitor m, Repository r, string branchName, bool noWarnOnCreate, string repoDisplayName )
         {
-            if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
+            Throw.CheckNotNullOrWhiteSpaceArgument( branchName );
             var b = DoGetBranch( m, r, branchName, logErrorMissingLocalAndRemote: false, repoDisplayName: repoDisplayName );
             if( b == null )
             {
@@ -215,7 +263,7 @@ namespace CK.Env
         [CommandMethod]
         public bool FetchBranches( IActivityMonitor m, bool originOnly = true )
         {
-            using( m.OpenInfo( $"Fetching {(originOnly ? "origin" : "all remotes")} in repository '{SubPath}'." ) )
+            using( m.OpenInfo( $"Fetching {(originOnly ? "origin" : "all remotes")} in repository '{DisplayPath}'." ) )
             {
                 try
                 {
@@ -255,7 +303,7 @@ namespace CK.Env
         /// </returns>
         public (bool Success, bool ReloadNeeded) Pull( IActivityMonitor m, MergeFileFavor mergeFileFavor )
         {
-            using( m.OpenInfo( $"Pulling branch '{CurrentBranchName}' in '{SubPath}'." ) )
+            using( m.OpenInfo( $"Pulling branch '{CurrentBranchName}' in '{DisplayPath}'." ) )
             {
                 if( !FetchBranches( m )
                     || !CheckCleanCommit( m ) )
@@ -294,7 +342,7 @@ namespace CK.Env
         /// </returns>
         public (bool Success, bool ReloadNeeded) Checkout( IActivityMonitor m, string branchName, bool skipFetchBranches = false, bool skipPullMerge = false )
         {
-            using( m.OpenInfo( $"Checking out branch '{branchName}' in '{SubPath}'." ) )
+            using( m.OpenInfo( $"Checking out branch '{branchName}' in '{DisplayPath}'." ) )
             {
                 if( !skipFetchBranches && !FetchBranches( m ) ) return (false, false);
                 try
@@ -427,10 +475,10 @@ namespace CK.Env
                 return AmendCommit( m, modified );
             }
             if( string.IsNullOrWhiteSpace( commitMessage ) ) throw new ArgumentNullException( nameof( commitMessage ) );
-            using( m.OpenInfo( $"Committing changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
+            using( m.OpenInfo( $"Committing changes in '{DisplayPath}' (branch '{CurrentBranchName}')." ) )
             {
                 Commands.Stage( Git, "*" );
-                var s = Git.RetrieveStatus();
+                var s = Git.RetrieveStatus( _checkDirtyOptions );
                 if( !s.IsDirty )
                 {
                     m.CloseGroup( "Working folder is up-to-date." );
@@ -462,7 +510,7 @@ namespace CK.Env
                                              bool skipIfNothingToCommit = true )
         {
             if( !CanAmendCommit ) throw new InvalidOperationException( nameof( CanAmendCommit ) );
-            using( m.OpenInfo( $"Amending Commit in '{SubPath}' (branch '{CurrentBranchName}')." ) )
+            using( m.OpenInfo( $"Amending Commit in '{DisplayPath}' (branch '{CurrentBranchName}')." ) )
             {
                 var message = Git.Head.Tip.Message;
                 if( editMessage != null ) message = editMessage( message );
@@ -480,7 +528,7 @@ namespace CK.Env
                     return CommittingResult.Error;
                 }
                 Commands.Stage( Git, "*" );
-                var s = Git.RetrieveStatus();
+                var s = Git.RetrieveStatus( _checkDirtyOptions );
                 bool hasChange = s.IsDirty;
                 if( hasChange )
                 {
@@ -524,8 +572,6 @@ namespace CK.Env
                 return DoCommit( m, message, date.Value, true );
             }
         }
-
-        
 
         /// <returns>False on error. True otherwise.</returns>
         CommittingResult DoCommit( IActivityMonitor m, string commitMessage, DateTimeOffset date, bool amendPreviousCommit )
@@ -587,8 +633,8 @@ namespace CK.Env
         /// <returns>True on success, false on error.</returns>
         public bool Push( IActivityMonitor m, string branchName )
         {
-            if( branchName == null ) throw new ArgumentNullException( nameof( branchName ) );
-            using( m.OpenInfo( $"Pushing '{SubPath}' (branch '{branchName}') to origin." ) )
+            Throw.CheckNotNullArgument( branchName );
+            using( m.OpenInfo( $"Pushing '{DisplayPath}' (branch '{branchName}') to origin." ) )
             {
                 try
                 {
@@ -644,57 +690,86 @@ namespace CK.Env
         /// Checks out a working folder if needed or checks that an existing one is
         /// bound to the <see cref="GitRepositoryKey.OriginUrl"/> 'origin' remote.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="git">The Git key.</param>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="keyStore">The secret key store.</param>
         /// <param name="workingFolder">The local working folder.</param>
-        /// <param name="ensureHooks">True to create the standard hooks.</param>
+        /// <param name="url">The url of the remote.</param>
+        /// <param name="isPublic">Whether this repository is public.</param>
         /// <param name="branchName">
         /// The initial branch name if cloning is done.
         /// This branch is created if needed (just like <see cref="EnsureBranch"/> does).
+        /// It is checked out only if the repository has been created.
         /// </param>
         /// <returns>The LibGit2Sharp repository object or null on error.</returns>
-        public static Repository? EnsureWorkingFolder( IActivityMonitor m,
+        public static bool EnsureWorkingFolder( IActivityMonitor monitor,
+                                                SecretKeyStore keyStore,
+                                                NormalizedPath workingFolder,
+                                                Uri url,
+                                                bool isPublic,
+                                                string? branchName )
+        {
+            var r = EnsureWorkingFolder( monitor,
+                                         new GitRepositoryKey( keyStore, url, isPublic ),
+                                         workingFolder,
+                                         branchName );
+            if( r == null ) return false;
+            r.Dispose();
+            return true;
+        }
+
+        /// <summary>
+        /// Checks out a working folder if needed or checks that an existing one is
+        /// bound to the <see cref="GitRepositoryKey.OriginUrl"/> 'origin' remote.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="git">The Git key.</param>
+        /// <param name="workingFolder">The local working folder.</param>
+        /// <param name="branchName">
+        /// The initial branch name if cloning is done.
+        /// This branch is created if needed (just like <see cref="EnsureBranch"/> does).
+        /// It is checked out only if the repository has been created.
+        /// </param>
+        /// <returns>The LibGit2Sharp repository object or null on error.</returns>
+        public static Repository? EnsureWorkingFolder( IActivityMonitor monitor,
                                                        GitRepositoryKey git,
                                                        NormalizedPath workingFolder,
-                                                       bool ensureHooks,
                                                        string? branchName = null )
         {
-            using( m.OpenTrace( $"Ensuring working folder '{workingFolder}' on '{git.OriginUrl}'." ) )
+            using( monitor.OpenTrace( $"Ensuring working folder '{workingFolder}' on '{git.OriginUrl}'." ) )
             {
                 try
                 {
-                    var gitFolderPath = Path.Combine( workingFolder, ".git" );
+                    var gitFolderPath = workingFolder.AppendPart( ".git" );
                     bool repoCreated = false;
-                    using( m.OpenTrace( "Ensuring the git repository." ) )
+                    if( !Directory.Exists( gitFolderPath ) )
                     {
-                        if( !Directory.Exists( gitFolderPath ) )
+                        using( monitor.OpenTrace( $"The folder '{gitFolderPath}' does not exist." ) )
                         {
-                            m.Trace( $"The folder '{gitFolderPath}' does not exist." );
-                            using( m.OpenInfo( $"Cloning '{workingFolder}' from '{git.OriginUrl}' on {branchName}." ) )
+                            using( monitor.OpenInfo( $"Cloning '{workingFolder}' from '{git.OriginUrl}' on {branchName}." ) )
                             {
                                 try
                                 {
                                     Repository.Clone( git.OriginUrl.AbsoluteUri, workingFolder, new CloneOptions()
                                     {
-                                        CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( m, git ),
+                                        CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( monitor, git ),
                                         Checkout = true
                                     } );
                                     repoCreated = true;
                                 }
                                 catch( Exception ex )
                                 {
-                                    m.Error( "Git clone failed. Leaving existing directory as-is.", ex );
+                                    monitor.Error( "Git clone failed. Leaving existing directory as-is.", ex );
                                     return null;
                                 }
                             }
                         }
                     }
                     Repository r;
-                    using( m.OpenTrace( "Checking the validity of the git repository." ) )
+                    using( monitor.OpenTrace( "Checking the validity of the git repository." ) )
                     {
                         if( !Repository.IsValid( gitFolderPath ) )
                         {
-                            m.Fatal( $"Git folder '{gitFolderPath}' exists but is not a valid Repository." );
+                            monitor.Fatal( $"Git folder '{gitFolderPath}' exists but is not a valid Repository." );
                             return null;
                         }
                         r = new Repository( workingFolder );
@@ -702,39 +777,136 @@ namespace CK.Env
                         if( remote == null || remote.Name != "origin" )
                         {
 
-                            m.Fatal( $"Existing '{workingFolder}' must have its 'origin' remote set to '{git.OriginUrl}'. This must be fixed manually." );
+                            monitor.Fatal( $"Existing '{workingFolder}' must have its 'origin' remote set to '{git.OriginUrl}'. This must be fixed manually." );
                             r.Dispose();
                             return null;
                         }
-                        if( !r.Commits.Any() )
-                        {
-                            m.Info( $"Unitialized repository: automatically creating an initial commit." );
-                            var date = DateTimeOffset.Now;
-                            Signature author = r.Config.BuildSignature( date );
-                            var committer = new Signature( "CKli", "none", date );
-                            r.Commit( "Initial commit automatically created.", author, committer, new CommitOptions { AllowEmptyCommit = true } );
-                        }
+                        EnsureFirstCommit( monitor, r );
                     }
                     if( r.Head?.FriendlyName != branchName && branchName != null )
                     {
-                        Branch branch = DoEnsureBranch( m, r, branchName, false, workingFolder );
+                        Branch branch = DoEnsureBranch( monitor, r, branchName, false, workingFolder );
                         if( repoCreated ) Commands.Checkout( r, branch );
                     }
-                    if( ensureHooks ) EnsureHooks( m, workingFolder );
-                    m.CloseGroup( "Repository is checked out." );
+                    monitor.CloseGroup( "Repository is checked out." );
                     return r;
                 }
                 catch( Exception ex )
                 {
-                    m.Fatal( $"Failed to ensure '{workingFolder}'.", ex );
+                    monitor.Fatal( $"Failed to ensure Git '{workingFolder}'.", ex );
                     return null;
                 }
             }
         }
 
         /// <summary>
+        /// Calls <see cref="EnsureWorkingFolder(IActivityMonitor, GitRepositoryKey, NormalizedPath, bool, string?)"/>
+        /// on multiple repositories at once.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="keyStore">The key store.</param>
+        /// <param name="stackRoot">The root of the <paramref name="layout"/>.</param>
+        /// <param name="layout">The set of repositories to ensure.</param>
+        /// <param name="isPublic">Whether the repositories are public or not.</param>
+        /// <param name="branchName">
+        /// The initial branch name if cloning is done.
+        /// This branch is created if needed (just like <see cref="EnsureBranch"/> does).
+        /// It is checked out only if the repository has been created.
+        /// </param>
+        /// <returns>True on success, false is at least one repository failed.</returns>
+        public static bool EnsureWorkingFolders( IActivityMonitor monitor,
+                                                 SecretKeyStore keyStore,
+                                                 NormalizedPath stackRoot,
+                                                 IReadOnlyList<(NormalizedPath SubPath, Uri Url)> layout,
+                                                 bool isPublic,
+                                                 string? branchName = null )
+        {
+            bool success = true;
+            using( monitor.OpenInfo( $"Cloning {layout.Count} repositories in {stackRoot}." ) )
+            {
+                foreach( var (subPath, url) in layout )
+                {
+                    success &= EnsureWorkingFolder( monitor, keyStore, stackRoot.Combine( subPath ), url, isPublic, branchName );
+                }
+            }
+            return success;
+        }
+
+        /// <summary>
+        /// Tries to open an existing working folder. An "origin" remote must exist.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="workingFolder">The local working folder (above the .git folder).</param>
+        /// <param name="warnOnly">True to emit only warnings on error, false to emit errors.</param>
+        /// <param name="branchName">
+        /// An optional branch name that is created if it doesn't exist but is not checked out.
+        /// <see cref="EnsureBranch(IActivityMonitor, string, bool)"/>.
+        /// </param>
+        /// <returns>The LibGit2Sharp repository object and its "origin" Url or null on error.</returns>
+        public static (Repository Repository, Uri OriginUrl)? OpenWorkingFolder( IActivityMonitor monitor,
+                                                                                 NormalizedPath workingFolder,
+                                                                                 bool warnOnly,
+                                                                                 string? branchName = null )
+        {
+            Throw.CheckNotNullArgument( monitor );
+            Throw.CheckArgument( !workingFolder.IsEmptyPath );
+            try
+            {
+                var errorLevel = warnOnly ? Core.LogLevel.Warn : Core.LogLevel.Error;
+                var gitFolderPath = workingFolder.AppendPart( ".git" );
+                if( !Directory.Exists( gitFolderPath ) )
+                {
+                    monitor.Log( errorLevel, $"The folder '{gitFolderPath}' does not exist." );
+                    return null;
+                }
+                if( !Repository.IsValid( gitFolderPath ) )
+                {
+                    monitor.Log( errorLevel, $"Git folder '{gitFolderPath}' exists but is not a valid Repository. This must be fixed manually." );
+                    return null;
+                }
+                var r = new Repository( workingFolder );
+                var origin = r.Network.Remotes.FirstOrDefault( rem => rem.Name == "origin" );
+                if( origin == null )
+                {
+                    monitor.Log( errorLevel, $"Existing '{workingFolder}' must have an 'origin' remote. Remotes are: '{r.Network.Remotes.Select( r => r.Name ).Concatenate( "', '" )}'. This must be fixed manually." );
+                    r.Dispose();
+                    return null;
+                }
+                if( !Uri.TryCreate( origin.Url, UriKind.Absolute, out var originUrl ) )
+                {
+                    monitor.Log( errorLevel, $"Existing '{workingFolder}' has its 'origin' that is not a valid absolute Uri: '{origin.Url}'. This must be fixed manually." );
+                    r.Dispose();
+                    return null;
+                }
+                EnsureFirstCommit( monitor, r );
+                if( branchName != null && r.Head?.FriendlyName != branchName )
+                {
+                    DoEnsureBranch( monitor, r, branchName, false, workingFolder );
+                }
+                return (r, originUrl);
+            }
+            catch( Exception ex )
+            {
+                monitor.Fatal( $"Failed to open Git '{workingFolder}'.", ex );
+                return null;
+            }
+        }
+
+        static void EnsureFirstCommit( IActivityMonitor m, Repository r )
+        {
+            if( !r.Commits.Any() )
+            {
+                m.Info( $"Unitialized repository: automatically creating an initial commit." );
+                var date = DateTimeOffset.Now;
+                Signature author = r.Config.BuildSignature( date );
+                var committer = new Signature( "CKli", "none", date );
+                r.Commit( "Initial commit automatically created.", author, committer, new CommitOptions { AllowEmptyCommit = true } );
+            }
+        }
+
+        /// <summary>
         /// Credentials is read from the <see cref="GitRepositoryKey.SecretKeyStore"/>.
-        /// This can not be implemented by GitRepositoryKey since LibGit2Sharp is not
+        /// This cannot be implemented by GitRepositoryKey since LibGit2Sharp is not
         /// a dependency of CK.Env.Sys. 
         /// </summary>
         /// <param name="m">The monitor to use.</param>
@@ -756,176 +928,5 @@ namespace CK.Env
         /// <param name="m">The monitor to use.</param>
         /// <returns>The Credentials object that is null or a <see cref="UsernamePasswordCredentials"/>.</returns>
         protected Credentials? PATCredentialsHandler( IActivityMonitor m ) => PATCredentialsHandler( m, RepositoryKey );
-
-
-        #region GitHooks
-
-        static void EnsureHooks( IActivityMonitor m, NormalizedPath root )
-        {
-            const string prepush = "pre-push";
-            EnsureHookDispatcher( m, root, prepush );
-            EnsureHookFile( m, root, prepush, "check_not_local_branch", _hook_check_not_local );
-            EnsureHookFile( m, root, prepush, "check_no_commit_nopush", _hook_check_no_commit_nopush );
-        }
-
-
-        static SVersion CheckHookDispatcherVersion( string scriptString )
-        {
-            string[] lines = scriptString.Split( '\n' );
-            if( lines.Length <= 2 ) return null;
-            if( !lines[1].Contains( "script-dispatcher-" ) ) return null;
-            if( !SVersion.TryParse(
-                lines[1].Replace( "#script-dispatcher-", "" )
-                .Trim(),
-                out SVersion version ) )
-            {
-                throw new InvalidDataException( "Git hook script version badly forged" );
-            }
-            return version;
-        }
-        static NormalizedPath GetHooksDir( NormalizedPath root ) => root.AppendPart( ".git" ).AppendPart( "hooks" );
-
-        static NormalizedPath GetHookPath( NormalizedPath root, string hookName ) => GetHooksDir( root ).AppendPart( hookName );
-
-        static NormalizedPath GetMultiHooksDir( NormalizedPath root, string hookName ) => GetHooksDir( root ).AppendPart( hookName + "_scripts" );
-
-        static void EnsureHookDispatcher( IActivityMonitor m, NormalizedPath root, string hookName )
-        {
-            NormalizedPath hookPath = GetHookPath( root, hookName );
-            NormalizedPath multiHookDirectory = GetMultiHooksDir( root, hookName );
-            bool hookPresent = File.Exists( hookPath );
-            Directory.CreateDirectory( multiHookDirectory );
-            if( hookPresent )
-            {
-                string installedScript = File.ReadAllText( hookPath );
-                SVersion installedScriptVersion = CheckHookDispatcherVersion( installedScript );
-                //replacing the hook dispatcher on a new version is not implemented yet, we just save the script to not destroy user hooks.
-                if( installedScriptVersion == null )
-                {
-                    File.Move( hookPath, Path.Combine( multiHookDirectory, hookName ) );
-                    m.Info( $"Git hook {hookName} was not our dispatcher. Moved user hook to {multiHookDirectory}." );
-                }
-                else
-                {
-                    SVersion currentScriptVersion = CheckHookDispatcherVersion( HookPrePushScript( hookName ) );
-                    if( currentScriptVersion > installedScriptVersion )
-                    {
-                        m.Info( $"Git hook {hookName} was an old dispatcher. Removing it." );
-                        File.Delete( hookPath );
-                    }
-                    else
-                    {
-                        m.Trace( $"The current {hookName} hook is our dispatcher." );
-                    }
-                }
-            }
-            // Now hook file may not exist event if it did.
-            hookPresent = File.Exists( hookPath );
-            if( !hookPresent )
-            {
-                File.WriteAllText( hookPath, HookPrePushScript( hookName ) );
-                m.Info( $"Created dispatcher for {hookName} hooks." );
-            }
-        }
-
-        static void EnsureHookFile( IActivityMonitor m, NormalizedPath root, string hookName, string scriptName, string script )
-        {
-            var hookPath = Path.Combine( GetMultiHooksDir( root, hookName ), scriptName );
-            bool currentHookIsUpToDate = File.Exists( hookPath ) && File.ReadAllText( hookPath ) == script;
-            if( !currentHookIsUpToDate )
-            {
-                m.Info( "git " + Path.GetFileName( hookPath ) + " hook not up to date. Updating!" );
-                File.WriteAllText( hookPath, script );
-            }
-            else
-            {
-                m.Trace( $"The script {hookName}_scripts/{scriptName} is up to date." );
-            }
-        }
-
-        const string _hook_check_not_local =
-@"#!/bin/sh
-# Abort push on local branches
-while read local_ref local_sha remote_ref remote_sha 
-do 
-	regexp='(?i)(^|[^a-z0-9]+)local($|[^a-z0-9]+)'
-	result=$( echo ""$local_ref"" | grep -P $regexp )
-	if [[ ""$result"" != """" ]];
-	then
-		RED='\e[33;41m'
-		NC='\e[0m' # No Color
-		echo -e >&2 ""${RED}Pushing on a local branch, aborting!${NC}""
-        exit 1
-	fi
-done
-exit 0
-
-";
-        const string _hook_check_no_commit_nopush =
-@"#!/bin/sh
-# inspired from https://github.com/bobgilmore/githooks/blob/master/pre-push
-# Hook stopping the push if we find a [NOPUSH] commit.
-remote=""$1""
-url=""$2""
-
-z40=0000000000000000000000000000000000000000
-
-echo ""Checking if a commit contain NOPUSH...""
-while read local_ref local_sha remote_ref remote_sha
-do
-	if [ ""$local_sha"" = $z40 ]
-	then
-		echo ""Deleting files, OK.""
-	else
-		if [ ""$remote_sha"" = $z40 ]
-		then
-			# New branch, examine all commits
-			range=""$local_sha""
-		else
-			# Update to existing branch, examine new commits
-			range=""${remote_sha}..${local_sha}""
-		fi
-
-		# Check for foo commit
-		commit=`git rev-list -n 1 --grep 'NOPUSH' ""$range""`
-    echo $commit
-		if [ -n ""$commit"" ]
-		then
-			echo >&2 ""ERROR: Found commit message containing 'NOPUSH' in $local_ref so you should not push this commit !!!""
-      echo >&2 ""Commit containing the message: $commit""
-			exit 1
-		fi
-	fi
-done
-echo ""No commit found with NOPUSH. Push can continue.""
-exit 0
-";
-        static string HookPrePushScript( string hookName ) =>
-$@"#!/bin/sh
-#script-dispatcher-0.0.3
-# Hook that execute all scripts in a directory
-remote=""$1"";
-url=""$2"";
-hook_directory="".git/hooks""
-search_dir=""pre-push_scripts""
-search_path=""$hook_directory/$search_dir""
-i=0
-stdin=`cat`
-for scriptFile in ""$search_path""/*; do
-  i=$((i+=1))
-  echo ""Running script $scriptFile"";
-  echo ""$stdin"" | $scriptFile $@;  # execute successfully or break
-    # Or more explicitly: if this execution fails, then stop the `for`:
-   exitCode=$?
-   if [ $exitCode -ne 0 ] ; then
-   echo >&2 ""Script $scriptFile exit code is $exitCode. Aborting push."";
-   exit $exitCode;
-   fi
-done
-echo ""Executed successfully $i scripts.""
-exit 0
-";
-
-        #endregion GitHooks
     }
 }

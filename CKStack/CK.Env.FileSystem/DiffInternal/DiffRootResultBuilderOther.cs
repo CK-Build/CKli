@@ -3,11 +3,12 @@ using CK.Core;
 namespace CK.Env.Diff
 {
     /// <summary>
-    /// Accept any changes
+    /// Accept any changes.
     /// </summary>
-    class DiffRootResultBuilderOther : DiffRootResultBuilderBase
+    sealed class DiffRootResultBuilderOther : DiffRootResultBuilderBase
     {
-        public DiffRootResultBuilderOther( Env.DiffRoot diffRoot ) : base( diffRoot )
+        public DiffRootResultBuilderOther( GitDiffRoot diffRoot )
+            : base( diffRoot )
         {
 
         }

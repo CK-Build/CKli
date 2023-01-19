@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.4.27">
+    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.4.33">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
@@ -20,8 +20,8 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
     <PackageReference Include="NuGet.Credentials" Version="6.4.0" />
     <PackageReference Include="SimpleGitVersion.Cake" Version="8.0.0" />
-    <PackageReference Include="CK.Core" Version="16.1.0" />
-    <PackageReference Include="CKSetup.Cake" Version="18.0.0" />
+    <PackageReference Include="CK.Core" Version="16.1.1" />
+    <PackageReference Include="CKSetup.Cake" Version="18.0.1" />
   </ItemGroup>
 
 </Project>

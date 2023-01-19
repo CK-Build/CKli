@@ -9,12 +9,14 @@ using System.Xml.Linq;
 
 namespace CK.Env
 {
+
+
     /// <summary>
     /// Base implementation of a store for multiple worlds or single world.
     /// Local state is handled by default at this level (this can be overridden): local state file is stored
     /// at the root of the world.
     /// </summary>
-    public abstract class WorldStore
+    public abstract class WorldStore : IWorldStore
     {
         protected class SingleWorldMapping : IWorldLocalMapping
         {
@@ -33,7 +35,7 @@ namespace CK.Env
 
             public bool SetMap( IActivityMonitor m, string worldFullName, in NormalizedPath mappedPath )
             {
-                throw new InvalidOperationException( nameof( CanSetMapping ) );
+                return Throw.InvalidOperationException<bool>( nameof( CanSetMapping ) );
             }
 
             /// <summary>
@@ -59,7 +61,8 @@ namespace CK.Env
         /// <param name="worldLocalMapping">Required path mapper.</param>
         protected WorldStore( IWorldLocalMapping worldLocalMapping )
         {
-            WorldLocalMapping = worldLocalMapping ?? throw new ArgumentNullException( nameof( worldLocalMapping ) );
+            Throw.CheckNotNullArgument( worldLocalMapping );
+            WorldLocalMapping = worldLocalMapping;
         }
 
         /// <summary>
@@ -107,10 +110,10 @@ namespace CK.Env
         /// <returns>The new world or null on error.</returns>
         public IRootedWorldName? CreateNewParrallel( IActivityMonitor m, IRootedWorldName source, string parallelName, XDocument content )
         {
-            if( source == null ) throw new ArgumentNullException( nameof( source ) );
-            if( content == null ) throw new ArgumentNullException( nameof( content ) );
-            if( String.IsNullOrWhiteSpace( parallelName ) ) throw new ArgumentNullException( nameof( parallelName ) );
-            if( SingleWorld != null ) throw new InvalidOperationException( nameof( SingleWorld ) );
+            Throw.CheckNotNullArgument( source );
+            Throw.CheckNotNullArgument( content );
+            Throw.CheckNotNullOrWhiteSpaceArgument( parallelName );
+            Throw.CheckState( !IsSingleWorld );
             return DoCreateNewParallel( m, source, parallelName, content );
         }
 
@@ -123,14 +126,8 @@ namespace CK.Env
         /// <param name="parallelName">The parallel world name to create. See <see cref="IWorldName"/>.</param>
         /// <param name="content">The initial content.</param>
         /// <returns>The new world or null on error.</returns>
-        protected abstract IRootedWorldName? DoCreateNewParallel( IActivityMonitor m, IRootedWorldName source, string parallelName, XDocument content );
+        protected abstract LocalWorldName? DoCreateNewParallel( IActivityMonitor m, IRootedWorldName source, string parallelName, XDocument content );
 
-        /// <summary>
-        /// Gets the world description of one world.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="w">The world that must exist in the <see cref="ReadWorlds"/> result.</param>
-        /// <returns>The Xml document.</returns>
         public abstract XDocument ReadWorldDescription( IActivityMonitor m, IWorldName w );
 
         /// <summary>
@@ -142,71 +139,14 @@ namespace CK.Env
         /// <returns>True on success, false on error.</returns>
         public abstract bool WriteWorldDescription( IActivityMonitor m, IWorldName w, XDocument content );
 
-        /// <summary>
-        /// Gets or creates the <see cref="SharedWorldState"/> for a world.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="w">The world name. It must exist in this store.</param>
-        /// <returns>The existing or new world shared state.</returns>
         public abstract SharedWorldState GetOrCreateSharedState( IActivityMonitor m, IWorldName w );
 
-        /// <summary>
-        /// Gets or creates the <see cref="LocalWorldState"/> for a world.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="w">The world name. It must exist in this store.</param>
-        /// <returns>The existing or new world local state.</returns>
         public abstract LocalWorldState GetOrCreateLocalState( IActivityMonitor m, IWorldName w );
 
-        /// <summary>
-        /// Saves the local state xml document.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="w">The world name.</param>
-        /// <param name="d">The document state.</param>
-        /// <returns>True on success, false on error.</returns>
-        protected abstract bool SaveLocalState( IActivityMonitor m, IWorldName w, XDocument d );
+        public abstract bool SaveLocalState( IActivityMonitor m, IWorldName w, XDocument d );
 
-        /// <summary>
-        /// Must saves the shared state xml document.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="w">The world name.</param>
-        /// <param name="d">The document state.</param>
-        /// <returns>True on success, false on error.</returns>
-        protected abstract bool SaveSharedState( IActivityMonitor m, IWorldName w, XDocument d );
+        public abstract bool SaveSharedState( IActivityMonitor m, IWorldName w, XDocument d );
 
-        /// <summary>
-        /// Implementation must return a local folder where any local stuff associated
-        /// to the world may be stored.
-        /// </summary>
-        /// <param name="w">The world name. It must exist in this store.</param>
-        /// <returns>A local path to an existing and writable directory.</returns>
         public abstract NormalizedPath GetWorkingLocalFolder( IWorldName w );
-
-        /// <summary>
-        /// Saves an existing world's state.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="state">The updated world state. Must not be null.</param>
-        /// <returns>True on success, false on error.</returns>
-        public bool SaveState( IActivityMonitor m, BaseWorldState state )
-        {
-            if( state == null ) throw new ArgumentNullException( nameof( state ) );
-            try
-            {
-                if( state is LocalWorldState )
-                {
-                    return SaveLocalState( m, state.World, state.XDocument );
-                }
-                return SaveSharedState( m, state.World, state.XDocument );
-            }
-            catch( Exception ex )
-            {
-                m.Error( $"While saving {state.World.FullName} state.", ex );
-                return false;
-            }
-        }
-
     }
 }

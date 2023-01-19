@@ -13,33 +13,39 @@ namespace CK.Env
     /// A default branch must be provided: plugins registered in this default branch are used as fallbacks
     /// for unconfigured branch.
     /// </summary>
-    public class GitPluginManager : IDisposable
+    public sealed class GitPluginManager : IDisposable
     {
-        readonly CommandRegister _commandRegister;
+        readonly CommandRegistry _commandRegister;
         readonly string _defaultBranchName;
         readonly PluginCollection<IGitPlugin> _plugins;
-        readonly Branches _branches;
+        readonly BranchesPluginCollection _branches;
 
-        class Branches : IGitBranchPluginCollection, IDisposable
+        sealed class BranchesPluginCollection : IGitBranchPluginCollection, IDisposable
         {
             readonly GitPluginManager _manager;
             readonly Dictionary<string, PluginCollection<IGitBranchPlugin>> _branchPlugins;
 
-            public Branches( GitPluginManager manager )
+            public BranchesPluginCollection( GitPluginManager manager )
             {
                 _manager = manager;
                 _branchPlugins = new Dictionary<string, PluginCollection<IGitBranchPlugin>>();
             }
 
-            internal PluginCollection<IGitBranchPlugin> FindOrCreateWithoutInitialization( string branchName ) => DoFindOrCreate( false, branchName );
+            public bool IsInitialized( string branchName )
+            {
+                Throw.CheckNotNullOrWhiteSpaceArgument( branchName );
+                return _branchPlugins.TryGetValue( branchName, out var c ) && c.IsFirstLoadDone;
+            }
 
-            public IGitPluginCollection<IGitBranchPlugin> this[string branchName] => DoFindOrCreate( true, branchName );
+            internal PluginCollection<IGitBranchPlugin> FindOrCreateWithoutInitialization( string branchName ) => DoFindOrCreate( false, branchName )!;
+
+            public IGitPluginCollection<IGitBranchPlugin> this[string branchName] => DoFindOrCreate( true, branchName )!;
 
             public bool EnsurePlugins( IActivityMonitor m, string branchName ) => DoFindOrCreate( true, branchName, m ) != null;
 
-            PluginCollection<IGitBranchPlugin> DoFindOrCreate( bool ensureFirstLoad, string branchName, IActivityMonitor? m = null )
+            PluginCollection<IGitBranchPlugin>? DoFindOrCreate( bool ensureFirstLoad, string branchName, IActivityMonitor? m = null )
             {
-                if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
+                Throw.CheckNotNullOrWhiteSpaceArgument( branchName );
                 if( !_branchPlugins.TryGetValue( branchName, out var c )
                     || (ensureFirstLoad && !c.IsFirstLoadDone) )
                 {
@@ -81,7 +87,7 @@ namespace CK.Env
             /// Note that plugins that supports <see cref="IDisposable"/> are disposed.
             /// </summary>
             /// <param name="branchName">Branch name to reload. Null to reload all plugins.</param>
-            public void Reload( string branchName )
+            public void Reload( string? branchName )
             {
                 if( branchName == null )
                 {
@@ -103,36 +109,37 @@ namespace CK.Env
             }
         }
 
-        class PluginCollection<T> : IGitPluginCollection<T>, IDisposable, IServiceProvider where T : class
+        sealed class PluginCollection<T> : IGitPluginCollection<T>, IDisposable, IServiceProvider where T : class
         {
             readonly Dictionary<Type, object> _mappings;
             readonly GitPluginManager _manager;
+            readonly SimpleServiceContainer _serviceContainer;
             int _pluginCount;
 
-            public PluginCollection( GitPluginManager manager, string branchName )
+            public PluginCollection( GitPluginManager manager, string? branchName )
             {
                 _manager = manager;
                 BranchName = branchName;
                 if( branchName == null )
                 {
-                    ServiceContainer = manager.ServiceContainer;
+                    _serviceContainer = manager.ServiceContainer;
                 }
                 else
                 {
                     if( branchName == manager._defaultBranchName )
                     {
-                        ServiceContainer = new SimpleServiceContainer( manager._plugins );
+                        _serviceContainer = new SimpleServiceContainer( manager._plugins );
                     }
                     else
                     {
                         var baseProvider = manager._branches.FindOrCreateWithoutInitialization( manager._defaultBranchName );
-                        ServiceContainer = new SimpleServiceContainer( baseProvider );
+                        _serviceContainer = new SimpleServiceContainer( baseProvider );
                     }
                 }
                 _mappings = new Dictionary<Type, object>();
             }
 
-            public SimpleServiceContainer ServiceContainer { get; }
+            public SimpleServiceContainer ServiceContainer => _serviceContainer;
 
             /// <summary>
             /// Gets whether plugins have been initialized at least one: consider that as long as no plugins
@@ -151,12 +158,11 @@ namespace CK.Env
                 if( _pluginCount != 0 ) Reset();
                 // Collects the settings.
                 var updatedMappings = new Dictionary<Type, object>( _mappings );
-                _pluginCount = _manager.Registry.FillMappings(
-                                                    updatedMappings,
-                                                    ServiceContainer,
-                                                    _manager._commandRegister,
-                                                    BranchName,
-                                                    BranchName != null ? _manager._defaultBranchName : null );
+                _pluginCount = _manager.Registry.FillMappings( updatedMappings,
+                                                               _serviceContainer,
+                                                               _manager._commandRegister,
+                                                               BranchName,
+                                                               BranchName != null ? _manager._defaultBranchName : null );
                 _mappings.Clear();
                 _mappings.AddRange( updatedMappings );
             }
@@ -181,15 +187,15 @@ namespace CK.Env
                 }
             }
 
-            public string BranchName { get; }
+            public string? BranchName { get; }
 
             public int Count => _pluginCount;
 
             public IEnumerator<T> GetEnumerator() => _mappings.Values.OfType<T>().GetEnumerator();
 
-            public T? GetPlugin( Type t ) => _mappings.GetValueOrDefault( t, null ) as T;
+            public T? GetPlugin( Type t ) => _mappings.GetValueOrDefault( t ) as T;
 
-            public P? GetPlugin<P>() where P : T => (P?)_mappings.GetValueOrDefault( typeof( P ), null );
+            public P? GetPlugin<P>() where P : T => (P?)_mappings.GetValueOrDefault( typeof( P ) );
 
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
@@ -204,23 +210,23 @@ namespace CK.Env
         /// </summary>
         /// <param name="registry">The registry of plugins.</param>
         /// <param name="baseProvider">The base service provider.</param>
-        /// <param name="commandRegister">Command registerer.</param>
+        /// <param name="commandRegistry">Commands registry.</param>
         /// <param name="defaultBranchName">The default branch name (typically "develop"). Must not be null or empty.</param>
-        public GitPluginManager( GitPluginRegistry registry, ISimpleServiceContainer baseProvider, CommandRegister commandRegister, string defaultBranchName )
+        public GitPluginManager( GitPluginRegistry registry, ISimpleServiceContainer baseProvider, CommandRegistry commandRegistry, string defaultBranchName )
         {
-            if( String.IsNullOrWhiteSpace( defaultBranchName ) ) throw new ArgumentNullException( nameof( defaultBranchName ) );
+            Throw.CheckNotNullOrWhiteSpaceArgument( defaultBranchName );
             ServiceContainer = new SimpleServiceContainer( baseProvider );
             _defaultBranchName = defaultBranchName;
-            _commandRegister = commandRegister ?? throw new ArgumentNullException( nameof( commandRegister ) );
+            _commandRegister = commandRegistry ?? throw new ArgumentNullException( nameof( commandRegistry ) );
             Registry = registry;
             _plugins = new PluginCollection<IGitPlugin>( this, null );
-            _branches = new Branches( this );
+            _branches = new BranchesPluginCollection( this );
         }
 
         /// <summary>
         /// Gets the plugin registry.
         /// Any registration of new <see cref="IGitPlugin"/> (or <see cref="IGitBranchPlugin"/>) must be followed
-        /// by a <see cref="Reload"/> for actual plugins to be instanciated.
+        /// by a <see cref="Reload"/> for actual plugins to be instantiated.
         /// </summary>
         public GitPluginRegistry Registry { get; }
 
@@ -232,11 +238,11 @@ namespace CK.Env
 
         /// <summary>
         /// Gets a <see cref="SimpleServiceContainer"/> for a branch or, if <paramref name="branchName"/> is null,
-        /// the primary <see cref="ServiceContainer"/> without trigerring plugin initialization.
+        /// the primary <see cref="ServiceContainer"/> without triggering plugin initialization.
         /// </summary>
         /// <param name="branchName">Branch name.</param>
         /// <returns>The primary service container or the container for the branch.</returns>
-        public SimpleServiceContainer GetServiceContainer( string branchName )
+        public SimpleServiceContainer GetServiceContainer( string? branchName )
         {
             if( branchName == null ) return ServiceContainer;
             return _branches.FindOrCreateWithoutInitialization( branchName ).ServiceContainer;
@@ -258,7 +264,7 @@ namespace CK.Env
         /// Existing IDisposable plugins are disposed first.
         /// </summary>
         /// <param name="branchName">The branch name or null for all plugins.</param>
-        public void Reload( string branchName = null )
+        public void Reload( string? branchName = null )
         {
             if( branchName == null ) _plugins.Reload();
             _branches.Reload( branchName );

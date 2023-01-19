@@ -60,7 +60,7 @@ namespace CK.Env.Plugin
         {
             e.StartInfo.EnvironmentVariables.Add( "CKLI_CURRENT_WORLD_FULLNAME", GitFolder.World.FullName );
             e.StartInfo.EnvironmentVariables.Add( "CKLI_CURRENT_WORLD_NAME", GitFolder.World.Name );
-            e.StartInfo.EnvironmentVariables.Add( "CKLI_CURRENT_SOLUTION_NAME", GitFolder.SubPath.LastPart );
+            e.StartInfo.EnvironmentVariables.Add( "CKLI_CURRENT_SOLUTION_NAME", GitFolder.DisplayPath.LastPart );
         }
 
         void OnReset( IActivityMonitor m )
@@ -142,7 +142,7 @@ namespace CK.Env.Plugin
         {
             if( !IsSolutionValid || reloadSolution )
             {
-                using( monitor.OpenInfo( $"Loading solution '{GitFolder.SubPath}'." ) )
+                using( monitor.OpenInfo( $"Loading solution '{GitFolder.DisplayPath}'." ) )
                 {
                     DoLoadSolution( monitor );
                 }
@@ -176,7 +176,7 @@ namespace CK.Env.Plugin
             if( _solution == null )
             {
                 newSolution = true;
-                var expectedSolutionName = GitFolder.SubPath.LastPart + ".solution";
+                var expectedSolutionName = GitFolder.DisplayPath.LastPart + ".solution";
                 _solution = _solutionContext.AddSolution( BranchPath, expectedSolutionName );
             }
             var buildSecrets = new List<(string SecretKeyName, string? Secret)>();
@@ -490,7 +490,7 @@ namespace CK.Env.Plugin
             if( solution == null ) return false;
             if( !ParseDates( m, beginning, ending, out var beginningDate, out var endingDate ) ) return false;
             m.Info( $"Parsed date range: {beginningDate} => {endingDate}" );
-            var diff = GitFolder.GetDiff( m, beginningDate, endingDate, solution.Projects.Select( proj => new DiffRoot( proj.Name, proj.ProjectSources ) ), true );
+            var diff = GitFolder.GetDiff( m, beginningDate, endingDate, solution.Projects.Select( proj => new GitDiffRoot( proj.Name, proj.ProjectSources ) ), true );
             if( diff != null )
             {
                 Console.WriteLine( diff.ToString( true, showDiffs ) );

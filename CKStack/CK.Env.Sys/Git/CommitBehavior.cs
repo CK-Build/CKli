@@ -1,5 +1,7 @@
 namespace CK.Env
 {
+
+
     public enum CommitBehavior
     {
         CreateNewCommit,

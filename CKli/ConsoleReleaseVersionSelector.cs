@@ -10,10 +10,10 @@ using System.Linq;
 
 namespace CKli
 {
-    public class ConsoleReleaseVersionSelector : IReleaseVersionSelector
+    public sealed class ConsoleReleaseVersionSelector : IReleaseVersionSelector
     {
         /// <summary>
-        /// This method must choose between possible versions. It may return null to cancel the process.
+        /// This method must choose between possible versions.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="c">The context.</param>

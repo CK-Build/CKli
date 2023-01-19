@@ -5,11 +5,11 @@ namespace CK.Env.Diff
 {
     abstract class DiffRootResultBuilderBase
     {
-        protected Env.DiffRoot DiffRoot { get; }
+        protected Env.GitDiffRoot DiffRoot { get; }
         protected List<AddedDiff> AddedDiffs { get; } = new List<AddedDiff>();
         protected List<DeletedDiff> DeletedDiffs { get; } = new List<DeletedDiff>();
         protected List<ModifiedDiff> ModifiedDiffs { get; } = new List<ModifiedDiff>();
-        public DiffRootResultBuilderBase( Env.DiffRoot diffRoot )
+        public DiffRootResultBuilderBase( Env.GitDiffRoot diffRoot )
         {
             DiffRoot = diffRoot;
         }
@@ -20,9 +20,9 @@ namespace CK.Env.Diff
 
         public abstract bool Accept( IActivityMonitor m, ModifiedDiff modifiedDiff );
 
-        public DiffRootResult Result
+        public GitDiffRootResult Result
         {
-            get => new DiffRootResult( DiffRoot, AddedDiffs, DeletedDiffs, ModifiedDiffs );
+            get => new GitDiffRootResult( DiffRoot, AddedDiffs, DeletedDiffs, ModifiedDiffs );
         }
     }
 }

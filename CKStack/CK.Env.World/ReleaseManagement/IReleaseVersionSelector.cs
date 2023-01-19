@@ -7,7 +7,7 @@ namespace CK.Env
     public interface IReleaseVersionSelector
     {
         /// <summary>
-        /// This method must choose between possible versions. It may return null to cancel the process.
+        /// This method must choose between possible versions or cancel the process.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="context">The context.</param>

@@ -27,10 +27,10 @@ namespace CK.Env
         public XElement ToXml()
         {
             return new XElement( XmlNames.xR,
-                        new XAttribute( XmlNames.xSolutionName, SolutionName ),
-                        Current.ToXml(),
-                        PreviousVersion != null ? new XElement( XmlNames.xPreviousVersion, PreviousVersion.ToString() ) : null,
-                        new XElement( XmlNames.xReleaseNote, new XCData( ReleaseNote ?? String.Empty ) ) );
+                                 new XAttribute( XmlNames.xSolutionName, SolutionName ),
+                                 Current.ToXml(),
+                                 PreviousVersion != null ? new XElement( XmlNames.xPreviousVersion, PreviousVersion.ToString() ) : null,
+                                 new XElement( XmlNames.xReleaseNote, new XCData( ReleaseNote ?? String.Empty ) ) );
         }
 
         /// <summary>

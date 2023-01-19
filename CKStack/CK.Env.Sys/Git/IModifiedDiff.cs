@@ -3,7 +3,7 @@ using CK.Core;
 namespace CK.Env
 {
     /// <summary>
-    /// Models a modified file in <see cref="DiffResult"/>.
+    /// Models a modified file in <see cref="GitDiffResult"/>.
     /// </summary>
     public interface IModifiedDiff
     {

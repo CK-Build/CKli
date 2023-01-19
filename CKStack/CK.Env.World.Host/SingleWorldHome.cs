@@ -17,21 +17,20 @@ namespace CK.Env
         public static readonly NormalizedPath HomeCommandPath = "Home";
         public static readonly NormalizedPath WorldCommandPath = "World";
 
-        readonly XTypedFactory _xTypedObjectfactory;
+        readonly IXTypedMap _xTypedObjectfactory;
         readonly GitWorldStore _store;
         readonly WorldBearer _worldBearer;
 
-        SingleWorldHome( NormalizedPath userHostPath, XTypedFactory baseFactory, IRootedWorldName singleWorld, SecretKeyStore keyStore, Func<IReleaseVersionSelector> releaseVersionSelectorFatory )
+        SingleWorldHome( ICkliApplicationContext applicationContext, IRootedWorldName singleWorld )
         {
-            Directory.CreateDirectory( userHostPath );
-            CommandRegister = new CommandRegister();
-            _xTypedObjectfactory = new XTypedFactory( baseFactory );
-            _store = new GitWorldStore( userHostPath, singleWorld, keyStore );
-            _worldBearer = new WorldBearer();
+            CommandRegister = applicationContext.CommandRegistry;
+            _xTypedObjectfactory = new XTypedFactory( applicationContext.CoreXTypedMap );
+            _store = new GitWorldStore( applicationContext.UserHostPath, singleWorld, applicationContext.KeyStore );
+            _worldBearer = new WorldBearer( applicationContext );
         }
 
         /// <summary>
-        /// Creates a MultipleWorldHome (that should be disposed).
+        /// Creates a SingleWorldHome (that should be disposed).
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="rootStorePath">The base path that will contain the stack's Git repositories, the user key vault and the world mapping.</param>
@@ -41,23 +40,20 @@ namespace CK.Env
         /// <param name="releaseVersionSelectorFactory">Factory for <see cref="IReleaseVersionSelector"/>. One of them will be created for each world.</param>
         /// <returns>A SingleWorldHome or null on error.</returns>
         public static SingleWorldHome? Create( IActivityMonitor m,
-                                               NormalizedPath rootStorePath,
-                                               XTypedFactory sharedFactory,
                                                IRootedWorldName singleWorld,
-                                               SecretKeyStore keyStore,
-                                               Func<IReleaseVersionSelector> releaseVersionSelectorFatory )
+                                               ICkliApplicationContext appContext)
         {
-            var u = new SingleWorldHome( rootStorePath, sharedFactory, singleWorld, keyStore, releaseVersionSelectorFatory );
+            var u = new SingleWorldHome( appContext, singleWorld );
             if( !u._store.ReadStacksFromLocalStacksFilePath( m )
                 || !u._store.StackRepositories[0].RefreshSingle( m, out var name )
-                || !u._worldBearer.OpenWorld( m, name, new XTypedFactory( sharedFactory ), u.CommandRegister, u.WorldStore, keyStore, releaseVersionSelectorFatory ) )
+                || !u._worldBearer.OpenWorld( m, name, u.WorldStore ) )
             {
                 return null;
             }
             return u;
         }
 
-        public CommandRegister CommandRegister { get; }
+        public CommandRegistry CommandRegister { get; }
 
         /// <summary>
         /// Gets the world store.

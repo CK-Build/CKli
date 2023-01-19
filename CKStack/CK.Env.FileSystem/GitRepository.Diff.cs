@@ -8,31 +8,31 @@ using System.Linq;
 
 namespace CK.Env
 {
-    public partial class GitRepository : IGitHeadInfo, ICommandMethodsProvider
+    public partial class GitRepository : ICommandMethodsProvider
     {
         /// <summary>
-        /// Gets the <see cref="DiffResult"/> for a set of roots from the provided commit up to current head.
+        /// Gets the <see cref="GitDiffResult"/> for a set of roots from the provided commit up to current head.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="previousVersionCommitSha">Previous commit.</param>
         /// <param name="roots">Roots of interest. Typically projects of the solution.</param>
-        /// <param name="withCommitMessages">True to get <see cref="DiffResult.Messages"/>.</param>
+        /// <param name="withCommitMessages">True to get <see cref="GitDiffResult.Messages"/>.</param>
         /// <returns>The set of differences or null on error.</returns>
-        public DiffResult? GetDiff( IActivityMonitor m, string previousVersionCommitSha, IEnumerable<DiffRoot> roots, bool withCommitMessages )
+        public GitDiffResult? GetDiff( IActivityMonitor m, string previousVersionCommitSha, IEnumerable<GitDiffRoot> roots, bool withCommitMessages )
         {
-            return GetDiff( m, previousVersionCommitSha, Head.GetSha(), roots, withCommitMessages );
+            return GetDiff( m, previousVersionCommitSha, Head.CommitSha, roots, withCommitMessages );
         }
 
         /// <summary>
-        /// Gets the <see cref="DiffResult"/> between two dates in the parent commits of the current head.
+        /// Gets the <see cref="GitDiffResult"/> between two dates in the parent commits of the current head.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="from">Starting date.</param>
         /// <param name="to">Ending date.</param>
         /// <param name="roots">Roots of interest. Typically projects of the solution.</param>
-        /// <param name="withCommitMessages">True to get <see cref="DiffResult.Messages"/>.</param>
+        /// <param name="withCommitMessages">True to get <see cref="GitDiffResult.Messages"/>.</param>
         /// <returns>The set of differences or null on error.</returns>
-        public DiffResult? GetDiff( IActivityMonitor m, DateTimeOffset from, DateTimeOffset to, IEnumerable<DiffRoot> roots, bool withCommitMessages )
+        public GitDiffResult? GetDiff( IActivityMonitor m, DateTimeOffset from, DateTimeOffset to, IEnumerable<GitDiffRoot> roots, bool withCommitMessages )
         {
             Throw.CheckArgument( from < to );
             Commit? fromC = null;
@@ -65,15 +65,15 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the <see cref="DiffResult"/> for a set of roots between two commits.
+        /// Gets the <see cref="GitDiffResult"/> for a set of roots between two commits.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="fromCommitSha">Starting commit.</param>
         /// <param name="toCommitSha">Target commit.</param>
         /// <param name="roots">Roots of interest. Typically projects of the solution.</param>
-        /// <param name="withCommitMessages">True to get <see cref="DiffResult.Messages"/>.</param>
+        /// <param name="withCommitMessages">True to get <see cref="GitDiffResult.Messages"/>.</param>
         /// <returns>The set of differences or null on error.</returns>
-        public DiffResult? GetDiff( IActivityMonitor m, string fromCommitSha, string toCommitSha, IEnumerable<DiffRoot> roots, bool withCommitMessages )
+        public GitDiffResult? GetDiff( IActivityMonitor m, string fromCommitSha, string toCommitSha, IEnumerable<GitDiffRoot> roots, bool withCommitMessages )
         {
             Commit? from = Find( m, fromCommitSha, nameof( fromCommitSha ) );
             Commit? to = Find( m, toCommitSha, nameof( toCommitSha ) );
@@ -82,15 +82,15 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Gets the <see cref="DiffResult"/> for a set of roots between two commits.
+        /// Gets the <see cref="GitDiffResult"/> for a set of roots between two commits.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="from">Starting commit.</param>
         /// <param name="to">Target commit.</param>
         /// <param name="roots">Roots of interest. Typically projects of the solution.</param>
-        /// <param name="withCommitMessages">True to get <see cref="DiffResult.Messages"/>.</param>
+        /// <param name="withCommitMessages">True to get <see cref="GitDiffResult.Messages"/>.</param>
         /// <returns>The set of differences or null on error.</returns>
-        public DiffResult GetDiff( IActivityMonitor monitor, IEnumerable<DiffRoot> roots, Commit from, Commit to, bool withCommitMessages )
+        public GitDiffResult GetDiff( IActivityMonitor monitor, IEnumerable<GitDiffRoot> roots, Commit from, Commit to, bool withCommitMessages )
         {
             Throw.CheckNotNullArgument( from );
             Throw.CheckNotNullArgument( to );
@@ -99,7 +99,7 @@ namespace CK.Env
             {
                 return CreateEmptyDiffResult( roots );
             }
-            var alienRoot = new DiffRoot( "Others", Array.Empty<NormalizedPath>() );
+            var alienRoot = new GitDiffRoot( "Others", Array.Empty<NormalizedPath>() );
             var alien = new DiffRootResultBuilderOther( alienRoot );
             DiffResultBuilder builder = new DiffResultBuilder( Git,
                                                                roots.Select( r => new DiffRootResultBuilder( r ) ).ToList(), alien );
@@ -113,9 +113,9 @@ namespace CK.Env
             return commit;
         }
 
-        static DiffResult CreateEmptyDiffResult( IEnumerable<DiffRoot> roots )
+        static GitDiffResult CreateEmptyDiffResult( IEnumerable<GitDiffRoot> roots )
         {
-            return new DiffResult( roots.Select( r => new DiffRootResult( r ) ).ToArray(), new DiffRootResult( new DiffRoot( "Others", Array.Empty<NormalizedPath>() ) ), null );
+            return new GitDiffResult( roots.Select( r => new GitDiffRootResult( r ) ).ToArray(), new GitDiffRootResult( new GitDiffRoot( "Others", Array.Empty<NormalizedPath>() ) ), null );
         }
     }
 }

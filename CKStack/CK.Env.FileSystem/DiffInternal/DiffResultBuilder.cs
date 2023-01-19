@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace CK.Env.Diff
 {
-    class DiffResultBuilder
+    sealed class DiffResultBuilder
     {
         readonly Repository _git;
         readonly IReadOnlyList<DiffRootResultBuilderBase> _diffRootResultBuilders;
@@ -29,7 +29,7 @@ namespace CK.Env.Diff
             if( !accepted ) diff.SendToBuilder( m, _others );
         }
 
-        public DiffResult BuildDiffResult( IActivityMonitor monitor, Commit from, Commit to, bool withCommitMessages )
+        public GitDiffResult BuildDiffResult( IActivityMonitor monitor, Commit from, Commit to, bool withCommitMessages )
         {
             var fullDiff = _git.Diff.Compare<TreeChanges>( from.Tree, to.Tree );
             IReadOnlyList<CommitMessage>? messages = null;
@@ -62,10 +62,12 @@ namespace CK.Env.Diff
                 if( withCommitMessages )
                 {
                     var logs = _git.Commits.QueryBy( new CommitFilter() { IncludeReachableFrom = to, ExcludeReachableFrom = from.Parents, SortBy = CommitSortStrategies.Time|CommitSortStrategies.Reverse } );
-                    messages = logs.Where( c => c.Committer.Name != "CKli" ).Select( c => new CommitMessage(c.Sha, c.Committer.When, c.Committer.Name, c.Message ) ).ToArray();
+                    messages = logs.Where( c => c.Committer.Name != "CKli" )
+                                   .Select( c => new CommitMessage(c.Sha, c.Committer.When, c.Committer.Name, c.Message ) )
+                                   .ToArray();
                 }
             }
-            return new DiffResult( _diffRootResultBuilders.Select( p => p.Result ).ToList(), _others.Result, messages );
+            return new GitDiffResult( _diffRootResultBuilders.Select( p => p.Result ).ToList(), _others.Result, messages );
         }
     }
 }

@@ -21,11 +21,11 @@ namespace CKli
 
         public XCKliWorld( FileSystem fileSystem,
                            IRootedWorldName worldName,
-                           WorldStore worldStore,
+                           IWorldStore worldStore,
                            IEnvLocalFeedProvider localFeeds,
                            SecretKeyStore keyStore,
                            ArtifactCenter artifacts,
-                           CommandRegister commandRegister,
+                           CommandRegistry commandRegister,
                            IReleaseVersionSelector releaseVersionSelector,
                            Initializer initializer )
         : base( fileSystem, worldName, worldStore, localFeeds, keyStore, artifacts, commandRegister, releaseVersionSelector, initializer )

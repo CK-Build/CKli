@@ -9,13 +9,12 @@ namespace CKli
     /// </summary>
     public class XSolutionSpec : XTypedObject
     {
-        public XSolutionSpec(
-            Initializer initializer,
-            XBranch branch,
-            SharedSolutionSpec sharedSpec )
+        public XSolutionSpec( Initializer initializer,
+                              XBranch branch,
+                              SharedSolutionSpec sharedSpec )
             : base( initializer )
         {
-            if( !(initializer.Parent is XBranch) ) throw new Exception( "A SolutionSpec must be a direct child of a Git branch." );
+            Throw.CheckArgument( initializer.Parent is XBranch );
 
             // The XSolutionSpec is available to siblings (ie. up to the end of the parent git branch).
             initializer.Services.Add( this );
@@ -38,7 +37,7 @@ namespace CKli
         /// <summary>
         /// Gets the <see cref="XBranch"/> that is the direct parent.
         /// </summary>
-        public new XBranch Parent => (XBranch)base.Parent;
+        public new XBranch Parent => (XBranch)base.Parent!;
 
         /// <summary>
         /// Gets the solution specification.

@@ -37,13 +37,13 @@ namespace CK.Env
             public override string ToString() => $"'{BranchName}'/{Type.FullName}";
         }
 
-        class Descriptor
+        sealed class Descriptor
         {
             public readonly EntryKey Key;
-            public readonly ConstructorInfo Ctor;
+            public readonly ConstructorInfo? Ctor;
             public readonly int BranchParameterIdx;
-            public readonly ParameterInfo[] Parameters;
-            public object Settings;
+            public readonly ParameterInfo[]? Parameters;
+            public object? Settings;
 
             public Descriptor( EntryKey k )
             {
@@ -51,7 +51,7 @@ namespace CK.Env
                 var ctors = k.Type.GetConstructors();
                 if( ctors.Length != 1 )
                 {
-                    throw new ArgumentException( $"Git plugin '{k.Type.Name}' must have one and only one public constructor." );
+                    Throw.ArgumentException( $"Git plugin '{k.Type.ToCSharpName()}' must have one and only one public constructor." );
                 }
                 Ctor = ctors[0];
                 BranchParameterIdx = -1;
@@ -63,21 +63,21 @@ namespace CK.Env
                     {
                         if( k.BranchName == null && IsGitFolderBranchPlugin( p.ParameterType ) )
                         {
-                            throw new ArgumentException( $"Invalid plugin dependency: {k.Type.Name} depends on {p.ParameterType.Name} that is Branch dependent.", nameof( EntryKey ) );
+                            Throw.ArgumentException( $"Invalid plugin dependency: {k.Type.ToCSharpName()} depends on {p.ParameterType.Name} that is Branch dependent.", nameof( EntryKey ) );
                         }
                     }
                     else if( p.Name == "branchPath" && p.ParameterType == typeof( NormalizedPath ) )
                     {
                         if( k.BranchName == null )
                         {
-                            throw new ArgumentException( $"Invalid plugin: {k.Type.Name} is not a IGitBranchPlugin: it can not have a 'NormalizedPath branchPath' parameter.", nameof( EntryKey ) );
+                            Throw.ArgumentException( $"Invalid plugin: {k.Type.Name} is not a IGitBranchPlugin: it can not have a 'NormalizedPath branchPath' parameter.", nameof( EntryKey ) );
                         }
                         BranchParameterIdx = i;
                     }
                 }
                 if( BranchParameterIdx < 0 && k.BranchName != null )
                 {
-                    throw new ArgumentException( $"Constructor of {k.Type.Name} must have a 'NormalizedPath branchPath' parameter.", nameof( EntryKey ) );
+                    Throw.ArgumentException( $"Constructor of {k.Type.Name} must have a 'NormalizedPath branchPath' parameter.", nameof( EntryKey ) );
                 }
             }
 
@@ -127,8 +127,7 @@ namespace CK.Env
         /// <param name="folderPath">Path relative to <see cref="FileSystem.Root"/> and that contains the .git sub folder.</param>
         public GitPluginRegistry( in NormalizedPath folderPath )
         {
-            if( folderPath.IsRooted ) throw new ArgumentException( "Must not be rooted.", nameof( folderPath ) );
-            if( folderPath.LastPart == "branches" ) throw new ArgumentException( "Must not end with /branches.", nameof( folderPath ) );
+            Throw.CheckArgument( !folderPath.IsRooted  && folderPath.LastPart != "branches" );
             FolderPath = folderPath;
             BranchesPath = folderPath.AppendPart( "branches" );
             _descriptors = new Dictionary<EntryKey, Descriptor>();
@@ -153,13 +152,13 @@ namespace CK.Env
         /// <param name="type">The type to register. Must not be null.</param>
         /// <param name="instance">The instance. Must not be null.</param>
         /// <param name="branchName">The branch name or null for a root setting.</param>
-        public void RegisterSettings( Type type, object instance, string branchName = null )
+        public void RegisterSettings( Type type, object instance, string? branchName = null )
         {
-            if( type == null ) throw new ArgumentNullException( nameof( type ) );
-            if( instance == null ) throw new ArgumentNullException( nameof( instance ) );
+            Throw.CheckNotNullArgument( type );
+            Throw.CheckNotNullArgument( instance );
             if( IsGitFolderPlugin( type ) )
             {
-                throw new Exception( $"A plugin cannot be registered as a setting: {type.FullName}." );
+                Throw.ArgumentException( $"A plugin cannot be registered as a setting: {type.FullName}." );
             }
             var key = new EntryKey( type, branchName );
             if( !_descriptors.TryGetValue( key, out var desc ) )
@@ -181,7 +180,7 @@ namespace CK.Env
         /// <typeparam name="T">Type of the settings.</typeparam>
         /// <param name="instance">The instance. Must not be null.</param>
         /// <param name="branchName">The branch name or null for a root setting.</param>
-        public void RegisterSettings<T>( T instance, string branchName = null ) => RegisterSettings( typeof( T ), instance, branchName );
+        public void RegisterSettings<T>( T instance, string? branchName = null ) where T : notnull => RegisterSettings( typeof( T ), instance, branchName );
 
         /// <summary>
         /// Registers a type that must be <see cref="IGitPlugin"/>.
@@ -216,7 +215,7 @@ namespace CK.Env
             }
         }
 
-        Descriptor DoRegister( Type pluginType, string branchName )
+        Descriptor DoRegister( Type pluginType, string? branchName )
         {
             var key = new EntryKey( pluginType, branchName );
             if( !_descriptors.TryGetValue( key, out var desc ) )
@@ -227,12 +226,11 @@ namespace CK.Env
             return desc;
         }
 
-        internal int FillMappings(
-            Dictionary<Type, object> mappings,
-            IServiceProvider baseProvider,
-            CommandRegister commandRegister,
-            string? branchName,
-            string? defaultBranchName )
+        internal int FillMappings( Dictionary<Type, object> mappings,
+                                   IServiceProvider baseProvider,
+                                   CommandRegistry commandRegister,
+                                   string? branchName,
+                                   string? defaultBranchName )
         {
             Debug.Assert( (branchName != null) == (defaultBranchName != null) );
             Debug.Assert( !mappings.Keys.Any( k => IsGitFolderPlugin( k ) ), "There must not be any plugin. Only settings." );
@@ -254,18 +252,18 @@ namespace CK.Env
             return pluginCount;
         }
 
-        object CreateInstance(
-            IServiceProvider provider,
-            Descriptor desc,
-            string branchName,
-            string defaultBranchName,
-            Dictionary<Type, object> mappings,
-            CommandRegister commandRegister,
-            ref int pluginCount )
+        object CreateInstance( IServiceProvider provider,
+                               Descriptor desc,
+                               string? branchName,
+                               string? defaultBranchName,
+                               Dictionary<Type, object> mappings,
+                               CommandRegistry commandRegister,
+                               ref int pluginCount )
         {
             Debug.Assert( (branchName != null) == (defaultBranchName != null) );
             Debug.Assert( !mappings.ContainsKey( desc.Key.Type ) );
             Debug.Assert( desc.Settings == null );
+            Debug.Assert( desc.Ctor != null && desc.Parameters != null );
             ++pluginCount;
             var parameters = new object[desc.Parameters.Length];
             for( int i = 0; i < parameters.Length; ++i )
@@ -283,7 +281,7 @@ namespace CK.Env
                     }
                     else
                     {
-                        Descriptor pDesc = FindBestDescriptor( pType, branchName, defaultBranchName );
+                        Descriptor? pDesc = FindBestDescriptor( pType, branchName, defaultBranchName );
                         if( pDesc != null )
                         {
                             object obj = pDesc.Settings
@@ -293,13 +291,14 @@ namespace CK.Env
                         }
                         else
                         {
-                            parameters[i] = provider.GetService( pType );
-                            if( parameters[i] == null ) throw new Exception( $"Unable to resolve '{pType}' for {desc.Key.Type.FullName} plugin constructor." );
+                            var s = provider.GetService( pType );
+                            if( s == null ) Throw.Exception( $"Unable to resolve '{pType}' for {desc.Key.Type.ToCSharpName()} plugin constructor." );
+                            parameters[i] = s;
                         }
                     }
                 }
             }
-            object o = Activator.CreateInstance( desc.Key.Type, parameters );
+            object o = Activator.CreateInstance( desc.Key.Type, parameters )!;
             if( o is ICommandMethodsProvider c )
             {
                 commandRegister.Register( c );
@@ -307,7 +306,7 @@ namespace CK.Env
             return o;
         }
 
-        Descriptor FindBestDescriptor( Type type, string branchName, string defaultBranchName )
+        Descriptor? FindBestDescriptor( Type type, string? branchName, string? defaultBranchName )
         {
             Debug.Assert( type != null );
             Debug.Assert( (branchName != null) == (defaultBranchName != null) );
@@ -326,18 +325,18 @@ namespace CK.Env
 
         internal static void CheckPluginType( Type pluginType )
         {
-            if( pluginType == null ) throw new ArgumentNullException( nameof( pluginType ) );
-            if( !IsGitFolderPlugin( pluginType ) ) throw new ArgumentException( $"Must be a IGitPlugin: {pluginType.FullName}", nameof( pluginType ) );
-            if( IsGitFolderBranchPlugin( pluginType ) ) throw new ArgumentException( $"Must not be a IGitBranchPlugin: {pluginType.FullName}", nameof( pluginType ) );
+            Throw.CheckNotNullArgument( pluginType );
+            if( !IsGitFolderPlugin( pluginType ) ) Throw.ArgumentException( nameof( pluginType ), $"Must be a IGitPlugin: {pluginType.ToCSharpName()}" );
+            if( IsGitFolderBranchPlugin( pluginType ) ) Throw.ArgumentException( nameof( pluginType ), $"Must not be a IGitBranchPlugin: {pluginType.ToCSharpName()}" );
         }
 
         internal static bool CheckBranchPluginType( Type pluginType, string branchName, bool allowGitPlugin )
         {
-            if( pluginType == null ) throw new ArgumentNullException( nameof( pluginType ) );
-            if( String.IsNullOrWhiteSpace( branchName ) ) throw new ArgumentNullException( nameof( branchName ) );
+            Throw.CheckNotNullArgument( pluginType );
+            Throw.CheckNotNullOrWhiteSpaceArgument( branchName );
             if( !IsGitFolderBranchPlugin( pluginType ) )
             {
-                if( !allowGitPlugin ) throw new ArgumentException( $"Must be a IGitBranchPlugin: {pluginType.FullName}.", nameof( pluginType ) );
+                if( !allowGitPlugin ) Throw.ArgumentException( nameof( pluginType ), $"Must be a IGitBranchPlugin: {pluginType.ToCSharpName()}." );
                 CheckPluginType( pluginType );
                 return false;
             }

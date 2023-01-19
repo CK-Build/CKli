@@ -1,5 +1,5 @@
 using CK.Core;
-
+using CK.SimpleKeyVault;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
@@ -8,6 +8,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
+using static CK.Env.GitWorldStore;
 
 namespace CK.Env
 {
@@ -102,8 +103,7 @@ namespace CK.Env
             internal bool IsOpen => _git != null;
 
             /// <summary>
-            /// Gets the root path of this repository: it is a folder in <see cref="GitWorldStore.RootPath"/>
-            /// that is derived from this <see cref="GitRepositoryKey.OriginUrl"/>.
+            /// Gets the root path of this repository (the .Stack folder).
             /// </summary>
             public NormalizedPath Root { get; }
 
@@ -154,7 +154,7 @@ namespace CK.Env
                     if( _git.Pull( m, MergeFileFavor.Theirs ).ReloadNeeded || opened )
                     {
                         var worldNames = Directory.GetFiles( Root, "*.World.xml" )
-                                                  .Select( p => LocalWorldName.TryParse( p, _store.WorldLocalMapping ) )
+                                                  .Select( p => LocalWorldName.TryParseOBSOLETE( p, _store.WorldLocalMapping ) )
                                                   .Where( w => w != null )
                                                   .ToDictionary( w => w!.FullName, w => w! );
                         // Ignore parallels that have a StackName that doesn't exist.
@@ -220,7 +220,7 @@ namespace CK.Env
                 localDir = Root.AppendPart( "$Local" );
                 if( _git == null )
                 {
-                    _git = SimpleGitRepository.Create( m, this, Root, Root.LastPart, false, BranchName, checkOutBranchName: true );
+                    _git = SimpleGitRepository.Ensure( m, this, Root, Root.LastPart, BranchName, checkOutBranchName: true );
                     if( _git == null ) return false;
                     // Ensures that the $Local directory is created and that the .gitignore ignores it.
                     // The .gitignore file is created only once.
@@ -271,6 +271,6 @@ namespace CK.Env
                 return p;
             }
         }
-
     }
+
 }

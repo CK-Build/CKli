@@ -9,6 +9,14 @@ namespace CK.Env
     public interface IGitBranchPluginCollection : IReadOnlyCollection<IGitPluginCollection<IGitBranchPlugin>>
     {
         /// <summary>
+        /// Gets whether the plugins are initialized for the specified branch or
+        /// if <see cref="EnsurePlugins(IActivityMonitor, string)"/> must be called.
+        /// </summary>
+        /// <param name="branchName">The branch name.</param>
+        /// <returns>Whether the collection has been initialized.</returns>
+        bool IsInitialized( string branchName );
+
+        /// <summary>
         /// Gets the plugins for a specified branch. The collection is created as needed but if an error occurred
         /// (typically during plugin instantiation), this throws the error.
         /// Use <see cref="EnsurePlugins(IActivityMonitor, string, string)"/> to load the plugins in a safer way.
@@ -24,6 +32,5 @@ namespace CK.Env
         /// <param name="branchName">The branch name. Cannot be null or whitespace.</param>
         /// <returns>True on success, false on error.</returns>
         bool EnsurePlugins( IActivityMonitor m, string branchName );
-
     }
 }

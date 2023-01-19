@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using static CK.Env.GitRepositoryBase;
 
 namespace CK.Env
 {
@@ -18,9 +19,9 @@ namespace CK.Env
     /// Exposes its <see cref="ServiceContainer"/> that is the root of services
     /// available to <see cref="IGitPlugin"/> and <see cref="IGitBranchPlugin"/>.
     /// </summary>
-    public class FileSystem : IFileProvider, IDisposable
+    public partial class FileSystem : IFileProvider, IDisposable
     {
-        readonly CommandRegister _commandRegister;
+        readonly CommandRegistry _commandRegister;
         readonly SecretKeyStore _secretKeyStore;
         readonly List<ProtoGitFolder> _protoGits;
         readonly List<GitRepository> _gits;
@@ -32,7 +33,7 @@ namespace CK.Env
         /// <param name="commandRegister">Command register.</param>
         /// <param name="sp">Optional base services.</param>
         public FileSystem( string rootPath,
-                           CommandRegister commandRegister,
+                           CommandRegistry commandRegister,
                            SecretKeyStore secretKeyStore,
                            IServiceProvider sp )
         {
@@ -53,11 +54,6 @@ namespace CK.Env
         public SimpleServiceContainer ServiceContainer { get; }
 
         /// <summary>
-        /// Gets the <see cref="GitRepository"/> loaded so far (see <see cref="EnsureGitFolder(NormalizedPath)"/>).
-        /// </summary>
-        public IReadOnlyList<GitRepository> GitFolders => _gits;
-
-        /// <summary>
         /// Gets or sets whether this file system is the only one that interacts with the actual files.
         /// When true, some operations can be done more safely (or efficiently).
         /// Defaults to false.
@@ -70,58 +66,71 @@ namespace CK.Env
         public NormalizedPath Root { get; }
 
         /// <summary>
-        /// Finds or creates a <see cref="ProtoGitFolder"/>.
+        /// Gets the command registry that must be used to manage commands.
+        /// </summary>
+        public CommandRegistry CommandRegister => _commandRegister;
+
+        /// <summary>
+        /// Gets all the Git folder that has been declared by <see cref="DeclareProtoGitFolder(IWorldName, NormalizedPath, string, bool)"/>.
+        /// </summary>
+        public IReadOnlyList<ProtoGitFolder> ProtoGitFolders => _protoGits;
+
+        /// <summary>
+        /// Gets the <see cref="GitRepository"/> loaded so far (by <see cref="ProtoGitFolder.Load(IActivityMonitor)"/>.
+        /// </summary>
+        public IReadOnlyList<GitRepository> GitFolders => _gits;
+
+        /// <summary>
+        /// Finds or creates a <see cref="ProtoGitFolder"/>. The key is the <paramref name="folderPath"/>.
         /// </summary>
         /// <param name="folderPath">The folder relative to the <see cref="Root"/> and contains the .git sub folder.</param>
         /// <param name="urlRepository">The url repository.</param>
         /// <param name="isPublic">Whether the repository is public.</param>
         /// <returns>The <see cref="ProtoGitFolder"/>.</returns>
-        public ProtoGitFolder FindOrCreateProtoGitFolder( IActivityMonitor m, IWorldName world, NormalizedPath folderPath, string urlRepository, bool isPublic = false )
+        public ProtoGitFolder DeclareProtoGitFolder( IWorldName world, NormalizedPath folderPath, string urlRepository, bool isPublic = false )
         {
             ProtoGitFolder? g = _protoGits.FirstOrDefault( f => f.FolderPath == folderPath );
             if( g == null )
             {
-                g = new ProtoGitFolder( new Uri( urlRepository ), isPublic, folderPath, world, _secretKeyStore, this, _commandRegister );
+                g = new ProtoGitFolder( new Uri( urlRepository ), isPublic, folderPath, world, _secretKeyStore, this );
                 _protoGits.Add( g );
             }
             return g;
         }
 
         /// <summary>
-        /// Ensures that the Git folder is loaded.
-        /// The <see cref="ProtoGitFolder"/> must have been created first.
+        /// Ensures that all the <see cref="ProtoGitFolders"/> that have been declared are loaded.
         /// </summary>
-        /// <param name="proto">The folder.</param>
-        /// <returns>The <see cref="GitRepository"/> or null on error.</returns>
-        public GitRepository EnsureGitFolder( IActivityMonitor m, ProtoGitFolder proto )
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="hasErrors">True if at least one folder cannot be properly created.</param>
+        /// <returns>The list of successfully loaded folders.</returns>
+        public IReadOnlyList<GitRepository> LoadAllGitFolders( IActivityMonitor monitor, out bool hasErrors )
         {
-            Throw.CheckNotNullArgument( proto );
-            Throw.CheckArgument( proto.FileSystem == this );
-            GitRepository? g = GitFolders.FirstOrDefault( f => f.ProtoGitFolder == proto );
-            if( g == null )
+            hasErrors = false;
+            foreach( var p in _protoGits )
             {
-                g = proto.CreateGitFolder( m );
-                if( g != null )
+                if( p.Loaded == null )
                 {
-                    _gits.Add( g );
+                    hasErrors |= !p.DoLoad( monitor );
                 }
             }
-            return g;
+            return _gits;
         }
 
         /// <summary>
-        /// Ensures that the Git folder is loaded.
-        /// The <see cref="ProtoGitFolder"/> must have been created first.
+        /// Ensures that each <see cref="GitRepository"/> has its plugin initialized on
+        /// the current branch (whatever it is).
         /// </summary>
-        /// <param name="folderPath">
-        /// The folder path is a sub path of <see cref="Root"/> and contains the .git sub folder.
-        /// </param>
-        /// <returns>The <see cref="GitRepository"/> or null if not found.</returns>
-        public GitRepository? EnsureGitFolder( IActivityMonitor m, NormalizedPath folderPath )
+        /// <param name="monitor">The monitor to use.</param>
+        /// <returns>True on success, false if an error occurred.</returns>
+        public bool EnsureCurrentBranchPlugins( IActivityMonitor monitor )
         {
-            ProtoGitFolder? pg = _protoGits.FirstOrDefault( f => f.FolderPath == folderPath );
-            return pg != null ? EnsureGitFolder( m, pg ) : null;
+            var success = true;
+            foreach( var g in _gits ) success &= g.EnsureCurrentBranchPlugins( monitor );
+            return success;
         }
+
+        internal void OnLoaded( GitRepository g ) => _gits.Add( g );
 
         /// <summary>
         /// Disposes this file system.
@@ -139,7 +148,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="subPath">The path (<see cref="Root"/> based). Can be any path inside the Git folder.</param>
         /// <returns>The Git folder or null if not found.</returns>
-        public GitRepository? FindGitFolder( NormalizedPath subPath ) => GitFolders.FirstOrDefault( f => subPath.StartsWith( f.SubPath, strict: false ) );
+        public GitRepository? FindGitFolder( NormalizedPath subPath ) => GitFolders.FirstOrDefault( f => subPath.StartsWith( f.DisplayPath, strict: false ) );
 
         /// <summary>
         /// Gets the directory content for a path below the <see cref="Root"/>.
@@ -156,9 +165,9 @@ namespace CK.Env
         public IDirectoryContents GetDirectoryContents( NormalizedPath sub )
         {
             sub = sub.ResolveDots().With( NormalizedPathRootKind.None );
-            GitRepository? g = GitFolders.FirstOrDefault( f => sub.StartsWith( f.SubPath, strict: false ) );
+            GitRepository? g = GitFolders.FirstOrDefault( f => sub.StartsWith( f.DisplayPath, strict: false ) );
             return g != null
-                        ? g.GetDirectoryContents( sub.RemovePrefix( g.SubPath ) ) ?? NotFoundDirectoryContents.Singleton
+                        ? g.GetDirectoryContents( sub.RemovePrefix( g.DisplayPath ) ) ?? NotFoundDirectoryContents.Singleton
                         : PhysicalGetDirectoryContents( sub );
         }
 
@@ -179,9 +188,9 @@ namespace CK.Env
         {
             Throw.CheckArgument( sub.RootKind == NormalizedPathRootKind.None || sub.RootKind == NormalizedPathRootKind.RootedBySeparator );
             sub = sub.ResolveDots().With( NormalizedPathRootKind.None );
-            GitRepository? g = GitFolders.FirstOrDefault( f => sub.StartsWith( f.SubPath, strict: false ) );
+            GitRepository? g = GitFolders.FirstOrDefault( f => sub.StartsWith( f.DisplayPath, strict: false ) );
             return g != null
-                        ? g.GetFileInfo( sub.RemovePrefix( g.SubPath ) ) ?? new NotFoundFileInfo( sub.Path )
+                        ? g.GetFileInfo( sub.RemovePrefix( g.DisplayPath ) ) ?? new NotFoundFileInfo( sub.Path )
                         : PhysicalGetFileInfo( sub );
         }
 
@@ -380,7 +389,7 @@ namespace CK.Env
             return true;
         }
 
-        class FileSystemInfoWrapper : IFileInfo
+        sealed class FileSystemInfoWrapper : IFileInfo
         {
             readonly FileSystemInfo _info;
 
@@ -421,7 +430,7 @@ namespace CK.Env
             }
         }
 
-        class PhysicalDirectoryContents : IDirectoryContents
+        sealed class PhysicalDirectoryContents : IDirectoryContents
         {
             private readonly NormalizedPath _root;
 

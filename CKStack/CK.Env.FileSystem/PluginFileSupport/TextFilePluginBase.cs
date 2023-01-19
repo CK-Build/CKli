@@ -16,7 +16,7 @@ namespace CK.Env.Plugin
         protected TextFilePluginBase( GitRepository f, NormalizedPath branchPath, NormalizedPath filePath, Encoding? encoding = null )
             : base( f.FileSystem, filePath, encoding )
         {
-            if( !filePath.StartsWith( branchPath ) ) throw new ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
+            if( !filePath.StartsWith( branchPath ) ) throw new ArgumentException( $"Path {filePath} must start with folder {f.DisplayPath}." );
             _pluginImpl = new GitBranchPluginImpl( f, branchPath );
             f.OnReset += OnFileSystemReset;
         }

@@ -27,7 +27,7 @@ namespace CK.Env.Plugin
         public void SetDirty( IActivityMonitor monitor )
         {
             if( _sln == null ) return;
-            monitor.Info( $"MSBuild Solution '{_driver.GitFolder.SubPath}' must be reloaded." );
+            monitor.Info( $"MSBuild Solution '{_driver.GitFolder.DisplayPath}' must be reloaded." );
             _sln.Saved -= OnSavedSolution;
             _sln = null;
         }
@@ -39,11 +39,11 @@ namespace CK.Env.Plugin
         {
             if( !IsDirty ) return;
             var monitor = e.Monitor;
-            var expectedSolutionName = _driver.GitFolder.SubPath.LastPart + ".sln";
+            var expectedSolutionName = _driver.GitFolder.DisplayPath.LastPart + ".sln";
             _sln = SolutionFile.Read( _driver.GitFolder.FileSystem, monitor, _driver.BranchPath.AppendPart( expectedSolutionName ) );
             if( _sln == null )
             {
-                e.PreventSolutionUse( $"Unable to load MSBuild Solution '{_driver.GitFolder.SubPath.Path + ".sln"}'." );
+                e.PreventSolutionUse( $"Unable to load MSBuild Solution '{_driver.GitFolder.DisplayPath.Path + ".sln"}'." );
                 // On error, we remove all the MSBuild projects.
                 if( e.Solution.RemoveTags<SolutionFile>() )
                 {

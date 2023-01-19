@@ -12,11 +12,11 @@ using System.Text.RegularExpressions;
 
 namespace CK.Env
 {
-    public class CommandRegister
+    public class CommandRegistry
     {
         readonly Dictionary<NormalizedPath, ICommandHandler> _commands;
 
-        public CommandRegister()
+        public CommandRegistry()
         {
             _commands = new Dictionary<NormalizedPath, ICommandHandler>();
         }
@@ -29,7 +29,10 @@ namespace CK.Env
         public void Register( ICommandHandler h )
         {
             if( h.UniqueName.IsEmptyPath
-                || h.UniqueName.Path.IndexOfAny( new char[] { '*', '?' } ) >= 0 ) throw new ArgumentException( "Command name must not be empty nor contain '*' or '?'.", nameof( ICommandHandler.UniqueName ) );
+                || h.UniqueName.Path.IndexOfAny( new char[] { '*', '?' } ) >= 0 )
+            {
+                Throw.ArgumentException( "Command name must not be empty nor contain '*' or '?'.", nameof( ICommandHandler.UniqueName ) );
+            }
             _commands.Add( h.UniqueName, h );
         }
 
@@ -49,7 +52,7 @@ namespace CK.Env
             readonly Func<bool>? _enabled;
             readonly ParameterInfo[] _parameters;
 
-            public MethodHandler( bool confirmationRequired, NormalizedPath n, object instance, MethodInfo method, ParallelCommandMode parallelMode, ParameterInfo[] parameters, Func<bool>? enabled )
+            public MethodHandler( bool confirmationRequired, NormalizedPath n, object instance, MethodInfo method, ParameterInfo[] parameters, Func<bool>? enabled )
             {
                 if( !IsValidCommandName( n ) ) throw new ArgumentException( $"Invalid characters in command name: {n}." );
                 ConfirmationRequired = confirmationRequired;
@@ -61,7 +64,6 @@ namespace CK.Env
                               ? null
                               : '(' + parameters.Skip( 1 ).Select( p => p.Name ).Concatenate() + ')';
                 _enabled = enabled;
-                ParallelMode = parallelMode;
             }
 
             static readonly char[] _invalidCommandNameChar = Path.GetInvalidPathChars().Concat( new char[] { '*', '?', '|', '<', '>' } ).Distinct().ToArray();
@@ -78,8 +80,6 @@ namespace CK.Env
             public bool GetEnabled() => _enabled != null ? _enabled() : true;
 
             public string? PayloadSignature { get; }
-
-            public ParallelCommandMode ParallelMode { get; }
 
             public object? CreatePayload()
             {
@@ -122,10 +122,9 @@ namespace CK.Env
         /// <param name="uniqueName">The unique command name.</param>
         /// <param name="o">The object instance that holds the method.</param>
         /// <param name="method">The method.</param>
-        /// <param name="parallelMode">Parallel command mode.</param>
         /// <param name="enabled">A companion function that knows how to compute whether the command is enabled or not.</param>
         /// <returns>The registered command handler.</returns>
-        public ICommandHandler Register( bool confirmationRequired, NormalizedPath uniqueName, object o, MethodInfo method, ParallelCommandMode parallelMode, Func<bool>? enabled = null )
+        public ICommandHandler Register( bool confirmationRequired, NormalizedPath uniqueName, object o, MethodInfo method, Func<bool>? enabled = null )
         {
             if( _commands.ContainsKey( uniqueName ) )
             {
@@ -136,7 +135,7 @@ namespace CK.Env
             {
                 throw new ArgumentException( $"Method {method} for command '{uniqueName}' must have a first IActivityMonitor parameter.", nameof( method ) );
             }
-            var h = new MethodHandler( confirmationRequired, uniqueName, o, method, parallelMode, parameters, enabled );
+            var h = new MethodHandler( confirmationRequired, uniqueName, o, method, parameters, enabled );
             _commands.Add( uniqueName, h );
             return h;
         }
@@ -154,7 +153,7 @@ namespace CK.Env
                 if( attr != null )
                 {
                     var enabled = GetEnabledMethod( provider, methods, m.Name );
-                    Register( attr.ConfirmationRequired, provider.CommandProviderName.AppendPart( m.Name ), provider, m, attr.ParallelMode, enabled );
+                    Register( attr.ConfirmationRequired, provider.CommandProviderName.AppendPart( m.Name ), provider, m, enabled );
                 }
             }
         }

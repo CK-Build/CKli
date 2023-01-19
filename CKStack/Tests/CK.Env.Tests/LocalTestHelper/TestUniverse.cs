@@ -53,9 +53,10 @@ namespace CK.Env.Tests.LocalTestHelper
             var mappings = new FileWorldLocalMapping( ckliPath.AppendPart( "WorldLocalMapping.txt" ) );
             var keyVault = new FileKeyVault( ckliPath.AppendPart( "Personal.KeyVault.txt" ) );
             keyVault.OpenKeyVault( m );
-            UserHost = MultipleWorldHome.Create( m, ckliPath, _xTypedFactory!, keyVault, mappings, () => new FakeReleaseVersionSelector() );
-            UserHost.WorldStore.DestroyWorld( m, "CK" );
-            UserHost.WorldStore.DestroyWorld( m, "CK-Build" );
+
+            //UserHost = MultipleWorldHome.Create( m, ckliPath, _xTypedFactory!, keyVault, mappings, () => new FakeReleaseVersionSelector() );
+            //UserHost.WorldStore.DestroyWorld( m, "CK" );
+            //UserHost.WorldStore.DestroyWorld( m, "CK-Build" );
         }
 
         public void Restart(IActivityMonitor m)

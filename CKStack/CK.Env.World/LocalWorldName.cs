@@ -11,7 +11,7 @@ namespace CK.Env
     /// its definition file path (<see cref="XmlDescriptionFilePath"/>) and whether this file
     /// is available or not. 
     /// </summary>
-    public class LocalWorldName : RootedWorldName, IRootedWorldName
+    public sealed class LocalWorldName : RootedWorldName, IRootedWorldName
     {
         /// <summary>
         /// Initializes a new <see cref="LocalWorldName"/>.
@@ -23,8 +23,23 @@ namespace CK.Env
         public LocalWorldName( NormalizedPath xmlDescriptionFilePath, string stackName, string? parallelName, IWorldLocalMapping localMap )
             : base( stackName, parallelName, localMap )
         {
-            if( String.IsNullOrWhiteSpace( xmlDescriptionFilePath ) ) throw new ArgumentNullException( nameof( xmlDescriptionFilePath ) );
+            Throw.CheckArgument( !xmlDescriptionFilePath.IsEmptyPath );
             XmlDescriptionFilePath = xmlDescriptionFilePath;
+        }
+
+        /// <summary>
+        /// Initializes a new <see cref="LocalWorldName"/>.
+        /// </summary>
+        /// <param name="stackName">The stack name.</param>
+        /// <param name="parallelName">The optional parallel name. Can be null or empty.</param>
+        /// <param name="rootPath">Root folder of world.</param>
+        /// <param name="xmlDescriptionFilePath">Path of the definition file.</param>
+        public LocalWorldName( string stackName, string? parallelName, NormalizedPath rootPath, NormalizedPath xmlDescriptionFilePath )
+            : base( stackName, parallelName, rootPath )
+        {
+            Throw.CheckArgument( !Root.IsEmptyPath );
+            XmlDescriptionFilePath = xmlDescriptionFilePath;
+            HasDefinitionFile = true;
         }
 
         /// <summary>
@@ -34,9 +49,31 @@ namespace CK.Env
 
         /// <summary>
         /// Gets or sets whether the xml definition file for this stack exists.
-        /// Defaults to false.
         /// </summary>
         public bool HasDefinitionFile { get; set; }
+
+        /// <summary>
+        /// Tries to parse a xml World definition file path of the form "...StackName/.[Public|Private]Stack/StackName[parallel name].World.xml".
+        /// </summary>
+        /// <param name="path">The file path.</param>
+        /// <returns>The name or null on error.</returns>
+        public static LocalWorldName? TryParseDefinitionFilePath( NormalizedPath path )
+        {
+            if( path.IsEmptyPath
+                || path.Parts.Count < 4
+                || !path.LastPart.EndsWith( ".World.xml", StringComparison.OrdinalIgnoreCase ) ) return null;
+            var fName = path.LastPart;
+            Debug.Assert( ".World.xml".Length == 10 );
+            fName = fName.Substring( 0, fName.Length - 10 );
+            if( !TryParse( fName, out var stackName, out var parallelName ) ) return null;
+            if( stackName != path.Parts[^3] ) return null;
+            var wRoot = path.RemoveLastPart( 2 );
+            if( parallelName != null )
+            {
+                return new LocalWorldName( stackName, parallelName, wRoot.AppendPart($"[{parallelName}]"), path );
+            }
+            return new LocalWorldName( stackName, null, wRoot, path );
+        }
 
         /// <summary>
         /// Tries to parse a xml World definition file name (must end with ".World.xml").
@@ -44,7 +81,7 @@ namespace CK.Env
         /// <param name="path">The file path.</param>
         /// <param name="localMap">The mapper to use.</param>
         /// <returns>The name or null on error.</returns>
-        public static LocalWorldName? TryParse( NormalizedPath path, IWorldLocalMapping localMap )
+        public static LocalWorldName? TryParseOBSOLETE( NormalizedPath path, IWorldLocalMapping localMap )
         {
             if( path.IsEmptyPath || !path.LastPart.EndsWith( ".World.xml", StringComparison.OrdinalIgnoreCase ) ) return null;
             try

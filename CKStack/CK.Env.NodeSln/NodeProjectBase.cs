@@ -24,11 +24,9 @@ namespace CK.Env.NodeSln
             _path = solution.SolutionFolderPath.Combine( _solutionRelativePath );
         }
 
-        internal virtual bool Initialize( IActivityMonitor monitor )
-        {
-            _packageJson = PackageJsonFile.Read( monitor, this );
-            return _packageJson != null;
-        }
+        internal PackageJsonFile? TryReadPackageJson( IActivityMonitor monitor ) => _packageJson ??= PackageJsonFile.Read( monitor, this )!;
+
+        internal virtual bool Initialize( IActivityMonitor monitor ) => TryReadPackageJson( monitor ) != null;
 
         /// <summary>
         /// Gets the solution that owns this project.

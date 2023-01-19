@@ -1,6 +1,7 @@
 using CK.Core;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Xml.Linq;
 
 namespace CK.Env
@@ -109,15 +110,18 @@ namespace CK.Env
         public IReadOnlyList<XTypedObject> Children => _children!;
 
         /// <summary>
-        /// Enumerates through all descendants of the given element, returning the topmost
-        /// elements that match the given predicate
+        /// Enumerates through all descendants of this XTypedObject, returning the topmost
+        /// XTypedObject that match the <paramref name="predicate"/>.
         /// </summary>
-        /// <param name="predicate">Filter condition. When successful, children nodes are skipped.</param>
+        /// <param name="predicate">Filter condition: when returning false, the object and its descendants are skipped.</param>
         /// <returns>The set of descendants that match the predicate in document order regardless of their depth.</returns>
-        /// <param name="withSelf">True to consider <paramref name="this"/> element. Defaults to consider only the  children elements.</param>
+        /// <param name="withSelf">
+        /// True to consider <paramref name="this"/> element. Defaults to consider only the children elements.
+        /// When true and this <see cref="XTypedObject"/> satisfies the predicate, this is the single element returned.
+        /// </param>
         public IEnumerable<XTypedObject> TopDescendants( Func<XTypedObject, bool> predicate, bool withSelf = false )
         {
-            if( predicate == null ) throw new ArgumentNullException( nameof( predicate ) );
+            Throw.CheckNotNullArgument( predicate );
             if( withSelf && predicate( this ) )
             {
                 yield return this;
@@ -151,6 +155,21 @@ namespace CK.Env
                 }
                 current = next;
             }
+        }
+
+        /// <summary>
+        /// Enumerates through all descendants of this XTypedObject, returning the topmost
+        /// <see cref="XTypedObject"/> that is a <typeparamref name="T"/>.
+        /// </summary>
+        /// <typeparam name="T">The type to select.</typeparam>
+        /// <param name="withSelf">
+        /// True to consider <paramref name="this"/> element. Defaults to consider only the children elements.
+        /// When true and this <see cref="XTypedObject"/> is a <typeparamref name="T"/>, this is the single element returned.
+        /// </param>
+        /// <returns>The top <typeparamref name="T"/> elements below this one or this one.</returns>
+        public IEnumerable<T> TopDescendants<T>( bool withSelf = false ) where T : XTypedObject
+        {
+            return TopDescendants( x => x is T, withSelf ).Cast<T>();
         }
 
         /// <summary>
@@ -198,7 +217,7 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the raw <see cref="XElement"/>.
-        /// Unfortunaltely, there is no read-only view of XElement, so the check is at runtime:
+        /// Unfortunately, there is no read-only view of XElement, so the check is at runtime:
         /// this should not be mutated otherwise an InvalidOperationException is thrown.
         /// </summary>
         public XElement XElement { get; }
@@ -237,7 +256,7 @@ namespace CK.Env
         /// This default implementation simply returns true.
         /// </summary>
         /// <param name="monitor">Monitor that must be used to log any information.</param>
-        /// <returns>Must return true on success, false if an error occured.</returns>
+        /// <returns>Must return true on success, false if an error occurred.</returns>
         protected virtual bool OnSiblingsCreated( IActivityMonitor monitor )
         {
             return true;

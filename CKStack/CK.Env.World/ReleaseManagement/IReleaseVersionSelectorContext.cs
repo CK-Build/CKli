@@ -51,12 +51,12 @@ namespace CK.Env
         ITagCommit? PreviousVersion { get; }
 
         /// <summary>
-        /// Gets the <see cref="DiffResult"/> for the project folders between the current head
+        /// Gets the <see cref="GitDiffResult"/> for the project folders between the current head
         /// and <see cref="PreviousVersion"/> that must be not null.
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <returns>The result or null on error.</returns>
-        DiffResult? GetProjectsDiff( IActivityMonitor m );
+        GitDiffResult? GetProjectsDiff( IActivityMonitor m );
 
         /// <summary>
         /// Gets the list of the packages that must be updated in non published projects (typically in Tests projects).
@@ -77,7 +77,7 @@ namespace CK.Env
 
         /// <summary>
         /// Gets the current requirements that results from solution dependencies.
-        /// Note that the actual requirements used to filer possible versions may have been lowered
+        /// Note that the actual requirements used to filter possible versions may have been lowered
         /// by <see cref="SingleMajorConfigured"/> or <see cref="OnlyPatchConfigured"/>: see <see cref="ActualRequirements"/>.
         /// </summary>
         ReleaseInfo Requirements { get; }

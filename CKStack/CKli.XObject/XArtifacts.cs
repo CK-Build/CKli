@@ -7,9 +7,8 @@ namespace CKli
 {
     public class XArtifacts : XTypedObject
     {
-        public XArtifacts(
-            Initializer initializer,
-            ArtifactCenter artifactCenter )
+        public XArtifacts( Initializer initializer,
+                           ArtifactCenter artifactCenter )
             : base( initializer )
         {
             initializer.Services.Add( this );

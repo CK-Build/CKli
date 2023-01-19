@@ -3,15 +3,15 @@ using CK.Core;
 
 namespace CK.Env.Diff
 {
-    class AddedDiff : IDiff, IAddedDiff
+    sealed class DeletedDiff : IDiff, IDeletedDiff
     {
-        public AddedDiff( NormalizedPath path )
+        public DeletedDiff( NormalizedPath path )
         {
             Path = path;
         }
 
         /// <summary>
-        /// Path of the created file.
+        /// Path of the deleted file.
         /// </summary>
         public NormalizedPath Path { get; }
 

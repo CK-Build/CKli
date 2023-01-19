@@ -8,7 +8,7 @@ namespace CKli
     {
         public XArtifactCenter( Initializer initializer,
                                 IRootedWorldName worldName,
-                                WorldStore worldStore,
+                                IWorldStore worldStore,
                                 FileSystem fs )
             : base( initializer )
         {

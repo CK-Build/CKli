@@ -6,14 +6,14 @@ using System.Text;
 namespace CK.Env
 {
     /// <summary>
-    /// Results for a <see cref="DiffRoot"/>.
+    /// Results for a <see cref="GitDiffRoot"/>.
     /// </summary>
-    public sealed class DiffRootResult
+    public sealed class GitDiffRootResult
     {
         /// <summary>
         /// Gets the root with its name and possibly multiple paths.
         /// </summary>
-        public DiffRoot Root { get; }
+        public GitDiffRoot Root { get; }
 
         /// <summary>
         /// Gets the total number of changes.
@@ -36,16 +36,16 @@ namespace CK.Env
         public IReadOnlyList<IModifiedDiff> ModifiedDiffs { get; }
 
         /// <summary>
-        /// Initializes an new <see cref="DiffRootResult"/> with a change set.
+        /// Initializes an new <see cref="GitDiffRootResult"/> with a change set.
         /// </summary>
         /// <param name="root">The root.</param>
         /// <param name="addedDiffs">The new files.</param>
         /// <param name="deletedDiffs">The deleted files.</param>
         /// <param name="modifiedDiffs">The modified files.</param>
-        public DiffRootResult( DiffRoot root,
-                               IReadOnlyList<IAddedDiff> addedDiffs,
-                               IReadOnlyList<IDeletedDiff> deletedDiffs,
-                               IReadOnlyList<IModifiedDiff> modifiedDiffs )
+        public GitDiffRootResult( GitDiffRoot root,
+                                  IReadOnlyList<IAddedDiff> addedDiffs,
+                                  IReadOnlyList<IDeletedDiff> deletedDiffs,
+                                  IReadOnlyList<IModifiedDiff> modifiedDiffs )
         {
             Throw.CheckNotNullArgument( root );
             Throw.CheckNotNullArgument( addedDiffs );
@@ -59,10 +59,10 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Initializes an new empty <see cref="DiffRootResult"/>.
+        /// Initializes an new empty <see cref="GitDiffRootResult"/>.
         /// </summary>
         /// <param name="root">The root.</param>
-        public DiffRootResult( DiffRoot root )
+        public GitDiffRootResult( GitDiffRoot root )
         {
             Throw.CheckNotNullArgument( root );
             Root = root;

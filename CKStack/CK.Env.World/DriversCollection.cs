@@ -11,9 +11,9 @@ namespace CK.Env
     /// <summary>
     /// Handles drivers per branches and their respective solutions.
     /// </summary>
-    public class DriversCollection
+    public sealed class DriversCollection
     {
-        internal class WorldBranchContext : IWorldSolutionContext
+        internal sealed class WorldBranchContext : IWorldSolutionContext
         {
             readonly List<ISolutionDriver> _drivers;
             readonly SolutionContext? _context;
@@ -55,7 +55,7 @@ namespace CK.Env
 
             public IReadOnlyList<ISolutionDriver> Drivers => _drivers;
 
-            class PairList : IReadOnlyList<(DependentSolution Solution, ISolutionDriver Driver)>
+            sealed class PairList : IReadOnlyList<(DependentSolution Solution, ISolutionDriver Driver)>
             {
                 readonly WorldBranchContext _c;
 
@@ -84,7 +84,7 @@ namespace CK.Env
                     var s = d.GetSolution( m, allowInvalidSolution: false, reloadSolution: forceReload );
                     if( s == null )
                     {
-                        m.Error( $"Failed to load and configure solution from '{d.GitRepository.SubPath}'." );
+                        m.Error( $"Failed to load and configure solution from '{d.GitRepository.DisplayPath}'." );
                         idxSolution = -1;
                     }
                     if( idxSolution != -1 ) solutions[idxSolution++] = s!;
@@ -152,7 +152,7 @@ namespace CK.Env
         /// </summary>
         /// <param name="branchName">The name of the branch</param>
         /// <returns>The <see cref="WorldBranchContext"/> of a branch or null if it doesn't exist.</returns>
-        internal WorldBranchContext GetContextOnBranch( string branchName )
+        internal WorldBranchContext? GetContextOnBranch( string branchName )
         {
             return _perBranchContext.TryGetValue( branchName, out var ctx ) ? ctx : null;
         }
@@ -199,12 +199,11 @@ namespace CK.Env
         public IEnumerable<ISolutionDriver> GetDriversOnBranch( string branchName ) => _solutionDrivers.Where( p => p.BranchName == branchName );
 
         /// <summary>
-        /// Enslists a new driver in the root HashSet, ensures that a <see cref="WorldBranchContext"/> exists
+        /// Enlists a new driver in the root HashSet, ensures that a <see cref="WorldBranchContext"/> exists
         /// for the <see cref="ISolutionDriver.BranchName"/> and returns it.
-        /// The driver is not registered in the WorldBranchContext at this level.
         /// </summary>
         /// <param name="driver">The driver to register.</param>
-        /// <returns>The WorldBranchContext into which the driver must be registered.</returns>
+        /// <returns>The WorldBranchContext into which the driver has been registered.</returns>
         internal WorldBranchContext Register( ISolutionDriver driver )
         {
             if( !_perBranchContext.TryGetValue( driver.BranchName, out var c ) )
@@ -212,7 +211,7 @@ namespace CK.Env
                 c = new WorldBranchContext( driver.BranchName );
                 _perBranchContext.Add( driver.BranchName, c );
             }
-            if( !_solutionDrivers.Add( driver ) ) throw new InvalidOperationException( "Already registered." );
+            Throw.CheckState( "Already registered.", _solutionDrivers.Add( driver ) );
             return c;
         }
 
@@ -222,7 +221,7 @@ namespace CK.Env
         /// <param name="driver">The driver to remove.</param>
         internal void Unregister( ISolutionDriver driver )
         {
-            if( !_solutionDrivers.Remove( driver ) ) throw new InvalidOperationException( "Not registered." );
+            Throw.CheckState( "Not registered.", _solutionDrivers.Remove( driver ) );
             _perBranchContext[driver.BranchName].OnUnregisterDriver( driver );
         }
     }

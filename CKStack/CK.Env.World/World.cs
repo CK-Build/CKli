@@ -24,11 +24,13 @@ namespace CK.Env
     /// </remarks>
     public abstract class World : ISolutionDriverWorld, ICommandMethodsProvider
     {
-        readonly WorldStore _store;
+        readonly FileSystem _fileSystem;
+        readonly IWorldStore _store;
         readonly IEnvLocalFeedProvider _localFeedProvider;
         readonly SecretKeyStore _keyStore;
         readonly ArtifactCenter _artifacts;
 
+        // Managed by ISolutionDriverWorld.Register/Unregister.
         readonly DriversCollection _solutionDrivers;
         readonly HashSet<GitRepository> _gitRepositories;
 
@@ -39,14 +41,13 @@ namespace CK.Env
         /// <summary>
         /// Captures constructor World parameters.
         /// </summary>
-        public class ConstructorParameters
+        public sealed class ConstructorParameters
         {
             public IActivityMonitor InitializationMonitor { get; }
             public IServiceProvider InitialisationServices { get; }
             public FileSystem FileSystem { get; }
-            public CommandRegister CommandRegister { get; }
             public ArtifactCenter Artifacts { get; }
-            public WorldStore Store { get; }
+            public IWorldStore Store { get; }
             public IRootedWorldName WorldName { get; }
             public bool IsPublic { get; }
             public IEnvLocalFeedProvider LocalFeedProvider { get; }
@@ -55,9 +56,9 @@ namespace CK.Env
             public ConstructorParameters( IActivityMonitor initializationMonitor,
                                           IServiceProvider initialisationServices,
                                           FileSystem fileSystem,
-                                          CommandRegister commandRegister,
+                                          CommandRegistry commandRegister,
                                           ArtifactCenter artifacts,
-                                          WorldStore store,
+                                          IWorldStore store,
                                           IRootedWorldName worldName,
                                           bool isPublic,
                                           IEnvLocalFeedProvider localFeedProvider,
@@ -66,7 +67,6 @@ namespace CK.Env
                 InitializationMonitor = initializationMonitor ?? throw new ArgumentNullException( nameof( initializationMonitor ) );
                 InitialisationServices = initialisationServices ?? throw new ArgumentNullException( nameof( initialisationServices ) );
                 FileSystem = fileSystem ?? throw new ArgumentNullException( nameof( fileSystem ) );
-                CommandRegister = commandRegister ?? throw new ArgumentNullException( nameof( commandRegister ) );
                 Artifacts = artifacts ?? throw new ArgumentNullException( nameof( artifacts ) );
                 Store = store ?? throw new ArgumentNullException( nameof( store ) );
                 WorldName = worldName ?? throw new ArgumentNullException( nameof( worldName ) );
@@ -82,6 +82,7 @@ namespace CK.Env
         /// <param name="parameters">Available parameters.</param>
         protected World( ConstructorParameters parameters )
         {
+            _fileSystem = parameters.FileSystem;
             _artifacts = parameters.Artifacts;
             _store = parameters.Store;
             WorldName = parameters.WorldName;
@@ -92,7 +93,7 @@ namespace CK.Env
             _gitRepositories = new HashSet<GitRepository>();
 
             CommandProviderName = "World";
-            parameters.CommandRegister.Register( this );
+            parameters.FileSystem.CommandRegister.Register( this );
         }
 
         public NormalizedPath CommandProviderName { get; }
@@ -128,21 +129,24 @@ namespace CK.Env
         public IRootedWorldName WorldName { get; }
 
         /// <summary>
-        /// Initializes this world state by loading the local and shared states.
-        /// This initializes the user log level.
+        /// Gets the <see cref="FileSystem"/> of this world.
+        /// </summary>
+        public FileSystem FileSystem => _fileSystem;
+
+        /// <summary>
+        /// Initializes this world: ensures that all the <see cref="FileSystem.GitFolders"/> can be
+        /// loaded without errors.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <returns>True on success, false on error.</returns>
         public bool Initialize( IActivityMonitor monitor )
         {
-            bool alreadyInitialized = _localState != null;
-            if( !alreadyInitialized )
-            {
-                _localState = _store.GetOrCreateLocalState( monitor, WorldName );
-                _sharedState = _store.GetOrCreateSharedState( monitor, WorldName );
-                OnInitialize( monitor );
-            }
-            return true;
+            Throw.CheckState( !IsInitialized );
+            _localState = _store.GetOrCreateLocalState( monitor, WorldName );
+            _sharedState = _store.GetOrCreateSharedState( monitor, WorldName );
+            _fileSystem.LoadAllGitFolders( monitor, out var hasErrors );
+            OnInitialize( monitor );
+            return !hasErrors;
         }
 
         protected virtual void OnInitialize( IActivityMonitor monitor )
@@ -383,7 +387,6 @@ namespace CK.Env
             _sharedState.SaveState( m );
         }
 
-
         /// <summary>
         /// Calls <see cref="UpdateGlobalGitStatus"/> and checks the current Git status.
         /// </summary>
@@ -430,6 +433,7 @@ namespace CK.Env
         /// </summary>
         public GlobalWorkStatus? WorkStatus => _localState?.WorkStatus;
 
+
         /// <summary>
         /// Sets the <see cref="WorkStatus"/>.
         /// </summary>
@@ -466,8 +470,12 @@ namespace CK.Env
         {
             var branchName = GetCleanBranchName( monitor );
             if( branchName == null ) return null;
-            var c = _solutionDrivers.GetContextOnBranch( branchName )
-                ?? throw new Exception( $"No solution context available for branch {branchName}. GitBranchPlugins are not initialized or a ISolutionDriver plugin implementation is missing." );
+            if( !_fileSystem.EnsureCurrentBranchPlugins( monitor ) ) return null;
+            var c = _solutionDrivers.GetContextOnBranch( branchName );
+            if( c == null )
+            {
+                Throw.Exception( $"No solution context available for branch {branchName}. GitBranchPlugins are not initialized or a ISolutionDriver plugin implementation is missing." );
+            }
             return c.Refresh( monitor, reloadSolutions );
         }
 
@@ -798,7 +806,7 @@ namespace CK.Env
                     {
                         var snapshot = new XElement( XmlNames.xGitSnapshot,
                                                  _gitRepositories.Select( g => new XElement( XmlNames.xG,
-                                                            new XAttribute( XmlNames.xP, g.SubPath ),
+                                                            new XAttribute( XmlNames.xP, g.DisplayPath ),
                                                             new XAttribute( XmlNames.xD, g.GetBranchSha( m, WorldName.DevelopBranchName ) ),
                                                             new XAttribute( XmlNames.xM, g.GetBranchSha( m, WorldName.MasterBranchName ) ?? "" ) ) ) );
                         _localState.SetGitSnapshot( snapshot );
@@ -862,7 +870,7 @@ namespace CK.Env
                         foreach( var e in snapshot.Elements() )
                         {
                             var path = (string)e.AttributeRequired( XmlNames.xP );
-                            var git = _gitRepositories.FirstOrDefault( g => g.SubPath == path );
+                            var git = _gitRepositories.FirstOrDefault( g => g.DisplayPath == path );
                             if( git == null )
                             {
                                 m.Error( $"Unable to find Git repository for {path}." );
@@ -894,7 +902,7 @@ namespace CK.Env
                                 : "Clearing version tags." ) )
             {
                 var versions = ReleaseRoadmap.Load( _localState.Roadmap )
-                                             .Select( e => (e.SubPath, e.Info, Git: _gitRepositories.FirstOrDefault( g => e.SubPath.StartsWith( g.SubPath ) )) );
+                                             .Select( e => (e.SubPath, e.Info, Git: _gitRepositories.FirstOrDefault( g => e.SubPath.StartsWith( g.DisplayPath ) )) );
                 foreach( var (SubPath, Info, Git) in versions )
                 {
                     if( Git == null )
@@ -1012,6 +1020,7 @@ namespace CK.Env
                                     && WorkStatus == GlobalWorkStatus.Idle
                                     && CachedGlobalGitStatus == StandardGitStatus.Develop;
 
+
         [CommandMethod( confirmationRequired: true )]
         public bool CreateLTS( IActivityMonitor m, string parallelName, bool pushLTSBranches = false, bool pushBaseBranches = false )
         {
@@ -1066,7 +1075,7 @@ namespace CK.Env
                         var commitInfo = repo.ReadVersionInfo( m );
                         if( commitInfo == null )
                         {
-                            m.Error( $"Unable to read version on '{repo.SubPath}'. Aborting." );
+                            m.Error( $"Unable to read version on '{repo.DisplayPath}'. Aborting." );
                             return false;
                         }
                         toProcess.Add( (repo, commitInfo.Value.Commit) );
@@ -1128,7 +1137,7 @@ namespace CK.Env
                             {
                                 error = true;
                             }
-                            m.Info( $"SingleMajor for {p.Repo.SubPath}: '{commitMessage}'." );
+                            m.Info( $"SingleMajor for {p.Repo.DisplayPath}: '{commitMessage}'." );
                         }
                         else
                         {
@@ -1155,7 +1164,7 @@ namespace CK.Env
                             {
                                 error = true;
                             }
-                            m.Info( $"StartingVersion for {p.Repo.SubPath} '{WorldName.DevelopBranchName}' is now '{starting}'." );
+                            m.Info( $"StartingVersion for {p.Repo.DisplayPath} '{WorldName.DevelopBranchName}' is now '{starting}'." );
                         }
                     }
                     catch( Exception ex )

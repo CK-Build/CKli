@@ -3,48 +3,42 @@ using CK.SimpleKeyVault;
 
 using LibGit2Sharp;
 using System;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CK.Env
 {
     /// <summary>
     /// Captures all information required to instantiate an actual <see cref="GitRepository"/> in two steps.
     /// This split in two phases is mainly to first collect the secrets required by the
-    /// repositories and resolve them before any actual instantiation.
+    /// repositories and resolve them before any actual instantiation but also to defer the repository opening.
+    /// <para>
+    /// This can be created by <see cref="FileSystem.DeclareProtoGitFolder(IWorldName, NormalizedPath, string, bool)"/>.
+    /// </para>
     /// </summary>
     public sealed class ProtoGitFolder : GitRepositoryKey
     {
-        /// <summary>
-        /// Initializes a new <see cref="ProtoGitFolder"/>.
-        /// </summary>
-        /// <param name="url">The url of the remote.</param>
-        /// <param name="isPublic">Whether this repository is public.</param>
-        /// <param name="folderPath">The path that is relative to <see cref="FileSystem.Root"/> and contains the .git sub folder.</param>
-        /// <param name="world">The world name.</param>
-        /// <param name="secretKeyStore">The secret key store.</param>
-        /// <param name="fileSystem">=The file system.</param>
-        /// <param name="commandRegister">The command register.</param>
-        public ProtoGitFolder( Uri url,
-                               bool isPublic,
-                               in NormalizedPath folderPath,
-                               IWorldName world,
-                               SecretKeyStore secretKeyStore,
-                               FileSystem fileSystem,
-                               CommandRegister commandRegister )
+        internal GitRepository? _loaded;
+
+        internal ProtoGitFolder( Uri url,
+                                 bool isPublic,
+                                 in NormalizedPath folderPath,
+                                 IWorldName world,
+                                 SecretKeyStore secretKeyStore,
+                                 FileSystem fileSystem )
             : base( secretKeyStore, url, isPublic )
         {
-            Throw.CheckArgument( "Empty path: FileSystem.Root path can not be a Git folder.", !folderPath.IsEmptyPath );
-            Throw.CheckArgument( "Must be relative to the FileSystem.Root.", !folderPath.IsRooted );
-            Throw.CheckArgument( "Path should be the repository directory and not the .git directory.", !folderPath.EndsWith( ".git" ) );
+            Debug.Assert( !folderPath.IsEmptyPath, "Empty path: FileSystem.Root path can not be a Git folder." );
+            Debug.Assert( !folderPath.IsRooted, "Must be relative to the FileSystem.Root." );
+            Debug.Assert( !folderPath.EndsWith( ".git" ), "Path should be the repository directory and not the .git directory." );
 
             Throw.CheckNotNullArgument( world );
             Throw.CheckNotNullArgument( fileSystem );
-            Throw.CheckNotNullArgument( commandRegister );
 
             World = world;
             FolderPath = folderPath;
             FullPhysicalPath = fileSystem.Root.Combine( folderPath );
             FileSystem = fileSystem;
-            CommandRegister = commandRegister;
             PluginRegistry = new GitPluginRegistry( folderPath );
         }
 
@@ -69,25 +63,36 @@ namespace CK.Env
         public NormalizedPath FullPhysicalPath { get; }
 
         /// <summary>
-        /// Gets the command register.
-        /// </summary>
-        public CommandRegister CommandRegister { get; }
-
-        /// <summary>
         /// Gets the plugin registry for this repository.
         /// </summary>
         public GitPluginRegistry PluginRegistry { get; }
 
         /// <summary>
-        /// Ensures that the Git working folder actually exists and creates a
-        /// GitFolder instance where the checked out or returns null on error.
+        /// Gets the repository if it has been <see cref="Load(IActivityMonitor)"/>.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <returns>The GitFolder instance or null on error.</returns>
-        public GitRepository? CreateGitFolder( IActivityMonitor m )
+        public GitRepository? Loaded => _loaded;
+
+        /// <summary>
+        /// Ensures that the <see cref="GitRepository"/> is loaded.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <returns>The <see cref="GitRepository"/> or null on error.</returns>
+        public GitRepository? Load( IActivityMonitor monitor )
         {
-            var r = GitRepositoryBase.EnsureWorkingFolder( m, this, FullPhysicalPath, true, World.DevelopBranchName );
-            return r != null ? new GitRepository( r, this ) : null;
+            if( _loaded == null ) DoLoad( monitor );
+            return _loaded;
+        }
+
+        [MemberNotNullWhen( true, nameof( _loaded ) )]
+        internal bool DoLoad( IActivityMonitor monitor )
+        {
+            Debug.Assert( _loaded == null );
+            var r = GitRepositoryBase.EnsureWorkingFolder( monitor, this, FullPhysicalPath, World.DevelopBranchName );
+            if( r == null ) return false;
+            var g = new GitRepository( r, this );
+            _loaded = g;
+            FileSystem.OnLoaded( g );
+            return true;
         }
 
         /// <summary>

@@ -31,10 +31,13 @@ namespace CK.Env
                 {
                     if( Optional )
                     {
-                        m.Warn( "Loading failed for optional assembly.", ex );
+                        m.Warn( $"Loading failed for optional assembly '{Name}'.", ex );
                     }
-                    else m.Error( "Load failed.", ex );
-                    throw;
+                    else
+                    {
+                        m.Error( "Load failed.", ex );
+                        throw;
+                    }
                 }
             }
         }

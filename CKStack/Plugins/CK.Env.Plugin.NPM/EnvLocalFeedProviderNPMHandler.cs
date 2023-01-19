@@ -61,12 +61,12 @@ namespace CK.Env
                 For npm, the cache should be managed through "cacache".
                     ==> https://github.com/greggman/npm-cache-rm/tree/master
                     cacache, that has numerous dependencies. It must be launched
-                    by a node project (or is there a simpler way?).
+                    by a node project. The npx https://www.npmjs.com/package/npx tool should do the job.
 
                 For Yarn: yarn config --json
 
-                    ==> "globalFolder": "C:\\Users\\olivier.spinelli\\AppData\\Local\\Yarn\\Berry"
-                    ==> "cacheFolder": "C:\\Dev\\SC\\Core-Projects\\CK-Observable-Domain\\Clients\\.yarn\\cache"
+                    ==> "globalFolder": "C:\Users\olivier.spinelli\AppData\Local\Yarn\Berry"
+                    ==> "cacheFolder": "C:\Dev\SC\Core-Projects\CK-Observable-Domain\Clients\.yarn\cache"
 
                     Cache global: "globalFolder"/cache
                     One zip per package: @babel-core-npm-7.20.2-7fb00344fc-98faaaef26.zip
@@ -76,7 +76,7 @@ namespace CK.Env
                     - The cacheFolder (local) is in the project root.
                     - The global cache depends on the yarn version that is used by the project (.yarnrc).
 
-                    This implies that it may be better that this cleanup is a CCB feature.
+                    This implies that it may be better that this cleanup is a CCB feature :(.
 
              */
         }

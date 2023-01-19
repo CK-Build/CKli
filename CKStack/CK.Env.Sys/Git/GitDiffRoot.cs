@@ -6,14 +6,14 @@ namespace CK.Env
     /// <summary>
     /// Specifies a set of rooted paths in the repository grouped under a name (typically a project name).
     /// </summary>
-    public sealed class DiffRoot
+    public sealed class GitDiffRoot
     {
         /// <summary>
-        /// Initializes a new <see cref="DiffRoot"/>.
+        /// Initializes a new <see cref="GitDiffRoot"/>.
         /// </summary>
         /// <param name="name">The name (typically a project's name).</param>
         /// <param name="paths">The set of paths.</param>
-        public DiffRoot( string name, IEnumerable<NormalizedPath> paths )
+        public GitDiffRoot( string name, IEnumerable<NormalizedPath> paths )
         {
             Name = name;
             Paths = paths;

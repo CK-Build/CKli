@@ -8,9 +8,8 @@ namespace CKli
     /// </summary>
     public class XBranch : XPathItem
     {
-        public XBranch(
-            Initializer initializer,
-            XGitFolder parent )
+        public XBranch( Initializer initializer,
+                        XGitFolder parent )
             : base( initializer, parent.FileSystem, parent.FullPath.AppendPart( "branches" ) )
         {
             initializer.ChildServices.Add( this );
@@ -20,7 +19,7 @@ namespace CKli
         /// <summary>
         /// Gets the parent <see cref="XGitFolder"/> object.
         /// </summary>
-        public new XGitFolder Parent => (XGitFolder)base.Parent;
+        public new XGitFolder Parent => (XGitFolder)base.Parent!;
 
     }
 }

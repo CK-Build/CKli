@@ -3,7 +3,7 @@ using CK.Core;
 
 namespace CK.Env.Diff
 {
-    class ModifiedDiff : IDiff, IModifiedDiff
+    sealed class ModifiedDiff : IDiff, IModifiedDiff
     {
         public ModifiedDiff( NormalizedPath oldPath, NormalizedPath newPath )
         {

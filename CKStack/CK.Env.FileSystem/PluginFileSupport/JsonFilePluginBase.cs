@@ -10,7 +10,7 @@ namespace CK.Env.Plugin
         public JsonFilePluginBase( GitRepository f, NormalizedPath branchPath, NormalizedPath filePath )
             : base( f.FileSystem, filePath )
         {
-            if( !filePath.StartsWith( branchPath ) ) Throw.ArgumentException( $"Path {filePath} must start with folder {f.SubPath}." );
+            if( !filePath.StartsWith( branchPath ) ) Throw.ArgumentException( $"Path {filePath} must start with folder {f.DisplayPath}." );
             _pluginImpl = new GitBranchPluginImpl( f, branchPath );
             f.OnReset += OnFileSystemReset;
         }

@@ -15,7 +15,7 @@ namespace CK.Env.MSBuildSln.Tests
     [TestFixture]
     public class SolutionFileTests
     {
-        readonly CommandRegister _commandRegister = new CommandRegister();
+        readonly CommandRegistry _commandRegister = new CommandRegistry();
         readonly SecretKeyStore _keyStore = new SecretKeyStore();
 
         [Test]

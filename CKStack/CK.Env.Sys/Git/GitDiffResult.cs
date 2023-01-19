@@ -9,14 +9,14 @@ namespace CK.Env
     /// <summary>
     /// Captures a set of modifications in a repository between 2 commits.
     /// </summary>
-    public sealed class DiffResult
+    public sealed class GitDiffResult
     {
         /// <summary>
-        /// Initializes a new <see cref="DiffResult"/>.
+        /// Initializes a new <see cref="GitDiffResult"/>.
         /// </summary>
         /// <param name="diffs">The list of defined rooted results.</param>
         /// <param name="others">Other changes.</param>
-        public DiffResult( IReadOnlyList<DiffRootResult> diffs, DiffRootResult others, IReadOnlyList<CommitMessage>? messages )
+        public GitDiffResult( IReadOnlyList<GitDiffRootResult> diffs, GitDiffRootResult others, IReadOnlyList<CommitMessage>? messages )
         {
             Diffs = diffs;
             Others = others;
@@ -30,16 +30,16 @@ namespace CK.Env
         public int ChangeCount { get; }
 
         /// <summary>
-        /// Gets a list of <see cref="DiffRootResult"/> for roots that have
-        /// been declared by <see cref="DiffRoot"/>.
+        /// Gets a list of <see cref="GitDiffRootResult"/> for roots that have
+        /// been declared by <see cref="GitDiffRoot"/>.
         /// </summary>
-        public IReadOnlyList<DiffRootResult> Diffs { get; }
+        public IReadOnlyList<GitDiffRootResult> Diffs { get; }
 
         /// <summary>
-        /// Gets <see cref="DiffRootResult"/> of modifications that have
+        /// Gets <see cref="GitDiffRootResult"/> of modifications that have
         /// not been captured by <see cref="Diffs"/>.
         /// </summary>
-        public DiffRootResult Others { get; }
+        public GitDiffRootResult Others { get; }
 
         /// <summary>
         /// Gets the list of commit messages if it has been computed.

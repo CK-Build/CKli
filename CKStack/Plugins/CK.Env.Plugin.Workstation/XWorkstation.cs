@@ -63,7 +63,7 @@ namespace CKli
         readonly List<object> _scripts;
 
         public XWorkstation( Initializer initializer,
-            CommandRegister commands,
+            CommandRegistry commands,
             FileSystem fileSystem )
             : base( initializer )
         {

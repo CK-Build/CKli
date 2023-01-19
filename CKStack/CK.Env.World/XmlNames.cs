@@ -41,7 +41,6 @@ namespace CK.Env
         public static readonly XName xMonitorLogFilter = XNamespace.None + "MonitorLogFilter";
         public static readonly XName xRoadmap = XNamespace.None + "Roadmap";
         public static readonly XName xCICDKeyVault = XNamespace.None + "CICDKeyVault";
-        public static readonly XName xArtifactCache = XNamespace.None + "ArtifactCache";
 
     }
 }

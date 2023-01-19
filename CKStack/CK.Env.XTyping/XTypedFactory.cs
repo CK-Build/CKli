@@ -10,16 +10,16 @@ using System.Xml.XPath;
 
 namespace CK.Env
 {
-    public class XTypedFactory
+    public sealed class XTypedFactory : IXTypedMap
     {
-        readonly XTypedFactory? _base;
+        readonly IXTypedMap? _base;
         readonly Dictionary<XName, Type> _typeRegister;
         readonly HashSet<Assembly> _already;
         bool _isLocked;
 
-        public XTypedFactory( XTypedFactory? baseFactory = null )
+        public XTypedFactory( IXTypedMap? baseMap = null )
         {
-            _base = baseFactory;
+            _base = baseMap;
             _typeRegister = new Dictionary<XName, Type>();
             _already = new HashSet<Assembly>();
         }
@@ -106,7 +106,7 @@ namespace CK.Env
             if( !a.IsDynamic && _already.Add( a ) && (_base == null || !_base.HasAlreadyRegistered( a )) )
             {
                 var allTypes = a.ExportedTypes
-                            .Where( t => !t.IsAbstract && typeof( XTypedObject ).IsAssignableFrom( t ) );
+                                .Where( t => !t.IsAbstract && typeof( XTypedObject ).IsAssignableFrom( t ) );
                 RegisterNames( monitor, allTypes, AutoNamesFromType );
             }
         }
@@ -147,7 +147,7 @@ namespace CK.Env
 
         void CheckLocked()
         {
-            if( _isLocked ) throw new InvalidOperationException( "Locked XTypedFactory cannot register new types." );
+            Throw.CheckState( "Locked XTypedFactory cannot register new types.", !_isLocked );
         }
 
         public Type? GetNameMappping( XName n )
@@ -176,8 +176,8 @@ namespace CK.Env
         {
             using( monitor.OpenDebug( $"Creating XTypedObject from root {e.ToStringPath()}." ) )
             {
-                if( e == null ) throw new ArgumentNullException( nameof( e ) );
-                if( monitor == null ) throw new ArgumentNullException( nameof( monitor ) );
+                Throw.CheckNotNullArgument( monitor );
+                Throw.CheckNotNullArgument( e );
 
                 e.Changing += PreventAnyChangesToXElement;
                 var eReader = new XElementReader( monitor, e, new HashSet<XObject>() );
@@ -193,36 +193,37 @@ namespace CK.Env
                 }
                 return result;
             }
+
+            static bool CreateChildren( XTypedObject parent, XTypedObject.Initializer parentConfig )
+            {
+                SimpleServiceContainer? cChild = null;
+                List<XTypedObject>? created = null;
+                XTypedFactory? typeFactory = null;
+                var eParent = parent.XElement;
+                foreach( var child in eParent.Elements() )
+                {
+                    typeFactory ??= parentConfig.ChildServices.GetService<XTypedFactory>( true );
+                    var rChild = parentConfig.Reader.WithElement( child, false );
+                    var tChild = typeFactory.GetMappping( rChild );
+                    if( tChild != null )
+                    {
+                        cChild ??= new SimpleServiceContainer( parentConfig.ChildServices );
+                        var config = new XTypedObject.Initializer( parent, rChild, cChild );
+                        var o = (XTypedObject?)cChild.SimpleObjectCreate( rChild.Monitor, tChild, config );
+                        created ??= new List<XTypedObject>();
+                        if( o == null || !CreateChildren( o, config ) ) return false;
+                        created.Add( o );
+                        rChild.WarnUnhandledAttributes();
+                    }
+                }
+                return parent.OnChildrenCreated( parentConfig, (IReadOnlyList<XTypedObject>?)created ?? Array.Empty<XTypedObject>() );
+            }
+
         }
 
         static void PreventAnyChangesToXElement( object? sender, XObjectChangeEventArgs e )
         {
-            throw new InvalidOperationException( "An XElement that is bound to a TypedObject must not be changed." );
-        }
-
-        static bool CreateChildren( XTypedObject parent, XTypedObject.Initializer parentConfig )
-        {
-            SimpleServiceContainer? cChild = null;
-            List<XTypedObject>? created = null;
-            XTypedFactory? typeFactory = null;
-            var eParent = parent.XElement;
-            foreach( var child in eParent.Elements() )
-            {
-                if( typeFactory == null ) typeFactory = parentConfig.ChildServices.GetService<XTypedFactory>( true );
-                var rChild = parentConfig.Reader.WithElement( child, false );
-                var tChild = typeFactory.GetMappping( rChild );
-                if( tChild != null )
-                {
-                    if( cChild == null ) cChild = new SimpleServiceContainer( parentConfig.ChildServices );
-                    var config = new XTypedObject.Initializer( parent, rChild, cChild );
-                    var o = (XTypedObject?)cChild.SimpleObjectCreate( rChild.Monitor, tChild, config );
-                    if( created == null ) created = new List<XTypedObject>();
-                    if( o == null || !CreateChildren( o, config ) ) return false;
-                    created.Add( o );
-                    rChild.WarnUnhandledAttributes();
-                }
-            }
-            return parent.OnChildrenCreated( parentConfig, (IReadOnlyList<XTypedObject>?)created ?? Array.Empty<XTypedObject>() );
+            Throw.InvalidOperationException( "An XElement that is bound to a TypedObject must not be changed." );
         }
 
         /// <summary>
@@ -258,7 +259,7 @@ namespace CK.Env
             }
         }
 
-        class ReusableWrapper
+        sealed class ReusableWrapper
         {
             Dictionary<string, List<XNode>>? _map;
 

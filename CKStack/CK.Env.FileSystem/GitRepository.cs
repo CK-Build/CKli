@@ -37,14 +37,14 @@ namespace CK.Env
             _headFolder = new HeadFolder( this );
             _branchesFolder = new BranchesFolder( this, "branches", isRemote: false );
             _remoteBranchesFolder = new RemotesFolder( this );
-            _thisDir = new RootDir( this, SubPath.LastPart );
+            _thisDir = new RootDir( this, DisplayPath.LastPart );
             ServiceContainer = new SimpleServiceContainer( FileSystem.ServiceContainer );
             ServiceContainer.Add( this );
-            PluginManager = new GitPluginManager( data.PluginRegistry, ServiceContainer, data.CommandRegister, data.World.DevelopBranchName );
-            data.CommandRegister.Register( this );
+            PluginManager = new GitPluginManager( data.PluginRegistry, ServiceContainer, FileSystem.CommandRegister, data.World.DevelopBranchName );
+            FileSystem.CommandRegister.Register( this );
         }
 
-        NormalizedPath ICommandMethodsProvider.CommandProviderName => SubPath;
+        NormalizedPath ICommandMethodsProvider.CommandProviderName => DisplayPath;
 
         /// <summary>
         /// Gets the service container for this GitFolder.
@@ -57,18 +57,31 @@ namespace CK.Env
         public GitPluginManager PluginManager { get; }
 
         /// <summary>
+        /// Gets a <see cref="GitRepositoryBase.SimpleStatusInfo"/> for this repository.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="initializePlugins">True to initialize the plugins if they are not initialized.</param>
+        /// <returns>The simplified status info.</returns>
+        public SimpleStatusInfo GetSimpleStatusInfo( IActivityMonitor monitor, bool initializePlugins )
+        {
+            var r = GetSimpleStatusInfo();
+            if( PluginManager.BranchPlugins.IsInitialized( CurrentBranchName )
+                || (initializePlugins && EnsureCurrentBranchPlugins( monitor )) )
+            {
+                r.PluginCount = PluginManager.BranchPlugins.Count;
+            }
+            return r;
+        }
+
+        /// <summary>
         /// Ensures that plugins are loaded for the <see cref="CurrentBranchName"/>.
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
         /// <returns></returns>
-        public bool EnsureCurrentBranchPlugins( IActivityMonitor m )
+        public bool EnsureCurrentBranchPlugins( IActivityMonitor monitor )
         {
-            if( CurrentBranchName != null )
-            {
-                return PluginManager.BranchPlugins.EnsurePlugins( m, CurrentBranchName );
-            }
-            m.Error( $"No plugins since '{this}' is not on a branch." );
-            return false;
+            Throw.CheckState( CurrentBranchName != null );
+            return PluginManager.BranchPlugins.EnsurePlugins( monitor, CurrentBranchName );
         }
 
         protected override void OnNewCurrentBranch( IActivityMonitor m ) => EnsureCurrentBranchPlugins( m );
@@ -111,7 +124,7 @@ namespace CK.Env
         /// <param name="fileName">The filename to execute.</param>
         /// <param name="arguments">the raw string of arguments.</param>
         /// <returns>True on success. False on error.</returns>
-        [CommandMethod( ParallelMode = ParallelCommandMode.UserChoice )]
+        [CommandMethod]
         public bool RunProcess( IActivityMonitor m, string fileName, string arguments, int timeoutSeconds = 60 )
         {
             ProcessStartInfo info = ProcessRunner.ConfigureProcessInfo( FullPhysicalPath, fileName, arguments );
@@ -141,7 +154,7 @@ namespace CK.Env
             if( branchName == null ) branchName = CurrentBranchName;
             try
             {
-                using( m.OpenInfo( $"Reading version info of '{SubPath}/{branchName}'." ) )
+                using( m.OpenInfo( $"Reading version info of '{DisplayPath}/{branchName}'." ) )
                 {
                     Branch b = Git.Branches[branchName];
                     if( b == null )
@@ -150,8 +163,8 @@ namespace CK.Env
                         return null;
                     }
                     var pathOpt = b.IsRemote
-                                    ? SubPath.AppendPart( "remotes" ).Combine( b.FriendlyName )
-                                    : SubPath.AppendPart( "branches" ).AppendPart( branchName );
+                                    ? DisplayPath.AppendPart( "remotes" ).Combine( b.FriendlyName )
+                                    : DisplayPath.AppendPart( "branches" ).AppendPart( branchName );
 
                     pathOpt = pathOpt.AppendPart( "RepositoryInfo.xml" );
                     var fOpt = FileSystem.GetFileInfo( pathOpt );
@@ -217,7 +230,7 @@ namespace CK.Env
         public bool PushVersionTag( IActivityMonitor m, SVersion v )
         {
             var sv = 'v' + v.ToString();
-            using( m.OpenInfo( $"Pushing tag {sv} to remote for {SubPath}." ) )
+            using( m.OpenInfo( $"Pushing tag {sv} to remote for {DisplayPath}." ) )
             {
                 try
                 {
@@ -230,7 +243,7 @@ namespace CK.Env
                     var exists = Git.Tags[sv];
                     if( exists == null )
                     {
-                        m.Error( $"Version Tag {sv} does not exist in {SubPath}." );
+                        m.Error( $"Version Tag {sv} does not exist in {DisplayPath}." );
                         return false;
                     }
                     Git.Network.Push( remote, exists.CanonicalName, options );
@@ -238,7 +251,7 @@ namespace CK.Env
                 }
                 catch( Exception ex )
                 {
-                    m.Error( $"PushVersionTags failed ({sv} on {SubPath}).", ex );
+                    m.Error( $"PushVersionTags failed ({sv} on {DisplayPath}).", ex );
                     return false;
                 }
             }
@@ -258,18 +271,18 @@ namespace CK.Env
             {
                 if( Git.Tags[sv] == null )
                 {
-                    m.Info( $"Tag '{sv}' in {SubPath} not found (cannot remove it)." );
+                    m.Info( $"Tag '{sv}' in {DisplayPath} not found (cannot remove it)." );
                 }
                 else
                 {
                     Git.Tags.Remove( sv );
-                    m.Info( $"Removing Version tag '{sv}' from {SubPath}." );
+                    m.Info( $"Removing Version tag '{sv}' from {DisplayPath}." );
                 }
                 return true;
             }
             catch( Exception ex )
             {
-                m.Error( $"ClearVersionTag {sv} on {SubPath} failed.", ex );
+                m.Error( $"ClearVersionTag {sv} on {DisplayPath} failed.", ex );
                 return false;
             }
         }
@@ -297,7 +310,7 @@ namespace CK.Env
         public bool Reset( IActivityMonitor monitor, bool gitResetHard = false )
         {
             if( gitResetHard ) return ResetHard( monitor );
-            using( monitor.OpenInfo( $"Soft reset '{SubPath}' (branch '{CurrentBranchName}')." ) )
+            using( monitor.OpenInfo( $"Soft reset '{DisplayPath}' (branch '{CurrentBranchName}')." ) )
             {
                 OnReset?.Invoke( monitor );
                 return true;
@@ -312,12 +325,12 @@ namespace CK.Env
         /// <returns>True on success, false on error.</returns>
         public bool ResetHard( IActivityMonitor monitor )
         {
-            using( monitor.OpenInfo( $"Reset --hard changes in '{SubPath}' (branch '{CurrentBranchName}')." ) )
+            using( monitor.OpenInfo( $"Reset --hard changes in '{DisplayPath}' (branch '{CurrentBranchName}')." ) )
             {
                 try
                 {
                     Git.Reset( ResetMode.Hard );
-                    var status = Git.RetrieveStatus();
+                    var status = Git.RetrieveStatus( _checkDirtyOptions );
                     int untrackedCount = status.Untracked.Count();
                     bool success = true;
                     if( untrackedCount > 0 )
@@ -326,7 +339,7 @@ namespace CK.Env
                         {
                             foreach( var e in status.Untracked )
                             {
-                                if( !FileSystem.Delete( monitor, SubPath.AppendPart( "branches" ).AppendPart( CurrentBranchName ).Combine( e.FilePath ) ) )
+                                if( !FileSystem.Delete( monitor, DisplayPath.AppendPart( "branches" ).AppendPart( CurrentBranchName ).Combine( e.FilePath ) ) )
                                 {
                                     success = false;
                                 }
@@ -359,8 +372,8 @@ namespace CK.Env
             Throw.CheckNotNullOrWhiteSpaceArgument( branchName );
             bool delete = String.IsNullOrWhiteSpace( commitSha );
             using( m.OpenInfo( delete
-                                ? $"Restoring {SubPath} '{branchName}' state (removing it)."
-                                : $"Restoring {SubPath} '{branchName}' state." ) )
+                                ? $"Restoring {DisplayPath} '{branchName}' state (removing it)."
+                                : $"Restoring {DisplayPath} '{branchName}' state." ) )
             {
                 try
                 {
@@ -433,7 +446,7 @@ namespace CK.Env
         /// <returns>True on success, false on error.</returns>
         public bool SwitchDevelopToLocal( IActivityMonitor m, bool autoCommit = true )
         {
-            using( m.OpenInfo( $"Switching '{SubPath}' to branch '{World.LocalBranchName}')." ) )
+            using( m.OpenInfo( $"Switching '{DisplayPath}' to branch '{World.LocalBranchName}')." ) )
             {
                 try
                 {
@@ -513,7 +526,7 @@ namespace CK.Env
 
         bool RaiseEnteredLocalBranch( IActivityMonitor m, bool enter )
         {
-            PluginManager.BranchPlugins.EnsurePlugins( m, World.LocalBranchName );
+            if( !PluginManager.BranchPlugins.EnsurePlugins( m, World.LocalBranchName ) ) return false;
             using( m.OpenTrace( $"{this}: Raising {(enter ? "OnLocalBranchEntered" : "OnLocalBranchLeaving")} event." ) )
             {
                 try
@@ -551,7 +564,7 @@ namespace CK.Env
         /// <returns>True on success, false on error.</returns>
         public bool SwitchDevelopToMaster( IActivityMonitor monitor )
         {
-            using( monitor.OpenInfo( $"Switching '{SubPath}' to branch '{World.MasterBranchName}')." ) )
+            using( monitor.OpenInfo( $"Switching '{DisplayPath}' to branch '{World.MasterBranchName}')." ) )
             {
                 try
                 {
@@ -617,7 +630,7 @@ namespace CK.Env
         /// <returns>True on success, false on error.</returns>
         public bool SwitchLocalToDevelop( IActivityMonitor monitor )
         {
-            using( monitor.OpenInfo( $"Switching '{SubPath}' to branch '{World.DevelopBranchName}'." ) )
+            using( monitor.OpenInfo( $"Switching '{DisplayPath}' to branch '{World.DevelopBranchName}'." ) )
             {
                 try
                 {
@@ -639,7 +652,7 @@ namespace CK.Env
                         return false;
                     }
 
-                    // Auto merge from Ours or Theirs: we privilegiate the current branch.
+                    // Auto merge from Ours or Theirs: we favor the current branch.
                     MergeFileFavor mergeFileFavor = MergeFileFavor.Normal;
                     if( bLocal.IsCurrentRepositoryHead )
                     {
@@ -647,14 +660,14 @@ namespace CK.Env
                         if( AmendCommit( monitor ) == CommittingResult.Error ) return false;
                         Commands.Checkout( Git, bDevelop );
                         OnNewCurrentBranch( monitor );
-                        monitor.Info( $"Coming from {World.LocalBranchName}: privilegiates 'local' file changes during merge." );
+                        monitor.Info( $"Coming from {World.LocalBranchName}: favors 'local' file changes during merge." );
                         mergeFileFavor = MergeFileFavor.Theirs;
                     }
                     else
                     {
                         if( !CheckCleanCommit( monitor ) ) return false;
                         EnsureCurrentBranchPlugins( monitor );
-                        monitor.Info( $"Already on {World.DevelopBranchName}: privilegiates 'develop' file changes during merge." );
+                        monitor.Info( $"Already on {World.DevelopBranchName}: favors 'develop' file changes during merge." );
                         mergeFileFavor = MergeFileFavor.Ours;
                     }
 
@@ -693,7 +706,7 @@ namespace CK.Env
         /// <returns>True on success, false on error.</returns>
         public bool SwitchMasterToDevelop( IActivityMonitor m )
         {
-            using( m.OpenInfo( $"Switching '{SubPath}' to branch '{World.DevelopBranchName}'." ) )
+            using( m.OpenInfo( $"Switching '{DisplayPath}' to branch '{World.DevelopBranchName}'." ) )
             {
                 try
                 {
@@ -727,7 +740,7 @@ namespace CK.Env
 
         public override void Dispose()
         {
-            ProtoGitFolder.CommandRegister.Unregister( this );
+            FileSystem.CommandRegister.Unregister( this );
             ((IDisposable)PluginManager).Dispose();
             base.Dispose();
         }
@@ -809,7 +822,7 @@ namespace CK.Env
 
             public IEnumerator<IFileInfo> GetEnumerator()
             {
-                _physical ??= _f.FileSystem.PhysicalGetDirectoryContents( _f.SubPath );
+                _physical ??= _f.FileSystem.PhysicalGetDirectoryContents( _f.DisplayPath );
                 return _physical.GetEnumerator();
             }
 
@@ -1053,7 +1066,7 @@ namespace CK.Env
             }
             if( IsInWorkingFolder( ref sub ) )
             {
-                return FileSystem.PhysicalFindFiles( SubPath.Combine( sub ), fileMatch, directoryMatch );
+                return FileSystem.PhysicalFindFiles( DisplayPath.Combine( sub ), fileMatch, directoryMatch );
             }
             RefreshBranches();
             if( sub.FirstPart == _branchesFolder.Name )
@@ -1074,7 +1087,7 @@ namespace CK.Env
             if( IsInWorkingFolder( ref sub ) )
             {
                 if( sub.IsEmptyPath ) return _headFolder;
-                return FileSystem.PhysicalGetFileInfo( SubPath.Combine( sub ) );
+                return FileSystem.PhysicalGetFileInfo( DisplayPath.Combine( sub ) );
             }
             RefreshBranches();
             if( sub.FirstPart == _branchesFolder.Name )
@@ -1094,7 +1107,7 @@ namespace CK.Env
             if( IsInWorkingFolder( ref sub ) )
             {
                 if( sub.IsEmptyPath ) return _headFolder;
-                return FileSystem.PhysicalGetDirectoryContents( SubPath.Combine( sub ) );
+                return FileSystem.PhysicalGetDirectoryContents( DisplayPath.Combine( sub ) );
             }
             RefreshBranches();
             if( sub.FirstPart == _branchesFolder.Name )

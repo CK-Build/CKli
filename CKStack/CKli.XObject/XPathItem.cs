@@ -13,10 +13,9 @@ namespace CKli
         IFileInfo? _fileInfo;
         IDirectoryContents? _contents;
 
-        public XPathItem(
-            Initializer initializer,
-            FileSystem fs,
-            XPathItem? parent = null )
+        public XPathItem( Initializer initializer,
+                          FileSystem fs,
+                          XPathItem? parent = null )
             : this( initializer, fs, parent?.FullPath ?? new NormalizedPath() )
         {
         }
@@ -30,10 +29,9 @@ namespace CKli
         /// <param name="initializer">Initializer object.</param>
         /// <param name="fs">Root file system object.</param>
         /// <param name="parentPath">Parent path.</param>
-        public XPathItem(
-            Initializer initializer,
-            FileSystem fs,
-            NormalizedPath parentPath )
+        public XPathItem( Initializer initializer,
+                          FileSystem fs,
+                          NormalizedPath parentPath )
             : this( initializer,
                     fs,
                     initializer.Element.Name == "File"
@@ -43,11 +41,10 @@ namespace CKli
         {
         }
 
-        protected XPathItem(
-            Initializer initializer,
-            FileSystem fs,
-            FileSystemItemKind kind,
-            NormalizedPath fullPath )
+        protected XPathItem( Initializer initializer,
+                             FileSystem fs,
+                             FileSystemItemKind kind,
+                             NormalizedPath fullPath )
             : base( initializer )
         {
             FileSystem = fs;

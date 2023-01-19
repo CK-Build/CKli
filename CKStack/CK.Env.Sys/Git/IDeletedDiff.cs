@@ -4,7 +4,7 @@ using CK.Core;
 namespace CK.Env
 {
     /// <summary>
-    /// Models a deleted file in <see cref="DiffResult"/>.
+    /// Models a deleted file in <see cref="GitDiffResult"/>.
     /// </summary>
     public interface IDeletedDiff
     {

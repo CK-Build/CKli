@@ -47,6 +47,7 @@ namespace CKli
         [CommandMethod( confirmationRequired: false )]
         public bool DumpWorldState( IActivityMonitor monitor )
         {
+            if( !FileSystem.EnsureCurrentBranchPlugins( monitor ) ) return false;
             return RunSafe( monitor, "World Status.", ( m, error ) =>
             {
                 var ev = new EventMonitoredArgs( monitor );

@@ -53,7 +53,7 @@ namespace CK.Env.NPM
         public void SetDirty( IActivityMonitor monitor )
         {
             if( _isDirty ) return;
-            monitor.Info( $"Node Solution '{_driver.GitFolder.SubPath}' must be reloaded." );
+            monitor.Info( $"Node Solution '{_driver.GitFolder.DisplayPath}' must be reloaded." );
             _isDirty = true;
             if( _nodeSolution != null )
             {

@@ -2,7 +2,13 @@
   "profiles": {
     "CKli": {
       "commandName": "Project",
-      "workingDirectory": "C:/Dev/SC"
+      "workingDirectory": "C:/Dev2/CK",
+      "commandLineArgs": "--interactive",
+      "_commandLineArgs": "stack list",
+      "__commandLineArgs": "world status --git",
+      "1_commandLineArgs": "clone https://github.com/CK-Build/CK-Build-Sample-Stack C:/Dev2",
+      "2_commandLineArgs": "clone https://github.com/signature-opensource/CK-Stack C:/Dev2",
+      "E0_commandLineArgs": "clone https://github.com/CK-Build/CK-Build-Sample-Stack C:/Dev2/CK --allowDuplicate"
     }
   }
 }

@@ -1,6 +1,9 @@
 using CK.Core;
 using CK.SimpleKeyVault;
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 
 namespace CK.Env
@@ -12,6 +15,18 @@ namespace CK.Env
     /// </summary>
     public class GitRepositoryKey
     {
+        sealed class UriComparer : IEqualityComparer<Uri>
+        {
+            public bool Equals( Uri? x, Uri? y ) => StringComparer.OrdinalIgnoreCase.Equals( x?.ToString(), y?.ToString() );
+
+            public int GetHashCode( [DisallowNull] Uri obj ) => StringComparer.OrdinalIgnoreCase.GetHashCode( obj.ToString() );
+        }
+
+        /// <summary>
+        /// An equality comparer for Url that uses <see cref="StringComparer.OrdinalIgnoreCase"/>.
+        /// </summary>
+        public static readonly IEqualityComparer<Uri> OrdinalIgnoreCaseUrlEqualityComparer = new UriComparer();
+
         /// <summary>
         /// Initializes a new <see cref="GitRepositoryKey"/>.
         /// </summary>
@@ -52,44 +67,6 @@ namespace CK.Env
         }
 
         /// <summary>
-        /// Normalizes a valid, absolute, url. If the path ends with ".git" (case insensitive), this suffix is removed.
-        /// </summary>
-        /// <param name="url">The valid, absolute, url.</param>
-        /// <returns>The normalized url.</returns>
-        public static Uri CheckAndNormalizeRepositoryUrl( Uri url )
-        {
-            Throw.CheckNotNullArgument( url );
-            if( !url.IsAbsoluteUri ) Throw.ArgumentException( nameof( url ), $"Invalid Url. It must be absolute: {url}" );
-            if( url.Query.Length == 0 )
-            {
-                // Security: since execution paths may differ before reaching the constructor, multiple suffix may be handled or not.
-                // Here we ensure that all suffixes are removed.
-                while( url.AbsolutePath.EndsWith( ".git", StringComparison.OrdinalIgnoreCase ) )
-                {
-                    var s = url.AbsoluteUri;
-                    url = new Uri( s.Remove( s.Length - 4 ) );
-                }
-            }
-            return url;
-        }
-
-        /// <summary>
-        /// Checks that the 2 urls's string, after a call to <see cref="CheckAndNormalizeRepositoryUrl(Uri)"/>
-        /// are <see cref="StringComparison.OrdinalIgnoreCase"/> equal.
-        /// This is a lot of computation for a boolean and it is hard to "optimize" since we never know if the urls
-        /// have already been normalized.
-        /// </summary>
-        /// <param name="u1">First valid and absolute url.</param>
-        /// <param name="u2">Second valid and absolute url.</param>
-        /// <returns>Whether the 2 urls are equivalent.</returns>
-        public static bool IsEquivalentRepositoryUri( Uri u1, Uri u2 )
-        {
-            u1 = CheckAndNormalizeRepositoryUrl( u1 );
-            u2 = CheckAndNormalizeRepositoryUrl( u2 );
-            return u1.ToString().Equals( u2.ToString(), StringComparison.OrdinalIgnoreCase );
-        }
-
-        /// <summary>
         /// Gets whether the Git repository is public.
         /// Specialized classes may set this property.
         /// </summary>
@@ -127,12 +104,12 @@ namespace CK.Env
         public string? WritePATKeyName { get; }
 
         /// <summary>
-        /// Helper that formats the PAT name based on the kind of provider.
+        /// Private helper that formats the PAT name based on the kind of provider.
         /// <see cref="KnownGitProvider"/> must not be Unknown.
         /// </summary>
         /// <param name="suffix">Suffix to use.</param>
         /// <returns>The PAT name or null if <see cref="KnownGitProvider"/> is Unknown.</returns>
-        public string GetPATName( string suffix = "_PAT" )
+        string GetPATName( string suffix = "_PAT" )
         {
             switch( KnownGitProvider )
             {
@@ -157,7 +134,51 @@ namespace CK.Env
             }
         }
 
+        /// <summary>
+        /// Overridden to return the OriginUrl and whether 
+        /// </summary>
+        /// <returns>A readable string.</returns>
         public override string ToString() => $"{OriginUrl} ({(IsPublic ? "Public" : "Private")})";
+
+        /// <summary>
+        /// Normalizes a valid, absolute, url. If the path ends with ".git" (case insensitive), this suffix is removed.
+        /// Throws a <see cref="ArgumentException"/> if <see cref="Uri.IsAbsoluteUri"/> is false.
+        /// </summary>
+        /// <param name="url">The valid, absolute, url.</param>
+        /// <returns>The normalized url.</returns>
+        public static Uri CheckAndNormalizeRepositoryUrl( Uri url )
+        {
+            Throw.CheckNotNullArgument( url );
+            if( !url.IsAbsoluteUri ) Throw.ArgumentException( nameof( url ), $"Invalid Url: '{url}' must be absolute." );
+            if( url.Query.Length == 0 )
+            {
+                // Security: since execution paths may differ before reaching the constructor, multiple suffix may be handled or not.
+                // Here we ensure that all suffixes are removed.
+                while( url.AbsolutePath.EndsWith( ".git", StringComparison.OrdinalIgnoreCase ) )
+                {
+                    var s = url.AbsoluteUri;
+                    url = new Uri( s.Remove( s.Length - 4 ) );
+                }
+            }
+            return url;
+        }
+
+        /// <summary>
+        /// Checks that the 2 urls's string, after a call to <see cref="CheckAndNormalizeRepositoryUrl(Uri)"/>
+        /// are <see cref="StringComparison.OrdinalIgnoreCase"/> equal.
+        /// This is a lot of computation for a boolean and it is hard to "optimize" since we never know if the urls
+        /// have already been normalized.
+        /// </summary>
+        /// <param name="u1">First valid and absolute url.</param>
+        /// <param name="u2">Second valid and absolute url.</param>
+        /// <returns>Whether the 2 urls are equivalent.</returns>
+        public static bool IsEquivalentRepositoryUri( Uri u1, Uri u2 )
+        {
+            u1 = CheckAndNormalizeRepositoryUrl( u1 );
+            u2 = CheckAndNormalizeRepositoryUrl( u2 );
+            return OrdinalIgnoreCaseUrlEqualityComparer.Equals( u1, u2 );
+        }
+
     }
 
 }

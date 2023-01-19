@@ -7,6 +7,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Xml.Linq;
 
@@ -19,6 +20,7 @@ namespace CK.Env
         readonly int? _singleMajorConfig;
         readonly bool _onlyPatchConfig;
 
+        [AllowNull]
         ReleaseRoadmap _releaser;
         ReleaseInfo _previouslyResolvedInfo;
         ReleaseInfo _releaseInfo;
@@ -36,7 +38,7 @@ namespace CK.Env
             _onlyPatchConfig = versionInfo.OnlyPatch;
             if( previous != null )
             {
-                ReleaseNote = previous.Element( "ReleaseNote" ).Value;
+                ReleaseNote = previous.Element( "ReleaseNote" )?.Value;
                 var releaseInfoXml = previous.Element( "ReleaseInfo" );
                 if( releaseInfoXml != null )
                 {
@@ -101,7 +103,7 @@ namespace CK.Env
             _releaseInfo = new ReleaseInfo();
         }
 
-        class PossibleVersions : IReadOnlyDictionary<ReleaseLevel, IReadOnlyList<CSVersion>>
+        sealed class PossibleVersions : IReadOnlyDictionary<ReleaseLevel, IReadOnlyList<CSVersion>>
         {
             static readonly ReleaseLevel[] _levels = new[] { ReleaseLevel.None, ReleaseLevel.Fix, ReleaseLevel.Feature, ReleaseLevel.BreakingChange };
             readonly IReadOnlyList<CSVersion>[] _versionList;
@@ -155,11 +157,11 @@ namespace CK.Env
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         }
 
-        class SelectorContext : IReleaseVersionSelectorContext
+        sealed class SelectorContext : IReleaseVersionSelectorContext
         {
             readonly ReleaseSolutionInfo _info;
             readonly PossibleVersions _possible;
-            DiffResult? _diffResult;
+            GitDiffResult? _diffResult;
 
             SelectorContext( ReleaseSolutionInfo info,
                              ITagCommit? lastRelease,
@@ -247,12 +249,12 @@ namespace CK.Env
 
             public string? ReleaseNote { get => _info.ReleaseNote; set => _info.ReleaseNote = value; }
 
-            public DiffResult? GetProjectsDiff( IActivityMonitor m )
+            public GitDiffResult? GetProjectsDiff( IActivityMonitor m )
             {
                 Throw.CheckState( PreviousVersion != null );
                 if( _diffResult == null )
                 {
-                    var diffRoots = Solution.Solution.GeneratedArtifacts.Select( g => new DiffRoot( g.Artifact.TypedName, g.Project.ProjectSources ) );
+                    var diffRoots = Solution.Solution.GeneratedArtifacts.Select( g => new GitDiffRoot( g.Artifact.TypedName, g.Project.ProjectSources ) );
                     _diffResult = _info._repository.GetDiff( m, PreviousVersion.CommitSha, diffRoots, withCommitMessages: true );
                 }
                 return _diffResult;
@@ -295,7 +297,7 @@ namespace CK.Env
             ReleaseInfo requirements = new ReleaseInfo();
             // Here we could have processed only the MinimalRequirements (so that the global process ordering
             // matches the dependency order).
-            // But, we need to iterate though all Requirements in order to not miss a version
+            // But, we need to iterate through all Requirements in order to not miss a version
             // package upgrade.
             List<(ImportedLocalPackage, SVersion)>? nonPublishedUpdates = null;
             List<(ImportedLocalPackage, SVersion)>? publishedUpdates = null;

@@ -101,7 +101,7 @@ namespace CK.Env
                                               IWorldSolutionContext ctx,
                                               XElement? previous = null )
         {
-            if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
+            Throw.CheckNotNullArgument( ctx );
             ReleaseSolutionInfo[] infos = new ReleaseSolutionInfo[ctx.Solutions.Count];
             foreach( var (s, d) in ctx.Solutions )
             {
@@ -116,7 +116,7 @@ namespace CK.Env
                                                           v.Value,
                                                           previous?
                                                             .Elements()
-                                                            .FirstOrDefault( e => (string)e.Attribute( "Name" ) == s.Solution.Name ) );
+                                                            .FirstOrDefault( e => (string?)e.Attribute( "Name" ) == s.Solution.Name ) );
             }
             return new ReleaseRoadmap( ctx, infos );
         }

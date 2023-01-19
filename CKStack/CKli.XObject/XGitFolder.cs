@@ -1,6 +1,7 @@
 using CK.Core;
 using CK.Env;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CKli
 {
@@ -8,12 +9,12 @@ namespace CKli
     {
         readonly List<XBranch> _branches;
 
-        public XGitFolder( Initializer initializer, XPathItem parent, World world )
-            : base( initializer, parent.FileSystem, parent )
+        public XGitFolder( Initializer initializer, FileSystem fs, XPathItem? parent, World world )
+            : base( initializer, fs, parent )
         {
             _branches = new List<XBranch>();
             initializer.ChildServices.Add( this );
-            ProtoGitFolder = FileSystem.FindOrCreateProtoGitFolder( initializer.Monitor, world.WorldName, FullPath, Url!, world.IsPublicWorld );
+            ProtoGitFolder = FileSystem.DeclareProtoGitFolder( world.WorldName, FullPath, Url, world.IsPublicWorld );
         }
 
         /// <summary>
@@ -24,11 +25,13 @@ namespace CKli
         /// <summary>
         /// Gets the url of the remote repository.
         /// </summary>
+        [AllowNull]
         public string Url { get; private set; }
 
         /// <summary>
         /// Gets the develop branch (<see cref="IWorldName.DevelopBranchName"/>).
         /// </summary>
+        [AllowNull]
         public XBranch DevelopBranch { get; private set; }
 
         /// <summary>

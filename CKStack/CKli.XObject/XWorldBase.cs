@@ -6,6 +6,7 @@ using SimpleGitVersion;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 
 namespace CKli
 {
@@ -22,11 +23,11 @@ namespace CKli
 
         public XWorldBase( FileSystem fileSystem,
                            IRootedWorldName worldName,
-                           WorldStore worldStore,
+                           IWorldStore worldStore,
                            IEnvLocalFeedProvider localFeeds,
                            SecretKeyStore keyStore,
                            ArtifactCenter artifacts,
-                           CommandRegister commandRegister,
+                           CommandRegistry commandRegister,
                            IReleaseVersionSelector releaseVersionSelector,
                            Initializer initializer )
             : base( initializer )
@@ -44,14 +45,15 @@ namespace CKli
                                                               isPublic,
                                                               localFeeds,
                                                               keyStore );
-            _world = (T)Activator.CreateInstance( typeof(T), new object[] { parameters } )!;
+            _world = (T)Activator.CreateInstance( typeof(T), parameters )!;
             _world.VersionSelector = releaseVersionSelector;
             initializer.Services.Add( (World)_world );
             fileSystem.ServiceContainer.Add<ISolutionDriverWorld>( _world );
         }
 
         /// <summary>
-        /// Initializes the world state and publishes the <see cref="World.LocalWorldState"/>
+        /// Initializes the world state with all the <see cref="XGitFolder"/> that appear after it
+        /// and publishes the <see cref="World.LocalWorldState"/>
         /// and <see cref="World.SharedWorldState"/> in the <see cref="FileSystem.ServiceContainer"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
@@ -69,41 +71,7 @@ namespace CKli
         /// </summary>
         protected T World => _world;
 
-        /// <summary>
-        /// Initializes the Git folders: this instantiates the <see cref="GitRepository"/> from the
-        /// <see cref="XGitFolder.ProtoGitFolder"/>.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <returns>The world  on success, null on error.</returns>
-        T? IXTypedObjectProvider<T>.GetObject( IActivityMonitor m )
-        {
-            var proto = Parent.Descendants<XGitFolder>().Select( g => g.ProtoGitFolder ).ToList();
-            List<GitRepository> gitFolders = new List<GitRepository>();
-
-            using( m.OpenInfo( $"Initializing {proto.Count} Git folders." ) )
-            {
-                try
-                {
-                    foreach( var p in proto )
-                    {
-                        var g = _fileSystem.EnsureGitFolder( m, p );
-                        if( g != null ) gitFolders.Add( g );
-                        else
-                        {
-                            m.Error( $"GitFolder creation failed for {p.FolderPath}." );
-                            return null;
-                        }
-                    }
-                    DumpGitFolders( m, gitFolders );
-                    return _world;
-                }
-                catch( Exception ex )
-                {
-                    m.Error( ex );
-                    return null;
-                }
-            }
-        }
+        T? IXTypedObjectProvider<T>.GetObject( IActivityMonitor m ) => _world;
 
         /// <summary>
         /// Dumps the hierarchy of repositories into the monitor, ensuring that all
@@ -123,7 +91,7 @@ namespace CKli
             {
                 ++gitFoldersCount;
                 string commitAhead = git.Head.AheadOriginCommitCount != null ? $"{git.Head.AheadOriginCommitCount} commits ahead origin" : "Untracked";
-                using( m.OpenInfo( $"{git.SubPath} - branch: {git.CurrentBranchName} ({commitAhead})." ) )
+                using( m.OpenInfo( $"{git.DisplayPath} - branch: {git.CurrentBranchName} ({commitAhead})." ) )
                 {
                     string pluginInfo;
                     if( !git.EnsureCurrentBranchPlugins( m ) )
@@ -142,7 +110,7 @@ namespace CKli
                     }
                     else
                     {
-                        dirty.Add( git.SubPath );
+                        dirty.Add( git.DisplayPath );
                         m.CloseGroup( "Dirty. " + pluginInfo );
                     }
                 }
@@ -162,7 +130,7 @@ namespace CKli
                     {
                         foreach( var b in byActiveBranch )
                         {
-                            m.Warn( $"Branch '{b.Key}': " + b.Select( g => g.SubPath.Path ).Concatenate() );
+                            m.Warn( $"Branch '{b.Key}': " + b.Select( g => g.DisplayPath.Path ).Concatenate() );
                         }
                     }
                 }

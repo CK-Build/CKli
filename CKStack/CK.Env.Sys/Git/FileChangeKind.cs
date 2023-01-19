@@ -3,7 +3,7 @@ namespace CK.Env
     /// <summary>
     /// Direct projection of Git ChangeKind with all its possibilities.
     /// This is intended to show all kind of changes, and to take no risk, even the ones that should
-    /// not appear in <see cref="DiffRootResult"/>. 
+    /// not appear in <see cref="GitDiffRootResult"/>. 
     /// </summary>
     public enum FileChangeKind
     {

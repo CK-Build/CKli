@@ -249,11 +249,8 @@ namespace CK.Env.NodeSln
             var folder = FileSystem.GetFileInfo( root.Combine( path ) );
             if( !folder.Exists || !folder.IsDirectory )
             {
-                if( path.IsEmptyPath )
-                {
-                    monitor.Warn( $"{ownerDescription}: Path folder not found. It is ignored." );
-                    return null;
-                }
+                monitor.Warn( $"{ownerDescription}: Path folder not found. It is ignored." );
+                return null;
             }
             NodeProjectBase? project;
 

@@ -16,7 +16,7 @@ namespace CK.Env.Plugin
         /// <returns>The file info (null if it doesn't exist on the file system) and its path.</returns>
         public static (IFileInfo? FileInfo, NormalizedPath Path) GetFileInfo( this GitRepository @this, string fileName )
         {
-            var path = @this.SubPath
+            var path = @this.DisplayPath
                                .AppendPart( "branches" ).AppendPart( @this.CurrentBranchName )
                                .Combine( fileName );
             var fileInfo = @this.FileSystem.GetFileInfo( path );

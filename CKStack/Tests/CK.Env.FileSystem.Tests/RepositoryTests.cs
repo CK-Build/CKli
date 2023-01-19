@@ -14,7 +14,7 @@ namespace CK.Env.FS.Tests
     public class RepositoryTests
     {
 
-        readonly CommandRegister _commandRegister = new CommandRegister();
+        readonly CommandRegistry _commandRegister = new CommandRegistry();
         readonly SecretKeyStore _keyStore = new SecretKeyStore();
 
 
@@ -39,8 +39,8 @@ namespace CK.Env.FS.Tests
             var w = new WorldMock();
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
-                var proto = fs.FindOrCreateProtoGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
-                fs.EnsureGitFolder( TestHelper.Monitor, proto ).Should().NotBeNull();
+                var proto = fs.DeclareProtoGitFolder( w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
+                proto.Load( TestHelper.Monitor ).Should().NotBeNull();
                 CheckRoot( fs.GetFileInfo( "TestGitRepository" ) );
                 CheckRoot( fs.GetFileInfo( "/TestGitRepository" ) );
                 CheckRoot( fs.GetFileInfo( "TestGitRepository/" ) );
@@ -65,8 +65,8 @@ namespace CK.Env.FS.Tests
             var w = new WorldMock();
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
-                var proto = fs.FindOrCreateProtoGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
-                fs.EnsureGitFolder( TestHelper.Monitor, proto );
+                var proto = fs.DeclareProtoGitFolder( w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
+                proto.Load( TestHelper.Monitor ).Should().NotBeNull();
                 CheckRootContent( fs.GetDirectoryContents( "TestGitRepository" ) );
                 CheckRootContent( fs.GetDirectoryContents( "/TestGitRepository" ) );
                 CheckRootContent( fs.GetDirectoryContents( "TestGitRepository/" ) );
@@ -92,8 +92,8 @@ namespace CK.Env.FS.Tests
             var w = new WorldMock();
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
-                var proto = fs.FindOrCreateProtoGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
-                fs.EnsureGitFolder( TestHelper.Monitor, proto );
+                var proto = fs.DeclareProtoGitFolder( w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
+                proto.Load( TestHelper.Monitor ).Should().NotBeNull();
                 CheckHead( fs.GetFileInfo( "TestGitRepository/head" ) );
                 CheckHead( fs.GetFileInfo( "/TestGitRepository/head" ) );
                 CheckHead( fs.GetFileInfo( "TestGitRepository/head/" ) );
@@ -137,8 +137,8 @@ namespace CK.Env.FS.Tests
             var w = new WorldMock();
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
-                var proto = fs.FindOrCreateProtoGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
-                fs.EnsureGitFolder( TestHelper.Monitor, proto );
+                var proto = fs.DeclareProtoGitFolder( w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
+                proto.Load( TestHelper.Monitor ).Should().NotBeNull();
                 var f = fs.GetFileInfo( "TestGitRepository/branches" );
                 f.IsDirectory.Should().BeTrue();
                 f.Name.Should().Be( "branches" );
@@ -160,12 +160,12 @@ namespace CK.Env.FS.Tests
             var w = new WorldMock();
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
-                var proto = fs.FindOrCreateProtoGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
-                var git = fs.EnsureGitFolder( TestHelper.Monitor, proto );
+                var proto = fs.DeclareProtoGitFolder( w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
+                var git = proto.Load( TestHelper.Monitor );
                 git.CheckCleanCommit( TestHelper.Monitor ).Should().BeTrue();
                 git.CurrentBranchName.Should().Be( IWorldName.MasterName );
 
-                var gitRoot = git.SubPath.AppendPart( "branches" ).AppendPart( IWorldName.MasterName );
+                var gitRoot = git.DisplayPath.AppendPart( "branches" ).AppendPart( IWorldName.MasterName );
 
                 // Detecting New file.
                 fs.CopyTo( TestHelper.Monitor, "newFile", gitRoot.AppendPart( "new.txt" ) );
@@ -200,8 +200,8 @@ namespace CK.Env.FS.Tests
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, keyStore, new SimpleServiceContainer() ) )
             {
                 fs.ServiceContainer.Add( keyStore );
-                var proto = fs.FindOrCreateProtoGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
-                fs.EnsureGitFolder( TestHelper.Monitor, proto );
+                var proto = fs.DeclareProtoGitFolder( w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
+                proto.Load( TestHelper.Monitor ).Should().NotBeNull();
 
                 var f = fs.GetFileInfo( "TestGitRepository/remotes/" );
                 f.IsDirectory.Should().BeTrue();
@@ -254,8 +254,8 @@ namespace CK.Env.FS.Tests
             var w = new WorldMock();
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
-                var proto = fs.FindOrCreateProtoGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
-                var git = fs.EnsureGitFolder( TestHelper.Monitor, proto );
+                var proto = fs.DeclareProtoGitFolder( w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
+                var git = proto.Load( TestHelper.Monitor );
                 fs.GitFolders[0].CurrentBranchName.Should().Be( IWorldName.MasterName, "The TestRepository must be on IWorldName.MasterName." );
 
                 var fA = fs.GetFileInfo( $"TestGitRepository/branches/{IWorldName.MasterName}/a" );
@@ -300,8 +300,8 @@ namespace CK.Env.FS.Tests
             var w = new WorldMock();
             using( var fs = new FileSystem( LocalTestHelper.WorldFolder, _commandRegister, _keyStore, new SimpleServiceContainer() ) )
             {
-                var proto = fs.FindOrCreateProtoGitFolder( TestHelper.Monitor, w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
-                var git = fs.EnsureGitFolder( TestHelper.Monitor, proto );
+                var proto = fs.DeclareProtoGitFolder( w, "TestGitRepository", LocalTestHelper.TestGitRepositoryUrl );
+                var git = proto.Load( TestHelper.Monitor );
                 fs.GitFolders[0].Checkout( TestHelper.Monitor, "alpha" ).Success.Should().BeTrue( "Go to 'alpha' branch." ); ;
 
                 var cA = fs.GetDirectoryContents( "TestGitRepository/branches/master/a" );

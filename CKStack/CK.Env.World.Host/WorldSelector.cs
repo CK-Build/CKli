@@ -14,11 +14,9 @@ namespace CK.Env
     /// </summary>
     public sealed partial class WorldSelector : ICommandMethodsProvider
     {
+        readonly ICkliApplicationContext _appContext;
         readonly XTypedFactory _factory;
-        readonly SecretKeyStore _userKeyStore;
-        readonly CommandRegister _command;
         readonly HashSet<ICommandHandler> _otherCommands;
-        readonly Func<IReleaseVersionSelector> _releaseVersionSelectorFactory;
         readonly WorldBearer _worldBearer;
 
         /// <summary>
@@ -29,22 +27,14 @@ namespace CK.Env
         /// <param name="factory">The factory for XTypedObjects.</param>
         /// <param name="userKeyStore">The user key store.</param>
         /// <param name="releaseVersionSelectorFactory">Factory for <see cref="IReleaseVersionSelector"/> that the world will use.</param>
-        /// <param name="appLife">Simple application lifetime controller.</param>
-        public WorldSelector(
-            GitWorldStore store,
-            CommandRegister commandRegister,
-            XTypedFactory factory,
-            SecretKeyStore userKeyStore,
-            Func<IReleaseVersionSelector> releaseVersionSelectorFactory )
+        public WorldSelector( ICkliApplicationContext appContext, GitWorldStore store, XTypedFactory factory )
         {
+            _appContext = appContext;
             Store = store ?? throw new ArgumentNullException( nameof( store ) );
-            _command = commandRegister ?? throw new ArgumentNullException( nameof( commandRegister ) );
-            _userKeyStore = userKeyStore ?? throw new ArgumentNullException( nameof( userKeyStore ) );
             _factory = factory ?? throw new ArgumentNullException( nameof( factory ) );
-            commandRegister.Register( this );
-            _otherCommands = new HashSet<ICommandHandler>( commandRegister.GetAllCommands( false ) );
-            _releaseVersionSelectorFactory = releaseVersionSelectorFactory;
-            _worldBearer = new WorldBearer();
+            appContext.CommandRegistry.Register( this );
+            _otherCommands = new HashSet<ICommandHandler>( appContext.CommandRegistry.GetAllCommands( false ) );
+            _worldBearer = new WorldBearer( appContext );
         }
 
         /// <summary>
@@ -75,7 +65,7 @@ namespace CK.Env
             if( !CanCloseWorld ) throw new InvalidOperationException();
             Debug.Assert( CurrentWorld != null );
             _worldBearer.Close( monitor );
-            _command.UnregisterAll( _otherCommands.Contains );
+            _appContext.CommandRegistry.UnregisterAll( _otherCommands.Contains );
             Store.DisableRepositoryAndStacksCommands = false;
         }
 
@@ -128,7 +118,7 @@ namespace CK.Env
                 }
                 Debug.Assert( w != null );
 
-                bool success = _worldBearer.OpenWorld( m, w, _factory, _command, Store, _userKeyStore, _releaseVersionSelectorFactory );
+                bool success = _worldBearer.OpenWorld( m, w, Store );
                 if( success )
                 {
                     Store.DisableRepositoryAndStacksCommands = true;

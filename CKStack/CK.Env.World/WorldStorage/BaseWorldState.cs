@@ -10,19 +10,19 @@ namespace CK.Env
     /// </summary>
     public abstract class BaseWorldState
     {
-        readonly WorldStore _store;
+        readonly IWorldStore _store;
 
-        internal BaseWorldState( WorldStore store, IWorldName w, bool isLocal, XDocument? d = null )
+        internal BaseWorldState( IWorldStore store, IWorldName w, bool isLocal, XDocument? d = null )
         {
-            if( store == null ) throw new ArgumentNullException( nameof( store ) );
-            if( w == null ) throw new ArgumentNullException( nameof( w ) );
+            Throw.CheckNotNullArgument( store );
+            Throw.CheckNotNullArgument( w );
 
             _store = store;
             World = w;
 
             string safeName = SafeElementName( w, isLocal );
             if( d == null ) d = new XDocument( new XElement( safeName, new XAttribute( XmlNames.xWorkStatus, GlobalWorkStatus.Idle.ToString() ) ) );
-            else if( d.Root.Name != safeName ) throw new ArgumentException( $"Invalid state document root. Must be {safeName}, found {d.Root.Name}.", nameof( d ) );
+            else if( d.Root?.Name != safeName ) Throw.ArgumentException( nameof( d ), $"Invalid state document root. Must be '<{safeName}>', found '<{d.Root?.Name}>'." );
             d.Changed += ( o, e ) => IsStateDirty = true;
 
             XDocument = d;

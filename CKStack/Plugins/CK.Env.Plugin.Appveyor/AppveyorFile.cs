@@ -113,7 +113,7 @@ namespace CK.Env.Plugin
 
             firstMapping.Children["version"] = "build{build}";
             firstMapping.Children["image"] = "Visual Studio 2022";
-            firstMapping.Children["clone_folder"] = "C:\\CKli-World\\" + GitFolder.SubPath.Path.Replace( '/', '\\' );
+            firstMapping.Children["clone_folder"] = "C:\\CKli-World\\" + GitFolder.DisplayPath.Path.Replace( '/', '\\' );
             var onFinish = new YamlSequenceNode
             {
                 CreateKeyValue( "ps", "'Get-ChildItem -Recurse *.log | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''Log files'' }'" ),

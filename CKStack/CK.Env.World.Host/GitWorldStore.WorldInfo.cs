@@ -33,7 +33,7 @@ namespace CK.Env
             {
                 Repo = r;
                 var n = (string)e.AttributeRequired( nameof( WorldName.FullName ) );
-                var name = LocalWorldName.TryParse( r.Root.AppendPart( n + ".World.xml" ), r.Store.WorldLocalMapping );
+                var name = LocalWorldName.TryParseOBSOLETE( r.Root.AppendPart( n + ".World.xml" ), r.Store.WorldLocalMapping );
                 if( name == null ) throw new InvalidDataException( $"Unable to parse world name '{n}'." );
                 name.HasDefinitionFile = (bool?)e.Attribute( nameof( WorldName.HasDefinitionFile ) ) ?? false;
                 _name = name;

@@ -35,16 +35,11 @@ namespace CK.Env.NodeSln
         internal override bool Initialize( IActivityMonitor monitor )
         {
             if( !base.Initialize( monitor ) ) return false;
-            JObject? jProjects = TryReadAngularJsonProjects( monitor );
+            JObject? jProjects = TryReadProjectsFromAngularJson( monitor );
             if( jProjects == null ) return false;
             foreach( var propProject in jProjects.Properties() )
             {
                 var type = propProject.Value["projectType"]?.ToString();
-                if( type != "library" )
-                {
-                    monitor.Trace( $"Project '{propProject.Name}' is a \"{type}\". It is ignored." );
-
-                }
                 var root = propProject.Value["root"]?.ToString();
                 if( string.IsNullOrWhiteSpace( root ) )
                 {
@@ -65,7 +60,7 @@ namespace CK.Env.NodeSln
             return true;
         }
 
-        JObject? TryReadAngularJsonProjects( IActivityMonitor monitor )
+        JObject? TryReadProjectsFromAngularJson( IActivityMonitor monitor )
         {
             bool success = true;
             if( !PackageJsonFile.IsPrivate )

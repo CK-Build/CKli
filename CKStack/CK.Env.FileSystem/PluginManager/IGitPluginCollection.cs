@@ -14,7 +14,7 @@ namespace CK.Env
         /// <summary>
         /// Gets the branch name. This is null for root plugins.
         /// </summary>
-        string BranchName { get; }
+        string? BranchName { get; }
 
         /// <summary>
         /// Gets the service container for this <see cref="BranchName"/>
@@ -27,13 +27,13 @@ namespace CK.Env
         /// </summary>
         /// <param name="t">Type of the plugin.</param>
         /// <returns>The plugin instance or null.</returns>
-        T GetPlugin( Type t );
+        T? GetPlugin( Type t );
 
         /// <summary>
         /// Typed version of <see cref="GetPlugin(Type)"/>.
         /// </summary>
         /// <typeparam name="P">Type of the plugin.</typeparam>
         /// <returns>The plugin instance or null.</returns>
-        P GetPlugin<P>() where P : T;
+        P? GetPlugin<P>() where P : T;
     }
 }

@@ -27,11 +27,10 @@ namespace CK.Env
         /// <param name="mapping">The world mapping.</param>
         /// <param name="keyStore">The key store to use.</param>
         /// <param name="commandRegister">Optional command register.</param>
-        public GitWorldStore(
-            NormalizedPath rootStorePath,
-            IWorldLocalMapping mapping,
-            SecretKeyStore keyStore,
-            CommandRegister? commandRegister )
+        public GitWorldStore( NormalizedPath rootStorePath,
+                              IWorldLocalMapping mapping,
+                              SecretKeyStore keyStore,
+                              CommandRegistry? commandRegister )
             : base( mapping )
         {
             _rootStorePath = rootStorePath;
@@ -48,7 +47,6 @@ namespace CK.Env
         /// </summary>
         /// <param name="rootStorePath">The root path where the stores repositories and local states are hosted.</param>
         /// <param name="singleWorld">The single world to host.</param>
-        /// <param name="worldRootPath">The world root folder (where the solutions are checked out).</param>
         /// <param name="keyStore">The key store to use.</param>
         public GitWorldStore( NormalizedPath rootStorePath,
                               IRootedWorldName singleWorld,
@@ -422,14 +420,14 @@ namespace CK.Env
 
         public override bool WriteWorldDescription( IActivityMonitor m, IWorldName w, XDocument content )
         {
-            if( content == null ) throw new ArgumentNullException( nameof( content ) );
+            Throw.CheckNotNullArgument( content );
             var local = ToLocal( w );
             content.Save( local.XmlDescriptionFilePath );
             OnWorkingFolderChanged( m, local );
             return true;
         }
 
-        protected override IRootedWorldName? DoCreateNewParallel( IActivityMonitor m, IRootedWorldName source, string parallelName, XDocument content )
+        protected override LocalWorldName? DoCreateNewParallel( IActivityMonitor m, IRootedWorldName source, string parallelName, XDocument content )
         {
             Debug.Assert( source != null );
             Debug.Assert( content != null );
@@ -473,7 +471,7 @@ namespace CK.Env
             return new SharedWorldState( this, w );
         }
 
-        protected override bool SaveSharedState( IActivityMonitor m, IWorldName w, XDocument d )
+        public override bool SaveSharedState( IActivityMonitor m, IWorldName w, XDocument d )
         {
             var p = ToSharedStateFilePath( w );
             d.Save( p.Item2 );
@@ -489,7 +487,7 @@ namespace CK.Env
             return new LocalWorldState( this, w );
         }
 
-        protected override bool SaveLocalState( IActivityMonitor m, IWorldName w, XDocument d )
+        public override bool SaveLocalState( IActivityMonitor m, IWorldName w, XDocument d )
         {
             var p = ToLocalStateFilePath( w );
             d.Save( p );
@@ -529,11 +527,6 @@ namespace CK.Env
 
         NormalizedPath ToLocalStateFilePath( IWorldName w ) => GetWorkingLocalFolder( w ).AppendPart( "LocalState.xml" );
 
-        /// <summary>
-        /// Returns the "$Local" folder in the <see cref="StackRepo"/> repository.
-        /// </summary>
-        /// <param name="w">The world name. It must exist in this store.</param>
-        /// <returns>A local path to an existing and writable directory.</returns>
         public override NormalizedPath GetWorkingLocalFolder( IWorldName w )
         {
             var local = ToLocal( w );
