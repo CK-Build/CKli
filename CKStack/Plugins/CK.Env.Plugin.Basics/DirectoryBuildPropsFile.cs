@@ -131,6 +131,9 @@ namespace CK.Env.Plugin
   <!-- InformationalVersion is either the Zero version or provided by the CodeCakeBuilder when in CI build). -->
   <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
 
+  <!-- Includes the .pdb in package. -->
+  <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+
 </PropertyGroup>" );
 
             // This is obsolete. Soon the Directory.Packages.props will be used.
