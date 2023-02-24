@@ -9,14 +9,14 @@
   <ItemGroup>
     <ProjectReference Include="..\CK.Build.Artifact.Model\CK.Build.Artifact.Model.csproj" />
     
-    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="17.0.1" />
-    <PackageReference Include="CK.PerfectEvent" Version="18.0.1" />
+    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="18.0.0" />
+    <PackageReference Include="CK.PerfectEvent" Version="19.0.0" />
     <PackageReference Include="System.Threading.Channels" Version="7.0.0" />
 
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Update="NuGetizer" Version="0.9.1">
+    <PackageReference Update="NuGetizer" Version="0.9.4">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
