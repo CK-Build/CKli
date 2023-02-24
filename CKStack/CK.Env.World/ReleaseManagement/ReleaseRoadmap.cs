@@ -1,5 +1,5 @@
 using CK.Core;
-
+using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,13 +10,14 @@ namespace CK.Env
     /// <summary>
     /// Enables road map edition.
     /// </summary>
-    public class ReleaseRoadmap
+    public sealed class ReleaseRoadmap
     {
         readonly ReleaseSolutionInfo[] _infos;
 
-        ReleaseRoadmap( IWorldSolutionContext ctx, ReleaseSolutionInfo[] infos )
+        ReleaseRoadmap( IWorldSolutionContext ctx, SVersion worldReleaseVersion, ReleaseSolutionInfo[] infos )
         {
             SolutionContext = ctx;
+            WorldReleaseVersion = worldReleaseVersion;
             _infos = infos;
             foreach( var i in infos ) i.Initialize( this );
         }
@@ -27,6 +28,11 @@ namespace CK.Env
         /// Gets the solution context.
         /// </summary>
         public IWorldSolutionContext SolutionContext { get; }
+
+        /// <summary>
+        /// Gets this world release version.
+        /// </summary>
+        public SVersion WorldReleaseVersion { get; }
 
         /// <summary>
         /// Gets whether this roadmap is valid: all versions have been determined
@@ -79,16 +85,20 @@ namespace CK.Env
         /// Exports this Roadmap in xml format.
         /// </summary>
         /// <returns>The Xml roadmap.</returns>
-        public XElement ToXml() => new XElement( "Roadmap", _infos.Select( i => i.ToXml() ) );
+        public XElement ToXml() => new XElement( "Roadmap",
+                                                 new XAttribute( "WorldReleaseVersion", WorldReleaseVersion ),
+                                                 _infos.Select( i => i.ToXml() ) );
 
         /// <summary>
         /// Extracts current information from xml roadmap.
         /// </summary>
         /// <param name="e">The Roadmap element.</param>
         /// <returns>Solutions, Git path and <see cref="ReleaseInfo"/>.</returns>
-        public static IEnumerable<(string SolutionName, NormalizedPath SubPath, ReleaseInfo Info)> Load( XElement e )
+        public static IEnumerable<(string SolutionName, NormalizedPath SubPath, ReleaseInfo Info)> LoadSolutionInfos( XElement e )
         {
-            return e.Elements().Select( s => ((string)s.AttributeRequired( "Name" ), new NormalizedPath( (string)s.AttributeRequired( "SubPath" ) ), new ReleaseInfo( s.Element( "ReleaseInfo" ) )) );
+            return e.Elements().Select( s => ((string)s.AttributeRequired( "Name" ),
+                                              new NormalizedPath( (string)s.AttributeRequired( "SubPath" ) ),
+                                              new ReleaseInfo( s.Element( "ReleaseInfo" ) )) );
         }
 
         /// <summary>
@@ -96,12 +106,24 @@ namespace CK.Env
         /// </summary>
         /// <param name="m">The monitor to use.</param>
         /// <param name="ctx">The context.</param>
+        /// <param name="worldReleaseVersion">Optional release version. Computed from the current date.</param>
+        /// <param name="previous">Optional previous release. Used to recover previously release info (versions and release notes).</param>
         /// <returns>Null on error.</returns>
         public static ReleaseRoadmap? Create( IActivityMonitor m,
                                               IWorldSolutionContext ctx,
+                                              SVersion? worldReleaseVersion = null, 
                                               XElement? previous = null )
         {
-            if( ctx == null ) throw new ArgumentNullException( nameof( ctx ) );
+            Throw.CheckNotNullArgument( ctx );
+            if( worldReleaseVersion == null )
+            {
+                var now = DateTime.UtcNow;
+                // Next CSemVer version allows the null (keep the NRT warning).
+                var prevVersion = SVersion.TryParse( (string?)previous?.Attribute( "WorldReleaseVersion" ) );
+                bool needFourtPart = prevVersion.IsValid && prevVersion.Major == now.Year && prevVersion.Minor == now.Month && prevVersion.Patch == now.Day;
+                int fourthPart = needFourtPart ? prevVersion.FourthPart + 1 : -1;
+                worldReleaseVersion = SVersion.Create( now.Year, now.Month, now.Day, handleCSVersion: false, fourthPart: fourthPart );
+            }
             ReleaseSolutionInfo[] infos = new ReleaseSolutionInfo[ctx.Solutions.Count];
             foreach( var (s, d) in ctx.Solutions )
             {
@@ -116,9 +138,9 @@ namespace CK.Env
                                                           v.Value,
                                                           previous?
                                                             .Elements()
-                                                            .FirstOrDefault( e => (string)e.Attribute( "Name" ) == s.Solution.Name ) );
+                                                            .FirstOrDefault( e => (string?)e.Attribute( "Name" ) == s.Solution.Name ) );
             }
-            return new ReleaseRoadmap( ctx, infos );
+            return new ReleaseRoadmap( ctx, worldReleaseVersion, infos );
         }
     }
 }
