@@ -343,14 +343,14 @@ namespace CK.Build.PackageDB
 
             IEnumerator IEnumerable.GetEnumerator() => _instances.GetEnumerator();
 
-            ArraySegment<PackageInstance> Range( ArraySegment<PackageInstance> all, Func<PackageInstance, int> comparer )
+            static ArraySegment<PackageInstance> Range( ArraySegment<PackageInstance> all, Func<PackageInstance, int> comparer )
             {
                 int rStart( PackageInstance p )
                 {
                     int cmp = comparer( p );
                     return cmp == 0 ? -1 : cmp;
                 }
-                int start = ~_instances.AsSpan().BinarySearch( new Comparable( rStart ) );
+                int start = ~all.AsSpan().BinarySearch( new Comparable( rStart ) );
                 Debug.Assert( start >= 0 );
                 if( start == all.Count || comparer( all[start] ) != 0 ) return all.Slice( 0, 0 );
                 int rEnd( PackageInstance p )
@@ -358,7 +358,7 @@ namespace CK.Build.PackageDB
                     int cmp = comparer( p );
                     return cmp == 0 ? 1 : cmp;
                 }
-                int end = ~_instances.AsSpan().BinarySearch( new Comparable( rEnd ) );
+                int end = ~all.AsSpan().BinarySearch( new Comparable( rEnd ) );
                 return all.Slice( start, end - start );
             }
         }
