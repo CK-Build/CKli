@@ -190,7 +190,7 @@ namespace CK.Env
             var xmlBuild = e?.Elements().FirstOrDefault();
             if( xmlBuild != null )
             {
-                _publishedBuildHistory.Add( xmlBuild );
+                _publishedBuildHistory.AddFirst( xmlBuild );
                 xmlBuild.Remove();
             }
         }

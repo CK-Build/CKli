@@ -753,7 +753,7 @@ namespace CK.Env
         {
             var depContext = GetWorldSolutionContext( monitor );
             if( depContext == null ) return null;
-            return ReleaseRoadmap.Create( monitor, depContext, _localState.Roadmap );
+            return ReleaseRoadmap.Create( monitor, depContext, worldReleaseVersion: null, previous: _localState.Roadmap );
         }
 
         /// <summary>
@@ -901,7 +901,7 @@ namespace CK.Env
                                 ? "Pushing version tags and branches."
                                 : "Clearing version tags." ) )
             {
-                var versions = ReleaseRoadmap.Load( _localState.Roadmap )
+                var versions = ReleaseRoadmap.LoadSolutionInfos( _localState.Roadmap )
                                              .Select( e => (e.SubPath, e.Info, Git: _gitRepositories.FirstOrDefault( g => e.SubPath.StartsWith( g.DisplayPath ) )) );
                 foreach( var (SubPath, Info, Git) in versions )
                 {
