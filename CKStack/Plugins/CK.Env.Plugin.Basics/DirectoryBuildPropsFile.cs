@@ -131,6 +131,9 @@ namespace CK.Env.Plugin
   <!-- InformationalVersion is either the Zero version or provided by the CodeCakeBuilder when in CI build). -->
   <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
 
+  <!-- Includes the .pdb in package. -->
+  <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+
 </PropertyGroup>" );
 
             // This is obsolete. Soon the Directory.Packages.props will be used.
@@ -315,7 +318,7 @@ $@"<PropertyGroup>
             Debug.Assert( Document != null && Document.Root != null );
 
             var section = XCommentSection.FindOrCreate( Document.Root, "Analyzers" );
-            const string currentVersion = "17.3.48";
+            const string currentVersion = "17.5.22";
             const string packageName = "Microsoft.VisualStudio.Threading.Analyzers";
 
             section.StartComment = ": This analyzer provides very welcome guidelines about async and threading issues.";
@@ -382,7 +385,7 @@ $@"<PropertyGroup>
                 var f = FileSystem.GetFileInfo( fName ).AsTextFileInfo( ignoreExtension: true );
                 if( f != null )
                 {
-                    var linkNames = new string[] { null, "GitHub", "GitLab", "Vsts.Git", "Bitbucket.Git", "FileSystem" };
+                    var linkNames = new string?[] { null, "GitHub", "GitLab", "Vsts.Git", "Bitbucket.Git", "FileSystem" };
                     var linkName = linkNames[(int)GitFolder.KnownGitProvider];
                     if( linkName != null )
                     {

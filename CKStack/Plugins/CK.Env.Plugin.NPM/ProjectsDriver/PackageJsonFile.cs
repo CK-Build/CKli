@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CK.Env.Plugin
 {
@@ -55,6 +56,7 @@ namespace CK.Env.Plugin
         /// Gets whether this package is published.
         /// It must not be private and have a name and a version.
         /// </summary>
+        [MemberNotNullWhen( true, nameof( Name ), nameof( Version ) )]
         public bool IsPublished => !IsPrivate && Name != null && Version != null;
 
         /// <summary>
@@ -84,7 +86,7 @@ namespace CK.Env.Plugin
         /// <param name="m">The monitor to use.</param>
         /// <param name="name">The dependency name that must appear in <see cref="Dependencies"/>.</param>
         /// <param name="v">The minimal version. Must not be null.</param>
-        /// <returns>True if the version has been chenged, false it was the same version.</returns>
+        /// <returns>True if the version has been changed, false it was the same version.</returns>
         internal bool SetDependencyMinVersion( IActivityMonitor m, string name, SVersion v )
         {
             var idx = _deps.FindIndex( dep => dep.Name == name );

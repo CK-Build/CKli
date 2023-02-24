@@ -63,12 +63,13 @@ namespace CK.Env.Plugin
             // This should be modeled in the world xml.
             var framework = MSProject.Savors.FindOrCreate( _buildSpec.TargetFramework );
             var dependencies = new[] {
-                ("NuGet.Credentials", "6.2.1", false),
-                ("CK.Core", "15.0.0-r06", false),
-                ("Cake.Yarn", "0.4.8", false),
-                ("SimpleGitVersion.Cake", "7.2.0", false),
-                ("CKSetup.Cake", "15.0.0-r08", false),
-                ("Newtonsoft.Json", "13.0.1", false)
+                ("NuGet.Credentials", "6.5.0", false),
+                ("CK.Core", "17.0.0", false),
+                ("Cake.Yarn", "2.0.0", false),
+                ("Cake.Npm", "2.0.0", false),
+                ("SimpleGitVersion.Cake", "9.0.0", false),
+                ("CKSetup.Cake", "19.0.0", false),
+                ("Newtonsoft.Json", "13.0.2", false)
             };
             ccbProject.SetLangVersion( m, null );
             ccbProject.SetNullable( m, "annotations" );

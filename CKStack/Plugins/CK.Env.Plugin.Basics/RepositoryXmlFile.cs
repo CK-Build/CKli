@@ -26,26 +26,11 @@ namespace CK.Env.Plugin
             _driver.OnStartBuild += OnStartBuild;
             _driver.OnEndBuild += OnEndBuild;
 
-            _simpleGitVersionOption = new ChildObject<RepositoryInfoOptions>( this, XNamespace.None + "SimpleGitVersion", LoadWithLegacy, o => o.ToXml() );
+            _simpleGitVersionOption = new ChildObject<RepositoryInfoOptions>( this,
+                                                                              XNamespace.None + "SimpleGitVersion",
+                                                                              e => new RepositoryInfoOptions( e ),
+                                                                              o => o.ToXml() );
 
-            // We use e.Parent so that detection of the old schema can be done (root of the document).
-            // Once migrated, replace this with: e => new RepositoryInfoOptions( e )
-            RepositoryInfoOptions LoadWithLegacy( XElement e )
-            {
-                var o = new RepositoryInfoOptions( e.Parent );
-                if( o.XmlMigrationRequired )
-                {
-                    Document.Root.RemoveAllNamespaces();
-                    Document.Root.Elements( SGVSchema.Branches ).Remove();
-                    Document.Root.Elements( SGVSchema.IgnoreModifiedFiles ).Remove();
-                    Document.Root.Elements( SGVSchema.Debug ).Remove();
-                    e.ReplaceWith( o.ToXml() );
-                }
-                // Forgot these 2 ones.
-                Document.Root.Elements( "StartingVersionForCSemVer" ).Remove();
-                Document.Root.Nodes().OfType<XComment>().Where( c => c.Value.Contains( "Debug IgnoreDirtyWorkingFolder=" ) ).Remove();
-                return o;
-            }
         }
 
         void OnStartBuild( object? sender, BuildStartEventArgs e )

@@ -40,7 +40,7 @@ namespace CK.Env.Plugin
             else
             {
                 var root = new XElement( "NPMSolution",
-                    projects.OrderBy( p => p.FullPath ).Select( p => p.ToXml() )
+                    projects.Select( p => p.ToXml() )
                     .Concat(
                         workspace?.OrderBy( p => p.FullPath ).Select( s => s.ToXml() )
                             ?? Enumerable.Empty<XElement>()
