@@ -5,6 +5,7 @@ using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Diagnostics;
 
 namespace CK.Env
 {
@@ -111,7 +112,7 @@ namespace CK.Env
                     m.CloseGroup( "Failed." );
                     return null;
                 }
-                result = CreateBuildResult( m );
+                result = CreateBuildResult( m, _targetVersions );
                 if( result == null ) return null;
                 if( forceRebuild )
                 {
@@ -129,13 +130,15 @@ namespace CK.Env
         /// <summary>
         /// Creates the <see cref="BuildResult"/> once <see cref="PrepareBuild"/> has been called
         /// for each solutions.
-        /// ReleaseBuilder overrides this to apply build project upgrades before its actual Build.
+        /// ReleaseBuilder overrides this to apply build project upgrades before its actual Build
+        /// (and sets the <see cref="ReleaseRoadmap.WorldReleaseVersion"/>).
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="targetVersions">The target versions (indexed by <see cref="DependentSolution.Index"/>).</param>
         /// <returns>The build result. Null on error.</returns>
-        protected virtual BuildResult? CreateBuildResult( IActivityMonitor m )
+        protected virtual BuildResult? CreateBuildResult( IActivityMonitor monitor, IReadOnlyList<SVersion?> targetVersions )
         {
-            return BuildResult.Create( m, _type, _artifacts, DependentSolutionContext, _targetVersions, GetReleaseNotes() );
+            return BuildResult.Create( monitor, _type, null, DependentSolutionContext, _targetVersions, GetReleaseNotes() );
         }
 
         /// <summary>

@@ -26,6 +26,8 @@ namespace CK.Env
         public static readonly XName xSolutionName = XNamespace.None + "SolutionName";
         public static readonly XName xPreviousVersion = XNamespace.None + "PreviousVersion";
         public static readonly XName xVersion = XNamespace.None + "Version";
+        public static readonly XName xCreationDate = XNamespace.None + "CreationDate";
+        public static readonly XName xWorldReleaseVersion = XNamespace.None + "WorldReleaseVersion";
         public static readonly XName xReleaseNote = XNamespace.None + "ReleaseNote";
         public static readonly XName xLevel = XNamespace.None + "Level";
         public static readonly XName xConstraint = XNamespace.None + "Constraint";

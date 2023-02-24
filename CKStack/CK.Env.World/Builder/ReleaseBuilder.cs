@@ -4,6 +4,7 @@ using CK.Env.DependencyModel;
 using CSemVer;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Diagnostics;
 using System.Linq;
 
@@ -17,11 +18,10 @@ namespace CK.Env
         readonly string[] _commits;
         readonly ReleaseRoadmap _roadmap;
 
-        public ReleaseBuilder(
-                ZeroBuilder zeroBuilder,
-                ArtifactCenter artifacts,
-                ReleaseRoadmap roadmap,
-                IEnvLocalFeedProvider localFeedProvider )
+        public ReleaseBuilder( ZeroBuilder zeroBuilder,
+                               ArtifactCenter artifacts,
+                               ReleaseRoadmap roadmap,
+                               IEnvLocalFeedProvider localFeedProvider )
             : base( zeroBuilder, BuildResultType.Release, artifacts, localFeedProvider, roadmap.SolutionContext )
         {
             _commits = new string[roadmap.SolutionContext.Solutions.Count];
@@ -51,30 +51,31 @@ namespace CK.Env
             return (targetVersion, info.CurrentReleaseInfo.Level != ReleaseLevel.None);
         }
 
-        protected override BuildResult? CreateBuildResult( IActivityMonitor m )
+        protected override BuildResult? CreateBuildResult( IActivityMonitor monitor, IReadOnlyList<SVersion?> targetVersions )
         {
             foreach( var (s, driver) in DependentSolutionContext.Solutions )
             {
                 var buildProjectUpgrades = GetBuildProjectUpgrades( s );
-                if( !driver.UpdatePackageDependencies( m, buildProjectUpgrades ) ) return null;
-                if( driver.GitRepository.Commit( m, "Updated Build project dependencies.", CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage )
-                    == CommittingResult.Error
-
-                    ) return null;
+                if( !driver.UpdatePackageDependencies( monitor, buildProjectUpgrades ) ) return null;
+                if( driver.GitRepository.Commit( monitor,
+                                                "Updated Build project dependencies.",
+                                                CommitBehavior.AmendIfPossibleAndOverwritePreviousMessage ) == CommittingResult.Error )
+                {
+                    return null;
+                }
                 _commits[s.Index] = driver.GitRepository.Head.CommitSha;
             }
-            return base.CreateBuildResult( m );
+            return BuildResult.Create( monitor, BuildResultType.Release, null, DependentSolutionContext, targetVersions, GetReleaseNotes() );
         }
 
         protected override IReadOnlyList<ReleaseNoteInfo> GetReleaseNotes() => _roadmap.GetReleaseNotes();
 
-        protected override BuildState Build(
-            IActivityMonitor m,
-            DependentSolution s,
-            ISolutionDriver driver,
-            IReadOnlyList<UpdatePackageInfo> upgrades,
-            SVersion sVersion,
-            IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade )
+        protected override BuildState Build( IActivityMonitor m,
+                                             DependentSolution s,
+                                             ISolutionDriver driver,
+                                             IReadOnlyList<UpdatePackageInfo> upgrades,
+                                             SVersion sVersion,
+                                             IReadOnlyCollection<UpdatePackageInfo> buildProjectsUpgrade )
         {
             IReleaseSolutionInfo info = _roadmap.ReleaseInfos[s.Index];
             Debug.Assert( (sVersion == null) == (info.CurrentReleaseInfo.Level == ReleaseLevel.None) );
@@ -93,6 +94,7 @@ namespace CK.Env
             }
             else
             {
+                Debug.Assert( targetVersion != null );
                 bool buildResult = DoBuild( m, driver, targetVersion, out bool tagCreated );
                 if( !buildResult && tagCreated )
                 {
@@ -106,11 +108,10 @@ namespace CK.Env
             }
         }
 
-        private static bool DoBuild(
-            IActivityMonitor m,
-            ISolutionDriver driver,
-            CSVersion targetVersion,
-            out bool tagCreated )
+        private static bool DoBuild( IActivityMonitor m,
+                                     ISolutionDriver driver,
+                                     CSVersion targetVersion,
+                                     out bool tagCreated )
         {
             tagCreated = false;
             try
