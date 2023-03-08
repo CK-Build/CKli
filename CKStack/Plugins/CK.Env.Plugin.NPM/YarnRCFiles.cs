@@ -90,12 +90,17 @@ namespace CK.Env.Plugin.NPM
                         else m.Warn( $"Empty feed password. Configuration for feed '{p.Name}' skipped." );
                         continue;
                     }
+                    scope.Children["npmAlwaysAuth"] = "true";
                     if( p.Url.Contains( "dev.azure.com", StringComparison.OrdinalIgnoreCase ) )
                     {
-                        password = Convert.ToBase64String( Encoding.UTF8.GetBytes( password ) );
+                        // To be tested!!!!
+                        password = Convert.ToBase64String( Encoding.UTF8.GetBytes( "username:" + password ) );
+                        scope.Children["npmAuthIdent"] = password;
                     }
-                    scope.Children["npmAlwaysAuth"] = "true";
-                    scope.Children["npmAuthIdent"] = "username:" + password;
+                    else
+                    {
+                        scope.Children["npmAuthIdent"] = "username:" + password;
+                    }
                 }
             }
 
