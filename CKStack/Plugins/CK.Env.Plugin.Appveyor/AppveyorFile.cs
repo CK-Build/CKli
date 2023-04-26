@@ -122,7 +122,9 @@ namespace CK.Env.Plugin
                 CreateKeyValue( "ps", "'Get-ChildItem -Recurse *.ckmon | % { Push-AppveyorArtifact $_.FullName -FileName $_.Name -DeploymentName ''Log files'' }'" )
             };
             firstMapping.Children["on_finish"] = onFinish;
-            EnsureDefaultBranches( firstMapping );
+            // Having "branches" > "only" > "master", "develop" prevents CIVersionMode="ZeroTimed" to be used.
+            // Removing "branches" configuration.
+            firstMapping.Remove( "branches" ); // EnsureDefaultBranches( firstMapping );
             firstMapping.SetSequence( "build_script", "dotnet run --project CodeCakeBuilder -nointeraction" );
             firstMapping.Children["test"] = "off";
             CreateOrUpdate( monitor, YamlMappingToString( monitor ) );
