@@ -564,7 +564,8 @@ namespace CK.Env.Plugin
                 }
             }
             if( error ) return false;
-            return mustSave ? _sln.Save( monitor ) : true;
+            // OnUpdatePackageDependency may have already invalidated the current solution.
+            return mustSave && _sln != null ? _sln.Save( monitor ) : true;
         }
 
 
