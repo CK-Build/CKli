@@ -21,7 +21,7 @@
     <PackageReference Include="ReadLine" Version="2.0.1" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
     <!-- Fix run: cannot find git2-8e0b172.dll-->
-    <PackageReference Include="LibGit2Sharp" Version="0.26.2" />
+    <PackageReference Include="LibGit2Sharp" Version="0.27.2" />
   </ItemGroup>
   
 </Project>

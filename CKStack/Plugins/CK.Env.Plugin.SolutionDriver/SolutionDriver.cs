@@ -444,7 +444,8 @@ namespace CK.Env.Plugin
                 }
             }
             if( error ) return false;
-            return mustSave ? sln.Save( monitor ) : true;
+            // OnUpdatePackageDependency may have already invalidated the current solution.
+            return mustSave && _sln != null ? _sln.Save( monitor ) : true;
         }
 
         // This should not be here: only CKli (the console) is concerned here.
