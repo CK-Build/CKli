@@ -54,7 +54,7 @@ namespace System.CommandLine
         /// <summary>
         /// Binds to an optional service from <see cref="BindingContext"/>.
         /// </summary>
-        public static IValueDescriptor<T?> Service<T>() where T : notnull => new RequiredServiceBinder<T>();
+        public static IValueDescriptor<T?> OptionalService<T>() where T : notnull => new OptionalServiceBinder<T>();
 
         sealed class ContantDescriptor<T> : BinderBase<T>
         {

@@ -6,15 +6,15 @@ using System.Linq;
 
 namespace CKli
 {
-    sealed partial class InteractiveContext
+    sealed partial class CkliInteractiveContext
     {
-        static Command CreateChangeDirectory()
+        static Command CreateChangeDirectoryCommand()
         {
             var c = new Command( "cd", "Navigates across the worlds." );
             var target = new Argument<string>( "target", "Target world name." );
             c.AddArgument( target );
             c.SetHandler( ChangeDirectory,
-                          Binder.RequiredService<InteractiveContext>(),
+                          Binder.RequiredService<ICkliContext>(),
                           target );
             return c;
         }
@@ -22,11 +22,11 @@ namespace CKli
         static Command CreateChangeDirectoryUp()
         {
             var c = new Command( "cd.." ) { IsHidden = true };
-            c.SetHandler( ChangeDirectory, Binder.RequiredService<InteractiveContext>(), Binder.Constant( ".." ) );
+            c.SetHandler( ChangeDirectory, Binder.RequiredService<ICkliContext>(), Binder.Constant( ".." ) );
             return c;
         }
 
-        static void ChangeDirectory( InteractiveContext ctx, string targetName )
+        static void ChangeDirectory( ICkliContext ctx, string targetName )
         {
             if( targetName == ".." )
             {

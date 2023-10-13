@@ -30,7 +30,12 @@ some functions like `Binder.Constant` above or:
 /// <summary>
 /// Binds to the required service from <see cref="BindingContext"/>.
 /// </summary>
-public static IValueDescriptor<T> Service<T>() where T : notnull;
+public static IValueDescriptor<T> RequiredService<T>() where T : notnull => new RequiredServiceBinder<T>();
+
+/// <summary>
+/// Binds to an optional service from <see cref="BindingContext"/>.
+/// </summary>
+public static IValueDescriptor<T?> OptionalService<T>() where T : notnull => new OptionalServiceBinder<T>();
 ```
 
 ## Surprise!
@@ -73,6 +78,10 @@ sealed class ContantDescriptor<T> : BinderBase<T>
     protected override T GetBoundValue( BindingContext bindingContext ) => _value;
 }
 ```
+
+## The Interactive mode
+
+TODO: Explain the Interactive service base abstract and the UseMiddleware.
 
 
 

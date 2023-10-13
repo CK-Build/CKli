@@ -42,7 +42,7 @@ in a stupid text file (currently `StackRootRegistry.v0.txt`).
 
 The path, remote url and whether the repository is public or not is listed. Duplicates
 can exist (same stack name cloned at different paths) and are also listed: the oldest one is considered
-to be the primary ones.
+to be the primary one.
 
 ### World area
 To avoid mistakes commands in this area will execute only on the World based on the current directory.
@@ -52,7 +52,12 @@ Dumps a git-like status for each repository of the World and the World global st
 
 
 
+## Implementation notes
+The `BasicApplicationContext : ICkliApplicationContext` provides the minimal context.
+This context is immutable.
 
+The `--interactive` option enables navigation accross stacks and worlds. In interactive mode
+the ``
 
 
 

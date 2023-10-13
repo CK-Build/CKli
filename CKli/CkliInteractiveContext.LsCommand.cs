@@ -3,16 +3,16 @@ using System.Linq;
 
 namespace CKli
 {
-    sealed partial class InteractiveContext
+    sealed partial class CkliInteractiveContext
     {
-        static Command CreateListDirectoryContent()
+        static Command CreateLsCommand()
         {
             var c = new Command( "ls", "Lists the available Worlds (without duplicates: use 'stack list' to list the duplicates)." );
-            c.SetHandler( ListDirectoryContent, Binder.RequiredService<InteractiveContext>() );
+            c.SetHandler( ListDirectoryContent, Binder.RequiredService<ICkliContext>() );
             return c;
         }
 
-        static int ListDirectoryContent( InteractiveContext ctx )
+        static int ListDirectoryContent( ICkliContext ctx )
         {
             var worlds = ctx.GetStackRegistry( true ).GetListInfo().SelectMany( i => i.PrimaryWorlds );
             int idx = 0;

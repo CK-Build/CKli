@@ -9,20 +9,20 @@ namespace CKli
 {
     partial class Program
     {
-        static Command CreateStackArea( IActivityMonitor monitor, ICkliApplicationContext appContext, Command clone )
+        static Command CreateStackArea( Command clone )
         {
             var stackArea = new Command( "stack", "Commands related to Stacks." );
             stackArea.AddCommand( clone );
-            stackArea.AddCommand( CreateListCommand( monitor, appContext ) );
+            stackArea.AddCommand( CreateListCommand() );
             return stackArea;
         }
 
-        static Command CreateListCommand( IActivityMonitor monitor, ICkliApplicationContext appContext )
+        static Command CreateListCommand()
         {
             var list = new Command( "list", "Lists stacks and their worlds that have been created so far, including duplicated ones." );
-            list.SetHandler( console =>
+            list.SetHandler( (console, ckliContext) =>
             {
-                var r = StackRootRegistry.Load( monitor, appContext.UserHostPath );
+                var r = ckliContext.GetStackRegistry( refresh: true );
                 var infos = r.GetListInfo().ToList();
                 if( infos.Count == 0 )
                 {
@@ -48,7 +48,7 @@ namespace CKli
                         }
                     }
                 }
-            }, Binder.Console );
+            }, Binder.Console, Binder.RequiredService<ICkliContext>() );
             return list;
 
             static void DumpInfo( IConsole console, StackRootRegistry.StackInfo info, bool badUrl )

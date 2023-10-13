@@ -8,35 +8,26 @@ namespace CKli
 {
     partial class Program
     {
-        static Command CreateWorldArea( IActivityMonitor monitor, ICkliApplicationContext appContext )
+        static Command CreateWorldArea()
         {
             var worldArea = new Command( "world", "Commands related to a World. The current directory must be in a World." );
-            worldArea.AddCommand( CreateStatusCommand( monitor, appContext ) );
+            worldArea.AddCommand( CreateStatusCommand() );
             return worldArea;
 
         }
 
-        static Command CreateStatusCommand( IActivityMonitor monitor, ICkliApplicationContext appContext )
+        static Command CreateStatusCommand()
         {
             var status = new Command( "status", "Displays the status of the World and all its repositories." );
             var gitOnly = new Option<bool>( new[] { "--git", "--gitOnly" }, "Checks only the Git status." );
             status.AddOption( gitOnly );
-            status.SetHandler( ( console, gitOnly, interactiveContext ) =>
+            status.SetHandler( ( console, gitOnly, ckliContext ) =>
             {
-                StackRoot? stack = interactiveContext?.CurrentStack;
-                if( stack == null )
-                {
-                    if( !StackRoot.TryLoad( monitor, appContext, Environment.CurrentDirectory, out stack ) )
-                    {
-                        return -2;
-                    }
-                }
-                if( stack?.World == null )
-                {
-                    monitor.Error( $"Current directory must be inside a World." );
+                if( !ckliContext.TryGetCurrentWorld( out var world ) )
+                { 
                     return -1;
                 }
-                FileSystem.SimpleMultipleStatusInfo status = stack.World.FileSystem.GetSimpleMultipleStatusInfo( monitor, !gitOnly );
+                FileSystem.SimpleMultipleStatusInfo status = world.FileSystem.GetSimpleMultipleStatusInfo( ckliContext.Monitor, !gitOnly );
                 if( status.RepositoryStatus.Count == 0 )
                 {
                     console.WriteLine( "No valid Git repository." );
@@ -76,7 +67,7 @@ namespace CKli
                     }
                 }
                 return 0;
-            }, Binder.Console, gitOnly, Binder.Service<InteractiveContext>() );
+            }, Binder.Console, gitOnly, Binder.RequiredService<ICkliContext>() );
             return status;
         }
     }

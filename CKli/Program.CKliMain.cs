@@ -33,8 +33,8 @@ namespace CKli
             // The stack area clone command is also available as a root command.
             var clone = CreateCloneCommand( monitor, appContext );
             rootCommand.Add( clone );
-            rootCommand.Add( CreateWorldArea( monitor, appContext ) );
-            rootCommand.Add( CreateStackArea( monitor, appContext, clone ) );
+            rootCommand.Add( CreateWorldArea() );
+            rootCommand.Add( CreateStackArea( clone ) );
 
             var parser = commandLineBuilder.Build();
             return parser.Invoke( args );
@@ -76,7 +76,7 @@ namespace CKli
             var interactive = new Option<bool>( new[] { "--interactive", "-i" },
                                             "Keeps CKli running, subsequent commands can be entered until 'exit' is entered or ^C is pressed." );
             rootCommand.AddGlobalOption( interactive );
-            commandLineBuilder.UseInteractiveMode( interactive, services => new InteractiveContext( services.GetRequiredService<IConsole>(),
+            commandLineBuilder.UseInteractiveMode( interactive, services => new CkliInteractiveContext( services.GetRequiredService<IConsole>(),
                                                                                                     services.GetRequiredService<IActivityMonitor>(),
                                                                                                     services.GetRequiredService<ColoredActivityMonitorConsoleClient>(),
                                                                                                     appContext ) );
@@ -102,7 +102,7 @@ namespace CKli
             clone.AddOption( isPrivate );
             clone.AddOption( allowDuplicate );
             clone.SetHandler(
-                ( repository, directory, isPrivate, allowDuplicate, InteractiveContext ) =>
+                ( repository, directory, isPrivate, allowDuplicate, interactive ) =>
                 {
                     var r = StackRoot.Create( monitor,
                                               appContext,
@@ -110,11 +110,11 @@ namespace CKli
                                               directory.FullName,
                                               !isPrivate,
                                               allowDuplicate,
-                                              openDefaultWorld: InteractiveContext.IsInteractive );
+                                              openDefaultWorld: interactive.IsInteractive );
                     if( r == null ) return -1;
-                    if( InteractiveContext.IsInteractive )
+                    if( interactive.IsInteractive )
                     {
-                        InteractiveContext.SetCurrentStack( r );
+                        interactive.SetCurrentStack( r );
                     }
                     else
                     {
@@ -122,7 +122,7 @@ namespace CKli
                     }
                     return 0;
                 },
-                repository, directory, isPrivate, allowDuplicate, Binder.RequiredService<InteractiveContext>() );
+                repository, directory, isPrivate, allowDuplicate, Binder.RequiredService<CkliInteractiveContext>() );
             return clone;
         }
     }
