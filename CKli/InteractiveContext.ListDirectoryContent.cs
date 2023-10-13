@@ -8,7 +8,7 @@ namespace CKli
         static Command CreateListDirectoryContent()
         {
             var c = new Command( "ls", "Lists the available Worlds (without duplicates: use 'stack list' to list the duplicates)." );
-            c.SetHandler( ListDirectoryContent, Binder.Service<InteractiveContext>() );
+            c.SetHandler( ListDirectoryContent, Binder.RequiredService<InteractiveContext>() );
             return c;
         }
 

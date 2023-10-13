@@ -16,14 +16,15 @@ namespace CK.Env.NodeSln
         VersionBound,
 
         /// <summary>
-        /// 'file:' url that references a local folder relative to the package.
+        /// 'file:' url that references a local folder.
+        /// It can be relative to the package (file:..) or rooted (file:/).
         /// </summary>
         LocalPath,
 
         /// <summary>
         ///  'file:' url that reference a tarball (.tgz) in a local feed.
         /// </summary>
-        LocalFeedTarball,
+        LocalTarball,
 
         /// <summary>
         /// 'http://' or 'https://' url to a tarball (.tar.gz).

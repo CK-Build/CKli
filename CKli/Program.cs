@@ -36,7 +36,7 @@ namespace CKli
                     if( appContext == null ) return 1;
                     return CkliMain( monitor, appContext, args );
                 }
-                CKliInteractive( monitor );
+                LegacyInteractive( monitor );
                 return 0;
             }
             catch( Exception ex )

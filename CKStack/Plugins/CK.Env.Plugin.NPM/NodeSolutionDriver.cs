@@ -36,7 +36,7 @@ namespace CK.Env.Plugin
         public bool? HasNodeSolution => _nodeSolutionProvider.HasNodeSolution;
 
         /// <summary>
-        /// Gets a non null <see cref="HasNodeSolution"/> by reloading the solution if it is dirty.
+        /// Updates a non null <see cref="HasNodeSolution"/> by reloading the solution if it is dirty.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
         /// <param name="hasNodeSolution">Whether a Node solution exists in the repository (even if it cannot be successfully loaded).</param>

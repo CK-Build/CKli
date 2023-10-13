@@ -441,19 +441,19 @@ namespace CK.Env
         /// On success, the solution inside should be purely local: there should not be any possible remote interactions (except
         /// possibly importing fully external packages).
         /// </summary>
-        /// <param name="m">The monitor to use.</param>
+        /// <param name="monitor">The monitor to use.</param>
         /// <param name="autoCommit">False to require the working folder to be clean and not automatically creating a commit.</param>
         /// <returns>True on success, false on error.</returns>
-        public bool SwitchDevelopToLocal( IActivityMonitor m, bool autoCommit = true )
+        public bool SwitchDevelopToLocal( IActivityMonitor monitor, bool autoCommit = true )
         {
-            using( m.OpenInfo( $"Switching '{DisplayPath}' to branch '{World.LocalBranchName}')." ) )
+            using( monitor.OpenInfo( $"Switching '{DisplayPath}' to branch '{World.LocalBranchName}')." ) )
             {
                 try
                 {
                     Branch develop = Git.Branches[World.DevelopBranchName];
                     if( develop == null )
                     {
-                        m.Error( $"Unable to find branch '{World.DevelopBranchName}'." );
+                        monitor.Error( $"Unable to find branch '{World.DevelopBranchName}'." );
                         return false;
                     }
                     // Auto merge from Ours or Theirs: we favor the current branch.
@@ -463,35 +463,35 @@ namespace CK.Env
                     {
                         if( !develop.IsCurrentRepositoryHead )
                         {
-                            m.Error( $"Expected current branch to be '{World.DevelopBranchName}' or '{World.LocalBranchName}'." );
+                            monitor.Error( $"Expected current branch to be '{World.DevelopBranchName}' or '{World.LocalBranchName}'." );
                             return false;
                         }
                         if( autoCommit )
                         {
-                            if( Commit( m, $"Switching to {World.LocalBranchName} branch." ) == CommittingResult.Error ) return false;
+                            if( Commit( monitor, $"Switching to {World.LocalBranchName} branch." ) == CommittingResult.Error ) return false;
                         }
                         else
                         {
-                            if( !CheckCleanCommit( m ) ) return false;
+                            if( !CheckCleanCommit( monitor ) ) return false;
                         }
                         if( local == null )
                         {
-                            m.Info( $"Creating the {World.LocalBranchName}." );
+                            monitor.Info( $"Creating the {World.LocalBranchName}." );
                             local = Git.CreateBranch( World.LocalBranchName );
                         }
                         else
                         {
-                            m.Info( "Coming from develop: favors 'develop' file changes during merge." );
+                            monitor.Info( "Coming from develop: favors 'develop' file changes during merge." );
                             mergeFileFavor = MergeFileFavor.Theirs;
                         }
                         Commands.Checkout( Git, local );
-                        OnNewCurrentBranch( m );
+                        OnNewCurrentBranch( monitor );
                     }
                     else
                     {
-                        m.Info( $"Already on {World.LocalBranchName}: favors 'local' file changes during merge." );
+                        monitor.Info( $"Already on {World.LocalBranchName}: favors 'local' file changes during merge." );
                         mergeFileFavor = MergeFileFavor.Ours;
-                        EnsureCurrentBranchPlugins( m );
+                        EnsureCurrentBranchPlugins( monitor );
                     }
                     var merger = Git.Config.BuildSignature( DateTimeOffset.Now );
                     var r = Git.Merge( develop, merger, new MergeOptions
@@ -503,22 +503,22 @@ namespace CK.Env
                     } );
                     if( r.Status == MergeStatus.Conflicts )
                     {
-                        m.Error( $"Merge failed from '{World.DevelopBranchName}' to '{World.LocalBranchName}': conflicts must be manually resolved." );
+                        monitor.Error( $"Merge failed from '{World.DevelopBranchName}' to '{World.LocalBranchName}': conflicts must be manually resolved." );
                         return false;
                     }
 
-                    if( !RaiseEnteredLocalBranch( m, true ) ) return false;
+                    if( !RaiseEnteredLocalBranch( monitor, true ) ) return false;
 
-                    if( AmendCommit( m ) == CommittingResult.Error ) return false;
+                    if( AmendCommit( monitor ) == CommittingResult.Error ) return false;
                     if( r.Status != MergeStatus.UpToDate )
                     {
-                        m.CloseGroup( $"Success (with merge from '{World.DevelopBranchName}')." );
+                        monitor.CloseGroup( $"Success (with merge from '{World.DevelopBranchName}')." );
                     }
                     return true;
                 }
                 catch( Exception ex )
                 {
-                    m.Error( ex );
+                    monitor.Error( ex );
                     return false;
                 }
             }

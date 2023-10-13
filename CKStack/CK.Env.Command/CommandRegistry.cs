@@ -77,7 +77,7 @@ namespace CK.Env
 
             public NormalizedPath UniqueName { get; }
 
-            public bool GetEnabled() => _enabled != null ? _enabled() : true;
+            public bool GetEnabled() => _enabled == null || _enabled();
 
             public string? PayloadSignature { get; }
 
@@ -91,7 +91,7 @@ namespace CK.Env
                 object[] p;
                 if( PayloadSignature != null )
                 {
-                    if( !(payload is SimplePayload simple)
+                    if( payload is not SimplePayload simple
                         || simple.Fields.Count != _parameters.Length - 1 )
                     {
                         throw new ArgumentException( nameof( payload ) );

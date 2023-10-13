@@ -6,11 +6,6 @@ using System.Threading.Tasks;
 
 namespace System.CommandLine
 {
-    public interface IScopedInteractiveCommand
-    {
-        Parser CreateScopedParser( InteractiveService service ); 
-    }
-
     /// <summary>
     /// Base class of the interactive service.
     /// </summary>

@@ -30,6 +30,11 @@ namespace System.CommandLine
                                                                                     ?? throw new Exception( $"Required service '{typeof( T )}' not found in BindingContext." );
         }
 
+        sealed class OptionalServiceBinder<T> : BinderBase<T?>
+        {
+            protected override T? GetBoundValue( BindingContext bindingContext ) => (T?)bindingContext.GetService( typeof( T ) );
+        }
+
         /// <summary>
         /// Binds to the <see cref="BindingContext.Console"/>.
         /// See <see cref="HandlerWithExitCode"/> for why this is required.
@@ -44,7 +49,12 @@ namespace System.CommandLine
         /// <summary>
         /// Binds to the required service from <see cref="BindingContext"/>.
         /// </summary>
-        public static IValueDescriptor<T> Service<T>() where T : notnull => new RequiredServiceBinder<T>();
+        public static IValueDescriptor<T> RequiredService<T>() where T : notnull => new RequiredServiceBinder<T>();
+
+        /// <summary>
+        /// Binds to an optional service from <see cref="BindingContext"/>.
+        /// </summary>
+        public static IValueDescriptor<T?> Service<T>() where T : notnull => new RequiredServiceBinder<T>();
 
         sealed class ContantDescriptor<T> : BinderBase<T>
         {

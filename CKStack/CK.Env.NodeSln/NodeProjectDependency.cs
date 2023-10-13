@@ -35,7 +35,7 @@ namespace CK.Env.NodeSln
 
         /// <summary>
         /// Gets the dependency version if <see cref="Type"/> is <see cref="NodeProjectDependencyType.VersionBound"/>
-        /// or <see cref="NodeProjectDependencyType.LocalFeedTarball"/>, otherwise it is <see cref="SVersionBound.None"/>.
+        /// or <see cref="NodeProjectDependencyType.LocalTarball"/>, otherwise it is <see cref="SVersionBound.None"/>.
         /// <para>
         /// This version can be <see cref="SVersionLock.Lock"/>:
         /// <list type="bullet">
@@ -58,7 +58,7 @@ namespace CK.Env.NodeSln
         public static NodeProjectDependency CreateNPMDepLocalFeedTarball( NormalizedPath localFeedPath, string name, ArtifactDependencyKind kind, SVersion version )
         {
             return new NodeProjectDependency( name,
-                                              NodeProjectDependencyType.LocalFeedTarball,
+                                              NodeProjectDependencyType.LocalTarball,
                                               kind,
                                               $"file:{CreateTarballPath( localFeedPath, name,version )}",
                                               new SVersionBound( version ) );

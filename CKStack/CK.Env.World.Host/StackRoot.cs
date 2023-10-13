@@ -6,6 +6,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -336,14 +337,14 @@ namespace CK.Env
             Throw.CheckNotNullArgument( gitStackUri );
             if( !gitStackUri.IsAbsoluteUri )
             {
-                monitor.Error( $"'{gitStackUri}' must be an absolute url to a 'XX-Stack' git repository." );
+                monitor.Error( $"'{gitStackUri}' must be an absolute url to a 'XXX-Stack' git repository." );
                 return null;
             }
             gitStackUri = GitRepositoryKey.CheckAndNormalizeRepositoryUrl( gitStackUri );
             var uriLeaf = gitStackUri.Segments[^1];
-            if( !Regex.IsMatch( uriLeaf, "\\w\\w-Stack$" ) )
+            if( !Regex.IsMatch( uriLeaf, "\\w+-Stack$", RegexOptions.IgnoreCase ) )
             {
-                monitor.Error( $"'{gitStackUri}' must be a valid url to a 'XX-Stack' git repository." );
+                monitor.Error( $"'{gitStackUri}' must be a valid url to a 'XXX-Stack' git repository." );
                 return null;
             }
             var registry = StackRootRegistry.Load( monitor, appContext.UserHostPath );

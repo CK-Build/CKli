@@ -2,7 +2,7 @@
   "profiles": {
     "CKli": {
       "commandName": "Project",
-      "workingDirectory": "C:/Dev2/CK",
+      "workingDirectory": "C:/Dev2",
       "commandLineArgs": "--interactive",
       "_commandLineArgs": "stack list",
       "__commandLineArgs": "world status --git",

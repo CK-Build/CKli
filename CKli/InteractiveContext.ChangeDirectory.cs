@@ -14,7 +14,7 @@ namespace CKli
             var target = new Argument<string>( "target", "Target world name." );
             c.AddArgument( target );
             c.SetHandler( ChangeDirectory,
-                          Binder.Service<InteractiveContext>(),
+                          Binder.RequiredService<InteractiveContext>(),
                           target );
             return c;
         }
@@ -22,7 +22,7 @@ namespace CKli
         static Command CreateChangeDirectoryUp()
         {
             var c = new Command( "cd.." ) { IsHidden = true };
-            c.SetHandler( ChangeDirectory, Binder.Service<InteractiveContext>(), Binder.Constant( ".." ) );
+            c.SetHandler( ChangeDirectory, Binder.RequiredService<InteractiveContext>(), Binder.Constant( ".." ) );
             return c;
         }
 

@@ -144,7 +144,7 @@ namespace CKli
             static Command CreateSimpleInteractiveCommand( string name, string description, Action<InteractiveContext> handler )
             {
                 var c = new Command( name, description );
-                c.SetHandler( handler, Binder.Service<InteractiveContext>() );
+                c.SetHandler( handler, Binder.RequiredService<InteractiveContext>() );
                 return c;
             }
         }

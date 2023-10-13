@@ -318,7 +318,7 @@ namespace CK.Env
             return true;
         }
 
-        IFileInfo GetWritableDestination( IActivityMonitor m, ref NormalizedPath destination )
+        IFileInfo? GetWritableDestination( IActivityMonitor m, ref NormalizedPath destination )
         {
             destination = destination.ResolveDots();
             Throw.CheckArgument( !destination.IsEmptyPath );
@@ -328,7 +328,7 @@ namespace CK.Env
                 m.Error( $"Cannot replace a folder '{destination}' by a file content." );
                 fDest = null;
             }
-            if( fDest.PhysicalPath == null )
+            else if( fDest.PhysicalPath == null )
             {
                 m.Error( $"Destination file '{destination}' is not writable." );
                 fDest = null;

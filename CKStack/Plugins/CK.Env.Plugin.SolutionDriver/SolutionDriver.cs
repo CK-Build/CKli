@@ -353,7 +353,7 @@ namespace CK.Env.Plugin
                 {
                     b.Append( "|   " ).Append( p.SimpleProjectName ).Append( " [" ).Append( p.Type ).Append( "] " );
                     if( p.IsTestProject ) b.Append( "[Test]" );
-                    if( p.Savors != null ) b.Append( " [" ).Append( p.Savors ).Append( "]" );
+                    if( p.Savors != null ) b.Append( " [" ).Append( p.Savors ).Append( ']' );
                     b.AppendLine();
                 }
                 if( p.GeneratedArtifacts.Any() ) b.Append( "|     => " ).AppendJoin( ", ", p.GeneratedArtifacts ).AppendLine();
@@ -445,7 +445,7 @@ namespace CK.Env.Plugin
             }
             if( error ) return false;
             // OnUpdatePackageDependency may have already invalidated the current solution.
-            return mustSave && _sln != null ? _sln.Save( monitor ) : true;
+            return mustSave ? sln.Save( monitor ) : true;
         }
 
         // This should not be here: only CKli (the console) is concerned here.

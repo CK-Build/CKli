@@ -148,7 +148,7 @@ namespace CK.Env.NPM
                 var toRemove = new HashSet<Artifact>( project.PackageReferences.Select( r => r.Target.Artifact ) );
                 foreach( var dep in p.PackageJsonFile.Dependencies )
                 {
-                    if( dep.Type == NodeProjectDependencyType.LocalFeedTarball
+                    if( dep.Type == NodeProjectDependencyType.LocalTarball
                         || dep.Type == NodeProjectDependencyType.Workspace )
                     {
                         // a Yarn "workspace:*" or "file:...tgz" dependency is a ProjectReference.
@@ -178,7 +178,7 @@ namespace CK.Env.NPM
                     Debug.Assert( project.Solution != null, "Project is not detached from its solution." );
 
                     var available = project.Solution.Projects.Where( d => d.Type == "Node" );
-                    if( dep.Type == NodeProjectDependencyType.LocalFeedTarball
+                    if( dep.Type == NodeProjectDependencyType.LocalTarball
                         || dep.Type == NodeProjectDependencyType.Workspace )
                     {
                         if( !TryAddProjectReference( monitor, project, p, toRemove, dep, available ) )

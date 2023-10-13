@@ -196,11 +196,11 @@ namespace CK.Env.NodeSln
             {
                 if( root.UseYarn )
                 {
-                    monitor.Info( $"'{root}' project uses yarn since .yarn/ folder found: {root.YarnPath}. All other projects in this repository should be the same." );
+                    monitor.Info( $"'{root}' project uses yarn since .yarn/ folder found: {root.YarnPath}. All other projects in this repository should also use Yarn." );
                 }
                 else
                 {
-                    monitor.Info( $"'{root}' project uses NPM. All other projects should be the same. All other projects in this repository should also use NPM." );
+                    monitor.Info( $"'{root}' project uses NPM. All other projects in this repository should also use NPM." );
                 }
             }
             else

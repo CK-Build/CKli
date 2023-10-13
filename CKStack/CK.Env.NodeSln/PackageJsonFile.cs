@@ -223,7 +223,7 @@ namespace CK.Env.NodeSln
                 monitor.Warn( $"Dependency '{packageId}' current version is '{dOrig.Version}'. New version '{version}' overrides its bound." );
             }
             NodeProjectDependency d;
-            if( dOrig.Type == NodeProjectDependencyType.LocalFeedTarball )
+            if( dOrig.Type == NodeProjectDependencyType.LocalTarball )
             {
                 d = NodeProjectDependency.CreateLocalFeedTarballFromRawDep( dOrig.RawDep, dOrig.Name, dOrig.Kind, version );
             }
@@ -302,7 +302,7 @@ namespace CK.Env.NodeSln
                                 m.Error( $"Unable to extract version for package '{name}' from '{rawDep}': {r.Error}" );
                                 return (SVersionBound.None, NodeProjectDependencyType.None);
                             }
-                            return (r.Result, NodeProjectDependencyType.LocalFeedTarball);
+                            return (r.Result, NodeProjectDependencyType.LocalTarball);
                         }
                         if( rawDep.StartsWith( "file:.." ) )
                         {

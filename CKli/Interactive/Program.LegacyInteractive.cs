@@ -15,7 +15,7 @@ namespace CKli
 {
     partial class Program
     {
-        static void CKliInteractive( ActivityMonitor monitor )
+        static void LegacyInteractive( ActivityMonitor monitor )
         {
             monitor.Output.RegisterClient( new ColoredActivityMonitorConsoleClient() );
 
@@ -28,7 +28,7 @@ namespace CKli
             var appContext = BasicApplicationContext.Create( userHostPath, keyVault );
 
             ReadLine.HistoryEnabled = true;
-            MultipleWorldHome? multiHome = null;
+            MultipleWorldHome? multiHome;
             try
             {
                 var mappings = new FileWorldLocalMapping( userHostPath.AppendPart( "WorldLocalMapping.txt" ) );
