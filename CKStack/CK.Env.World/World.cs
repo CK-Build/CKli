@@ -12,6 +12,7 @@ using System.Linq;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Xml.Linq;
+using LibGit2Sharp;
 
 namespace CK.Env
 {
@@ -289,16 +290,64 @@ namespace CK.Env
         protected ArtifactCenter Artifacts => _artifacts;
 
         /// <summary>
-        /// Gets the registered solution drivers.
-        /// </summary>
-        public DriversCollection SolutionDrivers => _solutionDrivers;
-
-        /// <summary>
         /// Gets the set of <see cref="GitRepository"/> that has been discovered
         /// (thanks to the registration of at one <see cref="ISolutionDriver"/> on a branch).
         /// </summary>
         public IReadOnlyCollection<GitRepository> GitRepositories => _gitRepositories;
 
+
+        public bool Checkout( IActivityMonitor monitor, string branchName, string? startingBranchName )
+        {
+            bool success = true;
+            foreach( var r in FileSystem.GitFolders )
+            {
+                if( !r.CanCheckout( branchName, startingBranchName, out var message ) )
+                {
+                    success = false;
+                    monitor.Error( message );
+                }
+            }
+            if( success )
+            {
+                foreach( var r in FileSystem.GitFolders )
+                {
+                    if( !r.Checkout( monitor, branchName, startingBranchName ) )
+                    {
+                        success = false;
+                        break;
+                    }
+                }
+            }
+            return success;
+        }
+
+        public bool Pull( IActivityMonitor monitor, MergeFileFavor mergeFileFavor, bool fastForward )
+        {
+            bool success = true;
+            foreach( var r in FileSystem.GitFolders )
+            {
+                success &= r.Pull( monitor, mergeFileFavor, fastForward
+                                                            ? FastForwardStrategy.FastForwardOnly
+                                                            : FastForwardStrategy.NoFastForward );
+            }
+            return success;
+        }
+
+        public bool Fetch( IActivityMonitor monitor, bool originOnly )
+        {
+            bool success = true;
+            foreach( var r in FileSystem.GitFolders )
+            {
+                success &= r.FetchBranches( monitor, originOnly );
+            }
+            return success;
+        }
+
+
+        /// <summary>
+        /// Gets the registered solution drivers.
+        /// </summary>
+        public DriversCollection SolutionDrivers => _solutionDrivers;
 
         /// <summary>
         /// Secure the execution of the lambda in a try/catch.

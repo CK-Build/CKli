@@ -94,13 +94,11 @@ namespace CK.Env
         /// <returns>The non null list of worlds or null on error.</returns>
         public IReadOnlyList<LocalWorldName>? TryRefreshWorlds( IActivityMonitor monitor, bool pull )
         {
-            if( pull )
+            if( pull && !_git.Pull( monitor, MergeFileFavor.Theirs, FastForwardStrategy.Default ) )
             {
-                var r = _git.Pull( monitor, MergeFileFavor.Theirs );
-                if( !r.Success ) return null;
-                if( !r.ReloadNeeded ) return _worldsDef;
+                return null;
             }
-            return _worldsDef = ReadWorlds( StackRoot );
+            return _worldsDef = ReadWorlds( Path );
         }
 
         /// <summary>

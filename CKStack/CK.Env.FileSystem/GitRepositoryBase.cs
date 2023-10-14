@@ -112,40 +112,17 @@ namespace CK.Env
         /// <summary>
         /// Captures minimal status information.
         /// </summary>
-        public struct SimpleStatusInfo
-        {
-            /// <summary>
-            /// The Git folder name.
-            /// </summary>
-            public NormalizedPath DisplayName;
-
-            /// <summary>
-            /// The currently checked out branch.
-            /// </summary>
-            public string CurrentBranchName;
-
-            /// <summary>
-            /// Whether the WorkingFolder is dirty.
-            /// </summary>
-            public bool IsDirty;
-
-            /// <summary>
-            /// The number of commit that are ahead of the origin.
-            /// 0 mean that there a no commit ahead of origin.
-            /// Null if there is no origin (the branch is not tacked).
-            /// </summary>
-            public int? CommitAhead;
-
-            /// <summary>
-            /// The number of plugins that are associated to this branch.
-            /// Null if a plugin initialization occurred: this folder is on error.
-            /// </summary>
-            public int? PluginCount;
-        }
+        /// <param name="DisplayName">The Git folder name.</param>
+        /// <param name="CurrentBranchName">The currently checked out branch.</param>
+        /// <param name="IsDirty">Whether the working folder is dirty.</param>
+        /// <param name="CommitAhead">
+        /// The number of commit that are ahead of the origin.
+        /// 0 mean that there a no commit ahead of origin.
+        /// Null if there is no origin (the branch is not tacked).</param>
+        public readonly record struct SimpleStatusInfo( NormalizedPath DisplayName, string CurrentBranchName, bool IsDirty, int? CommitAhead );
 
         /// <summary>
         /// Gets a <see cref="SimpleStatusInfo"/> for this repository.
-        /// The <see cref="SimpleStatusInfo.PluginCount"/> is let to null at this level.
         /// </summary>
         /// <returns>The simplified status info</returns>
         public SimpleStatusInfo GetSimpleStatusInfo()
@@ -269,7 +246,7 @@ namespace CK.Env
                 {
                     foreach( Remote remote in Git.Network.Remotes.Where( r => !originOnly || r.Name == "origin" ) )
                     {
-                        m.Info( $"Fetching remote '{remote.Name}'." );
+                        if( !originOnly ) m.Info( $"Fetching remote '{remote.Name}'." );
                         IEnumerable<string> refSpecs = remote.FetchRefSpecs.Select( x => x.Specification ).ToArray();
                         Commands.Fetch( Git, remote.Name, refSpecs, new FetchOptions()
                         {
@@ -281,12 +258,51 @@ namespace CK.Env
                 }
                 catch( Exception ex )
                 {
-                    using( m.OpenFatal( "The following error need manual fix:" ) )
-                    {
-                        m.Fatal( ex );
-                    }
+                    m.Error( "Error while fetching. This requires need a manual fix.", ex );
                     return false;
                 }
+            }
+        }
+
+
+        public bool Pull( IActivityMonitor monitor, MergeFileFavor mergeFileFavor, FastForwardStrategy fastForwardStrategy )
+        {
+            if( Git.Head.TrackedBranch == null )
+            {
+                monitor.Warn( $"There is no tracking branch for the '{DisplayPath}/{CurrentBranchName}' branch. Skip pulling from the remote." );
+                return true;
+            }
+
+            var merger = Git.Config.BuildSignature( DateTimeOffset.Now ) ?? new Signature( "CKli", "none", DateTimeOffset.Now );
+            try
+            {
+                var result = Commands.Pull( Git, merger, new PullOptions
+                {
+                    FetchOptions = new FetchOptions
+                    {
+                        TagFetchMode = TagFetchMode.All,
+                        CredentialsProvider = ( url, user, cred ) => PATCredentialsHandler( monitor )
+                    },
+                    MergeOptions = new MergeOptions
+                    {
+                        MergeFileFavor = mergeFileFavor,
+                        CommitOnSuccess = true,
+                        FailOnConflict = true,
+                        FastForwardStrategy = fastForwardStrategy,
+                        SkipReuc = true
+                    }
+                } );
+                if( result.Status == MergeStatus.Conflicts )
+                {
+                    monitor.Error( "Merge conflicts occurred. Unable to merge changes from the remote." );
+                    return false;
+                }
+                return true;
+            }
+            catch( Exception ex )
+            {
+                monitor.Error( $"While pulling from '{DisplayPath}/{CurrentBranchName}'", ex );
+                return false;
             }
         }
 
@@ -387,27 +403,12 @@ namespace CK.Env
 
         (bool Success, bool ReloadNeeded) DoPull( IActivityMonitor m, MergeFileFavor mergeFileFavor )
         {
-            var merger = Git.Config.BuildSignature( DateTimeOffset.Now ) ?? new Signature( "CKli", "none", DateTimeOffset.Now );
-            if( Git.Branches.Count() == 1 )
-            {
-                // There's only one branch.
-                var unique = Git.Branches.Single();
-                if( unique.TrackedBranch?.Tip == null )
-                {
-                    Debug.Assert( !Git.Branches.Single().IsRemote );
-                    m.Warn( $"The remote repository is not initialized and have 0 commits. We can't pull since there is only 1 local branch '{unique.FriendlyName}'." );
-                    if( unique.FriendlyName != IWorldName.MasterName )
-                    {
-                        m.Warn( $"The single (main) branch should be '{IWorldName.MasterName}', not '{unique.FriendlyName}'." );
-                    }
-                    return (true, false);
-                }
-            }
             if( Git.Head.TrackedBranch == null )
             {
                 m.Warn( $"There is no tracking branch for the current branch. Skip pulling from the remote." );
                 return (true, false);
             }
+            var merger = Git.Config.BuildSignature( DateTimeOffset.Now ) ?? new Signature( "CKli", "none", DateTimeOffset.Now );
             var result = Commands.Pull( Git, merger, new PullOptions
             {
                 FetchOptions = new FetchOptions

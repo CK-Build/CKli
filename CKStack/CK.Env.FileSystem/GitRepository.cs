@@ -8,8 +8,10 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Xml.Linq;
 
 namespace CK.Env
@@ -57,23 +59,6 @@ namespace CK.Env
         public GitPluginManager PluginManager { get; }
 
         /// <summary>
-        /// Gets a <see cref="GitRepositoryBase.SimpleStatusInfo"/> for this repository.
-        /// </summary>
-        /// <param name="monitor">The monitor to use.</param>
-        /// <param name="initializePlugins">True to initialize the plugins if they are not initialized.</param>
-        /// <returns>The simplified status info.</returns>
-        public SimpleStatusInfo GetSimpleStatusInfo( IActivityMonitor monitor, bool initializePlugins )
-        {
-            var r = GetSimpleStatusInfo();
-            if( PluginManager.BranchPlugins.IsInitialized( CurrentBranchName )
-                || (initializePlugins && EnsureCurrentBranchPlugins( monitor )) )
-            {
-                r.PluginCount = PluginManager.BranchPlugins.Count;
-            }
-            return r;
-        }
-
-        /// <summary>
         /// Ensures that plugins are loaded for the <see cref="CurrentBranchName"/>.
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
@@ -101,46 +86,9 @@ namespace CK.Env
         /// </summary>
         public event Action<IActivityMonitor>? OnReset;
 
-
-        /// <summary>
-        /// Gets the standard git status, based on the <see cref="CurrentBranchName"/>.
-        /// </summary>
-        public StandardGitStatus StandardGitStatus => CurrentBranchName == World.LocalBranchName
-                                                        ? StandardGitStatus.Local
-                                                        : (CurrentBranchName == World.DevelopBranchName
-                                                            ? StandardGitStatus.Develop
-                                                            : StandardGitStatus.Unknown);
         public IWorldName World => ProtoGitFolder.World;
 
-        /// <summary>
-        /// Event raised when <see cref="RunProcess(IActivityMonitor, string, string)"/> is called.
-        /// </summary>
-        public event EventHandler<RunCommandEventArgs>? RunProcessStarting;
 
-        /// <summary>
-        /// Runs a command at the root of this repository.
-        /// </summary>
-        /// <param name="m">The monitor to use.</param>
-        /// <param name="fileName">The filename to execute.</param>
-        /// <param name="arguments">the raw string of arguments.</param>
-        /// <returns>True on success. False on error.</returns>
-        [CommandMethod]
-        public bool RunProcess( IActivityMonitor m, string fileName, string arguments, int timeoutSeconds = 60 )
-        {
-            ProcessStartInfo info = ProcessRunner.ConfigureProcessInfo( FullPhysicalPath, fileName, arguments );
-            RunCommandEventArgs arg = new RunCommandEventArgs( m, info );
-            RunProcessStarting?.Invoke( this, arg );
-            return ProcessRunner.Run( m, arg.StartInfo, timeoutSeconds * 1000, arg.StdErrorLevel );
-        }
-
-        class AdaptedLogger : ILogger
-        {
-            readonly IActivityMonitor _m;
-            public AdaptedLogger( IActivityMonitor m ) => _m = m;
-            public void Error( string msg ) => _m.Error( msg );
-            public void Warn( string msg ) => _m.Warn( msg );
-            public void Info( string msg ) => _m.Info( msg );
-        }
 
         /// <summary>
         /// Gets the simple git version <see cref="ICommitInfo"/> from a branch.
@@ -431,6 +379,150 @@ namespace CK.Env
                 }
             }
         }
+
+        /// <summary>
+        /// Checks whether <see cref="Checkout(IActivityMonitor, string, string?)"/> can be called.
+        /// </summary>
+        /// <param name="branchName">The branch name to checkout.</param>
+        /// <param name="startingBranchName">
+        /// Optional "base" branch name from which the <paramref name="branchName"/> will be
+        /// created if it doesn' exist yet.
+        /// </param>
+        /// <param name="errorMessage">The error message.</param>
+        /// <returns>True if the operation can be done, false otherwise.</returns>
+        public bool CanCheckout( string branchName, string? startingBranchName, [NotNullWhen( false )]out string? errorMessage )
+        {
+            var currentBranchName = Git.Head.FriendlyName;
+            if( currentBranchName != branchName )
+            {
+                if( Git.RetrieveStatus( _checkDirtyOptions ).IsDirty )
+                {
+                    errorMessage = $"Repository '{DisplayPath}' has uncommitted changes ({CurrentBranchName}).";
+                    return false;
+                }
+                var b = Git.Branches[branchName];
+                if( b == null )
+                {
+                    string remoteName = "origin/" + branchName;
+                    if( Git.Branches[remoteName] == null )
+                    {
+                        if( startingBranchName == null )
+                        {
+                            errorMessage = $"Branch '{DisplayPath}/{branchName}' doesn't exist.";
+                            return false;
+                        }
+                        if( Git.Branches[startingBranchName] == null )
+                        {
+                            remoteName = "origin/" + startingBranchName;
+                            if( Git.Branches[remoteName] == null )
+                            {
+                                errorMessage = $"Branch '{DisplayPath}/{startingBranchName}' doesn't exist. Unable to use it as a starting point to create '{branchName}'.";
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
+            errorMessage = null;
+            return true;
+        }
+
+        /// <summary>
+        /// Checkouts an existing branch. Optionnally creates it from <paramref name="startingBranchName"/>
+        /// that must exist.
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="branchName">The branch name to checkout.</param>
+        /// <param name="startingBranchName">
+        /// Optional "base" branch name from which the <paramref name="branchName"/> will be
+        /// created if it doesn' exist yet.
+        /// </param>
+        /// <returns>True on success, false on error.</returns>
+        public bool Checkout( IActivityMonitor monitor, string branchName, string? startingBranchName )
+        {
+            if( !CanCheckout( branchName, startingBranchName, out var message ) )
+            {
+                monitor.Error( message );
+                return false;
+            }
+            if( Git.Head.FriendlyName != branchName )
+            {
+                var b = Git.Branches[branchName];
+                if( b == null )
+                {
+                    string remoteName = "origin/" + branchName;
+                    var remote = Git.Branches[remoteName];
+                    if( remote != null )
+                    {
+                        b = Git.CreateBranch( branchName, remote.Tip );
+                        b = Git.Branches.Update( b, u => u.TrackedBranch = remote.CanonicalName );
+                    }
+                    else
+                    {
+                        var bStart = Git.Branches[startingBranchName];
+                        if( bStart == null )
+                        {
+                            remoteName = "origin/" + startingBranchName;
+                            remote = Git.Branches[remoteName];
+                            Debug.Assert( remote != null );
+                            bStart = Git.CreateBranch( branchName, remote.Tip );
+                            bStart = Git.Branches.Update( bStart, u => u.TrackedBranch = remote.CanonicalName );
+                        }
+                        b = Git.CreateBranch( branchName, bStart.Tip );
+                        monitor.Info( $"Created branch '{DisplayPath}/{branchName}' from '{startingBranchName}' branch." );
+                    }
+                }
+                Commands.Checkout( Git, b );
+            }
+            return true;
+        }
+
+
+
+
+
+
+
+
+
+        /// <summary>
+        /// Gets the standard git status, based on the <see cref="CurrentBranchName"/>.
+        /// </summary>
+        public StandardGitStatus StandardGitStatus => CurrentBranchName == World.LocalBranchName
+                                                        ? StandardGitStatus.Local
+                                                        : (CurrentBranchName == World.DevelopBranchName
+                                                            ? StandardGitStatus.Develop
+                                                            : StandardGitStatus.Unknown);
+        /// <summary>
+        /// Event raised when <see cref="RunProcess(IActivityMonitor, string, string)"/> is called.
+        /// </summary>
+        public event EventHandler<RunCommandEventArgs>? RunProcessStarting;
+
+        /// <summary>
+        /// Runs a command at the root of this repository.
+        /// </summary>
+        /// <param name="m">The monitor to use.</param>
+        /// <param name="fileName">The filename to execute.</param>
+        /// <param name="arguments">the raw string of arguments.</param>
+        /// <returns>True on success. False on error.</returns>
+        [CommandMethod]
+        public bool RunProcess( IActivityMonitor m, string fileName, string arguments, int timeoutSeconds = 60 )
+        {
+            ProcessStartInfo info = ProcessRunner.ConfigureProcessInfo( FullPhysicalPath, fileName, arguments );
+            RunCommandEventArgs arg = new RunCommandEventArgs( m, info );
+            RunProcessStarting?.Invoke( this, arg );
+            return ProcessRunner.Run( m, arg.StartInfo, timeoutSeconds * 1000, arg.StdErrorLevel );
+        }
+
+        class AdaptedLogger : ILogger
+        {
+            readonly IActivityMonitor _m;
+            public AdaptedLogger( IActivityMonitor m ) => _m = m;
+            public void Error( string msg ) => _m.Error( msg );
+            public void Warn( string msg ) => _m.Warn( msg );
+            public void Info( string msg ) => _m.Info( msg );
+        }
+
 
         /// <summary>
         /// Checkouts the <see cref="IWorldName.LocalBranchName"/>, always merging <see cref="IWorldName.DevelopBranchName"/> into it.
@@ -1057,6 +1149,7 @@ namespace CK.Env
                 _branchRefreshed = true;
             }
         }
+
         // Currently unused. To be tested.
         internal IEnumerable<IFileInfo> FindFiles( NormalizedPath sub, Func<NormalizedPath, bool>? directoryMatch, Func<NormalizedPath, bool>? fileMatch )
         {
