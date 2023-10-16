@@ -29,7 +29,7 @@ namespace CK.Env.DependencyModel
         /// packages.
         /// This handles the locally produced package.
         /// </summary>
-        class LocalPackageItem : IDependentItem, IDependentItemRef
+        sealed class LocalPackageItem : IDependentItem, IDependentItemRef
         {
             // This contains only the Solution of the Project for local projects (the Package -published- requires the
             // Solution that owns its source code.)
@@ -80,7 +80,7 @@ namespace CK.Env.DependencyModel
         /// This internal class is the IDependentItem that represents a Project
         /// in a solution graph.
         /// </summary>
-        class ProjectItem : IDependentItem, IDependentItemRef
+        sealed class ProjectItem : IDependentItem, IDependentItemRef
         {
             readonly IProject _p;
             readonly List<IDependentItemRef> _requires;

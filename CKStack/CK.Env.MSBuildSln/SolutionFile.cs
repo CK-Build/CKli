@@ -1,3 +1,4 @@
+using CK.Build;
 using CK.Core;
 
 using System;
@@ -169,7 +170,7 @@ namespace CK.Env.MSBuildSln
         /// </summary>
         /// <param name="name">Name of the section.</param>
         /// <returns>The section or null if not found.</returns>
-        public Section? FindGlobalSection( string name ) => _sections.GetValueOrDefault( name, null );
+        public Section? FindGlobalSection( string name ) => _sections.GetValueOrDefault( name );
 
         /// <summary>
         /// Gets the <see cref="DotnetToolConfigFile"/> that is the ".config/dotnet-tools.json" file
@@ -199,7 +200,7 @@ namespace CK.Env.MSBuildSln
         internal ProjectBase? FindProjectByGuid( IActivityMonitor m, string guid, int lineNumber = 0 )
         {
             Debug.Assert( _projectIndex != null );
-            var project = _projectIndex.GetValueOrDefault( guid, null );
+            var project = _projectIndex.GetValueOrDefault( guid );
             if( project == null )
             {
                 m.Error( lineNumber == 0
@@ -218,6 +219,35 @@ namespace CK.Env.MSBuildSln
                         ? $"Project '{guid}' must be a {typeof( T ).GetType().Name}."
                         : $"Guid '{guid}' defined on line #{lineNumber} references must be a {typeof( T ).GetType().Name}." );
             return null;
+        }
+
+        public int TransformToLocal( IActivityMonitor monitor,
+                                     Func<NormalizedPath, Artifact, NormalizedPath> toLocalProjectPath )
+        {
+            var collector = new HashSet<NormalizedPath>();
+            foreach( var p in MSProjects )
+            {
+                p.TransformPackageToProjectDepencies( monitor, toLocalProjectPath, collector );
+            }
+            if( collector.Count > 0 )
+            {
+                SolutionFolder? local = _projectBaseList.OfType<SolutionFolder>()
+                                            .FirstOrDefault( s => "$Local".Equals( s.ProjectName, StringComparison.OrdinalIgnoreCase ) );
+                if( local == null )
+                {
+                    local = new SolutionFolder( this, Guid.NewGuid().ToString( "B" ), "$Local" );
+                    AddProject( local );
+                }
+                foreach( var e in collector )
+                {
+                    Debug.Assert( e.LastPart.EndsWith( ".csproj" ) );
+                    var projectName = e.LastPart.Substring( 0, e.LastPart.Length - 7 );
+                    var p = new Project( this, Guid.NewGuid().ToString( "B" ), KnownProjectType.CSharp.ToGuid(), projectName, e );
+                    AddProject( p );
+                    //p.ParentFolder = local;
+                }
+            }
+            return collector.Count;
         }
 
         /// <summary>

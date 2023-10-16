@@ -287,14 +287,13 @@ namespace CK.Env
         /// <summary>
         /// Gets the <see cref="ArtifactCenter"/>.
         /// </summary>
-        protected ArtifactCenter Artifacts => _artifacts;
+        public ArtifactCenter Artifacts => _artifacts;
 
         /// <summary>
         /// Gets the set of <see cref="GitRepository"/> that has been discovered
         /// (thanks to the registration of at one <see cref="ISolutionDriver"/> on a branch).
         /// </summary>
         public IReadOnlyCollection<GitRepository> GitRepositories => _gitRepositories;
-
 
         public bool Checkout( IActivityMonitor monitor, string branchName, string? startingBranchName )
         {
@@ -340,6 +339,34 @@ namespace CK.Env
             {
                 success &= r.FetchBranches( monitor, originOnly );
             }
+            return success;
+        }
+
+        public bool Localize( IActivityMonitor monitor )
+        {
+            var status = FileSystem.GetSimpleMultipleStatusInfo();
+            if( status.SingleBranchName == null )
+            {
+                monitor.Error( status.GetMultipleBranchesString() );
+                return false;
+            }
+            if( !status.SingleBranchName.EndsWith( "-local" ) )
+            {
+                monitor.Error( $"This can be applied only on '-local' branches." );
+            }
+
+            bool success = true;
+            foreach( var r in FileSystem.GitFolders )
+            {
+
+            }
+            return success;
+        }
+
+        bool Localize( IActivityMonitor monitor, GitRepository r )
+        {
+            bool success = true;
+
             return success;
         }
 

@@ -381,10 +381,10 @@ namespace CK.Env.DependencyModel
             _ctx.OnProjectReferenceAdded( r );
         }
 
-        internal void OnPackageReferenceUpdated( in ProjectReference r )
+        internal void OnProjectReferenceUpdated( in ProjectReference r )
         {
             _version++;
-            _ctx.OnPackageReferenceUpdated( r );
+            _ctx.OnProjectReferenceUpdated( r );
         }
 
         internal void OnProjectReferenceRemoved( in ProjectReference r )

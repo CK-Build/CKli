@@ -1,5 +1,8 @@
 using CK.Core;
+using LibGit2Sharp;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using static CK.Env.GitRepositoryBase;
 
@@ -9,7 +12,7 @@ namespace CK.Env
     {
         public sealed class SimpleMultipleStatusInfo
         {
-            public SimpleMultipleStatusInfo( IReadOnlyList<SimpleStatusInfo> repositoryStatus,
+            internal SimpleMultipleStatusInfo( IReadOnlyList<SimpleStatusInfo> repositoryStatus,
                                              string? singleBranch,
                                              int dirty )
             {
@@ -32,6 +35,23 @@ namespace CK.Env
             /// Gets the number of repositories that are dirty.
             /// </summary>
             public int DirtyCount { get; }
+
+            public string GetSingleBranchString()
+            {
+                if( SingleBranchName == null ) return string.Empty;
+                return $"All repositories are on branch '{SingleBranchName}'{(DirtyCount > 0 ? $" ({DirtyCount} are dirty)" : "")}.";
+            }
+
+            public string GetMultipleBranchesString()
+            {
+                if( SingleBranchName != null ) return string.Empty;
+
+                var branches = RepositoryStatus.GroupBy( s => s.CurrentBranchName )
+                        .Select( g => (B: g.Key, C: g.Count(), D: g.Select( x => x.DisplayName.Path )) )
+                        .OrderBy( e => e.C );
+                return $"Multiple branches are checked out:{Environment.NewLine}" +
+                       $"{branches.Select( b => $"{b.B} ({b.C}) => {b.D.Concatenate()}" )}";
+            }
         }
 
         /// <summary>

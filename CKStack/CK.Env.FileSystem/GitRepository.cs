@@ -18,7 +18,7 @@ namespace CK.Env
 {
     /// <summary>
     /// Implements Git repository mapping.
-    /// GitFolder are internally created (and disposed) by <see cref="FileSystem"/>.
+    /// GitRepository are internally created (and disposed) by <see cref="FileSystem"/>.
     /// </summary>
     public partial class GitRepository : GitRepositoryBase, IGitHeadInfo, ICommandMethodsProvider
     {
@@ -395,11 +395,7 @@ namespace CK.Env
             var currentBranchName = Git.Head.FriendlyName;
             if( currentBranchName != branchName )
             {
-                if( Git.RetrieveStatus( _checkDirtyOptions ).IsDirty )
-                {
-                    errorMessage = $"Repository '{DisplayPath}' has uncommitted changes ({CurrentBranchName}).";
-                    return false;
-                }
+                if( !IsCleanGitFolder( out errorMessage ) ) return false;
                 var b = Git.Branches[branchName];
                 if( b == null )
                 {
@@ -422,6 +418,17 @@ namespace CK.Env
                         }
                     }
                 }
+            }
+            errorMessage = null;
+            return true;
+        }
+
+        bool IsCleanGitFolder( [NotNullWhen( false )] out string? errorMessage )
+        {
+            if( Git.RetrieveStatus( _checkDirtyOptions ).IsDirty )
+            {
+                errorMessage = $"Repository '{DisplayPath}' has uncommitted changes ({CurrentBranchName}).";
+                return false;
             }
             errorMessage = null;
             return true;

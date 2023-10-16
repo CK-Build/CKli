@@ -20,7 +20,7 @@ namespace CK.Env.DependencyModel
         int _version;
         DependencyAnalyzer? _analyzer;
 
-        class ProjectNameComparer : IComparer<Project>
+        sealed class ProjectNameComparer : IComparer<Project>
         {
             public static readonly ProjectNameComparer Comparer = new ProjectNameComparer();
 
@@ -208,7 +208,7 @@ namespace CK.Env.DependencyModel
             ++_version;
         }
 
-        internal void OnPackageReferenceUpdated( in ProjectReference r )
+        internal void OnProjectReferenceUpdated( in ProjectReference r )
         {
             ++_version;
         }

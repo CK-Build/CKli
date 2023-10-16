@@ -146,14 +146,13 @@ namespace CK.Env.MSBuildSln
                 }
                 else
                 {
-                    Debug.Assert( _primaryFile.Document.Root != null );
                     TargetFrameworks = Savors.FindOrCreate( tE[0].Value );
 
                     LangVersion = _primaryFile.FindProperty( "LangVersion" ).LastOrDefault()?.Value;
                     OutputType = _primaryFile.FindProperty( "OutputType" ).LastOrDefault()?.Value;
                     IsPackable = (bool?)_primaryFile.FindProperty( "IsPackable" ).LastOrDefault();
 
-                    UseMicrosoftBuildCentralPackageVersions = _primaryFile.Document.Root.Elements( "Sdk" )
+                    UseMicrosoftBuildCentralPackageVersions = _primaryFile.Root.Elements( "Sdk" )
                                                                                     .Attributes( "Name" )
                                                                                     .Any( a => a.Value == "Microsoft.Build.CentralPackageVersions" );
 
@@ -161,7 +160,7 @@ namespace CK.Env.MSBuildSln
                     {
                         monitor.Debug( "Microsoft.Build.CentralPackageVersions is used." );
                         NormalizedPath packageFile;
-                        var definer = _primaryFile.AllFiles.Select( file => file.Document.Root )
+                        var definer = _primaryFile.AllFiles.Select( file => file.Root )
                                              .SelectMany( root => root?.Elements( "PropertyGroup" ) ?? XElement.EmptySequence )
                                              .Elements()
                                              .FirstOrDefault( e => e.Name.LocalName == "CentralPackagesFile" );
@@ -214,7 +213,10 @@ namespace CK.Env.MSBuildSln
         /// Gets the &lt;IsPackable&gt; element value.
         /// Null if the project can not be read or if IsPackable is not defined.
         /// <para>
-        /// IsPackable defaults to false for us!
+        /// We consider a false default for projects whose name ends with ".Tests"
+        /// and true for other projects (excpet build project).
+        /// </para>
+        /// <para>
         /// Originally (dnx may be), there was no .sln taken into account.
         /// To pack, you did "dotnet pack" in each project you wanted to pack. And basta!
         ///
@@ -302,7 +304,7 @@ namespace CK.Env.MSBuildSln
             Throw.CheckArgument( "Must be from MSProject.Savors context.", frameworks.Context == Savors );
             Throw.CheckState( "Invalid project file.", _primaryFile != null );
             if( TargetFrameworks == frameworks ) return false;
-            XElement? f = _primaryFile.Document.Root?
+            XElement? f = _primaryFile.Root
                             .Elements( "PropertyGroup" )
                             .Elements()
                             .Where( x => x.Name.LocalName == "TargetFramework" || x.Name.LocalName == "TargetFrameworks" )
@@ -411,7 +413,7 @@ namespace CK.Env.MSBuildSln
             if( !remainingFrameworksToUpdate.IsEmpty && addIfNotExists )
             {
                 Debug.Assert( ProjectFile.Document.Root != null );
-                var firstPropertyGroup = ProjectFile.Document.Root.Element( "PropertyGroup" );
+                var firstPropertyGroup = ProjectFile.Root.Element( "PropertyGroup" );
                 Debug.Assert( firstPropertyGroup != null, "There's necessarily at least one PropertyGroup." );
                 var pRef = new XElement( "ItemGroup",
                                 new XElement( "PackageReference",
@@ -441,13 +443,13 @@ namespace CK.Env.MSBuildSln
 
         void DoSetSimpleProperty( IActivityMonitor m, string elementName, string? value )
         {
-            Debug.Assert( _primaryFile != null && _primaryFile.Document.Root != null );
-            _primaryFile.Document.Root
+            Debug.Assert( _primaryFile != null );
+            _primaryFile.Root
                     .Elements( "PropertyGroup" )
                     .Elements( elementName ).Remove();
             if( value != null )
             {
-                _primaryFile.Document.Root
+                _primaryFile.Root
                         .EnsureElement( "PropertyGroup" )
                         .SetElementValue( elementName, value );
             }
@@ -555,6 +557,46 @@ namespace CK.Env.MSBuildSln
         }
 
         /// <summary>
+        /// Transforms PackageReference into ProjectReference.
+        /// This is internally called by ToL
+        /// </summary>
+        /// <param name="monitor">The monitor to use.</param>
+        /// <param name="toLocalProjectPath">PAckage to local path function.</param>
+        /// <returns>The count of transformations.</returns>
+        internal int TransformPackageToProjectDepencies( IActivityMonitor monitor,
+                                                       Func<NormalizedPath, Artifact, NormalizedPath> toLocalProjectPath,
+                                                       HashSet<NormalizedPath> collector )
+        {
+            int count = 0;
+            foreach( var d in Deps.Packages )
+            {
+                Debug.Assert( d.OriginFile.Path.StartsWith( Solution.SolutionFolderPath ) );
+                // Removes "branches/XXX/" parts.
+                var originFilePath = d.OriginFile.Path.RemoveParts( Solution.SolutionFolderPath.Parts.Count - 2, 2 );
+                var target = toLocalProjectPath( originFilePath, d.BaseArtifactInstance.Artifact );
+                if( !target.IsEmptyPath )
+                {
+                    var replaced = $"PackageReference Include={d.PackageId} Version={d.Version}";
+                    monitor.Trace( $"Replaced '{replaced}' with ProjectReference to '{target}'." );
+                    // Captures the relative depth of the declaring file before messing with the element.
+                    int originDepthInSolution = d.OriginFile.Path.Parts.Count - Solution.SolutionFolderPath.Parts.Count - 1;
+                    XComment comment = new XComment( replaced );
+                    var rep = new XElement( "ProjectReference", new XAttribute( "Include", target ) );
+                    d.OriginElement.ReplaceWith( comment, rep );
+                    // Removes "../" so that the path is relative to the solution (the .sln file). 
+                    target = target.RemoveFirstPart( originDepthInSolution );
+                    collector.Add( target );
+                    ++count;
+                }
+            }
+            if( count != 0 )
+            {
+                OnChange( monitor );
+            }
+            return count;
+        }
+
+        /// <summary>
         /// Removes a set of dependencies.
         /// </summary>
         /// <param name="toRemove">Set of dependencies to remove.</param>
@@ -622,7 +664,7 @@ namespace CK.Env.MSBuildSln
                 System.Xml.Linq.Extensions.Remove( oldProperties );
                 parents.Where( p => !p.HasElements ).Remove();
                 // Removes the Sdk import.
-                _primaryFile.Document.Root!.Elements( "Sdk" ).Where( e => e.Attribute( "Name" )?.Value == "Microsoft.Build.CentralPackageVersions" ).Remove();
+                _primaryFile.Root.Elements( "Sdk" ).Where( e => e.Attribute( "Name" )?.Value == "Microsoft.Build.CentralPackageVersions" ).Remove();
                 UseMicrosoftBuildCentralPackageVersions = false;
                 _centralPackagesFile = null;
                 OnChange( monitor );
@@ -639,18 +681,18 @@ namespace CK.Env.MSBuildSln
             Solution.CheckDirtyProjectFiles( true );
         }
 
-        void DoInitializeDependencies( IActivityMonitor m )
+        void DoInitializeDependencies( IActivityMonitor monitor )
         {
             Debug.Assert( _primaryFile != null );
-            var packageRefs = _primaryFile.AllFiles.Select( f => f.Document.Root )
-                             .SelectMany( root => root.Elements( "ItemGroup" )
+            var packageRefs = _primaryFile.AllFiles
+                             .SelectMany( f => f.Root.Elements( "ItemGroup" )
                                                         .Elements()
                                                         .Where( e => e.Name.LocalName == "PackageReference"
                                                                      || e.Name.LocalName == "ProjectReference" ) )
                              .Select( e => (Origin: e,
-                                            PackageId: (string)e.Attribute( "Include" ),
-                                            RawVersion: (string)e.Attribute( "Version" ) ?? (string)e.Element( "Version" ),
-                                            PrivateAssets: (string)e.Attribute( "PrivateAssets" ) ?? (string)e.Element( "PrivateAssets" ) ?? ""
+                                            PackageId: (string?)e.Attribute( "Include" ),
+                                            RawVersion: (string?)e.Attribute( "Version" ) ?? (string?)e.Element( "Version" ),
+                                            PrivateAssets: (string?)e.Attribute( "PrivateAssets" ) ?? (string?)e.Element( "PrivateAssets" ) ?? ""
                                             ) );
 
             var conditionEvaluator = new PartialEvaluator();
@@ -663,12 +705,12 @@ namespace CK.Env.MSBuildSln
                 {
                     if( p.Origin.Attribute( "Include" ) == null )
                     {
-                        m.Warn( $"Element {p.Origin} misses Include attribute. It is ignored." );
+                        monitor.Warn( $"Element {p.Origin} misses Include attribute. It is ignored." );
                         continue;
                     }
                         if( string.IsNullOrWhiteSpace( p.PackageId ) )
                         {
-                            m.Error( $"Invalid Include attribute on element {p.Origin}." );
+                            monitor.Error( $"Invalid Include attribute on element {p.Origin}." );
                             return;
                         }
 
@@ -684,11 +726,11 @@ namespace CK.Env.MSBuildSln
                         {
                             if( UseMicrosoftBuildCentralPackageVersions )
                             {
-                                m.Error( $"Missing Version attribute (or child element) on element {p.Origin} and Microsoft.Build.CentralPackageVersions is not operational: the props file (via CentralPackagesFile property or Packages.props in solution folder) has not been found." );
+                                monitor.Error( $"Missing Version attribute (or child element) on element {p.Origin} and Microsoft.Build.CentralPackageVersions is not operational: the props file (via CentralPackagesFile property or Packages.props in solution folder) has not been found." );
                             }
                             else
                             {
-                                m.Warn( $"Missing Version attribute (or child element) on element {p.Origin} (and Microsoft.Build.CentralPackageVersions is not used). This is ignored." );
+                                monitor.Warn( $"Missing Version attribute (or child element) on element {p.Origin} (and Microsoft.Build.CentralPackageVersions is not used). This is ignored." );
                             }
                             continue;
                         }
@@ -697,35 +739,35 @@ namespace CK.Env.MSBuildSln
                         if( vO != null )
                         {
                             isVersionOverride = true;
-                            versionBound = ParseNugetBound( m, vO );
+                            versionBound = ParseNugetBound( monitor, vO );
                             if( !versionBound.IsValid )
                             {
-                                m.Error( $"Unable to parse VersionOverride attribute on element {p.Origin}: {versionBound.Error}" );
+                                monitor.Error( $"Unable to parse VersionOverride attribute on element {p.Origin}: {versionBound.Error}" );
                                 return;
                             }
-                            m.Warn( $"VersionOverride is used for package {p.PackageId}: {versionBound}." );
+                            monitor.Warn( $"VersionOverride is used for package {p.PackageId}: {versionBound}." );
                         }
                         if( !isVersionOverride )
                         {
                             // We must find the <Package Update= ... version.
-                            propertyDef = _centralPackagesFile.Document.Root.Elements().Where( e => e.Name.LocalName == "ItemGroup" )
+                            propertyDef = _centralPackagesFile.Root.Elements().Where( e => e.Name.LocalName == "ItemGroup" )
                                                                             .Elements().Where( e => e.Name.LocalName == "PackageReference" )
-                                                                            .FirstOrDefault( e => (string)e.Attribute( "Update" ) == p.PackageId );
+                                                                            .FirstOrDefault( e => (string?)e.Attribute( "Update" ) == p.PackageId );
                             if( propertyDef == null )
                             {
-                                propertyDef = _centralPackagesFile.Document.Root.Elements().Where( e => e.Name.LocalName == "ItemGroup" )
+                                propertyDef = _centralPackagesFile.Root.Elements().Where( e => e.Name.LocalName == "ItemGroup" )
                                                                                     .Elements().Where( e => e.Name.LocalName == "PackageReference" )
-                                                                                    .FirstOrDefault( e => p.PackageId.Equals( (string)e.Attribute( "Update" ), StringComparison.OrdinalIgnoreCase ) );
+                                                                                    .FirstOrDefault( e => p.PackageId.Equals( (string?)e.Attribute( "Update" ), StringComparison.OrdinalIgnoreCase ) );
                                 if( propertyDef == null )
                                 {
-                                    m.Error( $"Unable to find a version for '{p.PackageId}' in central package file '{_centralPackagesFile.Path}'." );
+                                    monitor.Error( $"Unable to find a version for '{p.PackageId}' in central package file '{_centralPackagesFile.Path}'." );
                                     return;
                                 }
-                                m.Warn( $"Found a package version for '{p.PackageId}' in central package file '{_centralPackagesFile.Path}': '{propertyDef.Attribute( "Update" )}' case differ." );
+                                monitor.Warn( $"Found a package version for '{p.PackageId}' in central package file '{_centralPackagesFile.Path}': '{propertyDef.Attribute( "Update" )}' case differ." );
                             }
-                            if( !(versionBound = ParseNugetBound( m, (string)propertyDef.Attribute( "Version" ) )).IsValid )
+                            if( !(versionBound = ParseNugetBound( monitor, (string?)propertyDef.Attribute( "Version" ) )).IsValid )
                             {
-                                m.Error( $"Unable to parse Version attribute on element {propertyDef} in central package file '{_centralPackagesFile.Path}': {versionBound.Error}" );
+                                monitor.Error( $"Unable to parse Version attribute on element {propertyDef} in central package file '{_centralPackagesFile.Path}': {versionBound.Error}" );
                                 return;
                             }
                         }
@@ -735,25 +777,25 @@ namespace CK.Env.MSBuildSln
                         // Check empty or whitespace.
                         if( string.IsNullOrWhiteSpace( p.RawVersion ) )
                         {
-                            m.Error( $"Invalid Version attribute on element {p.Origin}." );
+                            monitor.Error( $"Invalid Version attribute on element {p.Origin}." );
                             return;
                         }
                         bool isPropVersion = p.RawVersion.StartsWith( "$(" );
                         if( !isPropVersion )
                         {
-                            versionBound = ParseNugetBound( m, p.RawVersion );
+                            versionBound = ParseNugetBound( monitor, p.RawVersion );
                             if( !versionBound.IsValid )
                             {
-                                m.Error( $"Unable to parse Version attribute on element {p.Origin}: {versionBound.Error}" );
+                                monitor.Error( $"Unable to parse Version attribute on element {p.Origin}: {versionBound.Error}" );
                                 return;
                             }
                         }
                         else
                         {
-                            versionBound = FollowRefPropertyVersion( m, p, out propertyDef );
+                            versionBound = FollowRefPropertyVersion( monitor, p, out propertyDef );
                             if( !versionBound.IsValid )
                             {
-                                m.Error( versionBound.Error );
+                                monitor.Error( versionBound.Error );
                                 return;
                             }
                         }
@@ -762,46 +804,55 @@ namespace CK.Env.MSBuildSln
 
                     string[] defaultValues = new string[] { "compile", "runtime", "contentFiles", "build", "analyzers", "native" };
 
-                    CKTrait? frameworks = ComputeFrameworks( m, p.Origin, conditionEvaluator );
+                    CKTrait? frameworks = ComputeFrameworks( monitor, p.Origin, conditionEvaluator );
                     if( frameworks == null ) return;
                     if( frameworks.IsEmpty )
                     {
-                        m.Warn( $"Useless PackageReference (applies to undeclared frameworks): {p.Origin}." );
+                        monitor.Warn( $"Useless PackageReference (applies to undeclared frameworks): {p.Origin}." );
                         uselessDeps.Add( p.Origin );
                         continue;
                     }
-                    deps.Add( new DeclaredPackageDependency( this, p.PackageId, versionBound.Result, p.Origin, propertyDef, frameworks, p.PrivateAssets, isVersionOverride ) );
+                    deps.Add( new DeclaredPackageDependency( this,
+                                                             p.PackageId,
+                                                             versionBound.Result,
+                                                             p.Origin,
+                                                             propertyDef,
+                                                             frameworks,
+                                                             p.PrivateAssets,
+                                                             isVersionOverride ) );
                 }
                 else
                 {
                     // This is a ProjectReference.
-                    string projectName = new NormalizedPath( p.PackageId ).LastPart;
+                    var projectPath = new NormalizedPath( p.PackageId );
+                    string projectName = projectPath.LastPart;
                     if( !projectName.EndsWith( ".csproj" ) )
                     {
-                        m.Error( $"ProjectReference must Include a .csproj project: {p.Origin}." );
+                        monitor.Error( $"ProjectReference must Include a .csproj project: {p.Origin}." );
                         return;
                     }
                     projectName = projectName.Substring( 0, projectName.Length - 7 );
                     var target = Solution.MSProjects.FirstOrDefault( pRef => pRef.ProjectName == projectName );
-                    if( target == null )
+                    if( target != null )
                     {
-                        m.Warn( $"ProjectReference '{p.PackageId}' not found in the solution. Project name '{projectName}' should exist in the solution." );
-                        uselessDeps.Add( p.Origin );
+                        CKTrait? frameworks = ComputeFrameworks( monitor, p.Origin, conditionEvaluator );
+                        if( frameworks == null ) return;
+                        if( frameworks.IsEmpty )
+                        {
+                            monitor.Warn( $"Useless ProjectReference (applies to undeclared frameworks): {p.Origin}." );
+                            uselessDeps.Add( p.Origin );
+                            continue;
+                        }
+                        projs.Add( new ProjectToProjectDependency( this, target, frameworks, p.Origin ) );
                         continue;
                     }
-                    CKTrait? frameworks = ComputeFrameworks( m, p.Origin, conditionEvaluator );
-                    if( frameworks == null ) return;
-                    if( frameworks.IsEmpty )
-                    {
-                        m.Warn( $"Useless ProjectReference (applies to undeclared frameworks): {p.Origin}." );
-                        uselessDeps.Add( p.Origin );
-                        continue;
-                    }
-                    projs.Add( new ProjectToProjectDependency( this, target, frameworks, p.Origin ) );
+                    monitor.Warn( $"ProjectReference '{p.PackageId}' not found in the solution. Project name '{projectName}' should exist in the solution." );
+                    uselessDeps.Add( p.Origin );
+                    continue;
                 }
             }
             // Consider Solution level dependency as active for all TargetFrameworks.
-            if( !EnumerateSolutionLevelProjectDependencies( m,
+            if( !EnumerateSolutionLevelProjectDependencies( monitor,
                     p => projs.Add( new ProjectToProjectDependency( this, p, TargetFrameworks, null ) ) ) )
             {
                 return;

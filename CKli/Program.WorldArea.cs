@@ -1,11 +1,12 @@
 using CK.Core;
 using CK.Env;
+using CK.Env.DependencyModel;
 using LibGit2Sharp;
 using System;
 using System.CommandLine;
 using System.Diagnostics;
-using System.Linq;
 using System.Threading;
+using static CK.Monitoring.MultiLogReader;
 
 namespace CKli
 {
@@ -18,6 +19,8 @@ namespace CKli
             worldArea.AddCommand( CreateCheckoutCommand() );
             worldArea.AddCommand( CreateFetchCommand() );
             worldArea.AddCommand( CreatePullCommand() );
+            worldArea.AddCommand( CreateLocalizeCommand() );
+            worldArea.AddCommand( CreateResetHardCommand() );
             return worldArea;
         }
 
@@ -31,7 +34,7 @@ namespace CKli
             status.SetHandler( ( console, gitOnly, ckliContext ) =>
             {
                 if( !ckliContext.TryGetCurrentWorld( out var world ) )
-                { 
+                {
                     return -1;
                 }
                 FileSystem.SimpleMultipleStatusInfo status = world.FileSystem.GetSimpleMultipleStatusInfo();
@@ -53,20 +56,11 @@ namespace CKli
                     }
                     if( status.SingleBranchName != null )
                     {
-                        console.Write( $"All repositories are on branch '{status.SingleBranchName}'" );
-                        if( status.DirtyCount > 0 ) console.Write( $" ({status.DirtyCount} are dirty)" );
-                        console.WriteLine( "." );
+                        console.WriteLine( status.GetSingleBranchString() );
                     }
                     else
                     {
-                        var branches = status.RepositoryStatus.GroupBy( s => s.CurrentBranchName )
-                                                .Select( g => (B: g.Key, C: g.Count(), D: g.Select( x => x.DisplayName.Path )) )
-                                                .OrderBy( e => e.C );
-                        console.WriteLine( $"Multiple branches are checked out:" );
-                        foreach( var b in branches )
-                        {
-                            console.WriteLine( $"{b.B} ({b.C}) => {b.D.Concatenate()}" );
-                        }
+                        console.WriteLine( status.GetMultipleBranchesString() );
                     }
                 }
                 return 0;
@@ -149,9 +143,77 @@ namespace CKli
             return pull;
         }
 
+        static Command CreateResetHardCommand()
+        {
+            var reset = new Command( "reset", "Resets any local modifications of the current branch." );
+            var hard = new Option<bool>( "--hard", "Calls git reset --hard and deletes any untracked files." );
+            reset.AddOption( hard );
+            reset.SetHandler( (hard, ckliContext) =>
+            {
+                if( !ckliContext.TryGetCurrentWorld( out var world ) )
+                {
+                    return -1;
+                }
+                var status = world.FileSystem.GetSimpleMultipleStatusInfo();
+                if( status.SingleBranchName == null )
+                {
+                    ckliContext.Monitor.Error( status.GetMultipleBranchesString() );
+                    return -1;
+                }
+                foreach( var r in world.FileSystem.GitFolders )
+                {
+                    r.Reset( ckliContext.Monitor, hard );
+                }
+                return 0;
+            }, hard, Binder.RequiredService<ICkliContext>() );
+            return reset;
+        }
 
+        static Command CreateLocalizeCommand()
+        {
+            var loc = new Command( "localize", "Localize the world." );
+            loc.SetHandler( ckliContext =>
+            {
+                if( !ckliContext.TryGetCurrentWorld( out var world ) )
+                {
+                    return -1;
+                }
+                if( !Localize( ckliContext.Monitor, world.FileSystem, world.Artifacts ) )
+                {
+                    return -1;
+                }
+                return 0;
+            }, Binder.RequiredService<ICkliContext>() );
+            return loc;
+        }
+
+        static bool Localize( IActivityMonitor monitor, FileSystem fs, ArtifactCenter artifactCenter )
+        {
+            var status = fs.GetSimpleMultipleStatusInfo();
+            if( status.SingleBranchName == null )
+            {
+                monitor.Error( status.GetMultipleBranchesString() );
+                return false;
+            }
+            if( !status.SingleBranchName.EndsWith( "-local" ) )
+            {
+                monitor.Error( $"This can be applied only on '-local' branches." );
+                return false;
+            }
+
+            MSBuildSolutionProvider[] providers = new[] { new MSBuildSolutionProvider() };
+            var solutions = SolutionBuilder.LoadSolutions( monitor, artifactCenter, fs, status.SingleBranchName, providers );
+            if( solutions == null ) return false;
+            foreach( var p in providers )
+            {
+                if( !p.Localize( monitor, solutions ) )
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
-
 
 }
 

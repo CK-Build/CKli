@@ -82,7 +82,7 @@ namespace CK.Env.DependencyModel
 
         /// <summary>
         /// Gets whether this is test project.
-        /// Test projects are usually not published but then can be.
+        /// Test projects are usually not published.
         /// </summary>
         bool IsTestProject { get; }
 

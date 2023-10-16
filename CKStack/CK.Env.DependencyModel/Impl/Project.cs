@@ -357,7 +357,7 @@ namespace CK.Env.DependencyModel
         /// <param name="target">The referenced project.</param>
         /// <param name="kind">The dependency kind.</param>
         /// <param name="applicableSavors">Optional savors that, when defined, must be a subset of this <see cref="Savors"/>.</param>
-        /// <returns>True if the dependency has been added or its savors updated, false is it already exists as-is.</returns>
+        /// <returns>True if the dependency has been added or its savors updated, false if it already exists as-is.</returns>
         public bool AddProjectReference( Project target, ArtifactDependencyKind kind = ArtifactDependencyKind.Transitive, CKTrait? applicableSavors = null )
         {
             CheckSolution();
@@ -380,7 +380,7 @@ namespace CK.Env.DependencyModel
             else
             {
                 _projectReferences[idx] = r;
-                _solution.OnPackageReferenceUpdated( r );
+                _solution.OnProjectReferenceUpdated( r );
             }
             return true;
         }

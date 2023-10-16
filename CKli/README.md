@@ -1,8 +1,6 @@
 # Ckli
 
-# Command lines
-
-### Clone
+## Clone
 ```
 > ckli clone -?
 Description:
@@ -32,7 +30,7 @@ C:/Dev/CK-Build-Sample/
     SampleD/
 ```
 
-### Area: Stack
+## Area: Stack
 `ckli stack` exposes stack related commands.
 
 ### stack list
@@ -44,20 +42,21 @@ The path, remote url and whether the repository is public or not is listed. Dupl
 can exist (same stack name cloned at different paths) and are also listed: the oldest one is considered
 to be the primary one.
 
-### World area
+## World Area
 To avoid mistakes commands in this area will execute only on the World based on the current directory.
 
 ### world status
 Dumps a git-like status for each repository of the World and the World global status.
 
+### world reset
+Resets the current working folder on the current global branch.
+
+### world localize
+Setup the current global "XXX-local" branch to be in local mode.
 
 
-## Implementation notes
-The `BasicApplicationContext : ICkliApplicationContext` provides the minimal context.
-This context is immutable.
 
-The `--interactive` option enables navigation accross stacks and worlds. In interactive mode
-the ``
+
 
 
 

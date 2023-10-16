@@ -103,7 +103,7 @@ namespace CK.Env.Plugin
                 {
                     project.IsTestProject = project.SimpleProjectName.EndsWith( ".Tests" );
                     var g = new Artifact( NuGet.NuGetClient.NuGetType, project.SimpleProjectName );
-                    if( p.IsPackable ?? false )
+                    if( p.IsPackable ?? !project.IsTestProject )
                     {
                         project.AddGeneratedArtifacts( g );
                     }

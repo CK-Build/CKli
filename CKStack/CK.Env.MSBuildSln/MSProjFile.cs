@@ -59,8 +59,10 @@ namespace CK.Env.MSBuildSln
 
         MSProjFile( NormalizedPath p, XDocument d, List<Import> imports )
         {
+            Debug.Assert( d.Root != null );
             Path = p;
             Document = d;
+            d.Root.AddAnnotation( this );
             _imports = imports;
             Document.Changed += OnDocumentChanged;
         }
@@ -133,6 +135,12 @@ namespace CK.Env.MSBuildSln
         public NormalizedPath Path { get; }
 
         public XDocument Document { get; }
+
+        /// <summary>
+        /// Gets the root xml element.
+        /// The root is annotated by this this <see cref="MSProjFile"/>.
+        /// </summary>
+        public XElement Root => Document.Root!;
 
         /// <summary>
         /// Gets all the imports in this file.
@@ -223,7 +231,7 @@ namespace CK.Env.MSBuildSln
         /// </summary>
         /// <param name="propertyName">The property name to lookup.</param>
         /// <returns>The list of elements.</returns>
-        public IList<XElement> FindProperty( string propertyName ) => _allFiles.Select( f => f.Document.Root )
+        public IList<XElement> FindProperty( string propertyName ) => _allFiles.Select( f => f.Root )
                                                                                 .Elements( "PropertyGroup" )
                                                                                 .Elements()
                                                                                 .Where( x => x.Name.LocalName == propertyName )
@@ -235,7 +243,7 @@ namespace CK.Env.MSBuildSln
         /// </summary>
         /// <param name="elementNameFilter">The element name predicate.</param>
         /// <returns>The list of elements.</returns>
-        public IList<XElement> FindProperty( Func<XName, bool> elementNameFilter ) => _allFiles.Select( f => f.Document.Root )
+        public IList<XElement> FindProperty( Func<XName, bool> elementNameFilter ) => _allFiles.Select( f => f.Root )
                                                                                                .Elements( "PropertyGroup" )
                                                                                                .Elements()
                                                                                                .Where( x => elementNameFilter( x.Name ) )

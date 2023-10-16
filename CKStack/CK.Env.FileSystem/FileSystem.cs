@@ -265,7 +265,7 @@ namespace CK.Env
         /// <returns>True on success, false on error.</returns>
         public bool CopyTo( IActivityMonitor m, Stream content, NormalizedPath destination )
         {
-            IFileInfo fDest = GetWritableDestination( m, ref destination );
+            IFileInfo? fDest = GetWritableDestination( m, ref destination );
             if( fDest == null ) return false;
             using( m.OpenInfo( $"{(fDest.Exists ? "Replacing" : "Creating")} {destination}." ) )
             {
@@ -335,8 +335,8 @@ namespace CK.Env
             }
             if( fDest != null )
             {
-                string dir = Path.GetDirectoryName( fDest.PhysicalPath );
-                if( !Directory.Exists( dir ) )
+                string? dir = Path.GetDirectoryName( fDest.PhysicalPath );
+                if( dir != null && !Directory.Exists( dir ) )
                 {
                     m.Trace( $"Creating directory '{dir}'." );
                     Directory.CreateDirectory( dir );

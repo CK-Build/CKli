@@ -2,6 +2,7 @@ using CK.Core;
 using CSemVer;
 using CK.Build;
 using System.Xml.Linq;
+using System.Diagnostics;
 
 namespace CK.Env.MSBuildSln
 {
@@ -18,6 +19,8 @@ namespace CK.Env.MSBuildSln
                                             string privateAsset,
                                             bool isVersionOverride )
         {
+            Debug.Assert( originElement != null
+                          && originElement.Document?.Root?.Annotation<MSProjFile>() != null );
             Owner = owner;
             PackageId = packageId;
             Version = version;
@@ -64,6 +67,24 @@ namespace CK.Env.MSBuildSln
         /// Gets the PackageReference element.
         /// </summary>
         public XElement OriginElement { get; }
+
+        /// <summary>
+        /// Gets whether this dependency is still hosted in its <see cref="OriginFile"/>.
+        /// </summary>
+        public bool IsValid => OriginElement.Document != null;
+
+        /// <summary>
+        /// Gets the file that hosts this <see cref="OriginElement"/>.
+        /// <see cref="IsValid"/> must be true.
+        /// </summary>
+        public MSProjFile OriginFile
+        {
+            get
+            {
+                Throw.CheckState( IsValid );
+                return OriginElement.Document!.Root!.Annotation<MSProjFile>()!;
+            }
+        }
 
         /// <summary>
         /// Gets the element that defines the $(Version) if a property version is used (The element is like &lt;CKCoreVersion&gt;13.0.1&lt;/CKCoreVersion&gt;)
