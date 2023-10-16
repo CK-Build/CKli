@@ -5,6 +5,7 @@ using System.Collections.Generic;
 
 namespace CK.Env.MSBuildSln
 {
+
     /// <summary>
     /// Base project for either <see cref="SolutionFolder"/> or <see cref="Project"/>.
     /// </summary>
@@ -27,6 +28,23 @@ namespace CK.Env.MSBuildSln
             KnownType = ProjectType.Parse( projectTypeGuid );
             _projectName = projectName;
             _solutionRelativePath = relativePath;
+            _sections = new Dictionary<string, Section>( StringComparer.OrdinalIgnoreCase );
+        }
+
+        // For new StackLocalProject.
+        internal ProjectBase( SolutionFolder local,
+                              KnownProjectType type,
+                              string projectName,
+                              NormalizedPath relativePath )
+        {
+            Solution = local.Solution;
+            ProjectGuid = Guid.NewGuid().ToString( "B" );
+            ProjectTypeGuid = type.ToGuid();
+            KnownType = type;
+            _projectName = projectName;
+            _solutionRelativePath = relativePath;
+            _parentFolder = local;
+            ParentFolderGuid = local.ProjectGuid;
             _sections = new Dictionary<string, Section>( StringComparer.OrdinalIgnoreCase );
         }
 

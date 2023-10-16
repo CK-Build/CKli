@@ -80,7 +80,7 @@ namespace CK.Env.DependencyModel
         /// Creates a new solution on a logical path and a name that must both be unique.
         /// </summary>
         /// <param name="fullPath">The unique path of the solution.</param>
-        /// <param name="name">The unique name of the solution.</param>
+        /// <param name="uniqueName">The unique name of the solution.</param>
         public Solution AddSolution( NormalizedPath fullPath, string uniqueName )
         {
             var s = new Solution( this, fullPath, uniqueName );
@@ -132,7 +132,7 @@ namespace CK.Env.DependencyModel
         {
             if( _analyzer == null || _analyzer.IsObsolete )
             {
-                _analyzer = DependencyAnalyzer.Create( m, this, traceGraphDetails, this );
+                _analyzer = DependencyAnalyzer.Create( m, traceGraphDetails, this );
             }
             return _analyzer;
         }

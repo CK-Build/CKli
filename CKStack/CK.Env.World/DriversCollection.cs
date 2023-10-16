@@ -77,47 +77,7 @@ namespace CK.Env
 
             public IWorldSolutionContext? Refresh( IActivityMonitor m, bool forceReload )
             {
-                var solutions = new ISolution[_drivers.Count];
-                int idxSolution = 0;
-                foreach( var d in _drivers )
-                {
-                    var s = d.GetSolution( m, allowInvalidSolution: false, reloadSolution: forceReload );
-                    if( s == null )
-                    {
-                        m.Error( $"Failed to load and configure solution from '{d.GitRepository.DisplayPath}'." );
-                        idxSolution = -1;
-                    }
-                    if( idxSolution != -1 ) solutions[idxSolution++] = s!;
-                }
-                if( idxSolution == -1 ) return null;
-
-                if( _depContext == null || _depContext.HasError || _depContext.IsObsolete )
-                {
-                    LogFilter final = m.ActualFilter;
-                    if( final == LogFilter.Undefined ) final = ActivityMonitor.DefaultFilter;
-                    SolutionDependencyContext solutionDependencyContext;
-                    if( _context != null )
-                    {
-                        solutionDependencyContext = _context.GetDependencyAnalyser( m, final == LogFilter.Debug ).DefaultDependencyContext;
-                    }
-                    else
-                    {
-                        var da = DependencyAnalyzer.Create( m, solutions, final == LogFilter.Debug );
-                        if( da == null )
-                        {
-                            m.Error( "Error while creating the DependencyAnalyzer." );
-                            return null;
-                        }
-                        solutionDependencyContext = da.DefaultDependencyContext;
-                    }
-                    _depContext = solutionDependencyContext;
-                    if( !_depContext.HasError )
-                    {
-                        Debug.Assert( _drivers.Count() == _depContext.Solutions.Count );
-                        var aliasCtx = _depContext;
-                        _drivers.Sort( ( d1, d2 ) => aliasCtx[d1.GetSolution( m, false, false )].Index - aliasCtx[d2.GetSolution( m, false, false )].Index );
-                    }
-                }
+                Throw.NotSupportedException();
                 return this;
             }
 

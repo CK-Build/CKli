@@ -43,6 +43,32 @@ namespace CK.Env.MSBuildSln
         }
 
         /// <summary>
+        /// Maps ".csproj", ".vbproj" and ".fsproj".
+        /// <see cref="KnownProjectType.Unknown"/> for any other files.
+        /// </summary>
+        /// <param name="projectFilePath">File path.</param>
+        /// <returns>The project type or <see cref="KnownProjectType.Unknown"/>.</returns>
+        public static KnownProjectType FromFilePath( ref string projectFilePath )
+        {
+            if( projectFilePath.EndsWith( ".csproj", StringComparison.OrdinalIgnoreCase ) )
+            {
+                projectFilePath = projectFilePath.Substring( 0, projectFilePath.Length - 7 );
+                return KnownProjectType.CSharp;
+            }
+            if( projectFilePath.EndsWith( ".vbproj", StringComparison.OrdinalIgnoreCase ) )
+            {
+                projectFilePath = projectFilePath.Substring( 0, projectFilePath.Length - 7 );
+                return KnownProjectType.VisualBasic;
+            }
+            if( projectFilePath.EndsWith( ".fsproj", StringComparison.OrdinalIgnoreCase ) )
+            {
+                projectFilePath = projectFilePath.Substring( 0, projectFilePath.Length - 7 );
+                return KnownProjectType.FSharp;
+            }
+            return KnownProjectType.Unknown;
+        }
+
+        /// <summary>
         /// Returns whether this type uses standard xml MSBuild project format.
         /// </summary>
         /// <param name="this">This project type.</param>

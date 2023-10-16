@@ -72,7 +72,10 @@ namespace CK.Env.DependencyModel
 
             MinimalRequirements = DirectRequirements.Except( DirectRequirements.SelectMany( r => r.MinimalRequirements ) ).ToList();
             Rank = MinimalRequirements.Count == 0 ? 0 : MinimalRequirements.Max( r => r.Rank ) + 1;
-            TransitiveRequirements = DirectRequirements.SelectMany( r => r.TransitiveRequirements ).Distinct().ToList();
+
+            var transitiveReq = new HashSet<DependentSolution>( DirectRequirements );
+            foreach( var i in DirectRequirements.SelectMany( r => r.TransitiveRequirements ) ) transitiveReq.Add( i );
+            TransitiveRequirements = transitiveReq;
 
             PublishedRequirements = dependencyTable.Where( r => r.Origin.Solution == s
                                               && r.Target != null
@@ -121,7 +124,7 @@ namespace CK.Env.DependencyModel
         /// <summary>
         /// Gets the maximal set of required solutions (the transitive closure of this <see cref="DirectRequirements"/>).
         /// </summary>
-        public IReadOnlyList<DependentSolution> TransitiveRequirements { get; }
+        public IReadOnlySet<DependentSolution> TransitiveRequirements { get; }
 
         /// <summary>
         /// Gets the direct impacts of this solution: these are all the solutions that use at least one package
@@ -141,7 +144,7 @@ namespace CK.Env.DependencyModel
         /// Gets the maximal set of impacted solutions (the transitive closure of this <see cref="DirectImpacts"/>).
         /// </summary>
         [AllowNull]
-        public IReadOnlyCollection<DependentSolution> TransitiveImpacts { get; private set; }
+        public IReadOnlySet<DependentSolution> TransitiveImpacts { get; private set; }
 
         /// <summary>
         /// Gets the locally produced packages that are consumed by this solution.
@@ -174,9 +177,10 @@ namespace CK.Env.DependencyModel
                                             .Select( i => solutions.Solutions.First( d => d.Solution == i ) )
                                             .ToList();
             MinimalImpacts = DirectImpacts.Except( DirectImpacts.SelectMany( r => r.TransitiveImpacts ) ).ToList();
-            var transitive = new HashSet<DependentSolution>( DirectImpacts );
-            foreach( var i in DirectImpacts.SelectMany( r => r.TransitiveImpacts ) ) transitive.Add( i );
-            TransitiveImpacts = transitive;
+
+            var transitiveImpacts = new HashSet<DependentSolution>( DirectImpacts );
+            foreach( var i in DirectImpacts.SelectMany( r => r.TransitiveImpacts ) ) transitiveImpacts.Add( i );
+            TransitiveImpacts = transitiveImpacts;
 
             ImportedLocalPackages = solutions.PackageDependencies
                                      .Where( d => d.Origin == this )

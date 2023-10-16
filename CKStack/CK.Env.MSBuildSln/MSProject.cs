@@ -561,39 +561,60 @@ namespace CK.Env.MSBuildSln
         /// This is internally called by ToL
         /// </summary>
         /// <param name="monitor">The monitor to use.</param>
-        /// <param name="toLocalProjectPath">PAckage to local path function.</param>
+        /// <param name="selector">Package to project selector.</param>
+        /// <param name="solutionCollector">Collects projects that must be added to the solution.</param>
         /// <returns>The count of transformations.</returns>
         internal int TransformPackageToProjectDepencies( IActivityMonitor monitor,
-                                                       Func<NormalizedPath, Artifact, NormalizedPath> toLocalProjectPath,
-                                                       HashSet<NormalizedPath> collector )
+                                                         Func<Artifact, MSProject?> selector,
+                                                         HashSet<MSProject> solutionCollector )
         {
             int count = 0;
             foreach( var d in Deps.Packages )
             {
-                Debug.Assert( d.OriginFile.Path.StartsWith( Solution.SolutionFolderPath ) );
-                // Removes "branches/XXX/" parts.
-                var originFilePath = d.OriginFile.Path.RemoveParts( Solution.SolutionFolderPath.Parts.Count - 2, 2 );
-                var target = toLocalProjectPath( originFilePath, d.BaseArtifactInstance.Artifact );
-                if( !target.IsEmptyPath )
-                {
-                    var replaced = $"PackageReference Include={d.PackageId} Version={d.Version}";
-                    monitor.Trace( $"Replaced '{replaced}' with ProjectReference to '{target}'." );
-                    // Captures the relative depth of the declaring file before messing with the element.
-                    int originDepthInSolution = d.OriginFile.Path.Parts.Count - Solution.SolutionFolderPath.Parts.Count - 1;
-                    XComment comment = new XComment( replaced );
-                    var rep = new XElement( "ProjectReference", new XAttribute( "Include", target ) );
-                    d.OriginElement.ReplaceWith( comment, rep );
-                    // Removes "../" so that the path is relative to the solution (the .sln file). 
-                    target = target.RemoveFirstPart( originDepthInSolution );
-                    collector.Add( target );
-                    ++count;
-                }
+                // Skips any fully locked version.
+                if( d.Version.Lock == SVersionLock.Lock ) continue;
+                var targetProject = selector( d.BaseArtifactInstance.Artifact );
+                if( targetProject == null ) continue;
+
+                var originFilePath = RemoveBranchParts( Solution, d.OriginFile.Path );
+                var target = GetRelativePath( originFilePath, targetProject );
+                Debug.Assert( !target.IsEmptyPath );
+                var replaced = $"PackageReference Include={d.PackageId} Version={d.Version}";
+                monitor.Trace( $"Replaced '{replaced}' with ProjectReference to '{target}'." );
+                XComment comment = new XComment( replaced );
+                var rep = new XElement( "ProjectReference", new XAttribute( "Include", target ) );
+                d.OriginElement.ReplaceWith( comment, rep );
+                solutionCollector.Add( targetProject );
+                ++count;
             }
             if( count != 0 )
             {
                 OnChange( monitor );
             }
             return count;
+
+        }
+
+        internal static NormalizedPath RemoveBranchParts( SolutionFile solution, NormalizedPath path )
+        {
+            Debug.Assert( path.StartsWith( solution.SolutionFolderPath )
+                          && path.Parts[solution.SolutionFolderPath.Parts.Count - 2] == "branches" );
+            return path.RemoveParts( solution.SolutionFolderPath.Parts.Count - 2, 2 );
+        }
+
+        internal static NormalizedPath GetRelativePath( NormalizedPath originFilePath, MSProject target )
+        {
+            // Removes "branches/XXX" parts.
+            var targetPath = RemoveBranchParts( target.Solution, target.Path );
+            while( targetPath.FirstPart == originFilePath.FirstPart )
+            {
+                targetPath = targetPath.RemoveFirstPart();
+                originFilePath = originFilePath.RemoveFirstPart();
+            }
+            int upCount = originFilePath.Parts.Count - 1;
+            NormalizedPath fromS = default;
+            for( int i = 0; i < upCount; i++ ) fromS = fromS.AppendPart( ".." );
+            return fromS.Combine( targetPath );
         }
 
         /// <summary>

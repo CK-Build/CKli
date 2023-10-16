@@ -1,16 +1,16 @@
 using CK.Build;
 using CK.Core;
 using CK.Env;
+using CK.Env.DependencyModel;
 using CK.Env.MSBuildSln;
+using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
-using System;
-using CK.Env.DependencyModel;
+using System.Net;
+using System.Runtime.Intrinsics.Arm;
 using ModelProject = CK.Env.DependencyModel.Project;
-using System.Xml.Linq;
-using Mono.Cecil;
-using LibGit2Sharp;
 
 namespace CKli
 {
@@ -51,7 +51,7 @@ namespace CKli
                 {
                     if( p.ProjectName != p.SolutionRelativeFolderPath.LastPart )
                     {
-                        monitor.Warn( $"Project named {p.ProjectName} should be in folder of the same name, not in {p.SolutionRelativeFolderPath.LastPart}." );
+                        monitor.Warn( $"Project named '{p.ProjectName}' should be in folder of the same name, not in '{p.SolutionRelativeFolderPath.LastPart}'." );
                     }
                     Debug.Assert( p.ProjectFile != null );
 
@@ -60,6 +60,10 @@ namespace CKli
                     SynchronizePackageReferences( monitor, project );
                     projectsToRemove.Remove( project );
                     orderedProjects[i++] = project;
+                    // We use the Xml annotations to store the MSProject => ModelProject association.
+                    // This avoids to implement yet another Tag management. Note that the MSBuildSln model
+                    // is unaware of this and this is good: the association is this provider's job.
+                    p.ProjectFile.Root.AddAnnotation( project );
                 }
 
                 SynchronizeSolutionPackageReferences( sln, solution );
@@ -147,36 +151,28 @@ namespace CKli
 
         public bool Localize( IActivityMonitor monitor, SolutionContext solutions )
         {
+            var projectInfos = solutions.GetDependencyAnalyser( monitor, false )
+                                        .DefaultDependencyContext
+                                        .GetProjectsDependencyInfo( NuGetType, solutions );
             foreach( var sModel in solutions )
             {
                 var s = sModel.Tag<SolutionFile>();
                 if( s != null )
                 {
-                    s.TransformToLocal( monitor, (p,d) => FindProject( solutions, p, d ) );
+                    s.TransformToLocal( monitor,
+                                        a => projectInfos.ArtifactGenerators.GetValueOrDefault( a )?.Tag<MSProject>(),
+                                        p =>
+                                        {
+                                            Debug.Assert( p.ProjectFile != null );
+                                            var project = p.ProjectFile.Root.Annotation<ModelProject>();
+                                            Debug.Assert( project != null );
+                                            var deps = projectInfos.ProjectDependencies.GetValueOrDefault( project, ImmutableHashSet<IProject>.Empty );
+                                            return deps.Select( d => d.Tag<MSProject>()! );
+                                        } );
                     s.Save( monitor );
                 }
             }
             return true;
-
-            static NormalizedPath FindProject( SolutionContext solutions, NormalizedPath originFilePath, Artifact packageId )
-            {
-                var generated = solutions.GeneratedArtifacts.FirstOrDefault( g => g.Artifact == packageId );
-                var target = generated.Project?.Tag<MSProject>();
-                if( target != null )
-                {
-                    var targetPath = target.Solution.SolutionFolderPath.RemoveLastPart( 2 ).Combine( target.SolutionRelativePath );
-                    while( targetPath.FirstPart == originFilePath.FirstPart )
-                    {
-                        targetPath = targetPath.RemoveFirstPart();
-                        originFilePath = originFilePath.RemoveFirstPart();
-                    }
-                    int upCount = originFilePath.Parts.Count - 1;
-                    NormalizedPath fromS = default;
-                    for( int i = 0; i < upCount; i++ ) fromS = fromS.AppendPart( ".." );
-                    return fromS.Combine( targetPath );
-                }
-                return default;
-            }
         }
     }
 }

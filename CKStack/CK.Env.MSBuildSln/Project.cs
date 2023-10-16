@@ -7,6 +7,7 @@ namespace CK.Env.MSBuildSln
 {
     /// <summary>
     /// Actual project that is not a <see cref="SolutionFolder"/>.
+    /// External projects (the ones outside of the solution folder) 
     /// </summary>
     public class Project : ProjectBase
     {

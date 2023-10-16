@@ -221,35 +221,6 @@ namespace CK.Env.MSBuildSln
             return null;
         }
 
-        public int TransformToLocal( IActivityMonitor monitor,
-                                     Func<NormalizedPath, Artifact, NormalizedPath> toLocalProjectPath )
-        {
-            var collector = new HashSet<NormalizedPath>();
-            foreach( var p in MSProjects )
-            {
-                p.TransformPackageToProjectDepencies( monitor, toLocalProjectPath, collector );
-            }
-            if( collector.Count > 0 )
-            {
-                SolutionFolder? local = _projectBaseList.OfType<SolutionFolder>()
-                                            .FirstOrDefault( s => "$Local".Equals( s.ProjectName, StringComparison.OrdinalIgnoreCase ) );
-                if( local == null )
-                {
-                    local = new SolutionFolder( this, Guid.NewGuid().ToString( "B" ), "$Local" );
-                    AddProject( local );
-                }
-                foreach( var e in collector )
-                {
-                    Debug.Assert( e.LastPart.EndsWith( ".csproj" ) );
-                    var projectName = e.LastPart.Substring( 0, e.LastPart.Length - 7 );
-                    var p = new Project( this, Guid.NewGuid().ToString( "B" ), KnownProjectType.CSharp.ToGuid(), projectName, e );
-                    AddProject( p );
-                    //p.ParentFolder = local;
-                }
-            }
-            return collector.Count;
-        }
-
         /// <summary>
         /// Gets whether any of the projects this solution contains need to be saved or the <see cref="StandardDotnetToolConfigFile"/>
         /// or the solution itself needs to be saved.

@@ -1,3 +1,5 @@
+using CK.Build;
+using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -125,5 +127,6 @@ namespace CK.Env.MSBuildSln
             }
             w.WriteLine( "\tEnd{0}", sectionType );
         }
+
     }
 }

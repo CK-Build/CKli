@@ -12,16 +12,14 @@ namespace CK.Env.DependencyModel
     /// Root class of dependency analysis.
     /// A DependencyAnalyzer is obtained from <see cref="ISolutionContext.GetDependencyAnalyser"/>.
     /// </summary>
-    public class DependencyAnalyzer
+    public sealed class DependencyAnalyzer
     {
-        readonly IReadOnlyCollection<ISolution> _solutions;
-        readonly ISolutionContext? _solutionContext;
+        readonly ISolutionContext _solutionContext;
         readonly ProjectItem.Cache _projects;
         readonly List<(ISolution Solution, LocalPackageItem LocalPackage)> _solutionDependencies;
         readonly IReadOnlyList<PackageReference> _externalRefs;
         readonly int _updateSerialNumber;
         readonly SolutionDependencyContext _defaultDependencyContext;
-
 
         /// <summary>
         /// Package items are not bound to any container (Solution). There is 2 kind of packages:
@@ -172,14 +170,12 @@ namespace CK.Env.DependencyModel
         }
 
         DependencyAnalyzer( IActivityMonitor m,
-                            IReadOnlyCollection<ISolution> solutions,
                             ISolutionContext solutionCtx,
                             List<(ISolution, LocalPackageItem)> solutionDependencies,
                             ProjectItem.Cache projects,
                             List<PackageReference> externalRefs,
                             bool traceGraphDetails )
         {
-            _solutions = solutions;
             _solutionContext = solutionCtx;
             _solutionDependencies = solutionDependencies;
             _updateSerialNumber = _solutionContext?.UpdateSerialNumber ?? 0;
@@ -189,10 +185,15 @@ namespace CK.Env.DependencyModel
         }
 
         /// <summary>
+        /// Gets the solution context.
+        /// </summary>
+        public ISolutionContext Solutions => _solutionContext;
+
+        /// <summary>
         /// Gets whether the <see cref="Solutions"/> has changed and this analyzer is no more
         /// up to date: a new one should be obtained from <see cref="ISolutionContext.GetDependencyAnalyser"/>.
         /// </summary>
-        public bool IsObsolete => _solutionContext == null ? true : _updateSerialNumber != _solutionContext.UpdateSerialNumber;
+        public bool IsObsolete => _updateSerialNumber != _solutionContext.UpdateSerialNumber;
 
         /// <summary>
         /// Gets all the external package references.
@@ -275,7 +276,7 @@ namespace CK.Env.DependencyModel
             }
         }
 
-        class SolutionItem : IDependentItemContainer
+        sealed class SolutionItem : IDependentItemContainer
         {
             readonly ISolution _solution;
             readonly IEnumerable<IDependentItemRef> _projects;
@@ -332,7 +333,7 @@ namespace CK.Env.DependencyModel
                 projectFilter = p => !p.IsBuildProject;
             }
             var sortables = new Dictionary<ISolution, SolutionItem>();
-            foreach( var s in _solutions )
+            foreach( var s in _solutionContext )
             {
                 // The Solution contains its Projects.
                 var children = s.Projects.Where( p => projectFilter( p ) ).Select( p => _projects[p] );
@@ -408,20 +409,7 @@ namespace CK.Env.DependencyModel
             return new SolutionDependencyContext( this, index, result, table, depSolutions, GetBuildProjectInfo( m ) );
         }
 
-        public static DependencyAnalyzer Create( IActivityMonitor m, IReadOnlyCollection<ISolution> solutions, bool traceGraphDetails )
-        {
-            return Create( m, solutions, traceGraphDetails, null );
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="m"></param>
-        /// <param name="solutions"></param>
-        /// <param name="traceGraphDetails"></param>
-        /// <param name="solutionCtx">May be null, used to construct the <see cref="DependencyAnalyzer"/></param>
-        /// <returns></returns>
-        internal static DependencyAnalyzer Create( IActivityMonitor m, IReadOnlyCollection<ISolution> solutions, bool traceGraphDetails, ISolutionContext solutionCtx )
+        internal static DependencyAnalyzer? Create( IActivityMonitor m, bool traceGraphDetails, ISolutionContext solutionCtx )
         {
             var packages = new Dictionary<Artifact, LocalPackageItem>();
             var projectItems = new ProjectItem.Cache();
@@ -433,7 +421,7 @@ namespace CK.Env.DependencyModel
             //       projects).
             using( m.OpenDebug( "Creating all the ProjectItem for all projects in all solutions." ) )
             {
-                foreach( var s in solutions )
+                foreach( var s in solutionCtx )
                 {
                     using( m.OpenDebug( $"Solution {s.Name}." ) )
                     {
@@ -446,13 +434,13 @@ namespace CK.Env.DependencyModel
             }
             using( m.OpenDebug( "Creating Package for all installable Artifacts in all solutions." ) )
             {
-                foreach( var s in solutions )
+                foreach( var s in solutionCtx )
                 {
                     using( m.OpenDebug( $"Solution {s.Name}." ) )
                     {
                         foreach( var project in s.Projects )
                         {
-                            foreach( var package in project.GeneratedArtifacts.Where( a => a.Artifact.Type.IsInstallable ) )
+                            foreach( var package in project.GeneratedArtifacts.Where( a => a.Artifact.IsValid && a.Artifact.Type.IsInstallable ) )
                             {
                                 if( packages.TryGetValue( package.Artifact, out var alreadyPublished ) )
                                 {
@@ -476,7 +464,7 @@ namespace CK.Env.DependencyModel
                 foreach( var dep in project.Project.PackageReferences )
                 {
                     Debug.Assert( project.Project == dep.Owner );
-                    if( packages.TryGetValue( dep.Target.Artifact, out LocalPackageItem target ) )
+                    if( packages.TryGetValue( dep.Target.Artifact, out LocalPackageItem? target ) )
                     {
                         if( target.Project.Solution != project.Project.Solution )
                         {
@@ -509,9 +497,9 @@ namespace CK.Env.DependencyModel
             //     produced to add them to the external references list.
             //     When the Solution reference is produced locally, it will have to be mapped as
             //     a required setup item during DependencyContext creation.
-            foreach( var p in solutions.SelectMany( s => s.SolutionPackageReferences ) )
+            foreach( var p in solutionCtx.SelectMany( s => s.SolutionPackageReferences ) )
             {
-                if( packages.TryGetValue( p.Target.Artifact, out LocalPackageItem target ) )
+                if( packages.TryGetValue( p.Target.Artifact, out LocalPackageItem? target ) )
                 {
                     if( target.Project.Solution != p.Owner )
                     {
@@ -534,7 +522,6 @@ namespace CK.Env.DependencyModel
 
             return new DependencyAnalyzer(
                         m,
-                        solutions,
                         solutionCtx,
                         solutionDependencies,
                         projectItems,
