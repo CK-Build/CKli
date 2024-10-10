@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CKli": {
+      "commandName": "Project",
+      "commandLineArgs": "checkout"
+    }
+  }
+}
