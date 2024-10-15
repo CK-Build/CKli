@@ -5,6 +5,10 @@
     <TargetFramework>net8.0</TargetFramework>
     <PublishAot>true</PublishAot>
     <InvariantGlobalization>true</InvariantGlobalization>
+    
+    <!-- It's a mess. See https://github.com/dotnet/project-system/issues/3619 -->
+    <RunWorkingDirectory>$(MSBuildProjectDirectory)</RunWorkingDirectory>
+    
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,6 +20,10 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
     <PackageReference Include="SimpleGitVersion.Core" Version="11.0.2" />
     <PackageReference Include="Spectre.Console" Version="0.49.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CKli.Core\CKli.Core.csproj" />
   </ItemGroup>
 
 </Project>

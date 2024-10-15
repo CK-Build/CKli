@@ -1,4 +1,6 @@
-﻿namespace CKli.Core;
+using System;
+
+namespace CKli.Core;
 
 /// <summary>
 /// Exposes all we need to know about the head of a <see cref="GitRepository"/>

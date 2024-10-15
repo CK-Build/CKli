@@ -1,15 +1,19 @@
 using CK.Core;
 using LibGit2Sharp;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading;
 using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.Core;
 
-
 /// <summary>
-/// Abstract base that adds useful methods to LibGit2Sharp <see cref="Repository"/>.
-/// Base class of <see cref="SimpleGitRepository"/> and FileSystem's <see cref="GitRepository"/>.
+/// Encapsulates LibGit2Sharp <see cref="Repository"/>.
 /// </summary>
-public class GitRepository : IGitHeadInfo, IDisposable
+public sealed class GitRepository : IGitHeadInfo, IDisposable
 {
     static readonly StatusOptions _checkDirtyOptions = new StatusOptions() { IncludeIgnored = false };
     readonly GitRepositoryKey _repositoryKey;
@@ -35,93 +39,9 @@ public class GitRepository : IGitHeadInfo, IDisposable
     }
 
     /// <summary>
-    /// Checks out a working folder if needed or checks that an existing one is
-    /// bound to the <see cref="GitRepositoryKey.OriginUrl"/> 'origin' remote, ensuring
-    /// that the specified branch name exists (and optionally checked out).
-    /// <para>Returns a GitRepository object or null on error.</para>
+    /// Disposes the LibGit repository.
     /// </summary>
-    /// <param name="m">The monitor to use.</param>
-    /// <param name="git">The Git key.</param>
-    /// <param name="workingFolder">The local working folder.</param>
-    /// <param name="subPath">
-    /// The short path to display, relative to a well known root. It must not be empty.
-    /// (this can be the <see cref="NormalizedPath.LastPart"/> of the <paramref name="workingFolder"/>.)
-    /// </param>
-    /// <param name="branchName">
-    /// The initial branch name if cloning is done and the branch that must be
-    /// checked out if <paramref name="checkOutBranchName"/> is true.
-    /// This branch is always created as needed (just like <see cref="EnsureBranch"/> does).
-    /// </param>
-    /// <param name="checkOutBranchName">
-    /// True to always check out the <paramref name="branchName"/>
-    /// even if the repository already exists.
-    /// </param>
-    /// <returns>The SimpleGitRepository object or null on error.</returns>
-    public static GitRepository? Ensure( IActivityMonitor m,
-                                         GitRepositoryKey git,
-                                         NormalizedPath workingFolder,
-                                         NormalizedPath subPath,
-                                         string branchName,
-                                         bool checkOutBranchName )
-    {
-        var r = EnsureWorkingFolder( m, git, workingFolder, branchName );
-        if( r == null ) return null;
-        var g = new GitRepository( git, r, workingFolder, subPath );
-        return CheckOutIfNeeded( m, branchName, checkOutBranchName, g );
-    }
-
-    /// <summary>
-    /// Opens a working folder.
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="secretsStore">The key store to use.</param>
-    /// <param name="workingFolder">The local working folder.</param>
-    /// <param name="displayPath">
-    /// The short path to display, relative to a well known root. It must not be empty.
-    /// (this can be the <see cref="NormalizedPath.LastPart"/> of the <paramref name="workingFolder"/>.)
-    /// </param>
-    /// <param name="isPublic">Whether this repository is a public or private one.</param>
-    /// <param name="branchName">
-    /// An optional branch name that is created and checked out if <paramref name="checkOutBranchName"/> is true.
-    /// </param>
-    /// <param name="checkOutBranchName">
-    /// True to always check out the <paramref name="branchName"/>.
-    /// </param>
-    /// <returns>The SimpleGitRepository object or null on error.</returns>
-    public static GitRepository? Open( IActivityMonitor monitor,
-                                       ISecretsStore secretsStore,
-                                       NormalizedPath workingFolder,
-                                       NormalizedPath displayPath,
-                                       bool isPublic,
-                                       string? branchName,
-                                       bool checkOutBranchName )
-    {
-        Throw.CheckArgument( !checkOutBranchName || branchName != null );
-        var r = OpenWorkingFolder( monitor, workingFolder, warnOnly: false, branchName );
-        if( r == null ) return null;
-
-        var gitKey = new GitRepositoryKey( secretsStore, r.Value.OriginUrl, isPublic );
-        var g = new GitRepository( gitKey, r.Value.Repository, workingFolder, displayPath );
-        return CheckOutIfNeeded( monitor, branchName, checkOutBranchName, g );
-    }
-
-    static GitRepository? CheckOutIfNeeded( IActivityMonitor monitor, string? branchName, bool checkOutBranchName, GitRepository g )
-    {
-        if( branchName != null
-            && checkOutBranchName
-            && branchName != g.CurrentBranchName
-            && !g.Checkout( monitor, branchName ).Success )
-        {
-            g.Dispose();
-            return null;
-        }
-        return g;
-    }
-
-    /// <summary>
-    /// Disposes the <see cref="_git"/> member.
-    /// </summary>
-    public virtual void Dispose()
+    public void Dispose()
     {
         _git.Dispose();
     }
@@ -221,28 +141,21 @@ public class GitRepository : IGitHeadInfo, IDisposable
     /// <summary>
     /// Gets the sha of the given branch tip or null if the branch doesn't exist.
     /// </summary>
-    /// <param name="m">The monitor to use.</param>
+    /// <param name="monitor">The monitor to use.</param>
     /// <param name="branchName">The branch name. Must not be null or white space.</param>
     /// <returns>The Sha or null.</returns>
-    public string? GetBranchSha( IActivityMonitor m, string branchName )
+    public string? GetBranchSha( IActivityMonitor monitor, string branchName )
     {
         Throw.CheckNotNullOrWhiteSpaceArgument( branchName );
-        var b = GetBranch( m, branchName, false );
+        var b = DoGetBranch( monitor, _git, branchName, LogLevel.Warn, _displayPath );
         return b?.Tip.Sha;
     }
 
-    /// <summary>
-    /// Gets whether the head can be amended: the current branch
-    /// is not tracked or the current commit is ahead of the remote branch.
-    /// </summary>
-    public bool CanAmendCommit => (_git.Head.TrackingDetails.AheadBy ?? 1) > 0;
-
-    Branch? GetBranch( IActivityMonitor m, string branchName, bool logErrorMissingLocalAndRemote )
-    {
-        return DoGetBranch( m, _git, branchName, logErrorMissingLocalAndRemote, DisplayPath );
-    }
-
-    static Branch? DoGetBranch( IActivityMonitor m, Repository r, string branchName, bool logErrorMissingLocalAndRemote, string repoDisplayName )
+    static Branch? DoGetBranch( IActivityMonitor monitor,
+                                Repository r,
+                                string branchName,
+                                LogLevel missingLocalAndRemote,
+                                string repoDisplayName )
     {
         var b = r.Branches[branchName];
         if( b == null )
@@ -251,42 +164,61 @@ public class GitRepository : IGitHeadInfo, IDisposable
             var remote = r.Branches[remoteName];
             if( remote == null )
             {
-                var msg = $"Repository '{repoDisplayName}': Both local '{branchName}' and remote '{remoteName}' not found.";
-                if( logErrorMissingLocalAndRemote ) m.Error( msg );
-                else m.Warn( msg );
+                if( missingLocalAndRemote != LogLevel.None )
+                {
+                    var msg = $"Repository '{repoDisplayName}': Both local '{branchName}' and remote '{remoteName}' not found.";
+                    monitor.Log( missingLocalAndRemote, msg );
+                }
                 return null;
             }
-            m.Info( $"Creating local branch on remote '{remoteName}' in repository '{repoDisplayName}'." );
+            monitor.Info( $"Creating local branch on remote '{remoteName}' in repository '{repoDisplayName}'." );
             b = r.Branches.Add( branchName, remote.Tip );
             b = r.Branches.Update( b, u => u.TrackedBranch = remote.CanonicalName );
         }
         return b;
     }
 
-    /// <summary>
-    /// Ensures that a local branch exists.
-    /// If the branch is created, it will point at the same commit as the current <see cref="Head"/>.
-    /// The branch is guaranteed to exist but the <see cref="CurrentBranchName"/> stays where it is.
-    /// Use <see cref="Checkout(IActivityMonitor, string, bool, bool)"/> to change the current branch.
-    /// </summary>
-    /// <param name="m">The monitor to use.</param>
-    /// <param name="branchName">The branch name.</param>
-    public void EnsureBranch( IActivityMonitor m, string branchName, bool noWarnOnCreate = false )
-    {
-        DoEnsureBranch( m, _git, branchName, noWarnOnCreate, DisplayPath );
-    }
-
-    static Branch DoEnsureBranch( IActivityMonitor m, Repository r, string branchName, bool noWarnOnCreate, string repoDisplayName )
+    static Branch DoEnsureBranch( IActivityMonitor monitor,
+                                  Repository r,
+                                  string branchName,
+                                  LogLevel createLocalLogLevel,
+                                  string repoDisplayName,
+                                  out bool localCreated )
     {
         Throw.CheckNotNullOrWhiteSpaceArgument( branchName );
-        var b = DoGetBranch( m, r, branchName, logErrorMissingLocalAndRemote: false, repoDisplayName: repoDisplayName );
+        localCreated = false;
+        var b = DoGetBranch( monitor, r, branchName, LogLevel.Warn, repoDisplayName: repoDisplayName );
         if( b == null )
         {
-            m.Log( noWarnOnCreate ? LogLevel.Info : LogLevel.Warn, $"Branch '{branchName}' does not exist. Creating local branch." ); ;
+            localCreated = true;
+            monitor.Log( createLocalLogLevel, $"Branch '{branchName}' does not exist. Creating purely local branch." ); ;
             b = r.CreateBranch( branchName );
         }
         return b;
     }
+
+    /// <summary>
+    /// Ensures that a local branch exists. If a remote branch form the 'origin' remote is known locally
+    /// it will be associated.
+    /// <para>
+    /// If the branch is created, it will point at the same commit as the current <see cref="Head"/>.
+    /// The branch is guaranteed to exist but the <see cref="CurrentBranchName"/> stays where it is.
+    /// Use <see cref="SetCurrentBranch(IActivityMonitor, string)"/> to make sure that the potential remote 'origin' branch
+    /// is fetched if it exists.
+    /// </para>
+    /// </summary>
+    /// <param name="m">The monitor to use.</param>
+    /// <param name="branchName">The branch name.</param>
+    public void EnsureBranch( IActivityMonitor m, string branchName, LogLevel createLocalLogLevel = LogLevel.Info )
+    {
+        DoEnsureBranch( m, _git, branchName, createLocalLogLevel, DisplayPath, out var _ );
+    }
+
+    /// <summary>
+    /// Gets whether the head can be amended: the current branch
+    /// is not tracked or the current commit is ahead of the remote branch.
+    /// </summary>
+    public bool CanAmendCommit => (_git.Head.TrackingDetails.AheadBy ?? 1) > 0;
 
     /// <summary>
     /// Fetches 'origin' (or all remotes) branches into this repository.
@@ -323,10 +255,53 @@ public class GitRepository : IGitHeadInfo, IDisposable
         }
     }
 
+    /// <summary>
+    /// Checkout the specified branch. 
+    /// <list type="number">
+    ///     <item>If <see cref="CurrentBranchName"/> is <paramref name="branchName"/>, does nothing.</item>
+    ///     <item>Otherwise, the working folder must be clean (<see cref="CheckCleanCommit(IActivityMonitor)"/>).</item>
+    ///     <item>If the local branch doesn't exist yet, all branches from 'origin' are fetched, a tracking local branch is created if the remote branch exists and it is checked out.</item>
+    ///     <item>If the local branch already exists, it is checked out and pulled-merge from the remote unless <paramref name="skipPullMerge"/> is true.</item>
+    /// </list>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="branchName">The branch name.</param>
+    /// <param name="skipPullMerge">True to not pull-merge the branch if it exists locally.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool SetCurrentBranch( IActivityMonitor monitor, string branchName, bool skipPullMerge = false )
+    {
+        if( CurrentBranchName == branchName ) return true;
+        try
+        {
+            if( !CheckCleanCommit( monitor ) ) return false;
+            var b = DoGetBranch( monitor, _git, branchName, LogLevel.None, _displayPath );
+            if( b == null )
+            {
+                if( !FetchBranches( monitor, originOnly: true ) )
+                {
+                    return false;
+                }
+                // Either the branch has been created from its remote fetched branch, or it has been created
+                // a a local branch (as there's no remote branch): in both case, we can skip the pull.
+                b = DoEnsureBranch( monitor, _git, branchName, LogLevel.Warn, _displayPath, out bool localCreated );
+                skipPullMerge = true;
+            }
+            return Checkout( monitor, branchName, skipFetchBranches: true, skipPullMerge );
+        }
+        catch( Exception ex )
+        {
+            monitor.Fatal( "Unexpected error. Manual fix should be required.", ex );
+            return false;
+        }
+    }
+
 
     /// <summary>
-    /// Pull-Merge the current commit from the remote. Any merge conflict is an error with <see cref="MergeFileFavor.Normal"/> and this is the
-    /// safest mode. Choosing one of other flavors will not trigger an error.
+    /// Pull-Merge the current head from the remote. Any merge conflict is an error with <see cref="MergeFileFavor.Normal"/> and this is the
+    /// safest mode. Choosing one of other flavors will not trigger a conflict error.
+    /// <para>
+    /// If the current head has no associated tracking branch, nothing is done. 
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="mergeFileFavor">How merge must be done.</param>
@@ -385,16 +360,18 @@ public class GitRepository : IGitHeadInfo, IDisposable
     /// Checks out a branch, calling <see cref="FetchBranches(IActivityMonitor, bool)"/>
     /// and <see cref="Pull(IActivityMonitor, MergeFileFavor, FastForwardStrategy)"/> by default.
     /// There must not be any uncommitted changes on the current head.
+    /// <para>
     /// The branch must exist locally or on the 'origin' remote.
     /// If the branch exists only in the "origin" remote, a local branch is automatically
     /// created that tracks the remote one.
+    /// Call <see cref="EnsureBranch(IActivityMonitor, string, bool)"/> first to ensure that the branch exists.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor.</param>
     /// <param name="branchName">The local name of the branch.</param>
     /// <param name="skipFetchBranches">True to not call <see cref="FetchBranches(IActivityMonitor, bool)"/>.</param>
     /// <param name="skipPullMerge">True to not "pull merge" from the remote after having checked out the branch.</param>
-    /// <returns>True on success, false on error (such as merge conflicts).
-    /// </returns>
+    /// <returns>True on success, false on error (such as merge conflicts).</returns>
     public bool Checkout( IActivityMonitor monitor, string branchName, bool skipFetchBranches = false, bool skipPullMerge = false )
     {
         using( monitor.OpenInfo( $"Checking out branch '{branchName}' in '{DisplayPath}'." ) )
@@ -402,7 +379,7 @@ public class GitRepository : IGitHeadInfo, IDisposable
             if( !skipFetchBranches && !FetchBranches( monitor ) ) return false;
             try
             {
-                Branch? b = GetBranch( monitor, branchName, logErrorMissingLocalAndRemote: true );
+                Branch? b = DoGetBranch( monitor, _git, branchName, LogLevel.Error, DisplayPath );
                 if( b == null ) return false;
                 if( b.IsCurrentRepositoryHead )
                 {
@@ -414,14 +391,14 @@ public class GitRepository : IGitHeadInfo, IDisposable
                     monitor.Info( $"Checking out {branchName} (leaving {CurrentBranchName})." );
                     Commands.Checkout( _git, b );
                 }
-                if( skipPullMerge ) return false;
+                if( skipPullMerge ) return true;
 
-                return Pull( monitor, MergeFileFavor.Normal ) is not MergeResult.Error or MergeResult.ErrorConflicts;
+                return Pull( monitor, MergeFileFavor.Normal ).IsSuccess();
             }
             catch( Exception ex )
             {
                 monitor.Fatal( "Unexpected error. Manual fix should be required.", ex );
-                return (false, true);
+                return false;
             }
         }
     }
@@ -667,163 +644,100 @@ public class GitRepository : IGitHeadInfo, IDisposable
     }
 
     /// <summary>
-    /// Extension point: called whenever a branch that has not been seen yet
-    /// has been checked out.
-    /// </summary>
-    /// <param name="m">The monitor to use.</param>
-    protected virtual void OnNewCurrentBranch( IActivityMonitor m )
-    {
-    }
-
-    /// <summary>
-    /// Checks out a working folder if needed or checks that an existing one is
-    /// bound to the <see cref="GitRepositoryKey.OriginUrl"/> 'origin' remote.
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="secretStore">The secret key store.</param>
-    /// <param name="workingFolder">The local working folder.</param>
-    /// <param name="url">The url of the remote.</param>
-    /// <param name="isPublic">Whether this repository is public.</param>
-    /// <param name="branchName">
-    /// The initial branch name if cloning is done.
-    /// This branch is created if needed (just like <see cref="EnsureBranch"/> does).
-    /// It is checked out only if the repository has been created.
-    /// </param>
-    /// <returns>The LibGit2Sharp repository object or null on error.</returns>
-    public static bool EnsureWorkingFolder( IActivityMonitor monitor,
-                                            ISecretsStore secretStore,
-                                            NormalizedPath workingFolder,
-                                            Uri url,
-                                            bool isPublic,
-                                            string? branchName )
-    {
-        var r = EnsureWorkingFolder( monitor,
-                                     new GitRepositoryKey( secretStore, url, isPublic ),
-                                     workingFolder,
-                                     branchName );
-        if( r == null ) return false;
-        r.Dispose();
-        return true;
-    }
-
-    /// <summary>
-    /// Checks out a working folder if needed or checks that an existing one is
-    /// bound to the <see cref="GitRepositoryKey.OriginUrl"/> 'origin' remote.
+    /// Clones the <see cref="GitRepositoryKey.OriginUrl"/> in a local working folder
+    /// that must be the 'origin' remote.
+    /// <para>
+    /// The remote repository can be totally empty: an initial empty commit is created in such case.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="git">The Git key.</param>
     /// <param name="workingFolder">The local working folder.</param>
-    /// <param name="branchName">
-    /// The initial branch name if cloning is done.
-    /// This branch is created if needed (just like <see cref="EnsureBranch"/> does).
-    /// It is checked out only if the repository has been created.
+    /// <param name="displayPath">
+    /// The short path to display, relative to a well known root. It must not be empty.
+    /// (this can be the <see cref="NormalizedPath.LastPart"/> of the <paramref name="workingFolder"/>.)
     /// </param>
-    /// <returns>The LibGit2Sharp repository object or null on error.</returns>
-    public static Repository? EnsureWorkingFolder( IActivityMonitor monitor,
-                                                   GitRepositoryKey git,
-                                                   NormalizedPath workingFolder,
-                                                   string? branchName = null )
+    /// <returns>The GitRepository object or null on error.</returns>
+    public static GitRepository? Clone( IActivityMonitor monitor,
+                                        GitRepositoryKey git,
+                                        NormalizedPath workingFolder,
+                                        NormalizedPath displayPath )
     {
-        using( monitor.OpenTrace( $"Ensuring working folder '{workingFolder}' on '{git.OriginUrl}'." ) )
+        var r = CloneWorkingFolder( monitor, git, workingFolder );
+        return r == null ? null : new GitRepository( git, r, workingFolder, displayPath );
+    }
+
+    /// <summary>
+    /// Clones the <see cref="GitRepositoryKey.OriginUrl"/> in a local working folder
+    /// that must be the 'origin' remote.
+    /// <para>
+    /// The remote repository can be totally empty: an initial empty commit is created in such case.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="git">The Git key.</param>
+    /// <param name="workingFolder">The local working folder.</param>
+    /// <returns>The LibGit2Sharp Repository object or null on error.</returns>
+    public static Repository? CloneWorkingFolder( IActivityMonitor monitor,
+                                                  GitRepositoryKey git,
+                                                  NormalizedPath workingFolder )
+    {
+        using( monitor.OpenInfo( $"Cloning '{workingFolder}' from '{git.OriginUrl}'." ) )
         {
+            if( !git.GetReadCredentials( monitor, out var creds ) ) return null;
             try
             {
-                var gitFolderPath = workingFolder.AppendPart( ".git" );
-                bool repoCreated = false;
-                if( !Directory.Exists( gitFolderPath ) )
+                Repository.Clone( git.OriginUrl.AbsoluteUri, workingFolder, new CloneOptions()
                 {
-                    using( monitor.OpenTrace( $"The folder '{gitFolderPath}' does not exist." ) )
-                    {
-                        using( monitor.OpenInfo( $"Cloning '{workingFolder}' from '{git.OriginUrl}' on {branchName}." ) )
-                        {
-                            if( !git.GetReadCredentials( monitor, out var creds ) ) return null;
-
-                            try
-                            {
-                                Repository.Clone( git.OriginUrl.AbsoluteUri, workingFolder, new CloneOptions()
-                                {
-                                    FetchOptions =
+                    FetchOptions =
                                     {
                                         CredentialsProvider = ( url, user, cred ) => creds
                                     },
-                                    Checkout = true
-                                } );
-                                repoCreated = true;
-                            }
-                            catch( Exception ex )
-                            {
-                                monitor.Error( "Git clone failed. Leaving existing directory as-is.", ex );
-                                return null;
-                            }
-                        }
-                    }
-                }
-                Repository r;
-                using( monitor.OpenTrace( "Checking the validity of the git repository." ) )
+                    Checkout = true
+                } );
+                var r = new Repository( workingFolder );
+                var remote = r.Network.Remotes.FirstOrDefault( rem => GitRepositoryKey.IsEquivalentRepositoryUri( new Uri( rem.Url, UriKind.Absolute ), git.OriginUrl ) );
+                if( remote == null || remote.Name != "origin" )
                 {
-                    if( !Repository.IsValid( gitFolderPath ) )
-                    {
-                        monitor.Fatal( $"Git folder '{gitFolderPath}' exists but is not a valid Repository." );
-                        return null;
-                    }
-                    r = new Repository( workingFolder );
-                    var remote = r.Network.Remotes.FirstOrDefault( rem => GitRepositoryKey.IsEquivalentRepositoryUri( new Uri( rem.Url, UriKind.Absolute ), git.OriginUrl ) );
-                    if( remote == null || remote.Name != "origin" )
-                    {
 
-                        monitor.Fatal( $"Existing '{workingFolder}' must have its 'origin' remote set to '{git.OriginUrl}'. This must be fixed manually." );
-                        r.Dispose();
-                        return null;
-                    }
-                    EnsureFirstCommit( monitor, r );
+                    monitor.Fatal( $"Existing '{workingFolder}' must have its 'origin' remote set to '{git.OriginUrl}'. This must be fixed manually." );
+                    r.Dispose();
+                    return null;
                 }
-                if( r.Head?.FriendlyName != branchName && branchName != null )
-                {
-                    Branch branch = DoEnsureBranch( monitor, r, branchName, false, workingFolder );
-                    if( repoCreated ) Commands.Checkout( r, branch );
-                }
-                monitor.CloseGroup( "Repository is checked out." );
+                EnsureFirstCommit( monitor, r );
                 return r;
             }
             catch( Exception ex )
             {
-                monitor.Fatal( $"Failed to ensure Git '{workingFolder}'.", ex );
+                monitor.Error( "Git clone failed. Leaving existing directory as-is.", ex );
                 return null;
             }
         }
     }
 
     /// <summary>
-    /// Calls <see cref="EnsureWorkingFolder(IActivityMonitor, GitRepositoryKey, NormalizedPath, bool, string?)"/>
-    /// on multiple repositories at once.
+    /// Opens a working folder.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="secretStore">The key store.</param>
-    /// <param name="stackRoot">The root of the <paramref name="layout"/>.</param>
-    /// <param name="layout">The set of repositories to ensure.</param>
-    /// <param name="isPublic">Whether the repositories are public or not.</param>
-    /// <param name="branchName">
-    /// The initial branch name if cloning is done.
-    /// This branch is created if needed (just like <see cref="EnsureBranch"/> does).
-    /// It is checked out only if the repository has been created.
+    /// <param name="secretsStore">The key store to use.</param>
+    /// <param name="workingFolder">The local working folder.</param>
+    /// <param name="displayPath">
+    /// The short path to display, relative to a well known root. It must not be empty.
+    /// (this can be the <see cref="NormalizedPath.LastPart"/> of the <paramref name="workingFolder"/>.)
     /// </param>
-    /// <returns>True on success, false is at least one repository failed.</returns>
-    public static bool EnsureWorkingFolders( IActivityMonitor monitor,
-                                             ISecretsStore secretStore,
-                                             NormalizedPath stackRoot,
-                                             IReadOnlyList<(NormalizedPath SubPath, Uri Url)> layout,
-                                             bool isPublic,
-                                             string? branchName = null )
+    /// <param name="isPublic">Whether this repository is a public or private one.</param>
+    /// <returns>The SimpleGitRepository object or null on error.</returns>
+    public static GitRepository? Open( IActivityMonitor monitor,
+                                       ISecretsStore secretsStore,
+                                       NormalizedPath workingFolder,
+                                       NormalizedPath displayPath,
+                                       bool isPublic )
     {
-        bool success = true;
-        using( monitor.OpenInfo( $"Cloning {layout.Count} repositories in {stackRoot}." ) )
-        {
-            foreach( var (subPath, url) in layout )
-            {
-                success &= EnsureWorkingFolder( monitor, secretStore, stackRoot.Combine( subPath ), url, isPublic, branchName );
-            }
-        }
-        return success;
+        var r = OpenWorkingFolder( monitor, workingFolder, warnOnly: false );
+        if( r == null ) return null;
+
+        var gitKey = new GitRepositoryKey( secretsStore, r.Value.OriginUrl, isPublic );
+        return new GitRepository( gitKey, r.Value.Repository, workingFolder, displayPath );
     }
 
     /// <summary>
@@ -832,15 +746,10 @@ public class GitRepository : IGitHeadInfo, IDisposable
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="workingFolder">The local working folder (above the .git folder).</param>
     /// <param name="warnOnly">True to emit only warnings on error, false to emit errors.</param>
-    /// <param name="branchName">
-    /// An optional branch name that is created if it doesn't exist but is not checked out.
-    /// <see cref="EnsureBranch(IActivityMonitor, string, bool)"/>.
-    /// </param>
     /// <returns>The LibGit2Sharp repository object and its "origin" Url or null on error.</returns>
     public static (Repository Repository, Uri OriginUrl)? OpenWorkingFolder( IActivityMonitor monitor,
                                                                              NormalizedPath workingFolder,
-                                                                             bool warnOnly,
-                                                                             string? branchName = null )
+                                                                             bool warnOnly )
     {
         Throw.CheckNotNullArgument( monitor );
         Throw.CheckArgument( !workingFolder.IsEmptyPath );
@@ -862,21 +771,24 @@ public class GitRepository : IGitHeadInfo, IDisposable
             var origin = r.Network.Remotes.FirstOrDefault( rem => rem.Name == "origin" );
             if( origin == null )
             {
-                monitor.Log( errorLevel, $"Existing '{workingFolder}' must have an 'origin' remote. Remotes are: '{r.Network.Remotes.Select( r => r.Name ).Concatenate( "', '" )}'. This must be fixed manually." );
+                monitor.Log( errorLevel, $"""
+                                          Existing '{workingFolder}' must have an 'origin' remote. Remotes are: '{r.Network.Remotes.Select( r => r.Name ).Concatenate( "', '" )}'.
+                                          This must be fixed manually.
+                                          """ );
                 r.Dispose();
                 return null;
             }
+            
             if( !Uri.TryCreate( origin.Url, UriKind.Absolute, out var originUrl ) )
             {
-                monitor.Log( errorLevel, $"Existing '{workingFolder}' has its 'origin' that is not a valid absolute Uri: '{origin.Url}'. This must be fixed manually." );
+                monitor.Log( errorLevel, $"""
+                                          Existing '{workingFolder}' has its 'origin' that is not a valid absolute Uri: '{origin.Url}'.
+                                          This must be fixed manually.
+                                          """ );
                 r.Dispose();
                 return null;
             }
             EnsureFirstCommit( monitor, r );
-            if( branchName != null && r.Head?.FriendlyName != branchName )
-            {
-                DoEnsureBranch( monitor, r, branchName, false, workingFolder );
-            }
             return (r, originUrl);
         }
         catch( Exception ex )

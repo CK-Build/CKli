@@ -31,5 +31,10 @@ public enum MergeResult
     /// Non-fast-forward merge.
     /// </summary>
     NonFastForward,
+}
 
+public static class MergeResultExtensions
+{
+    public static bool IsError( this MergeResult result ) => result is MergeResult.Error or MergeResult.ErrorConflicts;
+    public static bool IsSuccess( this MergeResult result ) => result is not MergeResult.Error and not MergeResult.ErrorConflicts;
 }

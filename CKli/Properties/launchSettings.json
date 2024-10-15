@@ -1,8 +1,16 @@
 {
   "profiles": {
-    "CKli": {
+    "clone -h": {
       "commandName": "Project",
-      "commandLineArgs": "checkout"
+      "commandLineArgs": "clone -h"
+    },
+    "clone CK-Build -p C:/Dev3": {
+      "commandName": "Project",
+      "commandLineArgs": "clone https://github.com/CK-Build/CK-Build-Stack -p C:\\Dev3"
+    },
+    "clone CK-Build -p C:/Dev3 --allow-duplicate": {
+      "commandName": "Project",
+      "commandLineArgs": "clone https://github.com/CK-Build/CK-Build-Stack -p C:/Dev3 --allow-duplicate"
     }
   }
 }

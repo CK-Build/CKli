@@ -186,16 +186,53 @@ public partial class GitRepositoryKey
     public static Uri CheckAndNormalizeRepositoryUrl( Uri url )
     {
         Throw.CheckNotNullArgument( url );
-        if( !url.IsAbsoluteUri ) Throw.ArgumentException( nameof( url ), $"Invalid Url: '{url}' must be absolute." );
-        if( url.Query.Length == 0 )
+        if( !url.IsAbsoluteUri || url.Query.Length > 0 )
         {
-            // Ensure that all suffixes are removed.
-            while( url.AbsolutePath.EndsWith( ".git", StringComparison.OrdinalIgnoreCase ) )
-            {
-                var s = url.AbsoluteUri;
-                url = new Uri( s.Remove( s.Length - 4 ) );
-            }
+            Throw.ArgumentException( nameof( url ), $"Invalid Url: '{url}' must be absolute and have no query part." );
         }
+        // Ensure that all suffixes are removed.
+        while( url.AbsolutePath.EndsWith( ".git", StringComparison.OrdinalIgnoreCase ) )
+        {
+            var s = url.AbsoluteUri;
+            url = new Uri( s.Remove( s.Length - 4 ) );
+        }
+        return url;
+    }
+
+    /// <summary>
+    /// Normalizes a repository url (see <see cref="CheckAndNormalizeRepositoryUrl(Uri)"/>) and extracts the
+    /// repository name that must be valid (see <see cref="WorldName.IsValidRepositoryName"/>).
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="url">Any url (can be null).</param>
+    /// <param name="repositoryFromUrl">The valid repository name extracted from the url on success.</param>
+    /// <returns>The normalized url or null on error.</returns>
+    public static Uri? CheckAndNormalizeRepositoryUrl( IActivityMonitor monitor, Uri? url, out string? repositoryFromUrl )
+    {
+        repositoryFromUrl = null;
+        if( url == null || !url.IsAbsoluteUri || url.Query.Length > 0 )
+        {
+            monitor.Error( $"Invalid Url: '{url}' must be absolute and have no query part." );
+            return null;
+        }
+        // Ensure that all suffixes are removed.
+        string absolutePath = url.AbsolutePath;
+        while( absolutePath.EndsWith( ".git", StringComparison.OrdinalIgnoreCase ) )
+        {
+            var s = url.AbsoluteUri;
+            url = new Uri( s.Remove( s.Length - 4 ) );
+            absolutePath = url.AbsolutePath;
+        }
+        // Consider that all Git providers follow this pattern: the last part of the path is the repository name.
+        // If this must be tweaked for some providers (like the "no query" restriction above), we are at the
+        // right place to exploit the KnownGitProvider enum...
+        var n = System.IO.Path.GetFileName( absolutePath.AsSpan() );
+        if( !WorldName.IsValidRepositoryName( n ) )
+        {
+            monitor.Error( $"Invalid repository Url: the last path part must be a valid repository name: '{url}'." );
+            return null;
+        }
+        repositoryFromUrl = new string( n );
         return url;
     }
 

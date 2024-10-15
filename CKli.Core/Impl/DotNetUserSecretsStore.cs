@@ -3,10 +3,16 @@ using CK.Core;
 using System.Text.Json;
 using System.Threading;
 using System.IO;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace CKli.Core;
 
-sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
+/// <summary>
+/// Implements <see cref="ISecretsStore"/> on dotnet user-secrets (with Id = "CKli").
+/// </summary>
+public sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
 {
     static string? _secretFilePath;
 
@@ -44,7 +50,7 @@ sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
 
                             Instead of '{failed[0]}', if you are allowed to obtain a valid secret for one of the following keys:
                             '{failed.Skip( 1 ).Concatenate( "', '" )}'
-                            Register one of them: they enable more operations.
+                            Register one of them as they enable more operations.
                             """;
 
         monitor.Error( $"""
@@ -62,18 +68,18 @@ sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
         if( !_documentLoaded )
         {
             _documentLoaded = true;
-            var path = PathHelper.GetSecretsPathFromSecretsId( "CKli" );
+            _secretFilePath ??= PathHelper.GetSecretsPathFromSecretsId( "CKli" );
             try
             {
-                if( File.Exists( path ) )
+                if( File.Exists( _secretFilePath ) )
                 {
-                    _document = JsonDocument.Parse( File.ReadAllBytes( path ),
+                    _document = JsonDocument.Parse( File.ReadAllBytes( _secretFilePath ),
                                                     new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip } );
                 }
             }
             catch( Exception ex )
             {
-                monitor.Error( $"While reading secret store at '{path}'.", ex );
+                monitor.Error( $"While reading secret store at '{_secretFilePath}'.", ex );
             }
         }
         return _document;

@@ -1,29 +1,33 @@
 using CK.Core;
+using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace CKli.Core;
 
 /// <summary>
 /// Immutable implementation.
 /// </summary>
-public class WorldName : IEquatable<WorldName>
+public partial class WorldName : IEquatable<WorldName>
 {
     readonly string _name;
     readonly string? _ltsName;
     readonly string _fullName;
 
     /// <summary>
-    /// Gets the base name of this world: this is the name of the "Stack".
+    /// Gets the base name of this world: this is the name of the Stack.
     /// </summary>
-    public string Name => _name;
+    public string StackName => _name;
 
     /// <summary>
-    /// Gets the Long Term Support name. Normalized to null for current LTS.
+    /// Gets the Long Term Support name. Normalized to null for current LTS
+    /// and always starts withe the leading '@' when not null.
     /// </summary>
     public string? LTSName => _ltsName;
 
     /// <summary>
-    /// Gets the <see cref="Name"/> or <see cref="Name"/>@<see cref="LTSName"/> if the LTSName is not null.
+    /// Gets the name and LTSName if the LTSName is not null.
     /// </summary>
     public string FullName => _fullName;
 
@@ -40,13 +44,13 @@ public class WorldName : IEquatable<WorldName>
     /// <param name="ltsName">The Long Term Support suffix. Can be null or empty.</param>
     public WorldName( string stackName, string? ltsName )
     {
-        Throw.CheckArgument( IsValidStackOrLTSName( stackName ) );
-        Throw.CheckArgument( ltsName == null || IsValidStackOrLTSName( ltsName ) );
+        Throw.CheckArgument( IsValidRepositoryName( stackName ) );
         _name = stackName;
         if( !String.IsNullOrWhiteSpace( ltsName ) )
         {
+            Throw.CheckArgument( IsValidLTSName( ltsName.AsSpan( 1 ) ) );
             _ltsName = ltsName;
-            _fullName = $"{stackName}@{ltsName}";
+            _fullName = string.Concat( stackName, ltsName );
         }
         else
         {
@@ -89,11 +93,11 @@ public class WorldName : IEquatable<WorldName>
 
     /// <summary>
     /// Tries to parse a full name of a world. The stack and LTS name must satisfy
-    /// <see cref="IsValidStackOrLTSName(string)"/>.
+    /// <see cref="IsValidStackOrLTSName(ReadOnlySpan{char})"/>.
     /// </summary>
     /// <param name="fullName">The full name to parse.</param>
     /// <param name="stackName">The non null stack name on success.</param>
-    /// <param name="ltsName">The LTS name on success. Can be null.</param>
+    /// <param name="ltsName">The LTS name on success with its leading @ prefix. Can be null.</param>
     /// <returns>True on success, false otherwise.</returns>
     public static bool TryParse( string? fullName, [NotNullWhen( true )] out string? stackName, out string? ltsName )
     {
@@ -103,17 +107,17 @@ public class WorldName : IEquatable<WorldName>
         int idx = fullName.IndexOf( '@' );
         if( idx < 0 )
         {
-            if( !IsValidStackOrLTSName( fullName ) ) return false;
+            if( !IsValidRepositoryName( fullName ) ) return false;
             stackName = fullName;
         }
         else
         {
-            var s = fullName.Substring( 0, idx );
-            if( !IsValidStackOrLTSName( s ) ) return false;
-            var p = fullName.Substring( idx + 1, fullName.Length - idx );
-            if( !IsValidStackOrLTSName( p ) ) return false;
-            stackName = s;
-            ltsName = p;
+            var s = fullName.AsSpan( 0, idx );
+            if( !IsValidRepositoryName( s ) ) return false;
+            var lts = fullName.AsSpan( idx );
+            if( !IsValidLTSName( lts ) ) return false;
+            stackName = new string( s );
+            ltsName = new string( lts );
         }
         return true;
     }
@@ -139,18 +143,29 @@ public class WorldName : IEquatable<WorldName>
     public bool Equals( WorldName? other ) => FullName.Equals( other?.FullName, StringComparison.OrdinalIgnoreCase );
 
     /// <summary>
-    /// Validates a stack or LTS name: at least 2 characters, only ASCII characters that are letter, digits, - (minus)
+    /// Validates a repository name: at least 2 characters, only ASCII characters that are letter, digits, - (minus)
     /// or _ (underscore).
     /// And the first character must be a letter.
     /// </summary>
     /// <param name="name">Name to test.</param>
     /// <returns>True if the name is a valid name.</returns>
-    public static bool IsValidStackOrLTSName( string name )
-    {
-        Throw.CheckNotNullArgument( name );
-        return name.Length >= 2
-               && name.All( c => Char.IsAscii( c ) && (c == '-' || c == '_' || Char.IsLetterOrDigit( c )) )
-               && Char.IsLetter( name[0] );
-    }
+    public static bool IsValidRepositoryName( ReadOnlySpan<char> name ) => _rRepo.IsMatch( name );
 
+    /// <summary>
+    /// Validates a LTS name: at least 3 characters that starts with '@', only ASCII lowercase characters, digits, - (minus),
+    /// _ (underscore) and '.' (dot).
+    /// </summary>
+    /// <param name="name">Name to test.</param>
+    /// <returns>True if the name is a valid LTS name.</returns>
+    public static bool IsValidLTSName( ReadOnlySpan<char> name ) => _rLTS.IsMatch( name );
+
+    static readonly Regex _rRepo = ValidRepoName();
+
+    [GeneratedRegex( "[a-zA-Z][0-9a-zA-Z_-]+", RegexOptions.CultureInvariant )]
+    private static partial Regex ValidRepoName();
+
+    static readonly Regex _rLTS = ValidLTSName();
+
+    [GeneratedRegex( "@[0-9a-z._-]{2,}", RegexOptions.CultureInvariant )]
+    private static partial Regex ValidLTSName();
 }
