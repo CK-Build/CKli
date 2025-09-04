@@ -297,7 +297,6 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
         }
     }
 
-
     /// <summary>
     /// Pull-Merge the current head from the remote. Any merge conflict is an error with <see cref="MergeFileFavor.Normal"/> and this is the
     /// safest mode. Choosing one of other flavors will not trigger a conflict error.

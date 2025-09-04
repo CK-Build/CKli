@@ -27,6 +27,7 @@ public sealed partial class StackRepository : IDisposable
 
     readonly GitRepository _git;
     readonly NormalizedPath _stackRoot;
+    readonly ISecretsStore _secretsStore;
     LocalWorldName? _defaultWorldName;
 
     ImmutableArray<LocalWorldName> _worldNames;
@@ -61,6 +62,11 @@ public sealed partial class StackRepository : IDisposable
     /// Gets whether the stack's repository url.
     /// </summary>
     public Uri OriginUrl => _git.OriginUrl;
+
+    /// <summary>
+    /// Gets the secrets store.
+    /// </summary>
+    public ISecretsStore SecretsStore => _secretsStore;
 
     /// <summary>
     /// Gets the default world name (no <see cref="WorldName.LTSName"/>).
@@ -103,7 +109,7 @@ public sealed partial class StackRepository : IDisposable
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <returns>The default world if it exists.</returns>
-    public LocalWorldName? GetDefaultWorld( IActivityMonitor monitor )
+    public LocalWorldName? GetDefaultWorldName( IActivityMonitor monitor )
     {
         var defaultWorld = WorldNames.FirstOrDefault( w => w.LTSName == null );
         if( defaultWorld == null )
@@ -117,13 +123,13 @@ public sealed partial class StackRepository : IDisposable
     /// Gets the world from a <paramref name="path"/> that must start with <see cref="StackRoot"/>.
     /// <para>
     /// This tries to find a LTS world if the path is below StackRoot and its first folder starts with '@' and is
-    /// a valid LTS name. When the path is every where else, <see cref="GetDefaultWorld(IActivityMonitor)"/> is used.
+    /// a valid LTS name. When the path is every where else, <see cref="GetDefaultWorldName(IActivityMonitor)"/> is used.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="path">The path that must be or start with <see cref="StackRoot"/> or an <see cref="ArgumentException"/> is thrown.</param>
     /// <returns>The world name for the path or null on error.</returns>
-    public LocalWorldName? GetWorldFromPath( IActivityMonitor monitor, NormalizedPath path )
+    public LocalWorldName? GetWorldNameFromPath( IActivityMonitor monitor, NormalizedPath path )
     {
         Throw.CheckArgument( path.StartsWith( StackRoot, strict: false ) );
 
@@ -138,7 +144,7 @@ public sealed partial class StackRepository : IDisposable
             }
             return worldName;
         }
-        return GetDefaultWorld( monitor );
+        return GetDefaultWorldName( monitor );
     }
 
     /// <summary>
@@ -163,10 +169,11 @@ public sealed partial class StackRepository : IDisposable
         return !_isDirty;
     }
 
-    StackRepository( GitRepository git, in NormalizedPath stackRoot )
+    StackRepository( GitRepository git, in NormalizedPath stackRoot, ISecretsStore secretsStore )
     {
         _git = git;
         _stackRoot = stackRoot;
+        _secretsStore = secretsStore;
     }
 
     /// <summary>
@@ -217,7 +224,7 @@ public sealed partial class StackRepository : IDisposable
                 }
                 else if( git.SetCurrentBranch( monitor, stackBranchName, skipPullMerge ) )
                 {
-                    stackRepository = new StackRepository( git, stackRoot );
+                    stackRepository = new StackRepository( git, stackRoot, secretsStore );
                     return true;
                 }
             }
@@ -300,8 +307,8 @@ public sealed partial class StackRepository : IDisposable
         {
             if( git.SetCurrentBranch( monitor, stackBranchName ) )
             {
-                SetupLocalDirectory( gitPath );
-                var result = new StackRepository( git, stackRoot );
+                SetupNewLocalDirectory( gitPath );
+                var result = new StackRepository( git, stackRoot, secretsStore );
                 Registry.RegisterNewStack( monitor, gitPath, url );
                 if( CloneWorld( monitor, result, secretsStore, result.DefaultWorldName ) )
                 {
@@ -314,7 +321,7 @@ public sealed partial class StackRepository : IDisposable
         }
         return null;
 
-        static void SetupLocalDirectory( NormalizedPath gitPath )
+        static void SetupNewLocalDirectory( NormalizedPath gitPath )
         {
             // Ensures that the $Local directory is created.
             var localDir = gitPath.AppendPart( "$Local" );

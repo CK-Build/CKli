@@ -1,4 +1,5 @@
 using CK.Core;
+using CKli.Core;
 using System;
 
 namespace CKli;
@@ -24,4 +25,5 @@ public static class CommandContext
             monitor.Output.RegisterClient( output, replayInitialLogs: true );
         }
     }
+
 }

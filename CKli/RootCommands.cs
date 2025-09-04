@@ -42,45 +42,91 @@ class RootCommands
     }
 
     /// <summary>
-    /// Updates the stack. 
+    /// Resynchronizes the current world from the remotes. 
     /// </summary>
-    /// <param name="path">-p, Path of the stack. By default, the stack folder above is found.</param>
-    /// <param name="updateStack">False to not pull the stack repository itself.</param>
+    /// <param name="path">-p, Path of the world. By default, the world that contains the current path is resolved.</param>
+    /// <param name="pullStack">False to not pull the stack repository itself.</param>
     /// <returns>0 on success, -1 on error.</returns>
     public int Pull( string? path = "<<From Current Directory>>",
-                     bool updateStack = true )
+                     bool pullStack = true )
     {
         return CommandContext.WithMonitor( monitor =>
         {
-            var p = new NormalizedPath( Environment.CurrentDirectory )
-                                .Combine( string.IsNullOrWhiteSpace( path ) || path[0] == '<' ? null : path )
-                                .ResolveDots( throwOnAboveRoot: false );
-            if( !StackRepository.TryOpenFrom( monitor, _secretsStore, p, out var stackRepository, skipPullMerge: !updateStack ) )
+            World? world = TryOpenWorldFromPath( monitor, path, pullStack, out var absolutePath, out int errorCode );
+            if( world == null ) return errorCode;
+            try
             {
-                return -1;
+                using( monitor.OpenInfo( world.Name.IsDefaultWorld
+                                        ? $"Pulling {world.Layout.Count} repositories of '{world.Name.StackName}''s default world."
+                                        : $"Pulling {world.Layout.Count} repositories of LTS world '{world.Name.LTSName}'." ) )
+                {
+                    if( !world.FixLayout( monitor, deleteAliens: false, out var newClones ) )
+                    {
+                        return -4;
+                    }
+                    var all = world.EnsureAllGitRepositories( monitor );
+                    if( all == null )
+                    {
+                        return -5;
+                    }
+                    bool success = true;
+                    foreach( var g in all )
+                    {
+                        if( !newClones.Contains( g ) )
+                        {
+                            success &= g.Pull( monitor ).IsSuccess();
+                        }
+                    }
+                    return success ? 0 : -6;
+                }
+
             }
-            if( stackRepository == null )
+            finally
             {
-                monitor.Error( $"Unable to find a stack repository from path '{p}'." );
-                return -2;
-            }
-            Throw.DebugAssert( p.StartsWith( stackRepository.StackRoot, strict: false ) );
-            var worldName = stackRepository.GetWorldFromPath( monitor, p );
-            if( worldName == null )
-            {
-                return -3;
-            }
-            var layout = worldName.LoadDefinitionFile( monitor )?.ReadLayout( monitor );
-            if( layout == null )
-            {
-                return -4;
-            }
-            using( monitor.OpenInfo( worldName.IsDefaultWorld
-                                    ? $"Pulling {layout.Count} repositories of '{worldName.StackName}''s default world."
-                                    : $"Pulling {layout.Count} repositories of LTS world '{worldName.LTSName}'." ) )
-            {
+                world?.StackRepository?.Dispose();
+                world?.Dispose();
             }
         } );
     }
 
+    StackRepository? TryOpenStackRepositoryFromPath( IActivityMonitor monitor,
+                                                     string? inputPath,
+                                                     bool pullStack,
+                                                     out NormalizedPath path,
+                                                     out int errorCode )
+    {
+        errorCode = 0;
+        path = new NormalizedPath( Environment.CurrentDirectory )
+                            .Combine( string.IsNullOrWhiteSpace( inputPath ) || inputPath[0] == '<' ? null : inputPath )
+                            .ResolveDots( throwOnAboveRoot: false );
+        if( !StackRepository.TryOpenFrom( monitor, _secretsStore, path, out var stackRepository, skipPullMerge: !pullStack ) )
+        {
+            errorCode = -1;
+            return null;
+        }
+        if( stackRepository == null )
+        {
+            monitor.Error( $"Unable to find a stack repository from path '{path}'." );
+            errorCode = -2;
+            return null;
+        }
+        return stackRepository;
+    }
+
+    World? TryOpenWorldFromPath( IActivityMonitor monitor,
+                                 string? inputPath,
+                                 bool pullStack,
+                                 out NormalizedPath path,
+                                 out int errorCode )
+    {
+        StackRepository? stackRepository = TryOpenStackRepositoryFromPath( monitor, inputPath, pullStack, out path, out errorCode );
+        if( stackRepository == null ) return null;
+        Throw.DebugAssert( path.StartsWith( stackRepository.StackRoot, strict: false ) );
+        var world = World.TryOpenFromPath( monitor, stackRepository, path );
+        if( world == null )
+        {
+            errorCode = -3;
+        }
+        return world;
+    }
 }
