@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Xml.Linq;
 
 namespace CKli.Core;
@@ -45,11 +46,6 @@ public sealed partial class StackRepository : IDisposable
     /// Gets the name of this stack that is necessarily the last part of the <see cref="StackRoot"/>.
     /// </summary>
     public string StackName => _stackRoot.LastPart;
-
-    /// <summary>
-    /// Gets the branch name: Should always be <see cref="IWorldName.MasterName"/> but this may be changed.
-    /// </summary>
-    public string BranchName => _git.CurrentBranchName;
 
     /// <summary>
     /// Gets whether this stack is dirty.
@@ -109,7 +105,7 @@ public sealed partial class StackRepository : IDisposable
     /// <returns>The default world if it exists.</returns>
     public LocalWorldName? GetDefaultWorld( IActivityMonitor monitor )
     {
-        var defaultWorld = _worldNames.FirstOrDefault( w => w.LTSName == null );
+        var defaultWorld = WorldNames.FirstOrDefault( w => w.LTSName == null );
         if( defaultWorld == null )
         {
             monitor.Error( $"Stack '{StackRoot}': the default World definition is missing. Expecting file '{_git.FullPhysicalPath}/{StackName}.xml'." );
@@ -118,23 +114,51 @@ public sealed partial class StackRepository : IDisposable
     }
 
     /// <summary>
+    /// Gets the world from a <paramref name="path"/> that must start with <see cref="StackRoot"/>.
+    /// <para>
+    /// This tries to find a LTS world if the path is below StackRoot and its first folder starts with '@' and is
+    /// a valid LTS name. When the path is every where else, <see cref="GetDefaultWorld(IActivityMonitor)"/> is used.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="path">The path that must be or start with <see cref="StackRoot"/> or an <see cref="ArgumentException"/> is thrown.</param>
+    /// <returns>The world name for the path or null on error.</returns>
+    public LocalWorldName? GetWorldFromPath( IActivityMonitor monitor, NormalizedPath path )
+    {
+        Throw.CheckArgument( path.StartsWith( StackRoot, strict: false ) );
+
+        if( path.Parts.Count > _stackRoot.Parts.Count
+            && WorldName.IsValidLTSName( path.Parts[_stackRoot.Parts.Count] ) )
+        {
+            var ltsName = path.Parts[_stackRoot.Parts.Count];
+            var worldName = WorldNames.FirstOrDefault( n => n.LTSName == ltsName );
+            if( worldName == null )
+            {
+                monitor.Error( $"Stack '{StackName}' doesn't contain a LTS world '{ltsName}'." );
+            }
+            return worldName;
+        }
+        return GetDefaultWorld( monitor );
+    }
+
+    /// <summary>
     /// Commits and push changes to the remote.
     /// Nothing is done if <see cref="IsDirty"/> is false.
     /// </summary>
-    /// <param name="m">The monitor to use.</param>
+    /// <param name="monitor">The monitor to use.</param>
     /// <returns>True on success, false on error.</returns>
-    internal bool PushChanges( IActivityMonitor m )
+    internal bool PushChanges( IActivityMonitor monitor )
     {
         if( !_isDirty ) return false;
-        CommitResult result = _git.Commit( m, "Automatic synchronization commit." );
+        CommitResult result = _git.Commit( monitor, "Automatic synchronization commit." );
         if( result == CommitResult.NoChanges )
         {
-            m.Trace( "Nothing committed. Skipping push." );
+            monitor.Trace( "Nothing committed. Skipping push." );
             _isDirty = false;
         }
         else
         {
-            _isDirty = result == CommitResult.Error || !_git.Push( m );
+            _isDirty = result == CommitResult.Error || !_git.Push( monitor );
         }
         return !_isDirty;
     }
@@ -149,17 +173,24 @@ public sealed partial class StackRepository : IDisposable
     /// Tries to open a stack directory from a path.
     /// This lookups the ".PrivateStack" or ".PublicStack" in and above <paramref name="path"/>: if none
     /// are found, this is successful but <paramref name="stackRepository"/> is null.
+    /// <para>
+    /// On success, the <paramref name="stackRepository"/> is on the <paramref name="stackBranchName"/> and, by default,
+    /// the stack and its world definitions has been updated: use <paramref name="skipPullMerge"/> to leave the local stack
+    /// untouched.
+    /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="secretsStore">The secret key store.</param>
     /// <param name="path">The starting path.</param>
     /// <param name="stackRepository">The resulting stack directory if found and opened successfully.</param>
+    /// <param name="skipPullMerge">True to leave the stack repository as-is. By default, a pull is done from the stack repository.</param>
     /// <param name="stackBranchName">Specifies a branch name. There should be no reason to use multiple branch in a stack repository.</param>
     /// <returns>True on success, false on error.</returns>
     public static bool TryOpenFrom( IActivityMonitor monitor,
                                     ISecretsStore secretsStore,
                                     in NormalizedPath path,
                                     out StackRepository? stackRepository,
+                                    bool skipPullMerge = false,
                                     string stackBranchName = "main" )
     {
         Throw.CheckNotNullOrWhiteSpaceArgument( stackBranchName );
@@ -184,7 +215,7 @@ public sealed partial class StackRepository : IDisposable
                 {
                     monitor.Error( $"Stack folder '{stackRoot.LastPart}' must be '{stackNameFromUrl}' (or '{DuplicatePrefix}{stackNameFromUrl}') since repository Url is '{git.OriginUrl}'." );
                 }
-                else if( git.SetCurrentBranch( monitor, stackBranchName, skipPullMerge: true ) )
+                else if( git.SetCurrentBranch( monitor, stackBranchName, skipPullMerge ) )
                 {
                     stackRepository = new StackRepository( git, stackRoot );
                     return true;
@@ -196,7 +227,8 @@ public sealed partial class StackRepository : IDisposable
     }
 
     /// <summary>
-    /// Ensures that a root stack directory exists. The ".PrivateStack" or ".PublicStack" is checked out if needed.
+    /// Clones a Stack and all its current world repositories to the local file system in a new folder
+    /// from a stack repository.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="secretsStore">The secret key store.</param>
@@ -204,15 +236,15 @@ public sealed partial class StackRepository : IDisposable
     /// <param name="isPublic">Whether this repository is public.</param>
     /// <param name="parentPath">The path where the root stack folder will be created. Must be rooted.</param>
     /// <param name="allowDuplicateStack">True to create a "DuplicateOf-XX" stack folder if the stack is already available on this machine.</param>
-    /// <param name="stackBranchName">Specifies a branch name. There should be no reason to use multiple branch in a stack repository.</param>
+    /// <param name="stackBranchName">Specifies a branch name. There should be no reason to use multiple branches in a stack repository.</param>
     /// <returns>The repository or null on error.</returns>
     public static StackRepository? Clone( IActivityMonitor monitor,
-                                           ISecretsStore secretsStore,
-                                           Uri url,
-                                           bool isPublic,
-                                           in NormalizedPath parentPath,
-                                           bool allowDuplicateStack = false,
-                                           string stackBranchName = "main" )
+                                          ISecretsStore secretsStore,
+                                          Uri url,
+                                          bool isPublic,
+                                          in NormalizedPath parentPath,
+                                          bool allowDuplicateStack = false,
+                                          string stackBranchName = "main" )
     {
         Throw.CheckNotNullArgument( monitor );
         Throw.CheckNotNullArgument( secretsStore );
@@ -270,15 +302,16 @@ public sealed partial class StackRepository : IDisposable
             {
                 SetupLocalDirectory( gitPath );
                 var result = new StackRepository( git, stackRoot );
+                Registry.RegisterNewStack( monitor, gitPath, url );
                 if( CloneWorld( monitor, result, secretsStore, result.DefaultWorldName ) )
                 {
                     return result;
                 }
                 result.Dispose();
             }
+            git.Dispose();
             return null;
         }
-        git.Dispose();
         return null;
 
         static void SetupLocalDirectory( NormalizedPath gitPath )
@@ -335,7 +368,7 @@ public sealed partial class StackRepository : IDisposable
     /// <returns>A git stack or the empty path.</returns>
     public static NormalizedPath FindGitStackPath( NormalizedPath path )
     {
-        foreach( var tryPath in path.PathsToFirstPart( null, new[] { PublicStackName, PrivateStackName } ) )
+        foreach( var tryPath in path.PathsToFirstPart( null, [PublicStackName, PrivateStackName] ) )
         {
             if( Directory.Exists( tryPath ) ) return tryPath;
         }
@@ -345,7 +378,7 @@ public sealed partial class StackRepository : IDisposable
     public LocalWorldName? CreateNewLTS( IActivityMonitor monitor, string ltsName, XDocument content )
     {
         Throw.CheckArgument( content?.Root != null );
-        Throw.CheckNotNullOrWhiteSpaceArgument( ltsName );
+        Throw.CheckArgument( WorldName.IsValidLTSName( ltsName ) );
 
         var newRoot = _stackRoot.AppendPart( ltsName );
         var newDesc = _git.FullPhysicalPath.AppendPart( $"{StackName}{ltsName}.xml" );

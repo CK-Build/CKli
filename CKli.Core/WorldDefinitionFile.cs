@@ -53,7 +53,7 @@ public sealed class WorldDefinitionFile
     }
 
     static readonly XName _xPath = XNamespace.None + "Path";
-    static readonly XName _xUrl = XNamespace.None + "Uri";
+    static readonly XName _xUrl = XNamespace.None + "Url";
 
     static List<(NormalizedPath Path, Uri Uri)>? GetRepositoryLayout( IActivityMonitor monitor, XElement root )
     {
@@ -110,8 +110,20 @@ public sealed class WorldDefinitionFile
                     NormalizedPath path = c.Attribute( _xPath )?.Value;
                     if( path.IsEmptyPath || path.IsRooted )
                     {
-                        monitor.Warn( $"Element '{c}' in '{p}' missing or invalid Path attribute." );
+                        monitor.Error( $"""
+                                        Invalid element:
+                                        {c}
+                                        Attribute Path=\"...\" is missing or invalid.
+                                        """ );
                         hasError = true;
+                    }
+                    else if( !c.HasElements )
+                    {
+                        monitor.Warn( $"""
+                                        Invalid element:
+                                        {c}
+                                        Is empty. Element is ignored.
+                                        """ );
                     }
                     else
                     {
@@ -123,7 +135,11 @@ public sealed class WorldDefinitionFile
                     var uri = c.Attribute( _xUrl )?.Value;
                     if( !Uri.TryCreate( uri, UriKind.Absolute, out var url ) )
                     {
-                        monitor.Warn( $"Element '{c}' in '{p}' missing or invalid absolute Url attribute." );
+                        monitor.Error( $"""
+                                        Invalid element:
+                                        {c}
+                                        Attribute Url=\"...\" is missing or invalid.
+                                        """ );
                         hasError = true;
                     }
                     else
@@ -140,6 +156,14 @@ public sealed class WorldDefinitionFile
                             list.Add( (p.AppendPart( stackNameFromUrl ), url) );
                         }
                     }
+                }
+                else
+                {
+                    monitor.Warn( $"""
+                        Unexpected element:
+                        {c}
+                        Only <Folder Path="..."> ... </Folder> and <Repository Url="..." /> are handled. Element is ignored.
+                        """ );
                 }
             }
         }

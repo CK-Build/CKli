@@ -25,11 +25,11 @@ public sealed class LocalWorldName : WorldName
     /// Initializes a new <see cref="LocalWorldName"/>.
     /// </summary>
     /// <param name="stackName">The stack name.</param>
-    /// <param name="parallelName">The optional parallel name. Can be null or empty.</param>
+    /// <param name="ltsName">The optional LTS name. Can be null or empty.</param>
     /// <param name="rootPath">Root folder of world.</param>
     /// <param name="xmlDescriptionFilePath">Path of the definition file.</param>
-    public LocalWorldName( string stackName, string? parallelName, NormalizedPath rootPath, NormalizedPath xmlDescriptionFilePath )
-        : base( stackName, parallelName )
+    public LocalWorldName( string stackName, string? ltsName, NormalizedPath rootPath, NormalizedPath xmlDescriptionFilePath )
+        : base( stackName, ltsName )
     {
         Throw.CheckArgument( !rootPath.IsEmptyPath );
         _root = rootPath;

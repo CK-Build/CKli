@@ -22,7 +22,9 @@ public sealed partial class StackRepository
             FindOrUpdate( monitor, path, stackUri, out var _ );
         }
 
-        static NormalizedPath _regFilePath = System.IO.Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData ), "CKli", "StackRepositoryRegistry.v0.txt" );
+        static NormalizedPath _regFilePath = System.IO.Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData ),
+                                                                     "CKli",
+                                                                     "StackRepositoryRegistry.v0.txt" );
 
         static void FindOrUpdate( IActivityMonitor monitor, NormalizedPath newPath, Uri findOrUpdateStackUri, out List<NormalizedPath>? foundPath )
         {

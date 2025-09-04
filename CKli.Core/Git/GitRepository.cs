@@ -105,7 +105,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     /// <param name="CommitAhead">
     /// The number of commit that are ahead of the origin.
     /// 0 mean that there a no commit ahead of origin.
-    /// Null if there is no origin (the branch is not tacked).</param>
+    /// Null if there is no origin (the branch is not tracked).</param>
     public readonly record struct SimpleStatusInfo( NormalizedPath DisplayName, string CurrentBranchName, bool IsDirty, int? CommitAhead );
 
     /// <summary>
@@ -256,7 +256,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     }
 
     /// <summary>
-    /// Checkout the specified branch. 
+    /// Checks out the specified branch. 
     /// <list type="number">
     ///     <item>If <see cref="CurrentBranchName"/> is <paramref name="branchName"/>, does nothing.</item>
     ///     <item>Otherwise, the working folder must be clean (<see cref="CheckCleanCommit(IActivityMonitor)"/>).</item>
@@ -281,12 +281,14 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
                 {
                     return false;
                 }
+                b = DoEnsureBranch( monitor, _git, branchName, LogLevel.Warn, _displayPath, out bool localCreated );
                 // Either the branch has been created from its remote fetched branch, or it has been created
                 // a a local branch (as there's no remote branch): in both case, we can skip the pull.
-                b = DoEnsureBranch( monitor, _git, branchName, LogLevel.Warn, _displayPath, out bool localCreated );
                 skipPullMerge = true;
             }
-            return Checkout( monitor, branchName, skipFetchBranches: true, skipPullMerge );
+            monitor.Info( $"Checking out {branchName} (leaving {CurrentBranchName})." );
+            Commands.Checkout( _git, b );
+            return skipPullMerge || Pull( monitor, MergeFileFavor.Normal ).IsSuccess();
         }
         catch( Exception ex )
         {
@@ -353,53 +355,6 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
         {
             monitor.Error( $"While pulling from '{DisplayPath}/{CurrentBranchName}'.", ex );
             return MergeResult.Error;
-        }
-    }
-
-    /// <summary>
-    /// Checks out a branch, calling <see cref="FetchBranches(IActivityMonitor, bool)"/>
-    /// and <see cref="Pull(IActivityMonitor, MergeFileFavor, FastForwardStrategy)"/> by default.
-    /// There must not be any uncommitted changes on the current head.
-    /// <para>
-    /// The branch must exist locally or on the 'origin' remote.
-    /// If the branch exists only in the "origin" remote, a local branch is automatically
-    /// created that tracks the remote one.
-    /// Call <see cref="EnsureBranch(IActivityMonitor, string, bool)"/> first to ensure that the branch exists.
-    /// </para>
-    /// </summary>
-    /// <param name="monitor">The monitor.</param>
-    /// <param name="branchName">The local name of the branch.</param>
-    /// <param name="skipFetchBranches">True to not call <see cref="FetchBranches(IActivityMonitor, bool)"/>.</param>
-    /// <param name="skipPullMerge">True to not "pull merge" from the remote after having checked out the branch.</param>
-    /// <returns>True on success, false on error (such as merge conflicts).</returns>
-    public bool Checkout( IActivityMonitor monitor, string branchName, bool skipFetchBranches = false, bool skipPullMerge = false )
-    {
-        using( monitor.OpenInfo( $"Checking out branch '{branchName}' in '{DisplayPath}'." ) )
-        {
-            if( !skipFetchBranches && !FetchBranches( monitor ) ) return false;
-            try
-            {
-                Branch? b = DoGetBranch( monitor, _git, branchName, LogLevel.Error, DisplayPath );
-                if( b == null ) return false;
-                if( b.IsCurrentRepositoryHead )
-                {
-                    monitor.Trace( $"Already on {branchName}." );
-                }
-                else
-                {
-                    if( !CheckCleanCommit( monitor ) ) return false;
-                    monitor.Info( $"Checking out {branchName} (leaving {CurrentBranchName})." );
-                    Commands.Checkout( _git, b );
-                }
-                if( skipPullMerge ) return true;
-
-                return Pull( monitor, MergeFileFavor.Normal ).IsSuccess();
-            }
-            catch( Exception ex )
-            {
-                monitor.Fatal( "Unexpected error. Manual fix should be required.", ex );
-                return false;
-            }
         }
     }
 

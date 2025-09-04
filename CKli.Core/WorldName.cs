@@ -27,6 +27,12 @@ public partial class WorldName : IEquatable<WorldName>
     public string? LTSName => _ltsName;
 
     /// <summary>
+    /// Get whether this is the default world of the stack (<see cref="LTSName"/> is null).
+    /// </summary>
+    [MemberNotNullWhen( false, nameof( LTSName ) )]
+    public bool IsDefaultWorld => _ltsName == null;
+
+    /// <summary>
     /// Gets the name and LTSName if the LTSName is not null.
     /// </summary>
     public string FullName => _fullName;
@@ -48,7 +54,7 @@ public partial class WorldName : IEquatable<WorldName>
         _name = stackName;
         if( !String.IsNullOrWhiteSpace( ltsName ) )
         {
-            Throw.CheckArgument( IsValidLTSName( ltsName.AsSpan( 1 ) ) );
+            Throw.CheckArgument( IsValidLTSName( ltsName ) );
             _ltsName = ltsName;
             _fullName = string.Concat( stackName, ltsName );
         }
@@ -93,7 +99,7 @@ public partial class WorldName : IEquatable<WorldName>
 
     /// <summary>
     /// Tries to parse a full name of a world. The stack and LTS name must satisfy
-    /// <see cref="IsValidStackOrLTSName(ReadOnlySpan{char})"/>.
+    /// <see cref="IsValidRepositoryName(ReadOnlySpan{char})"/> and <see cref="IsValidLTSName(ReadOnlySpan{char})"/>.
     /// </summary>
     /// <param name="fullName">The full name to parse.</param>
     /// <param name="stackName">The non null stack name on success.</param>
@@ -149,7 +155,7 @@ public partial class WorldName : IEquatable<WorldName>
     /// </summary>
     /// <param name="name">Name to test.</param>
     /// <returns>True if the name is a valid name.</returns>
-    public static bool IsValidRepositoryName( ReadOnlySpan<char> name ) => _rRepo.IsMatch( name );
+    public static bool IsValidRepositoryName( ReadOnlySpan<char> name ) => ValidRepoName().IsMatch( name );
 
     /// <summary>
     /// Validates a LTS name: at least 3 characters that starts with '@', only ASCII lowercase characters, digits, - (minus),
@@ -157,14 +163,10 @@ public partial class WorldName : IEquatable<WorldName>
     /// </summary>
     /// <param name="name">Name to test.</param>
     /// <returns>True if the name is a valid LTS name.</returns>
-    public static bool IsValidLTSName( ReadOnlySpan<char> name ) => _rLTS.IsMatch( name );
-
-    static readonly Regex _rRepo = ValidRepoName();
+    public static bool IsValidLTSName( ReadOnlySpan<char> name ) => ValidLTSName().IsMatch( name );
 
     [GeneratedRegex( "[a-zA-Z][0-9a-zA-Z_-]+", RegexOptions.CultureInvariant )]
     private static partial Regex ValidRepoName();
-
-    static readonly Regex _rLTS = ValidLTSName();
 
     [GeneratedRegex( "@[0-9a-z._-]{2,}", RegexOptions.CultureInvariant )]
     private static partial Regex ValidLTSName();
