@@ -80,19 +80,22 @@ public sealed class WorldDefinitionFile
                 }
                 hasError = true;
             }
-            if( path.Parts.Count > 1 )
-            {
-                var repoName = $"repository name '{path.LastPart}'";
-                if( !uniqueCheck.TryAdd( repoName, url ) )
-                {
-                    monitor.Error( $"Repository url '{url}' and '{uniqueCheck[path]}' have the same '{repoName}'." );
-                    hasError = true;
-                }
-            }
             if( !uniqueUrl.Add( url ) )
             {
                 monitor.Error( $"Repository with Url '{url}' occurs more than once." );
                 hasError = true;
+            }
+            else
+            {
+                if( path.Parts.Count > 1 )
+                {
+                    var repoName = $"repository name '{path.LastPart}'";
+                    if( !uniqueCheck.TryAdd( repoName, url ) )
+                    {
+                        monitor.Error( $"Repository url '{url}' and '{uniqueCheck[path]}' have the same '{repoName}'." );
+                        hasError = true;
+                    }
+                }
             }
         }
         if( hasError ) return null;

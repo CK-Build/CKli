@@ -57,7 +57,7 @@ class RootCommands
             try
             {
                 using( monitor.OpenInfo( world.Name.IsDefaultWorld
-                                        ? $"Pulling {world.Layout.Count} repositories of '{world.Name.StackName}''s default world."
+                                        ? $"Pulling {world.Layout.Count} repositories of '{world.Name.StackName}' default world."
                                         : $"Pulling {world.Layout.Count} repositories of LTS world '{world.Name.LTSName}'." ) )
                 {
                     if( !world.FixLayout( monitor, deleteAliens: false, out var newClones ) )
