@@ -1,37 +1,28 @@
 using CK.Core;
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Xml.Linq;
 
 namespace CKli.Core;
 
 /// <summary>
 /// Local world name is a <see cref="WorldName"/> that also carries
-/// its local <see cref="Root"/> path, its definition file path and
+/// its local <see cref="WorldRoot"/> path, its definition file path and
 /// <see cref="WorldDefinitionFile"/> that is lazy loaded.
 /// </summary>
 public sealed class LocalWorldName : WorldName
 {
+    readonly StackRepository _stack;
     readonly NormalizedPath _root;
     readonly NormalizedPath _xmlDescriptionFilePath;
     WorldDefinitionFile? _definitionFile;
 
-    /// <summary>
-    /// Initializes a new <see cref="LocalWorldName"/>.
-    /// </summary>
-    /// <param name="stackName">The stack name.</param>
-    /// <param name="ltsName">The optional LTS name. Can be null or empty.</param>
-    /// <param name="rootPath">Root folder of world.</param>
-    /// <param name="xmlDescriptionFilePath">Path of the definition file.</param>
-    public LocalWorldName( string stackName, string? ltsName, NormalizedPath rootPath, NormalizedPath xmlDescriptionFilePath )
-        : base( stackName, ltsName )
+    internal LocalWorldName( StackRepository stack, string? ltsName, NormalizedPath rootPath, NormalizedPath xmlDescriptionFilePath )
+        : base( stack.StackName, ltsName )
     {
-        Throw.CheckArgument( !rootPath.IsEmptyPath );
+        Throw.CheckArgument( rootPath.StartsWith( stack.StackRoot, strict: false ) );
+        _stack = stack;
         _root = rootPath;
         _xmlDescriptionFilePath = xmlDescriptionFilePath;
     }
@@ -39,12 +30,17 @@ public sealed class LocalWorldName : WorldName
     /// <summary>
     /// Gets the local world root directory path.
     /// </summary>
-    public NormalizedPath Root => _root;
+    public NormalizedPath WorldRoot => _root;
 
     /// <summary>
     /// Gets the local definition file full path.
     /// </summary>
     public NormalizedPath XmlDescriptionFilePath => _xmlDescriptionFilePath;
+
+    /// <summary>
+    /// Gets the stack to which this world belong.
+    /// </summary>
+    public StackRepository Stack => _stack;
 
     /// <summary>
     /// Loads the definition file for this world.
@@ -74,7 +70,11 @@ public sealed class LocalWorldName : WorldName
                 monitor.Error( $"Invalid world definition root element. Attribute 'LTSName = \"{LTSName}\" is required. File: '{_xmlDescriptionFilePath}'." );
                 return null;
             }
-            return new WorldDefinitionFile( doc );
+            if( WorldDefinitionFile.RepositoryUrlHook != null )
+            {
+                WorldDefinitionFile.ApplyUrlHook( monitor, root );
+            }
+            return new WorldDefinitionFile( this, doc );
         }
         catch( Exception ex )
         {
@@ -84,25 +84,153 @@ public sealed class LocalWorldName : WorldName
     }
 
     /// <summary>
-    /// Tries to parse a xml World definition file path of the form "...StackName/.[Public|Private]Stack/StackName[@LTSName].xml".
+    /// Adds a new repository.
+    /// <list type="number">
+    ///     <item>The uri must be a valid absolute url.</item>
+    ///     <item>No existing repository must exist with the same repository name.</item>
+    ///     <item>The path must be <see cref="WorldRoot"/> or starts with it (it should not end with the repository name).</item>
+    ///     <item>The path must not be below any exisiting repository.</item>
+    ///     <item>The repository is cloned.</item>
+    ///     <item>The world definition file is updated and saved.</item>
+    /// </list>
     /// </summary>
-    /// <param name="path">The file path.</param>
-    /// <returns>The name or null on error.</returns>
-    public static LocalWorldName? TryParseDefinitionFilePath( NormalizedPath path )
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="repositoryUri">The repository url.</param>
+    /// <param name="folderPath">The absolute folder path inside <see cref="WorldRoot"/>.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool AddRepository( IActivityMonitor monitor, Uri repositoryUri, NormalizedPath folderPath )
     {
-        if( path.IsEmptyPath
-            || path.Parts.Count < 4
-            || !path.LastPart.EndsWith( ".xml", StringComparison.OrdinalIgnoreCase ) ) return null;
-        var fName = path.LastPart;
-        Throw.DebugAssert( ".xml".Length == 4 );
-        fName = fName.Substring( 0, fName.Length - 4 );
-        if( !TryParse( fName, out var stackName, out var ltsName ) ) return null;
-        if( stackName != path.Parts[^3] ) return null;
-        var wRoot = path.RemoveLastPart( 2 );
-        if( ltsName != null )
+        // Check the Uri.
+        repositoryUri = GitRepositoryKey.CheckAndNormalizeRepositoryUrl(monitor, repositoryUri, out var repoName )!;
+        if( repositoryUri == null ) return false;
+
+        var message = $"Adding '{repoName}' ({repositoryUri}) to world '{FullName}'.";
+        using var _ = monitor.OpenInfo( message );
+
+        // Check the folder path.
+        if( !folderPath.StartsWith( WorldRoot, strict: false ) )
         {
-            return new LocalWorldName( stackName, ltsName, wRoot.AppendPart( ltsName ), path );
+            monitor.Error( $"Invalid folder path '{folderPath}'. It must be '{WorldRoot}' or below (in a sub folder)." );
+            return false;
         }
-        return new LocalWorldName( stackName, null, wRoot, path );
+        // And normalize it: it now ends with the repository name from the Uri.
+        // The sub folders path without the trailing repository name.
+        NormalizedPath subFolderPath;
+        if( folderPath.LastPart.Equals( repoName, StringComparison.OrdinalIgnoreCase ) )
+        {
+            // Normalize case and obtains the sub folder path.
+            subFolderPath = folderPath.RemoveLastPart();
+            folderPath = subFolderPath.AppendPart( repoName );
+            monitor.Warn( $"Useless '{repoName}' specified in last folder of '{folderPath}'." );
+        }
+        else
+        {
+            subFolderPath = folderPath;
+            folderPath = folderPath.AppendPart( repoName );
+        }
+
+        // Each path part must be a valid folder name.
+        foreach( var f in subFolderPath.Parts.Skip( WorldRoot.Parts.Count ) )
+        {
+            if( !WorldDefinitionFile.IsValidFolderName( f ) )
+            {
+                monitor.Error( $"""
+                    Invalid folder path '{folderPath}'.
+                    Folder '{f}' is not a valid folder name.
+                    """ );
+                return false;
+            }
+        }
+
+        // The folder path must not be in an existing repository.
+        var definitionFile = LoadDefinitionFile( monitor );
+        if( definitionFile == null ) return false;
+        var layout = definitionFile.ReadLayout( monitor );
+        if( layout == null ) return false;
+
+        foreach( var (path, uri) in layout )
+        {
+            if( path.StartsWith( folderPath, strict: false ) )
+            {
+                monitor.Error( $"""
+                    Invalid folder path '{folderPath}'.
+                    Cannot add a repository inside an other one: repository '{uri}' is cloned at '{path}'.
+                    """ );
+                return false;
+            }
+            if( path.LastPart.Equals( repoName, StringComparison.OrdinalIgnoreCase ) )
+            {
+                monitor.Error( $"""
+                    Cannot add repository '{repositoryUri}'.
+                    A repository with the same name exists: '{uri}' cloned at '{path}'.
+                    """ );
+                return false;
+            }
+        }
+
+        // Before updating the definition file, we must ensure that there is no existing "alien" folder...
+        if( Directory.Exists( folderPath ) )
+        {
+            monitor.Error( $"""
+                    Unable to add repository at '{folderPath}'.
+                    The folder already exixts.
+                    """ );
+            return false;
+        }
+        // ...and we must ensure that it can be cloned.
+        var gitKey = new GitRepositoryKey( _stack.SecretsStore, repositoryUri, _stack.IsPublic );
+        using var libGit = GitRepository.CloneWorkingFolder( monitor, gitKey, folderPath );
+        if( libGit == null ) return false;
+        // The working folder is successfully cloned.
+        // We can dispose the Repository and update the definition file.
+        libGit.Dispose();
+        using( definitionFile.StartEdit() )
+        {
+            definitionFile.AddRepository( subFolderPath.Parts.Skip( WorldRoot.Parts.Count ), repositoryUri );
+        }
+        return SaveDefinitionFile( monitor, "Before adding a repository.", message );
+    }
+
+    /// <summary>
+    /// Removes a repository.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="nameOrUrl">The repository name or url.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool RemoveRepository( IActivityMonitor monitor, string nameOrUrl )
+    {
+        var definitionFile = LoadDefinitionFile( monitor );
+        if( definitionFile == null ) return false;
+        var layout = definitionFile.ReadLayout( monitor );
+        if( layout == null ) return false;
+        foreach( var (path, uri) in layout )
+        {
+            if( path.LastPart.Equals( nameOrUrl, StringComparison.OrdinalIgnoreCase )
+                || nameOrUrl.Equals( uri.ToString(), StringComparison.OrdinalIgnoreCase ) )
+            {
+                var message = $"Removing '{path.LastPart}' ({uri}) from world '{FullName}'.";
+                using( monitor.OpenInfo( message ) )
+                {
+                    using( definitionFile.StartEdit() )
+                    {
+                        if( !definitionFile.RemoveRepository( monitor, uri, removeEmptyFolder: true ) ) return false;
+                    }
+                    return FileHelper.DeleteFolder( monitor, path )
+                           && SaveDefinitionFile( monitor, "Before removing a repository.", message );
+                }
+            }
+        }
+        monitor.Info( $"Repository '{nameOrUrl}' is not defined in world '{FullName}'." );
+        return false;
+    }
+
+    internal bool SaveDefinitionFile( IActivityMonitor monitor,
+                                      string cleanCommitMessage,
+                                      string commitMessage )
+    {
+        Throw.DebugAssert( _definitionFile != null );
+        return _stack.Commit( monitor, cleanCommitMessage )
+               && _definitionFile.SaveFile( monitor )
+               && _stack.Commit( monitor, commitMessage );
     }
 }

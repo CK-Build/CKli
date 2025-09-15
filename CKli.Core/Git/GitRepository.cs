@@ -1,11 +1,10 @@
 using CK.Core;
 using LibGit2Sharp;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Threading;
 using LogLevel = CK.Core.LogLevel;
 
 namespace CKli.Core;
@@ -19,7 +18,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     readonly GitRepositoryKey _repositoryKey;
     readonly Repository _git;
     readonly NormalizedPath _displayPath;
-    readonly NormalizedPath _fullPhysicalPath;
+    readonly NormalizedPath _workingFolder;
 
     GitRepository( GitRepositoryKey repositoryKey,
                    Repository libRepository,
@@ -31,11 +30,11 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
 
         _repositoryKey = repositoryKey;
         _git = libRepository;
-        _fullPhysicalPath = fullPath;
+        _workingFolder = fullPath;
         _displayPath = displayPath;
 
-        Throw.CheckArgument( _fullPhysicalPath == libRepository.Info.WorkingDirectory );
-        Throw.CheckArgument( _fullPhysicalPath.EndsWith( _displayPath, strict: false ) );
+        Throw.CheckArgument( _workingFolder == libRepository.Info.WorkingDirectory );
+        Throw.CheckArgument( _workingFolder.EndsWith( _displayPath, strict: false ) );
     }
 
     /// <summary>
@@ -62,9 +61,10 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     public NormalizedPath DisplayPath => _displayPath;
 
     /// <summary>
-    /// Full physical path is the same as LibGit's <see cref="RepositoryInformation.WorkingDirectory"/>.
+    /// Gets the full physical path of the working folder.
+    /// Same as LibGit's <see cref="RepositoryInformation.WorkingDirectory"/>.
     /// </summary>
-    public NormalizedPath FullPhysicalPath => _fullPhysicalPath;
+    public NormalizedPath WorkingFolder => _workingFolder;
 
     /// <summary>
     /// Gets the current branch name (name of the repository's HEAD).
@@ -105,7 +105,8 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     /// <param name="CommitAhead">
     /// The number of commit that are ahead of the origin.
     /// 0 mean that there a no commit ahead of origin.
-    /// Null if there is no origin (the branch is not tracked).</param>
+    /// Null if there is no origin (the branch is not tracked).
+    /// </param>
     public readonly record struct SimpleStatusInfo( NormalizedPath DisplayName, string CurrentBranchName, bool IsDirty, int? CommitAhead );
 
     /// <summary>
@@ -203,15 +204,15 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     /// <para>
     /// If the branch is created, it will point at the same commit as the current <see cref="Head"/>.
     /// The branch is guaranteed to exist but the <see cref="CurrentBranchName"/> stays where it is.
-    /// Use <see cref="SetCurrentBranch(IActivityMonitor, string)"/> to make sure that the potential remote 'origin' branch
+    /// Use <see cref="SetCurrentBranch(IActivityMonitor, string, bool)"/> to make sure that the potential remote 'origin' branch
     /// is fetched if it exists.
     /// </para>
     /// </summary>
-    /// <param name="m">The monitor to use.</param>
+    /// <param name="monitor">The monitor to use.</param>
     /// <param name="branchName">The branch name.</param>
-    public void EnsureBranch( IActivityMonitor m, string branchName, LogLevel createLocalLogLevel = LogLevel.Info )
+    public void EnsureBranch( IActivityMonitor monitor, string branchName, LogLevel createLocalLogLevel = LogLevel.Info )
     {
-        DoEnsureBranch( m, _git, branchName, createLocalLogLevel, DisplayPath, out var _ );
+        DoEnsureBranch( monitor, _git, branchName, createLocalLogLevel, DisplayPath, out var _ );
     }
 
     /// <summary>
@@ -221,12 +222,10 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     public bool CanAmendCommit => (_git.Head.TrackingDetails.AheadBy ?? 1) > 0;
 
     /// <summary>
-    /// Fetches 'origin' (or all remotes) branches into this repository.
+    /// Fetches 'origin' (or all remotes) branches and tags into this repository.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <returns>
-    /// Success is true on success, false on error.
-    /// </returns>
+    /// <returns>True on success, false on error.</returns>
     public bool FetchBranches( IActivityMonitor monitor, bool originOnly = true )
     {
         using( monitor.OpenInfo( $"Fetching {(originOnly ? "origin" : "all remotes")} in repository '{DisplayPath}'." ) )
@@ -308,7 +307,9 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     /// <param name="mergeFileFavor">How merge must be done.</param>
     /// <param name="fastForwardStrategy">The fast forward strategy to apply.</param>
     /// <returns>A MergeResult: both <see cref="MergeResult.Error"/> and <see cref="MergeResult.ErrorConflicts"/> are failures.</returns>
-    public MergeResult Pull( IActivityMonitor monitor, MergeFileFavor mergeFileFavor = MergeFileFavor.Normal, FastForwardStrategy fastForwardStrategy = FastForwardStrategy.Default )
+    public MergeResult Pull( IActivityMonitor monitor,
+                             MergeFileFavor mergeFileFavor = MergeFileFavor.Normal,
+                             FastForwardStrategy fastForwardStrategy = FastForwardStrategy.Default )
     {
         if( _git.Head.TrackedBranch == null )
         {
@@ -415,7 +416,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     /// Amends the current commit, optionally changing its message and/or its date.
     /// <see cref="CanAmendCommit"/> must be true otherwise an <see cref="InvalidOperationException"/> is thrown.
     /// </summary>
-    /// <param name="m">The monitor to use.</param>
+    /// <param name="monitor">The monitor to use.</param>
     /// <param name="editMessage">
     /// Optional message transformer. By returning null, the operation is canceled and false is returned.
     /// </param>
@@ -427,19 +428,19 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     /// False will force the amend to be done if the date or message changed even if the working folder is clean.
     /// </param>
     /// <returns>True on success, false on error.</returns>
-    public CommitResult AmendCommit( IActivityMonitor m,
-                                         Func<string, string>? editMessage = null,
-                                         Func<DateTimeOffset, DateTimeOffset?>? editDate = null,
-                                         bool skipIfNothingToCommit = true )
+    public CommitResult AmendCommit( IActivityMonitor monitor,
+                                     Func<string, string>? editMessage = null,
+                                     Func<DateTimeOffset, DateTimeOffset?>? editDate = null,
+                                     bool skipIfNothingToCommit = true )
     {
         if( !CanAmendCommit ) throw new InvalidOperationException( nameof( CanAmendCommit ) );
-        using( m.OpenInfo( $"Amending Commit in '{DisplayPath}' (branch '{CurrentBranchName}')." ) )
+        using( monitor.OpenInfo( $"Amending Commit in '{DisplayPath}' (branch '{CurrentBranchName}')." ) )
         {
             var message = _git.Head.Tip.Message;
             if( editMessage != null ) message = editMessage( message );
             if( String.IsNullOrWhiteSpace( message ) )
             {
-                m.CloseGroup( "Canceled by empty message." );
+                monitor.CloseGroup( "Canceled by empty message." );
                 return CommitResult.Error;
             }
             DateTimeOffset initialDate = _git.Head.Tip.Committer.When;
@@ -447,7 +448,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
             if( editDate != null ) date = editDate( date.Value );
             if( date == null )
             {
-                m.CloseGroup( "Canceled by null date." );
+                monitor.CloseGroup( "Canceled by null date." );
                 return CommitResult.Error;
             }
             Commands.Stage( _git, "*" );
@@ -461,7 +462,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
                     date = DateTimeOffset.Now;
                     if( date < minDate )
                     {
-                        m.Trace( "Adjusted commit date to the next second." );
+                        monitor.Trace( "Adjusted commit date to the next second." );
                         date = minDate;
                     }
                 }
@@ -474,25 +475,25 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
                     bool dateUpdate = date.Value != _git.Head.Tip.Committer.When;
                     if( messageUpdate && dateUpdate )
                     {
-                        m.Info( "Updating message and date." );
+                        monitor.Info( "Updating message and date." );
                     }
                     else if( dateUpdate )
                     {
-                        m.Info( "Updating commit date." );
+                        monitor.Info( "Updating commit date." );
                     }
                     else if( messageUpdate )
                     {
-                        m.Info( "Only updating message." );
+                        monitor.Info( "Only updating message." );
                     }
                     else skipIfNothingToCommit = true;
                 }
                 if( skipIfNothingToCommit )
                 {
-                    m.CloseGroup( "Working folder is up-to-date." );
+                    monitor.CloseGroup( "Working folder is up-to-date." );
                     return CommitResult.NoChanges;
                 }
             }
-            return DoCommit( m, message, date.Value, true );
+            return DoCommit( monitor, message, date.Value, true );
         }
     }
 
@@ -561,7 +562,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
                 var b = _git.Branches[branchName];
                 if( b == null )
                 {
-                    monitor.Error( $"Unable to find branch '{branchName}'." );
+                    monitor.Error( $"Unable to find branch '{branchName}' in '{DisplayPath}'." );
                     return false;
                 }
                 bool created = false;
@@ -571,17 +572,31 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
                     _git.Branches.Update( b, u => { u.Remote = "origin"; u.UpstreamBranch = b.CanonicalName; } );
                     created = true;
                 }
-                var options = new PushOptions()
-                {
-                    CredentialsProvider = ( url, user, types ) => creds,
-                    OnPushStatusError = ( e ) =>
-                    {
-                        throw new InvalidOperationException( $"Error while pushing ref {e.Reference} => {e.Message}" );
-                    }
-                };
                 if( created || (b.TrackingDetails.AheadBy ?? 1) > 0 )
                 {
+                    // Take no risk: consider that the error callback can be called concurrently
+                    // and that there may be more than one error.
+                    ConcurrentBag<string> errors = new ConcurrentBag<string>();
+                    var options = new PushOptions()
+                    {
+                        CredentialsProvider = ( url, user, types ) => creds,
+                        OnPushStatusError = ( e ) =>
+                        {
+                            errors.Add( $"""
+                                Error while pushing ref '{e.Reference}':
+                                {e.Message}
+                                """ );
+                        }
+                    };
                     _git.Network.Push( b, options );
+                    if( errors.Count > 0 )
+                    {
+                        foreach( var error in errors )
+                        {
+                            monitor.Error( error );
+                        }
+                        monitor.CloseGroup( $"{errors.Count} errors." );
+                    }
                 }
                 else
                 {
@@ -609,7 +624,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     /// <param name="workingFolder">The local working folder.</param>
     /// <param name="displayPath">
     /// The short path to display, relative to a well known root. It must not be empty.
-    /// (this can be the <see cref="NormalizedPath.LastPart"/> of the <paramref name="workingFolder"/>.)
+    /// (This is often the <see cref="NormalizedPath.LastPart"/> of the <paramref name="workingFolder"/>.)
     /// </param>
     /// <returns>The GitRepository object or null on error.</returns>
     public static GitRepository? Clone( IActivityMonitor monitor,
@@ -619,6 +634,31 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     {
         var r = CloneWorkingFolder( monitor, git, workingFolder );
         return r == null ? null : new GitRepository( git, r, workingFolder, displayPath );
+    }
+
+    /// <summary>
+    /// Opens a working folder. The <paramref name="workingFolder"/> must exist otherwise an error is logged.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The key store to use.</param>
+    /// <param name="workingFolder">The local working folder.</param>
+    /// <param name="displayPath">
+    /// The short path to display, relative to a well known root. It must not be empty.
+    /// (This is often the <see cref="NormalizedPath.LastPart"/> of the <paramref name="workingFolder"/>.)
+    /// </param>
+    /// <param name="isPublic">Whether this repository is a public or private one.</param>
+    /// <returns>The SimpleGitRepository object or null on error.</returns>
+    public static GitRepository? Open( IActivityMonitor monitor,
+                                       ISecretsStore secretsStore,
+                                       NormalizedPath workingFolder,
+                                       NormalizedPath displayPath,
+                                       bool isPublic )
+    {
+        var r = OpenWorkingFolder( monitor, workingFolder, warnOnly: false );
+        if( r == null ) return null;
+
+        var gitKey = new GitRepositoryKey( secretsStore, r.Value.OriginUrl, isPublic );
+        return new GitRepository( gitKey, r.Value.Repository, workingFolder, displayPath );
     }
 
     /// <summary>
@@ -667,31 +707,6 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
                 return null;
             }
         }
-    }
-
-    /// <summary>
-    /// Opens a working folder.
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="secretsStore">The key store to use.</param>
-    /// <param name="workingFolder">The local working folder.</param>
-    /// <param name="displayPath">
-    /// The short path to display, relative to a well known root. It must not be empty.
-    /// (this can be the <see cref="NormalizedPath.LastPart"/> of the <paramref name="workingFolder"/>.)
-    /// </param>
-    /// <param name="isPublic">Whether this repository is a public or private one.</param>
-    /// <returns>The SimpleGitRepository object or null on error.</returns>
-    public static GitRepository? Open( IActivityMonitor monitor,
-                                       ISecretsStore secretsStore,
-                                       NormalizedPath workingFolder,
-                                       NormalizedPath displayPath,
-                                       bool isPublic )
-    {
-        var r = OpenWorkingFolder( monitor, workingFolder, warnOnly: false );
-        if( r == null ) return null;
-
-        var gitKey = new GitRepositoryKey( secretsStore, r.Value.OriginUrl, isPublic );
-        return new GitRepository( gitKey, r.Value.Repository, workingFolder, displayPath );
     }
 
     /// <summary>

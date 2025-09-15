@@ -1,0 +1,227 @@
+using CK.Core;
+using CKli.Core;
+using System;
+
+namespace CKli;
+
+/// <summary>
+/// Shell independent command implementations. All boolean options must be false by default.
+/// </summary>
+public static class CKliCommands
+{
+    /// <summary>
+    /// Clones a Stack and all its current world repositories in the current directory.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="path">The current path to consider.</param>
+    /// <param name="stackUrl">The url stack repository to clone from. The repository name must end with '-Stack'.</param>
+    /// <param name="private">Indicates a private repository. A Personal Access Token (or any other secret) is required.</param>
+    /// <param name="allowDuplicate">Allows a stack that already exists locally to be cloned.</param>
+    /// <returns>0 on success, negative on error.</returns>
+    public static int Clone( IActivityMonitor monitor, ISecretsStore secretsStore, NormalizedPath path, Uri stackUrl, bool @private = false, bool allowDuplicate = false )
+    {
+        return StackRepository.Clone( monitor, secretsStore, stackUrl, !@private, path, allowDuplicate ) != null
+                ? 0
+                : -1;
+    }
+
+    /// <summary>
+    /// Resynchronizes the current world from the remotes. 
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="path">The current path to consider.</param>
+    /// <param name="skipPullStack">Don't pull the stack repository itself.</param>
+    /// <returns>0 on success, negative on error.</returns>
+    public static int Pull( IActivityMonitor monitor, ISecretsStore secretsStore, NormalizedPath path, bool skipPullStack = false )
+    {
+        if( !StackRepository.OpenWorldFromPath( monitor,
+                                                secretsStore,
+                                                path,
+                                                out var stack,
+                                                out var world,
+                                                skipPullStack ) )
+        {
+            return -1;
+        }
+        try
+        {
+            return world.Pull( monitor ) ? 0 : -2;
+        }
+        finally
+        {
+            stack.Dispose();
+            world.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Pushes the repositories' current branches of the current world to the remotes.
+    /// A 'pull' is done first to detect any potential conflicts with the remotes' state. 
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="path">The current path to consider.</param>
+    /// <param name="stackOnly">Only push the stack repository, not the repositories of the current world.</param>
+    /// <param name="continueOnError">Push all the repositories even on error. By default the first error stops the pushes.</param>
+    /// <returns>0 on success, negative on error.</returns>
+    public static int Push( IActivityMonitor monitor, ISecretsStore secretsStore, string path, bool stackOnly = false, bool continueOnError = false )
+    {
+        if( !StackRepository.OpenWorldFromPath( monitor,
+                                                secretsStore,
+                                                path,
+                                                out var stack,
+                                                out var world,
+                                                skipPullStack: false ) )
+        {
+            return -1;
+        }
+        try
+        {
+            if( !stack.PushChanges( monitor ) )
+            {
+                return -2;
+            }
+            return stackOnly
+                    ? 0
+                    : world.Push( monitor, !continueOnError )
+                        ? 0
+                        : -2;
+        }
+        finally
+        {
+            stack.Dispose();
+            world.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Adds a new repository to the current world. 
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="path">The current path to consider.</param>
+    /// <param name="repositoryUrl">Url of the repository to add and clone.</param>
+    /// <param name="allowLTS">Allows the current world to be a Long Term Support world.</param>
+    /// <returns>0 on success, negative on error.</returns>
+    public static int RepositoryAdd( IActivityMonitor monitor, ISecretsStore secretsStore, NormalizedPath path, Uri repositoryUrl, bool allowLTS = false )
+    {
+        if( !StackRepository.OpenFromPath( monitor, secretsStore, path, out var stack, skipPullStack: true ) )
+        {
+            return -1;
+        }
+        try
+        {
+            var worldName = stack.GetWorldNameFromPath( monitor, path );
+            if( worldName == null )
+            {
+                return -2;
+            }
+            if( !allowLTS && !worldName.IsDefaultWorld )
+            {
+                return RequiresAllowLTS( monitor, worldName );
+            }
+            return worldName.AddRepository( monitor, repositoryUrl, path )
+                    ? 0
+                    : -4;
+        }
+        finally
+        {
+            stack.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Removes a repository from the current world. 
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="path">The current path to consider.</param>
+    /// <param name="nameOrUrl">Name or url of the repository to remove.</param>
+    /// <param name="allowLTS">Allows the current world to be a Long Term Support world.</param>
+    /// <returns>0 on success, negative on error.</returns>
+    public static int RepositoryRemove( IActivityMonitor monitor, ISecretsStore secretsStore, NormalizedPath path, string nameOrUrl, bool allowLTS = false )
+    {
+        if( !StackRepository.OpenFromPath( monitor, secretsStore, path, out var stack, skipPullStack: true ) )
+        {
+            return -1;
+        }
+        try
+        {
+            var worldName = stack.GetWorldNameFromPath( monitor, path );
+            if( worldName == null )
+            {
+                return -2;
+            }
+            if( !allowLTS && !worldName.IsDefaultWorld )
+            {
+                return RequiresAllowLTS( monitor, worldName );
+            }
+            return worldName.RemoveRepository( monitor, nameOrUrl )
+                    ? 0
+                    : -3;
+        }
+        finally
+        {
+            stack.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Fixes the the folders and repositories layout of the current world. 
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="path">The current path to consider.</param>
+    /// <param name="deleteAliens">Delete repositories that don't belong to the current world.</param>
+    /// <returns>0 on success, negative on error.</returns>
+    public static int LayoutFix( IActivityMonitor monitor, ISecretsStore secretsStore, NormalizedPath path, bool deleteAliens = false )
+    {
+        if( !StackRepository.OpenWorldFromPath( monitor, secretsStore, path, out var stack, out var world, skipPullStack: true ) )
+        {
+            return -1;
+        }
+        try
+        {
+            return world.FixLayout( monitor, deleteAliens, out _ )
+                    ? 0
+                    : -2;
+        }
+        finally
+        {
+            world.Dispose();
+            stack.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Updates the layout of the current world from existing folders and repositories.
+    /// To share this updated layout with others, 'push --stackOnly' must be executed. 
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="path">The current path to consider.</param>
+    /// <returns>0 on success, negative on error.</returns>
+    public static int LayoutXif( IActivityMonitor monitor, ISecretsStore secretsStore, NormalizedPath path )
+    {
+        if( !StackRepository.OpenWorldFromPath( monitor, secretsStore, path, out var stack, out var world, skipPullStack: true ) )
+        {
+            return -1;
+        }
+        try
+        {
+            return world.XifLayout( monitor )
+                    ? 0
+                    : -2;
+        }
+        finally
+        {
+            world.Dispose();
+            stack.Dispose();
+        }
+    }
+
+    static int RequiresAllowLTS( IActivityMonitor monitor, LocalWorldName worldName )
+    {
+        monitor.Error( $"""
+                        Current world '{worldName}' is not the default world.
+                        --allow-LTS option must be specified.
+                        """ );
+        return -3;
+    }
+
+}

@@ -33,7 +33,7 @@ public enum KnownGitProvider
     Bitbucket = 4,
 
     /// <summary>
-    /// A filesystem (file:// uri).
+    /// A filesystem (file:/// uri).
     /// </summary>
     FileSystem = 5
 }

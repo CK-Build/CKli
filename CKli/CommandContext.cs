@@ -8,7 +8,9 @@ static class CommandContext
 {
     public static LogFilter LogFilter;
 
-    public static int WithMonitor( Func<IActivityMonitor,int> run )
+    public static IUserPreferences UserPreferences = new DefaultUserPreferences();
+
+    public static int Run( Func<IActivityMonitor,int> run )
     {
         ActivityMonitor.DefaultFilter = LogFilter;
         var monitor = new ActivityMonitor();
@@ -25,4 +27,5 @@ static class CommandContext
         }
     }
 
+    public static int Run( Func<IActivityMonitor, IUserPreferences, int> run ) => Run( monitor => run( monitor, UserPreferences ) );
 }

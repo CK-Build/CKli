@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Configuration.UserSecrets;
 using CK.Core;
 using System.Text.Json;
-using System.Threading;
 using System.IO;
 using System;
 using System.Collections.Generic;

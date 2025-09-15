@@ -1,12 +1,9 @@
 using CK.Core;
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Xml.Linq;
 
 namespace CKli.Core;
@@ -15,9 +12,16 @@ namespace CKli.Core;
 /// Encapsulate the <see cref="GitRepository"/> with its worlds.
 /// There are only 2 ways to obtain a StackRepository:
 /// <list type="bullet">
-///     <item>Calling <see cref="TryOpenFrom(IActivityMonitor, ISecretsStore, in NormalizedPath, out CKli.Core.StackRepository?, string)"/> from any local path.</item>
-///     <item>Calling <see cref="Clone(IActivityMonitor, ISecretsStore, Uri, bool, in NormalizedPath, bool, string)"/> from the remote Uri of the stack.</item>
+///     <item>
+///         Calling <see cref="TryOpenFromPath"/>, <see cref="TryOpenWorldFromPath"/> or <see cref="OpenWorldFromPath"/>
+///         from any local path.
+///     </item>
+///     <item>
+///         Calling <see cref="Clone(IActivityMonitor, ISecretsStore, Uri, bool, in NormalizedPath, bool, string)"/>
+///         from the remote Uri of the stack.
+///     </item>
 /// </list>
+/// 
 /// </summary>
 public sealed partial class StackRepository : IDisposable
 {
@@ -29,29 +33,27 @@ public sealed partial class StackRepository : IDisposable
     readonly NormalizedPath _stackRoot;
     readonly ISecretsStore _secretsStore;
     LocalWorldName? _defaultWorldName;
-
     ImmutableArray<LocalWorldName> _worldNames;
-    bool _isDirty;
 
     /// <summary>
-    /// Gets the root path of the stack.
+    /// Gets the root path of the stack (the parent folder of the ".PrivateStack" or ".PublicStack" folder).
     /// </summary>
     public NormalizedPath StackRoot => _stackRoot;
 
     /// <summary>
     /// Gets the path of the ".PrivateStack" or ".PublicStack". 
     /// </summary>
-    public NormalizedPath Path => _git.FullPhysicalPath;
+    public NormalizedPath StackWorkingFolder => _git.WorkingFolder;
+
+    /// <summary>
+    /// Gets the <see cref="StackName"/>/<see cref="PublicStackName"/> (or <see cref="PrivateStackName"/>) path.
+    /// </summary>
+    public NormalizedPath GitDisplayPath => _git.DisplayPath;
 
     /// <summary>
     /// Gets the name of this stack that is necessarily the last part of the <see cref="StackRoot"/>.
     /// </summary>
     public string StackName => _stackRoot.LastPart;
-
-    /// <summary>
-    /// Gets whether this stack is dirty.
-    /// </summary>
-    public bool IsDirty => _isDirty;
 
     /// <summary>
     /// Gets whether this stack is public.
@@ -75,10 +77,7 @@ public sealed partial class StackRepository : IDisposable
     {
         get
         {
-            if( _defaultWorldName == null )
-            {
-                _defaultWorldName = new LocalWorldName( StackName, null, _stackRoot, Path.AppendPart( $"{StackName}.xml" ) );
-            }
+            _defaultWorldName ??= new LocalWorldName( this, null, _stackRoot, StackWorkingFolder.AppendPart( $"{StackName}.xml" ) );
             return _defaultWorldName;
         }
     }
@@ -86,6 +85,13 @@ public sealed partial class StackRepository : IDisposable
     /// <summary>
     /// Gets all the worlds that this stack contains starting with the <see cref="DefaultWorldName"/>
     /// and lexigraphically sorted.
+    /// <para>
+    /// Worlds are defined by the xml World definition files "StackName[@LTSName].xml" in this stack reposiory <see cref="StackWorkingFolder"/>.
+    /// </summary>
+    /// <param name="path">The file path.</param>
+    /// <returns>The name or null on error.</returns>
+
+    /// </para>
     /// </summary>
     public ImmutableArray<LocalWorldName> WorldNames
     {
@@ -93,15 +99,34 @@ public sealed partial class StackRepository : IDisposable
         {
             if( _worldNames.IsDefault )
             {
-                _worldNames = Directory.GetFiles( Path, $"{StackName}.*.xml" )
-                                .Select( p => LocalWorldName.TryParseDefinitionFilePath( p ) )
+                _worldNames = Directory.GetFiles( StackWorkingFolder, $"{StackName}@*.xml" )
+                                .Select( p => TryParseDefinitionFilePath( this, p ) )
                                 .Where( w => w != null )
                                 .OrderBy( n => n!.FullName )
                                 .Prepend( DefaultWorldName )
                                 .ToImmutableArray()!;
             }
             return _worldNames;
+
+            static LocalWorldName? TryParseDefinitionFilePath( StackRepository stack, NormalizedPath path )
+            {
+                Throw.DebugAssert( !path.IsEmptyPath
+                                   && path.Parts.Count >= 4
+                                   && path.LastPart.EndsWith( ".xml", StringComparison.OrdinalIgnoreCase ) );
+                var fName = path.LastPart;
+                Throw.DebugAssert( ".xml".Length == 4 );
+                fName = fName.Substring( 0, fName.Length - 4 );
+                if( !WorldName.TryParse( fName, out var stackName, out var ltsName ) ) return null;
+                Throw.DebugAssert( stackName == stack.StackName );
+                var wRoot = stack.StackRoot;
+                if( ltsName != null )
+                {
+                    return new LocalWorldName( stack, ltsName, wRoot.AppendPart( ltsName ), path );
+                }
+                return new LocalWorldName( stack, null, wRoot, path );
+            }
         }
+
     }
 
     /// <summary>
@@ -114,7 +139,7 @@ public sealed partial class StackRepository : IDisposable
         var defaultWorld = WorldNames.FirstOrDefault( w => w.LTSName == null );
         if( defaultWorld == null )
         {
-            monitor.Error( $"Stack '{StackRoot}': the default World definition is missing. Expecting file '{_git.FullPhysicalPath}/{StackName}.xml'." );
+            monitor.Error( $"Stack '{StackRoot}': the default World definition is missing. Expecting file '{_git.WorkingFolder}/{StackName}.xml'." );
         }
         return defaultWorld;
     }
@@ -148,25 +173,32 @@ public sealed partial class StackRepository : IDisposable
     }
 
     /// <summary>
+    /// Creates a commit if needed.
+    /// A stack never tries to amend commits: commits are always <see cref="CommitBehavior.CreateNewCommit"/>
+    /// and no empty commits are done.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="commitMessage">The commit message.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool Commit( IActivityMonitor monitor, string commitMessage )
+    {
+        return _git.Commit( monitor, commitMessage, CommitBehavior.CreateNewCommit ) != CommitResult.Error;
+    }
+
+    /// <summary>
     /// Commits and push changes to the remote.
-    /// Nothing is done if <see cref="IsDirty"/> is false.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <returns>True on success, false on error.</returns>
-    internal bool PushChanges( IActivityMonitor monitor )
+    public bool PushChanges( IActivityMonitor monitor )
     {
-        if( !_isDirty ) return false;
-        CommitResult result = _git.Commit( monitor, "Automatic synchronization commit." );
+        CommitResult result = _git.Commit( monitor, "Automatic pre-push commit." );
         if( result == CommitResult.NoChanges )
         {
             monitor.Trace( "Nothing committed. Skipping push." );
-            _isDirty = false;
+            return true;
         }
-        else
-        {
-            _isDirty = result == CommitResult.Error || !_git.Push( monitor );
-        }
-        return !_isDirty;
+        return result != CommitResult.Error && _git.Push( monitor );
     }
 
     StackRepository( GitRepository git, in NormalizedPath stackRoot, ISecretsStore secretsStore )
@@ -179,37 +211,37 @@ public sealed partial class StackRepository : IDisposable
     /// <summary>
     /// Tries to open a stack directory from a path.
     /// This lookups the ".PrivateStack" or ".PublicStack" in and above <paramref name="path"/>: if none
-    /// are found, this is successful but <paramref name="stackRepository"/> is null.
+    /// are found, there is no <paramref name="error"/> and null is returned.
     /// <para>
-    /// On success, the <paramref name="stackRepository"/> is on the <paramref name="stackBranchName"/> and, by default,
-    /// the stack and its world definitions has been updated: use <paramref name="skipPullMerge"/> to leave the local stack
-    /// untouched.
+    /// On success, the stack repository is on the <paramref name="stackBranchName"/> and, by default,
+    /// the stack and its world definitions has been updated (but not the repositories of any of the worlds):
+    /// use <paramref name="skipPullStack"/> to leave the local stack untouched.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="secretsStore">The secret key store.</param>
     /// <param name="path">The starting path.</param>
-    /// <param name="stackRepository">The resulting stack directory if found and opened successfully.</param>
-    /// <param name="skipPullMerge">True to leave the stack repository as-is. By default, a pull is done from the stack repository.</param>
-    /// <param name="stackBranchName">Specifies a branch name. There should be no reason to use multiple branch in a stack repository.</param>
-    /// <returns>True on success, false on error.</returns>
-    public static bool TryOpenFrom( IActivityMonitor monitor,
-                                    ISecretsStore secretsStore,
-                                    in NormalizedPath path,
-                                    out StackRepository? stackRepository,
-                                    bool skipPullMerge = false,
-                                    string stackBranchName = "main" )
+    /// <param name="error">True on success, false on error.</param>
+    /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
+    /// <param name="stackBranchName">Specifies a branch name. There should be no reason to use multiple branches in a stack repository.</param>
+    /// <returns>The resulting stack repository if found and opened successfully. May be null if not found.</returns>
+    public static StackRepository? TryOpenFromPath( IActivityMonitor monitor,
+                                                    ISecretsStore secretsStore,
+                                                    in NormalizedPath path,
+                                                    out bool error,
+                                                    bool skipPullStack = false,
+                                                    string stackBranchName = "main" )
     {
         Throw.CheckNotNullOrWhiteSpaceArgument( stackBranchName );
-        stackRepository = null;
+        error = false;
         var gitPath = FindGitStackPath( path );
-        if( gitPath.IsEmptyPath ) return true;
+        if( gitPath.IsEmptyPath ) return null;
 
         var isPublic = gitPath.LastPart == PublicStackName;
         var git = GitRepository.Open( monitor,
                                       secretsStore,
                                       gitPath,
-                                      gitPath,
+                                      gitPath.RemoveFirstPart( gitPath.Parts.Count - 2 ),
                                       isPublic );
         if( git != null )
         {
@@ -221,16 +253,126 @@ public sealed partial class StackRepository : IDisposable
                     && stackRoot.LastPart != DuplicatePrefix + stackNameFromUrl )
                 {
                     monitor.Error( $"Stack folder '{stackRoot.LastPart}' must be '{stackNameFromUrl}' (or '{DuplicatePrefix}{stackNameFromUrl}') since repository Url is '{git.OriginUrl}'." );
+                    error = true;
                 }
-                else if( git.SetCurrentBranch( monitor, stackBranchName, skipPullMerge ) )
+                else if( git.SetCurrentBranch( monitor, stackBranchName, skipPullStack ) )
                 {
-                    stackRepository = new StackRepository( git, stackRoot, secretsStore );
-                    return true;
+                    return new StackRepository( git, stackRoot, secretsStore );
                 }
             }
             git.Dispose();
         }
-        return false;
+        else
+        {
+            error = true;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Open a stack from a path.
+    /// This lookups the ".PrivateStack" or ".PublicStack" in and above <paramref name="path"/>: a stack
+    /// must be found otherwise it is an error.
+    /// <para>
+    /// On success, the stack repository is on the <paramref name="stackBranchName"/> and, by default,
+    /// the stack and its world definitions has been updated (but not the repositories of any of the worlds):
+    /// use <paramref name="skipPullStack"/> to leave the local stack untouched.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secret key store.</param>
+    /// <param name="path">The starting path.</param>
+    /// <param name="stack">The non null stack on success.</param>
+    /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
+    /// <param name="stackBranchName">Specifies a branch name. There should be no reason to use multiple branches in a stack repository.</param>
+    /// <returns>The resulting stack repository if found and opened successfully. May be null if not found.</returns>
+    public static bool OpenFromPath( IActivityMonitor monitor,
+                                     ISecretsStore secretsStore,
+                                     in NormalizedPath path,
+                                     [NotNullWhen(true)] out StackRepository? stack,
+                                     bool skipPullStack = false,
+                                     string stackBranchName = "main" )
+    {
+        stack = TryOpenFromPath( monitor, secretsStore, path, out bool error, skipPullStack );
+        if( error ) return false;
+        if( stack == null )
+        {
+            monitor.Error( $"Unable to find a stack repository from path '{path}'." );
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Tries to open a stack and a world from a <paramref name="path"/>. If no stack is found on or above the path,
+    /// this is not an error but <c>(null,null)</c> is returned.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secret key store.</param>
+    /// <param name="path">The starting path.</param>
+    /// <param name="error">True on success, false on error.</param>
+    /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
+    /// <returns>The resulting stack repository and world on success. Both are null on error of if no stack is found.</returns>
+    public static (StackRepository? Stack, World? World) TryOpenWorldFromPath( IActivityMonitor monitor,
+                                                                               ISecretsStore secretsStore,
+                                                                               in NormalizedPath path,
+                                                                               out bool error,
+                                                                               bool skipPullStack = false )
+    {
+        var stack = TryOpenFromPath( monitor, secretsStore, path, out error, skipPullStack );
+        if( stack != null )
+        {
+            var w = World.TryOpenFromPath( monitor, stack, path );
+            if( w == null )
+            {
+                error = true;
+                stack.Dispose();
+            }
+            else
+            {
+                return (stack, w);
+            }
+        }
+        return (null, null);
+    }
+
+    /// <summary>
+    /// Opens a stack and a world from a <paramref name="path"/>.
+    /// A stack must be found on or above the path otherwise it is an error.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secret key store.</param>
+    /// <param name="path">The starting path.</param>
+    /// <param name="stack">The non null stack on success.</param>
+    /// <param name="world">The non null world on success.</param>
+    /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
+    /// <returns>True on success, false on error.</returns>
+    public static bool OpenWorldFromPath( IActivityMonitor monitor,
+                                          ISecretsStore secretsStore,
+                                          in NormalizedPath path,
+                                          [NotNullWhen( true )] out StackRepository? stack,
+                                          [NotNullWhen( true )] out World? world,
+                                          bool skipPullStack = false )
+    {
+        world = null;
+        stack = TryOpenFromPath( monitor, secretsStore, path, out bool error, skipPullStack );
+        if( error )
+        {
+            return false;
+        }
+        if( stack == null )
+        {
+            monitor.Error( $"No stack found for path '{path}'." );
+            return false;
+        }
+        world = World.TryOpenFromPath( monitor, stack, path );
+        if( world == null )
+        {
+            stack.Dispose();
+            stack = null;
+            return false;
+        }
+        return true;
     }
 
     /// <summary>
@@ -269,7 +411,7 @@ public sealed partial class StackRepository : IDisposable
         var already = Registry.CheckExistingStack( monitor, url );
         if( already.Count > 0 )
         {
-            monitor.Log( allowDuplicateStack ? LogLevel.Warn : LogLevel.Error,
+            monitor.Log( allowDuplicateStack ? CK.Core.LogLevel.Warn : CK.Core.LogLevel.Error,
                         $"""
                         The stack '{stackNameFromUrl}' at '{url}' is already available here:
                         {already.Select( p => p.Path ).Concatenate( Environment.NewLine )}
@@ -302,14 +444,14 @@ public sealed partial class StackRepository : IDisposable
         var git = GitRepository.Clone( monitor,
                                        new GitRepositoryKey( secretsStore, url, isPublic ),
                                        gitPath,
-                                       gitPath );
+                                       gitPath.RemoveFirstPart( gitPath.Parts.Count - 2 ) );
         if( git != null )
         {
             if( git.SetCurrentBranch( monitor, stackBranchName ) )
             {
                 SetupNewLocalDirectory( gitPath );
-                var result = new StackRepository( git, stackRoot, secretsStore );
                 Registry.RegisterNewStack( monitor, gitPath, url );
+                var result = new StackRepository( git, stackRoot, secretsStore );
                 if( CloneWorld( monitor, result, secretsStore, result.DefaultWorldName ) )
                 {
                     return result;
@@ -354,7 +496,7 @@ public sealed partial class StackRepository : IDisposable
             {
                 var r = GitRepository.CloneWorkingFolder( monitor,
                                                           new GitRepositoryKey( secretsStore, url, stack.IsPublic ),
-                                                          world.Root.Combine( subPath ) );
+                                                          world.WorldRoot.Combine( subPath ) );
                 if( r == null )
                 {
                     success = false;
@@ -388,22 +530,21 @@ public sealed partial class StackRepository : IDisposable
         Throw.CheckArgument( WorldName.IsValidLTSName( ltsName ) );
 
         var newRoot = _stackRoot.AppendPart( ltsName );
-        var newDesc = _git.FullPhysicalPath.AppendPart( $"{StackName}{ltsName}.xml" );
-        var newOne = new LocalWorldName( StackName, ltsName, newRoot, newDesc );
+        var newDesc = _git.WorkingFolder.AppendPart( $"{StackName}{ltsName}.xml" );
+        var newOne = new LocalWorldName( this, ltsName, newRoot, newDesc );
 
         if( File.Exists( newOne.XmlDescriptionFilePath ) )
         {
             monitor.Error( $"Unable to create '{newOne}' world: file '{newOne.XmlDescriptionFilePath}' already exists." );
             return null;
         }
-        if( Directory.Exists( newOne.Root ) )
+        if( Directory.Exists( newOne.WorldRoot ) )
         {
-            monitor.Error( $"Unable to create '{newOne}' world: directory {newOne.Root} already exists." );
+            monitor.Error( $"Unable to create '{newOne}' world: directory {newOne.WorldRoot} already exists." );
             return null;
         }
         content.Save( newOne.XmlDescriptionFilePath );
-        Directory.CreateDirectory( newOne.Root );
-        _isDirty = true;
+        Directory.CreateDirectory( newOne.WorldRoot );
         return newOne;
     }
 
