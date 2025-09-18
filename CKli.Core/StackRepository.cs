@@ -9,7 +9,9 @@ using System.Xml.Linq;
 namespace CKli.Core;
 
 /// <summary>
-/// Encapsulate the <see cref="GitRepository"/> with its worlds.
+/// Encapsulate the <see cref="GitRepository"/> with its <see cref="LocalWorldName"/> (the default one and the LTS ones)
+/// but at most one <see cref="World"/> (if it has been opened on a World).
+/// <para>
 /// There are only 2 ways to obtain a StackRepository:
 /// <list type="bullet">
 ///     <item>
@@ -21,7 +23,7 @@ namespace CKli.Core;
 ///         from the remote Uri of the stack.
 ///     </item>
 /// </list>
-/// 
+/// </para>
 /// </summary>
 public sealed partial class StackRepository : IDisposable
 {
@@ -34,6 +36,7 @@ public sealed partial class StackRepository : IDisposable
     readonly ISecretsStore _secretsStore;
     LocalWorldName? _defaultWorldName;
     ImmutableArray<LocalWorldName> _worldNames;
+    World? _world;
 
     /// <summary>
     /// Gets the root path of the stack (the parent folder of the ".PrivateStack" or ".PublicStack" folder).
@@ -90,7 +93,6 @@ public sealed partial class StackRepository : IDisposable
     /// </summary>
     /// <param name="path">The file path.</param>
     /// <returns>The name or null on error.</returns>
-
     /// </para>
     /// </summary>
     public ImmutableArray<LocalWorldName> WorldNames
@@ -126,7 +128,6 @@ public sealed partial class StackRepository : IDisposable
                 return new LocalWorldName( stack, null, wRoot, path );
             }
         }
-
     }
 
     /// <summary>
@@ -334,6 +335,7 @@ public sealed partial class StackRepository : IDisposable
             }
             else
             {
+                stack._world = w;
                 return (stack, w);
             }
         }
@@ -376,10 +378,11 @@ public sealed partial class StackRepository : IDisposable
             stack = null;
             return false;
         }
+        stack._world = world;
         return true;
     }
     /// <summary>
-    /// Clones a Stack and all its current world repositories to the local file system in a new folder
+    /// Clones a Stack and all its default world repositories to the local file system in a new folder
     /// from a stack repository.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -549,6 +552,7 @@ public sealed partial class StackRepository : IDisposable
     public void Dispose()
     {
         _git.Dispose();
+        _world?.ReleaseWorld();
     }
 
     static bool CheckOriginUrlStackSuffix( IActivityMonitor monitor,

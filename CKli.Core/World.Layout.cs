@@ -30,10 +30,10 @@ sealed partial class World
                         {
                             return false;
                         }
-                        _definitionFile.AddRepository( m.NewPath.Parts.Skip( _name.WorldRoot.Parts.Count ), m.Uri );
+                        _definitionFile.AddRepository( m.NewPath, m.NewPath.Parts.Skip( _name.WorldRoot.Parts.Count ), m.Uri );
                         break;
                     case Clone c:
-                        _definitionFile.AddRepository( c.Path.Parts.Skip( _name.WorldRoot.Parts.Count ), c.Uri );
+                        _definitionFile.AddRepository( c.Path, c.Path.Parts.Skip( _name.WorldRoot.Parts.Count ), c.Uri );
                         break;
                     case Suppress s:
                         if( !_definitionFile.RemoveRepository( monitor, s.Uri, removeEmptyFolder: false ) )

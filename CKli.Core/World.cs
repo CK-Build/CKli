@@ -10,17 +10,13 @@ namespace CKli.Core;
 /// <para>
 /// The only way to obtain a World is to use the <see cref="StackRepository"/>.
 /// </para>
-/// <para>
-/// The Repos are loaded on demand and cached. Disposing a World is required to release the
-/// internal Repo's <see cref="GitRepository"/>.
-/// </para>
 /// </summary>
-public sealed partial class World : IDisposable
+public sealed partial class World
 {
     readonly StackRepository _stackRepository;
     readonly LocalWorldName _name;
     readonly WorldDefinitionFile _definitionFile;
-    readonly IReadOnlyList<(NormalizedPath Path, Uri Uri)> _layout;
+    IReadOnlyList<(NormalizedPath Path, Uri Uri)> _layout;
     // This caches the Repo (and its GitRepository) by uri and path as string and case insensitively.
     // This enables to cache the Repo even with case mismatch (that FixLayout will fix).
     readonly Dictionary<string, Repo?> _cachedRepositories;
@@ -59,9 +55,11 @@ public sealed partial class World : IDisposable
     }
 
     /// <summary>
-    /// Releases all the <see cref="Repo"/>'s internal <see cref="GitRepository"/>.
+    /// <para>
+    /// The Repos are loaded on demand and cached. Releasing the World is required to release the
+    /// internal Repo's <see cref="GitRepository"/> and is done, just like creation, by the StackRepository.
     /// </summary>
-    public void Dispose()
+    internal void ReleaseWorld()
     {
         foreach( var g in _cachedRepositories.Values )
         {

@@ -120,7 +120,7 @@ public sealed class WorldDefinitionFile
         } );
     }
 
-    internal void AddRepository( IEnumerable<string> folders, Uri uri )
+    internal void AddRepository( NormalizedPath path, IEnumerable<string> folders, Uri uri )
     {
         Throw.DebugAssert( folders.All( IsValidFolderName ) );
         Throw.DebugAssert( GitRepositoryKey.CheckAndNormalizeRepositoryUrl( uri ) == uri );
@@ -128,7 +128,6 @@ public sealed class WorldDefinitionFile
 
         XElement folder = EnsureFolder( folders, _root );
         folder.Add( new XElement( _xRepository, new XAttribute( _xUrl, uri.ToString() ) ) );
-
         static XElement EnsureFolder( IEnumerable<string> folders, XElement root )
         {
             XElement existing = root;
@@ -167,12 +166,12 @@ public sealed class WorldDefinitionFile
             }
             return existing;
         }
-
     }
 
     internal bool RemoveRepository( IActivityMonitor monitor, Uri uri, bool removeEmptyFolder )
     {
         Throw.DebugAssert( _allowEdit );
+        Throw.DebugAssert( _layout != null );
         var node = _root.Descendants( _xRepository )
                         .FirstOrDefault( e => e.Attribute( _xUrl )?.Value == uri.ToString() );
         if( node == null )
@@ -216,6 +215,16 @@ public sealed class WorldDefinitionFile
                 _root.Document!.Save( path );
                 _isDirty = false;
                 monitor.Trace( $"File '{path.LastPart}' saved." );
+                if( _layout != null )
+                {
+                    // Reloading the layout to honor sort and also to double check
+                    // that everything is fine.
+                    // We keep the container and change its content.
+                    var newLayout = GetRepositoryLayout( monitor, _root, _world.WorldRoot );
+                    if( newLayout == null ) return false;
+                    _layout.Clear();
+                    _layout.AddRange( newLayout );
+                }
             }
             catch( Exception ex )
             {

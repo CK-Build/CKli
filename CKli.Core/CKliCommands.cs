@@ -73,7 +73,6 @@ public static class CKliCommands
         finally
         {
             stack.Dispose();
-            world.Dispose();
         }
     }
 
@@ -116,7 +115,6 @@ public static class CKliCommands
         finally
         {
             stack.Dispose();
-            world.Dispose();
         }
     }
 
@@ -169,7 +167,6 @@ public static class CKliCommands
         finally
         {
             stack.Dispose();
-            world.Dispose();
         }
     }
 
@@ -278,7 +275,6 @@ public static class CKliCommands
         }
         finally
         {
-            world.Dispose();
             stack.Dispose();
         }
     }
@@ -307,7 +303,6 @@ public static class CKliCommands
         }
         finally
         {
-            world.Dispose();
             stack.Dispose();
         }
     }

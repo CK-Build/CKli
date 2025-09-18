@@ -77,6 +77,102 @@ public class StackRepositoryTests
     }
 
     [Test]
+    public void Clone_and_TryOpenWorldFrom()
+    {
+        var localPath = ClonedPaths.EnsureCleanFolder();
+        var remotes = Remotes.UseReadOnly( "CKt" );
+        var secretsStore = new DotNetUserSecretsStore();
+        using( var clone = StackRepository.Clone( TestHelper.Monitor,
+                                                  secretsStore,
+                                                  remotes.StackUri,
+                                                  isPublic: true,
+                                                  localPath,
+                                                  allowDuplicateStack: false ) )
+        {
+            clone.ShouldNotBeNull();
+        }
+
+        bool error;
+        var (stack, world) = StackRepository.TryOpenWorldFromPath( TestHelper.Monitor, secretsStore, localPath, out error, skipPullStack: true );
+        stack.ShouldBeNull( "No stack has been found: the path must be at least in a stack folder." );
+        world.ShouldBeNull( "No world either." );
+        error.ShouldBeFalse( "But this is not an error." );
+
+        (stack, world) = StackRepository.TryOpenWorldFromPath( TestHelper.Monitor, secretsStore, localPath.AppendPart( "CKt" ), out error, skipPullStack: true );
+        stack.ShouldNotBeNull();
+        world.ShouldNotBeNull();
+        error.ShouldBeFalse();
+        stack.Dispose();
+
+        (stack, world) = StackRepository.TryOpenWorldFromPath( TestHelper.Monitor, secretsStore, localPath.Combine( "CKt/CK-Core-Projects" ), out error, skipPullStack: true );
+        stack.ShouldNotBeNull();
+        world.ShouldNotBeNull();
+        error.ShouldBeFalse();
+        stack.Dispose();
+
+        (stack, world) = StackRepository.TryOpenWorldFromPath( TestHelper.Monitor, secretsStore, localPath.Combine( "CKt/CK-Core-Projects/CKt-Core" ), out error, skipPullStack: true );
+        stack.ShouldNotBeNull();
+        world.ShouldNotBeNull();
+        error.ShouldBeFalse();
+        stack.Dispose();
+
+        (stack, world) = StackRepository.TryOpenWorldFromPath( TestHelper.Monitor, secretsStore, localPath.Combine( "CKt/CK-Core-Projects/CKt-Core/Tests" ), out error, skipPullStack: true );
+        stack.ShouldNotBeNull();
+        world.ShouldNotBeNull();
+        error.ShouldBeFalse();
+        stack.Dispose();
+    }
+
+    [Test]
+    public void Clone_and_OpenWorldFrom()
+    {
+        var localPath = ClonedPaths.EnsureCleanFolder();
+        var remotes = Remotes.UseReadOnly( "CKt" );
+        var secretsStore = new DotNetUserSecretsStore();
+        using( var clone = StackRepository.Clone( TestHelper.Monitor,
+                                                  secretsStore,
+                                                  remotes.StackUri,
+                                                  isPublic: true,
+                                                  localPath,
+                                                  allowDuplicateStack: false ) )
+        {
+            clone.ShouldNotBeNull();
+        }
+
+        StackRepository? stack;
+        World? world;
+
+        StackRepository.OpenWorldFromPath( TestHelper.Monitor, secretsStore, localPath, out stack, out world, skipPullStack: true )
+            .ShouldBeFalse( "Here we have an error." );
+        stack.ShouldBe( null );
+        world.ShouldBeNull();
+
+        StackRepository.OpenWorldFromPath( TestHelper.Monitor, secretsStore, localPath.AppendPart( "CKt" ), out stack, out world, skipPullStack: true )
+            .ShouldBeTrue();
+        stack.ShouldNotBeNull();
+        world.ShouldNotBeNull();
+        stack.Dispose();
+
+        StackRepository.OpenWorldFromPath( TestHelper.Monitor, secretsStore, localPath.Combine( "CKt/CK-Core-Projects" ), out stack, out world, skipPullStack: true )
+            .ShouldBeTrue();
+        stack.ShouldNotBeNull();
+        world.ShouldNotBeNull();
+        stack.Dispose();
+
+        StackRepository.OpenWorldFromPath( TestHelper.Monitor, secretsStore, localPath.Combine( "CKt/CK-Core-Projects/CKt-Core" ), out stack, out world, skipPullStack: true )
+            .ShouldBeTrue();
+        stack.ShouldNotBeNull();
+        world.ShouldNotBeNull();
+        stack.Dispose();
+
+        StackRepository.OpenWorldFromPath( TestHelper.Monitor, secretsStore, localPath.Combine( "CKt/CK-Core-Projects/CKt-Core/Tests" ), out stack, out world, skipPullStack: true )
+            .ShouldBeTrue();
+        stack.ShouldNotBeNull();
+        world.ShouldNotBeNull();
+        stack.Dispose();
+    }
+
+    [Test]
     public void Add_new_repository_to_Default_World()
     {
         var localPath = ClonedPaths.EnsureCleanFolder();
@@ -130,7 +226,6 @@ public class StackRepositoryTests
 
             File.Exists( localPath.Combine( "CKt/CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Back thanks to the automatic FixLayout." );
 
-            world.Dispose();
             stack.Dispose();
         }
     }
