@@ -4,11 +4,30 @@ using CKli.Core;
 
 namespace CKli.RawSolution.Plugin;
 
-public sealed partial class RawSolutionProvider : RepoInfoProvider<RawSolutionInfo>
+public sealed partial class RawSolutionProvider : RepoInfoProvider<RawSolutionInfo>, IDisposable
 {
     public RawSolutionProvider( World world )
         : base( world )
     {
+        world.FixedLayout += World_FixedLayout;
+    }
+
+    public void Dispose()
+    {
+        World.FixedLayout -= World_FixedLayout;
+    }
+
+    void World_FixedLayout( object? sender, FixedLayoutEventArgs e )
+    {
+        if( TryGetAll( e.Monitor, out var all ) )
+        {
+            foreach( var info in all )
+            {
+                if( info.BadFolderProjectNames.Count > 0 )
+                {
+                }
+            }
+        }
     }
 
     protected override RawSolutionInfo Create( IActivityMonitor monitor, Repo repo )
@@ -33,9 +52,9 @@ public sealed partial class RawSolutionProvider : RepoInfoProvider<RawSolutionIn
     }
 
     static RawSolutionInfo LoadProjects( IActivityMonitor monitor,
-                                     Repo repo,
-                                     in NormalizedPath slnPath,
-                                     string content )
+                                         Repo repo,
+                                         in NormalizedPath slnPath,
+                                         string content )
     {
         Dictionary<string, NormalizedPath>? projectsPath = null;
         List<NormalizedPath>? badFolderProjectNames = null;
@@ -105,6 +124,6 @@ public sealed partial class RawSolutionProvider : RepoInfoProvider<RawSolutionIn
         return null;
     }
 
-    [GeneratedRegex( @"(?<="")[^""]*\.csproj(?="")" )]
+    [GeneratedRegex( """(?<=")[^"]*\.csproj(?=")""" )]
     private static partial Regex ExtractProjectPath();
 }

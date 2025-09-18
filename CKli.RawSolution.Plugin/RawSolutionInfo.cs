@@ -23,9 +23,9 @@ public sealed class RawSolutionInfo : RepoInfo
 
     // Success ctor.
     internal RawSolutionInfo( Repo repo,
-                          Dictionary<string, NormalizedPath> projectFiles,
-                          NormalizedPath slnPath,
-                          IReadOnlyList<NormalizedPath>? badFolderProjectNames )
+                              Dictionary<string, NormalizedPath> projectFiles,
+                              NormalizedPath slnPath,
+                              IReadOnlyList<NormalizedPath>? badFolderProjectNames )
         : base( repo )
     {
         _projectFiles = projectFiles;
@@ -78,5 +78,9 @@ public sealed class RawSolutionInfo : RepoInfo
     /// </summary>
     public IReadOnlyList<NormalizedPath> BadFolderProjectNames => _badFolderProjectNames;
 
+    /// <summary>
+    /// Overridden to return this <see cref="Name"/>.
+    /// </summary>
+    /// <returns>The name of the solution.</returns>
     public override string ToString() => _name;
 }

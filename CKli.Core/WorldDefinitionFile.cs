@@ -113,11 +113,7 @@ public sealed class WorldDefinitionFile
     {
         Throw.DebugAssert( !_allowEdit );
         _allowEdit = true;
-        return Util.CreateDisposableAction( () =>
-        {
-            _allowEdit = false;
-            _layout = null;
-        } );
+        return Util.CreateDisposableAction( () => _allowEdit = false );
     }
 
     internal void AddRepository( NormalizedPath path, IEnumerable<string> folders, Uri uri )

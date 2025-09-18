@@ -1,23 +1,19 @@
 using CK.Core;
+using System;
+using System.Collections.Immutable;
+using System.Runtime.InteropServices;
 
 namespace CKli.Core;
 
 /// <summary>
-/// Simple Template Method Pattern that caches information associated to a <see cref="Repo"/>.
+/// Non generic base for <see cref="RepoInfoProvider{T}"/>.
 /// </summary>
-/// <typeparam name="T">The information type.</typeparam>
-public abstract class RepoInfoProvider<T> where T : RepoInfo
+public abstract class WorldService
 {
-    readonly T?[] _infos;
     readonly World _world;
 
-    /// <summary>
-    /// Initializes a new information cache.
-    /// </summary>
-    /// <param name="world">The world.</param>
-    protected RepoInfoProvider( World world )
+    protected WorldService( World world )
     {
-        _infos = new T[world.Layout.Count];
         _world = world;
     }
 
@@ -25,6 +21,27 @@ public abstract class RepoInfoProvider<T> where T : RepoInfo
     /// Gets the world.
     /// </summary>
     public World World => _world;
+}
+
+/// <summary>
+/// Simple Template Method Pattern that caches information associated to a <see cref="Repo"/>.
+/// </summary>
+/// <typeparam name="T">The information type.</typeparam>
+public abstract class RepoInfoProvider<T> : WorldService
+    where T : RepoInfo
+{
+    readonly T?[] _infos;
+    ImmutableArray<T> _all;
+
+    /// <summary>
+    /// Initializes a new information cache.
+    /// </summary>
+    /// <param name="world">The world.</param>
+    protected RepoInfoProvider( World world )
+        : base( world )
+    {
+        _infos = new T[world.Layout.Count];
+    }
 
     /// <summary>
     /// Gets the associated information.
@@ -41,6 +58,31 @@ public abstract class RepoInfoProvider<T> where T : RepoInfo
             _infos[r.Index] = info;
         }
         return info;
+    }
+
+    /// <summary>
+    /// Tries to get the associated information for all the Repos.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="all">All the information on success.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool TryGetAll( IActivityMonitor monitor, out ImmutableArray<T> all )
+    {
+        all = _all;
+        if( all.IsDefault )
+        {
+            var allRepo = World.GetAllDefinedRepo( monitor );
+            if( allRepo == null ) return false;
+            for( int i = 0; i < allRepo.Count; ++i )
+            {
+                if( _infos[i] == null )
+                {
+                    _infos[i] = Create( monitor, allRepo[i] );
+                }
+            }
+            all = ImmutableCollectionsMarshal.AsImmutableArray( _infos )!;
+        }
+        return true;
     }
 
     /// <summary>

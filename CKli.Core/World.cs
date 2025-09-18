@@ -1,4 +1,5 @@
 using CK.Core;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -8,7 +9,7 @@ namespace CKli.Core;
 /// <summary>
 /// The World handles the <see cref="Repo"/> that are defined in its <see cref="Layout"/>.
 /// <para>
-/// The only way to obtain a World is to use the <see cref="StackRepository"/>.
+/// The only way to obtain a World is to use the StackRepository.
 /// </para>
 /// </summary>
 public sealed partial class World
@@ -16,11 +17,15 @@ public sealed partial class World
     readonly StackRepository _stackRepository;
     readonly LocalWorldName _name;
     readonly WorldDefinitionFile _definitionFile;
-    IReadOnlyList<(NormalizedPath Path, Uri Uri)> _layout;
+    // The WorldDefinitionFile maintains its layout list.
+    // AddRepository, RemoveRepository and XifLayout are the only ones that can
+    // invalidate the cache.
+    readonly IReadOnlyList<(NormalizedPath Path, Uri Uri)> _layout;
     // This caches the Repo (and its GitRepository) by uri and path as string and case insensitively.
     // This enables to cache the Repo even with case mismatch (that FixLayout will fix).
     readonly Dictionary<string, Repo?> _cachedRepositories;
     Repo[]? _allRepositories;
+    Repo? _firstRepo;
 
     World( StackRepository stackRepository,
            LocalWorldName name,
@@ -32,7 +37,7 @@ public sealed partial class World
         _definitionFile = definitionFile;
         _layout = layout;
         _cachedRepositories = new Dictionary<string, Repo?>( layout.Count, StringComparer.OrdinalIgnoreCase );
-        foreach( var (path, uri) in layout )
+        foreach( var (path, uri) in _layout )
         {
             _cachedRepositories.Add( path, null );
             _cachedRepositories.Add( uri.ToString(), null );
@@ -46,27 +51,22 @@ public sealed partial class World
     {
         var worldName = stackRepository.GetWorldNameFromPath( monitor, path );
         var definitionFile = worldName?.LoadDefinitionFile( monitor );
-        var layout = definitionFile?.ReadLayout( monitor );
-        if( layout == null )
+        var initialLayout = definitionFile?.ReadLayout( monitor );
+        if( initialLayout == null )
         {
             return null;
         }
-        return new World( stackRepository, worldName!, definitionFile!, layout );
+        return new World( stackRepository, worldName!, definitionFile!, initialLayout );
     }
 
-    /// <summary>
-    /// <para>
-    /// The Repos are loaded on demand and cached. Releasing the World is required to release the
-    /// internal Repo's <see cref="GitRepository"/> and is done, just like creation, by the StackRepository.
-    /// </summary>
-    internal void ReleaseWorld()
+    internal void DisposeRepositories()
     {
-        foreach( var g in _cachedRepositories.Values )
+        var r = _firstRepo;
+        while( r != null )
         {
-            g?._git.Dispose();
+            r._git.Dispose();
+            r = r._nextRepo;
         }
-        _cachedRepositories.Clear();
-        _allRepositories = null;
     }
 
     /// <summary>
@@ -157,6 +157,11 @@ public sealed partial class World
         }
         return success;
     }
+
+    /// <summary>
+    /// Raised when <see cref="FixLayout(IActivityMonitor, bool, out List{Repo}?)"/> has been successfully called.
+    /// </summary>
+    public event EventHandler<FixedLayoutEventArgs>? FixedLayout;
 
     /// <summary>
     /// Gets whether a full path or a origin url is defined in this <see cref="Layout"/>.
@@ -278,9 +283,7 @@ public sealed partial class World
             var repository = GitRepository.Open( monitor, _stackRepository.SecretsStore, p, p.LastPart, _stackRepository.IsPublic );
             if( repository != null )
             {
-                repo = new Repo( this, repository, index );
-                _cachedRepositories[p.Path] = repo;
-                _cachedRepositories[repository.OriginUrl.ToString()] = repo;
+                repo = CreateRepo( index, repository );
             }
         }
         if( repo == null && mustExist )
@@ -296,14 +299,36 @@ public sealed partial class World
                     var repository = GitRepository.Open( monitor, _stackRepository.SecretsStore, p, p.LastPart, _stackRepository.IsPublic );
                     if( repository != null )
                     {
-                        repo = new Repo( this, repository, index );
-                        _cachedRepositories[p] = repo;
-                        _cachedRepositories[repo.OriginUrl.ToString()] = repo;
+                        repo = CreateRepo( index, repository );
                     }
                 }
             }
         }
         return repo;
+    }
+
+    Repo CreateRepo( int index, GitRepository repository )
+    {
+        Repo? repo = new Repo( this, repository, index, _firstRepo );
+        _firstRepo = repo;
+        _cachedRepositories[repository.WorkingFolder] = repo;
+        _cachedRepositories[repository.OriginUrl.ToString()] = repo;
+        return repo;
+    }
+
+    bool SafeRaiseEvent<T>( IActivityMonitor monitor, EventHandler<T> handler, T args ) where T : WorldEventArgs
+    {
+        Throw.DebugAssert( handler != null );
+        try
+        {
+            handler( this, args );
+            return args.Success;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While raising '{typeof(T).Name}' event.", ex );
+            return false;
+        }
     }
 
     /// <inheritdoc cref="WorldName.ToString"/>

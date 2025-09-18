@@ -84,21 +84,9 @@ public sealed class LocalWorldName : WorldName
     }
 
     /// <summary>
-    /// Adds a new repository.
-    /// <list type="number">
-    ///     <item>The uri must be a valid absolute url.</item>
-    ///     <item>No existing repository must exist with the same repository name.</item>
-    ///     <item>The path must be <see cref="WorldRoot"/> or starts with it (it should not end with the repository name).</item>
-    ///     <item>The path must not be below any exisiting repository.</item>
-    ///     <item>The repository is cloned.</item>
-    ///     <item>The world definition file is updated, saved and comitted in the Stack repository.</item>
-    /// </list>
+    /// Called by <see cref="World.AddRepository"/> and <see cref="CKliCommands.RepositoryAdd"/>.
     /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="repositoryUri">The repository url.</param>
-    /// <param name="folderPath">The absolute folder path inside <see cref="WorldRoot"/>.</param>
-    /// <returns>True on success, false on error.</returns>
-    public bool AddRepository( IActivityMonitor monitor, Uri repositoryUri, NormalizedPath folderPath )
+    internal bool AddRepository( IActivityMonitor monitor, Uri repositoryUri, NormalizedPath folderPath )
     {
         // Check the Uri.
         repositoryUri = GitRepositoryKey.CheckAndNormalizeRepositoryUrl(monitor, repositoryUri, out var repoName )!;
@@ -193,12 +181,9 @@ public sealed class LocalWorldName : WorldName
     }
 
     /// <summary>
-    /// Removes a repository.
+    /// Called by <see cref="World.RemoveRepository"/> and <see cref="CKliCommands.RepositoryRemove"/>.
     /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="nameOrUrl">The repository name or url.</param>
-    /// <returns>True on success, false on error.</returns>
-    public bool RemoveRepository( IActivityMonitor monitor, string nameOrUrl )
+    internal bool RemoveRepository( IActivityMonitor monitor, string nameOrUrl )
     {
         var definitionFile = LoadDefinitionFile( monitor );
         if( definitionFile == null ) return false;

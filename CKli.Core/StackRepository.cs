@@ -552,7 +552,7 @@ public sealed partial class StackRepository : IDisposable
     public void Dispose()
     {
         _git.Dispose();
-        _world?.ReleaseWorld();
+        _world?.DisposeRepositories();
     }
 
     static bool CheckOriginUrlStackSuffix( IActivityMonitor monitor,

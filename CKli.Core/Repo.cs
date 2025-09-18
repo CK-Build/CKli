@@ -12,13 +12,15 @@ public sealed class Repo
     // World.Dispose() disposes the Git repository.
     internal readonly GitRepository _git;
     readonly int _index;
+    internal readonly Repo? _nextRepo;
     GitRepository.SimpleStatusInfo _status;
 
-    internal Repo( World world, GitRepository git, int index )
+    internal Repo( World world, GitRepository git, int index, Repo? nextRepo )
     {
         _world = world;
         _git = git;
         _index = index;
+        _nextRepo = nextRepo;
     }
 
     /// <summary>

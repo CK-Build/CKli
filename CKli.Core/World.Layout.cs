@@ -9,64 +9,52 @@ namespace CKli.Core;
 
 sealed partial class World
 {
-    public bool XifLayout( IActivityMonitor monitor )
-    {
-        var actions = CreateFixOrXifLayoutRoadMap( monitor, fix: false );
-        if( actions == null ) return false;
-        if( actions.Count == 0 ) return true;
-        var message = $"""
-            Updating '{_name.XmlDescriptionFilePath.LastPart}' in '{_stackRepository.GitDisplayPath}' with:
-            {string.Join( Environment.NewLine, actions.Select( a => a.ToString( _name.WorldRoot.Parts.Count ) ) )}
-            """;
-        using var _ = monitor.OpenInfo( message );
-        using( _definitionFile.StartEdit() )
-        {
-            foreach( var a in actions )
-            {
-                switch( a )
-                {
-                    case Move m:
-                        if( !_definitionFile.RemoveRepository( monitor, m.Uri, removeEmptyFolder: false ) )
-                        {
-                            return false;
-                        }
-                        _definitionFile.AddRepository( m.NewPath, m.NewPath.Parts.Skip( _name.WorldRoot.Parts.Count ), m.Uri );
-                        break;
-                    case Clone c:
-                        _definitionFile.AddRepository( c.Path, c.Path.Parts.Skip( _name.WorldRoot.Parts.Count ), c.Uri );
-                        break;
-                    case Suppress s:
-                        if( !_definitionFile.RemoveRepository( monitor, s.Uri, removeEmptyFolder: false ) )
-                        {
-                            return false;
-                        }
-                        break;
-                }
-            }
-            _definitionFile.RemoveEmptyFolders();
-        }
-        return _name.SaveAndCommitDefinitionFile( monitor, "Before Xif.", message );
-    }
+    /// <summary>
+    /// Gets whether <see cref="AddRepository"/>, <see cref="RemoveRepository"/> or <see cref="XifLayout"/> can be called.
+    /// </summary>
+    public bool CanChangeLayout => _firstRepo == null;
 
-    abstract record LayoutAction( NormalizedPath Path, Uri Uri )
+    /// <summary>
+    /// Adds a new repository.
+    /// <para>
+    /// This can be called only if <see cref="CanChangeLayout"/> is true otherwise an <see cref="InvalidOperationException"/> is thrown.
+    /// </para>
+    /// <list type="number">
+    ///     <item>The uri must be a valid absolute url.</item>
+    ///     <item>No existing repository must exist with the same repository name.</item>
+    ///     <item>The path must be <see cref="WorldRoot"/> or starts with it (it should not end with the repository name).</item>
+    ///     <item>The path must not be below any exisiting repository.</item>
+    ///     <item>The repository is cloned.</item>
+    ///     <item>The world definition file is updated, saved and comitted in the Stack repository.</item>
+    /// </list>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="repositoryUri">The repository url.</param>
+    /// <param name="folderPath">The absolute folder path inside <see cref="WorldRoot"/>.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool AddRepository( IActivityMonitor monitor, Uri repositoryUri, NormalizedPath folderPath )
     {
-        public abstract string ToString( int skipedPathParts );
-    }
-    sealed record Clone( NormalizedPath Path, Uri Uri ) : LayoutAction( Path, Uri )
-    {
-        public override string ToString( int skipedPathParts ) => $"New repository '{Path.Parts.Skip( skipedPathParts ).Concatenate( '/' )}' ({Uri})";
-    }
-    sealed record Suppress( NormalizedPath Path, Uri Uri ) : LayoutAction( Path, Uri )
-    {
-        public override string ToString( int skipedPathParts ) => $"Suppress '{Path.Parts.Skip( skipedPathParts ).Concatenate( '/' )}' ({Uri})";
-    }
-    sealed record Move( NormalizedPath Path, Uri Uri, NormalizedPath NewPath, bool FixedCase ) : LayoutAction( Path, Uri )
-    {
-        public override string ToString( int skipedPathParts ) => $"{(FixedCase ? "Fixed case in" : "Moved")} '{Path.Parts.Skip( skipedPathParts ).Concatenate( '/' )}' to '{NewPath.Parts.Skip( skipedPathParts ).Concatenate( '/' )}'.";
+        Throw.CheckState( CanChangeLayout );
+        return _name.AddRepository( monitor, repositoryUri, folderPath );
     }
 
     /// <summary>
-    /// Tries to fix the physical layout of the world.
+    /// Removes a repository.
+    /// <para>
+    /// This can be called only if <see cref="CanChangeLayout"/> is true otherwise an <see cref="InvalidOperationException"/> is thrown.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="nameOrUrl">The repository name or url.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool RemoveRepository( IActivityMonitor monitor, string nameOrUrl )
+    {
+        Throw.CheckState( CanChangeLayout );
+        return _name.RemoveRepository( monitor, nameOrUrl );
+    }
+
+    /// <summary>
+    /// Tries to fix the physical layout of the world. This doesn't change this world's <see cref="Layout"/>.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="deleteAliens">True to delete repositories that are not defined in this world.</param>
@@ -104,7 +92,7 @@ sealed partial class World
             DeletePotentiallyEmptyFolders( monitor, potentiallyEmptyFolders );
         }
 
-        return true;
+        return FixedLayout == null || SafeRaiseEvent( monitor, FixedLayout, new FixedLayoutEventArgs( monitor, this, newClones ) );
 
         static bool ExecuteMoves( IActivityMonitor monitor, World world, List<LayoutAction> actions, HashSet<NormalizedPath> potentiallyEmptyFolders )
         {
@@ -123,11 +111,10 @@ sealed partial class World
         {
             bool success = true;
             newClones = null;
-            var cache = world._cachedRepositories;
             foreach( var c in actions.OfType<Clone>() )
             {
-                Throw.DebugAssert( "Since we must Clone, the cached repository is missing.", cache[c.Uri.ToString()] == null );
-                Throw.DebugAssert( "Since we must Clone, the cached repository is missing.", cache[c.Path] == null );
+                Throw.DebugAssert( "Since we must Clone, the cached repository is missing.", world._cachedRepositories[c.Uri.ToString()] == null );
+                Throw.DebugAssert( "Since we must Clone, the cached repository is missing.", world._cachedRepositories[c.Path] == null );
                 var gitKey = new GitRepositoryKey( world._stackRepository.SecretsStore, c.Uri, world._stackRepository.IsPublic );
                 var cloned = GitRepository.Clone( monitor, gitKey, c.Path, c.Path.LastPart );
                 if( cloned == null )
@@ -136,11 +123,9 @@ sealed partial class World
                 }
                 else
                 {
-                    var r = new Repo( world, cloned, world.Layout.IndexOf( e => e.Path == c.Path ) );
+                    var repo = world.CreateRepo( world.Layout.IndexOf( e => e.Path == c.Path ), cloned );
                     newClones ??= new List<Repo>();
-                    newClones.Add( r );
-                    cache[c.Uri.ToString()] = r;
-                    cache[c.Path] = r;
+                    newClones.Add( repo );
                 }
             }
             return success;
@@ -200,6 +185,71 @@ sealed partial class World
                 if( count > 0 ) monitor.Trace( $"Removed {count} empty folders." );
             }
         }
+    }
+
+    /// <summary>
+    /// Updates the layout of the current world from existing folders and repositories.
+    /// <para>
+    /// This can be called only if <see cref="CanChangeLayout"/> is true otherwise an <see cref="InvalidOperationException"/> is thrown.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor"></param>
+    /// <returns></returns>
+    public bool XifLayout( IActivityMonitor monitor )
+    {
+        Throw.CheckState( CanChangeLayout );
+        var actions = CreateFixOrXifLayoutRoadMap( monitor, fix: false );
+        if( actions == null ) return false;
+        if( actions.Count == 0 ) return true;
+        var message = $"""
+            Updating '{_name.XmlDescriptionFilePath.LastPart}' in '{_stackRepository.GitDisplayPath}' with:
+            {string.Join( Environment.NewLine, actions.Select( a => a.ToString( _name.WorldRoot.Parts.Count ) ) )}
+            """;
+        using var _ = monitor.OpenInfo( message );
+        using( _definitionFile.StartEdit() )
+        {
+            foreach( var a in actions )
+            {
+                switch( a )
+                {
+                    case Move m:
+                        if( !_definitionFile.RemoveRepository( monitor, m.Uri, removeEmptyFolder: false ) )
+                        {
+                            return false;
+                        }
+                        _definitionFile.AddRepository( m.NewPath, m.NewPath.Parts.Skip( _name.WorldRoot.Parts.Count ), m.Uri );
+                        break;
+                    case Clone c:
+                        _definitionFile.AddRepository( c.Path, c.Path.Parts.Skip( _name.WorldRoot.Parts.Count ), c.Uri );
+                        break;
+                    case Suppress s:
+                        if( !_definitionFile.RemoveRepository( monitor, s.Uri, removeEmptyFolder: false ) )
+                        {
+                            return false;
+                        }
+                        break;
+                }
+            }
+            _definitionFile.RemoveEmptyFolders();
+        }
+        return _name.SaveAndCommitDefinitionFile( monitor, "Before Xif.", message );
+    }
+
+    abstract record LayoutAction( NormalizedPath Path, Uri Uri )
+    {
+        public abstract string ToString( int skipedPathParts );
+    }
+    sealed record Clone( NormalizedPath Path, Uri Uri ) : LayoutAction( Path, Uri )
+    {
+        public override string ToString( int skipedPathParts ) => $"New repository '{Path.Parts.Skip( skipedPathParts ).Concatenate( '/' )}' ({Uri})";
+    }
+    sealed record Suppress( NormalizedPath Path, Uri Uri ) : LayoutAction( Path, Uri )
+    {
+        public override string ToString( int skipedPathParts ) => $"Suppress '{Path.Parts.Skip( skipedPathParts ).Concatenate( '/' )}' ({Uri})";
+    }
+    sealed record Move( NormalizedPath Path, Uri Uri, NormalizedPath NewPath, bool FixedCase ) : LayoutAction( Path, Uri )
+    {
+        public override string ToString( int skipedPathParts ) => $"{(FixedCase ? "Fixed case in" : "Moved")} '{Path.Parts.Skip( skipedPathParts ).Concatenate( '/' )}' to '{NewPath.Parts.Skip( skipedPathParts ).Concatenate( '/' )}'.";
     }
 
     List<LayoutAction>? CreateFixOrXifLayoutRoadMap( IActivityMonitor monitor, bool fix )

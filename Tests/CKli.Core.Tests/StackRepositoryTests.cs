@@ -179,28 +179,34 @@ public class StackRepositoryTests
         var secretsStore = new DotNetUserSecretsStore();
         var remotes = Remotes.UseReadOnly( "CKt" );
 
+        // ckli clone file:///.../CKt-Stack
+        CKliCommands.Clone( TestHelper.Monitor, secretsStore, localPath, remotes.StackUri ).ShouldBe( 0 );
+        // cd CKt
+        localPath = localPath.AppendPart( "CKt" );
+
         var addedRepoUri = remotes.GetUriFor( "CKt-ActivityMonitor" );
 
         using( TestHelper.Monitor.OpenInfo( "Add the CKt-ActivityMonitor repository at the root and close the stack." ) )
         {
-            using var stack = StackRepository.Clone( TestHelper.Monitor,
-                                                     secretsStore,
-                                                     remotes.StackUri,
-                                                     isPublic: true,
-                                                     localPath,
-                                                     allowDuplicateStack: false );
-            stack.ShouldNotBeNull();
+            StackRepository.OpenWorldFromPath( TestHelper.Monitor,
+                                               secretsStore,
+                                               localPath,
+                                               out var stack,
+                                               out var world,
+                                               skipPullStack: true ).ShouldBeTrue();
+            File.Exists( localPath.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeFalse( "No yet." );
+            world.Layout.Count.ShouldBe( 1, "Only CKt-Core in the Layout" );
 
-            File.Exists( localPath.Combine( "CKt/CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeFalse( "No yet." );
-            stack.DefaultWorldName.AddRepository( TestHelper.Monitor,
-                                                  addedRepoUri,
-                                                  stack.DefaultWorldName.WorldRoot )
-                                  .ShouldBeTrue();
-            File.Exists( localPath.Combine( "CKt/CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Here it is." );
+            world.AddRepository( TestHelper.Monitor,
+                                 addedRepoUri,
+                                 stack.DefaultWorldName.WorldRoot ).ShouldBeTrue();
+
+            world.Layout.Count.ShouldBe( 2, "The Layout has been updated." );
+            File.Exists( localPath.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Here it is." );
         }
         using( TestHelper.Monitor.OpenInfo( "Open the stack and check that the definition file has the CKt-ActivityMonitor repository." ) )
         {
-            var readStack = StackRepository.TryOpenFromPath( TestHelper.Monitor, secretsStore, localPath.AppendPart( "CKt" ), out _, skipPullStack: true )
+            var readStack = StackRepository.TryOpenFromPath( TestHelper.Monitor, secretsStore, localPath, out _, skipPullStack: true )
                                            .ShouldNotBeNull();
             var definitionFile = readStack.DefaultWorldName.LoadDefinitionFile( TestHelper.Monitor ).ShouldNotBeNull();
             definitionFile.Root.Elements( "Repository" )
@@ -212,11 +218,11 @@ public class StackRepositoryTests
         }
         using( TestHelper.Monitor.OpenInfo( "Delete the CKt-ActivityMonitor repository working folder and pull the default world's repositories." ) )
         {
-            ClonedPaths.DeleteClonedFolderOnly( localPath.Combine( "CKt/CKt-ActivityMonitor" ) ).ShouldBeTrue( "This is a git working folder." );
+            ClonedPaths.DeleteClonedFolderOnly( localPath.Combine( "CKt-ActivityMonitor" ) ).ShouldBeTrue( "This is a git working folder." );
 
-            File.Exists( localPath.Combine( "CKt/CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeFalse( "No more." );
+            File.Exists( localPath.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeFalse( "No more." );
 
-            var (stack,world) = StackRepository.TryOpenWorldFromPath( TestHelper.Monitor, secretsStore, localPath.AppendPart( "CKt" ), out var error, skipPullStack: true );
+            var (stack,world) = StackRepository.TryOpenWorldFromPath( TestHelper.Monitor, secretsStore, localPath, out var error, skipPullStack: true );
             error.ShouldBeFalse();
             stack.ShouldNotBeNull();
             world.ShouldNotBeNull();
@@ -224,7 +230,7 @@ public class StackRepositoryTests
             // FixLayout kicks-in here.
             world.Pull( TestHelper.Monitor ).ShouldBe( true );
 
-            File.Exists( localPath.Combine( "CKt/CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Back thanks to the automatic FixLayout." );
+            File.Exists( localPath.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Back thanks to the automatic FixLayout." );
 
             stack.Dispose();
         }
