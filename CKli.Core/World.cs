@@ -6,9 +6,12 @@ using System.IO;
 namespace CKli.Core;
 
 /// <summary>
-/// The World handles its <see cref="Repo"/> that are defined in its <see cref="Layout"/>.
+/// The World handles the <see cref="Repo"/> that are defined in its <see cref="Layout"/>.
 /// <para>
-/// The Repo are loaded on demand and cached. Disposing a World is required to release the
+/// The only way to obtain a World is to use the <see cref="StackRepository"/>.
+/// </para>
+/// <para>
+/// The Repos are loaded on demand and cached. Disposing a World is required to release the
 /// internal Repo's <see cref="GitRepository"/>.
 /// </para>
 /// </summary>
@@ -38,6 +41,34 @@ public sealed partial class World : IDisposable
             _cachedRepositories.Add( path, null );
             _cachedRepositories.Add( uri.ToString(), null );
         }
+    }
+
+    /// <summary>
+    /// Only called by the StackRepository. Only fails if the world layout cannot be loaded (null is returned).
+    /// </summary>
+    internal static World? Create( IActivityMonitor monitor, StackRepository stackRepository, NormalizedPath path )
+    {
+        var worldName = stackRepository.GetWorldNameFromPath( monitor, path );
+        var definitionFile = worldName?.LoadDefinitionFile( monitor );
+        var layout = definitionFile?.ReadLayout( monitor );
+        if( layout == null )
+        {
+            return null;
+        }
+        return new World( stackRepository, worldName!, definitionFile!, layout );
+    }
+
+    /// <summary>
+    /// Releases all the <see cref="Repo"/>'s internal <see cref="GitRepository"/>.
+    /// </summary>
+    public void Dispose()
+    {
+        foreach( var g in _cachedRepositories.Values )
+        {
+            g?._git.Dispose();
+        }
+        _cachedRepositories.Clear();
+        _allRepositories = null;
     }
 
     /// <summary>
@@ -82,6 +113,28 @@ public sealed partial class World : IDisposable
     }
 
     /// <summary>
+    /// Calls <see cref="Repo.Fetch(IActivityMonitor, bool)"/> on all the repositories of this world.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="originOnly">False to fetch all the remote branches. By default, branches from only 'origin' remote are considered.</param>
+    /// <param name="skipFetch">Optional predicate to not fetch some repos.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool Fetch( IActivityMonitor monitor, bool originOnly = true, Func<Repo,bool>? skipFetch = null )
+    {
+        var all = GetAllDefinedRepo( monitor );
+        if( all == null ) return false;
+        bool success = true;
+        foreach( var g in all )
+        {
+            if( skipFetch == null || skipFetch( g ) )
+            {
+                success &= g.Fetch( monitor, originOnly );
+            }
+        }
+        return success;
+    }
+
+    /// <summary>
     /// Calls <see cref="Repo.Push(IActivityMonitor)"/> on all the repositories of this world.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -117,28 +170,43 @@ public sealed partial class World : IDisposable
     /// <returns>True if this repository is defined in this world, false otherwise.</returns>
     public bool FindDefinedRepo( string uriOrPath, out NormalizedPath workingFolder, out Repo? repo )
     {
+        return FindDefinedRepo( uriOrPath, out workingFolder, out repo, out _ );
+    }
+
+    bool FindDefinedRepo( string uriOrPath, out NormalizedPath workingFolder, out Repo? repo, out int index )
+    {
         if( _cachedRepositories.TryGetValue( uriOrPath, out repo ) && repo != null )
         {
             workingFolder = repo.WorkingFolder;
+            index = repo.Index;
             return true;
         }
-        workingFolder = FindPathOrUriInLayout( uriOrPath );
+        workingFolder = FindPathOrUriInLayout( uriOrPath, out index );
         return !workingFolder.IsEmptyPath;
     }
 
     /// <summary>
-    /// Finds or creates a cached <see cref="Repo"/> from its origin url or working folder path (case insensitive).
+    /// Finds or creates a cached <see cref="Repo"/> from its origin url or a path (case insensitive).
     /// <para>
     /// The repository must exist in the <see cref="DefinitionFile"/> or an error is logged and null is returned.
     /// </para>
     /// <para>
-    /// If the working folder is not found, this automatically triggers an attempt to fix the layout.
+    /// If the repository is defined and the working folder is not found, this automatically triggers an attempt to fix the layout.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="uriOrPath">The origin url or the working folder path.</param>
+    /// <param name="uriOrPath">The origin url or or a full path that can be below one of the defined <see cref="Repo.WorkingFolder"/>.</param>
     /// <returns>The Repo or null on error.</returns>
     public Repo? GetDefinedRepo( IActivityMonitor monitor, string uriOrPath ) => TryLoadDefinedGitRepository( monitor, uriOrPath, true );
+
+    /// <summary>
+    /// Tries to finds or creates a cached <see cref="Repo"/> from its origin url or a path (case insensitive).
+    /// If no Repo is found in this <see cref="Layout"/>, null is returned and this is not an error.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="uriOrPath">The origin url or or a full path that can be below one of the defined <see cref="Repo.WorkingFolder"/>.</param>
+    /// <returns>The Repo or null if not not found.</returns>
+    public Repo? TryGetRepo( IActivityMonitor monitor, string uriOrPath ) => TryLoadDefinedGitRepository( monitor, uriOrPath, false );
 
     /// <summary>
     /// Tries to load all the <see cref="Repo"/> in the <see cref="Layout"/>.
@@ -155,7 +223,7 @@ public sealed partial class World : IDisposable
             {
                 var p = _layout[i].Path;
                 Repo? g = _cachedRepositories[p]
-                          ?? DoLoadGitRepository( monitor, p, mustExist: true );
+                          ?? DoLoadGitRepository( monitor, p, i, mustExist: true );
                 // Stop on error (don't want to fix layout multiple times).
                 if( g == null ) return null;
                 all[i] = g;
@@ -165,10 +233,11 @@ public sealed partial class World : IDisposable
         return _allRepositories;
     }
 
-    NormalizedPath FindPathOrUriInLayout( string key )
+    NormalizedPath FindPathOrUriInLayout( string key, out int index )
     {
-        foreach( var (path, uri) in _layout )
+        for( index = 0; index < _layout.Count; ++index )
         {
+            var (path, uri) = _layout[index];
             if( MatchPath( key, path )
                 || uri.ToString().Equals( key, StringComparison.OrdinalIgnoreCase ) )
             {
@@ -187,11 +256,13 @@ public sealed partial class World : IDisposable
 
     Repo? TryLoadDefinedGitRepository( IActivityMonitor monitor, string key, bool mustExist )
     {
-        if( FindDefinedRepo( key, out var workingFolder, out var repo ) )
+        if( FindDefinedRepo( key, out var workingFolder, out var repo, out var index ) )
         {
             if( repo == null )
             {
-                repo = DoLoadGitRepository( monitor, workingFolder, mustExist );
+                // We found the key in the layout (the url or a workingFolder): it logically
+                // exists, we must try to fix the layout if we can't open the working folder.
+                repo = DoLoadGitRepository( monitor, workingFolder, index, mustExist: true );
             }
         }
         else if( mustExist )
@@ -201,7 +272,7 @@ public sealed partial class World : IDisposable
         return repo;
     }
 
-    Repo? DoLoadGitRepository( IActivityMonitor monitor, NormalizedPath p, bool mustExist )
+    Repo? DoLoadGitRepository( IActivityMonitor monitor, NormalizedPath p, int index, bool mustExist )
     {
         Repo? repo = null;
         if( Directory.Exists( p ) )
@@ -209,7 +280,7 @@ public sealed partial class World : IDisposable
             var repository = GitRepository.Open( monitor, _stackRepository.SecretsStore, p, p.LastPart, _stackRepository.IsPublic );
             if( repository != null )
             {
-                repo = new Repo( this, repository );
+                repo = new Repo( this, repository, index );
                 _cachedRepositories[p.Path] = repo;
                 _cachedRepositories[repository.OriginUrl.ToString()] = repo;
             }
@@ -227,7 +298,7 @@ public sealed partial class World : IDisposable
                     var repository = GitRepository.Open( monitor, _stackRepository.SecretsStore, p, p.LastPart, _stackRepository.IsPublic );
                     if( repository != null )
                     {
-                        repo = new Repo( this, repository );
+                        repo = new Repo( this, repository, index );
                         _cachedRepositories[p] = repo;
                         _cachedRepositories[repo.OriginUrl.ToString()] = repo;
                     }
@@ -235,41 +306,6 @@ public sealed partial class World : IDisposable
             }
         }
         return repo;
-    }
-
-    /// <summary>
-    /// Tries to create a world from a <paramref name="path"/> that must start with the <see cref="StackRepository.StackRoot"/>.
-    /// <para>
-    /// This tries to find a LTS world if the path is below StackRoot and its first folder starts with '@' and is
-    /// a valid LTS name. When the path is every where else, the default world is returned.
-    /// </para>
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="path">The path that must be or start with <see cref="StackRepository.StackRoot"/> or an <see cref="ArgumentException"/> is thrown.</param>
-    /// <returns>The world or null on error.</returns>
-    public static World? TryOpenFromPath( IActivityMonitor monitor, StackRepository stackRepository, NormalizedPath path )
-    {
-        var worldName = stackRepository.GetWorldNameFromPath( monitor, path );
-        var definitionFile = worldName?.LoadDefinitionFile( monitor );
-        var layout = definitionFile?.ReadLayout( monitor );
-        if( layout == null )
-        {
-            return null;
-        }
-        return new World( stackRepository, worldName!, definitionFile!, layout );
-    }
-
-    /// <summary>
-    /// Releases all the <see cref="Repo"/>'s internal <see cref="GitRepository"/>.
-    /// </summary>
-    public void Dispose()
-    {
-        foreach( var g in _cachedRepositories.Values )
-        {
-            g?._git.Dispose();
-        }
-        _cachedRepositories.Clear();
-        _allRepositories = null;
     }
 
     /// <inheritdoc cref="WorldName.ToString"/>

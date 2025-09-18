@@ -1,4 +1,3 @@
-using CK.Core;
 using NUnit.Framework;
 using Shouldly;
 using System.IO;
@@ -31,9 +30,9 @@ public class LayoutTests
         CKliCommands.RepositoryAdd( TestHelper.Monitor, secretsStore, localPath, remotes.GetUriFor( "CKt-ActivityMonitor" ) ).ShouldBe( 0 );
         File.Exists( localPath.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Here it is." );
 
-        // CKt-Core moved at the root and renamed to BadFolderRepository.
-        // Deleting CKt-ActivityMonitor.
-        Directory.Move( localPath.Combine( "CK-Core-Projects/CKt-Core" ), localPath.Combine( "BadFolderRepository" ) );
+        // Moves CKt-Core at the root and renamed to BadFolderRepository.
+        // Deletes CKt-ActivityMonitor.
+        ClonedPaths.MoveFolder( localPath.Combine( "CK-Core-Projects/CKt-Core" ), localPath.Combine( "BadFolderRepository" ) );
         ClonedPaths.DeleteClonedFolderOnly( localPath.Combine( "CKt-ActivityMonitor" ) ).ShouldBeTrue();
         File.Exists( localPath.Combine( "CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeFalse( "Moved." );
         File.Exists( localPath.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeFalse( "Deleted." );
@@ -64,10 +63,10 @@ public class LayoutTests
         CKliCommands.RepositoryAdd( TestHelper.Monitor, secretsStore, localPath, remotes.GetUriFor( "CKt-ActivityMonitor" ) ).ShouldBe( 0 );
         File.Exists( localPath.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Here it is." );
 
-        // CKt-Core and CKt-ActivityMonitor moved to NewCore.
+        // Moves CKt-Core and CKt-ActivityMonitor to NewCore.
         Directory.CreateDirectory( localPath.AppendPart( "NewCore" ) );
-        Directory.Move( localPath.Combine( "CK-Core-Projects/CKt-Core" ), localPath.Combine( "NewCore/CKt-Core" ) );
-        Directory.Move( localPath.Combine( "CKt-ActivityMonitor" ), localPath.Combine( "NewCore/CKt-ActivityMonitor" ) );
+        ClonedPaths.MoveFolder( localPath.Combine( "CK-Core-Projects/CKt-Core" ), localPath.Combine( "NewCore/CKt-Core" ) );
+        ClonedPaths.MoveFolder( localPath.Combine( "CKt-ActivityMonitor" ), localPath.Combine( "NewCore/CKt-ActivityMonitor" ) );
 
         // ckli layout xif
         CKliCommands.LayoutXif( TestHelper.Monitor, secretsStore, localPath ).ShouldBe( 0 );
@@ -80,6 +79,6 @@ public class LayoutTests
             [
                 remotes.GetUriFor( "CKt-ActivityMonitor" ).ToString(),
                 remotes.GetUriFor( "CKt-Core" ).ToString()
-            ] );
+            ], ignoreOrder: true );
     }
 }

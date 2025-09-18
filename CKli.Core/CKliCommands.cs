@@ -13,26 +13,41 @@ public static class CKliCommands
     /// Clones a Stack and all its current world repositories in the current directory.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secrets store.</param>
     /// <param name="path">The current path to consider.</param>
     /// <param name="stackUrl">The url stack repository to clone from. The repository name must end with '-Stack'.</param>
     /// <param name="private">Indicates a private repository. A Personal Access Token (or any other secret) is required.</param>
     /// <param name="allowDuplicate">Allows a stack that already exists locally to be cloned.</param>
     /// <returns>0 on success, negative on error.</returns>
-    public static int Clone( IActivityMonitor monitor, ISecretsStore secretsStore, NormalizedPath path, Uri stackUrl, bool @private = false, bool allowDuplicate = false )
+    public static int Clone( IActivityMonitor monitor,
+                             ISecretsStore secretsStore,
+                             NormalizedPath path,
+                             Uri stackUrl,
+                             bool @private = false,
+                             bool allowDuplicate = false )
     {
-        return StackRepository.Clone( monitor, secretsStore, stackUrl, !@private, path, allowDuplicate ) != null
-                ? 0
-                : -1;
+        using( var stack = StackRepository.Clone( monitor, secretsStore, stackUrl, !@private, path, allowDuplicate ) )
+        {
+            return stack != null
+                    ? 0
+                    : -1;
+        }
     }
 
     /// <summary>
-    /// Resynchronizes the current world from the remotes. 
+    /// Resynchronizes the current Repo or all the Repos of the current World from the remotes. 
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secrets store.</param>
     /// <param name="path">The current path to consider.</param>
+    /// <param name="all">True to pull all the repositories of the world even if <paramref name="path"/> is in the working folder of a repository.</param>
     /// <param name="skipPullStack">Don't pull the stack repository itself.</param>
     /// <returns>0 on success, negative on error.</returns>
-    public static int Pull( IActivityMonitor monitor, ISecretsStore secretsStore, NormalizedPath path, bool skipPullStack = false )
+    public static int Pull( IActivityMonitor monitor,
+                            ISecretsStore secretsStore,
+                            NormalizedPath path,
+                            bool all = false,
+                            bool skipPullStack = false )
     {
         if( !StackRepository.OpenWorldFromPath( monitor,
                                                 secretsStore,
@@ -45,6 +60,14 @@ public static class CKliCommands
         }
         try
         {
+            if( !all )
+            {
+                var repo = world.TryGetRepo( monitor, path );
+                if( repo != null )
+                {
+                    return repo.Pull( monitor ).IsSuccess() ? 0 : -2;
+                }
+            }
             return world.Pull( monitor ) ? 0 : -2;
         }
         finally
@@ -55,15 +78,64 @@ public static class CKliCommands
     }
 
     /// <summary>
-    /// Pushes the repositories' current branches of the current world to the remotes.
-    /// A 'pull' is done first to detect any potential conflicts with the remotes' state. 
+    /// Fetches all branches of the current Repo or all the Repos of the current World. 
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secrets store.</param>
     /// <param name="path">The current path to consider.</param>
+    /// <param name="all">True to fetch all the repositories of the world even if <paramref name="path"/> is in the working folder of a repository.</param>
+    /// <param name="fromAllRemotes">True to fetch from all available remotes, not only from 'origin'.</param>
+    /// <returns>0 on success, negative on error.</returns>
+    public static int Fetch( IActivityMonitor monitor,
+                             ISecretsStore secretsStore,
+                             NormalizedPath path,
+                             bool all = false,
+                             bool fromAllRemotes = false )
+    {
+        if( !StackRepository.OpenWorldFromPath( monitor,
+                                                secretsStore,
+                                                path,
+                                                out var stack,
+                                                out var world,
+                                                skipPullStack: true ) )
+        {
+            return -1;
+        }
+        try
+        {
+            if( !all )
+            {
+                var repo = world.TryGetRepo( monitor, path );
+                if( repo != null )
+                {
+                    return repo.Fetch( monitor, originOnly: !fromAllRemotes ) ? 0 : -2;
+                }
+            }
+            return world.Fetch( monitor, originOnly: !fromAllRemotes ) ? 0 : -2;
+        }
+        finally
+        {
+            stack.Dispose();
+            world.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Pushes the current Repo or all the current World's Repos current branches to their remotes.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secrets store.</param>
+    /// <param name="path">The current path to consider.</param>
+    /// <param name="all">True to pull all the repositories of the world even if <paramref name="path"/> is in the working folder of a repository.</param>
     /// <param name="stackOnly">Only push the stack repository, not the repositories of the current world.</param>
     /// <param name="continueOnError">Push all the repositories even on error. By default the first error stops the pushes.</param>
     /// <returns>0 on success, negative on error.</returns>
-    public static int Push( IActivityMonitor monitor, ISecretsStore secretsStore, string path, bool stackOnly = false, bool continueOnError = false )
+    public static int Push( IActivityMonitor monitor,
+                            ISecretsStore secretsStore,
+                            string path,
+                            bool all = false,
+                            bool stackOnly = false,
+                            bool continueOnError = false )
     {
         if( !StackRepository.OpenWorldFromPath( monitor,
                                                 secretsStore,
@@ -76,6 +148,14 @@ public static class CKliCommands
         }
         try
         {
+            if( !all )
+            {
+                var repo = world.TryGetRepo( monitor, path );
+                if( repo != null )
+                {
+                    return repo.Push( monitor ) ? 0 : -2;
+                }
+            }
             if( !stack.PushChanges( monitor ) )
             {
                 return -2;
@@ -97,11 +177,16 @@ public static class CKliCommands
     /// Adds a new repository to the current world. 
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secrets store.</param>
     /// <param name="path">The current path to consider.</param>
     /// <param name="repositoryUrl">Url of the repository to add and clone.</param>
     /// <param name="allowLTS">Allows the current world to be a Long Term Support world.</param>
     /// <returns>0 on success, negative on error.</returns>
-    public static int RepositoryAdd( IActivityMonitor monitor, ISecretsStore secretsStore, NormalizedPath path, Uri repositoryUrl, bool allowLTS = false )
+    public static int RepositoryAdd( IActivityMonitor monitor,
+                                     ISecretsStore secretsStore,
+                                     NormalizedPath path,
+                                     Uri repositoryUrl,
+                                     bool allowLTS = false )
     {
         if( !StackRepository.OpenFromPath( monitor, secretsStore, path, out var stack, skipPullStack: true ) )
         {
@@ -132,11 +217,16 @@ public static class CKliCommands
     /// Removes a repository from the current world. 
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secrets store.</param>
     /// <param name="path">The current path to consider.</param>
     /// <param name="nameOrUrl">Name or url of the repository to remove.</param>
     /// <param name="allowLTS">Allows the current world to be a Long Term Support world.</param>
     /// <returns>0 on success, negative on error.</returns>
-    public static int RepositoryRemove( IActivityMonitor monitor, ISecretsStore secretsStore, NormalizedPath path, string nameOrUrl, bool allowLTS = false )
+    public static int RepositoryRemove( IActivityMonitor monitor,
+                                        ISecretsStore secretsStore,
+                                        NormalizedPath path,
+                                        string nameOrUrl,
+                                        bool allowLTS = false )
     {
         if( !StackRepository.OpenFromPath( monitor, secretsStore, path, out var stack, skipPullStack: true ) )
         {
@@ -167,10 +257,14 @@ public static class CKliCommands
     /// Fixes the the folders and repositories layout of the current world. 
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secrets store.</param>
     /// <param name="path">The current path to consider.</param>
     /// <param name="deleteAliens">Delete repositories that don't belong to the current world.</param>
     /// <returns>0 on success, negative on error.</returns>
-    public static int LayoutFix( IActivityMonitor monitor, ISecretsStore secretsStore, NormalizedPath path, bool deleteAliens = false )
+    public static int LayoutFix( IActivityMonitor monitor,
+                                 ISecretsStore secretsStore,
+                                 NormalizedPath path,
+                                 bool deleteAliens = false )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, secretsStore, path, out var stack, out var world, skipPullStack: true ) )
         {
@@ -194,9 +288,12 @@ public static class CKliCommands
     /// To share this updated layout with others, 'push --stackOnly' must be executed. 
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secrets store.</param>
     /// <param name="path">The current path to consider.</param>
     /// <returns>0 on success, negative on error.</returns>
-    public static int LayoutXif( IActivityMonitor monitor, ISecretsStore secretsStore, NormalizedPath path )
+    public static int LayoutXif( IActivityMonitor monitor,
+                                 ISecretsStore secretsStore,
+                                 NormalizedPath path )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, secretsStore, path, out var stack, out var world, skipPullStack: true ) )
         {

@@ -18,6 +18,33 @@ public sealed class WorldDefinitionFile
     bool _allowEdit;
     bool _isDirty;
 
+    /// <summary>
+    /// Drives the <see cref="Repo.Index"/>.
+    /// </summary>
+    public enum LayoutRepoOrder
+    {
+        /// <summary>
+        /// Follows the order in the definition file.
+        /// This is the efault.
+        /// </summary>
+        DefinitionFile,
+
+        /// <summary>
+        /// Orders by the repository path (consider the layout folders).
+        /// </summary>
+        Path,
+
+        /// <summary>
+        /// Orders by repository name.
+        /// </summary>
+        Name
+    }
+
+    /// <summary>
+    /// Gets or sets the <see cref="LayoutRepoOrder"/>.
+    /// </summary>
+    public static LayoutRepoOrder RepoOrder { get; set; }
+
     internal WorldDefinitionFile( LocalWorldName world, XDocument document )
     {
         Throw.CheckNotNullArgument( document );
@@ -125,7 +152,15 @@ public sealed class WorldDefinitionFile
                 do
                 {
                     var newOne = new XElement( _xFolder, new XAttribute( _xName, e.Current ) );
-                    existing.Add( newOne );
+                    var nextName = existing.Elements( _xFolder ).FirstOrDefault( x => x.Attribute( _xName )!.Value.CompareTo( e.Current ) > 0 );
+                    if( nextName != null )
+                    {
+                        nextName.AddBeforeSelf( newOne );
+                    }
+                    else
+                    {
+                        existing.Add( newOne );
+                    }
                     existing = newOne;
                 }
                 while( e.MoveNext() );
@@ -249,9 +284,15 @@ public sealed class WorldDefinitionFile
             }
         }
         if( hasError ) return null;
-        list.Sort( ( e1, e2 ) => e1.Path.CompareTo( e2.Path ) );
+        if( RepoOrder == LayoutRepoOrder.Path )
+        {
+            list.Sort( ( e1, e2 ) => e1.Path.Path.AsSpan( worldRoot.Path.Length ).CompareTo( e2.Path.Path.AsSpan( worldRoot.Path.Length ), StringComparison.OrdinalIgnoreCase ) );
+        }
+        else if( RepoOrder == LayoutRepoOrder.Name )
+        {
+            list.Sort( ( e1, e2 ) => StringComparer.OrdinalIgnoreCase.Compare( e1.Path.LastPart, e2.Path.LastPart ) );
+        }
         return list;
-
 
         static void Process( IActivityMonitor monitor, XElement e, in NormalizedPath p, List<(NormalizedPath, Uri)> list, ref bool hasError )
         {

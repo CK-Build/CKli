@@ -91,7 +91,7 @@ public sealed class LocalWorldName : WorldName
     ///     <item>The path must be <see cref="WorldRoot"/> or starts with it (it should not end with the repository name).</item>
     ///     <item>The path must not be below any exisiting repository.</item>
     ///     <item>The repository is cloned.</item>
-    ///     <item>The world definition file is updated and saved.</item>
+    ///     <item>The world definition file is updated, saved and comitted in the Stack repository.</item>
     /// </list>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -179,16 +179,17 @@ public sealed class LocalWorldName : WorldName
         }
         // ...and we must ensure that it can be cloned.
         var gitKey = new GitRepositoryKey( _stack.SecretsStore, repositoryUri, _stack.IsPublic );
-        using var libGit = GitRepository.CloneWorkingFolder( monitor, gitKey, folderPath );
-        if( libGit == null ) return false;
-        // The working folder is successfully cloned.
-        // We can dispose the Repository and update the definition file.
-        libGit.Dispose();
+        using( var libGit = GitRepository.CloneWorkingFolder( monitor, gitKey, folderPath ) )
+        {
+            if( libGit == null ) return false;
+            // The working folder is successfully cloned.
+            // We can dispose the Repository and update the definition file.
+        }
         using( definitionFile.StartEdit() )
         {
             definitionFile.AddRepository( subFolderPath.Parts.Skip( WorldRoot.Parts.Count ), repositoryUri );
         }
-        return SaveDefinitionFile( monitor, "Before adding a repository.", message );
+        return SaveAndCommitDefinitionFile( monitor, "Before adding a repository.", message );
     }
 
     /// <summary>
@@ -216,7 +217,7 @@ public sealed class LocalWorldName : WorldName
                         if( !definitionFile.RemoveRepository( monitor, uri, removeEmptyFolder: true ) ) return false;
                     }
                     return FileHelper.DeleteFolder( monitor, path )
-                           && SaveDefinitionFile( monitor, "Before removing a repository.", message );
+                           && SaveAndCommitDefinitionFile( monitor, "Before removing a repository.", message );
                 }
             }
         }
@@ -224,7 +225,7 @@ public sealed class LocalWorldName : WorldName
         return false;
     }
 
-    internal bool SaveDefinitionFile( IActivityMonitor monitor,
+    internal bool SaveAndCommitDefinitionFile( IActivityMonitor monitor,
                                       string cleanCommitMessage,
                                       string commitMessage )
     {

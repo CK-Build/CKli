@@ -28,7 +28,7 @@ public class StackRepositoryTests
         localWorldName.ShouldNotBeNull();
         localWorldName.IsDefaultWorld.ShouldBeTrue();
         localWorldName.WorldRoot.ShouldBe( localPath.AppendPart( "CKt" ) );
-        stack.WorldNames.Length.ShouldBe( 1, "Their is no LTS world in CKt." );
+        stack.WorldNames.Length.ShouldBe( 1, "There is no LTS world in CKt." );
         stack.WorldNames[0].ShouldBeSameAs( localWorldName );
 
         File.Exists( localPath.Combine( "CKt/CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeTrue();

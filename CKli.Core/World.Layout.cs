@@ -45,7 +45,7 @@ sealed partial class World
             }
             _definitionFile.RemoveEmptyFolders();
         }
-        return _name.SaveDefinitionFile( monitor, "Before Xif.", message );
+        return _name.SaveAndCommitDefinitionFile( monitor, "Before Xif.", message );
     }
 
     abstract record LayoutAction( NormalizedPath Path, Uri Uri )
@@ -136,7 +136,7 @@ sealed partial class World
                 }
                 else
                 {
-                    var r = new Repo( world, cloned );
+                    var r = new Repo( world, cloned, world.Layout.IndexOf( e => e.Path == c.Path ) );
                     newClones ??= new List<Repo>();
                     newClones.Add( r );
                     cache[c.Uri.ToString()] = r;

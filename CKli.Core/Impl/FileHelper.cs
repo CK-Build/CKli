@@ -13,31 +13,38 @@ sealed class FileHelper
                                       NormalizedPath to,
                                       HashSet<NormalizedPath>? potentiallyEmptyFolders = null )
     {
-        try
+        int tryCount = 0;
+        for(; ; )
         {
-            if( Directory.Exists( to ) )
+            try
             {
-                // See https://stackoverflow.com/questions/1622597/renaming-directory-with-same-name-different-case
-                if( from.Path.Equals( to.Path, StringComparison.OrdinalIgnoreCase ) )
+                if( Directory.Exists( to ) )
                 {
-                    var tempName = to + "[__CASING]";
-                    Directory.Move( from, tempName );
-                    Directory.Move( tempName, to );
-                    return true;
+                    // See https://stackoverflow.com/questions/1622597/renaming-directory-with-same-name-different-case
+                    if( from.Path.Equals( to.Path, StringComparison.OrdinalIgnoreCase ) )
+                    {
+                        var tempName = to + "[__CASING]";
+                        Directory.Move( from, tempName );
+                        Directory.Move( tempName, to );
+                        return true;
+                    }
+                    monitor.Error( $"The target folder '{to}' exists. Failed to move '{from}'." );
+                    return false;
                 }
-                monitor.Error( $"The target folder '{to}' exists. Failed to move '{from}'." );
-                return false;
+                var parent = to.RemoveLastPart();
+                if( !Directory.Exists( parent ) ) Directory.CreateDirectory( parent );
+                Directory.Move( from, to );
+                potentiallyEmptyFolders?.Add( from.RemoveLastPart() );
+                return true;
             }
-            var parent = to.RemoveLastPart();
-            if( !Directory.Exists( parent ) ) Directory.CreateDirectory( parent );
-            Directory.Move( from, to );
-            potentiallyEmptyFolders?.Add( from.RemoveLastPart() );
-            return true;
-        }
-        catch( Exception ex )
-        {
-            monitor.Error( $"While moving folder from '{from}' to '{to}'.", ex );
-            return false;
+            catch( Exception ex )
+            {
+                if( ++tryCount > 5 )
+                {
+                    monitor.Error( $"While moving folder from '{from}' to '{to}'.", ex );
+                    return false;
+                }
+            }
         }
     }
 
@@ -89,8 +96,11 @@ sealed class FileHelper
             }
             catch( Exception ex )
             {
-                if( ++tryCount > 5 ) return false;
-                monitor.Warn( $"While trying to delete folder '{path}'.", ex );
+                if( ++tryCount > 5 )
+                {
+                    monitor.Error( $"While trying to delete folder '{path}'.", ex );
+                    return false;
+                }
                 Thread.Sleep( 100 );
             }
         }

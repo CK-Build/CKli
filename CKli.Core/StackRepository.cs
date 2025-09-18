@@ -13,7 +13,7 @@ namespace CKli.Core;
 /// There are only 2 ways to obtain a StackRepository:
 /// <list type="bullet">
 ///     <item>
-///         Calling <see cref="TryOpenFromPath"/>, <see cref="TryOpenWorldFromPath"/> or <see cref="OpenWorldFromPath"/>
+///         Calling <see cref="TryOpenFromPath"/>, <see cref="OpenFromPath"/>, <see cref="TryOpenWorldFromPath"/>, <see cref="OpenWorldFromPath"/>
 ///         from any local path.
 ///     </item>
 ///     <item>
@@ -221,7 +221,7 @@ public sealed partial class StackRepository : IDisposable
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="secretsStore">The secret key store.</param>
     /// <param name="path">The starting path.</param>
-    /// <param name="error">True on success, false on error.</param>
+    /// <param name="error">True on errror, false on success.</param>
     /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
     /// <param name="stackBranchName">Specifies a branch name. There should be no reason to use multiple branches in a stack repository.</param>
     /// <returns>The resulting stack repository if found and opened successfully. May be null if not found.</returns>
@@ -293,8 +293,12 @@ public sealed partial class StackRepository : IDisposable
                                      bool skipPullStack = false,
                                      string stackBranchName = "main" )
     {
-        stack = TryOpenFromPath( monitor, secretsStore, path, out bool error, skipPullStack );
-        if( error ) return false;
+        stack = TryOpenFromPath( monitor, secretsStore, path, out bool error, skipPullStack, stackBranchName );
+        if( error )
+        {
+            Throw.DebugAssert( stack == null );
+            return false;
+        }
         if( stack == null )
         {
             monitor.Error( $"Unable to find a stack repository from path '{path}'." );
@@ -310,7 +314,7 @@ public sealed partial class StackRepository : IDisposable
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="secretsStore">The secret key store.</param>
     /// <param name="path">The starting path.</param>
-    /// <param name="error">True on success, false on error.</param>
+    /// <param name="error">True on error, false on success.</param>
     /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
     /// <returns>The resulting stack repository and world on success. Both are null on error of if no stack is found.</returns>
     public static (StackRepository? Stack, World? World) TryOpenWorldFromPath( IActivityMonitor monitor,
@@ -322,7 +326,7 @@ public sealed partial class StackRepository : IDisposable
         var stack = TryOpenFromPath( monitor, secretsStore, path, out error, skipPullStack );
         if( stack != null )
         {
-            var w = World.TryOpenFromPath( monitor, stack, path );
+            var w = World.Create( monitor, stack, path );
             if( w == null )
             {
                 error = true;
@@ -365,7 +369,7 @@ public sealed partial class StackRepository : IDisposable
             monitor.Error( $"No stack found for path '{path}'." );
             return false;
         }
-        world = World.TryOpenFromPath( monitor, stack, path );
+        world = World.Create( monitor, stack, path );
         if( world == null )
         {
             stack.Dispose();
@@ -374,7 +378,6 @@ public sealed partial class StackRepository : IDisposable
         }
         return true;
     }
-
     /// <summary>
     /// Clones a Stack and all its current world repositories to the local file system in a new folder
     /// from a stack repository.
@@ -411,7 +414,7 @@ public sealed partial class StackRepository : IDisposable
         var already = Registry.CheckExistingStack( monitor, url );
         if( already.Count > 0 )
         {
-            monitor.Log( allowDuplicateStack ? CK.Core.LogLevel.Warn : CK.Core.LogLevel.Error,
+            monitor.Log( allowDuplicateStack ? LogLevel.Warn : LogLevel.Error,
                         $"""
                         The stack '{stackNameFromUrl}' at '{url}' is already available here:
                         {already.Select( p => p.Path ).Concatenate( Environment.NewLine )}
@@ -433,7 +436,7 @@ public sealed partial class StackRepository : IDisposable
         }
 
         // Don't clone if the resolved path exists.
-        if( System.IO.Path.Exists( stackRoot ) )
+        if( Path.Exists( stackRoot ) )
         {
             monitor.Error( $"The resolved path to clone '{stackRoot}' already exists." );
             return null;
@@ -494,16 +497,11 @@ public sealed partial class StackRepository : IDisposable
         {
             foreach( var (subPath, url) in layout )
             {
-                var r = GitRepository.CloneWorkingFolder( monitor,
-                                                          new GitRepositoryKey( secretsStore, url, stack.IsPublic ),
-                                                          world.WorldRoot.Combine( subPath ) );
-                if( r == null )
+                using( var r = GitRepository.CloneWorkingFolder( monitor,
+                                                                 new GitRepositoryKey( secretsStore, url, stack.IsPublic ),
+                                                                 world.WorldRoot.Combine( subPath ) ) )
                 {
-                    success = false;
-                }
-                else
-                {
-                    r.Dispose();
+                    success &= r != null;
                 }
             }
         }

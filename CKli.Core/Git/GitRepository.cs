@@ -99,15 +99,25 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     /// <summary>
     /// Captures minimal status information.
     /// </summary>
-    /// <param name="DisplayName">The Git folder name.</param>
     /// <param name="CurrentBranchName">The currently checked out branch.</param>
     /// <param name="IsDirty">Whether the working folder is dirty.</param>
     /// <param name="CommitAhead">
     /// The number of commit that are ahead of the origin.
-    /// 0 mean that there a no commit ahead of origin.
+    /// 0 mean that there a no commit ahead of origin (there's notthing to push).
     /// Null if there is no origin (the branch is not tracked).
     /// </param>
-    public readonly record struct SimpleStatusInfo( NormalizedPath DisplayName, string CurrentBranchName, bool IsDirty, int? CommitAhead );
+    /// <param name="CommitBehind">
+    /// Gets the number of commits that exist in origin but don't exist in this local one.
+    /// 0 mean that there's no missing commit (there's nothing to pull).
+    /// Null if there is no origin (the branch is not tracked).
+    /// </param>
+    public readonly record struct SimpleStatusInfo( string CurrentBranchName, bool IsDirty, int? CommitAhead, int? CommitBehind )
+    {
+        /// <summary>
+        /// Gets whether this status is the <c>default</c>, unitialized value.
+        /// </summary>
+        public bool IsDefault => CurrentBranchName == null;
+    }
 
     /// <summary>
     /// Gets a <see cref="SimpleStatusInfo"/> for this repository.
@@ -115,11 +125,12 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     /// <returns>The simplified status info</returns>
     public SimpleStatusInfo GetSimpleStatusInfo()
     {
+        var branchDetails = _git.Head.TrackingDetails;
         return new SimpleStatusInfo()
         {
-            DisplayName = DisplayPath,
-            CommitAhead = _git.Head.TrackingDetails.AheadBy,
             CurrentBranchName = _git.Head.FriendlyName,
+            CommitAhead = branchDetails.AheadBy,
+            CommitBehind = branchDetails.BehindBy,
             IsDirty = _git.RetrieveStatus( _checkDirtyOptions ).IsDirty,
         };
     }
@@ -225,6 +236,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     /// Fetches 'origin' (or all remotes) branches and tags into this repository.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
+    /// <param name="originOnly">False to fetch all the remote branches. By default, branches from only 'origin' remote are considered.</param>
     /// <returns>True on success, false on error.</returns>
     public bool FetchBranches( IActivityMonitor monitor, bool originOnly = true )
     {
@@ -497,9 +509,8 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
         }
     }
 
-    CommitResult DoCommit( IActivityMonitor m, string commitMessage, DateTimeOffset date, bool amendPreviousCommit )
+    CommitResult DoCommit( IActivityMonitor monitor, string commitMessage, DateTimeOffset date, bool amendPreviousCommit )
     {
-        using var grp = m.OpenTrace( "Committing changes..." );
         try
         {
             Signature? author = amendPreviousCommit ? _git.Head.Tip.Author : _git.Config.BuildSignature( date );
@@ -510,14 +521,14 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
             try
             {
                 Commit commit = _git.Commit( commitMessage, author ?? committer, committer, options );
-                grp.ConcludeWith( () => $"Committed changes." );
+                monitor.CloseGroup( "Committed changes." );
                 return amendPreviousCommit ? CommitResult.Amended : CommitResult.Commited;
             }
             catch( EmptyCommitException )
             {
                 if( !amendPreviousCommit ) throw;
                 Throw.DebugAssert( "This check on merge commit is already done by LibGit2Sharp.", _git.Head.Tip.Parents.Count() == 1 );
-                grp.ConcludeWith( () => "No actual changes. Reseting branch to parent commit." );
+                monitor.Trace( "No actual changes. Reseting branch to parent commit." );
                 _git.Reset( ResetMode.Hard, _git.Head.Tip.Parents.Single() );
                 Throw.DebugAssert( options.AmendPreviousCommit = true );
                 string sha = _git.Head.Tip.Sha;
@@ -527,7 +538,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
         }
         catch( Exception ex )
         {
-            m.Error( ex );
+            monitor.Error( ex );
             return CommitResult.Error;
         }
     }

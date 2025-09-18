@@ -1,5 +1,3 @@
-using CK.Core;
-using CKli.Core;
 using ConsoleAppFramework;
 using System;
 

@@ -1,5 +1,3 @@
-using CK.Core;
-using CKli.Core;
 using ConsoleAppFramework;
 using System;
 
@@ -12,13 +10,13 @@ public sealed class RepoCommands
     /// Adds a new repository to the current world. 
     /// </summary>
     /// <param name="repositoryUrl">Url of the repository to add and clone.</param>
-    /// <param name="allowLTS">Allows the current world to be a Long Term Support world.</param>
+    /// <param name="allowLts">Allows the current world to be a Long Term Support world.</param>
     /// <returns>0 on success, negative on error.</returns>
-    public int Add( [Argument, AbsoluteUrlParser] AbsoluteUrl repositoryUrl, bool allowLTS = false )
+    public int Add( [Argument, AbsoluteUrlParser] AbsoluteUrl repositoryUrl, bool allowLts = false )
     {
         return CommandContext.Run( ( monitor, userPreferences ) =>
         {
-            return CKliCommands.RepositoryAdd( monitor, userPreferences.SecretsStore, Environment.CurrentDirectory, repositoryUrl.Url, allowLTS );
+            return CKliCommands.RepositoryAdd( monitor, userPreferences.SecretsStore, Environment.CurrentDirectory, repositoryUrl.Url, allowLts );
         } );
     }
 
@@ -26,13 +24,13 @@ public sealed class RepoCommands
     /// Removes a repository from the current world. 
     /// </summary>
     /// <param name="nameOrUrl">Name or url of the repository to remove.</param>
-    /// <param name="allowLTS">Allows the current world to be a Long Term Support world.</param>
+    /// <param name="allowLts">Allows the current world to be a Long Term Support world.</param>
     /// <returns>0 on success, negative on error.</returns>
-    public int Remove( string nameOrUrl, bool allowLTS = false )
+    public int Remove( string nameOrUrl, bool allowLts = false )
     {
         return CommandContext.Run( ( monitor, userPreferences ) =>
         {
-            return CKliCommands.RepositoryRemove( monitor, userPreferences.SecretsStore, Environment.CurrentDirectory, nameOrUrl, allowLTS );
+            return CKliCommands.RepositoryRemove( monitor, userPreferences.SecretsStore, Environment.CurrentDirectory, nameOrUrl, allowLts );
         } );
     }
 
