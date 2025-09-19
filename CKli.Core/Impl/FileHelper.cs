@@ -8,6 +8,28 @@ namespace CKli.Core;
 
 sealed class FileHelper
 {
+    internal static bool DeleteFile( IActivityMonitor monitor, string path )
+    {
+        int tryCount = 0;
+        for(; ; )
+        {
+            try
+            {
+                if( File.Exists( path ) ) File.Delete( path );
+                return true;
+            }
+            catch( Exception ex )
+            {
+                if( ++tryCount > 5 )
+                {
+                    monitor.Error( $"While trying to delete file '{path}'.", ex );
+                    return false;
+                }
+                Thread.Sleep( 100 );
+            }
+        }
+    }
+
     public static bool TryMoveFolder( IActivityMonitor monitor,
                                       NormalizedPath from,
                                       NormalizedPath to,

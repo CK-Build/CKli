@@ -11,7 +11,7 @@ static class ClonedPaths
 {
     static NormalizedPath _clonedPath = TestHelper.TestProjectFolder.AppendPart( "Cloned" );
 
-    public static NormalizedPath EnsureCleanFolder( [CallerMemberName] string? name = null )
+    public static NormalizedPath EnsureCleanFolder( [CallerMemberName] string? name = null, bool clearStackRegistryFile = true )
     {
         var path = _clonedPath.AppendPart( name );
         if( Directory.Exists( path ) )
@@ -24,6 +24,10 @@ static class ClonedPaths
         else
         {
             Directory.CreateDirectory( path );
+        }
+        if( clearStackRegistryFile )
+        {
+            Throw.CheckState( StackRepository.ClearRegistry( TestHelper.Monitor ) );
         }
         return path;
     }

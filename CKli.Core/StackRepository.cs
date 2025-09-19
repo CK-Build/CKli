@@ -34,6 +34,8 @@ public sealed partial class StackRepository : IDisposable
     readonly GitRepository _git;
     readonly NormalizedPath _stackRoot;
     readonly ISecretsStore _secretsStore;
+    // No DuplicatePrefix here.
+    readonly string _stackName;
     LocalWorldName? _defaultWorldName;
     ImmutableArray<LocalWorldName> _worldNames;
     World? _world;
@@ -54,9 +56,15 @@ public sealed partial class StackRepository : IDisposable
     public NormalizedPath GitDisplayPath => _git.DisplayPath;
 
     /// <summary>
-    /// Gets the name of this stack that is necessarily the last part of the <see cref="StackRoot"/>.
+    /// Gets the name of this stack that is necessarily the last part of the <see cref="StackRoot"/>
+    /// unless <see cref="IsDuplicate"/> is true.
     /// </summary>
-    public string StackName => _stackRoot.LastPart;
+    public string StackName => _stackName;
+
+    /// <summary>
+    /// Gets whether this Stack is a duplicate clone: it is in a "<see cref="DuplicatePrefix"/><see cref="StackName"/>/" folder.
+    /// </summary>
+    public bool IsDuplicate => !ReferenceEquals( _stackName, _stackRoot.LastPart );
 
     /// <summary>
     /// Gets whether this stack is public.
@@ -202,11 +210,12 @@ public sealed partial class StackRepository : IDisposable
         return result != CommitResult.Error && _git.Push( monitor );
     }
 
-    StackRepository( GitRepository git, in NormalizedPath stackRoot, ISecretsStore secretsStore )
+    StackRepository( GitRepository git, in NormalizedPath stackRoot, ISecretsStore secretsStore, string stackName )
     {
         _git = git;
         _stackRoot = stackRoot;
         _secretsStore = secretsStore;
+        _stackName = stackName;
     }
 
     /// <summary>
@@ -250,15 +259,19 @@ public sealed partial class StackRepository : IDisposable
             var url = git.OriginUrl;
             if( CheckOriginUrlStackSuffix( monitor, ref url, out var stackNameFromUrl ) )
             {
-                if( stackRoot.LastPart != stackNameFromUrl
-                    && stackRoot.LastPart != DuplicatePrefix + stackNameFromUrl )
+                if( stackRoot.LastPart == stackNameFromUrl )
+                {
+                    // Use the same reference for non duplicate: ReferenceEquals is used.
+                    stackNameFromUrl = stackRoot.LastPart;
+                }
+                else if( stackRoot.LastPart != DuplicatePrefix + stackNameFromUrl )
                 {
                     monitor.Error( $"Stack folder '{stackRoot.LastPart}' must be '{stackNameFromUrl}' (or '{DuplicatePrefix}{stackNameFromUrl}') since repository Url is '{git.OriginUrl}'." );
                     error = true;
                 }
-                else if( git.SetCurrentBranch( monitor, stackBranchName, skipPullStack ) )
+                if( !error && git.SetCurrentBranch( monitor, stackBranchName, skipPullStack ) )
                 {
-                    return new StackRepository( git, stackRoot, secretsStore );
+                    return new StackRepository( git, stackRoot, secretsStore, stackNameFromUrl );
                 }
             }
             git.Dispose();
@@ -414,6 +427,8 @@ public sealed partial class StackRepository : IDisposable
             return null;
         }
 
+        // Default folder name is the stackNameFromUrl.
+        var stackFolderName = stackNameFromUrl;
         var already = Registry.CheckExistingStack( monitor, url );
         if( already.Count > 0 )
         {
@@ -423,17 +438,16 @@ public sealed partial class StackRepository : IDisposable
                         {already.Select( p => p.Path ).Concatenate( Environment.NewLine )}
                         """ );
             if( !allowDuplicateStack ) return null;
-            stackNameFromUrl = DuplicatePrefix + stackNameFromUrl;
+            stackFolderName = DuplicatePrefix + stackNameFromUrl;
         }
-
-        var stackRoot = parentPath.AppendPart( stackNameFromUrl );
+        var stackRoot = parentPath.AppendPart( stackFolderName );
 
         // Secure Stack inside Stack scenario.
         var parentStack = FindGitStackPath( parentPath );
         if( !parentStack.IsEmptyPath )
         {
             var stackAbove = parentStack.RemoveLastPart();
-            var safeRoot = stackAbove.RemoveLastPart().AppendPart( stackNameFromUrl );
+            var safeRoot = stackAbove.RemoveLastPart().AppendPart( stackFolderName );
             monitor.Warn( $"Resolved stack path '{stackRoot}' is inside stack '{stackAbove}': moving it to {safeRoot}." );
             stackRoot = safeRoot;
         }
@@ -444,6 +458,11 @@ public sealed partial class StackRepository : IDisposable
             monitor.Error( $"The resolved path to clone '{stackRoot}' already exists." );
             return null;
         }
+
+        // The NormalizedPath keeps (MUST keep!) the LastPart reference.
+        Throw.DebugAssert( "IsDuplicate uses ReferenceEquals.",
+            (ReferenceEquals( stackRoot.LastPart, stackFolderName ) && stackFolderName != stackNameFromUrl)
+            || (ReferenceEquals( stackRoot.LastPart, stackNameFromUrl ) && stackFolderName == stackNameFromUrl) );
 
         NormalizedPath gitPath = stackRoot.AppendPart( isPublic ? PublicStackName : PrivateStackName );
 
@@ -457,7 +476,7 @@ public sealed partial class StackRepository : IDisposable
             {
                 SetupNewLocalDirectory( gitPath );
                 Registry.RegisterNewStack( monitor, gitPath, url );
-                var result = new StackRepository( git, stackRoot, secretsStore );
+                var result = new StackRepository( git, stackRoot, secretsStore, stackNameFromUrl );
                 if( CloneWorld( monitor, result, secretsStore, result.DefaultWorldName ) )
                 {
                     return result;

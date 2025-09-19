@@ -2,6 +2,8 @@ using CK.Core;
 using NUnit.Framework;
 using Shouldly;
 using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
 using static CK.Testing.MonitorTestHelper;
 
 namespace CKli.Core.Tests;
@@ -233,6 +235,36 @@ public class StackRepositoryTests
             File.Exists( localPath.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Back thanks to the automatic FixLayout." );
 
             stack.Dispose();
+        }
+    }
+
+    [Test]
+    public void DuplicateOf_detection()
+    {
+        var root = ClonedPaths.EnsureCleanFolder();
+        var secretsStore = new DotNetUserSecretsStore();
+        var remotes = Remotes.UseReadOnly( "CKt" );
+
+        var initialPath = root.AppendPart( "Initial" );
+        var duplicate1 = root.AppendPart( "Duplicate1" );
+        var duplicate2 = root.AppendPart( "Duplicate2" );
+
+        // ckli clone file:///.../CKt-Stack -p Initial
+        CKliCommands.Clone( TestHelper.Monitor, secretsStore, initialPath, remotes.StackUri ).ShouldBe( 0 );
+
+        // ckli clone file:///.../CKt-Stack -p Duplicate1
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            CKliCommands.Clone( TestHelper.Monitor, secretsStore, duplicate1, remotes.StackUri )
+                .ShouldNotBe( 0, "This fails" );
+            logs.Any( log => Regex.Match( log, "The stack 'CKt' at '.*' is already available here" ).Success ).ShouldBeTrue();
+        }
+
+        // ckli clone file:///.../CKt-Stack -p Duplicate1 --allow-duplicate
+        using( var stack = StackRepository.Clone( TestHelper.Monitor, secretsStore, remotes.StackUri, isPublic: true, duplicate1, allowDuplicateStack: true ) )
+        {
+            stack.ShouldNotBeNull();
+            stack.IsDuplicate.ShouldBeTrue();
         }
     }
 }
