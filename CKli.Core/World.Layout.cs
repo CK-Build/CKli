@@ -91,8 +91,7 @@ sealed partial class World
         {
             DeletePotentiallyEmptyFolders( monitor, potentiallyEmptyFolders );
         }
-
-        return FixedLayout == null || SafeRaiseEvent( monitor, FixedLayout, new FixedLayoutEventArgs( monitor, this, newClones ) );
+        return FixedLayout == null || SafeRaiseEvent( monitor, FixedLayout, new FixedAllLayoutEventArgs( monitor, this, newClones ) );
 
         static bool ExecuteMoves( IActivityMonitor monitor, World world, List<LayoutAction> actions, HashSet<NormalizedPath> potentiallyEmptyFolders )
         {

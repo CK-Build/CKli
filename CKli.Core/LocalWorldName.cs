@@ -211,8 +211,8 @@ public sealed class LocalWorldName : WorldName
     }
 
     internal bool SaveAndCommitDefinitionFile( IActivityMonitor monitor,
-                                      string cleanCommitMessage,
-                                      string commitMessage )
+                                               string cleanCommitMessage,
+                                               string commitMessage )
     {
         Throw.DebugAssert( _definitionFile != null );
         return _stack.Commit( monitor, cleanCommitMessage )

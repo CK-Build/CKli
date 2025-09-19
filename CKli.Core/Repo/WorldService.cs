@@ -81,6 +81,7 @@ public abstract class RepoInfoProvider<T> : WorldService
                 }
             }
             all = ImmutableCollectionsMarshal.AsImmutableArray( _infos )!;
+            _all = all;
         }
         return true;
     }

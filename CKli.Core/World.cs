@@ -161,7 +161,7 @@ public sealed partial class World
     /// <summary>
     /// Raised when <see cref="FixLayout(IActivityMonitor, bool, out List{Repo}?)"/> has been successfully called.
     /// </summary>
-    public event EventHandler<FixedLayoutEventArgs>? FixedLayout;
+    public event EventHandler<FixedAllLayoutEventArgs>? FixedLayout;
 
     /// <summary>
     /// Gets whether a full path or a origin url is defined in this <see cref="Layout"/>.

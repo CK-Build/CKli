@@ -17,7 +17,7 @@ public sealed partial class RawSolutionProvider : RepoInfoProvider<RawSolutionIn
         World.FixedLayout -= World_FixedLayout;
     }
 
-    void World_FixedLayout( object? sender, FixedLayoutEventArgs e )
+    void World_FixedLayout( object? sender, FixedAllLayoutEventArgs e )
     {
         if( TryGetAll( e.Monitor, out var all ) )
         {
