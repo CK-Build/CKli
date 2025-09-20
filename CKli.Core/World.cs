@@ -1,8 +1,9 @@
 using CK.Core;
-using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
+using System.Xml.Linq;
 
 namespace CKli.Core;
 
@@ -17,10 +18,12 @@ public sealed partial class World
     readonly StackRepository _stackRepository;
     readonly LocalWorldName _name;
     readonly WorldDefinitionFile _definitionFile;
+    readonly PluginManager? _pluginManager;
     // The WorldDefinitionFile maintains its layout list.
     // AddRepository, RemoveRepository and XifLayout are the only ones that can
-    // invalidate the cache.
+    // update this layout.
     readonly IReadOnlyList<(NormalizedPath Path, Uri Uri)> _layout;
+
     // This caches the Repo (and its GitRepository) by uri and path as string and case insensitively.
     // This enables to cache the Repo even with case mismatch (that FixLayout will fix).
     readonly Dictionary<string, Repo?> _cachedRepositories;
@@ -30,12 +33,14 @@ public sealed partial class World
     World( StackRepository stackRepository,
            LocalWorldName name,
            WorldDefinitionFile definitionFile,
-           IReadOnlyList<(NormalizedPath Path, Uri Uri)> layout )
+           IReadOnlyList<(NormalizedPath Path, Uri Uri)> layout,
+           PluginManager? pluginManager )
     {
         _stackRepository = stackRepository;
         _name = name;
         _definitionFile = definitionFile;
         _layout = layout;
+        _pluginManager = pluginManager;
         _cachedRepositories = new Dictionary<string, Repo?>( layout.Count, StringComparer.OrdinalIgnoreCase );
         foreach( var (path, uri) in _layout )
         {
@@ -51,12 +56,19 @@ public sealed partial class World
     {
         var worldName = stackRepository.GetWorldNameFromPath( monitor, path );
         var definitionFile = worldName?.LoadDefinitionFile( monitor );
-        var initialLayout = definitionFile?.ReadLayout( monitor );
-        if( initialLayout == null )
+        var layout = definitionFile?.ReadLayout( monitor );
+        if( layout == null )
         {
             return null;
         }
-        return new World( stackRepository, worldName!, definitionFile!, initialLayout );
+        Throw.DebugAssert( worldName != null && definitionFile != null );
+        PluginManager? pluginManager = null;
+        if( !definitionFile.IsPluginsDisabled )
+        {
+            pluginManager = PluginManager.Create( monitor, worldName, definitionFile );
+            if( pluginManager == null ) return null;
+        }
+        return new World( stackRepository, worldName, definitionFile, layout, pluginManager );
     }
 
     internal void DisposeRepositories()

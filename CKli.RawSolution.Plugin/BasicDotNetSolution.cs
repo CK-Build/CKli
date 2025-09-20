@@ -2,14 +2,19 @@ using CK.Core;
 using System.Text.RegularExpressions;
 using CKli.Core;
 
-namespace CKli.RawSolution.Plugin;
+namespace CKli.Plugin;
 
-public sealed partial class RawSolutionProvider : RepoInfoProvider<RawSolutionInfo>, IDisposable
+public sealed partial class BasicDotNetSolution : RepoPlugin<BasicSolutionInfo>, IDisposable
 {
-    public RawSolutionProvider( World world )
+    public BasicDotNetSolution( World world )
         : base( world )
     {
         world.FixedLayout += World_FixedLayout;
+    }
+
+    public static void Register( PluginCollector collector )
+    {
+        collector.AddPrimaryPlugin<BasicDotNetSolution>();
     }
 
     public void Dispose()
@@ -30,7 +35,7 @@ public sealed partial class RawSolutionProvider : RepoInfoProvider<RawSolutionIn
         }
     }
 
-    protected override RawSolutionInfo Create( IActivityMonitor monitor, Repo repo )
+    protected override BasicSolutionInfo Create( IActivityMonitor monitor, Repo repo )
     {
         // Fast path: the .sln exists.
         var content = ReadSlnFile( repo.DisplayPath.LastPart, out var slnPath );
@@ -42,16 +47,16 @@ public sealed partial class RawSolutionProvider : RepoInfoProvider<RawSolutionIn
         int candidateCount = Directory.EnumerateFiles( repo.WorkingFolder, "*.sln*" )
                                       .Count( sln => sln.EndsWith( ".sln", StringComparison.OrdinalIgnoreCase )
                                                      || sln.EndsWith( ".slnx", StringComparison.OrdinalIgnoreCase ) );
-        return new RawSolutionInfo( repo, candidateCount switch
+        return new BasicSolutionInfo( repo, candidateCount switch
         {
-            0 => RawSolutionIssue.MissingSolution,
-            1 => RawSolutionIssue.BadNameSolution,
-            _ => RawSolutionIssue.MultipleSolution
+            0 => BasicSolutionIssue.MissingSolution,
+            1 => BasicSolutionIssue.BadNameSolution,
+            _ => BasicSolutionIssue.MultipleSolution
         }, null, null );
 
     }
 
-    static RawSolutionInfo LoadProjects( IActivityMonitor monitor,
+    static BasicSolutionInfo LoadProjects( IActivityMonitor monitor,
                                          Repo repo,
                                          in NormalizedPath slnPath,
                                          string content )
@@ -94,18 +99,18 @@ public sealed partial class RawSolutionProvider : RepoInfoProvider<RawSolutionIn
         }
         if( projectsPath == null )
         {
-            return new RawSolutionInfo( repo, RawSolutionIssue.MissingSolution, null, null );
+            return new BasicSolutionInfo( repo, BasicSolutionIssue.MissingSolution, null, null );
         }
         if( duplicateProjectNames != null || missingProjectFiles != null )
         {
-            var issue = duplicateProjectNames != null ? RawSolutionIssue.DuplicateProjects : RawSolutionIssue.None;
-            if( missingProjectFiles != null ) issue |= RawSolutionIssue.MissingProjects;
-            if( issue is RawSolutionIssue.None ) issue = RawSolutionIssue.EmptySolution;
-            Throw.DebugAssert( issue is not RawSolutionIssue.None );
+            var issue = duplicateProjectNames != null ? BasicSolutionIssue.DuplicateProjects : BasicSolutionIssue.None;
+            if( missingProjectFiles != null ) issue |= BasicSolutionIssue.MissingProjects;
+            if( issue is BasicSolutionIssue.None ) issue = BasicSolutionIssue.EmptySolution;
+            Throw.DebugAssert( issue is not BasicSolutionIssue.None );
 
-            return new RawSolutionInfo( repo, issue, duplicateProjectNames, missingProjectFiles );
+            return new BasicSolutionInfo( repo, issue, duplicateProjectNames, missingProjectFiles );
         }
-        return new RawSolutionInfo( repo, projectsPath, slnPath, badFolderProjectNames );
+        return new BasicSolutionInfo( repo, projectsPath, slnPath, badFolderProjectNames );
     }
 
     static string? ReadSlnFile( NormalizedPath solutionFolder, out NormalizedPath slnPath )

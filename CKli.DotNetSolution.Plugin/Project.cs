@@ -1,7 +1,7 @@
 using CK.Core;
 using System.Diagnostics.CodeAnalysis;
 
-namespace CKli.DotNetSolution.Plugin;
+namespace CKli.Plugin;
 
 public sealed class Project
 {
@@ -22,5 +22,5 @@ public sealed class Project
 
     public bool IsPackable => _isPackable;
 
-    public override string ToString() => $"{_solution.RawSolution.Name}/{_projectFileSubPath.LastPart}";
+    public override string ToString() => $"{_solution.BasicDotNetSolution.Name}/{_projectFileSubPath.LastPart}";
 }

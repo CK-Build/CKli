@@ -1,17 +1,17 @@
 using CK.Core;
 using CKli.Core;
-using CKli.RawSolution.Plugin;
+using CKli.BasicDotNetSolution.Plugin;
 using System.Collections.Immutable;
 
-namespace CKli.DotNetSolution.Plugin;
+namespace CKli.Plugin;
 
 public sealed class DotNetSolutionInfo : RepoInfo
 {
     readonly ImmutableArray<ProjectPackageReference> _refs;
-    readonly RawSolutionInfo _rawSolution;
+    readonly BasicSolutionInfo _rawSolution;
     readonly IReadOnlyDictionary<NormalizedPath, Project> _projects;
 
-    internal DotNetSolutionInfo( RawSolutionInfo rawSolution, Dictionary<NormalizedPath,Project> projects, ImmutableArray<ProjectPackageReference> refs )
+    internal DotNetSolutionInfo( BasicSolutionInfo rawSolution, Dictionary<NormalizedPath,Project> projects, ImmutableArray<ProjectPackageReference> refs )
         : base( rawSolution.Repo )
     {
         Throw.DebugAssert( refs.Length > 0 );
@@ -21,26 +21,26 @@ public sealed class DotNetSolutionInfo : RepoInfo
         foreach( var project in _projects.Values ) project._solution = this;
     }
 
-    // Error ctor (issue in RawSolution).
-    internal DotNetSolutionInfo( RawSolutionInfo rawSolution )
-        : this( rawSolution, RepoInfoErrorState.Invalid, $"RawSolution has '{rawSolution.Issue}' issue." )
+    // Error ctor (issue in BasicDotNetSolution).
+    internal DotNetSolutionInfo( BasicSolutionInfo rawSolution )
+        : this( rawSolution, RepoInfoErrorState.Invalid, $"BasicDotNetSolution has '{rawSolution.Issue}' issue." )
     {
-        Throw.DebugAssert( rawSolution.Issue is not RawSolutionIssue.None );
+        Throw.DebugAssert( rawSolution.Issue is not BasicSolutionIssue.None );
     }
 
     // Error ctor (Project analyzis error).
-    internal DotNetSolutionInfo( RawSolutionInfo rawSolution, string anayzisErrorMessage )
+    internal DotNetSolutionInfo( BasicSolutionInfo rawSolution, string anayzisErrorMessage )
         : this( rawSolution, RepoInfoErrorState.Invalid, anayzisErrorMessage )
     {
     }
 
     // Error ctor (Exception).
-    internal DotNetSolutionInfo( RawSolutionInfo rawSolution, Exception ex )
+    internal DotNetSolutionInfo( BasicSolutionInfo rawSolution, Exception ex )
         : this( rawSolution, RepoInfoErrorState.Error, ex )
     {
     }
 
-    DotNetSolutionInfo( RawSolutionInfo rawSolution, RepoInfoErrorState errorState, object reason )
+    DotNetSolutionInfo( BasicSolutionInfo rawSolution, RepoInfoErrorState errorState, object reason )
         : base( rawSolution.Repo, errorState, reason )
     {
         _refs = [];
@@ -49,9 +49,9 @@ public sealed class DotNetSolutionInfo : RepoInfo
     }
 
     /// <summary>
-    /// Gets the RawSolution.
+    /// Gets the BasicDotNetSolution.
     /// </summary>
-    public RawSolutionInfo RawSolution => _rawSolution;
+    public BasicSolutionInfo BasicDotNetSolution => _rawSolution;
 
     /// <summary>
     /// Gets the projects indexed by their <see cref="Project.ProjectFileSubPath"/>.

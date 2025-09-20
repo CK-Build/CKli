@@ -2,7 +2,7 @@ using CK.Core;
 using CKli.Core;
 using System.Collections.Immutable;
 
-namespace CKli.RawSolution.Plugin;
+namespace CKli.Plugin;
 
 /// <summary>
 /// Minimal capture of a ".sln" or ".slnx" file and its project.
@@ -11,9 +11,9 @@ namespace CKli.RawSolution.Plugin;
 /// cases but this <see cref="RepoInfo.ErrorState"/> is always <see cref="RepoInfoErrorState.None"/>.
 /// </para>
 /// </summary>
-public sealed class RawSolutionInfo : RepoInfo
+public sealed class BasicSolutionInfo : RepoInfo
 {
-    readonly RawSolutionIssue _issue;
+    readonly BasicSolutionIssue _issue;
     readonly IReadOnlyList<NormalizedPath> _duplicateProjectNames;
     readonly IReadOnlyList<NormalizedPath> _missingProjectFiles;
     readonly IReadOnlyDictionary<string, NormalizedPath> _projectFiles;
@@ -22,7 +22,7 @@ public sealed class RawSolutionInfo : RepoInfo
     readonly NormalizedPath _slnPath;
 
     // Success ctor.
-    internal RawSolutionInfo( Repo repo,
+    internal BasicSolutionInfo( Repo repo,
                               Dictionary<string, NormalizedPath> projectFiles,
                               NormalizedPath slnPath,
                               IReadOnlyList<NormalizedPath>? badFolderProjectNames )
@@ -37,8 +37,8 @@ public sealed class RawSolutionInfo : RepoInfo
     }
 
     // Failed ctor.
-    internal RawSolutionInfo( Repo repo,
-                          RawSolutionIssue issue,
+    internal BasicSolutionInfo( Repo repo,
+                          BasicSolutionIssue issue,
                           IReadOnlyList<NormalizedPath>? duplicateProjectNames,
                           IReadOnlyList<NormalizedPath>? missingProjectFiles )
         : base( repo )
@@ -54,7 +54,7 @@ public sealed class RawSolutionInfo : RepoInfo
     /// <summary>
     /// Gets issue for this solution.
     /// </summary>
-    public RawSolutionIssue Issue => _issue;
+    public BasicSolutionIssue Issue => _issue;
 
     /// <summary>
     /// Gets the short name of this solution.
@@ -63,7 +63,7 @@ public sealed class RawSolutionInfo : RepoInfo
 
     /// <summary>
     /// Gets the ".sln" or ".slnx" file path.
-    /// Can be if the empty path <see cref="Issue"/> is not <see cref="RawSolutionIssue.None"/>.
+    /// Can be if the empty path <see cref="Issue"/> is not <see cref="BasicSolutionIssue.None"/>.
     /// </summary>
     public NormalizedPath SlnPath => _slnPath;
 

@@ -1,28 +1,32 @@
 using Buildalyzer;
 using CK.Core;
 using CKli.Core;
-using CKli.RawSolution.Plugin;
 using CSemVer;
 using System.Collections.Immutable;
 using System.Text;
 
-namespace CKli.DotNetSolution.Plugin;
+namespace CKli.Plugin;
 
-public sealed class DotNetSolutionProvider : RepoInfoProvider<DotNetSolutionInfo>
+public sealed class DotNetSolution : RepoPlugin<DotNetSolutionInfo>
 {
-    readonly RawSolutionProvider _rawSolutionProvider;
+    readonly BasicDotNetSolution _rawSolutionProvider;
 
-    public DotNetSolutionProvider( RawSolutionProvider rawSolutionProvider )
+    public DotNetSolution( BasicDotNetSolution rawSolutionProvider )
         : base( rawSolutionProvider.World )
     {
         _rawSolutionProvider = rawSolutionProvider;
+    }
+
+    public static void Register( PluginCollector services )
+    {
+        services.AddPrimaryPlugin<DotNetSolution>();
     }
 
     protected override DotNetSolutionInfo Create( IActivityMonitor monitor, Repo repo )
     {
         var rawSolution = _rawSolutionProvider.Get( monitor, repo );
         Throw.DebugAssert( rawSolution.ErrorState is RepoInfoErrorState.None );
-        if( rawSolution.Issue != RawSolutionIssue.None )
+        if( rawSolution.Issue != BasicSolutionIssue.None )
         {
             return new DotNetSolutionInfo( rawSolution );
         }
@@ -34,7 +38,7 @@ public sealed class DotNetSolutionProvider : RepoInfoProvider<DotNetSolutionInfo
         var projects = new Dictionary<NormalizedPath, Project>();
 
         static Project EnsureProject( Dictionary<NormalizedPath, Project> projects,
-                                      RawSolutionInfo rawSolution,
+                                      BasicSolutionInfo rawSolution,
                                       IAnalyzerResult projectResult )
         {
             Throw.DebugAssert( projectResult.ProjectFilePath.StartsWith( rawSolution.Repo.WorkingFolder + '/' ) );

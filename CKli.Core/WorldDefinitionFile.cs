@@ -13,6 +13,7 @@ public sealed class WorldDefinitionFile
 {
     static Func<IActivityMonitor,string,string>? _repositoryUrlHook;
     readonly XElement _root;
+    readonly XElement _plugins;
     readonly LocalWorldName _world;
     List<(NormalizedPath, Uri)>? _layout;
     bool _allowEdit;
@@ -25,7 +26,7 @@ public sealed class WorldDefinitionFile
     {
         /// <summary>
         /// Follows the order in the definition file.
-        /// This is the efault.
+        /// This is the default.
         /// </summary>
         DefinitionFile,
 
@@ -45,12 +46,12 @@ public sealed class WorldDefinitionFile
     /// </summary>
     public static LayoutRepoOrder RepoOrder { get; set; }
 
-    internal WorldDefinitionFile( LocalWorldName world, XDocument document )
+    WorldDefinitionFile( LocalWorldName world, XElement root, XElement plugins )
     {
-        Throw.CheckNotNullArgument( document );
-        Throw.CheckArgument( document.Root is not null );
-        _root = document.Root;
-        _root.Document!.Changing += OnDocumentChanging;
+        Throw.DebugAssert( root.Document != null );
+        _root = root;
+        _plugins = plugins;
+        _root.Document.Changing += OnDocumentChanging;
         _world = world;
     }
 
@@ -73,6 +74,17 @@ public sealed class WorldDefinitionFile
     public XElement Root => _root;
 
     /// <summary>
+    /// Gets the &lt;Plugins /&gt; element.
+    /// Must not be mutated otherwise a <see cref="InvalidOperationException"/> is raised.
+    /// </summary>
+    public XElement Plugins => _plugins;
+
+    /// <summary>
+    /// Gets whether &lt;Plugins Disabled="true" /&gt; is set.
+    /// </summary>
+    public bool IsPluginsDisabled => (bool?)_plugins.Attribute( _xDisabled ) is true;
+
+    /// <summary>
     /// Shallow and quick analysis of the &lt;Folder&gt; and &lt;Repository&gt; elements that
     /// checks the unicity of "Path" and "Url" attribute.
     /// The list is ordered by the Path (that are absolute).
@@ -89,7 +101,7 @@ public sealed class WorldDefinitionFile
     /// <para>
     /// This is mainly for tests. Note that this is applied when loading the xml file definition:
     /// the in-memory representation is no more the same as the file. Saving the definition
-    /// file is required for the file to be updated with the transformation.
+    /// file is required for the file to be updated with the transformations.
     /// </para>
     /// </summary>
     public static Func<IActivityMonitor, string, string>? RepositoryUrlHook
@@ -231,18 +243,29 @@ public sealed class WorldDefinitionFile
         return true;
     }
 
+    static readonly XName _xDisabled = XNamespace.None + "Disabled";
+    static readonly XName _xPlugins = XNamespace.None + "Plugins";
     static readonly XName _xRepository = XNamespace.None + "Repository";
     static readonly XName _xFolder = XNamespace.None + "Folder";
     static readonly XName _xName = XNamespace.None + "Name";
     static readonly XName _xUrl = XNamespace.None + "Url";
 
-    internal static void ApplyUrlHook( IActivityMonitor monitor, XElement e )
+    internal static WorldDefinitionFile Create( IActivityMonitor monitor, LocalWorldName world, XElement root )
     {
-        Throw.DebugAssert( _repositoryUrlHook != null );
-        foreach( var a in e.Descendants( _xRepository ).Attributes( _xUrl ) )
+        var plugins = root.Element( _xPlugins );
+        if( plugins == null )
         {
-            if( a.Value != null ) a.Value = _repositoryUrlHook( monitor, a.Value );
+            plugins = new XElement( _xRepository );
+            root.AddFirst( plugins );
         }
+        if( _repositoryUrlHook != null )
+        {
+            foreach( var a in root.Descendants( _xRepository ).Attributes( _xUrl ) )
+            {
+                if( a.Value != null ) a.Value = _repositoryUrlHook( monitor, a.Value );
+            }
+        }
+        return new WorldDefinitionFile( world, root, plugins );
     }
 
     static List<(NormalizedPath Path, Uri Uri)>? GetRepositoryLayout( IActivityMonitor monitor, XElement root, NormalizedPath worldRoot )

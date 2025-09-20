@@ -1,12 +1,12 @@
 using CKli.Core;
 
-namespace CKli.RawSolution.Plugin;
+namespace CKli.Plugin;
 
 /// <summary>
-/// The <see cref="RawSolutionInfo.Issue"/>.
+/// The <see cref="BasicSolutionInfo.Issue"/>.
 /// </summary>
 [Flags]
-public enum RawSolutionIssue
+public enum BasicSolutionIssue
 {
     /// <summary>
     /// No issue.

@@ -70,11 +70,7 @@ public sealed class LocalWorldName : WorldName
                 monitor.Error( $"Invalid world definition root element. Attribute 'LTSName = \"{LTSName}\" is required. File: '{_xmlDescriptionFilePath}'." );
                 return null;
             }
-            if( WorldDefinitionFile.RepositoryUrlHook != null )
-            {
-                WorldDefinitionFile.ApplyUrlHook( monitor, root );
-            }
-            return new WorldDefinitionFile( this, doc );
+            return WorldDefinitionFile.Create( monitor, this, root );
         }
         catch( Exception ex )
         {

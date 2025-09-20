@@ -1,33 +1,15 @@
 using CK.Core;
-using System;
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 
 namespace CKli.Core;
 
 /// <summary>
-/// Non generic base for <see cref="RepoInfoProvider{T}"/>.
-/// </summary>
-public abstract class WorldService
-{
-    readonly World _world;
-
-    protected WorldService( World world )
-    {
-        _world = world;
-    }
-
-    /// <summary>
-    /// Gets the world.
-    /// </summary>
-    public World World => _world;
-}
-
-/// <summary>
-/// Simple Template Method Pattern that caches information associated to a <see cref="Repo"/>.
+/// <see cref="WorldPlugin"/> simple Template Method Pattern that caches information
+/// associated to a <see cref="Repo"/>.
 /// </summary>
 /// <typeparam name="T">The information type.</typeparam>
-public abstract class RepoInfoProvider<T> : WorldService
+public abstract class RepoPlugin<T> : WorldPlugin
     where T : RepoInfo
 {
     readonly T?[] _infos;
@@ -37,7 +19,7 @@ public abstract class RepoInfoProvider<T> : WorldService
     /// Initializes a new information cache.
     /// </summary>
     /// <param name="world">The world.</param>
-    protected RepoInfoProvider( World world )
+    protected RepoPlugin( World world )
         : base( world )
     {
         _infos = new T[world.Layout.Count];
