@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using System.Xml.Linq;
 
 namespace CKli.Core;
@@ -24,9 +25,7 @@ public sealed partial class World
 
     /// <summary>
     /// Gets this version, mapping the <see cref="SVersion.ZeroVersion"/> to the "0.0.1" version
-    /// because NuGet doesn't handle the very first version well: https://nuget.org consider the
-    /// version invalid and Central Package Management doesn't play well with it
-    /// (see https://github.com/NuGet/Home/issues/14547).
+    /// because https://nuget.org consider the version invalid.
     /// <para>
     /// When this version is the "0.0.0-0" version (dirty build), we fallback to the "0.0.1" that is
     /// available on NuGet.
@@ -47,6 +46,8 @@ public sealed partial class World
     readonly LocalWorldName _name;
     readonly WorldDefinitionFile _definitionFile;
     readonly IWorldPlugins? _plugins;
+    IDisposable? _instantiatedPlugins;
+
     // The WorldDefinitionFile maintains its layout list.
     // AddRepository, RemoveRepository and XifLayout are the only ones that can
     // update this layout.
@@ -96,11 +97,37 @@ public sealed partial class World
             plugins = PluginContext.Create( monitor, worldName, definitionFile );
             if( plugins == null ) return null;
         }
-        return new World( stackRepository, worldName, definitionFile, layout, plugins );
+        var w = new World( stackRepository, worldName, definitionFile, layout, plugins );
+        if( plugins != null )
+        {
+            if( !w.InstantiatePlugins( monitor ) )
+            {
+                w.DisposeRepositoriesAndPlugins();
+                w = null;
+            }
+        }
+        return w;
     }
 
-    internal void DisposeRepositories()
+    bool InstantiatePlugins( IActivityMonitor monitor )
     {
+        Throw.DebugAssert( _plugins != null );
+        try
+        {
+            _instantiatedPlugins = _plugins.Create( this );
+            return true;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( $"While instantiating plugins.", ex );
+            return false;
+        }
+    }
+
+    internal void DisposeRepositoriesAndPlugins()
+    {
+        _plugins?.Dispose();
+        _instantiatedPlugins?.Dispose();
         var r = _firstRepo;
         while( r != null )
         {

@@ -1,6 +1,7 @@
 using CK.Core;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -9,12 +10,14 @@ namespace CKli.Core;
 
 sealed class PluginLoadContext : AssemblyLoadContext, IWorldPlugins
 {
+    readonly NormalizedPath _runFolder;
     IWorldPlugins? _worldPlugins;
     bool _disposed;
 
-    public PluginLoadContext( WorldName worldName )
+    public PluginLoadContext( WorldName worldName, NormalizedPath runFolder )
         : base( worldName.FullName, isCollectible: true )
     {
+        _runFolder = runFolder;
     }
 
     public IReadOnlyCollection<IWorldPluginInfo> Plugins => _worldPlugins!.Plugins;
@@ -33,12 +36,25 @@ sealed class PluginLoadContext : AssemblyLoadContext, IWorldPlugins
 
     protected override Assembly? Load( AssemblyName assemblyName )
     {
-        return Default.Assemblies.FirstOrDefault( x => x.FullName == assemblyName.FullName );
+        var a = Default.Assemblies.FirstOrDefault( x => x.FullName == assemblyName.FullName );
+        if( a == null )
+        {
+            var p = $"{_runFolder}/{assemblyName.Name}.dll";
+            if( !File.Exists( p ) )
+            {
+                Throw.CKException( $"""
+                    Unable to find '{assemblyName.Name}.dll' in '{_runFolder}'.
+                    Please check that 'CKli.Plugins.csproj' has <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>.
+                    """ );
+            }
+            a = LoadFromAssemblyPath( p );
+        }
+        return a;
     }
 
-    static public IWorldPlugins? Load( IActivityMonitor monitor, NormalizedPath dllPath, PluginCollectorContext context )
+    static public IWorldPlugins? Load( IActivityMonitor monitor, NormalizedPath runFolder, NormalizedPath dllPath, PluginCollectorContext context )
     {
-        var result = new PluginLoadContext( context.WorldName );
+        var result = new PluginLoadContext( context.WorldName, runFolder );
         try
         {
             if( result.DoLoad( monitor, dllPath, context ) )

@@ -117,7 +117,7 @@ public sealed class WorldDefinitionFile
                 config.Add( name, (e, (bool?)e.Attribute( _xDisabled ) is true) );
             }
         }
-        return success ? _pluginsConfiguration : null;
+        return success ? config : null;
     }
 
     /// <summary>
@@ -427,7 +427,7 @@ public sealed class WorldDefinitionFile
                         }
                     }
                 }
-                else
+                else if( eN != _xPlugins.LocalName )
                 {
                     monitor.Warn( $"""
                         Unexpected element:

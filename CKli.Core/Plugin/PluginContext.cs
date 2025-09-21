@@ -9,6 +9,7 @@ sealed class PluginContext
 {
     readonly string _name;
     readonly NormalizedPath _root;
+    readonly NormalizedPath _runFolder;
     readonly NormalizedPath _dllPath;
 
     NormalizedPath _slnxPath;
@@ -23,6 +24,8 @@ sealed class PluginContext
 
     public NormalizedPath Root => _root;
 
+    public NormalizedPath RunFolder => _runFolder;
+
     public NormalizedPath DllPath => _dllPath;
 
     public NormalizedPath SlnxPath => _slnxPath.IsEmptyPath ? (_slnxPath = Root.AppendPart( $"{Name}.slnx" )) : _slnxPath;
@@ -31,7 +34,7 @@ sealed class PluginContext
 
     public NormalizedPath NuGetConfigFile => _nugetConfigFile.IsEmptyPath ? (_nugetConfigFile = Root.AppendPart( "nuget.config" )) : _nugetConfigFile;
 
-    public NormalizedPath DirectoryPackageProps => _directoryPackageProps.IsEmptyPath ? (_directoryPackageProps = Root.AppendPart( "Directory.Package.props" )) : _directoryPackageProps;
+    public NormalizedPath DirectoryPackageProps => _directoryPackageProps.IsEmptyPath ? (_directoryPackageProps = Root.AppendPart( "Directory.Packages.props" )) : _directoryPackageProps;
 
     public NormalizedPath CKliPluginsFolder => _ckliPluginsFolder.IsEmptyPath ? (_ckliPluginsFolder = Root.AppendPart( "CKli.Plugins" )) : _ckliPluginsFolder;
 
@@ -43,7 +46,8 @@ sealed class PluginContext
     {
         _name = "Plugins" + worldName.LTSName;
         _root = worldName.Stack.StackWorkingFolder.AppendPart( Name );
-        _dllPath = worldName.Stack.StackWorkingFolder.Combine( $"$Local/{Name}/bin/CKli.Plugins/run/CKli.Plugins.dll" );
+        _runFolder = worldName.Stack.StackWorkingFolder.Combine( $"$Local/{Name}/bin/CKli.Plugins/run" );
+        _dllPath = _runFolder.AppendPart( "CKli.Plugins.dll" );
     }
 
     internal static IWorldPlugins? Create( IActivityMonitor monitor, LocalWorldName worldName, WorldDefinitionFile definitionFile )
@@ -68,7 +72,7 @@ sealed class PluginContext
         {
             return null;
         }
-        return PluginLoadContext.Load( monitor, manager.DllPath, new PluginCollectorContext( worldName, definitionFile, pluginsConfiguration ) );
+        return PluginLoadContext.Load( monitor, manager.RunFolder, manager.DllPath, new PluginCollectorContext( worldName, definitionFile, pluginsConfiguration ) );
     }
 
     void CreateSolution( IActivityMonitor monitor )
@@ -128,6 +132,10 @@ sealed class PluginContext
                 """ );
         File.WriteAllText( CKliPluginsCSProj, $"""
                 <Project Sdk="Microsoft.NET.Sdk">
+
+                  <PropertyGroup>
+                    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+                  </PropertyGroup>
 
                   <ItemGroup>
                     <PackageReference Include="CKli.Plugins.Core" />
