@@ -1,6 +1,8 @@
 using CK.Core;
 using CKli.Core;
+using CSemVer;
 using System;
+using System.IO;
 
 namespace CKli;
 
@@ -305,6 +307,38 @@ public static class CKliCommands
         {
             stack.Dispose();
         }
+    }
+
+    public static int PluginAdd( IActivityMonitor monitor, ISecretsStore secretsStore, string path, string packageId, SVersion version, bool allowLTS )
+    {
+        if( !StackRepository.OpenWorldFromPath( monitor, secretsStore, path, out var stack, out var world, skipPullStack: true ) )
+        {
+            return -1;
+        }
+        try
+        {
+            if( world.DefinitionFile.IsPluginsDisabled )
+            {
+                return RequiresEnabledPlugins( monitor );
+            }
+            if( !allowLTS && !world.Name.IsDefaultWorld )
+            {
+                return RequiresAllowLTS( monitor, world.Name );
+            }
+            return world.AddPlugin( monitor, packageId, version )
+                    ? 0
+                    : -4;
+        }
+        finally
+        {
+            stack.Dispose();
+        }
+    }
+
+    static int RequiresEnabledPlugins( IActivityMonitor monitor )
+    {
+        monitor.Error( $"Plugins are disabled for this world." );
+        return -2;
     }
 
     static int RequiresAllowLTS( IActivityMonitor monitor, LocalWorldName worldName )

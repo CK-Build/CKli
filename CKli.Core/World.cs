@@ -35,7 +35,7 @@ public sealed partial class World
 
     static World()
     {
-        var informational = InformationalVersion.ReadFromAssembly( typeof( PluginContext ).Assembly );
+        var informational = InformationalVersion.ReadFromAssembly( typeof( PluginMachinery ).Assembly );
         SafeCKliVersion = informational.Version == null || informational.Version == SVersion.ZeroVersion
                             ? SVersion.Create( 0, 0, 1 )
                             : informational.Version;
@@ -45,7 +45,7 @@ public sealed partial class World
     readonly StackRepository _stackRepository;
     readonly LocalWorldName _name;
     readonly WorldDefinitionFile _definitionFile;
-    readonly IWorldPlugins? _plugins;
+    readonly PluginMachinery? _pluginMachinery;
     IDisposable? _instantiatedPlugins;
 
     // The WorldDefinitionFile maintains its layout list.
@@ -63,13 +63,13 @@ public sealed partial class World
            LocalWorldName name,
            WorldDefinitionFile definitionFile,
            IReadOnlyList<(NormalizedPath Path, Uri Uri)> layout,
-           IWorldPlugins? plugins )
+           PluginMachinery? pluginMachinery )
     {
         _stackRepository = stackRepository;
         _name = name;
         _definitionFile = definitionFile;
         _layout = layout;
-        _plugins = plugins;
+        _pluginMachinery = pluginMachinery;
         _cachedRepositories = new Dictionary<string, Repo?>( layout.Count, StringComparer.OrdinalIgnoreCase );
         foreach( var (path, uri) in _layout )
         {
@@ -91,14 +91,14 @@ public sealed partial class World
             return null;
         }
         Throw.DebugAssert( worldName != null && definitionFile != null );
-        IWorldPlugins? plugins = null;
+        PluginMachinery? machinery = null;
         if( !definitionFile.IsPluginsDisabled )
         {
-            plugins = PluginContext.Create( monitor, worldName, definitionFile );
-            if( plugins == null ) return null;
+            machinery = PluginMachinery.Create( monitor, worldName, definitionFile );
+            if( machinery == null ) return null;
         }
-        var w = new World( stackRepository, worldName, definitionFile, layout, plugins );
-        if( plugins != null )
+        var w = new World( stackRepository, worldName, definitionFile, layout, machinery );
+        if( machinery != null )
         {
             if( !w.InstantiatePlugins( monitor ) )
             {
@@ -111,10 +111,10 @@ public sealed partial class World
 
     bool InstantiatePlugins( IActivityMonitor monitor )
     {
-        Throw.DebugAssert( _plugins != null );
+        Throw.DebugAssert( _pluginMachinery != null );
         try
         {
-            _instantiatedPlugins = _plugins.Create( this );
+            _instantiatedPlugins = _pluginMachinery.WorlPlugins.Create( this );
             return true;
         }
         catch( Exception ex )
@@ -126,7 +126,7 @@ public sealed partial class World
 
     internal void DisposeRepositoriesAndPlugins()
     {
-        _plugins?.Dispose();
+        _pluginMachinery?.WorlPlugins.Dispose();
         _instantiatedPlugins?.Dispose();
         var r = _firstRepo;
         while( r != null )

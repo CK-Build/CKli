@@ -21,7 +21,7 @@ public partial class WorldName : IEquatable<WorldName>
 
     /// <summary>
     /// Gets the Long Term Support name. Normalized to null for current LTS
-    /// and always starts withe the leading '@' when not null.
+    /// and always starts with the leading '@' when not null.
     /// </summary>
     public string? LTSName => _ltsName;
 

@@ -24,3 +24,4 @@ public readonly struct AbsoluteUrl
 
     public AbsoluteUrl( Uri url ) => Url = url;
 }
+

@@ -1,11 +1,11 @@
 using CK.Core;
 using CSemVer;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 
 namespace CKli.Core;
 
-
-sealed class PluginContext
+sealed class PluginMachinery
 {
     readonly string _name;
     readonly NormalizedPath _root;
@@ -19,6 +19,9 @@ sealed class PluginContext
     NormalizedPath _nugetConfigFile;
     NormalizedPath _ckliPluginsCSProj;
     NormalizedPath _ckliPluginsFile;
+
+    // Result, on success, is set by Create (on error, the failing Machinery is not exposed).
+    [AllowNull]IWorldPlugins _worlPlugins;
 
     public string Name => _name;
 
@@ -42,28 +45,30 @@ sealed class PluginContext
 
     public NormalizedPath CKliPluginsFile => _ckliPluginsFile.IsEmptyPath ? (_ckliPluginsFile = CKliPluginsFolder.AppendPart( "CKli.Plugins.cs" )) : _ckliPluginsFile;
 
-    PluginContext( LocalWorldName worldName )
+    public IWorldPlugins WorlPlugins => _worlPlugins;
+
+    PluginMachinery( LocalWorldName worldName )
     {
-        _name = "Plugins" + worldName.LTSName;
+        _name = $"{worldName.StackName}-Plugins{worldName.LTSName}";
         _root = worldName.Stack.StackWorkingFolder.AppendPart( Name );
         _runFolder = worldName.Stack.StackWorkingFolder.Combine( $"$Local/{Name}/bin/CKli.Plugins/run" );
         _dllPath = _runFolder.AppendPart( "CKli.Plugins.dll" );
     }
 
-    internal static IWorldPlugins? Create( IActivityMonitor monitor, LocalWorldName worldName, WorldDefinitionFile definitionFile )
+    internal static PluginMachinery? Create( IActivityMonitor monitor, LocalWorldName worldName, WorldDefinitionFile definitionFile )
     {
         Throw.DebugAssert( !definitionFile.IsPluginsDisabled );
-        var manager = new PluginContext( worldName );
-        if( !Directory.Exists( manager.Root ) )
+        var machinery = new PluginMachinery( worldName );
+        if( !Directory.Exists( machinery.Root ) )
         {
-            manager.CreateSolution( monitor );
+            machinery.CreateSolution( monitor );
             // A newly created solution must compile.
-            if( !manager.EnsureCompiledPlugins( monitor, definitionFile ) )
+            if( !machinery.EnsureCompiledPlugins( monitor, definitionFile ) )
             {
                 return null;
             }
         }
-        if( !manager.CheckCompiledPlugin( monitor ) )
+        if( !machinery.CheckCompiledPlugin( monitor ) )
         {
             return null;
         }
@@ -72,7 +77,13 @@ sealed class PluginContext
         {
             return null;
         }
-        return PluginLoadContext.Load( monitor, manager.RunFolder, manager.DllPath, new PluginCollectorContext( worldName, definitionFile, pluginsConfiguration ) );
+        var worldPlugins = PluginLoadContext.Load( monitor, machinery.RunFolder, machinery.DllPath, new PluginCollectorContext( worldName, definitionFile, pluginsConfiguration ) );
+        if( worldPlugins == null )
+        {
+            return null;
+        }
+        machinery._worlPlugins = worldPlugins;
+        return machinery;
     }
 
     void CreateSolution( IActivityMonitor monitor )
