@@ -2,17 +2,16 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <!-- Not ready. -->
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Buildalyzer" Version="7.1.0" />
-    <PackageReference Include="CSemVer" Version="12.0.3" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CKli.RawSolution.Plugin\CKli.BasicDotNetSolution.Plugin.csproj" />
+    <ProjectReference Include="..\CKli.BasicDotNetSolution.Plugin\CKli.BasicDotNetSolution.Plugin.csproj" />
   </ItemGroup>
 
 </Project>

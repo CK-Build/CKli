@@ -16,6 +16,7 @@ public sealed class WorldDefinitionFile
     readonly XElement _plugins;
     readonly LocalWorldName _world;
     List<(NormalizedPath, Uri)>? _layout;
+    Dictionary<string, (XElement Config, bool IsDisabled)>? _pluginsConfiguration;
     bool _allowEdit;
     bool _isDirty;
 
@@ -83,6 +84,41 @@ public sealed class WorldDefinitionFile
     /// Gets whether &lt;Plugins Disabled="true" /&gt; is set.
     /// </summary>
     public bool IsPluginsDisabled => (bool?)_plugins.Attribute( _xDisabled ) is true;
+
+    /// <summary>
+    /// Reads the &lt;Plugins&gt; section.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <returns>The plugins configuration or null if errors have been detected.</returns>
+    public IReadOnlyDictionary<string,(XElement Config, bool IsDisabled)>? ReadPluginsConfiguration( IActivityMonitor monitor )
+    {
+        return _pluginsConfiguration  ??= DoReadPluginsConfiguration( monitor );
+    }
+
+    Dictionary<string, (XElement Config, bool IsDisabled)>? DoReadPluginsConfiguration( IActivityMonitor monitor )
+    {
+        bool success = true;
+        var config = new Dictionary<string, (XElement Config, bool IsDisabled)>( StringComparer.OrdinalIgnoreCase );
+        foreach( var e in _plugins.Elements() )
+        {
+            var name = e.Name.LocalName;
+            if( config.TryGetValue( name, out var exists ) )
+            {
+                monitor.Error( $"""
+                        Duplicate Plugin configuration found:
+                        {exists.Config}
+                        and:
+                        {e}
+                        """ );
+                success = false;
+            }
+            else
+            {
+                config.Add( name, (e, (bool?)e.Attribute( _xDisabled ) is true) );
+            }
+        }
+        return success ? _pluginsConfiguration : null;
+    }
 
     /// <summary>
     /// Shallow and quick analysis of the &lt;Folder&gt; and &lt;Repository&gt; elements that
@@ -255,7 +291,7 @@ public sealed class WorldDefinitionFile
         var plugins = root.Element( _xPlugins );
         if( plugins == null )
         {
-            plugins = new XElement( _xRepository );
+            plugins = new XElement( _xPlugins );
             root.AddFirst( plugins );
         }
         if( _repositoryUrlHook != null )

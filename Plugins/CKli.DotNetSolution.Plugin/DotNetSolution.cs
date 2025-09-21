@@ -2,6 +2,8 @@ using Buildalyzer;
 using CK.Core;
 using CKli.Core;
 using CSemVer;
+using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Text;
 
@@ -17,7 +19,7 @@ public sealed class DotNetSolution : RepoPlugin<DotNetSolutionInfo>
         _rawSolutionProvider = rawSolutionProvider;
     }
 
-    public static void Register( PluginCollector services )
+    public static void Register( IPluginCollector services )
     {
         services.AddPrimaryPlugin<DotNetSolution>();
     }

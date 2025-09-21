@@ -1,4 +1,5 @@
 using CK.Core;
+using CSemVer;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -15,10 +16,15 @@ namespace CKli.Core;
 /// </summary>
 public sealed partial class World
 {
+    /// <summary>
+    /// Gets the version of this assembly.
+    /// </summary>
+    public static readonly InformationalVersion CKliVersion = InformationalVersion.ReadFromAssembly( typeof( PluginContext ).Assembly );
+
     readonly StackRepository _stackRepository;
     readonly LocalWorldName _name;
     readonly WorldDefinitionFile _definitionFile;
-    readonly PluginManager? _pluginManager;
+    readonly IWorldPlugins? _plugins;
     // The WorldDefinitionFile maintains its layout list.
     // AddRepository, RemoveRepository and XifLayout are the only ones that can
     // update this layout.
@@ -34,13 +40,13 @@ public sealed partial class World
            LocalWorldName name,
            WorldDefinitionFile definitionFile,
            IReadOnlyList<(NormalizedPath Path, Uri Uri)> layout,
-           PluginManager? pluginManager )
+           IWorldPlugins? plugins )
     {
         _stackRepository = stackRepository;
         _name = name;
         _definitionFile = definitionFile;
         _layout = layout;
-        _pluginManager = pluginManager;
+        _plugins = plugins;
         _cachedRepositories = new Dictionary<string, Repo?>( layout.Count, StringComparer.OrdinalIgnoreCase );
         foreach( var (path, uri) in _layout )
         {
@@ -62,13 +68,13 @@ public sealed partial class World
             return null;
         }
         Throw.DebugAssert( worldName != null && definitionFile != null );
-        PluginManager? pluginManager = null;
+        IWorldPlugins? plugins = null;
         if( !definitionFile.IsPluginsDisabled )
         {
-            pluginManager = PluginManager.Create( monitor, worldName, definitionFile );
-            if( pluginManager == null ) return null;
+            plugins = PluginContext.Create( monitor, worldName, definitionFile );
+            if( plugins == null ) return null;
         }
-        return new World( stackRepository, worldName, definitionFile, layout, pluginManager );
+        return new World( stackRepository, worldName, definitionFile, layout, plugins );
     }
 
     internal void DisposeRepositories()

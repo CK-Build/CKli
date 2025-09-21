@@ -4,13 +4,15 @@ CKli is a tool for <u>multi-repositories</u> stacks.
 It allows to automate actions (build, package upgrade, etc...), on <u>Worlds</u> (a group of repositories),
 and concentrates informations in a single place.
 
+:warning: This is currently under development.
+
 ## Getting Started
 
 ### Prerequisites
 
 - [.NET SDK 8.0](https://dotnet.microsoft.com/download)
 
-### Installation
+### Installation (not supported yet)
 
 CKli is a [dotnet tool](https://docs.microsoft.com/en-us/dotnet/core/tools/global-tools).
 You can install it globally by running:
@@ -19,6 +21,15 @@ You can install it globally by running:
 #latest stable
 dotnet tool install CKli -g
 ```
+**This is the theory.**
+In practice a Long Term Support World should use a locked version of CKli and its plugins.
+The idea was to, in such case, install a **local** dotnet tool in the World and use the "fact"
+that the locally installed tool would take precedence over the global one. Simple and effective.
+
+Unfortunately this doesn't seem that simple:
+https://github.com/dotnet/sdk/issues/14626
+See also https://github.com/dotnet/sdk/issues/11958
+
 
 ### Run CKli
 

@@ -1,6 +1,10 @@
 using CK.Core;
 using System.Text.RegularExpressions;
 using CKli.Core;
+using System;
+using System.IO;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace CKli.Plugin;
 
@@ -12,7 +16,7 @@ public sealed partial class BasicDotNetSolution : RepoPlugin<BasicSolutionInfo>,
         world.FixedLayout += World_FixedLayout;
     }
 
-    public static void Register( PluginCollector collector )
+    public static void Register( IPluginCollector collector )
     {
         collector.AddPrimaryPlugin<BasicDotNetSolution>();
     }

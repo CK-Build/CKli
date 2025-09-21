@@ -1,5 +1,7 @@
 using CK.Core;
 using CKli.Core;
+using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 
 namespace CKli.Plugin;
@@ -23,9 +25,9 @@ public sealed class BasicSolutionInfo : RepoInfo
 
     // Success ctor.
     internal BasicSolutionInfo( Repo repo,
-                              Dictionary<string, NormalizedPath> projectFiles,
-                              NormalizedPath slnPath,
-                              IReadOnlyList<NormalizedPath>? badFolderProjectNames )
+                                Dictionary<string, NormalizedPath> projectFiles,
+                                NormalizedPath slnPath,
+                                IReadOnlyList<NormalizedPath>? badFolderProjectNames )
         : base( repo )
     {
         _projectFiles = projectFiles;

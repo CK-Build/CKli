@@ -1,7 +1,8 @@
 using CK.Core;
 using CKli.Core;
-using CKli.BasicDotNetSolution.Plugin;
 using System.Collections.Immutable;
+using System.Collections.Generic;
+using System;
 
 namespace CKli.Plugin;
 

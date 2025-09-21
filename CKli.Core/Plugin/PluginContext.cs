@@ -1,15 +1,12 @@
 using CK.Core;
-using System;
+using CSemVer;
 using System.IO;
-using System.Reflection;
 
 namespace CKli.Core;
 
-sealed class PluginManager
-{
-    readonly LocalWorldName _worldName;
-    PluginCollector? _plugins;
 
+sealed class PluginContext
+{
     readonly string _name;
     readonly NormalizedPath _root;
     readonly NormalizedPath _dllPath;
@@ -17,6 +14,7 @@ sealed class PluginManager
     NormalizedPath _slnxPath;
     NormalizedPath _ckliPluginsFolder;
     NormalizedPath _directoryBuildProps;
+    NormalizedPath _directoryPackageProps;
     NormalizedPath _ckliPluginsCSProj;
     NormalizedPath _ckliPluginsFile;
 
@@ -30,33 +28,44 @@ sealed class PluginManager
 
     public NormalizedPath DirectoryBuildProps => _directoryBuildProps.IsEmptyPath ? (_directoryBuildProps = Root.AppendPart( "Directory.Build.props" )) : _directoryBuildProps;
 
+    public NormalizedPath DirectoryPackageProps => _directoryPackageProps.IsEmptyPath ? (_directoryPackageProps = Root.AppendPart( "Directory.Package.props" )) : _directoryPackageProps;
+
     public NormalizedPath CKliPluginsFolder => _ckliPluginsFolder.IsEmptyPath ? (_ckliPluginsFolder = Root.AppendPart( "CKli.Plugins" )) : _ckliPluginsFolder;
 
     public NormalizedPath CKliPluginsCSProj => _ckliPluginsCSProj.IsEmptyPath ? (_ckliPluginsCSProj = CKliPluginsFolder.AppendPart( "CKli.Plugins.csproj" )) : _ckliPluginsCSProj;
 
     public NormalizedPath CKliPluginsFile => _ckliPluginsFile.IsEmptyPath ? (_ckliPluginsFile = CKliPluginsFolder.AppendPart( "CKli.Plugins.cs" )) : _ckliPluginsFile;
 
-    PluginManager( LocalWorldName worldName )
+    PluginContext( LocalWorldName worldName )
     {
-        _worldName = worldName;
         _name = "Plugins" + worldName.LTSName;
         _root = worldName.Stack.StackWorkingFolder.AppendPart( Name );
         _dllPath = worldName.Stack.StackWorkingFolder.Combine( $"$Local/{Name}/bin/CKli.Plugins/run/CKli.Plugins.dll" );
     }
 
-    internal static PluginManager? Create( IActivityMonitor monitor, LocalWorldName worldName, WorldDefinitionFile definitionFile )
+    internal static IWorldPlugins? Create( IActivityMonitor monitor, LocalWorldName worldName, WorldDefinitionFile definitionFile )
     {
         Throw.DebugAssert( !definitionFile.IsPluginsDisabled );
-        var manager = new PluginManager( worldName );
+        var manager = new PluginContext( worldName );
         if( !Directory.Exists( manager.Root ) )
         {
             manager.CreateSolution( monitor );
+            // A newly created solution must compile.
+            if( !manager.EnsureCompiledPlugins( monitor, definitionFile ) )
+            {
+                return null;
+            }
         }
-        if( !manager.SetupPlugins( monitor ) )
+        if( !manager.CheckCompiledPlugin( monitor ) )
         {
             return null;
         }
-        return manager;
+        var pluginsConfiguration = definitionFile.ReadPluginsConfiguration( monitor );
+        if( pluginsConfiguration == null )
+        {
+            return null;
+        }
+        return PluginLoadContext.Load( monitor, manager.DllPath, new PluginCollectorContext( worldName, definitionFile, pluginsConfiguration ) );
     }
 
     void CreateSolution( IActivityMonitor monitor )
@@ -82,6 +91,17 @@ sealed class PluginManager
                 </Project>
                 
                 """ );
+        File.WriteAllText( DirectoryPackageProps, $"""
+                <Project>
+                  <PropertyGroup>
+                    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <PackageVersion Include="CKli.Plugins.Core" Version="{World.CKliVersion.Version}" />
+                  </ItemGroup>
+                </Project>
+                
+                """ );
         File.WriteAllText( CKliPluginsCSProj, $"""
                 <Project Sdk="Microsoft.NET.Sdk">
 
@@ -91,34 +111,44 @@ sealed class PluginManager
         File.WriteAllText( CKliPluginsFile, """
                 using CKli.Core;
 
-                namespace CKli.Plugin;
+                namespace CKli.Plugins;
 
-                public static class Plugin
+                public static class Plugins
                 {
-                    public static void Register( WorldServiceCollection services )
+                    public static IWorldPlugins Register( PluginCollectorContext ctx )
                     {
+                        var collector = PluginCollector.Create( ctx );
+                        return collector.Build();
                     }
                 }
-                
+                                
                 """ );
     }
 
-    bool SetupPlugins( IActivityMonitor monitor )
+    bool CheckCompiledPlugin( IActivityMonitor monitor )
     {
-        Throw.DebugAssert( _plugins == null );
-        try
+        if( !File.Exists( DllPath ) )
         {
-            var a = Assembly.LoadFrom( DllPath );
-            var services = new PluginCollector();
-            a.GetType( "CKli.Plugin.Plugin" )!.GetMethod( "Register" )!.Invoke( null, [services] );
-            _plugins = services;
-            return true;
-        }
-        catch( Exception ex )
-        {
-            monitor.Error( "While initializing plugins.", ex );
+            monitor.Error( $"Expected compliled plugin file not found: {DllPath}" );
             return false;
         }
+        return true;
     }
+
+    bool EnsureCompiledPlugins( IActivityMonitor monitor, WorldDefinitionFile definitionFile )
+    {
+        int exitCode = ProcessRunner.RunProcess( monitor.ParallelLogger,
+                                                 "dotnet",
+                                                 "build",
+                                                 Root,
+                                                 environmentVariables: null );
+        if( exitCode != 0 )
+        {
+            monitor.Error( $"Failed to build '{Name}' solution. Exit code = '{exitCode}'." );
+            return false;
+        }
+        return CheckCompiledPlugin( monitor );
+    }
+
 }
 

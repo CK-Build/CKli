@@ -1,14 +1,15 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
-    <PublishAot>true</PublishAot>
+    <!-- Not sure yet that this can be a dotnet tool. -->
+    <IsPackable>false</IsPackable>
     <InvariantGlobalization>true</InvariantGlobalization>
-    
+
     <!-- It's a mess. See https://github.com/dotnet/project-system/issues/3619 -->
     <RunWorkingDirectory>$(MSBuildProjectDirectory)</RunWorkingDirectory>
-    
+
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,7 +17,6 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="CSemVer" Version="12.0.3" />
   </ItemGroup>
 
   <ItemGroup>
