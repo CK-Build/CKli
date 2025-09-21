@@ -2,8 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Description>Bootstrap package for CKli tool. This version is not actually used.</Description>
   </PropertyGroup>
 
   <ItemGroup>
