@@ -1,5 +1,6 @@
 using CK.Core;
 using CSemVer;
+using Microsoft.Extensions.Primitives;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -17,9 +18,30 @@ namespace CKli.Core;
 public sealed partial class World
 {
     /// <summary>
-    /// Gets the version of this assembly.
+    /// Gets the <see cref="InformationalVersion"/> of this assembly.
     /// </summary>
-    public static readonly InformationalVersion CKliVersion = InformationalVersion.ReadFromAssembly( typeof( PluginContext ).Assembly );
+    public static readonly InformationalVersion CKliVersion;
+
+    /// <summary>
+    /// Gets this version, mapping the <see cref="SVersion.ZeroVersion"/> to the "0.0.1" version
+    /// because NuGet doesn't handle the very first version well: https://nuget.org consider the
+    /// version invalid and Central Package Management doesn't play well with it
+    /// (see https://github.com/NuGet/Home/issues/14547).
+    /// <para>
+    /// When this version is the "0.0.0-0" version (dirty build), we fallback to the "0.0.1" that is
+    /// available on NuGet.
+    /// </para>
+    /// </summary>
+    public static readonly SVersion SafeCKliVersion;
+
+    static World()
+    {
+        var informational = InformationalVersion.ReadFromAssembly( typeof( PluginContext ).Assembly );
+        SafeCKliVersion = informational.Version == null || informational.Version == SVersion.ZeroVersion
+                            ? SVersion.Create( 0, 0, 1 )
+                            : informational.Version;
+        CKliVersion = informational;
+    }
 
     readonly StackRepository _stackRepository;
     readonly LocalWorldName _name;

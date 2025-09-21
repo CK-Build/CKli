@@ -15,6 +15,7 @@ sealed class PluginContext
     NormalizedPath _ckliPluginsFolder;
     NormalizedPath _directoryBuildProps;
     NormalizedPath _directoryPackageProps;
+    NormalizedPath _nugetConfigFile;
     NormalizedPath _ckliPluginsCSProj;
     NormalizedPath _ckliPluginsFile;
 
@@ -27,6 +28,8 @@ sealed class PluginContext
     public NormalizedPath SlnxPath => _slnxPath.IsEmptyPath ? (_slnxPath = Root.AppendPart( $"{Name}.slnx" )) : _slnxPath;
 
     public NormalizedPath DirectoryBuildProps => _directoryBuildProps.IsEmptyPath ? (_directoryBuildProps = Root.AppendPart( "Directory.Build.props" )) : _directoryBuildProps;
+
+    public NormalizedPath NuGetConfigFile => _nugetConfigFile.IsEmptyPath ? (_nugetConfigFile = Root.AppendPart( "nuget.config" )) : _nugetConfigFile;
 
     public NormalizedPath DirectoryPackageProps => _directoryPackageProps.IsEmptyPath ? (_directoryPackageProps = Root.AppendPart( "Directory.Package.props" )) : _directoryPackageProps;
 
@@ -91,19 +94,44 @@ sealed class PluginContext
                 </Project>
                 
                 """ );
+        File.WriteAllText( NuGetConfigFile, $"""
+                <configuration>
+
+                  <packageSources>
+                    <clear />
+
+                    <add key="Signature-OpenSource" value="https://pkgs.dev.azure.com/Signature-OpenSource/Feeds/_packaging/NetCore3/nuget/v3/index.json" />
+                    <add key="NuGet" value="https://api.nuget.org/v3/index.json" />
+                  </packageSources>
+
+                  <packageSourceMapping>
+                    <packageSource key="NuGet">
+                      <package pattern="*" />
+                    </packageSource>
+                    <packageSource key="Signature-OpenSource">
+                      <package pattern="*" />
+                    </packageSource>
+                  </packageSourceMapping>
+
+                </configuration>                
+                """ );
         File.WriteAllText( DirectoryPackageProps, $"""
                 <Project>
                   <PropertyGroup>
                     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
                   </PropertyGroup>
                   <ItemGroup>
-                    <PackageVersion Include="CKli.Plugins.Core" Version="{World.CKliVersion.Version}" />
+                    <PackageVersion Include="CKli.Plugins.Core" Version="{World.SafeCKliVersion}" />
                   </ItemGroup>
                 </Project>
                 
                 """ );
         File.WriteAllText( CKliPluginsCSProj, $"""
                 <Project Sdk="Microsoft.NET.Sdk">
+
+                  <ItemGroup>
+                    <PackageReference Include="CKli.Plugins.Core" />
+                  </ItemGroup>
 
                 </Project>
                 
