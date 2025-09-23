@@ -1,6 +1,8 @@
 using CK.Core;
 using CSemVer;
+using Microsoft.VisualBasic;
 using System;
+using System.Formats.Tar;
 using System.IO;
 using System.Linq;
 using System.Reflection.PortableExecutable;
@@ -102,8 +104,15 @@ sealed partial class PluginMachinery
             return true;
         }
 
-        public bool AddOrSetPackageReference( IActivityMonitor monitor, string shortPluginName, string fullPluginName, SVersion version )
+        public bool AddOrSetPackageReference( IActivityMonitor monitor,
+                                              string shortPluginName,
+                                              string fullPluginName,
+                                              SVersion version,
+                                              out bool added,
+                                              out bool versionChanged )
         {
+            added = false;
+            versionChanged = false;
             string projectPath = BuildProjectReferencePath( fullPluginName );
             if( FindProjectReference( projectPath ) != null )
             {
@@ -113,9 +122,11 @@ sealed partial class PluginMachinery
             XElement? existsRef = FindPackageReference( fullPluginName );
             if( existsRef == null )
             {
+                added = true;
                 _csFirstItemGroup.Add( new XElement( "PackageReference",
                                         new XAttribute( "Include", fullPluginName ) ) );
             }
+            var targetVersion = version.ToString();
             XElement? existsVer = FindPackageVersion( fullPluginName );
             if( existsVer == null )
             {
@@ -123,8 +134,16 @@ sealed partial class PluginMachinery
                                         new XAttribute( "Include", fullPluginName ), new XAttribute( "Version", version ) );
                 _dpFirstItemGroup.Add( existsVer );
             }
-
-            if( existsRef == null )
+            else
+            {
+                var vAttr = existsVer.Attribute( "Version" );
+                if( vAttr == null || vAttr.Value != targetVersion )
+                {
+                    existsVer.SetAttributeValue( "Version", targetVersion );
+                    versionChanged = true;
+                }
+            }
+            if( added )
             {
                 AddRegisterCall( shortPluginName );
             }

@@ -1,6 +1,7 @@
 using CK.Core;
 using CSemVer;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
@@ -9,34 +10,32 @@ namespace CKli.Core;
 
 public sealed partial class World
 {
-    internal bool AddPlugin( IActivityMonitor monitor, string packageId, SVersion version )
+    internal bool AddOrSetPluginPackage( IActivityMonitor monitor, string packageId, SVersion version )
     {
-        Throw.CheckState( !DefinitionFile.IsPluginsDisabled );
-        Throw.DebugAssert( _pluginMachinery != null );
-        if( !PluginMachinery.EnsureFullPluginName( monitor, packageId, out var shortName, out var fullName ) )
+        if( !CheckAndPrepareForNewPlugin( monitor, packageId, out var shortName, out var fullName ) )
         {
             return false;
         }
-        monitor.Error( "Not implemented yet." );
-        return false;
+        if( !_pluginMachinery.AddOrSetPluginPackage( monitor, shortName, fullName, version ) )
+        {
+            _stackRepository.ResetHard( monitor );
+            return false;
+        }
+        using( DefinitionFile.StartEdit() )
+        {
+            DefinitionFile.Plugins.Add( new XElement( shortName ) );
+        }
+        if( !DefinitionFile.SaveFile( monitor ) )
+        {
+            _stackRepository.ResetHard( monitor );
+            return false;
+        }
+        return true;
     }
 
     internal bool CreatePlugin( IActivityMonitor monitor, string pluginName )
     {
-        Throw.CheckState( !DefinitionFile.IsPluginsDisabled );
-        Throw.DebugAssert( _pluginMachinery != null );
-        if( !PluginMachinery.EnsureFullPluginName( monitor, pluginName, out var shortName, out var fullName ) )
-        {
-            return false;
-        }
-        var config = DefinitionFile.Plugins.Elements().FirstOrDefault( e => e.Name.LocalName.Equals( shortName, StringComparison.OrdinalIgnoreCase ) );
-        if( config != null )
-        {
-            monitor.Error( $"A Plugin '{config.Name.LocalName}' already exists in <Plugins /> of '{Name.XmlDescriptionFilePath}'." );
-            return false;
-        }
-        // Commit Stack before operations.
-        if( !_stackRepository.Commit( monitor, $"Before creating plugin '{fullName}'." ) )
+        if( !CheckAndPrepareForNewPlugin( monitor, pluginName, out var shortName, out var fullName ) )
         {
             return false;
         }
@@ -52,6 +51,33 @@ public sealed partial class World
         if( !DefinitionFile.SaveFile( monitor ) )
         {
             _stackRepository.ResetHard( monitor );
+            return false;
+        }
+        return true;
+    }
+
+    [MemberNotNullWhen(true, nameof(_pluginMachinery))]
+    bool CheckAndPrepareForNewPlugin( IActivityMonitor monitor,
+                                      string pluginName,
+                                      [NotNullWhen( true )] out string? shortName,
+                                      [NotNullWhen( true )] out string? fullName )
+    {
+        Throw.CheckState( !DefinitionFile.IsPluginsDisabled );
+        Throw.DebugAssert( _pluginMachinery != null );
+        if( !PluginMachinery.EnsureFullPluginName( monitor, pluginName, out shortName, out fullName ) )
+        {
+            return false;
+        }
+        var localShortName = shortName;
+        var config = DefinitionFile.Plugins.Elements().FirstOrDefault( e => e.Name.LocalName.Equals( localShortName, StringComparison.OrdinalIgnoreCase ) );
+        if( config != null )
+        {
+            monitor.Error( $"A Plugin '{config.Name.LocalName}' already exists in <Plugins /> of '{Name.XmlDescriptionFilePath}'." );
+            return false;
+        }
+        // Commit Stack before operations.
+        if( !_stackRepository.Commit( monitor, $"Before plugin '{fullName}'." ) )
+        {
             return false;
         }
         return true;

@@ -211,7 +211,7 @@ public class StackRepositoryTests
             using var readStack = StackRepository.TryOpenFromPath( TestHelper.Monitor, secretsStore, localPath, out _, skipPullStack: true )
                                                  .ShouldNotBeNull();
             var definitionFile = readStack.DefaultWorldName.LoadDefinitionFile( TestHelper.Monitor ).ShouldNotBeNull();
-            definitionFile.Root.Elements( "Repository" )
+            definitionFile.XmlRoot.Elements( "Repository" )
                                .ShouldHaveSingleItem()
                                .Attributes( "Url" )
                                .ShouldHaveSingleItem()

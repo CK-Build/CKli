@@ -71,10 +71,15 @@ public sealed class WorldDefinitionFile
     }
 
     /// <summary>
+    /// Gets the world defined by this file.
+    /// </summary>
+    public LocalWorldName World => _world;
+
+    /// <summary>
     /// Gets the root element.
     /// Must not be mutated otherwise a <see cref="InvalidOperationException"/> is raised.
     /// </summary>
-    public XElement Root => _root;
+    public XElement XmlRoot => _root;
 
     /// <summary>
     /// Gets the &lt;Plugins /&gt; element.

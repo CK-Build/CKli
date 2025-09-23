@@ -328,7 +328,7 @@ public static class CKliCommands
     }
 
     /// <summary>
-    /// Removes a plugin from the current World.
+    /// Fully removes a plugin from the current World. It must not have dependent plugins otherwise this fails.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="secretsStore">The secrets store.</param>
@@ -399,7 +399,7 @@ public static class CKliCommands
     }
 
     /// <summary>
-    /// Adds a new plugin (or upgrade an existing one) to the current world's plugins. 
+    /// Adds a new plugin (or sets the version of an existing one) in the current world's plugins. 
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="secretsStore">The secrets store.</param>
@@ -429,7 +429,7 @@ public static class CKliCommands
             {
                 return RequiresAllowLTS( monitor, world.Name );
             }
-            return world.AddPlugin( monitor, packageId, version )
+            return world.AddOrSetPluginPackage( monitor, packageId, version )
                     ? 0
                     : -4;
         }

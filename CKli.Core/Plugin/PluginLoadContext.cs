@@ -16,7 +16,7 @@ namespace CKli.Core;
 /// plugins assemblies (and their possibly shared assemblies) are in the plugins context. 
 /// </para>
 /// </summary>
-public sealed class PluginLoadContext : AssemblyLoadContext, IWorldPlugins
+sealed class PluginLoadContext : AssemblyLoadContext, IWorldPlugins
 {
     readonly string _runFolder;
     IWorldPlugins? _worldPlugins;

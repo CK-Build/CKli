@@ -26,7 +26,8 @@ public partial class WorldName : IEquatable<WorldName>
     public string? LTSName => _ltsName;
 
     /// <summary>
-    /// Get whether this is the default world of the stack (<see cref="LTSName"/> is null).
+    /// Get whether this is the default world of the stack (<see cref="LTSName"/> is null)
+    /// or a Long Term Support world.
     /// </summary>
     [MemberNotNullWhen( false, nameof( LTSName ) )]
     public bool IsDefaultWorld => _ltsName == null;

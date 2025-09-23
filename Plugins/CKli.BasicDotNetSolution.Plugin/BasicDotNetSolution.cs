@@ -9,7 +9,7 @@ using System.Text.RegularExpressions;
 
 namespace CKli.Plugin;
 
-public sealed partial class BasicDotNetSolution : RepoPlugin<BasicSolutionInfo>, IDisposable
+public sealed partial class BasicDotNetSolution : RepoPlugin<BasicSolutionInfo>
 {
     public BasicDotNetSolution( World world )
         : base( world )
@@ -20,11 +20,6 @@ public sealed partial class BasicDotNetSolution : RepoPlugin<BasicSolutionInfo>,
     public static void Register( IPluginCollector collector )
     {
         collector.AddPrimaryPlugin<BasicDotNetSolution>();
-    }
-
-    public void Dispose()
-    {
-        World.Events.FixedLayout -= OnFixedLayout;
     }
 
     void OnFixedLayout( FixedAllLayoutEvent e )

@@ -195,17 +195,27 @@ public sealed partial class PluginMachinery
                 monitor.Error( $"Invalid version in {ckliPluginsCore} (in '{DirectoryPackageProps}')." );
                 return false;
             }
-            var targetVersion = World.CKliVersion.Version;
-            if( v == targetVersion )
+            var ckliVersion = World.CKliVersion.Version;
+            Throw.Assert( ckliVersion != null );
+            if( v == ckliVersion )
             {
                 return true;
             }
+            if( !_definitionFile.World.IsDefaultWorld )
+            {
+                monitor.Error( $"""
+                               This world '{_definitionFile.World.FullName}' is a Long Term Support world.
+                               It uses CKli in version '{v}'. This CKli version is '{ckliVersion}'.
+                               Please use the appropriate CKli version.
+                               """ );
+                return false;
+            }
             monitor.Info( $"""
-            Updating 'Directory.Package.Props' file:
-            {ckliPluginsCore}
-            To use Version="{targetVersion}".
-            """ );
-            ckliPluginsCore.SetAttributeValue( "Version", targetVersion );
+                          Updating 'Directory.Package.Props' file:
+                          {ckliPluginsCore}
+                          To use Version="{ckliVersion}".
+                          """ );
+            ckliPluginsCore.SetAttributeValue( "Version", ckliVersion );
             d.Save( DirectoryPackageProps );
             mustRecompile = true;
             return true;
@@ -345,6 +355,34 @@ public sealed partial class PluginMachinery
         {
             monitor.Error( $"Command 'dotnet sln add {fullPluginName}' failed." );
             return false;
+        }
+        return CompilePlugins( monitor, vNext: true );
+    }
+
+    internal bool AddOrSetPluginPackage( IActivityMonitor monitor, string shortPluginName, string fullPluginName, SVersion version )
+    {
+        using var gLog = monitor.OpenTrace( $"Adding or updating plugin '{fullPluginName}' at version '{version}'." );
+        var ckliPlugins = CKliPluginsProject.Create( monitor, this );
+        if( ckliPlugins == null
+            || !ckliPlugins.AddOrSetPackageReference( monitor, shortPluginName, fullPluginName, version, out bool added, out bool versionChanged )
+            || !ckliPlugins.Save( monitor ) )
+        {
+            return false;
+        }
+        if( added )
+        {
+            // Uses dotnet tooling to add the project to the sln.
+            // We don't care if it takes time here and this acts as a check.
+            if( ProcessRunner.RunProcess( monitor.ParallelLogger, "dotnet", $"sln add {fullPluginName}", Root, null ) != 0 )
+            {
+                monitor.Error( $"Command 'dotnet sln add {fullPluginName}' failed." );
+                return false;
+            }
+        }
+        if( !added && !versionChanged )
+        {
+            monitor.CloseGroup( "No change, skipping plugins recompilation." );
+            return true;
         }
         return CompilePlugins( monitor, vNext: true );
     }
