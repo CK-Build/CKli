@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli;
+using CKli.Core;
 using ConsoleAppFramework;
 using System;
 using System.Collections.Generic;
@@ -27,6 +28,8 @@ if( path != null )
         return;
     }
 }
+
+World.PluginLoader = CKli.Loader.PluginLoadContext.Load;
 
 var app = ConsoleApp.Create();
 

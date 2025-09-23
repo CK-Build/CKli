@@ -91,7 +91,7 @@ sealed partial class World
         {
             DeletePotentiallyEmptyFolders( monitor, potentiallyEmptyFolders );
         }
-        return FixedLayout == null || SafeRaiseEvent( monitor, FixedLayout, new FixedAllLayoutEventArgs( monitor, this, newClones ) );
+        return _events.SafeRaiseEvent( monitor, new FixedAllLayoutEvent( monitor, this, newClones ) );
 
         static bool ExecuteMoves( IActivityMonitor monitor, World world, List<LayoutAction> actions, HashSet<NormalizedPath> potentiallyEmptyFolders )
         {
@@ -192,8 +192,8 @@ sealed partial class World
     /// This can be called only if <see cref="CanChangeLayout"/> is true otherwise an <see cref="InvalidOperationException"/> is thrown.
     /// </para>
     /// </summary>
-    /// <param name="monitor"></param>
-    /// <returns></returns>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <returns>True on success, false otherwise.</returns>
     public bool XifLayout( IActivityMonitor monitor )
     {
         Throw.CheckState( CanChangeLayout );
@@ -216,10 +216,10 @@ sealed partial class World
                         {
                             return false;
                         }
-                        _definitionFile.AddRepository( m.NewPath, m.NewPath.Parts.Skip( _name.WorldRoot.Parts.Count ), m.Uri );
+                        _definitionFile.AddRepository( monitor, m.NewPath, m.NewPath.Parts.Skip( _name.WorldRoot.Parts.Count ), m.Uri );
                         break;
                     case Clone c:
-                        _definitionFile.AddRepository( c.Path, c.Path.Parts.Skip( _name.WorldRoot.Parts.Count ), c.Uri );
+                        _definitionFile.AddRepository( monitor, c.Path, c.Path.Parts.Skip( _name.WorldRoot.Parts.Count ), c.Uri );
                         break;
                     case Suppress s:
                         if( !_definitionFile.RemoveRepository( monitor, s.Uri, removeEmptyFolder: false ) )

@@ -34,6 +34,7 @@ public sealed partial class StackRepository : IDisposable
     readonly GitRepository _git;
     readonly NormalizedPath _stackRoot;
     readonly ISecretsStore _secretsStore;
+    readonly NormalizedPath _localProxyRepositoriesPath;
     // No DuplicatePrefix here.
     readonly string _stackName;
     LocalWorldName? _defaultWorldName;
@@ -72,9 +73,24 @@ public sealed partial class StackRepository : IDisposable
     public bool IsPublic => _git.IsPublic;
 
     /// <summary>
-    /// Gets whether the stack's repository url.
+    /// Gets the stack's repository url.
     /// </summary>
     public Uri OriginUrl => _git.OriginUrl;
+
+    /// <summary>
+    /// Gets a non empty path if this stack's <see cref="OriginUrl"/> is a file.
+    /// <para>
+    /// When not empty, this is the folder that contains the stack's remote repository.
+    /// It can contain other local repositories: these "remotes" can be true "remote proxies" (if they
+    /// have an 'origin') or purely local remotes (this is used for tests).
+    /// </para>
+    /// <para>
+    /// When <see cref="WorldDefinitionFile"/> detects &lt;Repository Url="file:///..." /&gt; that are
+    /// actually located in this local proxy repositories folder, the Url is normalized to the
+    /// repository name ("file:///C:/Dev/CKli/Tests/CKli.Core.Tests/Remotes/CKt/CKt-Core" is replaced by "CKt-Core").
+    /// </para>
+    /// </summary>
+    public NormalizedPath LocalProxyRepositoriesPath => _localProxyRepositoriesPath;
 
     /// <summary>
     /// Gets the secrets store.
@@ -195,6 +211,16 @@ public sealed partial class StackRepository : IDisposable
     }
 
     /// <summary>
+    /// Resets the working folder to its committed state. Also deletes any untracked files.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool ResetHard( IActivityMonitor monitor )
+    {
+        return _git.ResetHard( monitor, out _ );
+    }
+
+    /// <summary>
     /// Commits and push changes to the remote.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
@@ -216,6 +242,15 @@ public sealed partial class StackRepository : IDisposable
         _stackRoot = stackRoot;
         _secretsStore = secretsStore;
         _stackName = stackName;
+        var originUrl = git.OriginUrl;
+        if( originUrl.IsFile )
+        {
+            var p  = new NormalizedPath( originUrl.LocalPath );
+            if( p.Parts.Count > 1 )
+            {
+                _localProxyRepositoriesPath = p.RemoveLastPart();
+            }
+        }
     }
 
     /// <summary>

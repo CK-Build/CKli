@@ -1,10 +1,11 @@
 using CK.Core;
-using System.Text.RegularExpressions;
 using CKli.Core;
 using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
+
+using System.Text.RegularExpressions;
 
 namespace CKli.Plugin;
 
@@ -13,7 +14,7 @@ public sealed partial class BasicDotNetSolution : RepoPlugin<BasicSolutionInfo>,
     public BasicDotNetSolution( World world )
         : base( world )
     {
-        world.FixedLayout += World_FixedLayout;
+        world.Events.FixedLayout += OnFixedLayout;
     }
 
     public static void Register( IPluginCollector collector )
@@ -23,10 +24,10 @@ public sealed partial class BasicDotNetSolution : RepoPlugin<BasicSolutionInfo>,
 
     public void Dispose()
     {
-        World.FixedLayout -= World_FixedLayout;
+        World.Events.FixedLayout -= OnFixedLayout;
     }
 
-    void World_FixedLayout( object? sender, FixedAllLayoutEventArgs e )
+    void OnFixedLayout( FixedAllLayoutEvent e )
     {
         if( TryGetAll( e.Monitor, out var all ) )
         {

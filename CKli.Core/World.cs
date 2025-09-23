@@ -1,12 +1,8 @@
 using CK.Core;
 using CSemVer;
-using Microsoft.Extensions.Primitives;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
-using System.Threading;
-using System.Xml.Linq;
 
 namespace CKli.Core;
 
@@ -21,30 +17,30 @@ public sealed partial class World
     /// <summary>
     /// Gets the <see cref="InformationalVersion"/> of this assembly.
     /// </summary>
-    public static readonly InformationalVersion CKliVersion;
+    public static readonly InformationalVersion CKliVersion = InformationalVersion.ReadFromAssembly( typeof( PluginMachinery ).Assembly );
+
+    static Func<IActivityMonitor, NormalizedPath, PluginCollectorContext, IWorldPlugins?>? _pluginLoader;
 
     /// <summary>
-    /// Gets this version, mapping the <see cref="SVersion.ZeroVersion"/> to the "0.0.1" version
-    /// because https://nuget.org consider the version invalid.
+    /// Gets or sets once the loader for plugins.
     /// <para>
-    /// When this version is the "0.0.0-0" version (dirty build), we fallback to the "0.0.1" that is
-    /// available on NuGet.
+    /// When not set, plugins are disabled. Once set, it cannot be changed.
     /// </para>
     /// </summary>
-    public static readonly SVersion SafeCKliVersion;
-
-    static World()
+    public static Func<IActivityMonitor, NormalizedPath, PluginCollectorContext, IWorldPlugins?>? PluginLoader
     {
-        var informational = InformationalVersion.ReadFromAssembly( typeof( PluginMachinery ).Assembly );
-        SafeCKliVersion = informational.Version == null || informational.Version == SVersion.ZeroVersion
-                            ? SVersion.Create( 0, 0, 1 )
-                            : informational.Version;
-        CKliVersion = informational;
+        get => _pluginLoader;
+        set
+        {
+            Throw.CheckState( "One set, PluginLoader cannot be changed.", _pluginLoader == null || value != _pluginLoader );
+            _pluginLoader = value;
+        }
     }
 
     readonly StackRepository _stackRepository;
     readonly LocalWorldName _name;
     readonly WorldDefinitionFile _definitionFile;
+    readonly WorldEvents _events;
     readonly PluginMachinery? _pluginMachinery;
     IDisposable? _instantiatedPlugins;
 
@@ -76,10 +72,12 @@ public sealed partial class World
             _cachedRepositories.Add( path, null );
             _cachedRepositories.Add( uri.ToString(), null );
         }
+        _events = new WorldEvents();
     }
 
     /// <summary>
-    /// Only called by the StackRepository. Only fails if the world layout cannot be loaded (null is returned).
+    /// Only called by the StackRepository.
+    /// Fails if the world layout cannot be loaded or plugins initialization fails (null is returned).
     /// </summary>
     internal static World? Create( IActivityMonitor monitor, StackRepository stackRepository, NormalizedPath path )
     {
@@ -92,10 +90,16 @@ public sealed partial class World
         }
         Throw.DebugAssert( worldName != null && definitionFile != null );
         PluginMachinery? machinery = null;
-        if( !definitionFile.IsPluginsDisabled )
+        if( !definitionFile.IsPluginsDisabled && World.PluginLoader != null )
         {
             machinery = PluginMachinery.Create( monitor, worldName, definitionFile );
             if( machinery == null ) return null;
+        }
+        else
+        {
+            monitor.Info( World.PluginLoader == null
+                            ? "Plugins are disabled because there is no configured World.PluginLoader."
+                            : $"Plugins are disabled by configuration in '{worldName.FullName}.xml'." );
         }
         var w = new World( stackRepository, worldName, definitionFile, layout, machinery );
         if( machinery != null )
@@ -114,7 +118,7 @@ public sealed partial class World
         Throw.DebugAssert( _pluginMachinery != null );
         try
         {
-            _instantiatedPlugins = _pluginMachinery.WorlPlugins.Create( this );
+            _instantiatedPlugins = _pluginMachinery.WorldPlugins.Create( this );
             return true;
         }
         catch( Exception ex )
@@ -126,14 +130,44 @@ public sealed partial class World
 
     internal void DisposeRepositoriesAndPlugins()
     {
-        _pluginMachinery?.WorlPlugins.Dispose();
-        _instantiatedPlugins?.Dispose();
+        _events.ReleaseEvents();
+        if( _pluginMachinery != null )
+        {
+            Throw.DebugAssert( _instantiatedPlugins != null );
+            _instantiatedPlugins.Dispose();
+            _instantiatedPlugins = null;
+            _pluginMachinery.ReleasePlugins();
+        }
         var r = _firstRepo;
         while( r != null )
         {
             r._git.Dispose();
             r = r._nextRepo;
         }
+    }
+
+    internal bool RaisePluginInfo( IActivityMonitor monitor )
+    {
+        var definitionFile = DefinitionFile;
+        if( definitionFile.IsPluginsDisabled )
+        {
+            Console.WriteLine( $"""
+                    Plugins are disabled by configuration.
+                    Configurations:
+                    {definitionFile.Plugins}
+                    """ );
+            return true;
+        }
+        if( _pluginMachinery == null )
+        {
+            Console.WriteLine( $"No configured PluginLoader. Plugins are disabled." );
+            return true;
+        }
+        foreach( var i in _pluginMachinery.WorldPlugins.Plugins )
+        {
+            Console.WriteLine( $"{i.Name}, {i.Status}" );
+        }
+        return _events.SafeRaiseEvent( monitor, new PluginInfoEvent( monitor, this ) );
     }
 
     /// <summary>
@@ -155,6 +189,11 @@ public sealed partial class World
     /// Gets the expected layout of this world.
     /// </summary>
     public IReadOnlyList<(NormalizedPath Path, Uri Uri)> Layout => _layout;
+
+    /// <summary>
+    /// Gets all events that can be raised by a World.
+    /// </summary>
+    public WorldEvents Events => _events;
 
     /// <summary>
     /// Calls <see cref="Repo.Pull(IActivityMonitor)"/> on all the repositories of this world.
@@ -224,11 +263,6 @@ public sealed partial class World
         }
         return success;
     }
-
-    /// <summary>
-    /// Raised when <see cref="FixLayout(IActivityMonitor, bool, out List{Repo}?)"/> has been successfully called.
-    /// </summary>
-    public event EventHandler<FixedAllLayoutEventArgs>? FixedLayout;
 
     /// <summary>
     /// Gets whether a full path or a origin url is defined in this <see cref="Layout"/>.
@@ -381,21 +415,6 @@ public sealed partial class World
         _cachedRepositories[repository.WorkingFolder] = repo;
         _cachedRepositories[repository.OriginUrl.ToString()] = repo;
         return repo;
-    }
-
-    bool SafeRaiseEvent<T>( IActivityMonitor monitor, EventHandler<T> handler, T args ) where T : WorldEventArgs
-    {
-        Throw.DebugAssert( handler != null );
-        try
-        {
-            handler( this, args );
-            return args.Success;
-        }
-        catch( Exception ex )
-        {
-            monitor.Error( $"While raising '{typeof(T).Name}' event.", ex );
-            return false;
-        }
     }
 
     /// <inheritdoc cref="WorldName.ToString"/>

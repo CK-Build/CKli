@@ -1,5 +1,6 @@
 using CK.Core;
 using NUnit.Framework;
+using Shouldly;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -10,9 +11,10 @@ using static CK.Testing.MonitorTestHelper;
 namespace CKli.Core.Tests;
 
 [SetUpFixture]
-static partial class Remotes
+static partial class TestEnv
 {
     readonly static NormalizedPath _remotesPath = TestHelper.TestProjectFolder.AppendPart( "Remotes" );
+    readonly static NormalizedPath _nugetSourcePath = TestHelper.TestProjectFolder.AppendPart( "NuGetSource" );
     static Dictionary<string, RemotesCollection>? _readOnlyRemotes;
     static RemotesCollection? _inUse;
 
@@ -20,6 +22,51 @@ static partial class Remotes
     public static void EnsureRemotes() => TestHelper.OnlyOnce( Initialize );
 
     static void Initialize()
+    {
+        World.PluginLoader = CKli.Loader.PluginLoadContext.Load;
+        InitializeRemotes();
+        InitializeNuGetSource();
+    }
+
+    static void InitializeNuGetSource()
+    {
+        if( !Directory.Exists( _nugetSourcePath ) )
+        {
+            Directory.CreateDirectory( _nugetSourcePath );
+        }
+        PluginMachinery.NuGetConfigFileHook = ( monitor, nuGetXmlDoc ) =>
+        {
+            PluginMachinery.SetOrRemoveNuGetSource( monitor,
+                                                    nuGetXmlDoc,
+                                                    "test-override",
+                                                    _nugetSourcePath,
+                                                    "CKli.Core", "CKli.Plugins.Core" )
+                           .ShouldBeTrue();
+        };
+        CopyMostRecentPackageToNuGetSource( "CKli.Core" );
+        CopyMostRecentPackageToNuGetSource( "CKli.Plugins.Core" );
+
+        static void CopyMostRecentPackageToNuGetSource( string projectFolder )
+        {
+            var projectBin = TestHelper.SolutionFolder.Combine( $"{projectFolder}/bin/{TestHelper.BuildConfiguration}" );
+            var (path, date) = Directory.EnumerateFiles( projectBin, "*.nupkg" )
+                                 .Select( file => (file, File.GetLastWriteTimeUtc( file )) )
+                                 .OrderByDescending( e => e.Item2 )
+                                 .FirstOrDefault();
+            if( path == null )
+            {
+                throw new Exception( $"Unable to find any *.nupkg file in '{projectBin}'." );
+            }
+            var target = _nugetSourcePath.AppendPart( Path.GetFileName( path ) );
+            if( date != File.GetLastWriteTimeUtc( target ) )
+            {
+                File.Copy( path, target, overwrite: true );
+                File.SetLastWriteTimeUtc( target, date );
+            }
+        }
+    }
+
+    static void InitializeRemotes()
     {
         var zipPath = _remotesPath.AppendPart( "Remotes.zip" );
         var zipTime = File.GetLastWriteTimeUtc( zipPath );
@@ -52,7 +99,7 @@ static partial class Remotes
             {
                 return true;
             }
-            foreach( var sub in  Directory.EnumerateDirectories( _remotesPath ) )
+            foreach( var sub in Directory.EnumerateDirectories( _remotesPath ) )
             {
                 if( Directory.GetLastWriteTimeUtc( sub ) != zipTime )
                 {
@@ -65,7 +112,7 @@ static partial class Remotes
         static void SetLastWriteTime( DateTime zipTime )
         {
             Directory.SetLastWriteTimeUtc( _remotesPath, zipTime );
-            foreach( var sub in  Directory.EnumerateDirectories( _remotesPath ) )
+            foreach( var sub in Directory.EnumerateDirectories( _remotesPath ) )
             {
                 Directory.SetLastWriteTimeUtc( sub, zipTime );
             }
@@ -89,10 +136,15 @@ static partial class Remotes
             }
         }
         var newOne = _readOnlyRemotes[name];
-        // Allows Url to already be Url (to support tests that alter the definition files).
-        WorldDefinitionFile.RepositoryUrlHook = ( monitor, sUri ) => Uri.TryCreate( sUri, UriKind.Absolute, out var uri )
-                                                                      ? sUri
-                                                                      : newOne.GetUriFor( sUri ).ToString();
+        //
+        // Now useless (but still possible):
+        // "Repositories Proxy" has been integrated in WorldDefinitionFile.
+        //
+        //  // Allows Url to already be Url (to support tests that alter the definition files).
+        //  WorldDefinitionFile.RepositoryUrlHook = ( monitor, sUri ) => Uri.TryCreate( sUri, UriKind.Absolute, out var uri )
+        //                                                               ? sUri
+        //                                                               : newOne.GetUriFor( sUri ).ToString();
+
         return _inUse = newOne;
     }
 

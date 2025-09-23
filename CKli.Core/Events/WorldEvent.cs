@@ -1,19 +1,21 @@
-﻿using CK.Core;
+using CK.Core;
+using System;
 
 namespace CKli.Core;
 
 /// <summary>
 /// Base class for all events raised by a <see cref="World"/>.
 /// </summary>
-public abstract class WorldEventArgs : EventMonitoredArgs
+public abstract class WorldEvent : EventMonitoredArgs
 {
     readonly World _world;
     bool _success;
 
-    private protected WorldEventArgs( IActivityMonitor monitor, World world )
+    private protected WorldEvent( IActivityMonitor monitor, World world )
         : base( monitor )
     {
         _world = world;
+        _success = true;
     }
 
     /// <summary>
@@ -23,6 +25,7 @@ public abstract class WorldEventArgs : EventMonitoredArgs
 
     /// <summary>
     /// Gets or sets whether the handle of the event failed.
+    /// Defaults to true.
     /// <para>
     /// When false, event handlers should normally ignore the event.
     /// </para>

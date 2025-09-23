@@ -19,7 +19,7 @@ public class LayoutTests
     {
         var localPath = ClonedPaths.EnsureCleanFolder();
         var secretsStore = new DotNetUserSecretsStore();
-        var remotes = Remotes.UseReadOnly( "CKt" );
+        var remotes = TestEnv.UseReadOnly( "CKt" );
 
         // ckli clone file:///.../CKt-Stack
         CKliCommands.Clone( TestHelper.Monitor, secretsStore, localPath, remotes.StackUri ).ShouldBe( 0 );
@@ -53,7 +53,7 @@ public class LayoutTests
     {
         var localPath = ClonedPaths.EnsureCleanFolder();
         var secretsStore = new DotNetUserSecretsStore();
-        var remotes = Remotes.UseReadOnly( "CKt" );
+        var remotes = TestEnv.UseReadOnly( "CKt" );
 
         // ckli clone file:///.../CKt-Stack
         CKliCommands.Clone( TestHelper.Monitor, secretsStore, localPath, remotes.StackUri ).ShouldBe( 0 );
@@ -79,10 +79,7 @@ public class LayoutTests
         var onlyOneFolder = xml.Elements( "Folder" ).ShouldHaveSingleItem();
         onlyOneFolder.Attribute( "Name" ).ShouldNotBeNull().Value.ShouldBe( "NewCore" );
         onlyOneFolder.Elements().Elements().ShouldAllBe( e => e.Name.LocalName == "Repository" );
-        onlyOneFolder.Elements().Attributes( "Url" ).Select( a => a.Value ).ToArray().ShouldBe(
-            [
-                remotes.GetUriFor( "CKt-ActivityMonitor" ).ToString(),
-                remotes.GetUriFor( "CKt-Core" ).ToString()
-            ], ignoreOrder: true );
+        onlyOneFolder.Elements().Attributes( "Url" ).Select( a => a.Value )
+            .ToArray().ShouldBe( [ "CKt-ActivityMonitor", "CKt-Core" ], ignoreOrder: true );
     }
 }

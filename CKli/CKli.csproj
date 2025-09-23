@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CKli.Core\CKli.Core.csproj" />
+    <ProjectReference Include="..\CKli.Loader\CKli.Loader.csproj" />
   </ItemGroup>
 
 </Project>

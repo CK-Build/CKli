@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Diagnostics;
 using System.Reflection;
 
 namespace CKli.Core;
@@ -18,13 +19,13 @@ sealed partial class ReflectionBasedPluginCollector
         readonly int _activationIndex;
 
         public PluginFactory( string name,
-                            ConstructorInfo ctor,
-                            int[] deps,
-                            object?[] arguments,
-                            int worldParameterIndex,
-                            int xmlConfigIndex,
-                            WorldPluginStatus status,
-                            int activationIndex )
+                              ConstructorInfo ctor,
+                              int[] deps,
+                              object?[] arguments,
+                              int worldParameterIndex,
+                              int xmlConfigIndex,
+                              WorldPluginStatus status,
+                              int activationIndex )
         {
             _name = name;
             _ctor = ctor;
@@ -47,16 +48,17 @@ sealed partial class ReflectionBasedPluginCollector
 
         internal object Instantiate( World world, object[] instantiated )
         {
+            Debugger.Break();
             for( int i = 0; i < _deps.Length; i++ )
             {
                 int iInstance = _deps[ i ];
                 if( iInstance == -1 )
                 {
-                    if( iInstance == _worldParameterIndex )
+                    if( i == _worldParameterIndex )
                     {
                         _arguments[i] = world;
                     }
-                    else if( iInstance != _xmlConfigIndex )
+                    else if( i != _xmlConfigIndex )
                     {
                         _arguments[i] = null;
                     }

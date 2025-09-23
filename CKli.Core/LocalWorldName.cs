@@ -171,7 +171,7 @@ public sealed class LocalWorldName : WorldName
         }
         using( definitionFile.StartEdit() )
         {
-            definitionFile.AddRepository( folderPath, subFolderPath.Parts.Skip( WorldRoot.Parts.Count ), repositoryUri );
+            definitionFile.AddRepository( monitor, folderPath, subFolderPath.Parts.Skip( WorldRoot.Parts.Count ), repositoryUri );
         }
         return SaveAndCommitDefinitionFile( monitor, "Before adding a repository.", message );
     }

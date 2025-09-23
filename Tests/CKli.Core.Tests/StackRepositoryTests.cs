@@ -17,7 +17,7 @@ public class StackRepositoryTests
         var localPath = ClonedPaths.EnsureCleanFolder();
         File.Exists( localPath.Combine( "CKt/CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeFalse();
 
-        var remotes = Remotes.UseReadOnly( "CKt" );
+        var remotes = TestEnv.UseReadOnly( "CKt" );
         using var stack = StackRepository.Clone( TestHelper.Monitor,
                                                  new DotNetUserSecretsStore(),
                                                  remotes.StackUri,
@@ -40,7 +40,7 @@ public class StackRepositoryTests
     public void Clone_and_OpenFrom()
     {
         var localPath = ClonedPaths.EnsureCleanFolder();
-        var remotes = Remotes.UseReadOnly( "CKt" );
+        var remotes = TestEnv.UseReadOnly( "CKt" );
         var secretsStore = new DotNetUserSecretsStore();
         using( var stack = StackRepository.Clone( TestHelper.Monitor,
                                                   secretsStore,
@@ -82,7 +82,7 @@ public class StackRepositoryTests
     public void Clone_and_TryOpenWorldFrom()
     {
         var localPath = ClonedPaths.EnsureCleanFolder();
-        var remotes = Remotes.UseReadOnly( "CKt" );
+        var remotes = TestEnv.UseReadOnly( "CKt" );
         var secretsStore = new DotNetUserSecretsStore();
         using( var clone = StackRepository.Clone( TestHelper.Monitor,
                                                   secretsStore,
@@ -129,7 +129,7 @@ public class StackRepositoryTests
     public void Clone_and_OpenWorldFrom()
     {
         var localPath = ClonedPaths.EnsureCleanFolder();
-        var remotes = Remotes.UseReadOnly( "CKt" );
+        var remotes = TestEnv.UseReadOnly( "CKt" );
         var secretsStore = new DotNetUserSecretsStore();
         using( var clone = StackRepository.Clone( TestHelper.Monitor,
                                                   secretsStore,
@@ -179,14 +179,12 @@ public class StackRepositoryTests
     {
         var localPath = ClonedPaths.EnsureCleanFolder();
         var secretsStore = new DotNetUserSecretsStore();
-        var remotes = Remotes.UseReadOnly( "CKt" );
+        var remotes = TestEnv.UseReadOnly( "CKt" );
 
         // ckli clone file:///.../CKt-Stack
         CKliCommands.Clone( TestHelper.Monitor, secretsStore, localPath, remotes.StackUri ).ShouldBe( 0 );
         // cd CKt
         localPath = localPath.AppendPart( "CKt" );
-
-        var addedRepoUri = remotes.GetUriFor( "CKt-ActivityMonitor" );
 
         using( TestHelper.Monitor.OpenInfo( "Add the CKt-ActivityMonitor repository at the root and close the stack." ) )
         {
@@ -200,23 +198,24 @@ public class StackRepositoryTests
             world.Layout.Count.ShouldBe( 1, "Only CKt-Core in the Layout" );
 
             world.AddRepository( TestHelper.Monitor,
-                                 addedRepoUri,
+                                 remotes.GetUriFor( "CKt-ActivityMonitor" ),
                                  stack.DefaultWorldName.WorldRoot ).ShouldBeTrue();
 
             world.Layout.Count.ShouldBe( 2, "The Layout has been updated." );
             File.Exists( localPath.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Here it is." );
+
+            stack.Dispose();
         }
         using( TestHelper.Monitor.OpenInfo( "Open the stack and check that the definition file has the CKt-ActivityMonitor repository." ) )
         {
-            var readStack = StackRepository.TryOpenFromPath( TestHelper.Monitor, secretsStore, localPath, out _, skipPullStack: true )
-                                           .ShouldNotBeNull();
+            using var readStack = StackRepository.TryOpenFromPath( TestHelper.Monitor, secretsStore, localPath, out _, skipPullStack: true )
+                                                 .ShouldNotBeNull();
             var definitionFile = readStack.DefaultWorldName.LoadDefinitionFile( TestHelper.Monitor ).ShouldNotBeNull();
             definitionFile.Root.Elements( "Repository" )
                                .ShouldHaveSingleItem()
                                .Attributes( "Url" )
                                .ShouldHaveSingleItem()
-                               .Value.ShouldBe( addedRepoUri.ToString() );
-            readStack.Dispose();
+                               .Value.ShouldBe( "CKt-ActivityMonitor" );
         }
         using( TestHelper.Monitor.OpenInfo( "Delete the CKt-ActivityMonitor repository working folder and pull the default world's repositories." ) )
         {
@@ -243,7 +242,7 @@ public class StackRepositoryTests
     {
         var root = ClonedPaths.EnsureCleanFolder();
         var secretsStore = new DotNetUserSecretsStore();
-        var remotes = Remotes.UseReadOnly( "CKt" );
+        var remotes = TestEnv.UseReadOnly( "CKt" );
 
         var initialPath = root.AppendPart( "Initial" );
         var duplicate1 = root.AppendPart( "Duplicate1" );

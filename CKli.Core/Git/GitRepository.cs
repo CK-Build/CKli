@@ -544,6 +544,66 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     }
 
     /// <summary>
+    /// Resets the index to the tree recorded by the commit, updates the working directory to
+    /// match the content of the index and by default tries to removes untracked files.
+    /// <para>
+    /// When removing of an untracked file fails, this returns true, warnings are emitted and
+    /// <see cref="remainingUntrackedFiles"/> is not null and contains the paths relative to
+    /// the <see cref="WorkingFolder"/> that failed to be deleted.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="remainingUntrackedFiles">Outputs the untracked files that remains on the file system.</param>
+    /// <param name="tryDeleteUntrackedFiles">False to not try to delete untracked files.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool ResetHard( IActivityMonitor monitor,
+                           out List<string>? remainingUntrackedFiles,
+                           bool tryDeleteUntrackedFiles = true )
+    {
+        remainingUntrackedFiles = null;
+        try
+        {
+            _git.Reset( ResetMode.Hard );
+            var status = _git.RetrieveStatus();
+            int untrackedCount = status.Untracked.Count();
+            if( untrackedCount > 0 )
+            {
+                if( tryDeleteUntrackedFiles )
+                {
+                    using( monitor.OpenTrace( $"ResetHard: Attempting to delete {untrackedCount} untracked files." ) )
+                    {
+                        foreach( var e in status.Untracked )
+                        {
+                            if( !FileHelper.DeleteFile( monitor, Path.Combine( _workingFolder, e.FilePath ) ) )
+                            {
+                                remainingUntrackedFiles ??= new List<string>();
+                                remainingUntrackedFiles.Add( e.FilePath );
+                            }
+                        }
+                        if( remainingUntrackedFiles != null )
+                        {
+                            monitor.Warn( $"""
+                            Failed to delete untracked files:
+                            {remainingUntrackedFiles.Concatenate( Environment.NewLine )}
+                            """ );
+                        }
+                    }
+                }
+                else
+                {
+                    remainingUntrackedFiles = status.Untracked.Select( e => e.FilePath ).ToList();
+                }
+            }
+            return true;
+        }
+        catch( Exception ex )
+        {
+            monitor.Error( ex );
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Gets whether <see cref="Push(IActivityMonitor)"/> can be called:
     /// the current branch is tracked and is ahead of the remote branch.
     /// </summary>

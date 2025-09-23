@@ -5,7 +5,7 @@ using System.IO;
 
 namespace CKli.Core.Tests;
 
-static partial class Remotes
+static partial class TestEnv
 {
     sealed partial class RemotesCollection : IRemotesCollection
     {

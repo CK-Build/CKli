@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\CKli.Core\CKli.Core.csproj" />
+    <ProjectReference Include="..\..\CKli.Loader\CKli.Loader.csproj" />
   </ItemGroup>
 
   <!-- Consider the Remotes and the Cloned folder as pure content: their .csproj are ignored by the build system. -->

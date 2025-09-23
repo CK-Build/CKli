@@ -1,4 +1,5 @@
 using CK.Core;
+using CKli.Core;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -6,16 +7,8 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
 
-namespace CKli.Core;
+namespace CKli.Loader;
 
-/// <summary>
-/// Implements the <see cref="World.PluginLoader"/> by loading the plugins "CKli.Plugins.dll" and all its
-/// installed plugins in a collectible <see cref="AssemblyLoadContext"/>.
-/// <para>
-/// Any assemblies that already are in the <see cref="AssemblyLoadContext.Default"/> are used: only the
-/// plugins assemblies (and their possibly shared assemblies) are in the plugins context. 
-/// </para>
-/// </summary>
 public sealed class PluginLoadContext : AssemblyLoadContext, IWorldPlugins
 {
     readonly string _runFolder;
@@ -25,6 +18,9 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IWorldPlugins
     PluginLoadContext( WorldName worldName, string runFolder )
         : base( worldName.FullName, isCollectible: true )
     {
+        // Just to preserve the assembly reference to CKli.Plugins.Core.
+        // Without this it is trimmed and the CKli.Plugins.Core is loaded in the plugins context.
+        GC.KeepAlive( typeof( CKli.Plugins.PluginCollector ) );
         _runFolder = runFolder;
     }
 
@@ -38,6 +34,7 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IWorldPlugins
         {
             _disposed = true;
             _worldPlugins?.Dispose();
+            _worldPlugins = null;
             Unload();
         }
     }
@@ -60,17 +57,10 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IWorldPlugins
         return a;
     }
 
-    /// <summary>
-    /// Loads the core "CKli.Plugins.dll" and all its plugins.
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="dllPath">The core "CKli.Plugins.dll" path.</param>
-    /// <param name="context">The context (provides plugin configurations.)</param>
-    /// <returns></returns>
     static public IWorldPlugins? Load( IActivityMonitor monitor, NormalizedPath dllPath, PluginCollectorContext context )
     {
-        var runFolder = Path.GetDirectoryName( dllPath );
-        Throw.CheckArgument( "DllPath cannot be at the root.", runFolder is not null );
+        var runFolder = Path.GetDirectoryName( dllPath.Path );
+        Throw.CheckArgument( "DllPath cannot be at the root of the file system.", runFolder != null );
         var result = new PluginLoadContext( context.WorldName, runFolder );
         try
         {
@@ -81,7 +71,7 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IWorldPlugins
         }
         catch( Exception ex )
         {
-            monitor.Error( $"Error while loading plugins.", ex );
+            monitor.Error( $"Error while collecting plugins.", ex );
         }
         result.Dispose();
         return null;

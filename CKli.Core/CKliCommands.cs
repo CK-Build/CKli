@@ -309,7 +309,111 @@ public static class CKliCommands
         }
     }
 
-    public static int PluginAdd( IActivityMonitor monitor, ISecretsStore secretsStore, string path, string packageId, SVersion version, bool allowLTS )
+    /// <summary>
+    /// Creates a new source based plugin project for the current World.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secrets store.</param>
+    /// <param name="path">The current path to consider.</param>
+    /// <param name="pluginName">The new plugin to create.</param>
+    /// <param name="allowLTS">Allows the current world to be a Long Term Support world.</param>
+    /// <returns>0 on success, negative on error.</returns>
+    public static int PluginCreate( IActivityMonitor monitor,
+                                    ISecretsStore secretsStore,
+                                    string path,
+                                    string pluginName,
+                                    bool allowLTS = false )
+    {
+        return CreateOrRemovePlugin( monitor, secretsStore, path, pluginName, allowLTS, create: true );
+    }
+
+    /// <summary>
+    /// Removes a plugin from the current World.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secrets store.</param>
+    /// <param name="path">The current path to consider.</param>
+    /// <param name="pluginName">The plugin to remove.</param>
+    /// <param name="allowLTS">Allows the current world to be a Long Term Support world.</param>
+    /// <returns>0 on success, negative on error.</returns>
+    public static int PluginRemove( IActivityMonitor monitor,
+                                    ISecretsStore secretsStore,
+                                    string path,
+                                    string pluginName,
+                                    bool allowLTS = false )
+    {
+        return CreateOrRemovePlugin( monitor, secretsStore, path, pluginName, allowLTS, create: false );
+    }
+
+    static int CreateOrRemovePlugin( IActivityMonitor monitor, ISecretsStore secretsStore, string path, string pluginName, bool allowLTS, bool create )
+    {
+        if( !StackRepository.OpenWorldFromPath( monitor, secretsStore, path, out var stack, out var world, skipPullStack: true ) )
+        {
+            return -1;
+        }
+        try
+        {
+            if( world.DefinitionFile.IsPluginsDisabled )
+            {
+                return RequiresEnabledPlugins( monitor );
+            }
+            if( !allowLTS && !world.Name.IsDefaultWorld )
+            {
+                return RequiresAllowLTS( monitor, world.Name );
+            }
+            return (create ? world.CreatePlugin( monitor, pluginName ) : world.RemovePlugin( monitor, pluginName ))
+                    ? 0
+                    : -4;
+        }
+        finally
+        {
+            stack.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Dumps information about installed plugins.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secrets store.</param>
+    /// <param name="path">The current path to consider.</param>
+    /// <returns>0 on success, negative on error.</returns>
+    public static int PluginInfo( IActivityMonitor monitor,
+                                  ISecretsStore secretsStore,
+                                  string path )
+    {
+        if( !StackRepository.OpenWorldFromPath( monitor, secretsStore, path, out var stack, out var world, skipPullStack: true ) )
+        {
+            return -1;
+        }
+        try
+        {
+            return world.RaisePluginInfo( monitor )
+                    ? 0
+                    : -2;
+        }
+        finally
+        {
+            stack.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Adds a new plugin (or upgrade an existing one) to the current world's plugins. 
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secrets store.</param>
+    /// <param name="path">The current path to consider.</param>
+    /// <param name="packageId">"Name@Version" or ""CKli.Name.Plugin@Version" to add. Actual CKli plugin packages are "CKli.XXX.Plugin".</param>
+    /// <param name="version">Package's version.</param>
+    /// <param name="allowLTS">Allows the current world to be a Long Term Support world.</param>
+    /// <returns>0 on success, negative on error.</returns>
+    public static int PluginAdd( IActivityMonitor monitor,
+                                 ISecretsStore secretsStore,
+                                 string path,
+                                 string packageId,
+                                 SVersion version,
+                                 bool allowLTS = false )
     {
         if( !StackRepository.OpenWorldFromPath( monitor, secretsStore, path, out var stack, out var world, skipPullStack: true ) )
         {

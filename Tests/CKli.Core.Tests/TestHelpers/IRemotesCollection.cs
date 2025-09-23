@@ -5,7 +5,7 @@ using System.Collections.Generic;
 namespace CKli.Core.Tests;
 
 /// <summary>
-/// Collection of remotes obtained by <see cref="Remotes.UseReadOnly"/>.
+/// Collection of remotes obtained by <see cref="TestEnv.UseReadOnly"/>.
 /// </summary>
 public interface IRemotesCollection
 {

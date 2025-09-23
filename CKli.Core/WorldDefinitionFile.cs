@@ -1,8 +1,10 @@
 using CK.Core;
-using System.Collections.Generic;
-using System.Xml.Linq;
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Xml.Linq;
 
 namespace CKli.Core;
 
@@ -129,7 +131,7 @@ public sealed class WorldDefinitionFile
     /// <returns>The layout of the repositories or null if errors have been detected.</returns>
     public IReadOnlyList<(NormalizedPath Path, Uri Uri)>? ReadLayout( IActivityMonitor monitor )
     {
-        return _layout ??= GetRepositoryLayout( monitor, _root, _world.WorldRoot );
+        return _layout ??= GetRepositoryLayout( monitor, _root, _world );
     }
 
     /// <summary>
@@ -164,14 +166,16 @@ public sealed class WorldDefinitionFile
         return Util.CreateDisposableAction( () => _allowEdit = false );
     }
 
-    internal void AddRepository( NormalizedPath path, IEnumerable<string> folders, Uri uri )
+    internal void AddRepository( IActivityMonitor monitor, NormalizedPath path, IEnumerable<string> folders, Uri uri )
     {
         Throw.DebugAssert( folders.All( IsValidFolderName ) );
         Throw.DebugAssert( GitRepositoryKey.CheckAndNormalizeRepositoryUrl( uri ) == uri );
         Throw.DebugAssert( _allowEdit );
 
+        // Normalizing "Repository Proxy" url.
+        string urlValue = NormalizeRepositoryProxyUrl( monitor, uri );
         XElement folder = EnsureFolder( folders, _root );
-        folder.Add( new XElement( _xRepository, new XAttribute( _xUrl, uri.ToString() ) ) );
+        folder.Add( new XElement( _xRepository, new XAttribute( _xUrl, urlValue ) ) );
         static XElement EnsureFolder( IEnumerable<string> folders, XElement root )
         {
             XElement existing = root;
@@ -216,8 +220,10 @@ public sealed class WorldDefinitionFile
     {
         Throw.DebugAssert( _allowEdit );
         Throw.DebugAssert( _layout != null );
+
+        string urlValue = NormalizeRepositoryProxyUrl( monitor, uri );
         var node = _root.Descendants( _xRepository )
-                        .FirstOrDefault( e => e.Attribute( _xUrl )?.Value == uri.ToString() );
+                        .FirstOrDefault( e => e.Attribute( _xUrl )?.Value == urlValue );
         if( node == null )
         {
             monitor.Error( $"""
@@ -242,6 +248,23 @@ public sealed class WorldDefinitionFile
         return true;
     }
 
+    string NormalizeRepositoryProxyUrl( IActivityMonitor monitor, Uri uri )
+    {
+        string? urlValue = null;
+        if( uri.IsFile
+            && !_world.Stack.LocalProxyRepositoriesPath.IsEmptyPath )
+        {
+            var local = new NormalizedPath( uri.LocalPath );
+            if( local.StartsWith( _world.Stack.LocalProxyRepositoriesPath ) )
+            {
+                urlValue = local.LastPart;
+                monitor.Trace( $"Automatic Repository Proxy rewrite for '{uri}'." );
+            }
+        }
+        urlValue ??= uri.ToString();
+        return urlValue;
+    }
+
     internal void RemoveEmptyFolders()
     {
         Throw.DebugAssert( _allowEdit );
@@ -264,7 +287,7 @@ public sealed class WorldDefinitionFile
                     // Reloading the layout to honor sort and also to double check
                     // that everything is fine.
                     // We keep the container and change its content.
-                    var newLayout = GetRepositoryLayout( monitor, _root, _world.WorldRoot );
+                    var newLayout = GetRepositoryLayout( monitor, _root, _world );
                     if( newLayout == null ) return false;
                     _layout.Clear();
                     _layout.AddRange( newLayout );
@@ -304,11 +327,15 @@ public sealed class WorldDefinitionFile
         return new WorldDefinitionFile( world, root, plugins );
     }
 
-    static List<(NormalizedPath Path, Uri Uri)>? GetRepositoryLayout( IActivityMonitor monitor, XElement root, NormalizedPath worldRoot )
+    static List<(NormalizedPath Path, Uri Uri)>? GetRepositoryLayout( IActivityMonitor monitor,
+                                                                      XElement root,
+                                                                      LocalWorldName world )
     {
         var list = new List<(NormalizedPath Path, Uri Uri)>();
         bool hasError = false;
-        Process( monitor, root, worldRoot, list, ref hasError );
+
+        NormalizedPath worldRoot = world.WorldRoot;
+        Process( monitor, root, world, worldRoot, list, ref hasError );
         if( hasError ) return null;
         var uniqueCheck = new Dictionary<string,Uri>();
         var uniquePath = new HashSet<NormalizedPath>();
@@ -358,7 +385,12 @@ public sealed class WorldDefinitionFile
         }
         return list;
 
-        static void Process( IActivityMonitor monitor, XElement e, in NormalizedPath p, List<(NormalizedPath, Uri)> list, ref bool hasError )
+        static void Process( IActivityMonitor monitor,
+                             XElement e,
+                             LocalWorldName world,
+                             in NormalizedPath p,
+                             List<(NormalizedPath, Uri)> list,
+                             ref bool hasError )
         {
             foreach( var c in e.Elements() )
             {
@@ -385,7 +417,7 @@ public sealed class WorldDefinitionFile
                     }
                     else
                     {
-                        Process( monitor, c, p.AppendPart( name ), list, ref hasError );
+                        Process( monitor, c, world, p.AppendPart( name ), list, ref hasError );
                     }
                 }
                 else if( eN == _xRepository.LocalName )
@@ -404,12 +436,26 @@ public sealed class WorldDefinitionFile
                     {
                         if( !Uri.TryCreate( aUrl.Value, UriKind.Absolute, out Uri? url ) )
                         {
-                            monitor.Error( $"""
-                                        Invalid element:
-                                        {c}
-                                        Attribute Url=\"{url}\" is invalid.
-                                        """ );
-                            hasError = true;
+                            // The Url is not an url.
+                            // Enter "Repositories Proxy" mode.
+                            if( IsValidFolderName( aUrl.Value ) && !world.Stack.LocalProxyRepositoriesPath.IsEmptyPath )
+                            {
+                                var candidate = world.Stack.LocalProxyRepositoriesPath.AppendPart( aUrl.Value );
+                                if( Directory.Exists( candidate ) )
+                                {
+                                    url = new Uri( "file:///" + candidate, UriKind.Absolute );
+                                    monitor.Trace( $"Automatic Repository Proxy mapping of Url=\"{aUrl.Value}\" to '{url}'." );
+                                }
+                            }
+                            if( url == null )
+                            {
+                                monitor.Error( $"""
+                                                Invalid element:
+                                                {c}
+                                                Attribute Url=\"{url}\" is invalid.
+                                                """ );
+                                hasError = true;
+                            }
                         }
                         if( url != null )
                         {
