@@ -5,11 +5,23 @@ using System.Text;
 
 namespace CKli.Core;
 
-static class ProcessRunner
+/// <summary>
+/// Basic external process runner encapsulation.
+/// </summary>
+public static class ProcessRunner
 {
     static readonly CKTrait _stdErrTag = ActivityMonitor.Tags.Register( "StdErr" );
     static readonly CKTrait _stdOutTag = ActivityMonitor.Tags.Register( "StdOut" );
 
+    /// <summary>
+    /// Starts and wait for the end of an external process.
+    /// </summary>
+    /// <param name="logger">The logger to use. Will receive standard errors and outputs.</param>
+    /// <param name="fileName">The file name to run.</param>
+    /// <param name="arguments">Command line arguments.</param>
+    /// <param name="workingDirectory">Working directory.</param>
+    /// <param name="environmentVariables">Optional environment variables to configure.</param>
+    /// <returns>The exit status code.</returns>
     public static int RunProcess( IParallelLogger logger,
                                   string fileName,
                                   string arguments,
@@ -21,6 +33,17 @@ static class ProcessRunner
         return process.ExitCode;
     }
 
+
+    /// <summary>
+    /// Starts and wait for the end of an external process until a <paramref name="timemout"/> occurs.
+    /// </summary>
+    /// <param name="logger">The logger to use. Will receive standard errors and outputs.</param>
+    /// <param name="fileName">The file name to run.</param>
+    /// <param name="arguments">Command line arguments.</param>
+    /// <param name="workingDirectory">Working directory.</param>
+    /// <param name="environmentVariables">Optional environment variables to configure.</param>
+    /// <param name="timemout">Timeout in milliseconds.</param>
+    /// <returns>The exit status code.</returns>
     public static int? RunProcess( IParallelLogger logger,
                                    string fileName,
                                    string arguments,
@@ -39,7 +62,12 @@ static class ProcessRunner
         return exited ? process.ExitCode : null;
     }
 
-    private static Process DoRun( IParallelLogger logger, string fileName, string arguments, string workingDirectory, Dictionary<string, string>? environmentVariables, Encoding outputEncoding )
+    static Process DoRun( IParallelLogger logger,
+                          string fileName,
+                          string arguments,
+                          string workingDirectory,
+                          Dictionary<string, string>? environmentVariables,
+                          Encoding outputEncoding )
     {
         var info = new ProcessStartInfo( fileName, arguments )
         {

@@ -3,6 +3,9 @@ using System;
 
 namespace CKli.Core;
 
+/// <summary>
+/// Exposes the <see cref="World.Events"/> to which <see cref="PluginBase"/> can subscribe.
+/// </summary>
 public sealed class WorldEvents
 {
     internal void ReleaseEvents()

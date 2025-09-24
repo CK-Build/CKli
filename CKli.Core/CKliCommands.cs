@@ -2,7 +2,6 @@ using CK.Core;
 using CKli.Core;
 using CSemVer;
 using System;
-using System.IO;
 
 namespace CKli;
 
@@ -388,9 +387,9 @@ public static class CKliCommands
         }
         try
         {
-            return world.RaisePluginInfo( monitor )
-                    ? 0
-                    : -2;
+            bool success = world.RaisePluginInfo( monitor, out var text );
+            Console.WriteLine( text );
+            return success ? 0 : -2;
         }
         finally
         {

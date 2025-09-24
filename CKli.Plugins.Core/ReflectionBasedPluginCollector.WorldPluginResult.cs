@@ -1,22 +1,23 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 
 namespace CKli.Core;
 
 sealed partial class ReflectionBasedPluginCollector
 {
-    sealed class WorldPluginResult : IWorldPlugins
+    sealed class WorldPluginResult : IPluginCollection
     {
-        readonly List<PluginFactory> _primaryList;
+        readonly ImmutableArray<PluginFactory> _defaultPrimaries;
         readonly List<PluginFactory> _activationList;
 
-        public WorldPluginResult( List<PluginFactory> primaryList, List<PluginFactory> activationList )
+        public WorldPluginResult( ImmutableArray<PluginFactory> defaultPrimaries, List<PluginFactory> activationList )
         {
-            _primaryList = primaryList;
+            _defaultPrimaries = defaultPrimaries;
             _activationList = activationList;
         }
 
-        public IReadOnlyCollection<IWorldPluginInfo> Plugins => _primaryList;
+        public IReadOnlyCollection<IPluginInfo> Plugins => _defaultPrimaries;
 
         public IDisposable Create( World world )
         {

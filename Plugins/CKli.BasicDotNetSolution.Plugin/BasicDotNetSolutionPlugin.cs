@@ -7,11 +7,11 @@ using System.Collections.Generic;
 
 using System.Text.RegularExpressions;
 
-namespace CKli.Plugin;
+namespace CKli.BasicDotNetSolution.Plugin;
 
-public sealed partial class BasicDotNetSolution : RepoPlugin<BasicSolutionInfo>
+public sealed partial class BasicDotNetSolutionPlugin : RepoPlugin<BasicSolutionInfo>
 {
-    public BasicDotNetSolution( World world )
+    public BasicDotNetSolutionPlugin( World world )
         : base( world )
     {
         world.Events.FixedLayout += OnFixedLayout;
@@ -19,7 +19,7 @@ public sealed partial class BasicDotNetSolution : RepoPlugin<BasicSolutionInfo>
 
     public static void Register( IPluginCollector collector )
     {
-        collector.AddPrimaryPlugin<BasicDotNetSolution>();
+        collector.AddPrimaryPlugin<BasicDotNetSolutionPlugin>();
     }
 
     void OnFixedLayout( FixedAllLayoutEvent e )
@@ -57,9 +57,9 @@ public sealed partial class BasicDotNetSolution : RepoPlugin<BasicSolutionInfo>
     }
 
     static BasicSolutionInfo LoadProjects( IActivityMonitor monitor,
-                                         Repo repo,
-                                         in NormalizedPath slnPath,
-                                         string content )
+                                           Repo repo,
+                                           in NormalizedPath slnPath,
+                                           string content )
     {
         Dictionary<string, NormalizedPath>? projectsPath = null;
         List<NormalizedPath>? badFolderProjectNames = null;

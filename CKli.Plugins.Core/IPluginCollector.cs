@@ -1,11 +1,26 @@
 namespace CKli.Core;
 
+/// <summary>
+/// Supports plugin registration.
+/// </summary>
 public interface IPluginCollector
 {
-    void AddPrimaryPlugin<T>() where T : WorldPlugin;
+    /// <summary>
+    /// Registers a primary plugin.
+    /// </summary>
+    /// <typeparam name="T">The primary plugin type.</typeparam>
+    void AddPrimaryPlugin<T>() where T : PluginBase;
 
-    void AddSupportPlugin<T>() where T : WorldPlugin;
+    /// <summary>
+    /// Registers a support plugin.
+    /// </summary>
+    /// <typeparam name="T">The plugin type.</typeparam>
+    void AddSupportPlugin<T>() where T : PluginBase;
 
-    IWorldPlugins Build();
+    /// <summary>
+    /// Infrastructure code.
+    /// This is public to avoid reflection.
+    /// </summary>
+    /// <returns>The plugin collection.</returns>
+    IPluginCollection Build();
 }
-

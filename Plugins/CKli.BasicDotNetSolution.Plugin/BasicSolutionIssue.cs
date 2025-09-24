@@ -1,7 +1,7 @@
 using CKli.Core;
 using System;
 
-namespace CKli.Plugin;
+namespace CKli.BasicDotNetSolution.Plugin;
 
 /// <summary>
 /// The <see cref="BasicSolutionInfo.Issue"/>.

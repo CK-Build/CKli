@@ -1,7 +1,7 @@
 using CK.Core;
 using System.Diagnostics.CodeAnalysis;
 
-namespace CKli.Plugin;
+namespace CKli.DotNetSolution.Plugin;
 
 public sealed class Project
 {

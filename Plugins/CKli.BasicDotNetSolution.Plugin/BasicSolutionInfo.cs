@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 
-namespace CKli.Plugin;
+namespace CKli.BasicDotNetSolution.Plugin;
 
 /// <summary>
 /// Minimal capture of a ".sln" or ".slnx" file and its project.

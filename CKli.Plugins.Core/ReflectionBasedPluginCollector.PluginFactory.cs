@@ -1,54 +1,63 @@
 using CK.Core;
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Xml.Linq;
 
 namespace CKli.Core;
 
 sealed partial class ReflectionBasedPluginCollector
 {
-    sealed class PluginFactory : IWorldPluginInfo
+    sealed class PluginFactory : IPluginInfo
     {
-        readonly string _name;
+        readonly Type _type;
         readonly ConstructorInfo _ctor;
         readonly int[] _deps;
         readonly object?[] _arguments;
+        readonly XElement? _xmlConfig;
         readonly int _worldParameterIndex;
-        readonly int _xmlConfigIndex;
-        readonly WorldPluginStatus _status;
+        readonly int _primaryPluginParameterIndex;
+        readonly PluginStatus _status;
         readonly int _activationIndex;
 
-        public PluginFactory( string name,
+        public PluginFactory( Type type,
                               ConstructorInfo ctor,
                               int[] deps,
                               object?[] arguments,
+                              XElement? xmlConfig,
                               int worldParameterIndex,
-                              int xmlConfigIndex,
-                              WorldPluginStatus status,
+                              int primaryPluginParameterIndex,
+                              PluginStatus status,
                               int activationIndex )
         {
-            _name = name;
+            _type = type;
             _ctor = ctor;
             _deps = deps;
             _arguments = arguments;
+            _xmlConfig = xmlConfig;
             _worldParameterIndex = worldParameterIndex;
-            _xmlConfigIndex = xmlConfigIndex;
+            _primaryPluginParameterIndex = primaryPluginParameterIndex;
             _status = status;
             _activationIndex = activationIndex;
             Throw.DebugAssert( IsDisabled == activationIndex < 0 );
+            Throw.DebugAssert( "Config is never null when the plugin is enabled.", IsDisabled || _xmlConfig != null );
         }
 
-        public string Name => _name;
+        public string TypeName => _type.Name;
 
-        public WorldPluginStatus Status => _status & ~_isPrimaryStatus;
+        public string FullPluginName => _type.Namespace!;
 
+        public PluginStatus Status => _status & ~(_isPrimaryStatus|_isDefaultPrimaryStatus);
+
+        [MemberNotNullWhen( false, nameof( _xmlConfig ) )]
         public bool IsDisabled => _status.IsDisabled();
 
         public int ActivationIndex => _activationIndex;
 
         internal object Instantiate( World world, object[] instantiated )
         {
-            Debugger.Break();
+            Throw.DebugAssert( !IsDisabled );
             for( int i = 0; i < _deps.Length; i++ )
             {
                 int iInstance = _deps[ i ];
@@ -58,9 +67,9 @@ sealed partial class ReflectionBasedPluginCollector
                     {
                         _arguments[i] = world;
                     }
-                    else if( i != _xmlConfigIndex )
+                    else if( i == _primaryPluginParameterIndex )
                     {
-                        _arguments[i] = null;
+                        _arguments[i] = new PrimaryPluginContext( this, _xmlConfig, world );
                     }
                 }
                 else
@@ -70,6 +79,8 @@ sealed partial class ReflectionBasedPluginCollector
             }
             return _ctor.Invoke( _arguments );
         }
+
+        public override string ToString() => FullPluginName;
     }
 
 }

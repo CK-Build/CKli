@@ -36,12 +36,12 @@ static partial class TestEnv
         }
         PluginMachinery.NuGetConfigFileHook = ( monitor, nuGetXmlDoc ) =>
         {
-            PluginMachinery.SetOrRemoveNuGetSource( monitor,
-                                                    nuGetXmlDoc,
-                                                    "test-override",
-                                                    _nugetSourcePath,
-                                                    "CKli.Core", "CKli.Plugins.Core" )
-                           .ShouldBeTrue();
+            NuGetHelper.SetOrRemoveNuGetSource( monitor,
+                                                nuGetXmlDoc,
+                                                "test-override",
+                                                _nugetSourcePath,
+                                                "CKli.Core", "CKli.Plugins.Core" )
+                       .ShouldBeTrue();
         };
         CopyMostRecentPackageToNuGetSource( "CKli.Core" );
         CopyMostRecentPackageToNuGetSource( "CKli.Plugins.Core" );

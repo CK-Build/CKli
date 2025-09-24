@@ -1,7 +1,9 @@
 using CK.Core;
 using NUnit.Framework;
-using System;
+using Shouldly;
+using System.IO;
 using static CK.Testing.MonitorTestHelper;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace CKli.Core.Tests;
 
@@ -24,8 +26,19 @@ public class PluginTests
 
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
-            CKliCommands.PluginInfo( TestHelper.Monitor, secretsStore, localPath ).ShouldBe( 0 );
-            logs.ShouldContain( "New 'MyFirstOne' in world 'One' plugin certainly requires some development." );
+            StackRepository.OpenWorldFromPath( TestHelper.Monitor, secretsStore, localPath, out var stack, out var world, skipPullStack: true )
+                           .ShouldBeTrue();
+            try
+            {
+                world.RaisePluginInfo( TestHelper.Monitor, out var text ).ShouldBeTrue();
+                text.ShouldContain( "1 loaded plugins, 1 configured plugins." );
+                text.ShouldContain( "Message from 'MyFirstOne' plugin." );
+                logs.ShouldContain( "New 'MyFirstOne' in world 'One' plugin certainly requires some development." );
+            }
+            finally
+            {
+                stack.Dispose();
+            }
         }
 
         CKliCommands.PluginRemove( TestHelper.Monitor, secretsStore, localPath, "MyFirstOne" ).ShouldBe( 0 );

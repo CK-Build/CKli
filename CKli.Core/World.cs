@@ -19,7 +19,7 @@ public sealed partial class World
     /// </summary>
     public static readonly InformationalVersion CKliVersion = InformationalVersion.ReadFromAssembly( typeof( PluginMachinery ).Assembly );
 
-    static Func<IActivityMonitor, NormalizedPath, PluginCollectorContext, IWorldPlugins?>? _pluginLoader;
+    static Func<IActivityMonitor, NormalizedPath, PluginCollectorContext, IPluginCollection?>? _pluginLoader;
 
     /// <summary>
     /// Gets or sets once the loader for plugins.
@@ -27,7 +27,7 @@ public sealed partial class World
     /// When not set, plugins are disabled. Once set, it cannot be changed.
     /// </para>
     /// </summary>
-    public static Func<IActivityMonitor, NormalizedPath, PluginCollectorContext, IWorldPlugins?>? PluginLoader
+    public static Func<IActivityMonitor, NormalizedPath, PluginCollectorContext, IPluginCollection?>? PluginLoader
     {
         get => _pluginLoader;
         set
@@ -144,30 +144,6 @@ public sealed partial class World
             r._git.Dispose();
             r = r._nextRepo;
         }
-    }
-
-    internal bool RaisePluginInfo( IActivityMonitor monitor )
-    {
-        var definitionFile = DefinitionFile;
-        if( definitionFile.IsPluginsDisabled )
-        {
-            Console.WriteLine( $"""
-                    Plugins are disabled by configuration.
-                    Configurations:
-                    {definitionFile.Plugins}
-                    """ );
-            return true;
-        }
-        if( _pluginMachinery == null )
-        {
-            Console.WriteLine( $"No configured PluginLoader. Plugins are disabled." );
-            return true;
-        }
-        foreach( var i in _pluginMachinery.WorldPlugins.Plugins )
-        {
-            Console.WriteLine( $"{i.Name}, {i.Status}" );
-        }
-        return _events.SafeRaiseEvent( monitor, new PluginInfoEvent( monitor, this ) );
     }
 
     /// <summary>

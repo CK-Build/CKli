@@ -1,5 +1,6 @@
 using Buildalyzer;
 using CK.Core;
+using CKli.BasicDotNetSolution.Plugin;
 using CKli.Core;
 using CSemVer;
 using System;
@@ -7,13 +8,13 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Text;
 
-namespace CKli.Plugin;
+namespace CKli.DotNetSolution.Plugin;
 
-public sealed class DotNetSolution : RepoPlugin<DotNetSolutionInfo>
+public sealed class DotNetSolutionPlugin : RepoPlugin<DotNetSolutionInfo>
 {
-    readonly BasicDotNetSolution _rawSolutionProvider;
+    readonly BasicDotNetSolutionPlugin _rawSolutionProvider;
 
-    public DotNetSolution( BasicDotNetSolution rawSolutionProvider )
+    public DotNetSolutionPlugin( BasicDotNetSolutionPlugin rawSolutionProvider )
         : base( rawSolutionProvider.World )
     {
         _rawSolutionProvider = rawSolutionProvider;
@@ -21,7 +22,7 @@ public sealed class DotNetSolution : RepoPlugin<DotNetSolutionInfo>
 
     public static void Register( IPluginCollector services )
     {
-        services.AddPrimaryPlugin<DotNetSolution>();
+        services.AddPrimaryPlugin<DotNetSolutionPlugin>();
     }
 
     protected override DotNetSolutionInfo Create( IActivityMonitor monitor, Repo repo )

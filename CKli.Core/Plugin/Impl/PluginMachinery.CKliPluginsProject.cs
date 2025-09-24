@@ -1,11 +1,8 @@
 using CK.Core;
 using CSemVer;
-using Microsoft.VisualBasic;
 using System;
-using System.Formats.Tar;
 using System.IO;
 using System.Linq;
-using System.Reflection.PortableExecutable;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
@@ -173,7 +170,7 @@ sealed partial class PluginMachinery
         {
             Throw.DebugAssert( projectPath.StartsWith( "..\\" ) && projectPath.EndsWith( ".csproj" ) );
             return _csProj.Root!.Elements( "ItemGroup" )
-                                         .Elements( "PackageReference" )
+                                         .Elements( "ProjectReference" )
                                          .FirstOrDefault( e => e.Attribute( "Include" )?.Value == projectPath );
         }
 
@@ -195,7 +192,7 @@ sealed partial class PluginMachinery
 
         void AddRegisterCall( string shortPluginName )
         {
-            var register = $"{shortPluginName}.Register( collector );{Environment.NewLine}{new string( ' ', _linePrefixLength )}";
+            var register = $"{shortPluginName}.Plugin.{shortPluginName}Plugin.Register( collector );{Environment.NewLine}{new string( ' ', _linePrefixLength )}";
             _ckliPluginsFileText = _ckliPluginsFileText.Insert( _autoSectionEnd, register );
         }
 
@@ -204,7 +201,7 @@ sealed partial class PluginMachinery
             Throw.DebugAssert( "No need to escape the shortPluginName (it is an identifier).",
                                PluginMachinery.IsValidShortPluginName( shortPluginName ) );
             _ckliPluginsFileText = Regex.Replace( _ckliPluginsFileText,
-                                                  $"""{shortPluginName}\s*\.\s*Register\s*(\s*collector\s*)\s*;\s*""",
+                                                  $"""{shortPluginName}\s*\.\s*Plugin\s*\.\s*{shortPluginName}Plugin\s*\.\s*Register\s*\(\s*collector\s*\)\s*;\s*""",
                                                   "",
                                                   RegexOptions.Singleline|RegexOptions.CultureInvariant ); 
         }

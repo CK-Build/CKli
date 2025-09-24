@@ -1,6 +1,6 @@
 using CSemVer;
 
-namespace CKli.Plugin;
+namespace CKli.DotNetSolution.Plugin;
 
 /// <summary>
 /// Captures a project to package reference.

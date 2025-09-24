@@ -7,12 +7,12 @@ namespace CKli.Core;
 /// <summary>
 /// Factory for initialized world's plugins.
 /// </summary>
-public interface IWorldPlugins : IDisposable
+public interface IPluginCollection : IDisposable
 {
     /// <summary>
-    /// Gets the plugin basic informations.
+    /// Gets the plugin basic informations. Only the default primary plugins appear in this collection.
     /// </summary>
-    IReadOnlyCollection<IWorldPluginInfo> Plugins { get; }
+    IReadOnlyCollection<IPluginInfo> Plugins { get; }
 
     /// <summary>
     /// Initializes a configured set of plugins for a World. 

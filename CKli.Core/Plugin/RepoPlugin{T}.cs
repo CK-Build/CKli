@@ -5,11 +5,11 @@ using System.Runtime.InteropServices;
 namespace CKli.Core;
 
 /// <summary>
-/// <see cref="WorldPlugin"/> simple Template Method Pattern that caches information
+/// <see cref="PluginBase"/> simple Template Method Pattern that caches information
 /// associated to a <see cref="Repo"/>.
 /// </summary>
 /// <typeparam name="T">The information type.</typeparam>
-public abstract class RepoPlugin<T> : WorldPlugin
+public abstract class RepoPlugin<T> : PluginBase
     where T : RepoInfo
 {
     readonly T?[] _infos;
@@ -26,7 +26,7 @@ public abstract class RepoPlugin<T> : WorldPlugin
     }
 
     /// <summary>
-    /// Gets the associated information.
+    /// Gets the associated information of a given <see cref="Repo"/>.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
     /// <param name="r">The Repo from which a <typeparamref name="T"/> muts be obtained.</param>

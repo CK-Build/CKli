@@ -1,6 +1,5 @@
 using CK.Core;
 using CSemVer;
-using Microsoft.Extensions.Primitives;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -8,7 +7,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
 using System.Xml.Linq;
 
 namespace CKli.Core;
@@ -17,7 +15,7 @@ namespace CKli.Core;
 /// Supports the Plugin infrastructure.
 /// This class is public only for tests purposes.
 /// <para>
-/// This class holds the reference to the initialized <see cref="IWorldPlugins"/>.
+/// This class holds the reference to the initialized <see cref="IPluginCollection"/>.
 /// </para>
 /// </summary>
 public sealed partial class PluginMachinery
@@ -51,7 +49,7 @@ public sealed partial class PluginMachinery
     static Action<IActivityMonitor, XDocument>? _nuGetConfigFileHook;
 
     // Result, on success, is set by Create (on error, the failing Machinery is not exposed).
-    [AllowNull] IWorldPlugins _worlPlugins;
+    [AllowNull] IPluginCollection _worlPlugins;
 
     /// <summary>
     /// Gets an identifier for the "<see cref="WorldName"/> Plugins" environment.
@@ -78,7 +76,7 @@ public sealed partial class PluginMachinery
 
     internal NormalizedPath CKliPluginsFile => _ckliPluginsFile.IsEmptyPath ? (_ckliPluginsFile = CKliPluginsFolder.AppendPart( "CKli.Plugins.cs" )) : _ckliPluginsFile;
 
-    internal IWorldPlugins WorldPlugins => _worlPlugins;
+    internal IPluginCollection WorldPlugins => _worlPlugins;
 
     PluginMachinery( LocalWorldName worldName, WorldDefinitionFile definitionFile )
     {
@@ -169,7 +167,7 @@ public sealed partial class PluginMachinery
     internal void ReleasePlugins()
     {
         // This is the CKli.Loader.PluginLoadContext.Dispose().
-        // It disposes its own IWorldPlugins obtained from the CKli.Plugins dll and initiate
+        // It disposes its own IPluginCollection obtained from the CKli.Plugins dll and initiate
         // its own Unload.
         _worlPlugins.Dispose();
         _worlPlugins = null;
@@ -328,15 +326,21 @@ public sealed partial class PluginMachinery
             using System.Linq;
             using System.Collections.Generic;
 
-            namespace CKli.Plugins;
+            namespace CKli.{{shortPluginName}}.Plugin;
 
-            public sealed class {{shortPluginName}} : WorldPlugin
+            public sealed class {{shortPluginName}}Plugin : PluginBase
             {
-                public {{shortPluginName}}( World world )
-                    : base( world )
+                /// <summary>
+                /// This is a primary plugin.
+                /// </summary>
+                public {{shortPluginName}}Plugin( IPrimaryPluginContext primaryContext )
+                    : base( primaryContext )
                 {
-                    world.Events.PluginInfo += e =>
+                    primaryContext.World.Events.PluginInfo += e =>
                     {
+                        Throw.CheckState( PrimaryContext.PluginInfo.FullPluginName == "{{fullPluginName}}" );
+                        Throw.CheckState( PrimaryContext.World == e.World );
+                        e.AddMessage( PrimaryContext, b => b.Append( "Message from '{{shortPluginName}}' plugin." ) );
                         e.Monitor.Info( $"New '{{shortPluginName}}' in world '{e.World.Name}' plugin certainly requires some development." );
                         Console.WriteLine( $"Hello from '{{shortPluginName}}' plugin." );
                     };
@@ -344,7 +348,7 @@ public sealed partial class PluginMachinery
 
                 public static void Register( IPluginCollector collector )
                 {
-                    collector.AddPrimaryPlugin<{{shortPluginName}}>();
+                    collector.AddPrimaryPlugin<{{shortPluginName}}Plugin>();
                 }
             }
             
@@ -445,77 +449,6 @@ public sealed partial class PluginMachinery
         }
     }
 
-
-
-    /// <summary>
-    /// Helper that removes a NuGet source or (re)configures it.
-    /// When set, the source is moved to the first position in both &lt;packageSources&gt; and &lt;packageSourceMapping&gt;.
-    /// See <see href="https://learn.microsoft.com/en-us/nuget/consume-packages/package-source-mapping#enable-by-manually-editing-nugetconfig"/>. 
-    /// </summary>
-    /// <param name="monitor">The monitor to use.</param>
-    /// <param name="nugetConfigFile">The configuration xml file.</param>
-    /// <param name="name">The name of the source.</param>
-    /// <param name="sourceUrl">The source url. Null to remove it.</param>
-    /// <param name="patterns">Optional patterns. When empty, "*" is used.</param>
-    /// <returns>True on success, false otheriwise.</returns>
-    public static bool SetOrRemoveNuGetSource( IActivityMonitor monitor,
-                                               XDocument nugetConfigFile,
-                                               string name,
-                                               string? sourceUrl,
-                                               params string[] patterns )
-    {
-        if( nugetConfigFile.Root?.Name.LocalName != "configuration" )
-        {
-            monitor.Error( $"Missing <configuration> root element in:{Environment.NewLine}{nugetConfigFile}" );
-            return false;
-        }
-        var root = nugetConfigFile.Root;
-        var packageSources = root.Elements( "packageSources" ).FirstOrDefault();
-        if( packageSources == null )
-        {
-            monitor.Error( $"Unable to find <packageSources> element in:{Environment.NewLine}{nugetConfigFile}" );
-            return false;
-        }
-        // Fix missing mapping first.
-        var mappings = root.Elements( "packageSourceMapping" ).FirstOrDefault();
-        if( mappings == null )
-        {
-            mappings = new XElement( "packageSourceMapping",
-                                     packageSources.Elements( "add" ).Attributes( "key" )
-                                        .Select( k => new XElement( "packageSource", new XAttribute( "key", k ),
-                                                        new XElement( "package", new XAttribute( "pattern", "*" ) ) ) ) );
-            root.Add( mappings );
-            monitor.Trace( $"Missing <packageSourceMapping>, it is now fixed:{Environment.NewLine}{nugetConfigFile}" );
-        }
-        // First, removes.
-        var existing = packageSources.Elements( "add" ).FirstOrDefault( e => StringComparer.OrdinalIgnoreCase.Equals( name, (string?)e.Attribute( "key" ) ) );
-        if( existing != null )
-        {
-            existing.Remove();
-            existing = mappings.Elements( "packageSource" ).FirstOrDefault( e => StringComparer.OrdinalIgnoreCase.Equals( name, (string?)e.Attribute( "key" ) ) );
-            existing?.Remove();
-        }
-        if( sourceUrl != null )
-        {
-            // Adds the source itself... but not before the </clear> elements!
-            var newOne = new XElement( "add", new XAttribute( "key", name ), new XAttribute( "value", sourceUrl ) );
-            var clear = packageSources.Elements( "clear" ).LastOrDefault();
-            if( clear != null )
-            {
-                clear.AddAfterSelf( newOne );
-            }
-            else
-            {
-                packageSources.AddFirst( newOne );
-            }
-            // And its mappings in first position.
-            if( patterns.Length == 0 ) patterns = ["*"];
-            mappings.AddFirst( new XElement( "packageSource", new XAttribute( "key", name ),
-                                    patterns.Select( p => new XElement( "package", new XAttribute( "pattern", p ) ) ) ) );
-        }
-        return true;
-    }
-
     public static bool EnsureFullPluginName( IActivityMonitor monitor,
                                              string pluginName,
                                              [NotNullWhen( true )] out string? shortPluginName,
@@ -567,14 +500,25 @@ public sealed partial class PluginMachinery
         return false;
     }
 
-    public static bool IsValidFullPluginName( string pluginName )
+    /// <summary>
+    /// Gets whether this name is a valid "CKli.XXX.Plugin" name.
+    /// </summary>
+    /// <param name="pluginName">The name to test.</param>
+    /// <returns>True if this is a valid full plugin name.</returns>
+    public static bool IsValidFullPluginName( [NotNullWhen(true)] string? pluginName )
     {
-        return ValidFullPluginName().Match( pluginName ).Success;
+        return pluginName != null && ValidFullPluginName().Match( pluginName ).Success;
     }
 
-    public static bool IsValidShortPluginName( string pluginName )
+    /// <summary>
+    /// Gets whether this name is a valid short "XXX" plugin name: starts
+    /// with [A-Za-z] followed by at least 2 [A-Za-z0-9].
+    /// </summary>
+    /// <param name="pluginName">The name to test.</param>
+    /// <returns>True if this is a valid short plugin name.</returns>
+    public static bool IsValidShortPluginName( [NotNullWhen( true )] string? pluginName )
     {
-        return ValidShortPluginName().Match( pluginName ).Success;
+        return pluginName != null && ValidShortPluginName().Match( pluginName ).Success;
     }
 
     [GeneratedRegex( @"^CKli\.[A-Za-z][A-Za-z0-9]{2,}\.Plugin$", RegexOptions.ExplicitCapture | RegexOptions.CultureInvariant )]
@@ -644,7 +588,7 @@ public sealed partial class PluginMachinery
 
                 public static class Plugins
                 {
-                    public static IWorldPlugins Register( PluginCollectorContext ctx )
+                    public static IPluginCollection Register( PluginCollectorContext ctx )
                     {
                         var collector = PluginCollector.Create( ctx );
                         // <AutoSection>

@@ -3,8 +3,9 @@ using CKli.Core;
 using System.Collections.Immutable;
 using System.Collections.Generic;
 using System;
+using CKli.BasicDotNetSolution.Plugin;
 
-namespace CKli.Plugin;
+namespace CKli.DotNetSolution.Plugin;
 
 public sealed class DotNetSolutionInfo : RepoInfo
 {
