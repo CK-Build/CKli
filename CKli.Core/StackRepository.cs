@@ -173,7 +173,7 @@ public sealed partial class StackRepository : IDisposable
     /// Gets the world from a <paramref name="path"/> that must start with <see cref="StackRoot"/>.
     /// <para>
     /// This tries to find a LTS world if the path is below StackRoot and its first folder starts with '@' and is
-    /// a valid LTS name. When the path is every where else, <see cref="GetDefaultWorldName(IActivityMonitor)"/> is used.
+    /// a valid LTS name. When the path is everywhere else, <see cref="GetDefaultWorldName(IActivityMonitor)"/> is used.
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>

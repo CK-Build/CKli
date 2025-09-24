@@ -453,4 +453,56 @@ public static class CKliCommands
         return -3;
     }
 
+    /// <summary>
+    /// Disables a plugin or all of them if <paramref name="name"/> is "global".
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secrets store.</param>
+    /// <param name="path">The current path to consider.</param>
+    /// <param name="name">The plugin to disable or "global".</param>
+    /// <returns>0 on success, negative on error.</returns>
+    public static int PluginDisable( IActivityMonitor monitor,
+                                     ISecretsStore secretsStore,
+                                     string path,
+                                     string name )
+    {
+        return EnableOrDisablePlugin( monitor, secretsStore, path, name, enable: false );
+    }
+
+    /// <summary>
+    /// Enables a plugin or all of them if <paramref name="name"/> is "global".
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secrets store.</param>
+    /// <param name="path">The current path to consider.</param>
+    /// <param name="name">The plugin to enable or "global".</param>
+    /// <returns>0 on success, negative on error.</returns>
+    public static int PluginEnable( IActivityMonitor monitor,
+                                    ISecretsStore secretsStore,
+                                    string path,
+                                    string name )
+    {
+        return EnableOrDisablePlugin( monitor, secretsStore, path, name, enable: true );
+    }
+
+    static int EnableOrDisablePlugin( IActivityMonitor monitor, ISecretsStore secretsStore, string path, string name, bool enable )
+    {
+        if( !StackRepository.OpenFromPath( monitor, secretsStore, path, out var stack, skipPullStack: true ) )
+        {
+            return -1;
+        }
+        try
+        {
+            var definitionFile = stack.GetWorldNameFromPath( monitor, path )?.LoadDefinitionFile( monitor );
+            if( definitionFile == null ) return -2;
+            
+            return definitionFile.EnablePlugin( monitor, name, enable )
+                    ? 0
+                    : -4;
+        }
+        finally
+        {
+            stack.Dispose();
+        }
+    }
 }

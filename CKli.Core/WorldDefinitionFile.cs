@@ -101,6 +101,51 @@ public sealed class WorldDefinitionFile
         return _pluginsConfiguration  ??= DoReadPluginsConfiguration( monitor );
     }
 
+    /// <summary>
+    /// Enables or disables a plugin or all of them if <paramref name="name"/> is "global".
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="name">The plugin to enable or "global".</param>
+    /// <param name="enable">True to enable, false to disable.</param>
+    /// <returns>True on success, false on error.</returns>
+    public bool EnablePlugin( IActivityMonitor monitor, string name, bool enable )
+    {
+        var config = ReadPluginsConfiguration( monitor );
+        if( config == null ) return false;
+        bool isGlobal = name == "global";
+        XElement? e = null;
+        if( !isGlobal )
+        {
+            if( !PluginMachinery.EnsureFullPluginName( monitor, name, out var shortPluginName, out var longPluginName ) )
+            {
+                return false;
+            }
+            e = config.GetValueOrDefault( name ).Config;
+            if( e == null )
+            {
+                monitor.Error( $"Unable to find Plugin configuration '{shortPluginName}'." );
+                return false;
+            }
+            if( (bool?)_plugins.Attribute( _xDisabled ) is true == !enable )
+            {
+                return true;
+            }
+        }
+        else
+        {
+            e = _plugins;
+            if( IsPluginsDisabled == !enable )
+            {
+                return true;
+            }
+        }
+        using( StartEdit() )
+        {
+            e.SetAttributeValue( _xDisabled, enable ? null : "true" );
+        }
+        return SaveFile( monitor );
+    }
+
     Dictionary<string, (XElement Config, bool IsDisabled)>? DoReadPluginsConfiguration( IActivityMonitor monitor )
     {
         bool success = true;

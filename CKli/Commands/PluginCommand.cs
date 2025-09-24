@@ -60,4 +60,31 @@ public sealed class PluginCommand
         } );
     }
 
+    /// <summary>
+    /// Disables a plugin or the plugin system itself if name is "global".
+    /// </summary>
+    /// <param name="name">Plugin name to enable or "global".</param>
+    /// <returns>0 on success, negative on error.</returns>
+    public int Disable( [Argument] string name )
+    {
+        return CommandContext.Run( ( monitor, userPreferences ) =>
+        {
+            return CKliCommands.PluginDisable( monitor, userPreferences.SecretsStore, Environment.CurrentDirectory, name );
+        } );
+    }
+
+    /// <summary>
+    /// Enables a disabled plugin or the plugin system itself if name is "global".
+    /// </summary>
+    /// <param name="name">Plugin name to enable or "global".</param>
+    /// <returns>0 on success, negative on error.</returns>
+    public int Enable( [Argument] string name )
+    {
+        return CommandContext.Run( ( monitor, userPreferences ) =>
+        {
+            return CKliCommands.PluginEnable( monitor, userPreferences.SecretsStore, Environment.CurrentDirectory, name );
+        } );
+    }
+
+
 }

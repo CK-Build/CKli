@@ -456,7 +456,7 @@ public sealed partial class PluginMachinery
     {
         if( !EnsureFullPluginName( pluginName, out shortPluginName, out fullPluginName ) )
         {
-            monitor.Error( $"Invalid plugin name '{pluginName}'. Must be '[A-Za-z][A-Za-z0-9]' or 'Ckli.[A-Za-z][A-Za-z0-9].Plugin'." );
+            monitor.Error( $"Invalid plugin name '{pluginName}'. Must be '[A-Za-z][A-Za-z0-9]' or 'Ckli.[A-Za-z][A-Za-z0-9].Plugin' (and not \"global\")." );
             return false;
         }
         return true;
@@ -501,24 +501,29 @@ public sealed partial class PluginMachinery
     }
 
     /// <summary>
-    /// Gets whether this name is a valid "CKli.XXX.Plugin" name.
+    /// Gets whether this name is a valid "CKli.XXX.Plugin" name (but not "CKli.global.Plugin").
     /// </summary>
     /// <param name="pluginName">The name to test.</param>
     /// <returns>True if this is a valid full plugin name.</returns>
     public static bool IsValidFullPluginName( [NotNullWhen(true)] string? pluginName )
     {
-        return pluginName != null && ValidFullPluginName().Match( pluginName ).Success;
+        return pluginName != null
+               && ValidFullPluginName().Match( pluginName ).Success
+               && !pluginName.Equals( "CKli.global.Plugin", StringComparison.OrdinalIgnoreCase )
+;
     }
 
     /// <summary>
     /// Gets whether this name is a valid short "XXX" plugin name: starts
-    /// with [A-Za-z] followed by at least 2 [A-Za-z0-9].
+    /// with [A-Za-z] followed by at least 2 [A-Za-z0-9] and is not "global".
     /// </summary>
     /// <param name="pluginName">The name to test.</param>
     /// <returns>True if this is a valid short plugin name.</returns>
     public static bool IsValidShortPluginName( [NotNullWhen( true )] string? pluginName )
     {
-        return pluginName != null && ValidShortPluginName().Match( pluginName ).Success;
+        return pluginName != null
+               && !pluginName.Equals( "global", StringComparison.OrdinalIgnoreCase )
+               && ValidShortPluginName().Match( pluginName ).Success;
     }
 
     [GeneratedRegex( @"^CKli\.[A-Za-z][A-Za-z0-9]{2,}\.Plugin$", RegexOptions.ExplicitCapture | RegexOptions.CultureInvariant )]
