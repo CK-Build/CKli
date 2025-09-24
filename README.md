@@ -15,21 +15,11 @@ and concentrates informations in a single place.
 ### Installation (not supported yet)
 
 CKli is a [dotnet tool](https://docs.microsoft.com/en-us/dotnet/core/tools/global-tools).
-You can install it globally by running:
+You should install it globally by running:
 
 ```powershell
-#latest stable
 dotnet tool install CKli -g
 ```
-**This is the theory.**
-In practice a Long Term Support World should use a locked version of CKli and its plugins.
-The idea was to, in such case, install a **local** dotnet tool in the World and use the "fact"
-that the locally installed tool would take precedence over the global one. Simple and effective.
-
-Unfortunately this doesn't seem that simple:
-https://github.com/dotnet/sdk/issues/14626
-See also https://github.com/dotnet/sdk/issues/11958
-
 
 ### Run CKli
 
@@ -136,73 +126,99 @@ The World's definition file is updated and a commit is done in the Stack reposit
 
 To publish this update, a `push` (typically with `--stack-only`) must be executed.
 
-## Ckli status
+## Plugin commands
 
-Whether the current directory is in a Repo or not, the "status" is quite different.
-When we consider the whole dependency graph from a Repo we should handle 2 sides:
-- The Imported, ingress, predecessors from which the Repo imports/consumes its dependencies.
-- The Exported, egress, successors to which the Repo exports/provides its published packages.
+The core commands of CKli handles Stack, World and Repo (Git repositories).
+The Repo can contain anything. To handle tasks specific to a technology (.NET, Node, Ruby, etc.)
+external and optional plugins can be used.
 
-This forms 2 "cones" that should drive the UX.
-1. Ingress: "As a developper, I want to update any packages in this Repo."
-2. Egress: "As a developper, I want to propagate the changes I made to this Repo to all the Repo that uses it."
+Plugins are written in .NET and distributed as NuGet packages or can be source code directly
+in the Stack repository.
 
-The "release of a Repo" is 1) followed by 2). This may touch only a few Repo in the World... or a lot.
-Before the ultimate `ckli update` that would do all the magics, there's some work to do.
+### `plugin create <name> --allow-lts`
+Creates a new source based plugin project in the current World.
 
-A question that seems easy to answer to is: "Is this Repo up-to-date?".
-First, the good question is "Is this branch in this Repo up-to-date?". So what does it mean?
+The name can be a short name ("MyFirstOne") or a full plugin name ("CKli.MyFirstOne.Plugin").
 
-- Ingress
+In a public World named "MyWorld", the code of the plugin is created in the `.PublicStack/MyWorld-Plugins/Ckli.MyFirstOne.Plugin/` folder.
+It can be edited and tested freely.
+The new plugin is added to the `<Plugins />` element of the world definition file:
 
-Are there new versions of the packages this Repo uses?
-If yes, then I upgrade them, test this Repo and we are good. No. This is true for external packages, that
-are not produced by this World, but in the World, some Repo may not be "up-to-date". But... wait!
-Is it my responsibility to produce packages from Repo because I want this Repo to be up-to-date? Moreover I
-don't necessarily master this low-level Repo... Well, it depends.
+```xml
+<MyWorld>
 
-When I'm working at the World level, yes (refactoring scenario). If my focus is solely this Repo (like in a
-bug fix scenario), then no. But when I'm fixing stuff, I should not upgrade any package (unless the issue
-comes from a dependency). And IF I upgrade a dependency, I should ensure that all other Repos in my World
-that depend on the upgraded package(s) also use the upgraded version.
+  <Plugins>
+    <MyFirstOne />
+  </Plugins>
 
-:warning: In a World, all external packages SHOULD use the same version. This is not always the case, this
-rule can be temporarily broken (hot-fix), but this is a problematic state that must eventually be handled.
+  <!-- Folders and Repositories... -->
+</MyWorld>
+```
+The `<MyFirstOne />` element is the plugin configuration: the plugin code can read it to configure
+its behavior.
 
+:warning: Warnings:
+- The plugins must not be globally disabled (see below).
 
+The new plugin will be "published" when `push` (typically with `--stack-only`) is executed.
 
+If the current World is a LTS one (`CK@Net8`), `--allow-lts` must be specified because
+it is weird to add a new plugin to a Long Term Support World.
 
+### `plugin remove <name> --allow-lts`
+Removes a source based or package plugin from the current World.
 
-- Egress
-Very easy: the commit point is clean.
-1. My working folder is not dirty.
-  - I have no uncomitted modified files, no staged files, the current commit contains all the code.
-2. If the branch is tracked, I must check if the remote has no new commits (from my colleagues). If yes,
-   I may need to `pull` (and possibly merge my local changes).
-3. The tests pass.
+The name can be the short name ("MyPlugin") or the full plugin name ("CKli.MyPlugin.Plugin").
 
+:warning: Warnings:
+- The removed plugin must not have dependent plugins otherwise this fails (and nothing is done).
+- The plugins must not be globally disabled (see below).
 
+If the current World is a LTS one (`CK@Net8`), `--allow-lts` must be specified because
+it is weird to remove a plugin from a Long Term Support World.
 
+### `plugin add <packageId@version> --allow-lts`
+Adds a new packaged plugin in the current World or sets its version.
 
+When added, the plugin is added to the `<Plugins />` element of the world definition file,
+just like in the source based scenario.
 
+:warning: Warnings:
+- The plugins must not be globally disabled (see below).
 
+If the current World is a LTS one (`CK@Net8`), `--allow-lts` must be specified because
+it is weird to add a new plugin to a Long Term Support World.
 
+The new plugin will be "published" when `push` (typically with `--stack-only`) is executed.
 
-1. Git level:
-  - `GitRepositoryInfo.SimpleStatusInfo`
-    - CurrentBranchName:  string
-    - IsDirty: bool
-    - CommitAhead int?
-    - CommitBehind int?
-2. Solution level (can be techno agnostic but there's the notion of "Solution")
-  - BasicDotNetIssue: enum { None, DirtyFolder, MissingProjects, MultipleSolution, BadNameSolution, EmptySolution }
-  - AllProjects: List of NormalizedPath
-  - Issue must be None to continue.
-3. RawDependency level (may be techno agnostic... but versions come into play)
-  - PackageRegerences: List of (PackageId, Version)
-  - PublishedProjects: List of NormalizedPath
-  - SupportProjects: List of NormalizedPath
-4. SimpleGitVersion level
-  - The RepositoryInfo should contain everything needed.
-5. "Imported/igress/predecessors"
+### `plugin disable <name>|global`
+Plugins are enabled by default but can be disabled.
+When `plugin disable global` is used, `IsDisabled="true"` attribute is set on the `<Plugins />` element
+and the whole plugin system is disabled (plugins loader is disabled and plugins can no more be added or removed).
+
+When a name is specified, the attribute is set on the corresponding plugin configuration element.
+```xml
+<MyWorld>
+
+  <Plugins IsDisabled="true">
+    <EnsureBranch IsDisabled="true">
+      <Branch Name="main" />
+      <Branch Name="develop" />
+    </EnsureBranch>
+    <MyPlugin />
+  </Plugins>
+
+  <!-- Folders and Repositories... -->
+</MyWorld>
+```
+As usual, this modification will be "published" when `push` (typically with `--stack-only`) is executed.
+
+### `plugin enable <name>|global`
+Reverts the `plugin disable` command by removing the `IsDisabled="true"` attribute.
+
+As usual, this modification will be "published" when `push` (typically with `--stack-only`) is executed.
+
+### `plugin info`
+Displays plugin related information (configured, disabled) and an optional message that can be
+produced by the plugin itself.
 

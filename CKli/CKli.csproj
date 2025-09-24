@@ -1,11 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
-    <!-- Not sure yet that this can be a dotnet tool. -->
-    <IsPackable>false</IsPackable>
     <InvariantGlobalization>true</InvariantGlobalization>
+
+    <OutputType>Exe</OutputType>
+    <IsPackable>true</IsPackable>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <DebugType>embedded</DebugType>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>ckli</ToolCommandName>
+    <Description>Command line tools to manage multi-repository Stacks.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
 
     <!-- It's a mess. See https://github.com/dotnet/project-system/issues/3619 -->
     <RunWorkingDirectory>$(MSBuildProjectDirectory)</RunWorkingDirectory>
