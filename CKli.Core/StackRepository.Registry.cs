@@ -66,17 +66,27 @@ public sealed partial class StackRepository
             if( mustSave )
             {
                 monitor.Trace( $"Updating file '{_regFilePath}' with {map.Count} stacks." );
-                LockedSave( map );
+                LockedSave( monitor, map );
             }
 
-            static void LockedSave( Dictionary<NormalizedPath, Uri> map )
+            static void LockedSave( IActivityMonitor monitor, Dictionary<NormalizedPath, Uri> map )
             {
                 var b = new StringBuilder();
                 foreach( var (path, uri) in map )
                 {
                     b.Append( path ).Append( '*' ).Append( uri ).AppendLine();
                 }
-                File.WriteAllText( _regFilePath, b.ToString() );
+                try
+                {
+                    File.WriteAllText( _regFilePath, b.ToString() );
+                }
+                catch( DirectoryNotFoundException )
+                {
+                    var ckliAppPath = _regFilePath.RemoveLastPart();
+                    monitor.Trace( $"First install: creating folder '{ckliAppPath}'." );
+                    Directory.CreateDirectory( ckliAppPath );
+                    File.WriteAllText( _regFilePath, b.ToString() );
+                }
             }
 
             static bool ReadStackRegistry( IActivityMonitor monitor, Uri findOrUpdateStackUri, List<NormalizedPath>? foundPath, Dictionary<NormalizedPath, Uri> map )
