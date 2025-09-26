@@ -318,7 +318,7 @@ public sealed partial class PluginMachinery
                 </ItemGroup>
             </Project>
             """ );
-        File.WriteAllText( projectPath.AppendPart( $"{shortPluginName}.cs" ), $$"""
+        File.WriteAllText( projectPath.AppendPart( $"{shortPluginName}Plugin.cs" ), $$"""
             using CK.Core;
             using CKli.Core;
             using System;
