@@ -33,8 +33,8 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
         _workingFolder = fullPath;
         _displayPath = displayPath;
 
-        Throw.CheckArgument( _workingFolder == libRepository.Info.WorkingDirectory );
-        Throw.CheckArgument( _workingFolder.EndsWith( _displayPath, strict: false ) );
+        Throw.CheckArgument( _workingFolder.Path.Equals( libRepository.Info.WorkingDirectory, StringComparison.OrdinalIgnoreCase ) );
+        Throw.CheckArgument( _workingFolder.Path.EndsWith( _displayPath, StringComparison.OrdinalIgnoreCase ) );
     }
 
     /// <summary>
@@ -269,7 +269,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
     /// <summary>
     /// Checks out the specified branch. 
     /// <list type="number">
-    ///     <item>If <see cref="CurrentBranchName"/> is <paramref name="branchName"/>, does nothing.</item>
+    ///     <item>If the current branch name is <paramref name="branchName"/>, does nothing.</item>
     ///     <item>Otherwise, the working folder must be clean (<see cref="CheckCleanCommit(IActivityMonitor)"/>).</item>
     ///     <item>If the local branch doesn't exist yet, all branches from 'origin' are fetched, a tracking local branch is created if the remote branch exists and it is checked out.</item>
     ///     <item>If the local branch already exists, it is checked out and pulled-merge from the remote unless <paramref name="skipPullMerge"/> is true.</item>
@@ -294,7 +294,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
                 }
                 b = DoEnsureBranch( monitor, _git, branchName, LogLevel.Warn, _displayPath, out bool localCreated );
                 // Either the branch has been created from its remote fetched branch, or it has been created
-                // a a local branch (as there's no remote branch): in both case, we can skip the pull.
+                // as a local branch (as there's no remote branch): in both cases, we can skip the pull.
                 skipPullMerge = true;
             }
             monitor.Info( $"Checking out {branchName} (leaving {CurrentBranchName})." );

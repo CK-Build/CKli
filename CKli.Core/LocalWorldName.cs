@@ -21,7 +21,7 @@ public sealed class LocalWorldName : WorldName
     internal LocalWorldName( StackRepository stack, string? ltsName, NormalizedPath rootPath, NormalizedPath xmlDescriptionFilePath )
         : base( stack.StackName, ltsName )
     {
-        Throw.CheckArgument( rootPath.StartsWith( stack.StackRoot, strict: false ) );
+        Throw.CheckArgument( rootPath.Path.StartsWith( stack.StackRoot, StringComparison.OrdinalIgnoreCase ) );
         _stack = stack;
         _root = rootPath;
         _xmlDescriptionFilePath = xmlDescriptionFilePath;

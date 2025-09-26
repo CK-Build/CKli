@@ -181,7 +181,7 @@ public sealed partial class StackRepository : IDisposable
     /// <returns>The world name for the path or null on error.</returns>
     public LocalWorldName? GetWorldNameFromPath( IActivityMonitor monitor, NormalizedPath path )
     {
-        Throw.CheckArgument( path.StartsWith( StackRoot, strict: false ) );
+        Throw.CheckArgument( path.Path.StartsWith( StackRoot, StringComparison.OrdinalIgnoreCase ) );
 
         if( path.Parts.Count > _stackRoot.Parts.Count
             && WorldName.IsValidLTSName( path.Parts[_stackRoot.Parts.Count] ) )
