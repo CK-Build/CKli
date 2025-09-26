@@ -92,4 +92,7 @@ public sealed class Repo
     /// <returns>True on success, false on error.</returns>
     public bool Push( IActivityMonitor monitor ) => _git.Push( monitor );
 
+    /// <inheritdoc cref="GitRepository.SetCurrentBranch(IActivityMonitor, string, bool)"/>
+    public bool SetCurrentBranch( IActivityMonitor monitor, string branchName, bool skipPullMerge = false )
+            => _git.SetCurrentBranch( monitor, branchName, skipPullMerge );
 }
