@@ -26,7 +26,7 @@ public abstract class WorldEvent : EventMonitoredArgs
     /// Gets or sets whether the handle of the event failed.
     /// Defaults to true.
     /// <para>
-    /// When false, event handlers should normally ignore the event.
+    /// When set to false by previous handlers, event handlers should normally ignore the event.
     /// </para>
     /// </summary>
     public bool Success

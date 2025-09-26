@@ -6,9 +6,18 @@ using System.Threading;
 
 namespace CKli.Core;
 
-sealed class FileHelper
+/// <summary>
+/// File system related helpers.
+/// </summary>
+public sealed class FileHelper
 {
-    internal static bool DeleteFile( IActivityMonitor monitor, string path )
+    /// <summary>
+    /// Standard helper with 5 retries. Ultimately gives up with a logged error and returns false.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="path">The file path to delete.</param>
+    /// <returns>True on success, false on error.</returns>
+    public static bool DeleteFile( IActivityMonitor monitor, string path )
     {
         int tryCount = 0;
         for(; ; )
@@ -30,6 +39,17 @@ sealed class FileHelper
         }
     }
 
+    /// <summary>
+    /// Moves/renames a directory. This handles casing correctly (even on case insenstive file systems).
+    /// <para>
+    /// Retries up to 5 times and ultimately gives up with a logged error and returns false.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="from">The source folder to move.</param>
+    /// <param name="to">The target folder.</param>
+    /// <param name="potentiallyEmptyFolders">When provided, thi set is filled with folders that may be empty and may need to be suppressed.</param>
+    /// <returns>True on success, false on error.</returns>
     public static bool TryMoveFolder( IActivityMonitor monitor,
                                       NormalizedPath from,
                                       NormalizedPath to,
@@ -70,7 +90,18 @@ sealed class FileHelper
         }
     }
 
-    internal static bool DeleteFolder( IActivityMonitor monitor, string path )
+    /// <summary>
+    /// Not so standard helper as this can delete a git working folder by removing the read-only attributes on ".git/objects/" files
+    /// before attempting to delete the folder. Only ".git/objects/" files are handled: if the folder contains other read-only files,
+    /// this fails.
+    /// <para>
+    /// Retries up to 5 times and ultimately gives up with a logged error and returns false.
+    /// </para>
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="path">The directory path to delete.</param>
+    /// <returns>True on success, false on error.</returns>
+    public static bool DeleteFolder( IActivityMonitor monitor, string path )
     {
         if( !DeleteClonedFolderOnly( monitor, path, out bool isClonedFolder ) )
         {

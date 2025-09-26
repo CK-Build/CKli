@@ -10,7 +10,7 @@ using System.Xml.Linq;
 namespace CKli.Core;
 
 /// <summary>
-/// Helpers related to NuGet.
+/// NuGet related helpers.
 /// </summary>
 public static class NuGetHelper
 {
@@ -106,5 +106,4 @@ public static class NuGetHelper
         }
         return true;
     }
-
 }
