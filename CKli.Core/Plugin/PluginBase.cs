@@ -13,9 +13,9 @@ public abstract class PluginBase
     readonly IPrimaryPluginContext? _primaryContext;
 
     /// <summary>
-    /// Initializes this plugin on its World.
-    /// This plugin may be a primary plugin but primary plugins are typically initialized
-    /// with their context by <see cref="PluginBase(IPrimaryPluginContext)"/>
+    /// Initializes a support plugin.
+    /// Primary plugins must accept a <see cref="IPrimaryPluginContext"/> parameter
+    /// and call <see cref="PluginBase(IPrimaryPluginContext)"/>.
     /// </summary>
     /// <param name="world">The world.</param>
     protected PluginBase( World world )

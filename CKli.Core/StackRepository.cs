@@ -566,7 +566,7 @@ public sealed partial class StackRepository : IDisposable
     }
 
     /// <summary>
-    /// Finds a git stack ".PrivateStack" or ".PublicStack" above. 
+    /// Finds a git stack here or above by looking for ".PrivateStack" or ".PublicStack" folder. 
     /// </summary>
     /// <param name="path">Starting path.</param>
     /// <returns>A git stack or the empty path.</returns>
@@ -579,7 +579,8 @@ public sealed partial class StackRepository : IDisposable
         return default;
     }
 
-    public LocalWorldName? CreateNewLTS( IActivityMonitor monitor, string ltsName, XDocument content )
+    // Not released, not tested yet.
+    internal LocalWorldName? CreateNewLTS( IActivityMonitor monitor, string ltsName, XDocument content )
     {
         Throw.CheckArgument( content?.Root != null );
         Throw.CheckArgument( WorldName.IsValidLTSName( ltsName ) );

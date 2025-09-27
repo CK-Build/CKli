@@ -10,7 +10,7 @@ namespace CKli.Core;
 public interface IPluginCollection : IDisposable
 {
     /// <summary>
-    /// Gets the plugin basic informations. Only the default primary plugins appear in this collection.
+    /// Gets the plugin informations.
     /// </summary>
     IReadOnlyCollection<IPluginInfo> Plugins { get; }
 

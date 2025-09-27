@@ -32,7 +32,7 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginCollection
         _runFolder = runFolder;
     }
 
-    IReadOnlyCollection<IPluginInfo> IPluginCollection.Plugins => _worldPlugins!.Plugins;
+    IReadOnlyCollection<IPluginTypeInfo> IPluginCollection.Plugins => _worldPlugins!.Plugins;
 
     IDisposable IPluginCollection.Create( World world ) => _worldPlugins!.Create( world );
 

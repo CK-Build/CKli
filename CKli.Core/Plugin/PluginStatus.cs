@@ -4,7 +4,7 @@ using System.IO;
 namespace CKli.Core;
 
 /// <summary>
-/// Describes <see cref="IPluginInfo.Status"/>.
+/// Describes <see cref="IPluginTypeInfo.Status"/>.
 /// </summary>
 public enum PluginStatus
 {

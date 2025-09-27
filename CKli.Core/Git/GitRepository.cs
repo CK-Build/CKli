@@ -33,7 +33,7 @@ public sealed class GitRepository : IGitHeadInfo, IDisposable
         _workingFolder = fullPath;
         _displayPath = displayPath;
 
-        Throw.CheckArgument( _workingFolder.Path.Equals( libRepository.Info.WorkingDirectory, StringComparison.OrdinalIgnoreCase ) );
+        Throw.CheckArgument( _workingFolder.Path.Equals( new NormalizedPath( libRepository.Info.WorkingDirectory ), StringComparison.OrdinalIgnoreCase ) );
         Throw.CheckArgument( _workingFolder.Path.EndsWith( _displayPath, StringComparison.OrdinalIgnoreCase ) );
     }
 

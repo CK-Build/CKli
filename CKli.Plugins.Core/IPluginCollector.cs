@@ -1,3 +1,6 @@
+using System;
+using System.Reflection;
+
 namespace CKli.Core;
 
 /// <summary>
@@ -6,21 +9,8 @@ namespace CKli.Core;
 public interface IPluginCollector
 {
     /// <summary>
-    /// Registers a primary plugin.
-    /// </summary>
-    /// <typeparam name="T">The primary plugin type.</typeparam>
-    void AddPrimaryPlugin<T>() where T : PluginBase;
-
-    /// <summary>
-    /// Registers a support plugin.
-    /// </summary>
-    /// <typeparam name="T">The plugin type.</typeparam>
-    void AddSupportPlugin<T>() where T : PluginBase;
-
-    /// <summary>
-    /// Infrastructure code.
-    /// This is public to avoid reflection.
+    /// Registers plugins assemblies via their default primary plugins.
     /// </summary>
     /// <returns>The plugin collection.</returns>
-    IPluginCollection Build();
+    IPluginCollection BuildPluginCollection( ReadOnlySpan<Type> defaultPrimaryPlugins );
 }

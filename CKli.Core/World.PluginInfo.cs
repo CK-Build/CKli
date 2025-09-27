@@ -64,7 +64,7 @@ public sealed partial class World
         var missings = config.Keys.Select( k => (ShortName: k, FullName: $"CKli.{k}.Plugin") )
                                   .Where( e => !loaded.Any( p => p.FullPluginName == e.FullName ) )
                                   .Select( e => new DisplayInfoPlugin( e.ShortName, e.FullName, PluginStatus.MissingImplementation ) );
-        var list = loaded.Select( p => new DisplayInfoPlugin( p.TypeName[..^6], p.FullPluginName, p.Status ) )
+        var list = loaded.Select( p => new DisplayInfoPlugin( p.PluginName, p.FullPluginName, p.Status ) )
                          .Concat( missings )
                          .ToList();
 

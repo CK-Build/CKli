@@ -8,16 +8,16 @@ sealed partial class ReflectionBasedPluginCollector
 {
     sealed class WorldPluginResult : IPluginCollection
     {
-        readonly ImmutableArray<PluginFactory> _defaultPrimaries;
-        readonly List<PluginFactory> _activationList;
+        readonly ImmutableArray<IPluginInfo> _pluginInfos;
+        readonly List<PluginType> _activationList;
 
-        public WorldPluginResult( ImmutableArray<PluginFactory> defaultPrimaries, List<PluginFactory> activationList )
+        public WorldPluginResult( ImmutableArray<IPluginInfo> pluginInfos, List<PluginType> activationList )
         {
-            _defaultPrimaries = defaultPrimaries;
+            _pluginInfos = pluginInfos;
             _activationList = activationList;
         }
 
-        public IReadOnlyCollection<IPluginInfo> Plugins => _defaultPrimaries;
+        public IReadOnlyCollection<IPluginInfo> Plugins => _pluginInfos;
 
         public IDisposable Create( World world )
         {

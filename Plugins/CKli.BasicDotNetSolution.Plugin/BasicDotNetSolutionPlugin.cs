@@ -14,25 +14,6 @@ public sealed partial class BasicDotNetSolutionPlugin : RepoPlugin<BasicSolution
     public BasicDotNetSolutionPlugin( World world )
         : base( world )
     {
-        world.Events.FixedLayout += OnFixedLayout;
-    }
-
-    public static void Register( IPluginCollector collector )
-    {
-        collector.AddPrimaryPlugin<BasicDotNetSolutionPlugin>();
-    }
-
-    void OnFixedLayout( FixedAllLayoutEvent e )
-    {
-        if( TryGetAll( e.Monitor, out var all ) )
-        {
-            foreach( var info in all )
-            {
-                if( info.BadFolderProjectNames.Count > 0 )
-                {
-                }
-            }
-        }
     }
 
     protected override BasicSolutionInfo Create( IActivityMonitor monitor, Repo repo )

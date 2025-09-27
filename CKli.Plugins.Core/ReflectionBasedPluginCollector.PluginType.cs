@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
@@ -9,9 +10,11 @@ namespace CKli.Core;
 
 sealed partial class ReflectionBasedPluginCollector
 {
-    sealed class PluginFactory : IPluginInfo
+    sealed class PluginType : IPluginTypeInfo
     {
+        readonly PluginInfo _pluginInfo;
         readonly Type _type;
+        readonly string _typeName;
         readonly ConstructorInfo _ctor;
         readonly int[] _deps;
         readonly object?[] _arguments;
@@ -21,17 +24,21 @@ sealed partial class ReflectionBasedPluginCollector
         readonly PluginStatus _status;
         readonly int _activationIndex;
 
-        public PluginFactory( Type type,
-                              ConstructorInfo ctor,
-                              int[] deps,
-                              object?[] arguments,
-                              XElement? xmlConfig,
-                              int worldParameterIndex,
-                              int primaryPluginParameterIndex,
-                              PluginStatus status,
-                              int activationIndex )
+        public PluginType( PluginInfo pluginInfo,
+                           Type type,
+                           string typeName,
+                           ConstructorInfo ctor,
+                           int[] deps,
+                           object?[] arguments,
+                           XElement? xmlConfig,
+                           int worldParameterIndex,
+                           int primaryPluginParameterIndex,
+                           PluginStatus status,
+                           int activationIndex )
         {
+            _pluginInfo = pluginInfo;
             _type = type;
+            _typeName = typeName;
             _ctor = ctor;
             _deps = deps;
             _arguments = arguments;
@@ -44,11 +51,13 @@ sealed partial class ReflectionBasedPluginCollector
             Throw.DebugAssert( "Config is never null when the plugin is enabled.", IsDisabled || _xmlConfig != null );
         }
 
-        public string TypeName => _type.Name;
+        public IPluginInfo Plugin => _pluginInfo;
 
-        public string FullPluginName => _type.Namespace!;
+        public string TypeName => _typeName;
 
-        public PluginStatus Status => _status & ~(_isPrimaryStatus|_isDefaultPrimaryStatus);
+        public PluginStatus Status => _status;
+
+        public bool IsPrimary => _primaryPluginParameterIndex >= 0;
 
         [MemberNotNullWhen( false, nameof( _xmlConfig ) )]
         public bool IsDisabled => _status.IsDisabled();
@@ -69,7 +78,7 @@ sealed partial class ReflectionBasedPluginCollector
                     }
                     else if( i == _primaryPluginParameterIndex )
                     {
-                        _arguments[i] = new PrimaryPluginContext( this, _xmlConfig, world );
+                        _arguments[i] = new PrimaryPluginContext( _pluginInfo, _xmlConfig, world );
                     }
                 }
                 else
@@ -80,7 +89,7 @@ sealed partial class ReflectionBasedPluginCollector
             return _ctor.Invoke( _arguments );
         }
 
-        public override string ToString() => FullPluginName;
+        public override string ToString() => TypeName;
     }
 
 }

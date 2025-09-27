@@ -192,16 +192,15 @@ sealed partial class PluginMachinery
 
         void AddRegisterCall( string shortPluginName )
         {
-            var register = $"{shortPluginName}.Plugin.{shortPluginName}Plugin.Register( collector );{Environment.NewLine}{new string( ' ', _linePrefixLength )}";
+            var register = $"typeof( {shortPluginName}.Plugin.{shortPluginName}Plugin ).Assembly,{Environment.NewLine}{new string( ' ', _linePrefixLength )}";
             _ckliPluginsFileText = _ckliPluginsFileText.Insert( _autoSectionEnd, register );
         }
 
         void RemoveRegisterCall( string shortPluginName )
         {
-            Throw.DebugAssert( "No need to escape the shortPluginName (it is an identifier).",
-                               PluginMachinery.IsValidShortPluginName( shortPluginName ) );
+            Throw.DebugAssert( "No need to escape the shortPluginName (it is an identifier).", IsValidShortPluginName( shortPluginName ) );
             _ckliPluginsFileText = Regex.Replace( _ckliPluginsFileText,
-                                                  $"""{shortPluginName}\s*\.\s*Plugin\s*\.\s*{shortPluginName}Plugin\s*\.\s*Register\s*\(\s*collector\s*\)\s*;\s*""",
+                                                  $"""typeof\s*\(\s*{shortPluginName}\s*\.\s*Plugin\s*\.\s*{shortPluginName}Plugin\s*\)\s*\.\s*Assembly\s*,?\s*""",
                                                   "",
                                                   RegexOptions.Singleline|RegexOptions.CultureInvariant ); 
         }

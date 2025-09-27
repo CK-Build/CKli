@@ -9,4 +9,7 @@ namespace CKli.DotNetSolution.Plugin;
 /// <param name="TargetFramework">The applicable target framework.</param>
 /// <param name="PackageId">The package name.</param>
 /// <param name="Version">The package version.</param>
-public sealed record ProjectPackageReference( Project Project, string TargetFramework, string PackageId, SVersion Version );
+/// <param name="DevDependency">
+/// When true, the dependency is NOT transitive (The PackageReference has PrivateAssets="all").
+/// </param>
+public sealed record ProjectPackageReference( Project Project, string TargetFramework, string PackageId, SVersion Version, bool DevDependency );

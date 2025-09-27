@@ -20,15 +20,10 @@ public sealed class DotNetSolutionPlugin : RepoPlugin<DotNetSolutionInfo>
         _rawSolutionProvider = rawSolutionProvider;
     }
 
-    public static void Register( IPluginCollector services )
-    {
-        services.AddPrimaryPlugin<DotNetSolutionPlugin>();
-    }
-
     protected override DotNetSolutionInfo Create( IActivityMonitor monitor, Repo repo )
     {
         var rawSolution = _rawSolutionProvider.Get( monitor, repo );
-        Throw.DebugAssert( rawSolution.ErrorState is RepoInfoErrorState.None );
+        Throw.DebugAssert( "RawSolution is never on error.", rawSolution.ErrorState is RepoInfoErrorState.None );
         if( rawSolution.Issue != BasicSolutionIssue.None )
         {
             return new DotNetSolutionInfo( rawSolution );
@@ -39,25 +34,6 @@ public sealed class DotNetSolutionPlugin : RepoPlugin<DotNetSolutionInfo>
             analyzerManager.GetProject( path );
         }
         var projects = new Dictionary<NormalizedPath, Project>();
-
-        static Project EnsureProject( Dictionary<NormalizedPath, Project> projects,
-                                      BasicSolutionInfo rawSolution,
-                                      IAnalyzerResult projectResult )
-        {
-            Throw.DebugAssert( projectResult.ProjectFilePath.StartsWith( rawSolution.Repo.WorkingFolder + '/' ) );
-            var isPackable = projectResult.GetProperty( "IsPackable" ) == "true";
-            NormalizedPath projectFileSubPath = projectResult.ProjectFilePath.Substring( rawSolution.Repo.WorkingFolder.Path.Length + 1 );
-            if( !projects.TryGetValue( projectFileSubPath, out var project ) )
-            {
-                project = new Project( projectFileSubPath, isPackable );
-                projects.Add( projectFileSubPath, project );
-            }
-            else
-            {
-                project._isPackable |= isPackable;
-            }
-            return project;
-        }
 
         StringBuilder? analyzisError = null;
         var bRefs = ImmutableArray.CreateBuilder<ProjectPackageReference>();
@@ -92,6 +68,25 @@ public sealed class DotNetSolutionPlugin : RepoPlugin<DotNetSolutionInfo>
                 ? new DotNetSolutionInfo( rawSolution, "No project found while analyzing solution." )
                 : new DotNetSolutionInfo( rawSolution, projects, bRefs.DrainToImmutable() );
 
+        static Project EnsureProject( Dictionary<NormalizedPath, Project> projects,
+                                      BasicSolutionInfo rawSolution,
+                                      IAnalyzerResult projectResult )
+        {
+            Throw.DebugAssert( projectResult.ProjectFilePath.StartsWith( rawSolution.Repo.WorkingFolder + '/' ) );
+            var isPackable = projectResult.GetProperty( "IsPackable" ) == "true";
+            NormalizedPath projectFileSubPath = projectResult.ProjectFilePath.Substring( rawSolution.Repo.WorkingFolder.Path.Length + 1 );
+            if( !projects.TryGetValue( projectFileSubPath, out var project ) )
+            {
+                project = new Project( projectFileSubPath, isPackable );
+                projects.Add( projectFileSubPath, project );
+            }
+            else
+            {
+                project._isPackable |= isPackable;
+            }
+            return project;
+        }
+
         static void ProcessPackageReferences( ImmutableArray<ProjectPackageReference>.Builder bRefs,
                                               Project project,
                                               string targetFramework,
@@ -100,7 +95,8 @@ public sealed class DotNetSolutionPlugin : RepoPlugin<DotNetSolutionInfo>
             foreach( var (name, props) in packageReferences )
             {
                 var v = SVersion.Parse( props["Version"] );
-                bRefs.Add( new ProjectPackageReference( project, targetFramework, name, v ) );
+                var d = props["PrivateAssets"] == "all";
+                bRefs.Add( new ProjectPackageReference( project, targetFramework, name, v, d ) );
             }
         }
 

@@ -345,11 +345,6 @@ public sealed partial class PluginMachinery
                         Console.WriteLine( $"Hello from '{{shortPluginName}}' plugin." );
                     };
                 }
-
-                public static void Register( IPluginCollector collector )
-                {
-                    collector.AddPrimaryPlugin<{{shortPluginName}}Plugin>();
-                }
             }
             
             """ );
@@ -450,7 +445,7 @@ public sealed partial class PluginMachinery
     }
 
     public static bool EnsureFullPluginName( IActivityMonitor monitor,
-                                             string pluginName,
+                                             string? pluginName,
                                              [NotNullWhen( true )] out string? shortPluginName,
                                              [NotNullWhen( true )] out string? fullPluginName )
     {
@@ -462,11 +457,10 @@ public sealed partial class PluginMachinery
         return true;
     }
 
-    public static bool EnsureFullPluginName( string pluginName,
+    public static bool EnsureFullPluginName( string? pluginName,
                                              [NotNullWhen( true )] out string? shortPluginName,
                                              [NotNullWhen( true )] out string? fullPluginName )
     {
-        Throw.CheckNotNullArgument( pluginName );
         if( IsValidFullPluginName( pluginName ) )
         {
             fullPluginName = pluginName;
@@ -595,10 +589,10 @@ public sealed partial class PluginMachinery
                 {
                     public static IPluginCollection Register( PluginCollectorContext ctx )
                     {
-                        var collector = PluginCollector.Create( ctx );
-                        // <AutoSection>
-                        // </AutoSection>
-                        return collector.Build();
+                        return PluginCollector.Create( ctx ).BuildPluginCollection( [
+                            // <AutoSection>
+                            // </AutoSection>
+                        ] );
                     }
                 }
                                 
