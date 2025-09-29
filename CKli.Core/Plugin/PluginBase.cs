@@ -10,12 +10,12 @@ namespace CKli.Core;
 public abstract class PluginBase
 {
     readonly World _world;
-    readonly IPrimaryPluginContext? _primaryContext;
+    readonly PrimaryPluginContext? _primaryContext;
 
     /// <summary>
     /// Initializes a support plugin.
-    /// Primary plugins must accept a <see cref="IPrimaryPluginContext"/> parameter
-    /// and call <see cref="PluginBase(IPrimaryPluginContext)"/>.
+    /// Primary plugins must accept a <see cref="PrimaryPluginContext"/> parameter
+    /// and call <see cref="PluginBase(PrimaryPluginContext)"/>.
     /// </summary>
     /// <param name="world">The world.</param>
     protected PluginBase( World world )
@@ -27,7 +27,7 @@ public abstract class PluginBase
     /// Initializes a primary plugin.
     /// </summary>
     /// <param name="primaryContext">The primary plugin context.</param>
-    protected PluginBase( IPrimaryPluginContext primaryContext )
+    protected PluginBase( PrimaryPluginContext primaryContext )
         : this( primaryContext.World )
     {
         _primaryContext = primaryContext;
@@ -39,7 +39,7 @@ public abstract class PluginBase
     public World World => _world;
 
     /// <summary>
-    /// Gets the context of this plugin if it has been initialized by <see cref="PluginBase(IPrimaryPluginContext)"/>.
+    /// Gets the context of this plugin if it has been initialized by <see cref="PluginBase(PrimaryPluginContext)"/>.
     /// </summary>
-    public IPrimaryPluginContext? PrimaryContext => _primaryContext;
+    public PrimaryPluginContext? PrimaryContext => _primaryContext;
 }

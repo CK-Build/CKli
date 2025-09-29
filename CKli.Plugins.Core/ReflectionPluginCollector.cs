@@ -23,17 +23,12 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
 
     readonly Dictionary<Type, InitialReg> _initialCollector;
     readonly ImmutableArray<PluginInfo>.Builder _pluginInfos;
+    readonly PluginCollectorContext _context;
 
-    readonly HashSet<Type> _cycleDetector;
-    readonly Dictionary<Type, PluginType> _factories;
-    readonly IReadOnlyDictionary<string, (XElement Config, bool IsDisabled)> _pluginsConfiguration;
-
-    public ReflectionPluginCollector( IReadOnlyDictionary<string, (XElement Config, bool IsDisabled)> pluginsConfiguration )
+    public ReflectionPluginCollector( PluginCollectorContext context )
     {
-        _pluginsConfiguration = pluginsConfiguration;
+        _context = context;
         _initialCollector = new Dictionary<Type, InitialReg>();
-        _cycleDetector = new HashSet<Type>();
-        _factories = new Dictionary<Type, PluginType>();
         _pluginInfos = ImmutableArray.CreateBuilder<PluginInfo>();
     }
 
@@ -54,7 +49,7 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
             }
             var status = PluginStatus.Available;
             XElement? configuration = null;
-            if( _pluginsConfiguration.TryGetValue( shortPluginName, out var config ) )
+            if( _context.PluginsConfiguration.TryGetValue( shortPluginName, out var config ) )
             {
                 if( config.IsDisabled ) status |= PluginStatus.DisabledByConfiguration;
                 else
@@ -112,11 +107,11 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
                 }
                 worldParameterIndex = p.Position;
             }
-            else if( parameterType == typeof( IPrimaryPluginContext ) )
+            else if( parameterType == typeof( PrimaryPluginContext ) )
             {
                 if( primaryPluginParameterIndex != -1 )
                 {
-                    Throw.CKException( $"Duplicate IPrimaryPluginContext configuration parameter in Plugin '{typeName}' constructor ('{parameters[primaryPluginParameterIndex].Name}' and '{p.Name}')." );
+                    Throw.CKException( $"Duplicate PrimaryPluginContext configuration parameter in Plugin '{typeName}' constructor ('{parameters[primaryPluginParameterIndex].Name}' and '{p.Name}')." );
                 }
                 primaryPluginParameterIndex = p.Position;
             }
@@ -134,7 +129,7 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
             Throw.CKException( $"""
                 Plugin '{typeName}' cannot have both parameters:
                 'World {parameters[worldParameterIndex].Name}' (optionally used by a Support Plugin) and
-                'IPrimaryPluginContext {parameters[primaryPluginParameterIndex].Name}' that denotes a Primary Plugin.
+                'PrimaryPluginContext {parameters[primaryPluginParameterIndex].Name}' that denotes a Primary Plugin.
                 """ );
         }
         var result = new InitialReg( pluginInfo, typeName, ctor, parameters, primaryPluginParameterIndex, worldParameterIndex, configuration );
@@ -188,7 +183,7 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
                 }
             }
         }
-        return new Result( _pluginInfos.DrainToImmutable(), activationList );
+        return new Result( _pluginInfos.DrainToImmutable(), activationList, _context );
     }
 
     PluginType RegisterPluginType( Dictionary<Type, PluginType> plugins,

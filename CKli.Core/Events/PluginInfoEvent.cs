@@ -21,7 +21,7 @@ public sealed class PluginInfoEvent : WorldEvent
     /// </summary>
     /// <param name="source">The plugin that emitted the message.</param>
     /// <param name="message">A message builder.</param>
-    public void AddMessage( IPrimaryPluginContext source, Action<StringBuilder> message )
+    public void AddMessage( PrimaryPluginContext source, Action<StringBuilder> message )
     {
         var p = _display.FirstOrDefault( d => d.FullName == source.PluginInfo.FullPluginName );
         if( p == null )

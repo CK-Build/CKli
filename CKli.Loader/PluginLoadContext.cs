@@ -34,7 +34,7 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginCollection
 
     IReadOnlyCollection<PluginInfo> IPluginCollection.Plugins => _worldPlugins!.Plugins;
 
-    IDisposable IPluginCollection.Create( World world ) => _worldPlugins!.Create( world );
+    IDisposable IPluginCollection.Create( IActivityMonitor monitor, World world ) => _worldPlugins!.Create( monitor, world );
 
     bool IPluginCollection.IsCompiledPlugins => _worldPlugins!.IsCompiledPlugins;
 
@@ -121,11 +121,20 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginCollection
                     return true;
 
                 }
-                monitor.Warn( $"static CompiledPlugins.Get() failed to return a IPluginCollection '{dllPath}'. Using reflection." );
+                if( rC != null )
+                {
+                    // Should never happen unless there's type differences between assembly load context.
+                    monitor.Warn( ActivityMonitor.Tags.ToBeInvestigated, $"static CompiledPlugins.Get() returned '{rC}'. Using reflection." );
+                }
+                else
+                {
+                    monitor.Trace( "Configuration signature changed. Using reflection." );
+                }
             }
             else
             {
-                monitor.Warn( $"Compiled static CompiledPlugins.Get() method is missing in '{dllPath}'. Using reflection." );
+                // Should never happen unless the code has been manually edited.
+                monitor.Warn( ActivityMonitor.Tags.ToBeInvestigated, $"Compiled static CompiledPlugins.Get() method is missing in '{dllPath}'. Using reflection." );
             }
         }
         // Falls back to the reflection based Plugins.

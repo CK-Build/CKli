@@ -16,9 +16,10 @@ sealed partial class ReflectionPluginCollector
         readonly PluginInfo _pluginInfo;
         readonly string _typeName;
         readonly ConstructorInfo _ctor;
-        readonly int[] _deps;
         readonly object?[] _arguments;
         readonly XElement? _xmlConfig;
+
+        readonly int[] _deps;
         readonly int _worldParameterIndex;
         readonly int _primaryPluginParameterIndex;
         readonly PluginStatus _status;
@@ -45,7 +46,7 @@ sealed partial class ReflectionPluginCollector
             _primaryPluginParameterIndex = primaryPluginParameterIndex;
             _status = status;
             _activationIndex = activationIndex;
-            //((List<IPluginTypeInfo>)pluginInfo.PluginTypes).Add( this );
+            ((List<IPluginTypeInfo>)pluginInfo.PluginTypes).Add( this );
             Throw.DebugAssert( IsDisabled == activationIndex < 0 );
             Throw.DebugAssert( "Config is never null when the plugin is enabled.", IsDisabled || _xmlConfig != null );
         }
@@ -62,6 +63,12 @@ sealed partial class ReflectionPluginCollector
         public bool IsDisabled => _status.IsDisabled();
 
         public int ActivationIndex => _activationIndex;
+
+        public int[] Deps => _deps;
+
+        public int WorldParameterIndex => _worldParameterIndex;
+
+        public int PrimaryPluginParameterIndex => _primaryPluginParameterIndex;
 
         internal object Instantiate( World world, object[] instantiated )
         {

@@ -92,14 +92,18 @@ public sealed partial class World
         PluginMachinery? machinery = null;
         if( !definitionFile.IsPluginsDisabled && World.PluginLoader != null )
         {
-            machinery = PluginMachinery.Create( monitor, worldName, definitionFile );
+            machinery = PluginMachinery.Create( monitor, worldName, definitionFile, out PluginCollectorContext? toRecompile );
             if( machinery == null ) return null;
+            if( toRecompile != null && !machinery.Recompile( monitor, toRecompile ) )
+            {
+                return null;
+            }
         }
         else
         {
             monitor.Info( World.PluginLoader == null
                             ? "Plugins are disabled because there is no configured World.PluginLoader."
-                            : $"Plugins are disabled by configuration in '{worldName.FullName}.xml'." );
+                            : $"Plugins are globally disabled by configuration in '{worldName.FullName}.xml'." );
         }
         var w = new World( stackRepository, worldName, definitionFile, layout, machinery );
         if( machinery != null )
@@ -118,7 +122,7 @@ public sealed partial class World
         Throw.DebugAssert( _pluginMachinery != null );
         try
         {
-            _instantiatedPlugins = _pluginMachinery.WorldPlugins.Create( this );
+            _instantiatedPlugins = _pluginMachinery.WorldPlugins.Create( monitor, this );
             return true;
         }
         catch( Exception ex )

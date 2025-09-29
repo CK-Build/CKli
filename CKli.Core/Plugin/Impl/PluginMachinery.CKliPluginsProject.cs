@@ -178,9 +178,14 @@ sealed partial class PluginMachinery
         {
             try
             {
+                monitor.Trace( $"Updating file '{_machinery.CKliPluginsFile.LastPart}', deleting '{_machinery.CKliCompiledPluginsFile.LastPart}'." );
                 File.WriteAllText( _machinery.CKliPluginsFile, _ckliPluginsFileText );
                 _csProj.Save( _machinery.CKliPluginsCSProj );
                 _directoryPackages.Save( _machinery.DirectoryPackageProps );
+                if( !FileHelper.DeleteFile( monitor, _machinery.CKliCompiledPluginsFile ) )
+                {
+                    return false;
+                }
                 return true;
             }
             catch( Exception ex )

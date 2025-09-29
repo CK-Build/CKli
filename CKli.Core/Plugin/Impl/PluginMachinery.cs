@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
@@ -12,10 +13,10 @@ using System.Xml.Linq;
 namespace CKli.Core;
 
 /// <summary>
-/// Supports the Plugin infrastructure.
-/// This class is public only for tests purposes.
+/// Supports the Plugin infrastructure, not intended to be used directly.
 /// <para>
-/// This class holds the reference to the initialized <see cref="IPluginCollection"/>.
+/// This class handles plugins discovery and compilation. It holds and control the lifetime of
+/// the reference to the initialized <see cref="IPluginCollection"/>.
 /// </para>
 /// </summary>
 public sealed partial class PluginMachinery
@@ -39,7 +40,7 @@ public sealed partial class PluginMachinery
     // Fundamental singleton!
     // This MAY be transformed in a dictionary per World (key would be the RunFolder) to allow more than a
     // World to exist at the same time in the process...
-    // But this would bring a lot of complexities for no real benefits: CKli is a World tool
+    // But this would bring more complexities for no real benefits: CKli is currently a World tool
     // not a server for multiple Worlds.
     static WeakReference? _singleRunning;
 
@@ -92,9 +93,15 @@ public sealed partial class PluginMachinery
         _dllPathVNext = _runFolderVNext.AppendPart( "CKli.Plugins.dll" );
     }
 
-    internal static PluginMachinery? Create( IActivityMonitor monitor, LocalWorldName worldName, WorldDefinitionFile definitionFile )
+    // First load and potential compilation.
+    [MethodImpl( MethodImplOptions.NoInlining )]
+    internal static PluginMachinery? Create( IActivityMonitor monitor,
+                                             LocalWorldName worldName,
+                                             WorldDefinitionFile definitionFile,
+                                             out PluginCollectorContext? toRecompile )
     {
         Throw.DebugAssert( !definitionFile.IsPluginsDisabled && World.PluginLoader != null );
+        toRecompile = null;
         var machinery = new PluginMachinery( worldName, definitionFile );
         bool forceRecompile = false;
         if( !Directory.Exists( machinery.Root ) )
@@ -149,27 +156,37 @@ public sealed partial class PluginMachinery
         }
         // Memorizes the AssemblyLoadContext to be able to wait for its actual unload.
         _singleRunning = new WeakReference( worldPlugins, trackResurrection: true );
-        //// Generating Compiled plugins version.
-        //if( !worldPlugins.IsCompiledPlugins )
-        //{
-        //    File.WriteAllText( machinery.CKliCompiledPluginsFile, worldPlugins.GenerateCode() );
-        //    worldPlugins.Dispose();
-
-        //    if( !RelaseCurrentSingleRunning( monitor )
-        //        || !machinery.CompilePlugins( monitor, vNext: false ) )
-        //    {
-        //        return null;
-        //    }
-        //    worldPlugins = World.PluginLoader( monitor, machinery.DllPath, pluginContext );
-        //    if( worldPlugins == null )
-        //    {
-        //        return null;
-        //    }
-        //    _singleRunning = new WeakReference( worldPlugins, trackResurrection: true );
-        //}
+        if( !worldPlugins.IsCompiledPlugins )
+        {
+            monitor.Trace( "Generating Compiled plugins file." );
+            File.WriteAllText( machinery.CKliCompiledPluginsFile, worldPlugins.GenerateCode() );
+            worldPlugins.Dispose();
+            worldPlugins = null;
+            toRecompile = pluginContext;
+        }
         // The plugins are available. They will be instantiated right after a World instance will be available.
         machinery._worlPlugins = worldPlugins;
         return machinery;
+    }
+
+    [MethodImpl( MethodImplOptions.NoInlining )]
+    internal bool Recompile( IActivityMonitor monitor, PluginCollectorContext pluginContext )
+    {
+        Throw.DebugAssert( World.PluginLoader != null );
+        using var _ = monitor.OpenTrace( $"Recompiling Plugins generated code." );
+        if( !RelaseCurrentSingleRunning( monitor )
+            || !CompilePlugins( monitor, vNext: false ) )
+        {
+            return false;
+        }
+        var worldPlugins = World.PluginLoader( monitor, DllPath, pluginContext );
+        if( worldPlugins == null )
+        {
+            return false;
+        }
+        _singleRunning = new WeakReference( worldPlugins, trackResurrection: true );
+        _worlPlugins = worldPlugins;
+        return true;
     }
 
     static bool RelaseCurrentSingleRunning( IActivityMonitor monitor )
@@ -246,6 +263,13 @@ public sealed partial class PluginMachinery
                           """ );
             ckliPluginsCore.SetAttributeValue( "Version", ckliVersion );
             d.Save( DirectoryPackageProps );
+
+            monitor.Trace( $"Deleting '{CKliCompiledPluginsFile.LastPart}'." );
+            if( !FileHelper.DeleteFile( monitor, CKliCompiledPluginsFile ) )
+            {
+                return false;
+            }
+
             mustRecompile = true;
             return true;
         }
@@ -264,7 +288,7 @@ public sealed partial class PluginMachinery
         // even if a previous change in the plugins triggered a next build in vNext.
         if( !forceRecompile && File.GetLastWriteTimeUtc( _dllPathVNext ) > File.GetLastWriteTimeUtc( _dllPath ) )
         {
-            monitor.Trace( $"A new compiled version of the Plugins is available. Replacing '{_runFolder}'." );
+            monitor.Trace( $"A new version of CKli.Plugins is available. Replacing '{_runFolder}'." );
             if( !FileHelper.DeleteFolder( monitor, _runFolder )
                 || !FileHelper.TryMoveFolder( monitor, _runFolderVNext, _runFolder ) )
             {
@@ -359,7 +383,7 @@ public sealed partial class PluginMachinery
                 /// <summary>
                 /// This is a primary plugin.
                 /// </summary>
-                public {{shortPluginName}}Plugin( IPrimaryPluginContext primaryContext )
+                public {{shortPluginName}}Plugin( PrimaryPluginContext primaryContext )
                     : base( primaryContext )
                 {
                     primaryContext.World.Events.PluginInfo += e =>
@@ -422,8 +446,10 @@ public sealed partial class PluginMachinery
         {
             return false;
         }
+        string slnRemoveCommand; 
         if( wasProjectReference )
         {
+            slnRemoveCommand = $"sln remove {fullPluginName}/{fullPluginName}.csproj";
             var projectPath = Root.AppendPart( fullPluginName );
             if( Directory.Exists( projectPath ) )
             {
@@ -433,7 +459,11 @@ public sealed partial class PluginMachinery
                 }
             }
         }
-        if( ProcessRunner.RunProcess( monitor.ParallelLogger, "dotnet", $"sln remove {fullPluginName}", Root, null ) != 0 )
+        else
+        {
+            slnRemoveCommand = $"sln remove {fullPluginName}";
+        }
+        if( ProcessRunner.RunProcess( monitor.ParallelLogger, "dotnet", slnRemoveCommand, Root, null ) != 0 )
         {
             monitor.Error( $"Command 'dotnet sln remove {fullPluginName}' failed." );
             return false;
@@ -651,6 +681,7 @@ public sealed partial class PluginMachinery
                     <TargetFramework>net8.0</TargetFramework>
                     <ArtifactsPath>$(MSBuildThisFileDirectory)../$Local/{0}</ArtifactsPath>
                     <ArtifactsPivots>run</ArtifactsPivots>
+                    <Nullable>enable</Nullable>
                   </PropertyGroup>
                 </Project>
                 

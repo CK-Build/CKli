@@ -1,4 +1,6 @@
 using CKli.Core;
+using System.Collections.Generic;
+using System.Security.Cryptography;
 
 namespace CKli.Plugins;
 
@@ -14,6 +16,7 @@ public static class PluginCollector
     /// <returns>The collector to use.</returns>
     public static IPluginCollector Create( PluginCollectorContext context )
     {
-        return new ReflectionPluginCollector( context.PluginsConfiguration );
+        return new ReflectionPluginCollector( context );
     }
+
 }
