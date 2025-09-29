@@ -198,7 +198,12 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
         var arguments = new object?[parameters.Length];
         foreach( var p in parameters )
         {
-            deps[p.Position] = -1;
+            int idxParam = p.Position;
+            deps[idxParam] = -1;
+            if( idxParam == reg.PrimaryPluginParameterIndex || idxParam == reg.WorldParameterIndex )
+            {
+                continue;
+            }
             Type parameterType = p.ParameterType;
             if( plugins.TryGetValue( parameterType, out var dep ) )
             {
@@ -228,12 +233,12 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
                 // Let the dep index be -1: this is not used if we are disabled
                 // and -1 will set a null argument if we are not disabled and
                 // the parameter is optional.
-                Throw.DebugAssert( deps[p.Position] == -1 );
+                Throw.DebugAssert( deps[idxParam] == -1 );
             }
             else
             {
                 Throw.DebugAssert( dep.ActivationIndex >= 0 );
-                deps[p.Position] = dep.ActivationIndex;
+                deps[idxParam] = dep.ActivationIndex;
             }
         }
         int activationIndex = status.IsDisabled() ? -1 : activationList.Count;

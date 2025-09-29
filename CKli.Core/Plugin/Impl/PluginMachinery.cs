@@ -149,24 +149,24 @@ public sealed partial class PluginMachinery
         }
         // Memorizes the AssemblyLoadContext to be able to wait for its actual unload.
         _singleRunning = new WeakReference( worldPlugins, trackResurrection: true );
-        // Generating Compiled plugins version.
-        if( !worldPlugins.IsCompiledPlugins )
-        {
-            File.WriteAllText( machinery.CKliCompiledPluginsFile, worldPlugins.GenerateCode() );
-            worldPlugins.Dispose();
+        //// Generating Compiled plugins version.
+        //if( !worldPlugins.IsCompiledPlugins )
+        //{
+        //    File.WriteAllText( machinery.CKliCompiledPluginsFile, worldPlugins.GenerateCode() );
+        //    worldPlugins.Dispose();
 
-            if( !RelaseCurrentSingleRunning( monitor )
-                || !machinery.CompilePlugins( monitor, vNext: false ) )
-            {
-                return null;
-            }
-            worldPlugins = World.PluginLoader( monitor, machinery.DllPath, pluginContext );
-            if( worldPlugins == null )
-            {
-                return null;
-            }
-            _singleRunning = new WeakReference( worldPlugins, trackResurrection: true );
-        }
+        //    if( !RelaseCurrentSingleRunning( monitor )
+        //        || !machinery.CompilePlugins( monitor, vNext: false ) )
+        //    {
+        //        return null;
+        //    }
+        //    worldPlugins = World.PluginLoader( monitor, machinery.DllPath, pluginContext );
+        //    if( worldPlugins == null )
+        //    {
+        //        return null;
+        //    }
+        //    _singleRunning = new WeakReference( worldPlugins, trackResurrection: true );
+        //}
         // The plugins are available. They will be instantiated right after a World instance will be available.
         machinery._worlPlugins = worldPlugins;
         return machinery;
