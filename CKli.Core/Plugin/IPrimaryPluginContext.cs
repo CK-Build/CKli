@@ -11,7 +11,7 @@ public interface IPrimaryPluginContext
     /// <summary>
     /// Gets the plugin info.
     /// </summary>
-    IPluginInfo PluginInfo { get; }
+    PluginInfo PluginInfo { get; }
 
     /// <summary>
     /// Gets the world.

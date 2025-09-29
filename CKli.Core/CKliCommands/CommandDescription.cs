@@ -1,3 +1,4 @@
+using CK.Core;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -7,25 +8,23 @@ using System.Threading.Tasks;
 
 namespace CKli.Core;
 
-public sealed class CommandNamespace
-{
-    public CommandGroup? Find( string name )
-}
+//public sealed class CommandNamespace
+//{
+//    public CommandGroup? Find( string name )
+//}
 
-public sealed class CommandGroup
-{
-    readonly string _name;
-    readonly string? _description;
-    readonly List<CommandDescription> _commands;
-    readonly CommandGroup? _parent;
-    int _commandCount;
-
-    internal CommandGroup( CommandGroup? parent, string name,  )
-    {
-        
-    }
-
-}
+//public sealed class CommandGroup
+//{
+//    readonly string _name;
+//    readonly string? _description;
+//    readonly List<CommandDescription> _commands;
+//    readonly CommandGroup? _parent;
+//    int _commandCount;
+//
+//    internal CommandGroup( CommandGroup? parent, string name,  )
+//    {
+//    }
+//}
 
 /// <summary>
 /// Immutable CKli command description.
@@ -37,7 +36,7 @@ public sealed class CommandGroup
 public sealed class CommandDescription
 {
     readonly IPluginTypeInfo? _typeInfo;
-    readonly ImmutableArray<(string Name, string? Description)> _path;
+    readonly string _fullCommandPath;
     readonly ImmutableArray<(string Name, string Description)> _arguments;
     readonly ImmutableArray<(ImmutableArray<string> Names, string Description)> _flags;
 
@@ -45,16 +44,16 @@ public sealed class CommandDescription
     /// Initializes a new command description.
     /// </summary>
     /// <param name="typeInfo">The type that handles the command.</param>
-    /// <param name="path">The commad path.</param>
+    /// <param name="fullCommandPath">The full whitespace separated command path.</param>
     /// <param name="arguments">The required command arguments.</param>
     /// <param name="flags">The flags.</param>
     public CommandDescription( IPluginTypeInfo? typeInfo,
-                               ImmutableArray<(string Name, string? Description)> path,
+                               string fullCommandPath,
                                ImmutableArray<(string Name, string Description)> arguments,
                                ImmutableArray<(ImmutableArray<string> Names, string Description)> flags )
     {
         _typeInfo = typeInfo;
-        _path = path;
+        _fullCommandPath = fullCommandPath;
         _arguments = arguments;
         _flags = flags;
     }
@@ -66,9 +65,9 @@ public sealed class CommandDescription
     public IPluginTypeInfo? PluginTypeInfo => _typeInfo;
 
     /// <summary>
-    /// Gets the command path: the last item is the command name and should have a description.
+    /// Gets the full whitespace separated command path.
     /// </summary>
-    public ImmutableArray<(string Name, string? Description)> CommandPath => _path;
+    public string FullCommandPath => _fullCommandPath;
 
     /// <summary>
     /// Gets the (required) arguments and their description.

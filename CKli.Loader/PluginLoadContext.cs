@@ -32,10 +32,13 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginCollection
         _runFolder = runFolder;
     }
 
-    IReadOnlyCollection<IPluginTypeInfo> IPluginCollection.Plugins => _worldPlugins!.Plugins;
+    IReadOnlyCollection<PluginInfo> IPluginCollection.Plugins => _worldPlugins!.Plugins;
 
     IDisposable IPluginCollection.Create( World world ) => _worldPlugins!.Create( world );
 
+    bool IPluginCollection.IsCompiledPlugins => _worldPlugins!.IsCompiledPlugins;
+
+    string IPluginCollection.GenerateCode() => _worldPlugins!.GenerateCode();
 
     /// <summary>
     /// Loads the core "CKli.Plugins.dll" and all its plugins.
@@ -46,6 +49,11 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginCollection
     /// <returns>The plugin collection on success, null on error.</returns>
     static public IPluginCollection? Load( IActivityMonitor monitor, NormalizedPath dllPath, PluginCollectorContext context )
     {
+        if( !File.Exists( dllPath ) )
+        {
+            monitor.Error( $"Expected compiled plugin not found: {dllPath}" );
+            return null;
+        }
         var runFolder = Path.GetDirectoryName( dllPath.Path );
         Throw.CheckArgument( "DllPath cannot be at the root of the file system.", runFolder != null );
         var result = new PluginLoadContext( context.WorldName, runFolder );
@@ -93,25 +101,50 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginCollection
         return a;
     }
 
+    static readonly Type[] _getOrRegisterParameterTypes = [typeof( PluginCollectorContext )];
+
     bool DoLoad( IActivityMonitor monitor, NormalizedPath dllPath, PluginCollectorContext context )
     {
         var a = LoadFromAssemblyPath( dllPath );
-        var t = a.GetType( "CKli.Plugins.Plugins", throwOnError: false );
+        var getOrRegisterArguments = new object[] { context };
+        // Tries the CompiledPlugins.
+        var t = a.GetType( "CKli.Plugins.CompiledPlugins", throwOnError: false );
+        if( t != null )
+        {
+            var mC = t.GetMethod( "Get", BindingFlags.Public | BindingFlags.Static, _getOrRegisterParameterTypes );
+            if( mC != null )
+            {
+                var rC = mC.Invoke( null, getOrRegisterArguments );
+                if( rC is IPluginCollection pC )
+                {
+                    _worldPlugins = pC;
+                    return true;
+
+                }
+                monitor.Warn( $"static CompiledPlugins.Get() failed to return a IPluginCollection '{dllPath}'. Using reflection." );
+            }
+            else
+            {
+                monitor.Warn( $"Compiled static CompiledPlugins.Get() method is missing in '{dllPath}'. Using reflection." );
+            }
+        }
+        // Falls back to the reflection based Plugins.
+        t = a.GetType( "CKli.Plugins.Plugins", throwOnError: false );
         if( t == null )
         {
-            monitor.Error( $"Unable to find required type 'CKli.Plugins.Plugins' in {dllPath}." );
+            monitor.Error( $"Unable to find required type 'CKli.Plugins.Plugins' in '{dllPath}'." );
             return false;
         }
-        var m = t.GetMethod( "Register", BindingFlags.Public | BindingFlags.Static, [typeof( PluginCollectorContext )] );
+        var m = t.GetMethod( "Register", BindingFlags.Public | BindingFlags.Static, _getOrRegisterParameterTypes );
         if( m == null || m.ReturnType != typeof( IPluginCollection ) )
         {
-            monitor.Error( $"Unable to find method 'static IPluginCollection Register( PluginCollectorContext ) in type 'CKli.Plugins.Plugins' of {dllPath}." );
+            monitor.Error( $"Unable to find method 'static IPluginCollection Register( PluginCollectorContext ) in type 'CKli.Plugins.Plugins' of '{dllPath}'." );
             return false;
         }
-        var r = m.Invoke( null, [context] );
+        var r = m.Invoke( null, getOrRegisterArguments );
         if( r is not IPluginCollection p )
         {
-            monitor.Error( $"Failed CKli.Plugins.Plugins.Register in {dllPath}." );
+            monitor.Error( $"Failed CKli.Plugins.Plugins.Register in '{dllPath}'." );
             return false;
         }
         _worldPlugins = p;

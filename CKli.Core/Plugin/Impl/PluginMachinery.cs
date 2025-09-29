@@ -34,6 +34,7 @@ public sealed partial class PluginMachinery
     NormalizedPath _nugetConfigFile;
     NormalizedPath _ckliPluginsCSProj;
     NormalizedPath _ckliPluginsFile;
+    NormalizedPath _ckliCompiledPluginsFile;
 
     // Fundamental singleton!
     // This MAY be transformed in a dictionary per World (key would be the RunFolder) to allow more than a
@@ -75,6 +76,8 @@ public sealed partial class PluginMachinery
     internal NormalizedPath CKliPluginsCSProj => _ckliPluginsCSProj.IsEmptyPath ? (_ckliPluginsCSProj = CKliPluginsFolder.AppendPart( "CKli.Plugins.csproj" )) : _ckliPluginsCSProj;
 
     internal NormalizedPath CKliPluginsFile => _ckliPluginsFile.IsEmptyPath ? (_ckliPluginsFile = CKliPluginsFolder.AppendPart( "CKli.Plugins.cs" )) : _ckliPluginsFile;
+
+    internal NormalizedPath CKliCompiledPluginsFile => _ckliCompiledPluginsFile.IsEmptyPath ? (_ckliCompiledPluginsFile = CKliPluginsFolder.AppendPart( "CKli.CompiledPlugins.cs" )) : _ckliCompiledPluginsFile;
 
     internal IPluginCollection WorldPlugins => _worlPlugins;
 
@@ -121,24 +124,10 @@ public sealed partial class PluginMachinery
         }
         // Before calling CheckCompiledPlugins that may moves vNext to the run folder, we must ensure
         // that there are no alive loaded plugins that would lock the run folder. 
-        if( _singleRunning != null && _singleRunning.IsAlive )
+        if( !RelaseCurrentSingleRunning( monitor ) )
         {
-            for( int i = 0; _singleRunning.IsAlive && (i < 10); i++ )
-            {
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-            }
-            if( _singleRunning.IsAlive )
-            {
-                monitor.Error( $"""
-                    Current plugins cannot be unloaded.
-                    A Plugin can still be referenced from its World. Plugins can be disabled to isolate the culprit.
-                    CKli uses AssemblyLoadContext, see https://learn.microsoft.com/en-us/dotnet/standard/assembly/unloadability.
-                    """ );
-                return null;
-            }
+            return null;
         }
-        _singleRunning = null;
 
         // We are ready to compile if needed.
         if( !machinery.CheckCompiledPlugins( monitor, forceRecompile ) )
@@ -152,22 +141,64 @@ public sealed partial class PluginMachinery
         {
             return null;
         }
-        var worldPlugins = World.PluginLoader( monitor, machinery.DllPath, new PluginCollectorContext( worldName, definitionFile, pluginsConfiguration ) );
+        var pluginContext = new PluginCollectorContext( worldName, pluginsConfiguration );
+        var worldPlugins = World.PluginLoader( monitor, machinery.DllPath, pluginContext );
         if( worldPlugins == null )
         {
             return null;
         }
         // Memorizes the AssemblyLoadContext to be able to wait for its actual unload.
         _singleRunning = new WeakReference( worldPlugins, trackResurrection: true );
+        // Generating Compiled plugins version.
+        if( !worldPlugins.IsCompiledPlugins )
+        {
+            File.WriteAllText( machinery.CKliCompiledPluginsFile, worldPlugins.GenerateCode() );
+            worldPlugins.Dispose();
+
+            if( !RelaseCurrentSingleRunning( monitor )
+                || !machinery.CompilePlugins( monitor, vNext: false ) )
+            {
+                return null;
+            }
+            worldPlugins = World.PluginLoader( monitor, machinery.DllPath, pluginContext );
+            if( worldPlugins == null )
+            {
+                return null;
+            }
+            _singleRunning = new WeakReference( worldPlugins, trackResurrection: true );
+        }
         // The plugins are available. They will be instantiated right after a World instance will be available.
         machinery._worlPlugins = worldPlugins;
         return machinery;
     }
 
+    static bool RelaseCurrentSingleRunning( IActivityMonitor monitor )
+    {
+        if( _singleRunning != null && _singleRunning.IsAlive )
+        {
+            for( int i = 0; _singleRunning.IsAlive && (i < 10); i++ )
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+            }
+            if( _singleRunning.IsAlive )
+            {
+                monitor.Error( $"""
+                    Current plugins cannot be unloaded.
+                    A Plugin is still referenced from the World. Plugins can be disabled to isolate the culprit.
+                    CKli uses AssemblyLoadContext, see https://learn.microsoft.com/en-us/dotnet/standard/assembly/unloadability.
+                    """ );
+                return false;
+            }
+        }
+        _singleRunning = null;
+        return true;
+    }
+
     internal void ReleasePlugins()
     {
         // This is the CKli.Loader.PluginLoadContext.Dispose().
-        // It disposes its own IPluginCollection obtained from the CKli.Plugins dll and initiate
+        // It disposes its own IPluginCollection obtained from the CKli.Plugins dll and initiates
         // its own Unload.
         _worlPlugins.Dispose();
         _worlPlugins = null;
@@ -242,12 +273,7 @@ public sealed partial class PluginMachinery
         }
         else if( forceRecompile || !File.Exists( DllPath ) )
         {
-            CompilePlugins( monitor, vNext: false );
-        }
-        if( !File.Exists( DllPath ) )
-        {
-            monitor.Error( $"Expected compiled plugin not found: {DllPath}" );
-            return false;
+            return CompilePlugins( monitor, vNext: false );
         }
         return true;
     }
@@ -474,20 +500,23 @@ public sealed partial class PluginMachinery
             shortPluginName = pluginName;
             return true;
         }
-        if( pluginName.StartsWith( "CKli.", StringComparison.OrdinalIgnoreCase ) )
+        if( pluginName != null )
         {
-            pluginName = pluginName.Substring( 5 );
-        }
-        if( pluginName.EndsWith( ".Plugin", StringComparison.OrdinalIgnoreCase ) )
-        {
-            pluginName = pluginName[..^7];
-        }
-        if( IsValidShortPluginName( pluginName ) )
-        {
-            fullPluginName = $"CKli.{pluginName}.Plugin";
-            Throw.DebugAssert( IsValidFullPluginName( fullPluginName ) );
-            shortPluginName = pluginName;
-            return true;
+            if( pluginName.StartsWith( "CKli.", StringComparison.OrdinalIgnoreCase ) )
+            {
+                pluginName = pluginName.Substring( 5 );
+            }
+            if( pluginName.EndsWith( ".Plugin", StringComparison.OrdinalIgnoreCase ) )
+            {
+                pluginName = pluginName[..^7];
+            }
+            if( IsValidShortPluginName( pluginName ) )
+            {
+                fullPluginName = $"CKli.{pluginName}.Plugin";
+                Throw.DebugAssert( IsValidFullPluginName( fullPluginName ) );
+                shortPluginName = pluginName;
+                return true;
+            }
         }
         shortPluginName = null;
         fullPluginName = null;

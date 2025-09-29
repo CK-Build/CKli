@@ -12,7 +12,6 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>ckli</ToolCommandName>
     <Description>Command line tools to manage multi-repository Stacks.</Description>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
 
     <!-- It's a mess. See https://github.com/dotnet/project-system/issues/3619 -->
     <RunWorkingDirectory>$(MSBuildProjectDirectory)</RunWorkingDirectory>

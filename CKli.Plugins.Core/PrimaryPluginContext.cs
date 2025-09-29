@@ -4,14 +4,14 @@ namespace CKli.Core;
 
 sealed class PrimaryPluginContext : IPrimaryPluginContext
 {
-    public PrimaryPluginContext( IPluginInfo pluginInfo, XElement xmlConfiguration, World world )
+    public PrimaryPluginContext( PluginInfo pluginInfo, XElement xmlConfiguration, World world )
     {
         PluginInfo = pluginInfo;
         XmlConfiguration = xmlConfiguration;
         World = world;
     }
 
-    public IPluginInfo PluginInfo { get; }
+    public PluginInfo PluginInfo { get; }
 
     public XElement XmlConfiguration { get; }
 

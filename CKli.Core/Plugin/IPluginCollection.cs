@@ -12,7 +12,7 @@ public interface IPluginCollection : IDisposable
     /// <summary>
     /// Gets the plugin informations.
     /// </summary>
-    IReadOnlyCollection<IPluginInfo> Plugins { get; }
+    IReadOnlyCollection<PluginInfo> Plugins { get; }
 
     /// <summary>
     /// Initializes a configured set of plugins for a World. 
@@ -23,5 +23,17 @@ public interface IPluginCollection : IDisposable
     /// plugins that are IDisposable.
     /// </returns>
     IDisposable Create( World world );
+
+    /// <summary>
+    /// Gets whether this collection is already compiled.
+    /// </summary>
+    bool IsCompiledPlugins { get; }
+
+    /// <summary>
+    /// Generates the CompiledPlugins code.
+    /// Must be called only when <see cref="IsCompiledPlugins"/> is false.
+    /// </summary>
+    /// <returns>The static class CompiledPlugins code.</returns>
+    string GenerateCode();
 }
 

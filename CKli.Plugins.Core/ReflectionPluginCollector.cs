@@ -4,12 +4,11 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Xml.Linq;
 
 namespace CKli.Core;
 
-sealed partial class ReflectionBasedPluginCollector : IPluginCollector
+sealed partial class ReflectionPluginCollector : IPluginCollector
 {
     sealed record InitialReg( PluginInfo Plugin,
                               string TypeName,
@@ -22,20 +21,20 @@ sealed partial class ReflectionBasedPluginCollector : IPluginCollector
         public bool IsPrimary => PrimaryPluginParameterIndex >= 0;
     }
 
-    readonly PluginCollectorContext _context;
     readonly Dictionary<Type, InitialReg> _initialCollector;
-    readonly ImmutableArray<IPluginInfo>.Builder _pluginInfos;
+    readonly ImmutableArray<PluginInfo>.Builder _pluginInfos;
 
     readonly HashSet<Type> _cycleDetector;
     readonly Dictionary<Type, PluginType> _factories;
+    readonly IReadOnlyDictionary<string, (XElement Config, bool IsDisabled)> _pluginsConfiguration;
 
-    public ReflectionBasedPluginCollector( PluginCollectorContext context )
+    public ReflectionPluginCollector( IReadOnlyDictionary<string, (XElement Config, bool IsDisabled)> pluginsConfiguration )
     {
-        _context = context;
+        _pluginsConfiguration = pluginsConfiguration;
         _initialCollector = new Dictionary<Type, InitialReg>();
         _cycleDetector = new HashSet<Type>();
         _factories = new Dictionary<Type, PluginType>();
-        _pluginInfos = ImmutableArray.CreateBuilder<IPluginInfo>();
+        _pluginInfos = ImmutableArray.CreateBuilder<PluginInfo>();
     }
 
     public IPluginCollection BuildPluginCollection( ReadOnlySpan<Type> defaultPrimaryPlugins )
@@ -55,7 +54,7 @@ sealed partial class ReflectionBasedPluginCollector : IPluginCollector
             }
             var status = PluginStatus.Available;
             XElement? configuration = null;
-            if( _context.PluginsConfiguration.TryGetValue( shortPluginName, out var config ) )
+            if( _pluginsConfiguration.TryGetValue( shortPluginName, out var config ) )
             {
                 if( config.IsDisabled ) status |= PluginStatus.DisabledByConfiguration;
                 else
@@ -67,11 +66,12 @@ sealed partial class ReflectionBasedPluginCollector : IPluginCollector
             {
                 status |= PluginStatus.DisabledByMissingConfiguration;
             }
-            var pluginInfo = new PluginInfo( fullPluginName, shortPluginName, status );
+            // The PluginType ctor (in Build) downcasts the pluginTypes list to add itself to its pluginInfo.PluginTypes.
+            var pluginInfo = new PluginInfo( fullPluginName, shortPluginName, status, new List<IPluginTypeInfo>() );
             _pluginInfos.Add( pluginInfo );
             foreach( var t in a.GetExportedTypes().Where( t => typeof( PluginBase ).IsAssignableFrom( t ) ) )
             {
-                AddPluginType( pluginInfo, t, t.ToCSharpName(), status, configuration );
+                AddPluginType( pluginInfo, t, t.ToCSharpName(), configuration );
             }
         }
         return Build();
@@ -80,7 +80,6 @@ sealed partial class ReflectionBasedPluginCollector : IPluginCollector
     void AddPluginType( PluginInfo pluginInfo,
                         Type type,
                         string typeName,
-                        PluginStatus status,
                         XElement? configuration )
     {
         if( !type.IsClass || !type.IsSealed )
@@ -142,51 +141,30 @@ sealed partial class ReflectionBasedPluginCollector : IPluginCollector
                                            bool isPrimary,
                                            ImmutableArray<CommandDescription>.Builder commands )
     {
-        var regCommands = type.GetMethod( "RegisterCommands", BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public );
-        if( regCommands == null )
-        {
-            return;
-        }
-        if( !isPrimary )
-        {
-            Throw.CKException( $"""
-                Invalid static RegisterCommand in '{typeName}': only primary plugins can handle commands.
-                Type: {typeName}.
-                """ );
-        }
-        var parameters = regCommands.GetParameters();
-        if( regCommands.IsStatic
-            && regCommands.ReturnParameter.ParameterType == typeof( void )
-            && parameters.Length == 1 && parameters[0].ParameterType == typeof( ICommandCollectionBuilder ) )
-        {
-            Throw.CKException( $"""
-                RegisterCommands method signature must be 'static void RegisterCommands( ICommandCollectionBuilder )'.
-                Type: {typeName}.
-                """ );
-        }
-        var builder = new CommandCollectionBuilder( plugin, commands );
-        regCommands.Invoke( null, [builder] );
-    }
-
-    static string CheckPrimaryTypeNameAndNamespace( Type type, string pluginFullName )
-    {
-        var assemblyName = type.Assembly.FullName;
-        Throw.Assert( assemblyName != null );
-
-        // Don't use GetName().
-        if( assemblyName.Length < pluginFullName.Length
-            || !assemblyName.StartsWith( pluginFullName )
-            || assemblyName[pluginFullName.Length] != ',' )
-        {
-            Throw.CKException( $"Invalid primary plugin namespace '{pluginFullName}': the namespace must be the assembly name '{type.Assembly.GetName().Name}'. Type: {type}." );
-        }
-        if( !type.Name.EndsWith( "Plugin" ) )
-        {
-            Throw.CKException( $"Invalid primary plugin type name '{type.Name}': the type name must end with 'Plugin'. Type: {type}." );
-        }
-        Throw.DebugAssert( "CKli.".Length == 5 && ".Plugin".Length == 7 );
-        var defaultPrimaryName = pluginFullName[5..^7];
-        return defaultPrimaryName;
+        //var regCommands = type.GetMethod( "RegisterCommands", BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public );
+        //if( regCommands == null )
+        //{
+        //    return;
+        //}
+        //if( !isPrimary )
+        //{
+        //    Throw.CKException( $"""
+        //        Invalid static RegisterCommand in '{typeName}': only primary plugins can handle commands.
+        //        Type: {typeName}.
+        //        """ );
+        //}
+        //var parameters = regCommands.GetParameters();
+        //if( regCommands.IsStatic
+        //    && regCommands.ReturnParameter.ParameterType == typeof( void )
+        //    && parameters.Length == 1 && parameters[0].ParameterType == typeof( ICommandCollectionBuilder ) )
+        //{
+        //    Throw.CKException( $"""
+        //        RegisterCommands method signature must be 'static void RegisterCommands( ICommandCollectionBuilder )'.
+        //        Type: {typeName}.
+        //        """ );
+        //}
+        //var builder = new CommandCollectionBuilder( plugin, commands );
+        //regCommands.Invoke( null, [builder] );
     }
 
     IPluginCollection Build()
@@ -204,7 +182,7 @@ sealed partial class ReflectionBasedPluginCollector : IPluginCollector
                 }
             }
         }
-        return new WorldPluginResult( _pluginInfos.DrainToImmutable(), activationList );
+        return new Result( _pluginInfos.DrainToImmutable(), activationList );
     }
 
     PluginType RegisterPluginType( Dictionary<Type, PluginType> plugins,
@@ -260,7 +238,6 @@ sealed partial class ReflectionBasedPluginCollector : IPluginCollector
         }
         int activationIndex = status.IsDisabled() ? -1 : activationList.Count;
         var result = new PluginType( reg.Plugin,
-                                     type,
                                      reg.TypeName,
                                      reg.Ctor,
                                      deps,
@@ -272,7 +249,7 @@ sealed partial class ReflectionBasedPluginCollector : IPluginCollector
                                      activationIndex );
         if( activationIndex >= 0 ) activationList.Add( result );
 
-        CheckAndGetPluginCommands( result, type, reg.TypeName, reg.IsPrimary, commands );
+        //CheckAndGetPluginCommands( result, type, reg.TypeName, reg.IsPrimary, commands );
         
         plugins[type] = result;
         return result;

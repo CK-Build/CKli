@@ -1,5 +1,6 @@
 using CK.Core;
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -8,12 +9,11 @@ using System.Xml.Linq;
 
 namespace CKli.Core;
 
-sealed partial class ReflectionBasedPluginCollector
+sealed partial class ReflectionPluginCollector
 {
     sealed class PluginType : IPluginTypeInfo
     {
         readonly PluginInfo _pluginInfo;
-        readonly Type _type;
         readonly string _typeName;
         readonly ConstructorInfo _ctor;
         readonly int[] _deps;
@@ -25,7 +25,6 @@ sealed partial class ReflectionBasedPluginCollector
         readonly int _activationIndex;
 
         public PluginType( PluginInfo pluginInfo,
-                           Type type,
                            string typeName,
                            ConstructorInfo ctor,
                            int[] deps,
@@ -37,7 +36,6 @@ sealed partial class ReflectionBasedPluginCollector
                            int activationIndex )
         {
             _pluginInfo = pluginInfo;
-            _type = type;
             _typeName = typeName;
             _ctor = ctor;
             _deps = deps;
@@ -47,11 +45,12 @@ sealed partial class ReflectionBasedPluginCollector
             _primaryPluginParameterIndex = primaryPluginParameterIndex;
             _status = status;
             _activationIndex = activationIndex;
+            //((List<IPluginTypeInfo>)pluginInfo.PluginTypes).Add( this );
             Throw.DebugAssert( IsDisabled == activationIndex < 0 );
             Throw.DebugAssert( "Config is never null when the plugin is enabled.", IsDisabled || _xmlConfig != null );
         }
 
-        public IPluginInfo Plugin => _pluginInfo;
+        public PluginInfo Plugin => _pluginInfo;
 
         public string TypeName => _typeName;
 

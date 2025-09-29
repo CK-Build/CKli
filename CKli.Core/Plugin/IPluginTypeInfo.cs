@@ -10,7 +10,7 @@ public interface IPluginTypeInfo
     /// <summary>
     /// Gets the plugin that defines this type.
     /// </summary>
-    IPluginInfo Plugin { get; }
+    PluginInfo Plugin { get; }
 
     /// <summary>
     /// Gets the csharp type name.
@@ -27,4 +27,3 @@ public interface IPluginTypeInfo
     /// </summary>
     PluginStatus Status { get; }
 }
-
