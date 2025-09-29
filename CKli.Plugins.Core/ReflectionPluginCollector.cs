@@ -69,9 +69,15 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
             // The PluginType ctor (in Build) downcasts the pluginTypes list to add itself to its pluginInfo.PluginTypes.
             var pluginInfo = new PluginInfo( fullPluginName, shortPluginName, status, new List<IPluginTypeInfo>() );
             _pluginInfos.Add( pluginInfo );
-            foreach( var t in a.GetExportedTypes().Where( t => typeof( PluginBase ).IsAssignableFrom( t ) ) )
+            foreach( var t in a.GetExportedTypes().Where( t => !t.IsAbstract
+                                                               && !t.IsGenericTypeDefinition
+                                                               && typeof( PluginBase ).IsAssignableFrom( t ) ) )
             {
-                AddPluginType( pluginInfo, t, t.ToCSharpName(), configuration );
+                var typeName = t.FullName;
+                if( typeName != null )
+                {
+                    AddPluginType( pluginInfo, t, typeName, configuration );
+                }
             }
         }
         return Build();
@@ -82,9 +88,9 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
                         string typeName,
                         XElement? configuration )
     {
-        if( !type.IsClass || !type.IsSealed )
+        if( !type.IsSealed || type.IsNested )
         {
-            Throw.CKException( $"Registered Plugin '{typeName}' must be a sealed class." );
+            Throw.CKException( $"Registered Plugin '{typeName}' must be a non nested sealed class." );
         }
         var ctors = type.GetConstructors();
         if( ctors.Length != 1 )
