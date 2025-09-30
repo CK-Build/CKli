@@ -154,7 +154,7 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
                 }
             }
         }
-        return new Result( _pluginInfos.DrainToImmutable(), activationList, _context );
+        return new Result( _pluginInfos.DrainToImmutable(), activationList, _context, _commandCollector.Commands );
     }
 
     PluginType RegisterPluginType( Dictionary<Type, PluginType> plugins,

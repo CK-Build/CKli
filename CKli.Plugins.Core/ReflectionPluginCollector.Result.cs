@@ -13,15 +13,22 @@ sealed partial class ReflectionPluginCollector
         readonly ImmutableArray<PluginInfo> _pluginInfos;
         readonly List<PluginType> _activationList;
         readonly PluginCollectorContext _context;
+        readonly IReadOnlyCollection<CommandDescription> _commands;
 
-        public Result( ImmutableArray<PluginInfo> pluginInfos, List<PluginType> activationList, PluginCollectorContext context )
+        public Result( ImmutableArray<PluginInfo> pluginInfos,
+                       List<PluginType> activationList,
+                       PluginCollectorContext context,
+                       IReadOnlyCollection<CommandDescription> commands )
         {
             _pluginInfos = pluginInfos;
             _activationList = activationList;
             _context = context;
+            _commands = commands;
         }
 
         public IReadOnlyCollection<PluginInfo> Plugins => _pluginInfos;
+
+        public IReadOnlyCollection<CommandDescription> Commands => _commands;
 
         public IDisposable Create( IActivityMonitor monitor, World world )
         {
@@ -70,22 +77,27 @@ sealed partial class ReflectionPluginCollector
             """ );
 
             GeneratePluginInfos( b );
+            GenerateCommands( b );
 
             b.Append( """
-                    return new Generated( infos );
+                    return new Generated( infos, commands );
                 }
             }
 
             sealed class Generated : IPluginCollection
             {
                 readonly PluginInfo[] _plugins;
+                readonly CommandDescription[] _commands;
 
-                internal Generated( PluginInfo[] plugins )
+                internal Generated( PluginInfo[] plugins, CommandDescription[] commands )
                 {
                     _plugins = plugins;
+                    _commands = commands;
                 }
 
                 public IReadOnlyCollection<PluginInfo> Plugins => _plugins;
+
+                public IReadOnlyCollection<CommandDescription> Commands => _commands;
 
                 public bool IsCompiledPlugins => true;
 
@@ -172,6 +184,64 @@ sealed partial class ReflectionPluginCollector
             }
         }
 
+        void GenerateCommands( StringBuilder b )
+        {
+            int offset = 8;
+            b.Append( ' ', offset ).Append( "var commands = new CommandDescription[]{" ).AppendLine();
+            offset += 4;
+            foreach( var c in _commands )
+            {
+                var typeInfo = c.PluginTypeInfo;
+                Throw.DebugAssert( typeInfo != null );
+                int idxPlugin = _pluginInfos.IndexOf( typeInfo.Plugin );
+                Throw.DebugAssert( idxPlugin >= 0 );
+                int idxType = typeInfo.Plugin.PluginTypes.IndexOf( t => t == typeInfo );
+
+                b.Append( ' ', offset ).Append( $"new CommandDescription( infos[{idxPlugin}][{idxType}]," ).AppendLine();
+                int paramOffset = offset + 24;
+                AppendSourceString( b.Append( ' ', paramOffset ), c.FullCommandPath ).Append( ',' ).AppendLine();
+                AppendSourceString( b.Append( ' ', paramOffset ), c.Description ).Append( ',' ).AppendLine();
+                // Arguments
+                b.Append( ' ', paramOffset ).Append( "arguments: [" ).AppendLine();
+                paramOffset += 4;
+                foreach( var a in c.Arguments )
+                {
+                    AppendSourceString( b.Append( ' ', paramOffset ).Append( '(' ), a.Name ).Append( ", " );
+                    AppendSourceString( b, a.Description ).Append( ")," ).AppendLine();
+                }
+                paramOffset -= 4;
+                b.Append( ' ', paramOffset ).Append( "]," ).AppendLine();
+                // Options
+                b.Append( ' ', paramOffset ).Append( "options: [" ).AppendLine();
+                DumpOptionsOrFlags( b, paramOffset + 4, c.Options );
+                b.Append( ' ', paramOffset ).Append( "]," ).AppendLine();
+                // Flags
+                b.Append( ' ', paramOffset ).Append( "flags: [" ).AppendLine();
+                DumpOptionsOrFlags( b, paramOffset + 4, c.Flags );
+                b.Append( ' ', paramOffset ).Append( "] );" ).AppendLine();
+            }
+            offset -= 4;
+            b.Append( ' ', offset ).Append( "};" ).AppendLine();
+
+            void DumpOptionsOrFlags( StringBuilder b, int paramOffset, ImmutableArray<(ImmutableArray<string> Names, string Description)> optionsOrFlags )
+            {
+                foreach( var o in optionsOrFlags )
+                {
+                    b.Append( ' ', paramOffset ).Append( '[' );
+                    foreach( var n in o.Names )
+                    {
+                        AppendSourceString( b, n ).Append( ',' );
+                    }
+                    b.Append( "], " );
+                    AppendSourceString( b, o.Description ).Append( ")," ).AppendLine();
+                }
+            }
+        }
+
+        StringBuilder AppendSourceString( StringBuilder b, string s )
+        {
+            return b.Append( '"' ).Append( s.Replace( "\r", "\\r" ).Replace( "\n", "\\n" ).Replace( "\"", "\\\"" ) ).Append( '"' );
+        }
     }
 
 }

@@ -15,6 +15,8 @@ sealed partial class CommandCollector
     readonly List<CommandDescription> _commands;
     readonly Dictionary<string, CommandHandler> _handlers;
 
+    public IReadOnlyList<CommandDescription> Commands => _commands;
+
     public CommandCollector()
     {
         _commands = new List<CommandDescription>();
@@ -52,13 +54,19 @@ sealed partial class CommandCollector
             isAsync = true;
         }
         var arguments = ImmutableArray.CreateBuilder<(string Name, string Description)>();
+        var options = ImmutableArray.CreateBuilder<(ImmutableArray<string> Names, string Description)>();
         var flags = ImmutableArray.CreateBuilder<(ImmutableArray<string> Names, string Description)>();
         int iP;
+        // Arguments: Eats strings until they become optional.
         for( iP = 1; iP < parameters.Length; iP++ )
         {
             var p = parameters[iP];
             if( p.ParameterType == typeof( string ) )
             {
+                if( p.HasDefaultValue )
+                {
+                    break;
+                }
                 arguments.Add( (p.Name!, GetDescription( p.GetCustomAttributesData() )) );
             }
             else if( ExpectBooleanFlag( typeInfo, method, p ) )
@@ -66,21 +74,31 @@ sealed partial class CommandCollector
                 break;
             }
         }
+        // Options: Eats strings until the first boolean.
+        for( iP = 1; iP < parameters.Length; iP++ )
+        {
+            var p = parameters[iP];
+            if( p.ParameterType == typeof( string ) )
+            {
+                var attr = p.GetCustomAttributesData();
+                options.Add( (GetOptionOrFlagNames( typeInfo, method, p, attr ), GetDescription( attr )) );
+            }
+            else if( ExpectBooleanFlag( typeInfo, method, p ) )
+            {
+                break;
+            }
+        }
+        // Flags: Eats booleans.
         for( ;  iP < parameters.Length; iP++ )
         {
             var p = parameters[iP];
             if( ExpectBooleanFlag( typeInfo, method, p ) )
             {
                 var attr = p.GetCustomAttributesData();
-                var names = GetNames( typeInfo, method, p, attr );
-                if( names.IsDefault )
-                {
-                    names = ["--" + ToSnakeCase().Replace( p.Name!, "$1-$2" ).ToLowerInvariant()];
-                }
-                flags.Add( (names, GetDescription( attr )) );
+                flags.Add( (GetOptionOrFlagNames( typeInfo, method, p, attr ), GetDescription( attr )) );
             }
         }
-        _commands.Add( new CommandDescription( typeInfo, commandPath, description, arguments.DrainToImmutable(), flags.DrainToImmutable() ) );
+        _commands.Add( new CommandDescription( typeInfo, commandPath, description, arguments.DrainToImmutable(), options.DrainToImmutable(), flags.DrainToImmutable() ) );
         _handlers.Add( commandPath, new CommandHandler( typeInfo, method, isAsync ) );
 
 
@@ -102,7 +120,7 @@ sealed partial class CommandCollector
             return result;
         }
 
-        static ImmutableArray<string> GetNames( IPluginTypeInfo typeInfo, MethodInfo method, ParameterInfo p, IList<CustomAttributeData> attributes )
+        static ImmutableArray<string> GetOptionOrFlagNames( IPluginTypeInfo typeInfo, MethodInfo method, ParameterInfo p, IList<CustomAttributeData> attributes )
         {
             foreach( var a in attributes )
             {
@@ -123,11 +141,11 @@ sealed partial class CommandCollector
                     Throw.CKException( $"""
                     Invalid [OptionName( "{s}" )] on '{p.ParameterType.Name} {p.Name}' in command method '{typeInfo.TypeName}.{method.Name}'.
                     There must be at least one option or flag name. The first name must start with "--" (long name),
-                    the optional following, comma separated, ones must start with "-" (short names).
+                    the optional following ones, comma separated, must start with "-" (short names).
                     """ );
                 }
             }
-            return default;
+            return ["--" + ToSnakeCase().Replace( p.Name!, "$1-$2" ).ToLowerInvariant()];
         }
 
         static bool ExpectBooleanFlag( IPluginTypeInfo typeInfo, MethodInfo method, ParameterInfo p )
@@ -136,7 +154,8 @@ sealed partial class CommandCollector
             {
                 Throw.CKException( $"""
                     Invalid parameter type '{p.ParameterType.Name} {p.Name}' in command method '{typeInfo.TypeName}.{method.Name}'.
-                    Only strings (arguments) and boolean (flags) are currently allowed in this order (arguments must come first).
+                    Only strings without default value (arguments), strings with a default value (options) and boolean (flags) are currently allowed
+                    in this order (arguments must come first, then options and then flags).
                     """ );
             }
             return true;

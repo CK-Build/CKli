@@ -16,6 +16,11 @@ public interface IPluginCollection : IDisposable
     IReadOnlyCollection<PluginInfo> Plugins { get; }
 
     /// <summary>
+    /// Gets the descriptions of all the commands supported by the plugins.
+    /// </summary>
+    IReadOnlyCollection<CommandDescription> Commands { get; }
+
+    /// <summary>
     /// Initializes a configured set of plugins for a World. 
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
