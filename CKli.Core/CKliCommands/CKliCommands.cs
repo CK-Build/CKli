@@ -2,6 +2,7 @@ using CK.Core;
 using CKli.Core;
 using CSemVer;
 using System;
+using System.Linq;
 
 namespace CKli;
 
@@ -10,6 +11,111 @@ namespace CKli;
 /// </summary>
 public static class CKliCommands
 {
+    static CommandDescription[] _commands;
+
+    static CKliCommands()
+    {
+        _commands = new CommandDescription[]
+        {
+            new CommandDescription( null,
+                                    "clone",
+                                    "Clones a Stack and all its current World repositories in the current directory.",
+                                    [("stackUrl", "The url stack repository to clone from. The repository name must end with '-Stack'.")],
+                                    [
+                                        (["--private"],"Indicates a private repository. A Personal Access Token (or any other secret) is required."),
+                                        (["--allow-duplicate"],"Allows a Stack that already exists locally to be cloned."),
+                                    ]),
+            new CommandDescription( null,
+                                    "pull",
+                                    "Resynchronizes the current Repo or World from the remotes.",
+                                    [],
+                                    [
+                                        (["--all"], "Pull all the Repos of the current World (even if current path is in a Repo)."),
+                                        (["--skip-pull-stack"], "Don't pull the Stack repository itself.")
+                                    ]),
+            new CommandDescription( null,
+                                    "fetch",
+                                    "Fetches all branches of the current Repo or all the Repos of the current World.",
+                                    [],
+                                    [
+                                        (["--all"], "Fetch from all the Repos of the current World (even if current path is in a Repo)."),
+                                        (["--from-all-remotes"], "Fetch from all available remotes, not only from 'origin'.")
+                                    ]),
+            new CommandDescription( null,
+                                    "push",
+                                    "Pushes the current Repo or all the current World's Repos current branches to their remotes.",
+                                    [],
+                                    [
+                                        (["--all"], "Push all the Repos of the current World (even if current path is in a Repo)."),
+                                        (["--stack-only"], "Only push the Stack repository, not the current Repo nor the Repos of the current World."),
+                                        (["--continue-on-error"], "Push all the Repos even on error. By default the first error stops the push."),
+                                    ]),
+            new CommandDescription( null,
+                                    "layout fix",
+                                    "Fixes the the folders and repositories layout of the current world.",
+                                    [],
+                                    [
+                                        (["--delete-aliens"], "Delete repositories that don't belong to the current world.")
+                                    ]),
+            new CommandDescription( null,
+                                    "layout xif",
+                                    """
+                                    Updates the layout of the current world from existing folders and repositories.
+                                    To share this updated layout with others, 'push --stackOnly' must be executed.
+                                    """,
+                                    [],[]),
+            new CommandDescription( null,
+                                    "repo add",
+                                    """
+                                    Updates the layout of the current world from existing folders and repositories.
+                                    To share this updated layout with others, 'push --stackOnly' must be executed.
+                                    """,
+                                    [("repositoryUrl", "Url of the repository to add to the current Worlf and clone.")],
+                                    [
+                                        (["--allow-lts"], "Allows the current world to be a Long Term Support world.")
+                                    ]),
+            new CommandDescription( null,
+                                    "repo remove",
+                                    "Removes a repository from the current world.",
+                                    [("nameOrUrl", "Name or url of the repository to remove.")],
+                                    [
+                                        (["--allow-lts"], "Allows the current world to be a Long Term Support world.")
+                                    ]),
+            new CommandDescription( null,
+                                    "plugin create",
+                                    "Creates a new source based plugin project for the current World.",
+                                    [("pluginName", """The plugin name "MyPlugin" (or "CKli.MyPlugin.Plugin") to create.""")],
+                                    [
+                                        (["--allow-lts"], "Allows the current world to be a Long Term Support world.")
+                                    ]),
+            new CommandDescription( null,
+                                    "plugin add",
+                                    "Adds a new plugin (or sets the version of an existing one) in the current World's plugins.",
+                                    [("package", """Package "Name@Version" or ""CKli.Name.Plugin@Version" to add. CKli plugin packages are normalized to "CKli.XXX.Plugin".""")],
+                                    [
+                                        (["--allow-lts"], "Allows the current world to be a Long Term Support world.")
+                                    ]),
+            new CommandDescription( null,
+                                    "plugin remove",
+                                    "Fully removes a plugin from the current World. It must not have dependent plugins otherwise this fails.",
+                                    [("pluginName", """The plugin name "MyPlugin" (or "CKli.MyPlugin.Plugin") to remove.""")],
+                                    [
+                                        (["--allow-lts"], "Allows the current world to be a Long Term Support world.")
+                                    ]),
+            new CommandDescription( null,
+                                    "plugin info",
+                                    "Dumps information about installed plugins.",
+                                    [],[])
+        };
+    }
+
+    /// <summary>
+    /// Finds a <see cref="CommandDescription"/> from its command path.
+    /// </summary>
+    /// <param name="commandPath">The command path.</param>
+    /// <returns>The command description if it exists, null otherwise.</returns>
+    public static CommandDescription? FindFromPath( string commandPath ) => _commands.FirstOrDefault( c => c.FullCommandPath == commandPath );
+
     /// <summary>
     /// Clones a Stack and all its current world repositories in the current directory.
     /// </summary>

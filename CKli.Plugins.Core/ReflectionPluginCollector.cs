@@ -21,15 +21,17 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
         public bool IsPrimary => PrimaryPluginParameterIndex >= 0;
     }
 
+    readonly PluginCollectorContext _context;
     readonly Dictionary<Type, InitialReg> _initialCollector;
     readonly ImmutableArray<PluginInfo>.Builder _pluginInfos;
-    readonly PluginCollectorContext _context;
+    readonly CommandCollector _commandCollector;
 
     public ReflectionPluginCollector( PluginCollectorContext context )
     {
         _context = context;
         _initialCollector = new Dictionary<Type, InitialReg>();
         _pluginInfos = ImmutableArray.CreateBuilder<PluginInfo>();
+        _commandCollector = new CommandCollector();
     }
 
     public IPluginCollection BuildPluginCollection( ReadOnlySpan<Type> defaultPrimaryPlugins )
@@ -136,37 +138,6 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
         _initialCollector.Add( type, result );
     }
 
-    static void CheckAndGetPluginCommands( PluginType plugin,
-                                           Type type,
-                                           string typeName,
-                                           bool isPrimary,
-                                           ImmutableArray<CommandDescription>.Builder commands )
-    {
-        //var regCommands = type.GetMethod( "RegisterCommands", BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public );
-        //if( regCommands == null )
-        //{
-        //    return;
-        //}
-        //if( !isPrimary )
-        //{
-        //    Throw.CKException( $"""
-        //        Invalid static RegisterCommand in '{typeName}': only primary plugins can handle commands.
-        //        Type: {typeName}.
-        //        """ );
-        //}
-        //var parameters = regCommands.GetParameters();
-        //if( regCommands.IsStatic
-        //    && regCommands.ReturnParameter.ParameterType == typeof( void )
-        //    && parameters.Length == 1 && parameters[0].ParameterType == typeof( ICommandCollectionBuilder ) )
-        //{
-        //    Throw.CKException( $"""
-        //        RegisterCommands method signature must be 'static void RegisterCommands( ICommandCollectionBuilder )'.
-        //        Type: {typeName}.
-        //        """ );
-        //}
-        //var builder = new CommandCollectionBuilder( plugin, commands );
-        //regCommands.Invoke( null, [builder] );
-    }
 
     IPluginCollection Build()
     {
@@ -254,11 +225,27 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
                                      status,
                                      activationIndex );
         if( activationIndex >= 0 ) activationList.Add( result );
-
-        //CheckAndGetPluginCommands( result, type, reg.TypeName, reg.IsPrimary, commands );
-        
         plugins[type] = result;
+
+        // Discover and collects commands.
+        var members = type.GetMethods();
+        foreach( var m in members )
+        {
+            string? path = null;
+            var attributes = m.GetCustomAttributesData();
+            foreach( var a in attributes )
+            {
+                if( a.AttributeType == typeof( FullCommandPathAttribute  ) )
+                {
+                    path = (string)a.ConstructorArguments[0].Value!;
+                }
+            }
+            if( path != null )
+            {
+                _commandCollector.Add( result, m, path, attributes );
+            }
+        }
+
         return result;
     }
 }
-

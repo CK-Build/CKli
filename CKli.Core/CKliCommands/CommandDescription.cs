@@ -1,30 +1,6 @@
-using CK.Core;
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CKli.Core;
-
-//public sealed class CommandNamespace
-//{
-//    public CommandGroup? Find( string name )
-//}
-
-//public sealed class CommandGroup
-//{
-//    readonly string _name;
-//    readonly string? _description;
-//    readonly List<CommandDescription> _commands;
-//    readonly CommandGroup? _parent;
-//    int _commandCount;
-//
-//    internal CommandGroup( CommandGroup? parent, string name,  )
-//    {
-//    }
-//}
 
 /// <summary>
 /// Immutable CKli command description.
@@ -37,6 +13,7 @@ public sealed class CommandDescription
 {
     readonly IPluginTypeInfo? _typeInfo;
     readonly string _fullCommandPath;
+    readonly string _description;
     readonly ImmutableArray<(string Name, string Description)> _arguments;
     readonly ImmutableArray<(ImmutableArray<string> Names, string Description)> _flags;
 
@@ -45,15 +22,18 @@ public sealed class CommandDescription
     /// </summary>
     /// <param name="typeInfo">The type that handles the command.</param>
     /// <param name="fullCommandPath">The full whitespace separated command path.</param>
+    /// <param name="description">The command description.</param>
     /// <param name="arguments">The required command arguments.</param>
     /// <param name="flags">The flags.</param>
     public CommandDescription( IPluginTypeInfo? typeInfo,
                                string fullCommandPath,
+                               string description,
                                ImmutableArray<(string Name, string Description)> arguments,
                                ImmutableArray<(ImmutableArray<string> Names, string Description)> flags )
     {
         _typeInfo = typeInfo;
         _fullCommandPath = fullCommandPath;
+        _description = description;
         _arguments = arguments;
         _flags = flags;
     }
@@ -68,6 +48,11 @@ public sealed class CommandDescription
     /// Gets the full whitespace separated command path.
     /// </summary>
     public string FullCommandPath => _fullCommandPath;
+
+    /// <summary>
+    /// Gets the command description.
+    /// </summary>
+    public string Description => _description;
 
     /// <summary>
     /// Gets the (required) arguments and their description.

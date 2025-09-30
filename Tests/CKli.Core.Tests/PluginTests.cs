@@ -1,9 +1,7 @@
 using CK.Core;
 using NUnit.Framework;
 using Shouldly;
-using System.IO;
 using static CK.Testing.MonitorTestHelper;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace CKli.Core.Tests;
 
