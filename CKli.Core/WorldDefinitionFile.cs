@@ -328,7 +328,7 @@ public sealed class WorldDefinitionFile
             var path = _world.XmlDescriptionFilePath;
             try
             {
-                _root.Document!.Save( path );
+                _root.Document!.SaveWithoutXmlDeclaration( path );
                 _isDirty = false;
                 monitor.Trace( $"File '{path.LastPart}' saved." );
                 if( _layout != null )

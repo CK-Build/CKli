@@ -113,20 +113,21 @@ sealed partial class ReflectionPluginCollector
             b.Append( ' ', offset ).Append( $"var objects = new object[{_activationList.Count}];" ).AppendLine();
             for( int i = 0; i < _activationList.Count; i++ )
             {
-                PluginType? a = _activationList[i];
-                b.Append( ' ', offset ).Append( $"objects[{i}] = new {a.TypeName}( " );
-                for( int j = 0; j < a.Deps.Length; ++j )
+                PluginType? dep = _activationList[i];
+                b.Append( ' ', offset ).Append( $"objects[{i}] = new {dep.TypeName}( " );
+                for( int j = 0; j < dep.Deps.Length; ++j )
                 {
-                    int iInstance = a.Deps[j];
+                    if( j > 0 ) b.Append( ", " );
+                    int iInstance = dep.Deps[j];
                     if( iInstance == -1 )
                     {
-                        if( i == a.WorldParameterIndex )
+                        if( j == dep.WorldParameterIndex )
                         {
                             b.Append( "world" );
                         }
-                        else if( i == a.PrimaryPluginParameterIndex )
+                        else if( j == dep.PrimaryPluginParameterIndex )
                         {
-                            int idxPlugin = _pluginInfos.IndexOf( a.Plugin );
+                            int idxPlugin = _pluginInfos.IndexOf( dep.Plugin );
                             b.Append( $"new PrimaryPluginContext( _plugins[{idxPlugin}], configs, world )" );
                         }
                         else
@@ -197,7 +198,7 @@ sealed partial class ReflectionPluginCollector
                 Throw.DebugAssert( idxPlugin >= 0 );
                 int idxType = typeInfo.Plugin.PluginTypes.IndexOf( t => t == typeInfo );
 
-                b.Append( ' ', offset ).Append( $"new CommandDescription( infos[{idxPlugin}][{idxType}]," ).AppendLine();
+                b.Append( ' ', offset ).Append( $"new CommandDescription( infos[{idxPlugin}].PluginTypes[{idxType}]," ).AppendLine();
                 int paramOffset = offset + 24;
                 AppendSourceString( b.Append( ' ', paramOffset ), c.FullCommandPath ).Append( ',' ).AppendLine();
                 AppendSourceString( b.Append( ' ', paramOffset ), c.Description ).Append( ',' ).AppendLine();
@@ -218,7 +219,7 @@ sealed partial class ReflectionPluginCollector
                 // Flags
                 b.Append( ' ', paramOffset ).Append( "flags: [" ).AppendLine();
                 DumpOptionsOrFlags( b, paramOffset + 4, c.Flags );
-                b.Append( ' ', paramOffset ).Append( "] );" ).AppendLine();
+                b.Append( ' ', paramOffset ).Append( "] )," ).AppendLine();
             }
             offset -= 4;
             b.Append( ' ', offset ).Append( "};" ).AppendLine();
@@ -227,7 +228,7 @@ sealed partial class ReflectionPluginCollector
             {
                 foreach( var o in optionsOrFlags )
                 {
-                    b.Append( ' ', paramOffset ).Append( '[' );
+                    b.Append( ' ', paramOffset ).Append( "([" );
                     foreach( var n in o.Names )
                     {
                         AppendSourceString( b, n ).Append( ',' );

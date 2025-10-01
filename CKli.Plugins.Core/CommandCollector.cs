@@ -132,7 +132,7 @@ sealed partial class CommandCollector
                         var names = s.Split( ',', StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries );
                         if( names.Length > 0
                             && names.All( n => !n.Contains(' ') ) 
-                            && names[0].StartsWith("--") && names.Length > 2
+                            && names[0].StartsWith("--") && names[0].Length > 2
                             && names.Skip(1).All( n => n.Length > 1 && n[0] == '-' && n[1] != '-' ) )
                         {
                             return ImmutableCollectionsMarshal.AsImmutableArray( names );

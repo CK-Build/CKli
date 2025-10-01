@@ -1,4 +1,5 @@
 using CK.Core;
+using CSemVer;
 using NUnit.Framework;
 using Shouldly;
 using static CK.Testing.MonitorTestHelper;
@@ -49,4 +50,39 @@ public class PluginTests
 
 
     }
+
+    [Test]
+    public void add_CommandSample_package()
+    {
+        var localPath = ClonedPaths.EnsureCleanFolder();
+        var secretsStore = new DotNetUserSecretsStore();
+        var remotes = TestEnv.UseReadOnly( "One" );
+
+        TestEnv.EnsurePluginPackage( "CKli.CommandSample.Plugin" );
+
+        // ckli clone file:///.../One-Stack
+        CKliCommands.Clone( TestHelper.Monitor, secretsStore, localPath, remotes.StackUri ).ShouldBe( 0 );
+        // cd One
+        localPath = localPath.AppendPart( "One" );
+
+        CKliCommands.PluginAdd( TestHelper.Monitor, secretsStore, localPath, "CommandSample", TestEnv.CKliPluginsCoreVersion ).ShouldBe( 0 );
+
+        using( TestHelper.Monitor.CollectTexts( out var logs ) )
+        {
+            StackRepository.OpenWorldFromPath( TestHelper.Monitor, secretsStore, localPath, out var stack, out var world, skipPullStack: true )
+                           .ShouldBeTrue();
+            try
+            {
+                logs.ShouldContain( "Pouf" );
+            }
+            finally
+            {
+                stack.Dispose();
+            }
+        }
+
+        CKliCommands.PluginRemove( TestHelper.Monitor, secretsStore, localPath, "CommandSample" ).ShouldBe( 0 );
+
+    }
+
 }

@@ -1,4 +1,6 @@
 using CK.Core;
+using CSemVer;
+using DiffEngine;
 using NUnit.Framework;
 using Shouldly;
 using System;
@@ -6,6 +8,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Xml;
+using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
 
 namespace CKli.Core.Tests;
@@ -15,11 +19,20 @@ static partial class TestEnv
 {
     readonly static NormalizedPath _remotesPath = TestHelper.TestProjectFolder.AppendPart( "Remotes" );
     readonly static NormalizedPath _nugetSourcePath = TestHelper.TestProjectFolder.AppendPart( "NuGetSource" );
+    readonly static NormalizedPath _packagedPluginsPath = TestHelper.TestProjectFolder.AppendPart( "PackagedPlugins" );
+    static SVersion? _cKliPluginsCoreVersion;
+    static XDocument? _packagedDirectoryPackagesProps;
     static Dictionary<string, RemotesCollection>? _readOnlyRemotes;
     static RemotesCollection? _inUse;
 
     [OneTimeSetUp]
-    public static void EnsureRemotes() => TestHelper.OnlyOnce( Initialize );
+    public static void SetupEnv() => TestHelper.OnlyOnce( Initialize );
+
+    [OneTimeTearDown]
+    public static void TearDownEnv()
+    {
+        _packagedDirectoryPackagesProps?.Save( _packagedPluginsPath.AppendPart( "Directory.Packages.props" ) );
+    }
 
     static void Initialize()
     {
@@ -40,13 +53,23 @@ static partial class TestEnv
                                                 nuGetXmlDoc,
                                                 "test-override",
                                                 _nugetSourcePath,
-                                                "CKli.Core", "CKli.Plugins.Core" )
+                                                "CKli.Core", "CKli.Plugins.Core", "CKli.*.Plugin" )
                        .ShouldBeTrue();
         };
-        CopyMostRecentPackageToNuGetSource( "CKli.Core" );
-        CopyMostRecentPackageToNuGetSource( "CKli.Plugins.Core" );
+        var corePath = CopyMostRecentPackageToNuGetSource( "CKli.Core" );
+        var pluginsPath = CopyMostRecentPackageToNuGetSource( "CKli.Plugins.Core" );
+        
+        foreach( var nuget in Directory.EnumerateFiles( _nugetSourcePath ) )
+        {
+            var p = new NormalizedPath( nuget );
+            if( p != corePath && p != pluginsPath )
+            {
+                FileHelper.DeleteFile( TestHelper.Monitor, p ).ShouldBeTrue();
+            }
+        }
+        _cKliPluginsCoreVersion = SVersion.Parse( pluginsPath.LastPart["CKli.Plugins.Core.".Length..^".nupkg".Length] );
 
-        static void CopyMostRecentPackageToNuGetSource( string projectFolder )
+        static NormalizedPath CopyMostRecentPackageToNuGetSource( string projectFolder )
         {
             var projectBin = TestHelper.SolutionFolder.Combine( $"{projectFolder}/bin/{TestHelper.BuildConfiguration}" );
             var (path, date) = Directory.EnumerateFiles( projectBin, "*.nupkg" )
@@ -63,6 +86,7 @@ static partial class TestEnv
                 File.Copy( path, target, overwrite: true );
                 File.SetLastWriteTimeUtc( target, date );
             }
+            return target;
         }
     }
 
@@ -146,6 +170,49 @@ static partial class TestEnv
         //                                                               : newOne.GetUriFor( sUri ).ToString();
 
         return _inUse = newOne;
+    }
+
+    /// <summary>
+    /// Gets the the version "CKli.Core" and "CKi.Plugins.Core" that have been compiled and ar available
+    /// in the "NuGetSource/" folder.
+    /// </summary>
+    public static SVersion CKliPluginsCoreVersion => _cKliPluginsCoreVersion!;
+
+    /// <summary>
+    /// Compiles and packs the specified "PcackgedPlugins/<paramref name="projectName"/>" and
+    /// make it available in the "NuGetSource" folder.
+    /// </summary>
+    /// <param name="projectName">The project name (in Plugins/ folder).</param>
+    /// <param name="version">Optional version that can differ from the <see cref="CKliPluginsCoreVersion"/>.</param>
+    public static void EnsurePluginPackage( string projectName, string? version = null )
+    {
+        if( _packagedDirectoryPackagesProps == null )
+        {
+            // Setting the "CKli.Plugins.Core" package in the current version (from the NuGetSource).
+            // The XDocument is cloned, the original one will be restored by TearDownEnv.
+            _cKliPluginsCoreVersion.ShouldNotBeNull();
+            var pathDirectoryPackages = _packagedPluginsPath.AppendPart( "Directory.Packages.props" );
+            _packagedDirectoryPackagesProps = XDocument.Load( pathDirectoryPackages );
+
+            var clone = new XDocument( _packagedDirectoryPackagesProps );
+            clone.Root.ShouldNotBeNull();
+            clone.Root.Elements( "ItemGroup" ).Elements( "PackageVersion" )
+                 .First( e => e.Attribute( "Include" )?.Value == "CKli.Plugins.Core" )
+                 .SetAttributeValue( "Version", _cKliPluginsCoreVersion );
+
+            clone.SaveWithoutXmlDeclaration( pathDirectoryPackages );
+        }
+
+        var v = version != null ? SVersion.Parse( version ) : _cKliPluginsCoreVersion;
+
+        var path = _packagedPluginsPath.AppendPart( projectName );
+        var args = $"""pack -tl:off --no-dependencies -o "{_nugetSourcePath}" -c {TestHelper.BuildConfiguration} /p:IsPackable=true;Version={v}""";
+        using var _ = TestHelper.Monitor.OpenInfo( $"""
+            Ensure plugin package '{projectName}':
+            dotnet {args}
+            """ );
+        ProcessRunner.RunProcess( TestHelper.Monitor.ParallelLogger, "dotnet", args, path, null )
+            .ShouldBe( 0 );
     }
 
 }

@@ -262,7 +262,7 @@ public sealed partial class PluginMachinery
                           To use Version="{ckliVersion}".
                           """ );
             ckliPluginsCore.SetAttributeValue( "Version", ckliVersion );
-            d.Save( DirectoryPackageProps );
+            d.SaveWithoutXmlDeclaration( DirectoryPackageProps );
 
             monitor.Trace( $"Deleting '{CKliCompiledPluginsFile.LastPart}'." );
             if( !FileHelper.DeleteFile( monitor, CKliCompiledPluginsFile ) )
@@ -418,16 +418,6 @@ public sealed partial class PluginMachinery
         {
             return false;
         }
-        if( added )
-        {
-            // Uses dotnet tooling to add the project to the sln.
-            // We don't care if it takes time here and this acts as a check.
-            if( ProcessRunner.RunProcess( monitor.ParallelLogger, "dotnet", $"sln add {fullPluginName}", Root, null ) != 0 )
-            {
-                monitor.Error( $"Command 'dotnet sln add {fullPluginName}' failed." );
-                return false;
-            }
-        }
         if( !added && !versionChanged )
         {
             monitor.CloseGroup( "No change, skipping plugins recompilation." );
@@ -446,10 +436,8 @@ public sealed partial class PluginMachinery
         {
             return false;
         }
-        string slnRemoveCommand; 
         if( wasProjectReference )
         {
-            slnRemoveCommand = $"sln remove {fullPluginName}/{fullPluginName}.csproj";
             var projectPath = Root.AppendPart( fullPluginName );
             if( Directory.Exists( projectPath ) )
             {
@@ -458,15 +446,11 @@ public sealed partial class PluginMachinery
                     return false;
                 }
             }
-        }
-        else
-        {
-            slnRemoveCommand = $"sln remove {fullPluginName}";
-        }
-        if( ProcessRunner.RunProcess( monitor.ParallelLogger, "dotnet", slnRemoveCommand, Root, null ) != 0 )
-        {
-            monitor.Error( $"Command 'dotnet sln remove {fullPluginName}' failed." );
-            return false;
+            if( ProcessRunner.RunProcess( monitor.ParallelLogger, "dotnet", $"sln remove {fullPluginName}/{fullPluginName}.csproj", Root, null ) != 0 )
+            {
+                monitor.Error( $"Command 'dotnet sln remove {fullPluginName}' failed." );
+                return false;
+            }
         }
         return CompilePlugins( monitor, vNext: true );
     }
@@ -490,7 +474,7 @@ public sealed partial class PluginMachinery
         {
             var d = XDocument.Load( nuGetConfigFile );
             _nuGetConfigFileHook( monitor, d );
-            d.Save( nuGetConfigFile );
+            d.SaveWithoutXmlDeclaration( nuGetConfigFile );
             return true;
         }
         catch( Exception ex )

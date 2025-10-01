@@ -128,7 +128,7 @@ sealed partial class PluginMachinery
             if( existsVer == null )
             {
                 existsVer = new XElement( "PackageVersion",
-                                        new XAttribute( "Include", fullPluginName ), new XAttribute( "Version", version ) );
+                                        new XAttribute( "Include", fullPluginName ), new XAttribute( "Version", targetVersion ) );
                 _dpFirstItemGroup.Add( existsVer );
             }
             else
@@ -180,8 +180,8 @@ sealed partial class PluginMachinery
             {
                 monitor.Trace( $"Updating file '{_machinery.CKliPluginsFile.LastPart}', deleting '{_machinery.CKliCompiledPluginsFile.LastPart}'." );
                 File.WriteAllText( _machinery.CKliPluginsFile, _ckliPluginsFileText );
-                _csProj.Save( _machinery.CKliPluginsCSProj );
-                _directoryPackages.Save( _machinery.DirectoryPackageProps );
+                _csProj.SaveWithoutXmlDeclaration( _machinery.CKliPluginsCSProj );
+                _directoryPackages.SaveWithoutXmlDeclaration( _machinery.DirectoryPackageProps );
                 if( !FileHelper.DeleteFile( monitor, _machinery.CKliCompiledPluginsFile ) )
                 {
                     return false;

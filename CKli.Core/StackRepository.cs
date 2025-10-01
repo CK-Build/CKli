@@ -599,7 +599,7 @@ public sealed partial class StackRepository : IDisposable
             monitor.Error( $"Unable to create '{newOne}' world: directory {newOne.WorldRoot} already exists." );
             return null;
         }
-        content.Save( newOne.XmlDescriptionFilePath );
+        content.SaveWithoutXmlDeclaration( newOne.XmlDescriptionFilePath );
         Directory.CreateDirectory( newOne.WorldRoot );
         return newOne;
     }

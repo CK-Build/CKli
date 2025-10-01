@@ -1,0 +1,3 @@
+﻿<Project>
+  <!-- Required here to avoid using the CKli solution Directory.Build.props. --> 
+</Project>

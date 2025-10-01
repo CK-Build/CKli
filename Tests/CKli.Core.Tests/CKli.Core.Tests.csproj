@@ -6,12 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Remotes\**" />
-    <EmbeddedResource Remove="Remotes\**" />
-    <None Remove="Remotes\**" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="CK.Testing.NUnit" Version="14.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="NUnit3TestAdapter" Version="5.1.0">
@@ -24,12 +18,12 @@
     <ProjectReference Include="..\..\CKli.Loader\CKli.Loader.csproj" />
   </ItemGroup>
 
-  <!-- Consider the Remotes and the Cloned folder as pure content: their .csproj are ignored by the build system. -->
+  <!-- Consider the Remotes, Cloned and PackagedPlugins folders as pure content: their .csproj are ignored by the build system. -->
   <ItemGroup>
-    <Content Include="$(Content);Remotes\**;Cloned\**" />
+    <Content Include="$(Content);Remotes\**;Cloned\**;PackagedPlugins\**" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Remove="Remotes\**;Cloned\**" />
+    <Compile Remove="Remotes\**;Cloned\**;PackagedPlugins\**" />
   </ItemGroup>
 
 </Project>
