@@ -16,7 +16,7 @@ public sealed class SupportWithCommand : PluginBase
     }
 
     [Description( "Writes the world name, optionnaly in upper case." )]
-    [FullCommandPath( "test get-world-name" )]
+    [CommandPath( "test get-world-name" )]
     public bool NameDoesntMatter( IActivityMonitor monitor,
                                   [Description("Writes the world name in lower case.")]
                                   [OptionName("--to-lower, -l")]

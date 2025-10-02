@@ -51,7 +51,7 @@ public sealed class CommandDescription
     /// <summary>
     /// Gets the full whitespace separated command path.
     /// </summary>
-    public string FullCommandPath => _fullCommandPath;
+    public string CommandPath => _fullCommandPath;
 
     /// <summary>
     /// Gets the command description.

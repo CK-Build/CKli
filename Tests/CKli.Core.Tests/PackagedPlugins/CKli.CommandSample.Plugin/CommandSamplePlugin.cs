@@ -25,7 +25,7 @@ public sealed class CommandSamplePlugin : PluginBase
         _tool = tool;
     }
 
-    [FullCommandPath( "test echo" )]
+    [CommandPath( "test echo" )]
     [Description( "Echoes the message, optionnaly in upper case." )]
     public bool Echo( IActivityMonitor monitor,
                       [Description("The message to write.")]

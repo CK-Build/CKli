@@ -235,7 +235,7 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
             var attributes = m.GetCustomAttributesData();
             foreach( var a in attributes )
             {
-                if( a.AttributeType == typeof( FullCommandPathAttribute  ) )
+                if( a.AttributeType == typeof( CommandPathAttribute  ) )
                 {
                     path = (string)a.ConstructorArguments[0].Value!;
                 }

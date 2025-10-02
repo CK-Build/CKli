@@ -28,12 +28,12 @@ sealed partial class CommandCollector
         commandPath = NormalizePath( commandPath );
         if( CKliCommands.FindFromPath( commandPath ) != null )
         {
-            Throw.CKException( $"""Invalid [FullCommandPath( "{commandPath}" )] on '{typeInfo.TypeName}.{method.Name}' method. This path is a CKli command.""" );
+            Throw.CKException( $"""Invalid [CommandPath( "{commandPath}" )] on '{typeInfo.TypeName}.{method.Name}' method. This path is a CKli command.""" );
         }
         if( _handlers.TryGetValue( commandPath, out var exists ) )
         {
             Throw.CKException( $"""
-                Duplicate [FullCommandPath( "{commandPath}" )] on '{typeInfo.TypeName}.{method.Name}' method.
+                Duplicate [CommandPath( "{commandPath}" )] on '{typeInfo.TypeName}.{method.Name}' method.
                 This path is already defined by '{exists}'.
                 """ );
         }
@@ -129,11 +129,11 @@ sealed partial class CommandCollector
                     var s = ((string?)a.ConstructorArguments[0].Value)?.Trim();
                     if( !string.IsNullOrWhiteSpace( s ) )
                     {
-                        var names = s.Split( ',', StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries );
+                        var names = s.Split( ',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries );
                         if( names.Length > 0
-                            && names.All( n => !n.Contains(' ') ) 
-                            && names[0].StartsWith("--") && names[0].Length > 2
-                            && names.Skip(1).All( n => n.Length > 1 && n[0] == '-' && n[1] != '-' ) )
+                            && names.All( n => !n.Contains( ' ' ) )
+                            && names[0].StartsWith( "--" ) && names[0].Length > 2
+                            && names.Skip( 1 ).All( n => n.Length > 1 && n[0] == '-' && n[1] != '-' ) )
                         {
                             return ImmutableCollectionsMarshal.AsImmutableArray( names );
                         }
@@ -145,7 +145,7 @@ sealed partial class CommandCollector
                     """ );
                 }
             }
-            return ["--" + ToSnakeCase().Replace( p.Name!, "$1-$2" ).ToLowerInvariant()];
+            return ["--" + System.Text.Json.JsonNamingPolicy.KebabCaseLower.ConvertName( p.Name! )];
         }
 
         static bool ExpectBooleanFlag( IPluginTypeInfo typeInfo, MethodInfo method, ParameterInfo p )
@@ -170,7 +170,4 @@ sealed partial class CommandCollector
 
     [GeneratedRegex( "\\s+" )]
     private static partial Regex RegExPath();
-
-    [GeneratedRegex( "([a-z])([A-Z])", RegexOptions.CultureInvariant )]
-    private static partial Regex ToSnakeCase();
 }

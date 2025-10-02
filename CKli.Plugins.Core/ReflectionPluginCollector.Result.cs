@@ -200,7 +200,7 @@ sealed partial class ReflectionPluginCollector
 
                 b.Append( ' ', offset ).Append( $"new CommandDescription( infos[{idxPlugin}].PluginTypes[{idxType}]," ).AppendLine();
                 int paramOffset = offset + 24;
-                AppendSourceString( b.Append( ' ', paramOffset ), c.FullCommandPath ).Append( ',' ).AppendLine();
+                AppendSourceString( b.Append( ' ', paramOffset ), c.CommandPath ).Append( ',' ).AppendLine();
                 AppendSourceString( b.Append( ' ', paramOffset ), c.Description ).Append( ',' ).AppendLine();
                 // Arguments
                 b.Append( ' ', paramOffset ).Append( "arguments: [" ).AppendLine();

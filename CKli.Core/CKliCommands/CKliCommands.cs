@@ -124,7 +124,7 @@ public static class CKliCommands
     /// </summary>
     /// <param name="commandPath">The command path.</param>
     /// <returns>The command description if it exists, null otherwise.</returns>
-    public static CommandDescription? FindFromPath( string commandPath ) => _commands.FirstOrDefault( c => c.FullCommandPath == commandPath );
+    public static CommandDescription? FindFromPath( string commandPath ) => _commands.FirstOrDefault( c => c.CommandPath == commandPath );
 
     /// <summary>
     /// Clones a Stack and all its current world repositories in the current directory.
