@@ -5,6 +5,10 @@ namespace CKli.Core;
 
 /// <summary>
 /// Minimal abstraction of a secret store.
+/// <para>
+/// Alternative implementation to the default <see cref="DotNetUserSecretsStore"/> must have a
+/// public default constructor.
+/// </para>
 /// </summary>
 public interface ISecretsStore
 {

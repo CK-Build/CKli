@@ -43,6 +43,7 @@ static partial class TestEnv
 
     static void InitializeNuGetSource()
     {
+        CKliRootEnv.Initialize( "Test" );
         if( !Directory.Exists( _nugetSourcePath ) )
         {
             Directory.CreateDirectory( _nugetSourcePath );

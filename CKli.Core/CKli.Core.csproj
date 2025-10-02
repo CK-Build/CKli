@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="CSemVer" Version="12.0.3" />
-    <PackageReference Include="CK.ActivityMonitor.SimpleSender" Version="25.0.0" />
+    <PackageReference Include="CK.Monitoring" Version="25.0.1" />
     <PackageReference Include="LibGit2Sharp" Version="0.31.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="9.0.9" />
   </ItemGroup>

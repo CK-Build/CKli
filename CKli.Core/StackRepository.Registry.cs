@@ -26,9 +26,13 @@ public sealed partial class StackRepository
 
     static class Registry
     {
-        static NormalizedPath _regFilePath = Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData ),
-                                                           "CKli",
-                                                           StackRegistryFileName );
+        static NormalizedPath _regFilePath;
+
+        static Registry()
+        {
+            CKliRootEnv.CheckInitialized();
+            _regFilePath = CKliRootEnv.AppLocalDataPath.AppendPart( StackRegistryFileName );
+        }
 
         public static IReadOnlyList<NormalizedPath> CheckExistingStack( IActivityMonitor monitor, Uri stackUri )
         {
@@ -43,7 +47,7 @@ public sealed partial class StackRepository
 
         public static bool ClearRegistry( IActivityMonitor monitor )
         {
-            using Mutex mutex = AcquireMutex( monitor );
+            using Mutex mutex = CKliRootEnv.AcquireAppMutex( monitor );
             return FileHelper.DeleteFile( monitor, _regFilePath );
         }
 
@@ -52,7 +56,7 @@ public sealed partial class StackRepository
             foundPath = newPath.IsEmptyPath
                             ? new List<NormalizedPath>()
                             : null;
-            using Mutex mutex = AcquireMutex( monitor );
+            using Mutex mutex = CKliRootEnv.AcquireAppMutex( monitor );
             var map = new Dictionary<NormalizedPath, Uri>();
 
             bool mustSave = !File.Exists( _regFilePath )
@@ -76,17 +80,7 @@ public sealed partial class StackRepository
                 {
                     b.Append( path ).Append( '*' ).Append( uri ).AppendLine();
                 }
-                try
-                {
-                    File.WriteAllText( _regFilePath, b.ToString() );
-                }
-                catch( DirectoryNotFoundException )
-                {
-                    var ckliAppPath = _regFilePath.RemoveLastPart();
-                    monitor.Trace( $"First install: creating folder '{ckliAppPath}'." );
-                    Directory.CreateDirectory( ckliAppPath );
-                    File.WriteAllText( _regFilePath, b.ToString() );
-                }
+                File.WriteAllText( _regFilePath, b.ToString() );
             }
 
             static bool ReadStackRegistry( IActivityMonitor monitor, Uri findOrUpdateStackUri, List<NormalizedPath>? foundPath, Dictionary<NormalizedPath, Uri> map )
@@ -138,18 +132,6 @@ public sealed partial class StackRepository
                 }
 
             }
-        }
-
-        private static Mutex AcquireMutex( IActivityMonitor monitor )
-        {
-            var mutex = new Mutex( true, "Global-CKli-StackRepositoryRegistry", out var acquired );
-            if( !acquired )
-            {
-                monitor.Warn( "Waiting for the Global-CKli-StackRepositoryRegistry mutex to be released." );
-                mutex.WaitOne();
-            }
-
-            return mutex;
         }
     }
 

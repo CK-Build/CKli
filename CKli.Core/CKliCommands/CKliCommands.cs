@@ -3,6 +3,7 @@ using CKli.Core;
 using CSemVer;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace CKli;
 
@@ -56,7 +57,7 @@ public static class CKliCommands
                                     ]),
             new CommandDescription( null,
                                     "layout fix",
-                                    "Fixes the the folders and repositories layout of the current world.",
+                                    "Fixes the the folders and repositories layout of the current world (including casing differences).",
                                     [],
                                     [],
                                     [
@@ -89,6 +90,18 @@ public static class CKliCommands
                                         (["--allow-lts"], "Allows the current world to be a Long Term Support world.")
                                     ]),
             new CommandDescription( null,
+                                    "plugin",
+                                    "Manages CKli plugins.",
+                                    arguments: [],
+                                    options: [(["--compile-configuration"],
+                                                """
+                                                Sets the compilation mode. Can be:
+                                                - Release: (Default) plugins are compiled in Release mode.
+                                                - Debug: Plugins are compiled in Debug mode.
+                                                - None: Plugins are not compiled (uses reflection).
+                                                """)],
+                                    flags: []),
+            new CommandDescription( null,
                                     "plugin create",
                                     "Creates a new source based plugin project for the current World.",
                                     [("pluginName", """The plugin name "MyPlugin" (or "CKli.MyPlugin.Plugin") to create.""")],
@@ -111,20 +124,46 @@ public static class CKliCommands
                                     [],
                                     [
                                         (["--allow-lts"], "Allows the current world to be a Long Term Support world.")
-                                    ]),
-            new CommandDescription( null,
-                                    "plugin info",
-                                    "Dumps information about installed plugins.",
-                                    [], [], [])
+                                    ])
         };
     }
 
     /// <summary>
-    /// Finds a <see cref="CommandDescription"/> from its command path.
+    /// Finds an intrinsic <see cref="CommandDescription"/> from its command path.
     /// </summary>
     /// <param name="commandPath">The command path.</param>
     /// <returns>The command description if it exists, null otherwise.</returns>
-    public static CommandDescription? FindFromPath( string commandPath ) => _commands.FirstOrDefault( c => c.CommandPath == commandPath );
+    public static CommandDescription? FindCKliCommandFromPath( string commandPath ) => _commands.FirstOrDefault( c => c.CommandPath == commandPath );
+
+    public static Task<int> HandleCommandAsync( IActivityMonitor monitor,
+                                                ISecretsStore secretsStore,
+                                                NormalizedPath path,
+                                                string[] args )
+    {
+        var (stack, world) = StackRepository.TryOpenWorldFromPath( monitor, secretsStore, path, out bool error, skipPullStack: true );
+        if( error )
+        {
+            Throw.DebugAssert( stack == null && world == null );
+            return Task.FromResult( -1 );
+        }
+        try
+        {
+            if( world == null || world.DefinitionFile.IsPluginsDisabled )
+            {
+                return HandleCKliCommandAsync( monitor, secretsStore, path, args );
+            }
+            return world.HandleCommandAsync( monitor, args );
+        }
+        finally
+        {
+            stack?.Dispose();
+        }
+    }
+
+    static Task<int> HandleCKliCommandAsync( IActivityMonitor monitor, ISecretsStore secretsStore, NormalizedPath path, string[] args )
+    {
+
+    }
 
     /// <summary>
     /// Clones a Stack and all its current world repositories in the current directory.

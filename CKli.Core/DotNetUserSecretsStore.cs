@@ -10,6 +10,9 @@ namespace CKli.Core;
 
 /// <summary>
 /// Implements <see cref="ISecretsStore"/> on dotnet user-secrets (with Id = "CKli").
+/// <para>
+/// Note that the Id is <see cref="CKliRootEnv.InstanceName"/>.
+/// </para>
 /// </summary>
 public sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
 {
@@ -56,7 +59,7 @@ public sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
                             This operation requires the secret '{failed[0]}'.
                             Please obtain this secret (typically a Personal Access Token) and register it on this machine:
 
-                            dotnet user-secrets set {failed[0]} <<your-secret>> --id CKli
+                            dotnet user-secrets set {failed[0]} <<your-secret>> --id {CKliRootEnv.InstanceName}
                             {more}
                             """ );
         return null;
@@ -67,7 +70,7 @@ public sealed class DotNetUserSecretsStore : ISecretsStore, IDisposable
         if( !_documentLoaded )
         {
             _documentLoaded = true;
-            _secretFilePath ??= PathHelper.GetSecretsPathFromSecretsId( "CKli" );
+            _secretFilePath ??= PathHelper.GetSecretsPathFromSecretsId( CKliRootEnv.InstanceName );
             try
             {
                 if( File.Exists( _secretFilePath ) )
