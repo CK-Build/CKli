@@ -264,27 +264,25 @@ public sealed partial class StackRepository : IDisposable
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="secretsStore">The secret key store.</param>
-    /// <param name="path">The starting path.</param>
+    /// <param name="context">The basic command context.</param>
     /// <param name="error">True on errror, false on success.</param>
     /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
     /// <param name="stackBranchName">Specifies a branch name. There should be no reason to use multiple branches in a stack repository.</param>
     /// <returns>The resulting stack repository if found and opened successfully. May be null if not found.</returns>
     public static StackRepository? TryOpenFromPath( IActivityMonitor monitor,
-                                                    ISecretsStore secretsStore,
-                                                    in NormalizedPath path,
+                                                    CommandCommonContext context,
                                                     out bool error,
                                                     bool skipPullStack = false,
                                                     string stackBranchName = "main" )
     {
         Throw.CheckNotNullOrWhiteSpaceArgument( stackBranchName );
         error = false;
-        var gitPath = FindGitStackPath( path );
+        var gitPath = context.CurrentStackPath;
         if( gitPath.IsEmptyPath ) return null;
 
         var isPublic = gitPath.LastPart == PublicStackName;
         var git = GitRepository.Open( monitor,
-                                      secretsStore,
+                                      context.SecretsStore,
                                       gitPath,
                                       gitPath.RemoveFirstPart( gitPath.Parts.Count - 2 ),
                                       isPublic );
@@ -306,7 +304,7 @@ public sealed partial class StackRepository : IDisposable
                 }
                 if( !error && git.SetCurrentBranch( monitor, stackBranchName, skipPullStack ) )
                 {
-                    return new StackRepository( git, stackRoot, secretsStore, stackNameFromUrl );
+                    return new StackRepository( git, stackRoot, context.SecretsStore, stackNameFromUrl );
                 }
             }
             git.Dispose();
@@ -329,20 +327,18 @@ public sealed partial class StackRepository : IDisposable
     /// </para>
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="secretsStore">The secret key store.</param>
-    /// <param name="path">The starting path.</param>
+    /// <param name="context">The basic command context.</param>
     /// <param name="stack">The non null stack on success.</param>
     /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
     /// <param name="stackBranchName">Specifies a branch name. There should be no reason to use multiple branches in a stack repository.</param>
     /// <returns>The resulting stack repository if found and opened successfully. May be null if not found.</returns>
     public static bool OpenFromPath( IActivityMonitor monitor,
-                                     ISecretsStore secretsStore,
-                                     in NormalizedPath path,
+                                     CommandCommonContext context,
                                      [NotNullWhen(true)] out StackRepository? stack,
                                      bool skipPullStack = false,
                                      string stackBranchName = "main" )
     {
-        stack = TryOpenFromPath( monitor, secretsStore, path, out bool error, skipPullStack, stackBranchName );
+        stack = TryOpenFromPath( monitor, context, out bool error, skipPullStack, stackBranchName );
         if( error )
         {
             Throw.DebugAssert( stack == null );
@@ -350,7 +346,7 @@ public sealed partial class StackRepository : IDisposable
         }
         if( stack == null )
         {
-            monitor.Error( $"Unable to find a stack repository from path '{path}'." );
+            monitor.Error( $"Unable to find a stack repository from path '{context.CurrentDirectory}'." );
             return false;
         }
         return true;
@@ -361,21 +357,19 @@ public sealed partial class StackRepository : IDisposable
     /// this is not an error but <c>(null,null)</c> is returned.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="secretsStore">The secret key store.</param>
-    /// <param name="path">The starting path.</param>
+    /// <param name="context">The basic command context.</param>
     /// <param name="error">True on error, false on success.</param>
     /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
     /// <returns>The resulting stack repository and world on success. Both are null on error of if no stack is found.</returns>
     public static (StackRepository? Stack, World? World) TryOpenWorldFromPath( IActivityMonitor monitor,
-                                                                               ISecretsStore secretsStore,
-                                                                               in NormalizedPath path,
+                                                                               CommandCommonContext context,
                                                                                out bool error,
                                                                                bool skipPullStack = false )
     {
-        var stack = TryOpenFromPath( monitor, secretsStore, path, out error, skipPullStack );
+        var stack = TryOpenFromPath( monitor, context, out error, skipPullStack );
         if( stack != null )
         {
-            var w = World.Create( monitor, stack, path );
+            var w = World.Create( monitor, stack, context.CurrentDirectory );
             if( w == null )
             {
                 error = true;
@@ -395,31 +389,29 @@ public sealed partial class StackRepository : IDisposable
     /// A stack must be found on or above the path otherwise it is an error.
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="secretsStore">The secret key store.</param>
-    /// <param name="path">The starting path.</param>
+    /// <param name="context">The basic command context.</param>
     /// <param name="stack">The non null stack on success.</param>
     /// <param name="world">The non null world on success.</param>
     /// <param name="skipPullStack">True to leave the stack repository as-is. By default, a pull is done from the remote stack repository.</param>
     /// <returns>True on success, false on error.</returns>
     public static bool OpenWorldFromPath( IActivityMonitor monitor,
-                                          ISecretsStore secretsStore,
-                                          in NormalizedPath path,
+                                          CommandCommonContext context,
                                           [NotNullWhen( true )] out StackRepository? stack,
                                           [NotNullWhen( true )] out World? world,
                                           bool skipPullStack = false )
     {
         world = null;
-        stack = TryOpenFromPath( monitor, secretsStore, path, out bool error, skipPullStack );
+        stack = TryOpenFromPath( monitor, context, out bool error, skipPullStack );
         if( error )
         {
             return false;
         }
         if( stack == null )
         {
-            monitor.Error( $"No stack found for path '{path}'." );
+            monitor.Error( $"No stack found for path '{context.CurrentDirectory}'." );
             return false;
         }
-        world = World.Create( monitor, stack, path );
+        world = World.Create( monitor, stack, context.CurrentDirectory );
         if( world == null )
         {
             stack.Dispose();

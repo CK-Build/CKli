@@ -18,6 +18,7 @@ public sealed class WorldDefinitionFile
     readonly LocalWorldName _world;
     List<(NormalizedPath, Uri)>? _layout;
     Dictionary<string, (XElement Config, bool IsDisabled)>? _pluginsConfiguration;
+    PluginCompilationMode? _compilationMode;
     bool _allowEdit;
     bool _isDirty;
 
@@ -90,6 +91,34 @@ public sealed class WorldDefinitionFile
     /// Gets whether &lt;Plugins Disabled="true" /&gt; is set.
     /// </summary>
     public bool IsPluginsDisabled => (bool?)_plugins.Attribute( _xDisabled ) is true;
+
+    /// <summary>
+    /// Gets &lt;Plugins CompilationMode="..." /&gt;.
+    /// It must exactly be set to "Debug" or "None", any other value (including the lack of attribute)
+    /// is <see cref="PluginCompilationMode.Release"/>.
+    /// </summary>
+    public PluginCompilationMode CompilationMode
+    {
+        get
+        {
+            if( !_compilationMode.HasValue )
+            {
+                _compilationMode = _plugins.Attribute( _xCompilationMode )?.Value switch
+                {
+                    "Debug" => PluginCompilationMode.Debug,
+                    "None" => PluginCompilationMode.None,
+                    _ => PluginCompilationMode.Release
+                };
+            }
+            return _compilationMode.Value;
+        }
+
+        internal set
+        {
+            _plugins.SetAttributeValue( _xCompilationMode, value != PluginCompilationMode.Release ? value.ToString() : null );
+            _compilationMode = value;
+        }
+    }
 
     /// <summary>
     /// Reads the &lt;Plugins&gt; section.
@@ -351,8 +380,9 @@ public sealed class WorldDefinitionFile
         return true;
     }
 
-    static readonly XName _xDisabled = XNamespace.None + "Disabled";
     static readonly XName _xPlugins = XNamespace.None + "Plugins";
+    static readonly XName _xDisabled = XNamespace.None + "Disabled";
+    static readonly XName _xCompilationMode = XNamespace.None + "CompilationMode";
     static readonly XName _xRepository = XNamespace.None + "Repository";
     static readonly XName _xFolder = XNamespace.None + "Folder";
     static readonly XName _xName = XNamespace.None + "Name";

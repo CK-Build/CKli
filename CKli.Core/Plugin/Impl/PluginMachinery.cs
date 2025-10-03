@@ -2,6 +2,7 @@ using CK.Core;
 using CSemVer;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.Design;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
@@ -156,10 +157,21 @@ public sealed partial class PluginMachinery
         }
         // Memorizes the AssemblyLoadContext to be able to wait for its actual unload.
         _singleRunning = new WeakReference( worldPlugins, trackResurrection: true );
-        if( !worldPlugins.IsCompiledPlugins )
+        if( worldPlugins.CompilationMode != definitionFile.CompilationMode )
         {
-            monitor.Trace( "Generating Compiled plugins file." );
-            File.WriteAllText( machinery.CKliCompiledPluginsFile, worldPlugins.GenerateCode() );
+            if( definitionFile.CompilationMode == PluginCompilationMode.None )
+            {
+                monitor.Trace( "Deleting Compiled plugins file (CompilationMode = None)." );
+                if( !FileHelper.DeleteFile( monitor, machinery.CKliCompiledPluginsFile ) )
+                {
+                    return null;
+                }
+            }
+            else
+            {
+                monitor.Trace( $"Generating Compiled plugins file (CompilationMode = {definitionFile.CompilationMode})." );
+                File.WriteAllText( machinery.CKliCompiledPluginsFile, worldPlugins.GenerateCode() );
+            }
             worldPlugins.Dispose();
             worldPlugins = null;
             toRecompile = pluginContext;

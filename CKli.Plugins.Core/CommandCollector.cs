@@ -26,9 +26,9 @@ sealed partial class CommandCollector
     public void Add( IPluginTypeInfo typeInfo, MethodInfo method, string commandPath, IList<CustomAttributeData> attributes )
     {
         commandPath = NormalizePath( commandPath );
-        if( CKliCommands.FindCKliCommandFromPath( commandPath ) != null )
+        if( CKliCommands.Commands.Find( commandPath ) != null )
         {
-            Throw.CKException( $"""Invalid [CommandPath( "{commandPath}" )] on '{typeInfo.TypeName}.{method.Name}' method. This path is a CKli command.""" );
+            Throw.CKException( $"""Invalid [CommandPath( "{commandPath}" )] on '{typeInfo.TypeName}.{method.Name}' method. This path is an intrinsic CKli command.""" );
         }
         if( _handlers.TryGetValue( commandPath, out var exists ) )
         {

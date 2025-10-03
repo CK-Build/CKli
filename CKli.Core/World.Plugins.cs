@@ -3,12 +3,33 @@ using CSemVer;
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Xml.Linq;
 
 namespace CKli.Core;
 
 public sealed partial class World
 {
+
+    internal CommandNamespace Commands
+    {
+        get
+        {
+            Throw.DebugAssert( _pluginMachinery != null );
+            return _pluginMachinery.WorldPlugins.Commands;
+        }
+    }
+
+    internal bool SetPluginCompilationMode( IActivityMonitor monitor, PluginCompilationMode mode )
+    {
+        Throw.DebugAssert( mode != DefinitionFile.CompilationMode );
+        using( DefinitionFile.StartEdit() )
+        {
+            DefinitionFile.CompilationMode = mode;
+        }
+        return DefinitionFile.SaveFile( monitor );
+    }
+
     internal bool AddOrSetPluginPackage( IActivityMonitor monitor, string packageId, SVersion version )
     {
         if( !CheckAndPrepareForNewPlugin( monitor, packageId, out var shortName, out var fullName ) )
@@ -75,7 +96,7 @@ public sealed partial class World
             return false;
         }
         // Commit Stack before operations.
-        if( !_stackRepository.Commit( monitor, $"Before plugin '{fullName}'." ) )
+        if( !_stackRepository.Commit( monitor, $"Before new plugin '{fullName}'." ) )
         {
             return false;
         }

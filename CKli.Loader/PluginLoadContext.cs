@@ -34,11 +34,11 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginCollection
 
     IReadOnlyCollection<PluginInfo> IPluginCollection.Plugins => _worldPlugins!.Plugins;
 
-    IReadOnlyCollection<CommandDescription> IPluginCollection.Commands => _worldPlugins!.Commands;
+    CommandNamespace IPluginCollection.Commands => _worldPlugins!.Commands;
 
     IDisposable IPluginCollection.Create( IActivityMonitor monitor, World world ) => _worldPlugins!.Create( monitor, world );
 
-    bool IPluginCollection.IsCompiledPlugins => _worldPlugins!.IsCompiledPlugins;
+    PluginCompilationMode IPluginCollection.CompilationMode => _worldPlugins!.CompilationMode;
 
     string IPluginCollection.GenerateCode() => _worldPlugins!.GenerateCode();
 

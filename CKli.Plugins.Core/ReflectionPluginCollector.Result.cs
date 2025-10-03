@@ -13,12 +13,12 @@ sealed partial class ReflectionPluginCollector
         readonly ImmutableArray<PluginInfo> _pluginInfos;
         readonly List<PluginType> _activationList;
         readonly PluginCollectorContext _context;
-        readonly IReadOnlyCollection<CommandDescription> _commands;
+        readonly CommandNamespace _commands;
 
         public Result( ImmutableArray<PluginInfo> pluginInfos,
                        List<PluginType> activationList,
                        PluginCollectorContext context,
-                       IReadOnlyCollection<CommandDescription> commands )
+                       CommandNamespace commands )
         {
             _pluginInfos = pluginInfos;
             _activationList = activationList;
@@ -28,7 +28,7 @@ sealed partial class ReflectionPluginCollector
 
         public IReadOnlyCollection<PluginInfo> Plugins => _pluginInfos;
 
-        public IReadOnlyCollection<CommandDescription> Commands => _commands;
+        public CommandNamespace Commands => _commands;
 
         public IDisposable Create( IActivityMonitor monitor, World world )
         {
@@ -40,7 +40,7 @@ sealed partial class ReflectionPluginCollector
             return new ActivatedPlugins( instantiated );
         }
 
-        public bool IsCompiledPlugins => false;
+        public PluginCompilationMode CompilationMode => PluginCompilationMode.None;
 
         public void Dispose()
         {
@@ -98,8 +98,12 @@ sealed partial class ReflectionPluginCollector
                 public IReadOnlyCollection<PluginInfo> Plugins => _plugins;
 
                 public IReadOnlyCollection<CommandDescription> Commands => _commands;
-
-                public bool IsCompiledPlugins => true;
+                
+            #if DEBUG
+                public PluginCompilationMode CompilationMode => PluginCompilationMode.Debug;
+            #else
+                public PluginCompilationMode CompilationMode => PluginCompilationMode.Release;
+            #endif
 
                 public string GenerateCode() => throw new InvalidOperationException( "IsCompiledPlugins" );
 
@@ -214,19 +218,19 @@ sealed partial class ReflectionPluginCollector
                 b.Append( ' ', paramOffset ).Append( "]," ).AppendLine();
                 // Options
                 b.Append( ' ', paramOffset ).Append( "options: [" ).AppendLine();
-                DumpOptionsOrFlags( b, paramOffset + 4, c.Options );
+                DumpOptions( b, paramOffset + 4, c.Options );
                 b.Append( ' ', paramOffset ).Append( "]," ).AppendLine();
                 // Flags
                 b.Append( ' ', paramOffset ).Append( "flags: [" ).AppendLine();
-                DumpOptionsOrFlags( b, paramOffset + 4, c.Flags );
+                DumpFlags( b, paramOffset + 4, c.Flags );
                 b.Append( ' ', paramOffset ).Append( "] )," ).AppendLine();
             }
             offset -= 4;
             b.Append( ' ', offset ).Append( "};" ).AppendLine();
 
-            void DumpOptionsOrFlags( StringBuilder b, int paramOffset, ImmutableArray<(ImmutableArray<string> Names, string Description)> optionsOrFlags )
+            void DumpOptions( StringBuilder b, int paramOffset, ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> options )
             {
-                foreach( var o in optionsOrFlags )
+                foreach( var o in options )
                 {
                     b.Append( ' ', paramOffset ).Append( "([" );
                     foreach( var n in o.Names )
@@ -234,12 +238,27 @@ sealed partial class ReflectionPluginCollector
                         AppendSourceString( b, n ).Append( ',' );
                     }
                     b.Append( "], " );
-                    AppendSourceString( b, o.Description ).Append( ")," ).AppendLine();
+                    AppendSourceString( b, o.Description ).Append( ", " ).Append( o.Multiple ).Append( " )," ).AppendLine();
                 }
             }
+
+            void DumpFlags( StringBuilder b, int paramOffset, ImmutableArray<(ImmutableArray<string> Names, string Description)> flags )
+            {
+                foreach( var f in flags )
+                {
+                    b.Append( ' ', paramOffset ).Append( "([" );
+                    foreach( var n in f.Names )
+                    {
+                        AppendSourceString( b, n ).Append( ',' );
+                    }
+                    b.Append( "], " );
+                    AppendSourceString( b, f.Description ).Append( " )," ).AppendLine();
+                }
+            }
+
         }
 
-        StringBuilder AppendSourceString( StringBuilder b, string s )
+        static StringBuilder AppendSourceString( StringBuilder b, string s )
         {
             return b.Append( '"' ).Append( s.Replace( "\r", "\\r" ).Replace( "\n", "\\n" ).Replace( "\"", "\\\"" ) ).Append( '"' );
         }

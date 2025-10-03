@@ -1,12 +1,12 @@
 using CK.Core;
-using System;
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace CKli.Core;
 
 /// <summary>
-/// Immutable command description.
+/// Immutable command handler and description.
 /// <para>
 /// This command model supports 3 kind of parameters that must appear in the following order on the command line:
 /// <list type="number">
@@ -36,7 +36,7 @@ namespace CKli.Core;
 /// </list>
 /// </para>
 /// </summary>
-public partial class CommandDescription
+public abstract partial class CommandDescription
 {
     readonly IPluginTypeInfo? _typeInfo;
     readonly string _commandPath;
@@ -46,7 +46,7 @@ public partial class CommandDescription
     readonly ImmutableArray<(ImmutableArray<string> Names, string Description)> _flags;
 
     /// <summary>
-    /// Initializes a new command description.
+    /// Initializes a new command with its description.
     /// </summary>
     /// <param name="typeInfo">The type that handles the command.</param>
     /// <param name="commandPath">The whitespace separated command path.</param>
@@ -54,14 +54,14 @@ public partial class CommandDescription
     /// <param name="arguments">The required command arguments.</param>
     /// <param name="options">The options.</param>
     /// <param name="flags">The flags.</param>
-    public CommandDescription( IPluginTypeInfo? typeInfo,
-                               string commandPath,
-                               string description,
-                               ImmutableArray<(string Name, string Description)> arguments,
-                               ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> options,
-                               ImmutableArray<(ImmutableArray<string> Names, string Description)> flags )
+    protected CommandDescription( IPluginTypeInfo? typeInfo,
+                                  string commandPath,
+                                  string description,
+                                  ImmutableArray<(string Name, string Description)> arguments,
+                                  ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> options,
+                                  ImmutableArray<(ImmutableArray<string> Names, string Description)> flags )
     {
-        Throw.CheckArgument( ValidCommandPath().IsMatch( commandPath ) );
+        Throw.CheckArgument( IsValidCommandPath( commandPath ) );
         Throw.CheckNotNullArgument( description );
         _typeInfo = typeInfo;
         _commandPath = commandPath;
@@ -111,74 +111,28 @@ public partial class CommandDescription
     /// </summary>
     public ImmutableArray<(ImmutableArray<string> Names, string Description)> Flags => _flags;
 
-    [GeneratedRegex( "^[a-z]+(?: [a-z]+)$" )]
-    private static partial Regex ValidCommandPath();
-}
-
-public abstract class CKliCommand : CommandDescription
-{
-    private protected CKliCommand( IPluginTypeInfo? typeInfo,
-                                   string commandPath,
-                                   string description,
-                                   ImmutableArray<(string Name, string Description)> arguments,
-                                   ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> options,
-                                   ImmutableArray<(ImmutableArray<string> Names, string Description)> flags )
-        : base( typeInfo, commandPath, description, arguments, options, flags )
-    {
-    }
-
-    internal abstract int HandleCommand( IActivityMonitor monitor,
-                                         ISecretsStore secretsStore,
-                                         NormalizedPath path,
-                                         string[] args );
-}
-
-/// <summary>
-/// Clone command.
-/// </summary>
-public sealed class CKliClone : CKliCommand
-{
-    internal CKliClone()
-        : base( null,
-                "clone",
-                "Clones a Stack and all its current World repositories in the current directory.",
-                [("stackUrl", "The url stack repository to clone from. The repository name must end with '-Stack'.")],
-                [],
-                [
-                    (["--private"],"Indicates a private repository. A Personal Access Token (or any other secret) is required."),
-                    (["--allow-duplicate"],"Allows a Stack that already exists locally to be cloned."),
-                ] ) 
-    {
-    }
-
-    internal override int HandleCommand( IActivityMonitor monitor, ISecretsStore secretsStore, NormalizedPath path, string[] args )
-    {
-        if( Uri.TryCreate( new string( s ), UriKind.Absolute, out var uri ) )
-    }
+    /// <summary>
+    /// A valid command path is a single white separated list of lower case identifiers with optional leading '*' and/or trailing '*'.
+    /// </summary>
+    /// <param name="commandPath">The command path.</param>
+    /// <returns>True if this is a valid command path.</returns>
+    public static bool IsValidCommandPath( string commandPath ) => ValidCommandPath().IsMatch( commandPath );
 
     /// <summary>
-    /// Clones a Stack and all its current world repositories in the <paramref name="path"/>.
+    /// Command handler implementation. <paramref name="cmdLine"/> is ready to be consumed (and must be
+    /// consumed). <see cref="CommandLineArguments.CheckNoRemainingArguments(IActivityMonitor)"/> must be called
+    /// before executing the command. The number of required <see cref="Arguments"/> is guaranteed to exist (but may be
+    /// options or flags, this has to be handled).
     /// </summary>
     /// <param name="monitor">The monitor to use.</param>
-    /// <param name="secretsStore">The secrets store.</param>
-    /// <param name="path">The current path to consider.</param>
-    /// <param name="stackUrl">The url stack repository to clone from. The repository name must end with '-Stack'.</param>
-    /// <param name="private">Indicates a private repository. A Personal Access Token (or any other secret) is required.</param>
-    /// <param name="allowDuplicate">Allows a stack that already exists locally to be cloned.</param>
-    /// <returns>0 on success, negative on error.</returns>
-    public static int Clone( IActivityMonitor monitor,
-                             ISecretsStore secretsStore,
-                             NormalizedPath path,
-                             Uri stackUrl,
-                             bool @private = false,
-                             bool allowDuplicate = false )
-    {
-        using( var stack = StackRepository.Clone( monitor, secretsStore, stackUrl, !@private, path, allowDuplicate ) )
-        {
-            return stack != null
-                    ? 0
-                    : -1;
-        }
-    }
+    /// <param name="context">The basic command context.</param>
+    /// <param name="cmdLine">The matching command line.</param>
+    /// <returns>True on success, false on error. Errors must be logged.</returns>
+    internal protected abstract ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
+                                                                    CommandCommonContext context,
+                                                                    CommandLineArguments cmdLine );
 
+
+    [GeneratedRegex( """^\*?[a-z]+\*?( \*?[a-z]+\*?)*$""", RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture )]
+    private static partial Regex ValidCommandPath();
 }

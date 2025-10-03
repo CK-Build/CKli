@@ -1,4 +1,6 @@
 using CK.Core;
+using CommunityToolkit.HighPerformance;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -22,12 +24,6 @@ public sealed class CommandLineArguments
         _hasHelp = EatFlag( "--help", "-h", "-?" );
     }
 
-    internal void EatPath( int pathCount )
-    {
-        Throw.DebugAssert( pathCount >= 0 && pathCount <= _args.Count );
-        _args.RemoveRange( 0, pathCount );
-    }
-
     /// <summary>
     /// Gets whether "--help", "-h" or "-?" was in the command line.
     /// </summary>
@@ -37,6 +33,11 @@ public sealed class CommandLineArguments
     /// Gets whether all arguments have been eaten.
     /// </summary>
     public bool IsEmpty => _args.Count == 0;
+
+    /// <summary>
+    /// Gets the number of remaining arguments, options or flags.
+    /// </summary>
+    public int RemainingCount => _args.Count;
 
     /// <summary>
     /// Extracts the next required argument.
@@ -125,4 +126,13 @@ public sealed class CommandLineArguments
         }
         return true;
     }
+
+    internal ReadOnlySpan<string> Remaining => _args.AsSpan();
+
+    internal void EatPath( int pathCount )
+    {
+        Throw.DebugAssert( pathCount >= 0 && pathCount <= _args.Count );
+        _args.RemoveRange( 0, pathCount );
+    }
+
 }

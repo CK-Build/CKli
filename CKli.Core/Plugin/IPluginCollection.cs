@@ -16,9 +16,9 @@ public interface IPluginCollection : IDisposable
     IReadOnlyCollection<PluginInfo> Plugins { get; }
 
     /// <summary>
-    /// Gets the descriptions of all the commands supported by the plugins.
+    /// Gets the the commands supported by the plugins in addition the intrinsic CKli commands.
     /// </summary>
-    IReadOnlyCollection<CommandDescription> Commands { get; }
+    CommandNamespace Commands { get; }
 
     /// <summary>
     /// Initializes a configured set of plugins for a World. 
@@ -32,13 +32,13 @@ public interface IPluginCollection : IDisposable
     IDisposable Create( IActivityMonitor monitor, World world );
 
     /// <summary>
-    /// Gets whether this collection is already compiled.
+    /// Gets whether this collection compilation mode.
     /// </summary>
-    bool IsCompiledPlugins { get; }
+    PluginCompilationMode CompilationMode { get; }
 
     /// <summary>
     /// Generates the CompiledPlugins code.
-    /// Must be called only when <see cref="IsCompiledPlugins"/> is false.
+    /// Must be called only when <see cref="CompilationMode"/> is <see cref="PluginCompilationMode.None"/>.
     /// </summary>
     /// <returns>The static class CompiledPlugins source code.</returns>
     string GenerateCode();

@@ -41,28 +41,27 @@ public sealed class CommandNamespace
         return commands.OrderBy( c => c.CommandPath ).ToList();
     }
 
-    internal CommandDescription? FindForExecution( IActivityMonitor monitor, ref string[] args, out string? helpPath )
+    internal CommandDescription? FindForExecution( IActivityMonitor monitor, CommandLineArguments cmdLine, out string? helpPath )
     {
-        LocateCommand( args, out CommandDescription? cmd, out helpPath, out ReadOnlySpan<string> sArgs );
+        LocateCommand( cmdLine, out CommandDescription? cmd, out helpPath );
         if( cmd == null )
         {
             monitor.Error( "Unable to find command." );
             return null;
         }
-        if( cmd.Arguments.Length > args.Length )
+        if( cmd.Arguments.Length > cmdLine.RemainingCount )
         {
             monitor.Error( $"Command '{cmd.CommandPath}' requires {cmd.Arguments.Length} arguments." );
             return null;
         }
-        args = sArgs.ToArray();
         return cmd;
     }
 
-    void LocateCommand( string[] args, out CommandDescription? cmd, out string? path, out ReadOnlySpan<string> sArgs )
+    void LocateCommand( CommandLineArguments cmdLine, out CommandDescription? cmd, out string? path )
     {
         cmd = null;
         path = null;
-        sArgs = args.AsSpan();
+        var sArgs = cmdLine.Remaining;
         if( sArgs.Length == 0 ) return;
 
         int pathCount = 0;
@@ -83,7 +82,7 @@ public sealed class CommandNamespace
             b.Append( ' ' ).Append( sArgs[pathCount] );
             nextPath = b.ToString();
         }
-        sArgs = sArgs.Slice( pathCount );
+        cmdLine.EatPath( pathCount );
     }
 
 }

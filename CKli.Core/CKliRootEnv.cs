@@ -1,5 +1,7 @@
 using CK.Core;
+using CK.Monitoring;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Threading;
 
@@ -12,22 +14,32 @@ namespace CKli.Core;
 /// <para>
 /// This is a static class. Tests use the <see cref="Initialize(string?)"/> instance name to isolate the test environment ("CKli-Test")
 /// from the regular run environment ("CKli").
+/// This captures the initial <see cref="Environment.CurrentDirectory"/> and initializes the <see cref="GrandOutput.Default"/> if it is
+/// not already initialized.
 /// </para>
 /// </summary>
 public static class CKliRootEnv
 {
     static NormalizedPath _appLocalDataPath;
     static ISecretsStore? _secretsStore;
+    static NormalizedPath _currentDirectory;
+    static NormalizedPath _currentStackPath;
+    static CommandCommonContext? _defaultCommandContext;
 
     /// <summary>
-    /// Initialize the CKli environment. 
+    /// Initializes the CKli environment. This captures the <see cref="Environment.CurrentDirectory"/> and
+    /// initializes the 
     /// </summary>
     /// <param name="instanceName">Used by tests (with "Test"). Can be used with other suffix if needed.</param>
     public static void Initialize( string? instanceName = null )
     {
         Throw.CheckState( "Initialize can be called only once.", AppLocalDataPath.IsEmptyPath );
         _appLocalDataPath = Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData ), instanceName != null ? "CKli" : $"CKli-{instanceName}" );
-
+        // To handle logs, we firts must determine if we are in a Stack. If this is the case, then the Logs/ folder
+        // will be .XXXXStack/Logs, else the log will be in _appLocalDataPath/Out-of-Stack-Logs/.
+        _currentDirectory = Environment.CurrentDirectory;
+        _currentStackPath = StackRepository.FindGitStackPath( _currentDirectory );
+        InitializeMonitoring( _currentDirectory, _currentStackPath );
         NormalizedPath configFilePath = GetConfigPath();
         try
         {
@@ -71,10 +83,40 @@ public static class CKliRootEnv
             SetAndWriteDefaultConfig();
         }
 
+        _defaultCommandContext = new CommandCommonContext( _secretsStore, _currentDirectory, _currentStackPath );
+
+        [MemberNotNull( nameof(_secretsStore) )]
         static void SetAndWriteDefaultConfig()
         {
             _secretsStore = new DotNetUserSecretsStore();
             WriteConfiguration( null );
+        }
+
+        static void InitializeMonitoring( NormalizedPath currentDirectory, NormalizedPath currentStackPath )
+        {
+            // If the logging is already configured, we do nothing (except logging this first initialization).
+            if( GrandOutput.Default == null )
+            {
+                if( LogFile.RootLogPath == null )
+                {
+                    LogFile.RootLogPath = currentStackPath.IsEmptyPath
+                                            ? CKliRootEnv.AppLocalDataPath.AppendPart( "Out-of-Stack-Logs" )
+                                            : currentStackPath.AppendPart( "Logs" );
+                }
+                ActivityMonitor.DefaultFilter = LogFilter.Diagnostic;
+                GrandOutput.EnsureActiveDefault( new GrandOutputConfiguration()
+                {
+                    Handlers = { new CK.Monitoring.Handlers.TextFileConfiguration { MaximumTotalKbToKeep = 2 * 1024 /*2 MBytes */ } }
+                } );
+            }
+            else
+            {
+                ActivityMonitor.StaticLogger.Info( $"""
+                        Initializing CKliRootEnv:
+                        CurrentDirectory = '{currentDirectory}'
+                        AppLocalDataPath = '{CKliRootEnv.AppLocalDataPath}'
+                        """ );
+            }
         }
     }
 
@@ -86,17 +128,75 @@ public static class CKliRootEnv
     /// <summary>
     /// Gets instance name ("CKli" or "CKli-Test" for instance).
     /// </summary>
-    public static string InstanceName => _appLocalDataPath.LastPart;
+    public static string InstanceName
+    {
+        get
+        {
+            CheckInitialized();
+            return _appLocalDataPath.LastPart;
+        }
+    }
 
     /// <summary>
     /// Gets the full path of the folder in <see cref="Environment.SpecialFolder.LocalApplicationData"/> to use.
     /// </summary>
-    public static NormalizedPath AppLocalDataPath => _appLocalDataPath;
+    public static NormalizedPath AppLocalDataPath
+    {
+        get
+        {
+            CheckInitialized();
+            return _appLocalDataPath;
+        }
+    }
 
     /// <summary>
     /// Gets the secrets store to use.
     /// </summary>
-    public static ISecretsStore? SecretsStore => _secretsStore;
+    public static ISecretsStore SecretsStore
+    {
+        get
+        {
+            CheckInitialized();
+            return _secretsStore!;
+        }
+    }
+
+    /// <summary>
+    /// Gets the initial current directory.
+    /// </summary>
+    public static NormalizedPath CurrentDirectory
+    {
+        get
+        {
+            CheckInitialized();
+            return _currentDirectory;
+        }
+    }
+
+    /// <summary>
+    /// Gets the current <see cref="StackRepository.StackWorkingFolder"/> if initial <see cref="CurrentDirectory"/> is in a Stack directory.
+    /// <see cref="NormalizedPath.IsEmptyPath"/> otherwise.
+    /// </summary>
+    public static NormalizedPath CurrentStackPath
+    {
+        get
+        {
+            CheckInitialized();
+            return _currentStackPath;
+        }
+    }
+
+    /// <summary>
+    /// Gets the default command context.
+    /// </summary>
+    public static CommandCommonContext DefaultCommandContext
+    {
+        get
+        {
+            CheckInitialized();
+            return _defaultCommandContext!;
+        }
+    }
 
     /// <summary>
     /// Acquires an exclusive global system lock for this environment: the key is the <see cref="AppLocalDataPath"/>.
