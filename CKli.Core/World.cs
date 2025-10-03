@@ -32,7 +32,7 @@ public sealed partial class World
         get => _pluginLoader;
         set
         {
-            Throw.CheckState( "One set, PluginLoader cannot be changed.", _pluginLoader == null || value != _pluginLoader );
+            Throw.CheckState( "Once set, PluginLoader cannot be changed.", _pluginLoader == null || value != _pluginLoader );
             _pluginLoader = value;
         }
     }

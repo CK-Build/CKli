@@ -3,7 +3,8 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <InvariantGlobalization>true</InvariantGlobalization>
-
+    <LangVersion>13</LangVersion>
+    
     <OutputType>Exe</OutputType>
     <IsPackable>true</IsPackable>
     <DevelopmentDependency>true</DevelopmentDependency>

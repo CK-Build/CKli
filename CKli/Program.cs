@@ -10,6 +10,40 @@ using System.Linq;
 
 ConsoleApp.Version = CSemVer.InformationalVersion.ReadFromAssembly( System.Reflection.Assembly.GetExecutingAssembly() ).ToString();
 
+var arguments = new CommandLineArguments( args );
+
+if( arguments.EatFlag( "--launch-debugger" ) )
+{
+    if( !Debugger.IsAttached ) Debugger.Launch();
+}
+
+CKliRootEnv.Initialize();
+
+var explicitPath = arguments.EatSingleOption( "--path", "-p" );
+if( explicitPath != null )
+{
+    if( Directory.Exists( explicitPath ) )
+    {
+        Environment.CurrentDirectory = explicitPath;
+    }
+    else
+    {
+        Console.WriteLine( $"Invalid provided path. Directory '{explicitPath}' doesn't exist." );
+        Environment.ExitCode = -1;
+        return;
+    }
+}
+
+if( arguments.EatFlag( "--version" ) )
+{
+    var info = CSemVer.InformationalVersion.ReadFromAssembly( System.Reflection.Assembly.GetExecutingAssembly() );
+    Console.WriteLine( $"CKli - {info.Version} - {info.OriginalInformationalVersion}." );
+}
+
+World.PluginLoader = CKli.Loader.PluginLoadContext.Load;
+CKliRunEnv.Initialize( Environment.CurrentDirectory );
+
+
 var argsList = args.ToList();
 
 HandleLaunchDebugger( argsList );
@@ -46,7 +80,6 @@ if( hasHelp )
 
 CommandContext.LogFilter = HandleVerbosity( argsList );
 
-World.PluginLoader = CKli.Loader.PluginLoadContext.Load;
 
 var app = ConsoleApp.Create();
 await app.RunAsync( argsList.ToArray() );
@@ -67,7 +100,6 @@ static bool HandleHelp( List<string> args ) => args.Remove( "--help" ) | args.Re
 
 static LogFilter HandleVerbosity( List<string> args )
 {
-    // Waiting for CK-ActivityMonitor > v25.0.0.
     LogFilter log = new LogFilter( LogLevelFilter.Info, LogLevelFilter.Info );
     int idxV = args.IndexOf( "-v" );
     if( idxV < 0 ) idxV = args.IndexOf( "--verbosity" );

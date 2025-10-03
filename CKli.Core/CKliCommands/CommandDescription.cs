@@ -1,41 +1,70 @@
+using CK.Core;
+using System;
 using System.Collections.Immutable;
+using System.Text.RegularExpressions;
 
 namespace CKli.Core;
 
 /// <summary>
-/// Immutable CKli command description.
+/// Immutable command description.
 /// <para>
-/// The command model is rather simple. Arguments are required, options have an associated value
-/// and are optional and flags are booleans that defaults to false.
+/// This command model supports 3 kind of parameters that must appear in the following order on the command line:
+/// <list type="number">
+/// <item>
+///     <term>Arguments</term>
+///     <description>
+///         Required arguments that map to string method parameters. The exact number must appear first on the command line.
+///     </description>
+/// </item>
+/// <item>
+///     <term>Options</term>
+///     <description>
+///         Optional named value that map to optional string method parameters (parameter must have a null default)
+///         or an optional array of strings (parameter must have a null default).
+///         <para>
+///         When the method parameter is an array of strings, multiple occurences of the option names can appear on the command line.
+///         </para>
+///     </description>
+/// </item>
+/// <item>
+///     <term>Flags</term>
+///     <description>
+///         Optional names that map to optional boolean method parameters that should have a false default value.
+///         The value is true when the flag name appears.
+///         </description>
+///  </item>
+/// </list>
 /// </para>
 /// </summary>
-public sealed class CommandDescription
+public partial class CommandDescription
 {
     readonly IPluginTypeInfo? _typeInfo;
-    readonly string _fullCommandPath;
+    readonly string _commandPath;
     readonly string _description;
     readonly ImmutableArray<(string Name, string Description)> _arguments;
-    readonly ImmutableArray<(ImmutableArray<string> Names, string Description)> _options;
+    readonly ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> _options;
     readonly ImmutableArray<(ImmutableArray<string> Names, string Description)> _flags;
 
     /// <summary>
     /// Initializes a new command description.
     /// </summary>
     /// <param name="typeInfo">The type that handles the command.</param>
-    /// <param name="fullCommandPath">The full whitespace separated command path.</param>
+    /// <param name="commandPath">The whitespace separated command path.</param>
     /// <param name="description">The command description.</param>
     /// <param name="arguments">The required command arguments.</param>
     /// <param name="options">The options.</param>
     /// <param name="flags">The flags.</param>
     public CommandDescription( IPluginTypeInfo? typeInfo,
-                               string fullCommandPath,
+                               string commandPath,
                                string description,
                                ImmutableArray<(string Name, string Description)> arguments,
-                               ImmutableArray<(ImmutableArray<string> Names, string Description)> options,
+                               ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> options,
                                ImmutableArray<(ImmutableArray<string> Names, string Description)> flags )
     {
+        Throw.CheckArgument( ValidCommandPath().IsMatch( commandPath ) );
+        Throw.CheckNotNullArgument( description );
         _typeInfo = typeInfo;
-        _fullCommandPath = fullCommandPath;
+        _commandPath = commandPath;
         _description = description;
         _arguments = arguments;
         _options = options;
@@ -51,7 +80,7 @@ public sealed class CommandDescription
     /// <summary>
     /// Gets the full whitespace separated command path.
     /// </summary>
-    public string CommandPath => _fullCommandPath;
+    public string CommandPath => _commandPath;
 
     /// <summary>
     /// Gets the command description.
@@ -70,7 +99,7 @@ public sealed class CommandDescription
     /// Options are followed by a value.
     /// </para>
     /// </summary>
-    public ImmutableArray<(ImmutableArray<string> Names, string Description)> Options => _options;
+    public ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> Options => _options;
 
     /// <summary>
     /// Gets the flags name and description. The first name is the long form ("--extended"), the
@@ -81,4 +110,75 @@ public sealed class CommandDescription
     /// </para>
     /// </summary>
     public ImmutableArray<(ImmutableArray<string> Names, string Description)> Flags => _flags;
+
+    [GeneratedRegex( "^[a-z]+(?: [a-z]+)$" )]
+    private static partial Regex ValidCommandPath();
+}
+
+public abstract class CKliCommand : CommandDescription
+{
+    private protected CKliCommand( IPluginTypeInfo? typeInfo,
+                                   string commandPath,
+                                   string description,
+                                   ImmutableArray<(string Name, string Description)> arguments,
+                                   ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> options,
+                                   ImmutableArray<(ImmutableArray<string> Names, string Description)> flags )
+        : base( typeInfo, commandPath, description, arguments, options, flags )
+    {
+    }
+
+    internal abstract int HandleCommand( IActivityMonitor monitor,
+                                         ISecretsStore secretsStore,
+                                         NormalizedPath path,
+                                         string[] args );
+}
+
+/// <summary>
+/// Clone command.
+/// </summary>
+public sealed class CKliClone : CKliCommand
+{
+    internal CKliClone()
+        : base( null,
+                "clone",
+                "Clones a Stack and all its current World repositories in the current directory.",
+                [("stackUrl", "The url stack repository to clone from. The repository name must end with '-Stack'.")],
+                [],
+                [
+                    (["--private"],"Indicates a private repository. A Personal Access Token (or any other secret) is required."),
+                    (["--allow-duplicate"],"Allows a Stack that already exists locally to be cloned."),
+                ] ) 
+    {
+    }
+
+    internal override int HandleCommand( IActivityMonitor monitor, ISecretsStore secretsStore, NormalizedPath path, string[] args )
+    {
+        if( Uri.TryCreate( new string( s ), UriKind.Absolute, out var uri ) )
+    }
+
+    /// <summary>
+    /// Clones a Stack and all its current world repositories in the <paramref name="path"/>.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="secretsStore">The secrets store.</param>
+    /// <param name="path">The current path to consider.</param>
+    /// <param name="stackUrl">The url stack repository to clone from. The repository name must end with '-Stack'.</param>
+    /// <param name="private">Indicates a private repository. A Personal Access Token (or any other secret) is required.</param>
+    /// <param name="allowDuplicate">Allows a stack that already exists locally to be cloned.</param>
+    /// <returns>0 on success, negative on error.</returns>
+    public static int Clone( IActivityMonitor monitor,
+                             ISecretsStore secretsStore,
+                             NormalizedPath path,
+                             Uri stackUrl,
+                             bool @private = false,
+                             bool allowDuplicate = false )
+    {
+        using( var stack = StackRepository.Clone( monitor, secretsStore, stackUrl, !@private, path, allowDuplicate ) )
+        {
+            return stack != null
+                    ? 0
+                    : -1;
+        }
+    }
+
 }

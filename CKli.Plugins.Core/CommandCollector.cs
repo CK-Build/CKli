@@ -54,10 +54,12 @@ sealed partial class CommandCollector
             isAsync = true;
         }
         var arguments = ImmutableArray.CreateBuilder<(string Name, string Description)>();
-        var options = ImmutableArray.CreateBuilder<(ImmutableArray<string> Names, string Description)>();
+        var options = ImmutableArray.CreateBuilder<(ImmutableArray<string> Names, string Description, bool Multiple)>();
         var flags = ImmutableArray.CreateBuilder<(ImmutableArray<string> Names, string Description)>();
         int iP;
-        // Arguments: Eats strings until they become optional.
+        // Arguments: Eats strings until they become optional,
+        // or until an array of strings is found,
+        // or a boolean is found.
         for( iP = 1; iP < parameters.Length; iP++ )
         {
             var p = parameters[iP];
@@ -69,19 +71,28 @@ sealed partial class CommandCollector
                 }
                 arguments.Add( (p.Name!, GetDescription( p.GetCustomAttributesData() )) );
             }
+            else if( p.ParameterType == typeof( string[] ) )
+            {
+                break;
+            }
             else if( ExpectBooleanFlag( typeInfo, method, p ) )
             {
                 break;
             }
         }
-        // Options: Eats strings until the first boolean.
+        // Options: Eats strings and string arrays until the first boolean.
         for( iP = 1; iP < parameters.Length; iP++ )
         {
             var p = parameters[iP];
             if( p.ParameterType == typeof( string ) )
             {
                 var attr = p.GetCustomAttributesData();
-                options.Add( (GetOptionOrFlagNames( typeInfo, method, p, attr ), GetDescription( attr )) );
+                options.Add( (GetOptionOrFlagNames( typeInfo, method, p, attr ), GetDescription( attr ), Multiple: false) );
+            }
+            else if( p.ParameterType == typeof( string[] ) )
+            {
+                var attr = p.GetCustomAttributesData();
+                options.Add( (GetOptionOrFlagNames( typeInfo, method, p, attr ), GetDescription( attr ), Multiple: true) );
             }
             else if( ExpectBooleanFlag( typeInfo, method, p ) )
             {
