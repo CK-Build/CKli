@@ -14,11 +14,12 @@ public sealed class PluginTypeInfo : IPluginTypeInfo
     /// <param name="typeName">The type name.</param>
     /// <param name="isPrimary">Whether this is a primary or a support plugin.</param>
     /// <param name="status">The plugin status.</param>
-    public PluginTypeInfo( PluginInfo plugin, string typeName, bool isPrimary, int status )
+    public PluginTypeInfo( PluginInfo plugin, string typeName, bool isPrimary, int status, int activationIndex )
     {
         Plugin = plugin;
         TypeName = typeName;
         IsPrimary = isPrimary;
+        ActivationIndex = activationIndex;
         Status = (PluginStatus)status;
     }
 
@@ -33,6 +34,9 @@ public sealed class PluginTypeInfo : IPluginTypeInfo
 
     /// <inheritdoc />
     public PluginStatus Status { get; }
+
+    /// <inheritdoc />
+    public int ActivationIndex { get; }
 
     public override string ToString() => TypeName;
 }

@@ -1,6 +1,10 @@
 using CK.Core;
 using CKli.Core;
+using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace CKli;
@@ -37,6 +41,27 @@ public static class CKliCommands
     /// </summary>
     public static CommandNamespace Commands => _commands;
 
+    /// <summary>
+    /// Helper that calls <see cref="HandleCommandAsync(IActivityMonitor, CommandCommonContext, CommandLineArguments)"/>.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="context">The minimal context.</param>
+    /// <param name="cmdLine">The command line to handle.</param>
+    /// <returns>True on success, false on error.</returns>
+    public static ValueTask<bool> ExecAsync( IActivityMonitor monitor,
+                                             CommandCommonContext context,
+                                             params IEnumerable<object> cmdLine )
+    {
+        return HandleCommandAsync( monitor, context, new CommandLineArguments( cmdLine.Select( o => o.ToString() ).ToArray()! ) );
+    }
+
+    /// <summary>
+    /// Central command line handler.
+    /// </summary>
+    /// <param name="monitor">The monitor to use.</param>
+    /// <param name="context">The minimal context.</param>
+    /// <param name="cmdLine">The command line to handle.</param>
+    /// <returns>True on success, false on error.</returns>
     public static ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor,
                                                       CommandCommonContext context,
                                                       CommandLineArguments cmdLine )

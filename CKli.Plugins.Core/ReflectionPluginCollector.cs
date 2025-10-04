@@ -34,7 +34,7 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
         _commandCollector = new CommandCollector();
     }
 
-    public IPluginCollection BuildPluginCollection( ReadOnlySpan<Type> defaultPrimaryPlugins )
+    public IPluginFactory BuildPluginFactory( ReadOnlySpan<Type> defaultPrimaryPlugins )
     {
         foreach( var primaryPlugin in defaultPrimaryPlugins )
         {
@@ -139,7 +139,7 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
     }
 
 
-    IPluginCollection Build()
+    IPluginFactory Build()
     {
         List<PluginType> activationList = new List<PluginType>();
         Dictionary<Type,PluginType> plugins = new Dictionary<Type, PluginType>( _initialCollector.Count );
@@ -154,7 +154,11 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
                 }
             }
         }
-        return new Result( _pluginInfos.DrainToImmutable(), activationList, _context, _commandCollector.Commands );
+        return new Factory( _pluginInfos.DrainToImmutable(),
+                           activationList,
+                           _context,
+                           _commandCollector.BuildCommands(),
+                           _commandCollector.PluginCommands );
     }
 
     PluginType RegisterPluginType( Dictionary<Type, PluginType> plugins,
@@ -224,27 +228,33 @@ sealed partial class ReflectionPluginCollector : IPluginCollector
                                      reg.PrimaryPluginParameterIndex,
                                      status,
                                      activationIndex );
-        if( activationIndex >= 0 ) activationList.Add( result );
-        plugins[type] = result;
-
-        // Discover and collects commands.
-        var members = type.GetMethods();
-        foreach( var m in members )
+        // Adds to the activation list and collect commands.
+        // Disabled plugins don't expose their commands.
+        if( activationIndex >= 0 )
         {
-            string? path = null;
-            var attributes = m.GetCustomAttributesData();
-            foreach( var a in attributes )
+            activationList.Add( result );
+            // Discover and collects commands.
+            var members = type.GetMethods();
+            foreach( var m in members )
             {
-                if( a.AttributeType == typeof( CommandPathAttribute  ) )
+                string? path = null;
+                var attributes = m.GetCustomAttributesData();
+                foreach( var a in attributes )
                 {
-                    path = (string)a.ConstructorArguments[0].Value!;
+                    if( a.AttributeType == typeof( CommandPathAttribute ) )
+                    {
+                        path = (string)a.ConstructorArguments[0].Value!;
+                    }
+                }
+                if( path != null )
+                {
+                    _commandCollector.Add( result, m, path, attributes );
                 }
             }
-            if( path != null )
-            {
-                _commandCollector.Add( result, m, path, attributes );
-            }
         }
+
+        plugins[type] = result;
+
 
         return result;
     }

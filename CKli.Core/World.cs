@@ -19,7 +19,7 @@ public sealed partial class World
     /// </summary>
     public static readonly InformationalVersion CKliVersion = InformationalVersion.ReadFromAssembly( typeof( PluginMachinery ).Assembly );
 
-    static Func<IActivityMonitor, NormalizedPath, PluginCollectorContext, IPluginCollection?>? _pluginLoader;
+    static Func<IActivityMonitor, NormalizedPath, PluginCollectorContext, IPluginFactory?>? _pluginLoader;
 
     /// <summary>
     /// Gets or sets once the loader for plugins.
@@ -27,7 +27,7 @@ public sealed partial class World
     /// When not set, plugins are disabled. Once set, it cannot be changed.
     /// </para>
     /// </summary>
-    public static Func<IActivityMonitor, NormalizedPath, PluginCollectorContext, IPluginCollection?>? PluginLoader
+    public static Func<IActivityMonitor, NormalizedPath, PluginCollectorContext, IPluginFactory?>? PluginLoader
     {
         get => _pluginLoader;
         set
@@ -42,7 +42,7 @@ public sealed partial class World
     readonly WorldDefinitionFile _definitionFile;
     readonly WorldEvents _events;
     readonly PluginMachinery? _pluginMachinery;
-    IDisposable? _instantiatedPlugins;
+    IPluginCollection? _plugins;
 
     // The WorldDefinitionFile maintains its layout list.
     // AddRepository, RemoveRepository and XifLayout are the only ones that can
@@ -122,7 +122,7 @@ public sealed partial class World
         Throw.DebugAssert( _pluginMachinery != null );
         try
         {
-            _instantiatedPlugins = _pluginMachinery.WorldPlugins.Create( monitor, this );
+            _plugins = _pluginMachinery.PluginFactory.Create( monitor, this );
             return true;
         }
         catch( Exception ex )
@@ -137,10 +137,12 @@ public sealed partial class World
         _events.ReleaseEvents();
         if( _pluginMachinery != null )
         {
-            Throw.DebugAssert( _instantiatedPlugins != null );
-            _instantiatedPlugins.Dispose();
-            _instantiatedPlugins = null;
+            Throw.DebugAssert( _plugins != null );
+            _plugins.Commands.Clear();
+            _plugins.Dispose();
+            _plugins = null;
             _pluginMachinery.ReleasePlugins();
+            _pluginMachinery.ReleasePluginFactory();
         }
         var r = _firstRepo;
         while( r != null )

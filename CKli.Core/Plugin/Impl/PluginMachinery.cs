@@ -17,7 +17,7 @@ namespace CKli.Core;
 /// Supports the Plugin infrastructure, not intended to be used directly.
 /// <para>
 /// This class handles plugins discovery and compilation. It holds and control the lifetime of
-/// the reference to the initialized <see cref="IPluginCollection"/>.
+/// the reference to the initialized <see cref="IPluginFactory"/>.
 /// </para>
 /// </summary>
 public sealed partial class PluginMachinery
@@ -43,7 +43,7 @@ public sealed partial class PluginMachinery
     // World to exist at the same time in the process...
     // But this would bring more complexities for no real benefits: CKli is currently a World tool
     // not a server for multiple Worlds.
-    static WeakReference? _singleRunning;
+    static WeakReference? _singleFactory;
 
     // Caches whether "Directory.Packages.props" contains the <PackageVersion Include="CKli.Plugins.Core" Version="..." />
     // that is World.CKliVersion.Version. This check is done only once.
@@ -52,7 +52,7 @@ public sealed partial class PluginMachinery
     static Action<IActivityMonitor, XDocument>? _nuGetConfigFileHook;
 
     // Result, on success, is set by Create (on error, the failing Machinery is not exposed).
-    [AllowNull] IPluginCollection _worlPlugins;
+    [AllowNull] IPluginFactory _pluginFactory;
 
     /// <summary>
     /// Gets an identifier for the "<see cref="WorldName"/> Plugins" environment.
@@ -81,7 +81,7 @@ public sealed partial class PluginMachinery
 
     internal NormalizedPath CKliCompiledPluginsFile => _ckliCompiledPluginsFile.IsEmptyPath ? (_ckliCompiledPluginsFile = CKliPluginsFolder.AppendPart( "CKli.CompiledPlugins.cs" )) : _ckliCompiledPluginsFile;
 
-    internal IPluginCollection WorldPlugins => _worlPlugins;
+    internal IPluginFactory PluginFactory => _pluginFactory;
 
     PluginMachinery( LocalWorldName worldName, WorldDefinitionFile definitionFile )
     {
@@ -150,18 +150,21 @@ public sealed partial class PluginMachinery
             return null;
         }
         var pluginContext = new PluginCollectorContext( worldName, pluginsConfiguration );
-        var worldPlugins = World.PluginLoader( monitor, machinery.DllPath, pluginContext );
-        if( worldPlugins == null )
+        var pluginFactory = World.PluginLoader( monitor, machinery.DllPath, pluginContext );
+        if( pluginFactory == null )
         {
             return null;
         }
         // Memorizes the AssemblyLoadContext to be able to wait for its actual unload.
-        _singleRunning = new WeakReference( worldPlugins, trackResurrection: true );
-        if( worldPlugins.CompilationMode != definitionFile.CompilationMode )
+        _singleFactory = new WeakReference( pluginFactory, trackResurrection: true );
+        if( pluginFactory.CompilationMode != definitionFile.CompilationMode )
         {
             if( definitionFile.CompilationMode == PluginCompilationMode.None )
             {
-                monitor.Trace( "Deleting Compiled plugins file (CompilationMode = None)." );
+                monitor.Trace( """
+                    Deleting Compiled plugins file (CompilationMode = None).
+                    CKli.Plugins will be recompiled without compiled plugins. Only reflection will be used for subsequent loads.
+                    """ );
                 if( !FileHelper.DeleteFile( monitor, machinery.CKliCompiledPluginsFile ) )
                 {
                     return null;
@@ -169,15 +172,28 @@ public sealed partial class PluginMachinery
             }
             else
             {
-                monitor.Trace( $"Generating Compiled plugins file (CompilationMode = {definitionFile.CompilationMode})." );
-                File.WriteAllText( machinery.CKliCompiledPluginsFile, worldPlugins.GenerateCode() );
+                if( pluginFactory.CompilationMode == PluginCompilationMode.None )
+                {
+                    monitor.Trace( $"""
+                        Generating Compiled plugins file (CompilationMode = {definitionFile.CompilationMode}).
+                        CKli.Plugins will be recompiled with compiled plugins.
+                        """ );
+                    File.WriteAllText( machinery.CKliCompiledPluginsFile, pluginFactory.GenerateCode() );
+                }
+                else
+                {
+                    monitor.Trace( $"""
+                        CKli.Plugins is compiled in '{pluginFactory.CompilationMode}'.
+                        Recompiling it in '{definitionFile.CompilationMode}'.
+                        """ );
+                }
             }
-            worldPlugins.Dispose();
-            worldPlugins = null;
+            pluginFactory.Dispose();
+            pluginFactory = null;
             toRecompile = pluginContext;
         }
-        // The plugins are available. They will be instantiated right after a World instance will be available.
-        machinery._worlPlugins = worldPlugins;
+        // The factory is available (unless we must recompile).
+        machinery._pluginFactory = pluginFactory;
         return machinery;
     }
 
@@ -191,26 +207,26 @@ public sealed partial class PluginMachinery
         {
             return false;
         }
-        var worldPlugins = World.PluginLoader( monitor, DllPath, pluginContext );
-        if( worldPlugins == null )
+        var pluginFactory = World.PluginLoader( monitor, DllPath, pluginContext );
+        if( pluginFactory == null )
         {
             return false;
         }
-        _singleRunning = new WeakReference( worldPlugins, trackResurrection: true );
-        _worlPlugins = worldPlugins;
+        _singleFactory = new WeakReference( pluginFactory, trackResurrection: true );
+        _pluginFactory = pluginFactory;
         return true;
     }
 
     static bool RelaseCurrentSingleRunning( IActivityMonitor monitor )
     {
-        if( _singleRunning != null && _singleRunning.IsAlive )
+        if( _singleFactory != null && _singleFactory.IsAlive )
         {
-            for( int i = 0; _singleRunning.IsAlive && (i < 10); i++ )
+            for( int i = 0; _singleFactory.IsAlive && (i < 10); i++ )
             {
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
             }
-            if( _singleRunning.IsAlive )
+            if( _singleFactory.IsAlive )
             {
                 monitor.Error( $"""
                     Current plugins cannot be unloaded.
@@ -220,17 +236,17 @@ public sealed partial class PluginMachinery
                 return false;
             }
         }
-        _singleRunning = null;
+        _singleFactory = null;
         return true;
     }
 
-    internal void ReleasePlugins()
+    internal void ReleasePluginFactory()
     {
         // This is the CKli.Loader.PluginLoadContext.Dispose().
-        // It disposes its own IPluginCollection obtained from the CKli.Plugins dll and initiates
+        // It disposes its own IPluginFactory obtained from the CKli.Plugins dll and initiates
         // its own Unload.
-        _worlPlugins.Dispose();
-        _worlPlugins = null;
+        _pluginFactory.Dispose();
+        _pluginFactory = null;
     }
 
     bool CheckCKliPluginsCoreVersion( IActivityMonitor monitor, out bool mustRecompile )
@@ -336,6 +352,7 @@ public sealed partial class PluginMachinery
         var args = new StringBuilder( "build ", 256 );
         args.Append( CKliPluginsCSProj.LastPart );
         args.Append( " --tl:off" );
+        args.Append( " -c " ).Append( _definitionFile.CompilationMode == PluginCompilationMode.Debug ? "Debug" : "Release" );
         if( vNext )
         {
             args.Append( " /p:ArtifactsPivots=vNext" );
@@ -642,9 +659,9 @@ public sealed partial class PluginMachinery
 
                 public static class Plugins
                 {
-                    public static IPluginCollection Register( PluginCollectorContext ctx )
+                    public static IPluginFactory Register( PluginCollectorContext ctx )
                     {
-                        return PluginCollector.Create( ctx ).BuildPluginCollection( [
+                        return PluginCollector.Create( ctx ).BuildPluginFactory( [
                             // <AutoSection>
                             // </AutoSection>
                         ] );

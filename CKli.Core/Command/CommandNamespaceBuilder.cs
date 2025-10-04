@@ -21,6 +21,15 @@ public sealed class CommandNamespaceBuilder
     }
 
     /// <summary>
+    /// Initiaizes a new builder with an initial set of commands.
+    /// </summary>
+    /// <param name="commands">Existing commands.</param>
+    public CommandNamespaceBuilder( CommandNamespace commands )
+    {
+        _commands = new Dictionary<string, CommandDescription?>( commands.InternalCommands );
+    }
+
+    /// <summary>
     /// Creates a new immutable <see cref="CommandNamespace"/>.
     /// </summary>
     /// <returns>The commands.</returns>

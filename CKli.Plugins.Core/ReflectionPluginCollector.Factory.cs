@@ -1,43 +1,47 @@
 using CK.Core;
+using CKli.Plugins;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using static CK.Core.ActivityMonitor;
+using static Microsoft.IO.RecyclableMemoryStreamManager;
 
 namespace CKli.Core;
 
 sealed partial class ReflectionPluginCollector
 {
-    sealed class Result : IPluginCollection
+    sealed partial class Factory : IPluginFactory
     {
         readonly ImmutableArray<PluginInfo> _pluginInfos;
         readonly List<PluginType> _activationList;
         readonly PluginCollectorContext _context;
         readonly CommandNamespace _commands;
+        readonly List<PluginCommand> _pluginCommands;
 
-        public Result( ImmutableArray<PluginInfo> pluginInfos,
-                       List<PluginType> activationList,
-                       PluginCollectorContext context,
-                       CommandNamespace commands )
+        public Factory( ImmutableArray<PluginInfo> pluginInfos,
+                        List<PluginType> activationList,
+                        PluginCollectorContext context,
+                        CommandNamespace commands,
+                        List<PluginCommand> pluginCommands )
         {
             _pluginInfos = pluginInfos;
             _activationList = activationList;
             _context = context;
             _commands = commands;
+            _pluginCommands = pluginCommands;
         }
 
-        public IReadOnlyCollection<PluginInfo> Plugins => _pluginInfos;
-
-        public CommandNamespace Commands => _commands;
-
-        public IDisposable Create( IActivityMonitor monitor, World world )
+        public IPluginCollection Create( IActivityMonitor monitor, World world )
         {
             var instantiated = new object[_activationList.Count];
             for( int i = 0; i < _activationList.Count; ++i )
             {
                 instantiated[i] = _activationList[i].Instantiate( world, instantiated );
             }
-            return new ActivatedPlugins( instantiated );
+            return PluginCollection.CreateAndBindCommands( instantiated, _pluginInfos, _commands, _pluginCommands );
         }
 
         public PluginCompilationMode CompilationMode => PluginCompilationMode.None;
@@ -70,34 +74,37 @@ sealed partial class ReflectionPluginCollector
             b.Append( """
                 ];
 
-                public static IPluginCollection? Get( PluginCollectorContext ctx )
+                public static IPluginFactory? Get( PluginCollectorContext ctx )
                 {
                     if( !_configSignature.SequenceEqual( ctx.Signature ) ) return null;
 
             """ );
 
             GeneratePluginInfos( b );
-            GenerateCommands( b );
+            GeneratePluginCommandsArray( b );
 
             b.Append( """
-                    return new Generated( infos, commands );
+                    var commandBuilder = new CommandNamespaceBuilder( CKliCommands.Commands );
+                    foreach( var c in pluginCommands )
+                    {
+                        commandBuilder.Add( c );
+                    }
+                    return new Generated( infos, pluginCommands, commandBuilder.Build() );
                 }
             }
 
-            sealed class Generated : IPluginCollection
+            sealed class Generated : IPluginFactory
             {
                 readonly PluginInfo[] _plugins;
-                readonly CommandDescription[] _commands;
-
-                internal Generated( PluginInfo[] plugins, CommandDescription[] commands )
+                readonly PluginCommand[] _pluginCommands;
+                readonly CommandNamespace _commands;
+            
+                internal Generated( PluginInfo[] plugins, PluginCommand[] pluginCommands, CommandNamespace commands )
                 {
                     _plugins = plugins;
+                    _pluginCommands = pluginCommands;
                     _commands = commands;
                 }
-
-                public IReadOnlyCollection<PluginInfo> Plugins => _plugins;
-
-                public IReadOnlyCollection<CommandDescription> Commands => _commands;
                 
             #if DEBUG
                 public PluginCompilationMode CompilationMode => PluginCompilationMode.Debug;
@@ -105,9 +112,9 @@ sealed partial class ReflectionPluginCollector
                 public PluginCompilationMode CompilationMode => PluginCompilationMode.Release;
             #endif
 
-                public string GenerateCode() => throw new InvalidOperationException( "IsCompiledPlugins" );
+                public string GenerateCode() => throw new InvalidOperationException( "CompilationMode is not PluginCompilationMode.None" );
 
-                public IDisposable Create( IActivityMonitor monitor, World world )
+                public IPluginCollection Create( IActivityMonitor monitor, World world )
                 {
                     var configs = world.DefinitionFile.ReadPluginsConfiguration( monitor );
                     Throw.CheckState( "Plugins configurations have already been loaded.", configs != null );
@@ -147,13 +154,18 @@ sealed partial class ReflectionPluginCollector
                 b.Append( " );" ).AppendLine();
             }
             b.Append( """
-                    return new ActivatedPlugins( objects );
+                    return PluginCollection.CreateAndBindCommands( objects, _plugins, _commands, _pluginCommands );
                 }
 
                 public void Dispose() { }
             }
 
             """ );
+
+            foreach( var c in _pluginCommands )
+            {
+                GenerateCommand( b, c );
+            }
 
             return b.ToString();
         }
@@ -189,46 +201,86 @@ sealed partial class ReflectionPluginCollector
             }
         }
 
-        void GenerateCommands( StringBuilder b )
+        void GeneratePluginCommandsArray( StringBuilder b )
         {
             int offset = 8;
-            b.Append( ' ', offset ).Append( "var commands = new CommandDescription[]{" ).AppendLine();
+            b.Append( ' ', offset ).Append( "var pluginCommands = new PluginCommand[]{" ).AppendLine();
             offset += 4;
-            foreach( var c in _commands )
+            foreach( var c in _pluginCommands )
             {
                 var typeInfo = c.PluginTypeInfo;
-                Throw.DebugAssert( typeInfo != null );
                 int idxPlugin = _pluginInfos.IndexOf( typeInfo.Plugin );
                 Throw.DebugAssert( idxPlugin >= 0 );
                 int idxType = typeInfo.Plugin.PluginTypes.IndexOf( t => t == typeInfo );
 
-                b.Append( ' ', offset ).Append( $"new CommandDescription( infos[{idxPlugin}].PluginTypes[{idxType}]," ).AppendLine();
-                int paramOffset = offset + 24;
-                AppendSourceString( b.Append( ' ', paramOffset ), c.CommandPath ).Append( ',' ).AppendLine();
-                AppendSourceString( b.Append( ' ', paramOffset ), c.Description ).Append( ',' ).AppendLine();
-                // Arguments
-                b.Append( ' ', paramOffset ).Append( "arguments: [" ).AppendLine();
-                paramOffset += 4;
-                foreach( var a in c.Arguments )
-                {
-                    AppendSourceString( b.Append( ' ', paramOffset ).Append( '(' ), a.Name ).Append( ", " );
-                    AppendSourceString( b, a.Description ).Append( ")," ).AppendLine();
-                }
-                paramOffset -= 4;
-                b.Append( ' ', paramOffset ).Append( "]," ).AppendLine();
-                // Options
-                b.Append( ' ', paramOffset ).Append( "options: [" ).AppendLine();
-                DumpOptions( b, paramOffset + 4, c.Options );
-                b.Append( ' ', paramOffset ).Append( "]," ).AppendLine();
-                // Flags
-                b.Append( ' ', paramOffset ).Append( "flags: [" ).AppendLine();
-                DumpFlags( b, paramOffset + 4, c.Flags );
-                b.Append( ' ', paramOffset ).Append( "] )," ).AppendLine();
+                b.Append( ' ', offset ).Append( "new Cmd_" );
+                CommandDescription.WriteCommandPathAsIdentifier( b, c ).Append( $"( infos[{idxPlugin}].PluginTypes[{idxType}] )," ).AppendLine();
             }
             offset -= 4;
             b.Append( ' ', offset ).Append( "};" ).AppendLine();
+        }
 
-            void DumpOptions( StringBuilder b, int paramOffset, ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> options )
+        static void GenerateCommand( StringBuilder b, PluginCommand c )
+        {
+            b.Append( "sealed class Cmd_" );
+            CommandDescription.WriteCommandPathAsIdentifier( b, c ).Append( " : PluginCommand" ).AppendLine()
+                .Append( '{' ).AppendLine();
+            int offset = 4;
+            b.Append( ' ', offset ).Append( "internal Cmd_" );
+            CommandDescription.WriteCommandPathAsIdentifier( b, c ).Append( "( IPluginTypeInfo typeInfo )" ).AppendLine();
+            offset += 4;
+            b.Append( ' ', offset ).Append( ": base( typeInfo," ).AppendLine();
+            offset += 8;
+            AppendSourceString( b.Append( ' ', offset ), c.CommandPath ).Append( ',' ).AppendLine();
+            AppendSourceString( b.Append( ' ', offset ), c.Description ).Append( ',' ).AppendLine();
+
+            // Arguments
+            b.Append( ' ', offset ).Append( "arguments: [" ).AppendLine();
+            offset += 4;
+            foreach( var a in c.Arguments )
+            {
+                AppendSourceString( b.Append( ' ', offset ).Append( '(' ), a.Name ).Append( ", " );
+                AppendSourceString( b, a.Description ).Append( ")," ).AppendLine();
+            }
+            offset -= 4;
+            b.Append( ' ', offset ).Append( "]," ).AppendLine();
+            // Options
+            b.Append( ' ', offset ).Append( "options: [" ).AppendLine();
+            DumpOptions( b, offset + 4, c.Options );
+            b.Append( ' ', offset ).Append( "]," ).AppendLine();
+            // Flags
+            b.Append( ' ', offset ).Append( "flags: [" ).AppendLine();
+            DumpFlags( b, offset + 4, c.Flags );
+            b.Append( ' ', offset ).Append( "] ) {}" ).AppendLine();
+
+            offset = 4;
+            b.Append( ' ', offset ).Append( "protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor, CommandCommonContext context, CommandLineArguments cmdLine )" )
+                                   .AppendLine();
+            b.Append( ' ', offset ).Append( '{' ).AppendLine();
+
+            b.Append( ' ', offset ).Append( "return " );
+            switch( c.ReturnType )
+            {
+                case MethodAsyncReturn.None:
+                    b.Append( "ValueTask.FromResult( " );
+                    GenerateCall( b, offset + 35, c );
+                    b.Append( " );" );
+                    break;
+                case MethodAsyncReturn.ValueTask:
+                    GenerateCall( b, offset + 10, c );
+                    break;
+                default:
+                    Throw.DebugAssert( c.ReturnType == MethodAsyncReturn.Task );
+                    b.Append( "new ValueTask<bool>( " );
+                    GenerateCall( b, offset + 35, c );
+                    b.Append( " );" );
+                    break;
+            }
+            b.AppendLine().Append( ' ', offset ).Append( '}' ).AppendLine();
+
+            b.Append( '}' ).AppendLine();
+
+            static void DumpOptions( StringBuilder b, int paramOffset, ImmutableArray<(ImmutableArray<string> Names, string Description, bool Multiple)> options )
             {
                 foreach( var o in options )
                 {
@@ -242,7 +294,7 @@ sealed partial class ReflectionPluginCollector
                 }
             }
 
-            void DumpFlags( StringBuilder b, int paramOffset, ImmutableArray<(ImmutableArray<string> Names, string Description)> flags )
+            static void DumpFlags( StringBuilder b, int paramOffset, ImmutableArray<(ImmutableArray<string> Names, string Description)> flags )
             {
                 foreach( var f in flags )
                 {
@@ -254,6 +306,33 @@ sealed partial class ReflectionPluginCollector
                     b.Append( "], " );
                     AppendSourceString( b, f.Description ).Append( " )," ).AppendLine();
                 }
+            }
+
+            static void GenerateCall( StringBuilder b, int offset, PluginCommand c )
+            {
+                b.Append( "((" ).Append( c.PluginTypeInfo.TypeName ).Append( ")Instance)." ).Append( c.MethodName ).Append( '(' ).AppendLine();
+                bool atLeastOne = false;
+                for( int i = 0; i < c.Arguments.Length; i++ )
+                {
+                    if( atLeastOne ) b.Append( ',' ).AppendLine();
+                    atLeastOne = true;
+                    b.Append( ' ', offset ).Append( "cmdLine.EatArgument()" );
+                }
+                for( int i = 0; i < c.Options.Length; i++ )
+                {
+                    if( atLeastOne ) b.Append( ',' ).AppendLine();
+                    atLeastOne = true;
+                    b.Append( ' ', offset ).Append( "cmdLine.Eat" )
+                                           .Append( c.Options[i].Multiple ? "Multiple" : "Single" )
+                                           .Append( "Option( Options[" ).Append( i ).Append( "] )" );
+                }
+                for( int i = 0; i < c.Flags.Length; i++ )
+                {
+                    if( atLeastOne ) b.Append( ',' ).AppendLine();
+                    atLeastOne = true;
+                    b.Append( ' ', offset ).Append( "cmdLine.EatFlag( Flags[i].Names )" );
+                }
+                b.Append( " )" );
             }
 
         }

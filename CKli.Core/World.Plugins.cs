@@ -15,8 +15,8 @@ public sealed partial class World
     {
         get
         {
-            Throw.DebugAssert( _pluginMachinery != null );
-            return _pluginMachinery.WorldPlugins.Commands;
+            Throw.DebugAssert( _plugins != null );
+            return _plugins.Commands;
         }
     }
 

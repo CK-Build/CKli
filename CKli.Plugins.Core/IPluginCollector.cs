@@ -10,6 +10,6 @@ public interface IPluginCollector
     /// <summary>
     /// Registers plugins assemblies via their default primary plugins.
     /// </summary>
-    /// <returns>The plugin collection.</returns>
-    IPluginCollection BuildPluginCollection( ReadOnlySpan<Type> defaultPrimaryPlugins );
+    /// <returns>The plugin factory.</returns>
+    IPluginFactory BuildPluginFactory( ReadOnlySpan<Type> defaultPrimaryPlugins );
 }

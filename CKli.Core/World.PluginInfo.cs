@@ -48,13 +48,13 @@ public sealed partial class World
                     """;
             return true;
         }
-        if( _pluginMachinery == null )
+        if( _plugins == null )
         {
             text = $"No configured PluginLoader. Plugins are disabled.";
             return true;
         }
         var config = definitionFile.ReadPluginsConfiguration( monitor );
-        var loaded = _pluginMachinery.WorldPlugins.Plugins;
+        var loaded = _plugins.Plugins;
 
         Throw.DebugAssert( "Or we'll not be here.", config != null );
 

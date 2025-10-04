@@ -2,6 +2,7 @@ using CK.Core;
 using CSemVer;
 using NUnit.Framework;
 using Shouldly;
+using System.Threading.Tasks;
 using static CK.Testing.MonitorTestHelper;
 
 namespace CKli.Core.Tests;
@@ -10,22 +11,22 @@ namespace CKli.Core.Tests;
 public class PluginTests
 {
     [Test]
-    public void create_plugin_request_Info_and_remove_it()
+    public async Task create_plugin_request_Info_and_remove_it_Async()
     {
-        var localPath = ClonedPaths.EnsureCleanFolder();
-        var secretsStore = new DotNetUserSecretsStore();
+        var context = ClonedPaths.EnsureCleanFolder();
         var remotes = TestEnv.UseReadOnly( "One" );
 
         // ckli clone file:///.../One-Stack
-        CKliCommands.Clone( TestHelper.Monitor, secretsStore, localPath, remotes.StackUri ).ShouldBe( 0 );
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();
         // cd One
-        localPath = localPath.AppendPart( "One" );
+        context = context.With( "One" );
 
-        CKliCommands.PluginCreate( TestHelper.Monitor, secretsStore, localPath, "MyFirstOne" ).ShouldBe( 0 );
+        // ckli plugin create MyFirstOne
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "create", "MyFirstOne" )).ShouldBeTrue();
 
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
-            StackRepository.OpenWorldFromPath( TestHelper.Monitor, secretsStore, localPath, out var stack, out var world, skipPullStack: true )
+            StackRepository.OpenWorldFromPath( TestHelper.Monitor, context, out var stack, out var world, skipPullStack: true )
                            .ShouldBeTrue();
             try
             {
@@ -40,36 +41,36 @@ public class PluginTests
             }
         }
 
-        CKliCommands.PluginRemove( TestHelper.Monitor, secretsStore, localPath, "MyFirstOne" ).ShouldBe( 0 );
+        // ckli plugin remove MyFirstOne
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "remove", "MyFirstOne" )).ShouldBeTrue();
 
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
-            CKliCommands.PluginInfo( TestHelper.Monitor, secretsStore, localPath ).ShouldBe( 0 );
+            // ckli plugin
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin" )).ShouldBeTrue();
             logs.ShouldNotContain( "New 'MyFirstOne' in world 'One' plugin certainly requires some development." );
         }
-
-
     }
 
     [Test]
-    public void add_CommandSample_package()
+    public async Task add_CommandSample_package_Async()
     {
-        var localPath = ClonedPaths.EnsureCleanFolder();
-        var secretsStore = new DotNetUserSecretsStore();
+        var context = ClonedPaths.EnsureCleanFolder();
         var remotes = TestEnv.UseReadOnly( "One" );
 
         TestEnv.EnsurePluginPackage( "CKli.CommandSample.Plugin" );
 
         // ckli clone file:///.../One-Stack
-        CKliCommands.Clone( TestHelper.Monitor, secretsStore, localPath, remotes.StackUri ).ShouldBe( 0 );
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();
         // cd One
-        localPath = localPath.AppendPart( "One" );
+        context = context.With( "One" );
 
-        CKliCommands.PluginAdd( TestHelper.Monitor, secretsStore, localPath, "CommandSample", TestEnv.CKliPluginsCoreVersion ).ShouldBe( 0 );
+        // ckli plugin add CommandSample@version
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "add", $"CommandSample@{TestEnv.CKliPluginsCoreVersion}" )).ShouldBeTrue();
 
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
-            StackRepository.OpenWorldFromPath( TestHelper.Monitor, secretsStore, localPath, out var stack, out var world, skipPullStack: true )
+            StackRepository.OpenWorldFromPath( TestHelper.Monitor, context, out var stack, out var world, skipPullStack: true )
                            .ShouldBeTrue();
             try
             {
@@ -81,7 +82,8 @@ public class PluginTests
             }
         }
 
-        CKliCommands.PluginRemove( TestHelper.Monitor, secretsStore, localPath, "CommandSample" ).ShouldBe( 0 );
+        // ckli plugin remove CommandSample
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "plugin", "remove", "CommandSample" )).ShouldBeTrue();
 
     }
 

@@ -33,7 +33,7 @@ public static class CKliRootEnv
     /// <param name="instanceName">Used by tests (with "Test"). Can be used with other suffix if needed.</param>
     public static void Initialize( string? instanceName = null )
     {
-        Throw.CheckState( "Initialize can be called only once.", AppLocalDataPath.IsEmptyPath );
+        Throw.CheckState( "Initialize can be called only once.", _appLocalDataPath.IsEmptyPath );
         _appLocalDataPath = Path.Combine( Environment.GetFolderPath( Environment.SpecialFolder.LocalApplicationData ), instanceName != null ? "CKli" : $"CKli-{instanceName}" );
         // To handle logs, we firts must determine if we are in a Stack. If this is the case, then the Logs/ folder
         // will be .XXXXStack/Logs, else the log will be in _appLocalDataPath/Out-of-Stack-Logs/.
@@ -123,7 +123,7 @@ public static class CKliRootEnv
     /// <summary>
     /// Throws an <see cref="InvalidOperationException"/> if <see cref="Initialize(string?)"/> has not been called.
     /// </summary>
-    public static void CheckInitialized() => Throw.CheckState( "CKliRootEnv.Initialize() must have been called before.", !AppLocalDataPath.IsEmptyPath );
+    public static void CheckInitialized() => Throw.CheckState( "CKliRootEnv.Initialize() must have been called before.", !_appLocalDataPath.IsEmptyPath );
 
     /// <summary>
     /// Gets instance name ("CKli" or "CKli-Test" for instance).

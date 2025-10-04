@@ -24,4 +24,10 @@ public interface IPluginTypeInfo
     /// Gets the status flags.
     /// </summary>
     PluginStatus Status { get; }
+
+    /// <summary>
+    /// Gets the activation index.
+    /// Always -1 if the type is disabled.
+    /// </summary>
+    int ActivationIndex { get; }
 }

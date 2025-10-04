@@ -17,10 +17,10 @@ namespace CKli.Loader;
 /// plugins assemblies (and their possibly shared assemblies) are in the plugins context. 
 /// </para>
 /// </summary>
-public sealed class PluginLoadContext : AssemblyLoadContext, IPluginCollection
+public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
 {
     readonly string _runFolder;
-    IPluginCollection? _worldPlugins;
+    IPluginFactory? _pluginFactory;
     bool _disposed;
 
     PluginLoadContext( WorldName worldName, string runFolder )
@@ -32,15 +32,11 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginCollection
         _runFolder = runFolder;
     }
 
-    IReadOnlyCollection<PluginInfo> IPluginCollection.Plugins => _worldPlugins!.Plugins;
+    IPluginCollection IPluginFactory.Create( IActivityMonitor monitor, World world ) => _pluginFactory!.Create( monitor, world );
 
-    CommandNamespace IPluginCollection.Commands => _worldPlugins!.Commands;
+    PluginCompilationMode IPluginFactory.CompilationMode => _pluginFactory!.CompilationMode;
 
-    IDisposable IPluginCollection.Create( IActivityMonitor monitor, World world ) => _worldPlugins!.Create( monitor, world );
-
-    PluginCompilationMode IPluginCollection.CompilationMode => _worldPlugins!.CompilationMode;
-
-    string IPluginCollection.GenerateCode() => _worldPlugins!.GenerateCode();
+    string IPluginFactory.GenerateCode() => _pluginFactory!.GenerateCode();
 
     /// <summary>
     /// Loads the core "CKli.Plugins.dll" and all its plugins.
@@ -49,7 +45,7 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginCollection
     /// <param name="dllPath">The core "CKli.Plugins.dll" path.</param>
     /// <param name="context">The context (provides plugin configurations.)</param>
     /// <returns>The plugin collection on success, null on error.</returns>
-    static public IPluginCollection? Load( IActivityMonitor monitor, NormalizedPath dllPath, PluginCollectorContext context )
+    static public IPluginFactory? Load( IActivityMonitor monitor, NormalizedPath dllPath, PluginCollectorContext context )
     {
         if( !File.Exists( dllPath ) )
         {
@@ -79,8 +75,8 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginCollection
         if( !_disposed )
         {
             _disposed = true;
-            _worldPlugins?.Dispose();
-            _worldPlugins = null;
+            _pluginFactory?.Dispose();
+            _pluginFactory = null;
             Unload();
         }
     }
@@ -117,9 +113,9 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginCollection
             if( mC != null )
             {
                 var rC = mC.Invoke( null, getOrRegisterArguments );
-                if( rC is IPluginCollection pC )
+                if( rC is IPluginFactory pC )
                 {
-                    _worldPlugins = pC;
+                    _pluginFactory = pC;
                     return true;
 
                 }
@@ -147,18 +143,18 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginCollection
             return false;
         }
         var m = t.GetMethod( "Register", BindingFlags.Public | BindingFlags.Static, _getOrRegisterParameterTypes );
-        if( m == null || m.ReturnType != typeof( IPluginCollection ) )
+        if( m == null || m.ReturnType != typeof( IPluginFactory ) )
         {
-            monitor.Error( $"Unable to find method 'static IPluginCollection Register( PluginCollectorContext ) in type 'CKli.Plugins.Plugins' of '{dllPath}'." );
+            monitor.Error( $"Unable to find method 'static IPluginFactory Register( PluginCollectorContext ) in type 'CKli.Plugins.Plugins' of '{dllPath}'." );
             return false;
         }
         var r = m.Invoke( null, getOrRegisterArguments );
-        if( r is not IPluginCollection p )
+        if( r is not IPluginFactory p )
         {
             monitor.Error( $"Failed CKli.Plugins.Plugins.Register in '{dllPath}'." );
             return false;
         }
-        _worldPlugins = p;
+        _pluginFactory = p;
         return true;
     }
 }

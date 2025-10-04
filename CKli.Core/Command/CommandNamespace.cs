@@ -29,6 +29,11 @@ public sealed class CommandNamespace
     /// <returns>The command if it exists, null otherwise.</returns>
     public CommandDescription? Find( string commandPath ) => _commands.GetValueOrDefault( commandPath );
 
+
+    internal Dictionary<string, CommandDescription?> InternalCommands => _commands;
+
+    internal void Clear() => _commands.Clear();
+
     internal List<CommandDescription> GetForHelp( string? helpPath )
     {
         // No optimization here. This is the help.

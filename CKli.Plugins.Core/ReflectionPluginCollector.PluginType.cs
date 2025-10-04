@@ -44,7 +44,6 @@ sealed partial class ReflectionPluginCollector
             _status = status;
             _activationIndex = activationIndex;
             ((List<IPluginTypeInfo>)pluginInfo.PluginTypes).Add( this );
-            Throw.DebugAssert( IsDisabled == activationIndex < 0 );
             Throw.DebugAssert( "Config is never null when the plugin is enabled.", IsDisabled || _xmlConfig != null );
         }
 
@@ -56,10 +55,17 @@ sealed partial class ReflectionPluginCollector
 
         public bool IsPrimary => _primaryPluginParameterIndex >= 0;
 
-        [MemberNotNullWhen( false, nameof( _xmlConfig ) )]
-        public bool IsDisabled => _status.IsDisabled();
-
         public int ActivationIndex => _activationIndex;
+
+        [MemberNotNullWhen( false, nameof( _xmlConfig ) )]
+        public bool IsDisabled
+        {
+            get
+            {
+                Throw.DebugAssert( _status.IsDisabled() == (_activationIndex < 0) );
+                return _activationIndex < 0;
+            }
+        }
 
         public int[] Deps => _deps;
 

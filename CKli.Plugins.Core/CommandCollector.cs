@@ -12,30 +12,25 @@ namespace CKli.Core;
 
 sealed partial class CommandCollector
 {
-    readonly List<CommandDescription> _commands;
-    readonly Dictionary<string, CommandHandler> _handlers;
+    readonly List<PluginCommand> _pluginCommands;
+    readonly CommandNamespaceBuilder _commands;
 
-    public IReadOnlyList<CommandDescription> Commands => _commands;
+    public List<PluginCommand> PluginCommands => _pluginCommands;
+
+    public CommandNamespace BuildCommands() => _commands.Build();
 
     public CommandCollector()
     {
-        _commands = new List<CommandDescription>();
-        _handlers = new Dictionary<string, CommandHandler>();
+        _pluginCommands = new List<PluginCommand>();
+        _commands = new CommandNamespaceBuilder( CKliCommands.Commands );
     }
 
     public void Add( IPluginTypeInfo typeInfo, MethodInfo method, string commandPath, IList<CustomAttributeData> attributes )
     {
         commandPath = NormalizePath( commandPath );
-        if( CKliCommands.Commands.Find( commandPath ) != null )
+        if( !CommandDescription.IsValidCommandPath( commandPath ) )
         {
-            Throw.CKException( $"""Invalid [CommandPath( "{commandPath}" )] on '{typeInfo.TypeName}.{method.Name}' method. This path is an intrinsic CKli command.""" );
-        }
-        if( _handlers.TryGetValue( commandPath, out var exists ) )
-        {
-            Throw.CKException( $"""
-                Duplicate [CommandPath( "{commandPath}" )] on '{typeInfo.TypeName}.{method.Name}' method.
-                This path is already defined by '{exists}'.
-                """ );
+            Throw.CKException( $"Invalid command path '{commandPath}'." );
         }
         var description = GetDescription( attributes );
         var parameters = method.GetParameters();
@@ -43,15 +38,23 @@ sealed partial class CommandCollector
         {
             Throw.CKException( $"Invalid command method '{typeInfo.TypeName}.{method.Name}': the first parameter must be a 'IActivityMonitor'." );
         }
-        bool isAsync = false;
+
+        MethodAsyncReturn retType = MethodAsyncReturn.None;
         var returnedType = method.ReturnType;
         if( returnedType != typeof( bool ) )
         {
-            if( returnedType != typeof( ValueTask<bool> ) || returnedType != typeof( Task<bool> ) )
+            if( returnedType == typeof( ValueTask<bool> ) )
             {
-                Throw.CKException( $"Invalid command method '{typeInfo.TypeName}.{method.Name}': a command method must return a boolean (success)." );
+                retType = MethodAsyncReturn.ValueTask;
             }
-            isAsync = true;
+            else if( returnedType != typeof( Task<bool> ) )
+            {
+                retType = MethodAsyncReturn.Task;
+            }
+            else
+            {
+                Throw.CKException( $"Invalid command method '{typeInfo.TypeName}.{method.Name}': a command method must return a boolean, a ValueTask<bool> or a Task<bool>." );
+            }
         }
         var arguments = ImmutableArray.CreateBuilder<(string Name, string Description)>();
         var options = ImmutableArray.CreateBuilder<(ImmutableArray<string> Names, string Description, bool Multiple)>();
@@ -109,8 +112,23 @@ sealed partial class CommandCollector
                 flags.Add( (GetOptionOrFlagNames( typeInfo, method, p, attr ), GetDescription( attr )) );
             }
         }
-        _commands.Add( new CommandDescription( typeInfo, commandPath, description, arguments.DrainToImmutable(), options.DrainToImmutable(), flags.DrainToImmutable() ) );
-        _handlers.Add( commandPath, new CommandHandler( typeInfo, method, isAsync ) );
+        var cmd = new ReflectionPluginCommand( typeInfo,
+                                               commandPath,
+                                               description,
+                                               arguments.DrainToImmutable(),
+                                               options.DrainToImmutable(),
+                                               flags.DrainToImmutable(),
+                                               method,
+                                               parameters.Length,
+                                               retType );
+        if( !_commands.TryAdd( cmd, out var exists ) )
+        {
+            Throw.CKException( $"""
+                Duplicate [CommandPath( "{commandPath}" )] on '{cmd}' method.
+                This path is already defined by '{exists}'.
+                """ );
+        }
+        _pluginCommands.Add( cmd );
 
 
         static string GetDescription( IList<CustomAttributeData> attributes )
@@ -179,6 +197,6 @@ sealed partial class CommandCollector
         return commandPath;
     }
 
-    [GeneratedRegex( "\\s+" )]
+    [GeneratedRegex( "\\s+", RegexOptions.CultureInvariant )]
     private static partial Regex RegExPath();
 }

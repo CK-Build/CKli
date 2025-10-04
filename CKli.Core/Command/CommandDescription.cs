@@ -1,5 +1,6 @@
 using CK.Core;
 using System.Collections.Immutable;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -78,6 +79,11 @@ public abstract partial class CommandDescription
     public IPluginTypeInfo? PluginTypeInfo => _typeInfo;
 
     /// <summary>
+    /// Gets whether this command is disabled: its <see cref="PluginTypeInfo"/> is disabled.
+    /// </summary>
+    public bool IsDisabled => _typeInfo != null && _typeInfo.Status.IsDisabled();
+
+    /// <summary>
     /// Gets the full whitespace separated command path.
     /// </summary>
     public string CommandPath => _commandPath;
@@ -112,11 +118,11 @@ public abstract partial class CommandDescription
     public ImmutableArray<(ImmutableArray<string> Names, string Description)> Flags => _flags;
 
     /// <summary>
-    /// A valid command path is a single white separated list of lower case identifiers with optional leading '*' and/or trailing '*'.
+    /// Returns "[CKli] commad path".
+    /// This applies to intrinsic CKli commands and is overridden by command implemented by plugin.
     /// </summary>
-    /// <param name="commandPath">The command path.</param>
-    /// <returns>True if this is a valid command path.</returns>
-    public static bool IsValidCommandPath( string commandPath ) => ValidCommandPath().IsMatch( commandPath );
+    /// <returns>A readable string.</returns>
+    public override string ToString() => $"[CKli] {_commandPath}";
 
     /// <summary>
     /// Command handler implementation. <paramref name="cmdLine"/> is ready to be consumed (and must be
@@ -132,6 +138,34 @@ public abstract partial class CommandDescription
                                                                     CommandCommonContext context,
                                                                     CommandLineArguments cmdLine );
 
+
+    /// <summary>
+    /// A valid command path is a single white separated list of lower case identifiers with optional leading '*' and/or trailing '*'.
+    /// </summary>
+    /// <param name="commandPath">The command path.</param>
+    /// <returns>True if this is a valid command path.</returns>
+    public static bool IsValidCommandPath( string commandPath ) => ValidCommandPath().IsMatch( commandPath );
+
+    /// <summary>
+    /// Used by code generator. This is implemented here to maintain the correspondance between the <see cref="IsValidCommandPath(string)"/>
+    /// defition and this rewriting.
+    /// </summary>
+    /// <param name="b">The target string builder.</param>
+    /// <param name="command">The command for which the command path must be written as an identifier.</param>
+    /// <returns>The string builder.</returns>
+    public static StringBuilder WriteCommandPathAsIdentifier( StringBuilder b, CommandDescription command )
+    {
+        foreach( var c in command.CommandPath )
+        {
+            b.Append( c switch
+            {
+                ' ' => '_',
+                '*' => 'X',
+                _ => c
+            } );
+        }
+        return b;
+    }
 
     [GeneratedRegex( """^\*?[a-z]+\*?( \*?[a-z]+\*?)*$""", RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture )]
     private static partial Regex ValidCommandPath();

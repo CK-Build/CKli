@@ -2,6 +2,7 @@ using NUnit.Framework;
 using Shouldly;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 using static CK.Testing.MonitorTestHelper;
 
@@ -11,67 +12,64 @@ namespace CKli.Core.Tests;
 public class LayoutTests
 {
     [Test]
-    public void layout_fix()
+    public async Task layout_fix_Async()
     {
-        var localPath = ClonedPaths.EnsureCleanFolder();
-        var secretsStore = new DotNetUserSecretsStore();
+        var context = ClonedPaths.EnsureCleanFolder();
         var remotes = TestEnv.UseReadOnly( "CKt" );
 
         // ckli clone file:///.../CKt-Stack
-        CKliCommands.Clone( TestHelper.Monitor, secretsStore, localPath, remotes.StackUri ).ShouldBe( 0 );
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();
         // cd CKt
-        localPath = localPath.AppendPart( "CKt" );
+        context = context.With( "CKt" );
 
-        File.Exists( localPath.Combine( "CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeTrue( "CKt-Core is in the stack." );
-        File.Exists( localPath.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeFalse( "No yet." );
-
+        File.Exists( context.CurrentDirectory.Combine( "CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeTrue( "CKt-Core is in the stack." );
+        File.Exists( context.CurrentDirectory.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeFalse( "No yet." );
 
         // ckli repo add file:///.../CKt-ActivityMonitor
-        CKliCommands.RepositoryAdd( TestHelper.Monitor, secretsStore, localPath, remotes.GetUriFor( "CKt-ActivityMonitor" ) ).ShouldBe( 0 );
-        File.Exists( localPath.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Here it is." );
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "repo", "add", remotes.GetUriFor( "CKt-ActivityMonitor" ) )).ShouldBeTrue();
+        File.Exists( context.CurrentDirectory.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Here it is." );
 
         // Moves CKt-Core at the root and renamed to BadFolderRepository.
         // Deletes CKt-ActivityMonitor.
-        ClonedPaths.MoveFolder( localPath.Combine( "CK-Core-Projects/CKt-Core" ), localPath.Combine( "BadFolderRepository" ) );
-        ClonedPaths.DeleteClonedFolderOnly( localPath.Combine( "CKt-ActivityMonitor" ) ).ShouldBeTrue();
-        File.Exists( localPath.Combine( "CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeFalse( "Moved." );
-        File.Exists( localPath.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeFalse( "Deleted." );
+        ClonedPaths.MoveFolder( context.CurrentDirectory.Combine( "CK-Core-Projects/CKt-Core" ), context.CurrentDirectory.Combine( "BadFolderRepository" ) );
+        ClonedPaths.DeleteClonedFolderOnly( context.CurrentDirectory.Combine( "CKt-ActivityMonitor" ) ).ShouldBeTrue();
+        File.Exists( context.CurrentDirectory.Combine( "CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeFalse( "Moved." );
+        File.Exists( context.CurrentDirectory.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeFalse( "Deleted." );
 
         // ckli layout fix
-        CKliCommands.LayoutFix( TestHelper.Monitor, secretsStore, localPath ).ShouldBe( 0 );
-        File.Exists( localPath.Combine( "CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeTrue( "Back." );
-        File.Exists( localPath.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Back." );
-        Directory.Exists( localPath.Combine( "BadFolderRepository" ) ).ShouldBeFalse();
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "layout", "fix" )).ShouldBeTrue();
+        File.Exists( context.CurrentDirectory.Combine( "CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeTrue( "Back." );
+        File.Exists( context.CurrentDirectory.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Back." );
+        Directory.Exists( context.CurrentDirectory.Combine( "BadFolderRepository" ) ).ShouldBeFalse();
     }
 
     [Test]
-    public void layout_xif()
+    public async Task layout_xif_Async()
     {
-        var localPath = ClonedPaths.EnsureCleanFolder();
-        var secretsStore = new DotNetUserSecretsStore();
+        var context = ClonedPaths.EnsureCleanFolder();
         var remotes = TestEnv.UseReadOnly( "CKt" );
 
         // ckli clone file:///.../CKt-Stack
-        CKliCommands.Clone( TestHelper.Monitor, secretsStore, localPath, remotes.StackUri ).ShouldBe( 0 );
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "clone", remotes.StackUri )).ShouldBeTrue();
         // cd CKt
-        localPath = localPath.AppendPart( "CKt" );
+        context = context.With( "CKt" );
 
-        File.Exists( localPath.Combine( "CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeTrue( "CKt-Core is in the stack." );
-        File.Exists( localPath.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeFalse( "No yet." );
+        File.Exists( context.CurrentDirectory.Combine( "CK-Core-Projects/CKt-Core/CKt-Core.sln" ) ).ShouldBeTrue( "CKt-Core is in the stack." );
+        File.Exists( context.CurrentDirectory.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeFalse( "No yet." );
 
         // ckli repo add file:///.../CKt-ActivityMonitor
-        CKliCommands.RepositoryAdd( TestHelper.Monitor, secretsStore, localPath, remotes.GetUriFor( "CKt-ActivityMonitor" ) ).ShouldBe( 0 );
-        File.Exists( localPath.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Here it is." );
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "repo", "add", remotes.GetUriFor( "CKt-ActivityMonitor" ) )).ShouldBeTrue();
+        File.Exists( context.CurrentDirectory.Combine( "CKt-ActivityMonitor/CKt-ActivityMonitor.sln" ) ).ShouldBeTrue( "Here it is." );
 
         // Moves CKt-Core and CKt-ActivityMonitor to NewCore.
-        Directory.CreateDirectory( localPath.AppendPart( "NewCore" ) );
-        ClonedPaths.MoveFolder( localPath.Combine( "CK-Core-Projects/CKt-Core" ), localPath.Combine( "NewCore/CKt-Core" ) );
-        ClonedPaths.MoveFolder( localPath.Combine( "CKt-ActivityMonitor" ), localPath.Combine( "NewCore/CKt-ActivityMonitor" ) );
+        Directory.CreateDirectory( context.CurrentDirectory.AppendPart( "NewCore" ) );
+        ClonedPaths.MoveFolder( context.CurrentDirectory.Combine( "CK-Core-Projects/CKt-Core" ), context.CurrentDirectory.Combine( "NewCore/CKt-Core" ) );
+        ClonedPaths.MoveFolder( context.CurrentDirectory.Combine( "CKt-ActivityMonitor" ), context.CurrentDirectory.Combine( "NewCore/CKt-ActivityMonitor" ) );
 
         // ckli layout xif
-        CKliCommands.LayoutXif( TestHelper.Monitor, secretsStore, localPath ).ShouldBe( 0 );
+        (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "layout", "xif" )).ShouldBeTrue();
 
-        var xml = XElement.Load( localPath.Combine( ".PublicStack/CKt.xml" ) );
+        var xml = XElement.Load( context.CurrentStackPath.AppendPart( "CKt.xml" ) );
         var onlyOneFolder = xml.Elements( "Folder" ).ShouldHaveSingleItem();
         onlyOneFolder.Attribute( "Name" ).ShouldNotBeNull().Value.ShouldBe( "NewCore" );
         onlyOneFolder.Elements().Elements().ShouldAllBe( e => e.Name.LocalName == "Repository" );
