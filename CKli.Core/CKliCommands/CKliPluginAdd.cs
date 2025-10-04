@@ -25,7 +25,7 @@ sealed class CKliPluginAdd : CommandDescription
         string sPackage = cmdLine.EatArgument();
         if( !PackageInstance.TryParse( sPackage, out var package ) )
         {
-            monitor.Error( $"""Invalid <package> argument '{sPackage}'. It must like "name@version".""" );
+            monitor.Error( $"""Invalid <package> argument '{sPackage}'. It must be like "name@version".""" );
             return ValueTask.FromResult( false );
         }
         bool allowLTS = cmdLine.EatFlag( "--allow-lts" );

@@ -56,8 +56,9 @@ public sealed class PackageInstance
         int idxAt = s.IndexOf( '@' );
         if( idxAt <= 0 ) return false;
         var n = s.Slice( 0, idxAt );
-        var v = SVersion.TryParse( ref s );
-        if( !v.IsValid ) return false;
+        var head = s.Slice( idxAt + 1 );
+        var v = SVersion.TryParse( ref head );
+        if( !v.IsValid || !head.IsEmpty ) return false;
         result = new PackageInstance( v, new string( n ) );
         return true;
     }
