@@ -195,7 +195,9 @@ sealed partial class ReflectionPluginCollector
                     for( int j = 0; j < p.PluginTypes.Count; j++ )
                     {
                         IPluginTypeInfo? t = p.PluginTypes[j];
-                        b.Append( ' ', offset ).Append( $"""types[{j}] = new PluginTypeInfo( plugin, "{t.TypeName}", {(t.IsPrimary ? "true" : "false")}, {(int)t.Status} );""" ).AppendLine();
+                        b.Append( ' ', offset )
+                         .Append( $"""types[{j}] = new PluginTypeInfo( plugin, "{t.TypeName}", {(t.IsPrimary ? "true" : "false")}, {(int)t.Status}, {t.ActivationIndex} );""" )
+                         .AppendLine();
                     }
                 }
             }
