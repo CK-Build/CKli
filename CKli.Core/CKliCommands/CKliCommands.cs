@@ -1,5 +1,6 @@
 using CK.Core;
 using CKli.Core;
+using LibGit2Sharp;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -66,21 +67,44 @@ public static class CKliCommands
                                                       CommandCommonContext context,
                                                       CommandLineArguments cmdLine )
     {
+        // First, tries to locate a CKli intrinsic command and handles it independently when found:
+        // one cannot mix the 2 kind of commands: some CKli commands loads the current Stack and World if
+        // needed, we cannot pre-load the current World here.
+        var cmd = _commands.FindForExecution( monitor, cmdLine, out var helpPath );
+        if( cmd != null )
+        {
+            return cmd.HandleCommandAsync( monitor, context, cmdLine );
+        }
+        // Not a CKli command. Opens the current World and tries to find a plugin command.
         var (stack, world) = StackRepository.TryOpenWorldFromPath( monitor, context, out bool error, skipPullStack: true );
         if( error )
         {
             Throw.DebugAssert( stack == null && world == null );
             return ValueTask.FromResult( false );
         }
+        // No current World (not in a Stack directory): we can only display help on the CKli commands.
+        if( world == null )
+        {
+            HelpDisplay.Display( _commands.GetForHelp( helpPath ) );
+            return ValueTask.FromResult( false );
+        }
         try
         {
-            var commands = world == null || world.DefinitionFile.IsPluginsDisabled
-                            ? _commands
-                            : world.Commands;
-            var cmd = commands.FindForExecution( monitor, cmdLine, out var helpPath );
+            // We are in a World.
+            cmd = world.Commands.FindForExecution( monitor, cmdLine, out helpPath );
             if( cmd == null )
             {
-                HelpDisplay.Display( commands.GetForHelp( helpPath ) );
+                // No luck.
+                // Displays the help in the context of the World. The World's commands
+                // contain the CKli command: the help mixes the 2 kind of commands if needed.
+                HelpDisplay.Display( world.Commands.GetForHelp( helpPath ) );
+                return ValueTask.FromResult( false );
+            }
+            // We have a plugin command.
+            Throw.DebugAssert( "This cannot be a CKli command: we'd have located it initially.", cmd.PluginTypeInfo != null );
+            if( cmd.IsDisabled )
+            {
+                monitor.Error( $"Command '{cmd.CommandPath}' exists but its type '{cmd.PluginTypeInfo.TypeName}' is disabled in plugin '{cmd.PluginTypeInfo.Plugin.FullPluginName}'." );
                 return ValueTask.FromResult( false );
             }
             return cmd.HandleCommandAsync( monitor, context, cmdLine );

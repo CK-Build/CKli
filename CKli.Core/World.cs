@@ -141,7 +141,6 @@ public sealed partial class World
             _plugins.Commands.Clear();
             _plugins.Dispose();
             _plugins = null;
-            _pluginMachinery.ReleasePlugins();
             _pluginMachinery.ReleasePluginFactory();
         }
         var r = _firstRepo;
