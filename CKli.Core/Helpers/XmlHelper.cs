@@ -17,6 +17,8 @@ public static class XmlHelper
     public static void SaveWithoutXmlDeclaration( this XDocument doc, string path, SaveOptions saveOptions = SaveOptions.None )
     {
         XmlWriterSettings xws = new XmlWriterSettings { OmitXmlDeclaration = true };
+        if( (saveOptions & SaveOptions.DisableFormatting) == 0 ) xws.Indent = true;
+        if( (saveOptions & SaveOptions.OmitDuplicateNamespaces) != 0 ) xws.NamespaceHandling |= NamespaceHandling.OmitDuplicates;
         using( XmlWriter xw = XmlWriter.Create( path, xws ) )
             doc.Save( xw );
     }
