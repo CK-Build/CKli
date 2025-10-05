@@ -602,9 +602,11 @@ public sealed partial class PluginMachinery
 
     public static string DefaultSlnFile = """
                 <Solution>
-                  <Configurations>
-                    <Platform Name="Any CPU" />
-                  </Configurations>
+                  <Folder Name="/Solution Items/">
+                    <File Path="Directory.Build.props" />
+                    <File Path="Directory.Packages.props" />
+                    <File Path="nuget.config" />
+                  </Folder>
                   <Project Path="CKli.Plugins/CKli.Plugins.csproj" />
                 </Solution>
                 """;
