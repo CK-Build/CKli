@@ -141,6 +141,7 @@ public abstract partial class CommandDescription
 
     /// <summary>
     /// A valid command path is a single white separated list of lower case identifiers with optional leading '*' and/or trailing '*'.
+    /// Minus '-' can be in or end identifiers but cannot start them (kebab-case).
     /// </summary>
     /// <param name="commandPath">The command path.</param>
     /// <returns>True if this is a valid command path.</returns>
@@ -159,14 +160,15 @@ public abstract partial class CommandDescription
         {
             b.Append( c switch
             {
-                ' ' => '_',
-                '*' => 'X',
+                ' ' => '＿', // Fullwidth Low Line (U+FF3F)
+                '-' => '_',  // Underscore (U+005F)
+                '*' => 'ж',  // Cyrillic Small Letter Zhe (U+0436)
                 _ => c
             } );
         }
         return b;
     }
 
-    [GeneratedRegex( """^\*?[a-z]+\*?( \*?[a-z]+\*?)*$""", RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture )]
+    [GeneratedRegex( """^(?!-)\*?[a-z-]+\*?( (?!-)\*?[a-z-]+\*?)*$""", RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture )]
     private static partial Regex ValidCommandPath();
 }
