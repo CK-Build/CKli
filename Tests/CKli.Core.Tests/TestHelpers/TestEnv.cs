@@ -204,6 +204,9 @@ static partial class TestEnv
             clone.SaveWithoutXmlDeclaration( pathDirectoryPackages );
         }
 
+        // Clear any cached version of the new package.
+        NuGetHelper.ClearGlobalCache( TestHelper.Monitor, projectName, null );
+
         var v = version != null ? SVersion.Parse( version ) : _cKliPluginsCoreVersion;
 
         var path = _packagedPluginsPath.AppendPart( projectName );
