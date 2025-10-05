@@ -62,6 +62,7 @@ sealed partial class ReflectionPluginCollector
             using CKli.Core;
             using CK.Core;
             using System;
+            using System.Threading.Tasks;
             using System.Collections.Generic;
                     
             namespace CKli.Plugins;
@@ -253,7 +254,8 @@ sealed partial class ReflectionPluginCollector
             // Flags
             b.Append( ' ', offset ).Append( "flags: [" ).AppendLine();
             DumpFlags( b, offset + 4, c.Flags );
-            b.Append( ' ', offset ).Append( "] ) {}" ).AppendLine();
+            b.Append( ' ', offset ).Append( "]," ).AppendLine();
+            b.Append( " ", offset ).Append( '"' ).Append( c.MethodName ).Append( "\", MethodAsyncReturn." ).Append( c.ReturnType ).Append(" ) {}").AppendLine();
 
             offset = 4;
             b.Append( ' ', offset ).Append( "protected override ValueTask<bool> HandleCommandAsync( IActivityMonitor monitor, CommandCommonContext context, CommandLineArguments cmdLine )" )
@@ -292,7 +294,7 @@ sealed partial class ReflectionPluginCollector
                         AppendSourceString( b, n ).Append( ',' );
                     }
                     b.Append( "], " );
-                    AppendSourceString( b, o.Description ).Append( ", " ).Append( o.Multiple ).Append( " )," ).AppendLine();
+                    AppendSourceString( b, o.Description ).Append( ", " ).Append( o.Multiple ? "true" : "false" ).Append( " )," ).AppendLine();
                 }
             }
 
@@ -313,26 +315,23 @@ sealed partial class ReflectionPluginCollector
             static void GenerateCall( StringBuilder b, int offset, PluginCommand c )
             {
                 b.Append( "((" ).Append( c.PluginTypeInfo.TypeName ).Append( ")Instance)." ).Append( c.MethodName ).Append( '(' ).AppendLine();
-                bool atLeastOne = false;
+                b.Append( ' ', offset ).Append( "monitor" );
                 for( int i = 0; i < c.Arguments.Length; i++ )
                 {
-                    if( atLeastOne ) b.Append( ',' ).AppendLine();
-                    atLeastOne = true;
+                    b.Append( ',' ).AppendLine();
                     b.Append( ' ', offset ).Append( "cmdLine.EatArgument()" );
                 }
                 for( int i = 0; i < c.Options.Length; i++ )
                 {
-                    if( atLeastOne ) b.Append( ',' ).AppendLine();
-                    atLeastOne = true;
+                    b.Append( ',' ).AppendLine();
                     b.Append( ' ', offset ).Append( "cmdLine.Eat" )
                                            .Append( c.Options[i].Multiple ? "Multiple" : "Single" )
-                                           .Append( "Option( Options[" ).Append( i ).Append( "] )" );
+                                           .Append( "Option( Options[" ).Append( i ).Append( "].Names )" );
                 }
                 for( int i = 0; i < c.Flags.Length; i++ )
                 {
-                    if( atLeastOne ) b.Append( ',' ).AppendLine();
-                    atLeastOne = true;
-                    b.Append( ' ', offset ).Append( "cmdLine.EatFlag( Flags[i].Names )" );
+                    b.Append( ',' ).AppendLine();
+                    b.Append( ' ', offset ).Append( "cmdLine.EatFlag( Flags[" ).Append( i ).Append( "].Names )" );
                 }
                 b.Append( " )" );
             }
