@@ -70,16 +70,18 @@ public class PluginTests
 
         using( TestHelper.Monitor.CollectTexts( out var logs ) )
         {
-            StackRepository.OpenWorldFromPath( TestHelper.Monitor, context, out var stack, out var world, skipPullStack: true )
-                           .ShouldBeTrue();
-            try
-            {
-                logs.ShouldContain( "Pouf" );
-            }
-            finally
-            {
-                stack.Dispose();
-            }
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "echo", "hello n°1" )).ShouldBeTrue();
+            logs.ShouldContain( "echo: hello n°1" );
+
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "echo", "hello n°2", "--upper-case" )).ShouldBeTrue();
+            logs.ShouldContain( "echo: HELLO N°2" );
+
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "get-world-name" )).ShouldBeTrue();
+            logs.ShouldContain( "get-world-name: One" );
+
+            (await CKliCommands.ExecAsync( TestHelper.Monitor, context, "test", "get-world-name", "-l" )).ShouldBeTrue();
+            logs.ShouldContain( "get-world-name: one" );
+
         }
 
         // ckli plugin remove CommandSample
