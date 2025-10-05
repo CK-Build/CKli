@@ -112,7 +112,7 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
             var mC = t.GetMethod( "Get", BindingFlags.Public | BindingFlags.Static, _getOrRegisterParameterTypes );
             if( mC != null )
             {
-                var rC = mC.Invoke( null, getOrRegisterArguments );
+                var rC = mC.Invoke( null, BindingFlags.DoNotWrapExceptions, null, getOrRegisterArguments, System.Globalization.CultureInfo.InvariantCulture );
                 if( rC is IPluginFactory pC )
                 {
                     _pluginFactory = pC;
@@ -148,7 +148,7 @@ public sealed class PluginLoadContext : AssemblyLoadContext, IPluginFactory
             monitor.Error( $"Unable to find method 'static IPluginFactory Register( PluginCollectorContext ) in type 'CKli.Plugins.Plugins' of '{dllPath}'." );
             return false;
         }
-        var r = m.Invoke( null, getOrRegisterArguments );
+        var r = m.Invoke( null, BindingFlags.DoNotWrapExceptions, null, getOrRegisterArguments, System.Globalization.CultureInfo.InvariantCulture );
         if( r is not IPluginFactory p )
         {
             monitor.Error( $"Failed CKli.Plugins.Plugins.Register in '{dllPath}'." );
